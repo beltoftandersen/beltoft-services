@@ -24,11 +24,52 @@ final class Emails {
 	public static function register(): void {
 		add_filter( 'woocommerce_email_subject_new_renewal_order', array( __CLASS__, 'admin_subject' ), 20, 2 );
 		add_filter( 'woocommerce_email_heading_new_renewal_order', array( __CLASS__, 'admin_heading' ), 20, 2 );
-		add_filter( 'woocommerce_subscriptions_email_subject_customer_processing_renewal_order', array( __CLASS__, 'customer_subject' ), 20, 2 );
-		add_filter( 'woocommerce_subscriptions_email_subject_customer_completed_renewal_order', array( __CLASS__, 'customer_subject' ), 20, 2 );
-		add_filter( 'woocommerce_subscriptions_email_subject_new_renewal_order', array( __CLASS__, 'customer_subject' ), 20, 2 );
+		// The subject we build replaces the one WooCommerce Subscriptions got through woocommerce_email_subject_{id}, so it goes through that
+		// filter again: a language plugin that translates emails by id sees the text the customer will get.
+		foreach ( array( 'customer_processing_renewal_order', 'customer_completed_renewal_order' ) as $id ) {
+			add_filter(
+				'woocommerce_subscriptions_email_subject_' . $id,
+				static fn( $subject, $order = null ) => self::filtered( 'subject', $id, self::customer_subject( $subject, $order ), $order ),
+				20,
+				2
+			);
+		}
+		// The customer invoice email (to pay, or its paid variant) builds its subject through this hook.
+		add_filter(
+			'woocommerce_subscriptions_email_subject_new_renewal_order',
+			static fn( $subject, $order = null ) => self::filtered( 'subject', 'customer_renewal_invoice', self::customer_subject( $subject, $order ), $order ),
+			20,
+			2
+		);
 		// One heading filter for the customer's processing, completed and invoice emails.
 		add_filter( 'woocommerce_email_heading_customer_renewal_order', array( __CLASS__, 'customer_heading' ), 20, 2 );
+	}
+
+	/**
+	 * Passes a subject or heading of a usage invoice email through the filter every WooCommerce email has, woocommerce_email_subject_{id} or
+	 * woocommerce_email_heading_{id}, with the email object, when the order is a usage invoice (the text was changed by this class).
+	 *
+	 * @param string $kind  'subject' or 'heading'.
+	 * @param string $id    Email id.
+	 * @param mixed  $text  Text.
+	 * @param mixed  $order Order.
+	 * @return mixed
+	 */
+	private static function filtered( string $kind, string $id, $text, $order ) {
+		if ( ! self::is_usage( $order ) || ! function_exists( 'WC' ) || ! WC()->mailer() ) {
+			return $text;
+		}
+
+		$email = null;
+
+		foreach ( WC()->mailer()->get_emails() as $candidate ) {
+			if ( $candidate->id === $id ) {
+				$email = $candidate;
+				break;
+			}
+		}
+
+		return apply_filters( 'woocommerce_email_' . $kind . '_' . $id, $text, $order, $email ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce email hook.
 	}
 
 	/**
@@ -129,11 +170,14 @@ final class Emails {
 			return $heading;
 		}
 
+		// Which email this is, for its own filter: the invoice to pay, or the receipt of a processing or completed order.
+		$id = $order->needs_payment() ? 'customer_renewal_invoice' : ( $order->has_status( 'completed' ) ? 'customer_completed_renewal_order' : 'customer_processing_renewal_order' );
+
 		if ( $order->needs_payment() ) {
-			return __( 'Usage invoice needs payment', 'beltoft-services' );
+			return self::filtered( 'heading', $id, __( 'Usage invoice needs payment', 'beltoft-services' ), $order );
 		}
 
 		/* translators: 1: "Usage invoice" or "Usage invoice (early)", 2: month and year. */
-		return sprintf( __( '%1$s for %2$s', 'beltoft-services' ), self::name( $order ), self::month( $order ) );
+		return self::filtered( 'heading', $id, sprintf( __( '%1$s for %2$s', 'beltoft-services' ), self::name( $order ), self::month( $order ) ), $order );
 	}
 }

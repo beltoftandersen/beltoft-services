@@ -8,6 +8,7 @@
 namespace BeltoftServices;
 
 use BeltoftLicenses\Events;
+use BeltoftLicenses\Install;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Driver;
 
@@ -295,6 +296,29 @@ final class Resource {
 	 */
 	public static function any_meta_set( string $key ): bool {
 		return array() !== Licenses::resource_ids_having_meta( $key );
+	}
+
+	/**
+	 * Ids of the resources of any kind but site, live or closed, whose meta holds a value under a key (a cleared null does not count).
+	 * Unlike find_by_meta() this includes closed resources: what a closed resource is still owed is found through it.
+	 *
+	 * @param string $key Meta key.
+	 * @return int[]
+	 */
+	public static function ids_with_meta_value( string $key ): array {
+		global $wpdb;
+
+		$prefix = wp_json_encode( $key ) . ':';
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- the licenses table, always fresh.
+		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT id, meta FROM %i WHERE kind <> 'site' AND meta LIKE %s AND meta NOT LIKE %s", Install::tables()['activations'], '%' . $wpdb->esc_like( $prefix ) . '%', '%' . $wpdb->esc_like( $prefix . 'null' ) . '%' ), ARRAY_A );
+		$ids  = array();
+
+		foreach ( (array) $rows as $row ) {
+			$ids[] = (int) $row['id'];
+		}
+
+		return $ids;
 	}
 
 	/**

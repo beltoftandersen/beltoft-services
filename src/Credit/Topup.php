@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Credit;
 
+use BeltoftServices\Alerts;
 use BeltoftServices\Currency;
 
 defined( 'ABSPATH' ) || exit;
@@ -39,6 +40,9 @@ final class Topup {
 	public const CURRENCY_KEY  = 'beltoft_services_price_currency';
 	public const META_CURRENCY = '_beltoft_services_credit_currency';
 
+	/** Order meta: a paid top-up that could not be credited in its currency was put on hold (once). */
+	public const META_BLOCKED = '_beltoft_services_credit_blocked';
+
 	/** @var bool One notice per request when a line is removed for its currency. */
 	private static bool $noticed = false;
 
@@ -68,6 +72,8 @@ final class Topup {
 		add_action( 'template_redirect', array( __CLASS__, 'no_product_page' ), 1 );
 		add_filter( 'woocommerce_add_to_cart_validation', array( __CLASS__, 'validate_add' ), 10, 2 );
 		add_action( 'woocommerce_before_calculate_totals', array( __CLASS__, 'price_lines' ), 5 );
+		// Also when the cart is read (the Store API shows it before it is recalculated): a line in another currency is gone then too.
+		add_action( 'woocommerce_cart_loaded_from_session', array( __CLASS__, 'price_lines' ), 5 );
 		add_filter( 'woocommerce_cart_item_name', array( __CLASS__, 'cart_name' ), 20, 2 );
 		add_filter( 'woocommerce_get_item_data', array( __CLASS__, 'cart_note' ), 10, 2 );
 		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'order_line' ), 10, 3 );
@@ -293,9 +299,7 @@ final class Topup {
 		}
 
 		// Credit is in one currency: a customer whose credit is in another one cannot top up in this one.
-		$own = Balance::currency( get_current_user_id() );
-
-		if ( '' !== $own && Currency::current() !== $own ) {
+		if ( ! Balance::allows( get_current_user_id(), Currency::current() ) ) {
 			return false;
 		}
 
@@ -438,11 +442,11 @@ final class Topup {
 			}
 
 			$cents = (int) ( $item[ self::CART_KEY ] ?? 0 );
-			$tag   = (string) ( $item[ self::CURRENCY_KEY ] ?? '' );
-			$own   = Balance::currency( get_current_user_id() );
+			// A line with no currency (made before lines carried one) was validated in the shop's currency.
+			$tag   = '' !== (string) ( $item[ self::CURRENCY_KEY ] ?? '' ) ? (string) $item[ self::CURRENCY_KEY ] : Currency::base();
 
-			// The cents were validated in the currency on the line (and the customer's credit is in one currency): in another one the line goes, with one notice.
-			if ( ( '' !== $tag && Currency::current() !== $tag ) || ( '' !== $own && Currency::current() !== $own ) ) {
+			// The cents were validated in the currency on the line (and the customer's credit is in one currency, or the one fixed for them): in another one the line goes, with one notice.
+			if ( Currency::current() !== $tag || ! Balance::allows( get_current_user_id(), Currency::current() ) ) {
 				$cart->remove_cart_item( $key );
 
 				if ( ! self::$noticed && function_exists( 'wc_add_notice' ) ) {
@@ -612,8 +616,8 @@ final class Topup {
 			} elseif ( $cents > 0 && ! Balance::exists( Balance::TOPUP, 'order_item', $ref ) ) {
 				$own = Balance::currency( $user_id );
 
-				if ( '' !== $own && $own !== (string) $order->get_currency() ) {
-					$order->add_order_note( sprintf( /* translators: %s: currency code. */ __( 'Account credit not added: the customer\'s credit is in %s, not in the currency of this order. The admin was told.', 'beltoft-services' ), $own ) );
+				if ( ! Balance::allows( $user_id, (string) $order->get_currency() ) ) {
+					self::block( $order, $user_id, Balance::account_currency( $user_id ) );
 				} else {
 					$order->add_order_note( __( 'Account credit could not be added now (balance busy). It is added when the order status is saved again.', 'beltoft-services' ) );
 				}
@@ -621,6 +625,35 @@ final class Topup {
 
 			self::reinstate( $user_id, $order, $ref );
 		}
+	}
+
+	/**
+	 * A paid top-up that cannot be credited because the customer's credit is in another currency: once per order, a note, the order on hold
+	 * so the admin refunds or resolves it, and one alert. Saving the status again does none of it twice.
+	 *
+	 * @param \WC_Order $order    Order.
+	 * @param int       $user_id  Customer.
+	 * @param string    $currency The customer's credit currency.
+	 */
+	private static function block( \WC_Order $order, int $user_id, string $currency ): void {
+		if ( '' !== (string) $order->get_meta( self::META_BLOCKED ) ) {
+			return;
+		}
+
+		$order->update_meta_data( self::META_BLOCKED, 'yes' );
+		$order->save();
+
+		$note = sprintf( /* translators: %s: currency code. */ __( 'Account credit not added: the customer\'s credit is in %s, not in the currency of this order. The order is on hold: refund it or resolve it by hand.', 'beltoft-services' ), $currency );
+
+		Alerts::notify(
+			/* translators: %s: order number */
+			sprintf( __( 'Top-up #%s could not be credited', 'beltoft-services' ), $order->get_order_number() ),
+			array( sprintf( 'Top-up order %1$s of customer %2$d is in %3$s but their credit is in %4$s. Nothing was credited and the order was put on hold.', $order->get_order_number(), $user_id, $order->get_currency(), $currency ) ),
+			null,
+			'beltoft_services_credit_blocked_' . $order->get_id()
+		);
+
+		$order->update_status( 'on-hold', $note );
 	}
 
 	/**

@@ -154,6 +154,22 @@ final class TaxNote {
 	}
 
 	/**
+	 * What one usage invoice line of an amount excluding tax comes to including tax at the standard class, the way WooCommerce taxes a
+	 * line: the tax of the line is rounded on its own, or, with woocommerce_tax_round_at_subtotal, not rounded (the caller rounds the total).
+	 *
+	 * @param float $excl Amount of one invoice line, excluding tax.
+	 */
+	public static function line_incl( float $excl ): float {
+		$taxes = \WC_Tax::calc_tax( $excl, \WC_Tax::get_rates( '' ), false );
+
+		if ( 'yes' === get_option( 'woocommerce_tax_round_at_subtotal' ) ) {
+			return $excl + array_sum( $taxes );
+		}
+
+		return round( $excl + array_sum( array_map( 'wc_round_tax_total', $taxes ) ), 2 );
+	}
+
+	/**
 	 * Whether a catalogue figure of this product is shown including tax: the display in force is including and the amount belongs to a
 	 * product. Without a product the amount is shown as given (excluding tax) and the sentence around it says so.
 	 *

@@ -58,6 +58,33 @@ final class LineNames {
 	}
 
 	/**
+	 * A billing period or a backup frequency, as the attribute value of a product names it ("monthly", "daily"), in the language of the
+	 * page: the plugin's own strings for the usual ones, the value itself for any other. The value is lower case.
+	 *
+	 * @param string $low Value in lower case.
+	 */
+	public static function period_word( string $low ): string {
+		switch ( $low ) {
+			case 'monthly':
+				return __( 'monthly', 'beltoft-services' );
+			case 'yearly':
+				return __( 'yearly', 'beltoft-services' );
+			case 'annually':
+				return __( 'annually', 'beltoft-services' );
+			case 'quarterly':
+				return __( 'quarterly', 'beltoft-services' );
+			case 'weekly':
+				return __( 'weekly', 'beltoft-services' );
+			case 'daily':
+				return __( 'daily', 'beltoft-services' );
+			case 'hourly':
+				return __( 'hourly', 'beltoft-services' );
+			default:
+				return $low;
+		}
+	}
+
+	/**
 	 * The note under a pay-as-you-go line.
 	 *
 	 * @param string $context 'order' or 'cart'.
@@ -154,9 +181,9 @@ final class LineNames {
 					continue;
 				}
 				/* translators: %s: backup frequency, such as "daily". */
-				$extras[] = sprintf( __( '%s backups', 'beltoft-services' ), $low );
+				$extras[] = sprintf( __( '%s backups', 'beltoft-services' ), self::period_word( $low ) );
 			} elseif ( 'billing' === $slug ) {
-				$extras[] = self::is_usage( $product ) ? __( 'pay as you go', 'beltoft-services' ) : sprintf( /* translators: %s: billing period, such as "monthly". */ __( 'billed %s', 'beltoft-services' ), $low );
+				$extras[] = self::is_usage( $product ) ? __( 'pay as you go', 'beltoft-services' ) : sprintf( /* translators: %s: billing period, such as "monthly". */ __( 'billed %s', 'beltoft-services' ), self::period_word( $low ) );
 			} elseif ( 'extra-storage' === $slug ) {
 				if ( in_array( $low, array( 'none', 'no' ), true ) ) {
 					continue;

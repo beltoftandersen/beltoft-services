@@ -2,14 +2,14 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Beltoft Services for WooCommerce 0.7.1\n"
+"Project-Id-Version: Beltoft Services for WooCommerce 0.7.2\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/beltoft-services\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-11T07:03:32+00:00\n"
+"POT-Creation-Date: 2026-11-11T08:15:30+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-services\n"
@@ -169,8 +169,8 @@ msgstr ""
 
 #: src/Account/Billing.php:324
 #: src/Account/ServerPicker.php:893
-#: src/LineNames.php:343
-#: src/LineNames.php:394
+#: src/LineNames.php:370
+#: src/LineNames.php:421
 #: src/Usage/BillingField.php:191
 #: src/Usage/Cart.php:61
 #: templates/account/overview/next-payment.php:19
@@ -315,7 +315,7 @@ msgstr ""
 #. translators: %s: plan name such as Standard
 #: src/Account/DbPicker.php:367
 #: src/Account/ServerPicker.php:560
-#: src/Usage/Breakdown.php:221
+#: src/Usage/Breakdown.php:222
 #: templates/account/mail.php:56
 #: templates/account/vm.php:132
 #: templates/account/vm.php:162
@@ -901,7 +901,7 @@ msgid "Getting ready"
 msgstr ""
 
 #: src/Account/Panel.php:117
-#: src/Resource.php:224
+#: src/Resource.php:225
 #: templates/account/app.php:21
 #: templates/account/db.php:15
 #: templates/account/mail.php:20
@@ -910,7 +910,7 @@ msgstr ""
 
 #: src/Account/Panel.php:118
 #: src/Account/Panel.php:150
-#: src/Resource.php:225
+#: src/Resource.php:226
 #: templates/account/db.php:17
 #: templates/account/domain-page.php:66
 #: templates/account/mail.php:22
@@ -920,7 +920,7 @@ msgstr ""
 
 #: src/Account/Panel.php:119
 #: src/Account/Panel.php:153
-#: src/Resource.php:227
+#: src/Resource.php:228
 #: templates/account/mail.php:24
 msgid "Removed"
 msgstr ""
@@ -937,7 +937,7 @@ msgid "Active"
 msgstr ""
 
 #: src/Account/Panel.php:141
-#: src/Resource.php:223
+#: src/Resource.php:224
 #: src/Ssl/Panels.php:117
 #: templates/account/db.php:16
 #: templates/account/mail.php:21
@@ -1091,7 +1091,7 @@ msgstr ""
 #. translators: %s: price
 #: src/Account/ServerPicker.php:497
 #: src/Account/ServerPicker.php:782
-#: src/Usage/Rates.php:234
+#: src/Usage/Rates.php:243
 #: templates/account/vm.php:490
 #: templates/account/vm.php:647
 #, php-format
@@ -1104,20 +1104,11 @@ msgstr ""
 #. translators: %s: price
 #: src/Account/ServerPicker.php:497
 #: src/Account/ServerPicker.php:782
-#: src/Usage/Rates.php:230
+#: src/Usage/Rates.php:239
 #: templates/account/vm.php:490
 #: templates/account/vm.php:647
 #, php-format
 msgid "%s including VAT"
-msgstr ""
-
-#. translators: %s: price such as €4.00
-#. translators: %s: price
-#: src/Account/ServerPicker.php:497
-#: templates/account/vm.php:490
-#: templates/account/vm.php:647
-#, php-format
-msgid "%s"
 msgstr ""
 
 #. translators: 1: price such as €4.00, 2: period such as month
@@ -2224,14 +2215,14 @@ msgstr ""
 
 #: src/Apps/AppLicence.php:283
 #: src/Billing/TaxNote.php:77
-#: src/Billing/TaxNote.php:244
+#: src/Billing/TaxNote.php:260
 #: src/Proxmox/Disk/DiskField.php:180
 msgid "excl. VAT"
 msgstr ""
 
 #: src/Apps/AppLicence.php:283
 #: src/Billing/TaxNote.php:77
-#: src/Billing/TaxNote.php:241
+#: src/Billing/TaxNote.php:257
 #: src/Proxmox/Disk/DiskField.php:180
 msgid "incl. VAT"
 msgstr ""
@@ -2545,43 +2536,43 @@ msgid "The app login has already been shown or is no longer available."
 msgstr ""
 
 #. translators: %s: operating systems such as Ubuntu 24.04
-#: src/Apps/Apps.php:137
+#: src/Apps/Apps.php:170
 #, php-format
 msgid "Runs on %s"
 msgstr ""
 
 #. translators: 1: app name, 2: operating systems such as Ubuntu 24.04
-#: src/Apps/Apps.php:150
+#: src/Apps/Apps.php:183
 #, php-format
 msgid "%1$s runs on %2$s, so no app is selected now."
 msgstr ""
 
 #. translators: %s: operating systems such as Ubuntu 24.04 or AlmaLinux 9
-#: src/Apps/Apps.php:162
+#: src/Apps/Apps.php:195
 #, php-format
 msgid "This app needs %1$s and cannot be installed here with the chosen system. Choose %1$s, or no app."
 msgstr ""
 
 #. translators: 1: operating systems separated by commas, 2: the last one
-#: src/Apps/Apps.php:189
+#: src/Apps/Apps.php:222
 #, php-format
 msgid "%1$s or %2$s"
 msgstr ""
 
 #. translators: 1: app name, 2: plan name such as Performance
-#: src/Apps/Apps.php:270
+#: src/Apps/Apps.php:303
 #, php-format
 msgid "%1$s needs the %2$s plan or larger. Choose a larger plan or no app."
 msgstr ""
 
 #. translators: 1: app name, 2: CPU cores, 3: memory in GB, 4: disk in GB
-#: src/Apps/Apps.php:273
+#: src/Apps/Apps.php:306
 #, php-format
 msgid "%1$s needs at least %2$d CPU cores, %3$s GB of memory and %4$d GB of disk. Choose a larger plan or no app."
 msgstr ""
 
 #. translators: 1: version label, 2: end of support month and year
-#: src/Apps/Apps.php:287
+#: src/Apps/Apps.php:320
 #, php-format
 msgid "%1$s (supported until %2$s)"
 msgstr ""
@@ -2708,6 +2699,62 @@ msgstr ""
 #: src/Apps/AppTab.php:312
 #: templates/account/app.php:303
 msgid "You can remove it in DNS records."
+msgstr ""
+
+#: src/Apps/AppTexts.php:28
+msgid "Coolify, a self-hosted platform for deploying your own apps."
+msgstr ""
+
+#: src/Apps/AppTexts.php:29
+msgid "Open http://your-server-address:8000 and sign in with the root email and password shown once. The login is also stored on the server in /root/.beltoft-app/credentials.json. The first sign-in is not encrypted. Add a domain with HTTPS for the dashboard in its settings, then use that address. Docker-published ports can be internet-reachable even when ufw is on; review exposed ports before deploying apps. Coolify updates are manual."
+msgstr ""
+
+#: src/Apps/AppTexts.php:30
+msgid "Docker Engine and Compose, ready to use over SSH."
+msgstr ""
+
+#: src/Apps/AppTexts.php:31
+msgid "Log in over SSH to use Docker and Compose. Ports you publish with Docker bypass the firewall inside the server. Open or close them in the Firewall tab of your server, and bind to 127.0.0.1 the ports that only the server itself should use."
+msgstr ""
+
+#: src/Apps/AppTexts.php:32
+msgid "n8n workflow automation with Caddy and PostgreSQL. Optional domain with HTTPS."
+msgstr ""
+
+#: src/Apps/AppTexts.php:33
+msgid "Open your server address and sign in with the email and password shown once. The login and the encryption key are also stored on the server in /root/.beltoft-app/credentials.json. Keep the encryption key safe: without it, the logins you save in n8n cannot be restored on another server. Change the password in n8n's settings. Add a domain for HTTPS before you connect real accounts; without a domain the address is not encrypted. Outgoing mail on port 25 is blocked on all servers; use an SMTP service on port 587 or 465. Times in n8n use UTC until you change the timezone in settings. Set up a backup plan before you build workflows. You keep n8n up to date yourself, and you use it under n8n's Sustainable Use License (your own business use, not resale): https://github.com/n8n-io/n8n/blob/master/LICENSE.md"
+msgstr ""
+
+#: src/Apps/AppTexts.php:34
+msgid "Nextcloud Server 35 (community) with PostgreSQL, Redis and Caddy. Optional domain with HTTPS."
+msgstr ""
+
+#: src/Apps/AppTexts.php:35
+msgid "Open your server address and sign in as admin with the password shown once. The login is also stored on the server in /root/.beltoft-app/credentials.json, and your email address is set on the admin account. Add a domain for HTTPS before you connect the desktop and phone apps; without a domain the address is not encrypted and the apps need HTTPS. Calendar and contacts work over CalDAV and CardDAV at your server address. Your files are stored on the server disk, so a plan with more disk, or an extra disk, gives you more space. Outgoing mail on port 25 is blocked on all servers; set an SMTP service on port 587 or 465 in Nextcloud's Basic settings. Backups are your job: turn on maintenance mode with docker compose exec -u www-data app php occ maintenance:mode --on from /opt/nextcloud, back up the database with docker compose exec postgres pg_dump, copy the data volume (docker volume nextcloud_nextcloud-data), then turn maintenance mode off. Updates are manual and one major version at a time: pull the image of the next major version only, because Nextcloud cannot skip a major version. If the server address or domain changes, list the allowed ones with docker compose exec -u www-data app php occ config:system:get trusted_domains from /opt/nextcloud and add the new one under the next free number with occ config:system:set trusted_domains NUMBER --value=NEW-ADDRESS. Nextcloud Server is licensed under the AGPL-3.0."
+msgstr ""
+
+#: src/Apps/AppTexts.php:36
+msgid "Odoo Community 20 with Caddy and PostgreSQL. Optional domain with HTTPS."
+msgstr ""
+
+#: src/Apps/AppTexts.php:37
+msgid "Open your server address and sign in with the email and password shown once. The login and the master password are also stored on the server in /root/.beltoft-app/credentials.json. The master password protects database management; Odoo's database manager is turned off for safety, so it is only needed if you turn it on again in /opt/odoo/config/odoo.conf. Add a domain for HTTPS before real use; without a domain the address is not encrypted. Outgoing mail on port 25 is blocked on all servers; use an SMTP service on port 587 or 465 in Odoo's outgoing mail server settings. Backups are your job: because the database manager is off, back up the database with docker compose exec postgres pg_dump from /opt/odoo, and copy the filestore volume (docker volume odoo_odoo-data). Updates are manual: in /opt/odoo/compose.yaml replace the odoo image digest with a newer 20.0 one, run docker compose pull, then docker compose run --rm odoo odoo -d odoo -u all --stop-after-init, then docker compose up -d. This is Odoo Community, licensed under the LGPL-3.0; Enterprise apps need an Odoo subscription. The smallest plan runs Odoo for one or two users; for more users or several apps, choose 2 cores and 4 GB of memory or more."
+msgstr ""
+
+#: src/Apps/AppTexts.php:38
+msgid "Plesk Obsidian web hosting control panel, installed and licensed. Choose a Plesk edition when you order."
+msgstr ""
+
+#: src/Apps/AppTexts.php:39
+msgid "Open https://your-server-address:8443 and sign in as admin with the password shown once. The login is also stored on the server in /root/.beltoft-app/credentials.json. Your browser warns about the certificate at first, because Plesk starts with a certificate of its own; secure the panel with a Let's Encrypt certificate for a host name in Tools and Settings. The Plesk licence matches the edition you chose and is tied to the address of this server. It ends when you cancel the Plesk subscription or delete the server, and you can switch edition on this page. Plesk keeps itself up to date. The firewall opens ports 22, 80, 443 and 8443; open more in the firewall tab if you need them. Outgoing mail on port 25 is blocked on all servers; use an SMTP service on port 587 or 465."
+msgstr ""
+
+#: src/Apps/AppTexts.php:40
+msgid "WordPress with Caddy, PHP 8.3 and MariaDB. Optional domain with HTTPS."
+msgstr ""
+
+#: src/Apps/AppTexts.php:41
+msgid "Open /wp-admin/ at your server address and sign in with the admin login shown once. The login is also stored on the server in /root/.beltoft-app/credentials.json. Add a domain for HTTPS. Configure SMTP on port 587 before relying on site email. Set up a backup plan before making changes. You keep WordPress, plugins and themes up to date yourself."
 msgstr ""
 
 #: src/Apps/PleskLicence.php:123
@@ -3700,7 +3747,7 @@ msgid "Extended validation"
 msgstr ""
 
 #. translators: %d: customer id
-#: src/Credit/Balance.php:314
+#: src/Credit/Balance.php:406
 #, php-format
 msgid "Credit in two currencies for customer %d"
 msgstr ""
@@ -3736,56 +3783,56 @@ msgstr ""
 msgid "The code is busy. Try again."
 msgstr ""
 
-#: src/Credit/Code.php:189
+#: src/Credit/Code.php:191
+msgid "This code is in another currency than your account."
+msgstr ""
+
+#: src/Credit/Code.php:197
 msgid "That code has expired."
 msgstr ""
 
-#: src/Credit/Code.php:193
+#: src/Credit/Code.php:201
 msgid "That code has been used up."
 msgstr ""
 
-#: src/Credit/Code.php:199
+#: src/Credit/Code.php:207
 msgid "You have already used this code."
 msgstr ""
 
-#: src/Credit/Code.php:208
+#: src/Credit/Code.php:216
 msgid "This code is not available for your email address."
 msgstr ""
 
-#: src/Credit/Code.php:214
+#: src/Credit/Code.php:222
 msgid "Add a card first, then redeem the code."
 msgstr ""
 
-#: src/Credit/Code.php:221
+#: src/Credit/Code.php:229
 msgid "This card cannot be used to redeem a code. Add a credit or debit card."
 msgstr ""
 
-#: src/Credit/Code.php:229
+#: src/Credit/Code.php:237
 msgid "This code was already used with this card."
 msgstr ""
 
 #. translators: %s: the code.
-#: src/Credit/Code.php:232
+#: src/Credit/Code.php:240
 #, php-format
 msgid "Credit code %s"
 msgstr ""
 
-#: src/Credit/Code.php:240
-msgid "This code is in another currency than your credit."
-msgstr ""
-
-#: src/Credit/Code.php:244
+#: src/Credit/Code.php:243
 msgid "The credit could not be added. Try again."
 msgstr ""
 
 #. translators: %s: amount with currency.
-#: src/Credit/Code.php:254
+#: src/Credit/Code.php:253
 #, php-format
 msgid "%s credit added."
 msgstr ""
 
-#: src/Credit/Code.php:287
-#: src/Credit/Topup.php:332
+#: src/Credit/Code.php:286
+#: src/Credit/Topup.php:336
 msgid "The page expired. Please try again."
 msgstr ""
 
@@ -3819,8 +3866,8 @@ msgid "The balance is busy. Try again."
 msgstr ""
 
 #: src/Credit/Grant.php:126
-#: src/Credit/Topup.php:219
-#: src/Credit/Topup.php:281
+#: src/Credit/Topup.php:225
+#: src/Credit/Topup.php:287
 #: src/Settings.php:127
 msgid "Account credit"
 msgstr ""
@@ -3867,40 +3914,40 @@ msgstr ""
 msgid "You are not allowed to do this."
 msgstr ""
 
-#. translators: %d: customer id
-#: src/Credit/Invoice.php:119
-#, php-format
-msgid "Credit in another currency than the invoice, customer %d"
-msgstr ""
-
 #. translators: %s: order number.
-#: src/Credit/Invoice.php:137
+#: src/Credit/Invoice.php:133
 #, php-format
 msgid "Used on invoice #%s"
 msgstr ""
 
-#: src/Credit/Invoice.php:150
+#. translators: %d: customer id
+#: src/Credit/Invoice.php:145
+#, php-format
+msgid "Credit in another currency than the invoice, customer %d"
+msgstr ""
+
+#: src/Credit/Invoice.php:157
 msgid "Paid from account credit"
 msgstr ""
 
 #. translators: %s: amount.
-#: src/Credit/Invoice.php:160
+#: src/Credit/Invoice.php:167
 #, php-format
 msgid "Paid from account credit: %s."
 msgstr ""
 
-#: src/Credit/Invoice.php:203
+#: src/Credit/Invoice.php:210
 msgid "The invoice was paid in full from account credit."
 msgstr ""
 
 #. translators: %s: order number.
-#: src/Credit/Invoice.php:223
+#: src/Credit/Invoice.php:230
 #, php-format
 msgid "Returned from invoice #%s"
 msgstr ""
 
 #. translators: %s: amount.
-#: src/Credit/Invoice.php:227
+#: src/Credit/Invoice.php:234
 #, php-format
 msgid "Account credit returned: %s."
 msgstr ""
@@ -3912,156 +3959,162 @@ msgstr ""
 msgid "Credit"
 msgstr ""
 
-#: src/Credit/Page.php:175
+#: src/Credit/Page.php:177
 msgid "Enter your credit code."
 msgstr ""
 
 #. translators: %s: reason.
-#: src/Credit/Page.php:212
+#: src/Credit/Page.php:214
 #, php-format
 msgid "Credit added: %s"
 msgstr ""
 
 #. translators: %s: reason.
-#: src/Credit/Page.php:216
+#: src/Credit/Page.php:218
 #, php-format
 msgid "Credit correction: %s"
 msgstr ""
 
-#: src/Credit/Page.php:229
-#: src/Credit/Topup.php:610
+#: src/Credit/Page.php:231
+#: src/Credit/Topup.php:614
 msgid "Top-up"
 msgstr ""
 
-#: src/Credit/Page.php:230
+#: src/Credit/Page.php:232
 msgid "Used on invoice"
 msgstr ""
 
-#: src/Credit/Page.php:231
+#: src/Credit/Page.php:233
 msgid "Credit added"
 msgstr ""
 
-#: src/Credit/Page.php:232
+#: src/Credit/Page.php:234
 msgid "Refund"
 msgstr ""
 
-#: src/Credit/Page.php:233
+#: src/Credit/Page.php:235
 msgid "Chargeback"
 msgstr ""
 
-#: src/Credit/Page.php:234
+#: src/Credit/Page.php:236
 msgid "Adjustment"
 msgstr ""
 
-#: src/Credit/Topup.php:49
+#: src/Credit/Topup.php:53
 msgid "Prepayment for Pay as you go usage. No VAT is charged on a top-up; VAT is charged on your usage invoices."
 msgstr ""
 
-#: src/Credit/Topup.php:99
+#: src/Credit/Topup.php:105
 msgid "Account credit for pay as you go"
 msgstr ""
 
-#: src/Credit/Topup.php:100
+#: src/Credit/Topup.php:106
 msgid "Customers prepay a balance, without VAT. It is applied first to their Pay as you go usage invoices, which carry the VAT. Off, nothing about credit shows."
 msgstr ""
 
-#: src/Credit/Topup.php:108
+#: src/Credit/Topup.php:114
 msgid "Smallest top-up"
 msgstr ""
 
-#: src/Credit/Topup.php:109
+#: src/Credit/Topup.php:115
 msgid "In the store currency. No VAT is charged on a top-up: the customer pays this amount and all of it is credited."
 msgstr ""
 
-#: src/Credit/Topup.php:117
+#: src/Credit/Topup.php:123
 msgid "Largest top-up"
 msgstr ""
 
-#: src/Credit/Topup.php:118
+#: src/Credit/Topup.php:124
 msgid "In the store currency."
 msgstr ""
 
-#: src/Credit/Topup.php:340
+#: src/Credit/Topup.php:344
 #: templates/account/credit.php:50
 msgid "Top-ups are not available in your currency."
 msgstr ""
 
 #. translators: 1: smallest amount, 2: largest amount (with currency).
-#: src/Credit/Topup.php:349
+#: src/Credit/Topup.php:353
 #, php-format
 msgid "Enter an amount from %1$s to %2$s."
 msgstr ""
 
-#: src/Credit/Topup.php:360
+#: src/Credit/Topup.php:364
 msgid "The top-up could not be added to the cart."
 msgstr ""
 
-#: src/Credit/Topup.php:450
+#: src/Credit/Topup.php:454
 msgid "Your top-up was removed from the cart because the currency changed. Add it again in the new currency."
 msgstr ""
 
-#: src/Credit/Topup.php:494
-#: src/Credit/Topup.php:518
+#: src/Credit/Topup.php:498
+#: src/Credit/Topup.php:522
 msgid "Note"
 msgstr ""
 
-#: src/Credit/Topup.php:600
+#: src/Credit/Topup.php:604
 msgid "Account credit not added: the order has no customer account."
 msgstr ""
 
 #. translators: %s: amount.
-#: src/Credit/Topup.php:611
+#: src/Credit/Topup.php:615
 #, php-format
 msgid "Account credit of %s added to the balance."
 msgstr ""
 
-#. translators: %s: currency code.
-#: src/Credit/Topup.php:616
-#, php-format
-msgid "Account credit not added: the customer's credit is in %s, not in the currency of this order. The admin was told."
-msgstr ""
-
-#: src/Credit/Topup.php:618
+#: src/Credit/Topup.php:622
 msgid "Account credit could not be added now (balance busy). It is added when the order status is saved again."
 msgstr ""
 
+#. translators: %s: currency code.
+#: src/Credit/Topup.php:646
+#, php-format
+msgid "Account credit not added: the customer's credit is in %s, not in the currency of this order. The order is on hold: refund it or resolve it by hand."
+msgstr ""
+
+#. translators: %s: order number
+#: src/Credit/Topup.php:650
+#, php-format
+msgid "Top-up #%s could not be credited"
+msgstr ""
+
 #. translators: %s: order number.
-#: src/Credit/Topup.php:652
+#: src/Credit/Topup.php:685
 #, php-format
 msgid "Chargeback undone, order #%s"
 msgstr ""
 
 #. translators: %s: order number.
-#: src/Credit/Topup.php:653
+#: src/Credit/Topup.php:686
 msgid "The order is paid again: the credit taken back for the chargeback was returned to the balance."
 msgstr ""
 
 #. translators: %s: order number.
-#: src/Credit/Topup.php:721
+#: src/Credit/Topup.php:754
 #, php-format
 msgid "Refund, order #%s"
 msgstr ""
 
 #. translators: %s: amount.
-#: src/Credit/Topup.php:724
+#: src/Credit/Topup.php:757
 #, php-format
 msgid "Refund: %s taken back from the account credit."
 msgstr ""
 
 #. translators: 1: order number, 2: new status.
-#: src/Credit/Topup.php:766
+#: src/Credit/Topup.php:799
 #, php-format
 msgid "Chargeback, order #%1$s is now %2$s"
 msgstr ""
 
 #. translators: %s: amount.
-#: src/Credit/Topup.php:767
+#: src/Credit/Topup.php:800
 #, php-format
 msgid "The order is no longer paid: %s taken back from the account credit."
 msgstr ""
 
 #. translators: 1: customer id, 2: balance.
-#: src/Credit/Topup.php:783
+#: src/Credit/Topup.php:816
 #, php-format
 msgid "The account credit of customer #%1$d is now negative: %2$s. The customer has used credit that was paid back."
 msgstr ""
@@ -8695,33 +8748,61 @@ msgstr ""
 msgid "Fields the vendor answered"
 msgstr ""
 
-#: src/LineNames.php:119
+#: src/LineNames.php:69
+msgid "monthly"
+msgstr ""
+
+#: src/LineNames.php:71
+msgid "yearly"
+msgstr ""
+
+#: src/LineNames.php:73
+msgid "annually"
+msgstr ""
+
+#: src/LineNames.php:75
+msgid "quarterly"
+msgstr ""
+
+#: src/LineNames.php:77
+msgid "weekly"
+msgstr ""
+
+#: src/LineNames.php:79
+msgid "daily"
+msgstr ""
+
+#: src/LineNames.php:81
+msgid "hourly"
+msgstr ""
+
+#: src/LineNames.php:146
 msgid "Pay as you go account"
 msgstr ""
 
 #. translators: %s: backup frequency, such as "daily".
-#: src/LineNames.php:157
+#: src/LineNames.php:184
 #, php-format
 msgid "%s backups"
 msgstr ""
 
-#: src/LineNames.php:159
+#: src/LineNames.php:186
 msgid "pay as you go"
 msgstr ""
 
 #. translators: %s: billing period, such as "monthly".
-#: src/LineNames.php:159
+#: src/LineNames.php:186
 #, php-format
 msgid "billed %s"
 msgstr ""
 
 #. translators: %s: size, such as "100 GB".
-#: src/LineNames.php:165
+#: src/LineNames.php:192
 #, php-format
 msgid "%s extra storage"
 msgstr ""
 
-#: src/LineNames.php:170
+#: src/LineNames.php:197
 msgid "public IPv4"
 msgstr ""
 
@@ -9769,7 +9850,7 @@ msgstr ""
 
 #. translators: %s: price per hour such as €0.0740
 #: src/Mcp/Pricing.php:404
-#: src/Usage/Breakdown.php:296
+#: src/Usage/Breakdown.php:313
 #, php-format
 msgid "That is %s per hour, billed for the hours used."
 msgstr ""
@@ -10680,8 +10761,8 @@ msgid "Enabled"
 msgstr ""
 
 #: src/Proxmox/Backup/BackupField.php:80
-#: src/Usage/Breakdown.php:233
-#: src/Usage/Breakdown.php:437
+#: src/Usage/Breakdown.php:234
+#: src/Usage/Breakdown.php:454
 msgid "Daily backups"
 msgstr ""
 
@@ -11023,8 +11104,8 @@ msgstr ""
 #. translators: %d: extra storage in GB
 #: src/Proxmox/Db/DbDiskField.php:133
 #: src/Proxmox/Db/DbDiskField.php:222
-#: src/Usage/Breakdown.php:229
-#: src/Usage/Breakdown.php:437
+#: src/Usage/Breakdown.php:230
+#: src/Usage/Breakdown.php:454
 msgid "Extra storage"
 msgstr ""
 
@@ -11175,8 +11256,8 @@ msgid "No public IP address is available right now. Please try again later."
 msgstr ""
 
 #: src/Proxmox/Db/DbIpField.php:80
-#: src/Usage/Breakdown.php:224
-#: src/Usage/Breakdown.php:437
+#: src/Usage/Breakdown.php:225
+#: src/Usage/Breakdown.php:454
 msgid "Public IPv4 address"
 msgstr ""
 
@@ -11475,7 +11556,7 @@ msgstr ""
 #: src/Proxmox/Disk/DiskField.php:151
 #: src/Proxmox/Disk/DiskPanels.php:204
 #: src/Proxmox/Vm/EmailDetails.php:179
-#: src/Usage/Breakdown.php:239
+#: src/Usage/Breakdown.php:240
 #: src/Usage/Renewal.php:241
 msgid "Extra disk"
 msgstr ""
@@ -13244,7 +13325,7 @@ msgstr ""
 #. translators: 1: "Usage invoice" or "Usage invoice (early)", 2: month and year.
 #. translators: 1: item (Backups, Extra disk), 2: server name.
 #: src/Proxmox/Vm/CoreHooks.php:71
-#: src/Usage/Emails.php:137
+#: src/Usage/Emails.php:181
 #: src/Usage/Renewal.php:247
 #, php-format
 msgid "%1$s for %2$s"
@@ -13991,15 +14072,15 @@ msgstr ""
 msgid "Version %s"
 msgstr ""
 
-#: src/Resource.php:222
+#: src/Resource.php:223
 msgid "Requested"
 msgstr ""
 
-#: src/Resource.php:226
+#: src/Resource.php:227
 msgid "Being removed"
 msgstr ""
 
-#: src/Resource.php:228
+#: src/Resource.php:229
 #: templates/account/network.php:20
 msgid "Needs attention"
 msgstr ""
@@ -14904,32 +14985,32 @@ msgid "%d MB memory"
 msgstr ""
 
 #. translators: %s: plan name such as Standard
-#: src/Usage/Breakdown.php:221
+#: src/Usage/Breakdown.php:222
 #, php-format
 msgid "%s plan"
 msgstr ""
 
 #. translators: %d: extra storage in GB
-#: src/Usage/Breakdown.php:229
+#: src/Usage/Breakdown.php:230
 #, php-format
 msgid "Extra storage, %d GB"
 msgstr ""
 
 #. translators: %d: extra disk in GB
-#: src/Usage/Breakdown.php:239
+#: src/Usage/Breakdown.php:240
 #, php-format
 msgid "Extra disk, %d GB"
 msgstr ""
 
-#: src/Usage/Breakdown.php:294
+#: src/Usage/Breakdown.php:311
 msgid "Max per month"
 msgstr ""
 
-#: src/Usage/Breakdown.php:463
+#: src/Usage/Breakdown.php:480
 msgid "Billed by the hour, like the database."
 msgstr ""
 
-#: src/Usage/Breakdown.php:463
+#: src/Usage/Breakdown.php:480
 msgid "Billed by the hour, like the server."
 msgstr ""
 
@@ -15054,40 +15135,40 @@ msgstr ""
 msgid "The service could not be deleted now. Please try again."
 msgstr ""
 
-#: src/Usage/Emails.php:65
+#: src/Usage/Emails.php:106
 msgid "Usage invoice (early)"
 msgstr ""
 
-#: src/Usage/Emails.php:66
+#: src/Usage/Emails.php:107
 msgid "Usage invoice"
 msgstr ""
 
 #. translators: 1: "Usage invoice" or "Usage invoice (early)", 2: order number, 3: month and year.
-#: src/Usage/Emails.php:82
+#: src/Usage/Emails.php:123
 #, php-format
 msgid "%1$s #%2$s for %3$s"
 msgstr ""
 
 #. translators: 1: "Usage invoice" or "Usage invoice (early)", 2: month and year.
-#: src/Usage/Emails.php:113
+#: src/Usage/Emails.php:154
 #, php-format
 msgid "Your %1$s for %2$s needs payment"
 msgstr ""
 
 #. translators: 1: "Usage invoice" or "Usage invoice (early)", 2: month and year.
-#: src/Usage/Emails.php:117
+#: src/Usage/Emails.php:158
 #, php-format
 msgid "Your %1$s for %2$s"
 msgstr ""
 
-#: src/Usage/Emails.php:133
+#: src/Usage/Emails.php:177
 msgid "Usage invoice needs payment"
 msgstr ""
 
 #. translators: 1: product name, 2: the database's address.
 #. translators: 1: "€0.0829 per hour", 2: "max €55.00 per month"
 #: src/Usage/Estimate.php:119
-#: src/Usage/Rates.php:305
+#: src/Usage/Rates.php:314
 #, php-format
 msgid "%1$s, %2$s"
 msgstr ""
@@ -15155,13 +15236,13 @@ msgid "Your usage invoice for %s could not be charged. Pay it here: %%2$s"
 msgstr ""
 
 #. translators: %d: resource id
-#: src/Usage/Meter.php:192
+#: src/Usage/Meter.php:212
 #, php-format
 msgid "Usage hours not caught up for resource %d"
 msgstr ""
 
 #. translators: %s: currency code
-#: src/Usage/Meter.php:259
+#: src/Usage/Meter.php:287
 #, php-format
 msgid "Usage not metered in %s"
 msgstr ""
@@ -15179,47 +15260,47 @@ msgid "Usage of %1$s carried to next month (under the %2$s minimum)."
 msgstr ""
 
 #. translators: %s: monthly amount such as €45
-#: src/Usage/Rates.php:120
+#: src/Usage/Rates.php:128
 #, php-format
 msgid "%s / month"
 msgstr ""
 
 #. translators: %s: monthly amount such as €5
-#: src/Usage/Rates.php:131
+#: src/Usage/Rates.php:140
 #, php-format
 msgid "+%s / month"
 msgstr ""
 
 #. translators: %s: monthly amount such as €5
-#: src/Usage/Rates.php:142
+#: src/Usage/Rates.php:151
 #, php-format
 msgid "+%s per month"
 msgstr ""
 
 #. translators: 1: hourly price such as €0.0226, 2: monthly cap such as €16.50
-#: src/Usage/Rates.php:216
+#: src/Usage/Rates.php:225
 #, php-format
 msgid "Or %1$s/hour, max %2$s/month, pay as you go"
 msgstr ""
 
-#: src/Usage/Rates.php:264
+#: src/Usage/Rates.php:273
 msgid "Billed monthly for the hours used"
 msgstr ""
 
 #. translators: %s: price per hour such as €0.0829
-#: src/Usage/Rates.php:282
+#: src/Usage/Rates.php:291
 #, php-format
 msgid "%s per hour"
 msgstr ""
 
 #. translators: %s: monthly cap such as €55.00
-#: src/Usage/Rates.php:293
+#: src/Usage/Rates.php:302
 #, php-format
 msgid "max %s per month"
 msgstr ""
 
 #. translators: %s: monthly price such as €55.00
-#: src/Usage/Rates.php:316
+#: src/Usage/Rates.php:325
 #, php-format
 msgid "%s per month, paid in advance"
 msgstr ""

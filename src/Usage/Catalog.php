@@ -49,7 +49,8 @@ final class Catalog {
 		add_filter( 'bricks/posts/query_vars', array( __CLASS__, 'query_vars' ), 20 );
 		add_filter( 'bricks/dynamic_tags_list', array( __CLASS__, 'tags_list' ) );
 		add_filter( 'bricks/dynamic_data/render_content', array( __CLASS__, 'render' ), 20, 3 );
-		add_filter( 'bricks/frontend/render_data', array( __CLASS__, 'render' ), 20, 3 );
+		// render_data passes the area of the content, not its context: plain there, as only a text element may take markup.
+		add_filter( 'bricks/frontend/render_data', array( __CLASS__, 'render_data' ), 20, 2 );
 	}
 
 	/**
@@ -113,6 +114,17 @@ final class Catalog {
 		}
 
 		return $tags;
+	}
+
+	/**
+	 * The same for bricks/frontend/render_data, whose second argument is the area: the figure is the plain text in the display.
+	 *
+	 * @param mixed $content Content.
+	 * @param mixed $post    Current post or area.
+	 * @return mixed
+	 */
+	public static function render_data( $content, $post = null ) {
+		return self::render( $content, is_object( $post ) ? $post : null, 'plain' );
 	}
 
 	/**

@@ -214,58 +214,74 @@ final class Breakdown {
 	 *
 	 * @param array<string, mixed> $parts parts(), with an optional disk and disk_gb (the extra disk of a new server).
 	 * @param \WC_Product|null     $tax   Product for the tax display, null for the amounts as given (API answers).
+	 * @param array<string, float>|null $shown Figures worked out by shown() for the including display.
 	 * @return array<int, array{0: string, 1: string}>
 	 */
-	public static function rows( array $parts, string $plan_name = '', ?\WC_Product $tax = null ): array {
+	public static function rows( array $parts, string $plan_name = '', ?\WC_Product $tax = null, ?array $shown = null ): array {
 		/* translators: %s: plan name such as Standard */
-		$rows = array( array( '' !== $plan_name ? sprintf( __( '%s plan', 'beltoft-services' ), $plan_name ) : __( 'Plan', 'beltoft-services' ), Rates::per_month_line( (float) $parts['plan'], $tax ) ) );
+		$rows = array( array( '' !== $plan_name ? sprintf( __( '%s plan', 'beltoft-services' ), $plan_name ) : __( 'Plan', 'beltoft-services' ), Rates::per_month_line( (float) $parts['plan'], $tax, $shown['plan'] ?? null ) ) );
 
 		if ( $parts['ip'] > 0 ) {
-			$rows[] = array( __( 'Public IPv4 address', 'beltoft-services' ), Rates::plus_per_month_line( (float) $parts['ip'], $tax ) );
+			$rows[] = array( __( 'Public IPv4 address', 'beltoft-services' ), Rates::plus_per_month_line( (float) $parts['ip'], $tax, $shown['ip'] ?? null ) );
 		}
 
 		if ( $parts['storage'] > 0 ) {
 			/* translators: %d: extra storage in GB */
-			$rows[] = array( $parts['storage_gb'] > 0 ? sprintf( __( 'Extra storage, %d GB', 'beltoft-services' ), (int) $parts['storage_gb'] ) : __( 'Extra storage', 'beltoft-services' ), Rates::plus_per_month_line( (float) $parts['storage'], $tax ) );
+			$rows[] = array( $parts['storage_gb'] > 0 ? sprintf( __( 'Extra storage, %d GB', 'beltoft-services' ), (int) $parts['storage_gb'] ) : __( 'Extra storage', 'beltoft-services' ), Rates::plus_per_month_line( (float) $parts['storage'], $tax, $shown['storage'] ?? null ) );
 		}
 
 		if ( $parts['backups'] > 0 ) {
-			$rows[] = array( __( 'Daily backups', 'beltoft-services' ), Rates::plus_per_month_line( (float) $parts['backups'], $tax ) );
+			$rows[] = array( __( 'Daily backups', 'beltoft-services' ), Rates::plus_per_month_line( (float) $parts['backups'], $tax, $shown['backups'] ?? null ) );
 		}
 
 		// The extra disk of a new server is a cart line of its own: its row is added by the caller that quotes it (parts['disk']).
 		if ( ( $parts['disk'] ?? 0 ) > 0 ) {
 			/* translators: %d: extra disk in GB */
-			$rows[] = array( ( $parts['disk_gb'] ?? 0 ) > 0 ? sprintf( __( 'Extra disk, %d GB', 'beltoft-services' ), (int) $parts['disk_gb'] ) : __( 'Extra disk', 'beltoft-services' ), Rates::plus_per_month_line( (float) $parts['disk'], $tax ) );
+			$rows[] = array( ( $parts['disk_gb'] ?? 0 ) > 0 ? sprintf( __( 'Extra disk, %d GB', 'beltoft-services' ), (int) $parts['disk_gb'] ) : __( 'Extra disk', 'beltoft-services' ), Rates::plus_per_month_line( (float) $parts['disk'], $tax, $shown['disk'] ?? null ) );
 		}
 
 		return $rows;
 	}
 
 	/**
-	 * The maximum per month to show. In the including display each row is rounded to cents on its own and the maximum is the sum of the
-	 * rows shown, so the rows add up to it (the usage invoice has a line per item and taxes each line); otherwise the maximum as it is.
-	 * The figure given back is excluding tax: cap_money() turns it into the shown one, so the sum is divided back by the same factor.
+	 * The figures of the rows and the maximum in the including display, worked out the way the usage invoice is taxed, so the maximum shown
+	 * is the maximum charged. An invoice line is one item: for a database the plan, the public address and the extra storage are ONE line,
+	 * for a server the plan, the backups and the extra disk are a line each. Each line is taxed as WooCommerce taxes a line (the tax of
+	 * the line rounded, or with woocommerce_tax_round_at_subtotal the total rounded once). The address, storage, backups and disk rows show
+	 * their own including figure; the plan row takes the remainder, so the rows add up to the maximum. Null in the excluding display.
 	 *
-	 * @param array<string, mixed> $parts  parts().
-	 * @param \WC_Product|null     $usage  Product for the tax display.
+	 * @param array<string, mixed> $parts parts().
+	 * @param \WC_Product|null     $usage Product for the tax display.
+	 * @return array{plan: float, ip: float, storage: float, backups: float, disk: float, max: float}|null
 	 */
-	private static function shown_max( array $parts, ?\WC_Product $usage ): float {
+	public static function shown( array $parts, ?\WC_Product $usage ): ?array {
 		if ( null === $usage || 'incl' !== TaxNote::display() ) {
-			return (float) $parts['max'];
+			return null;
 		}
 
-		$sum = 0.0;
+		$get   = static fn( string $key ): float => (float) ( $parts[ $key ] ?? 0 );
+		// A database is one ledger item (one line) whose cap is the maximum itself; a server's plan is its own line.
+		$first = DbDriver::ID === (string) ( $parts['driver'] ?? '' ) ? max( 0.0, $get( 'max' ) - $get( 'backups' ) - $get( 'disk' ) ) : $get( 'plan' ) + $get( 'ip' ) + $get( 'storage' );
+		$lines = array( $first, $get( 'backups' ), $get( 'disk' ) );
+		$raw   = 0.0;
 
-		foreach ( array( 'plan', 'ip', 'storage', 'backups', 'disk' ) as $key ) {
-			$sum += round( TaxNote::usage_figure( (float) ( $parts[ $key ] ?? 0 ), $usage ), 2 );
+		foreach ( $lines as $excl ) {
+			$raw += $excl > 0 ? TaxNote::line_incl( $excl ) : 0.0;
 		}
 
-		// The sum of the shown rows is already including tax: Rates::cap_money() would add it again, so the max is passed through the
-		// same function with the tax taken off by the factor of the standard class.
-		$factor = TaxNote::usage_figure( 1.0, $usage );
+		$max    = round( $raw, 2 );
+		$own    = array();
+		$others = 0.0;
 
-		return $factor > 0 ? $sum / $factor : (float) $parts['max'];
+		foreach ( array( 'ip', 'storage', 'backups', 'disk' ) as $key ) {
+			$own[ $key ] = $get( $key ) > 0 ? round( TaxNote::usage_figure( $get( $key ), $usage ), 2 ) : 0.0;
+			$others     += $own[ $key ];
+		}
+
+		return $own + array(
+			'plan' => round( $max - $others, 2 ),
+			'max'  => $max,
+		);
 	}
 
 	/**
@@ -285,13 +301,14 @@ final class Breakdown {
 		// The order summary is in the cart: its figures follow the cart's tax display.
 		$out .= TaxNote::in_cart(
 			static function () use ( $parts, $plan, $usage ): string {
-				$rows = '';
+				$rows  = '';
+				$shown = self::shown( $parts, $usage );
 
-				foreach ( self::rows( $parts, $plan, $usage ) as $row ) {
+				foreach ( self::rows( $parts, $plan, $usage, $shown ) as $row ) {
 					$rows .= '<span class="beltoft-services-payg__row"><span>' . esc_html( $row[0] ) . '</span><span>' . esc_html( $row[1] ) . '</span></span>';
 				}
 
-				$rows .= '<span class="beltoft-services-payg__row beltoft-services-payg__row--max"><span>' . esc_html__( 'Max per month', 'beltoft-services' ) . '</span><span>' . esc_html( Rates::cap_money( self::shown_max( $parts, $usage ), $usage ) ) . '</span></span>';
+				$rows .= '<span class="beltoft-services-payg__row beltoft-services-payg__row--max"><span>' . esc_html__( 'Max per month', 'beltoft-services' ) . '</span><span>' . esc_html( null !== $shown ? Rates::cap_shown( $shown['max'] ) : Rates::cap_money( (float) $parts['max'], $usage ) ) . '</span></span>';
 				/* translators: %s: price per hour such as €0.0740 */
 				$rows .= '<span class="beltoft-services-payg__hourly">' . esc_html( sprintf( __( 'That is %s per hour, billed for the hours used.', 'beltoft-services' ), Rates::money( (float) $parts['hourly'], 4, '', $usage ) ) ) . '</span></span>';
 

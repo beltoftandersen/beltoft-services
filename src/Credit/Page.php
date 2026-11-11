@@ -148,7 +148,9 @@ final class Page {
 	public static function data(): array {
 		$user_id  = get_current_user_id();
 		// The credit is in one currency, the customer's own; top-ups are offered in it, and only on a page that shows it.
-		$currency = Balance::currency_or_user( $user_id );
+		// With no credit and no currency fixed for them the customer tops up in the currency of the page they are on.
+		$currency = Balance::account_currency( $user_id );
+		$currency = '' !== $currency ? $currency : Currency::current();
 		$here     = Currency::current() === $currency;
 
 		return array(

@@ -105,22 +105,18 @@ final class Invoice {
 
 		$currency = (string) $order->get_currency();
 
+		$wrong = '';
+
 		list( $locked, $used ) = Balance::locked(
 			$user_id,
-			static function () use ( $order, $user_id, $currency ): int {
+			static function () use ( $order, $user_id, $currency, &$wrong ): int {
 				$due     = Balance::cents( $order->get_total() );
 				// Only credit in the order's own currency is applied: a balance in another currency is never used on this invoice.
 				$balance = Balance::get_in( $user_id, $currency );
 				$cents   = min( $balance, $due );
 
 				if ( $balance < 1 && Balance::currency( $user_id ) !== '' && Balance::currency( $user_id ) !== $currency && Balance::get( $user_id ) > 0 ) {
-					Alerts::notify(
-						/* translators: %d: customer id */
-						sprintf( __( 'Credit in another currency than the invoice, customer %d', 'beltoft-services' ), $user_id ),
-						array( sprintf( 'Customer %1$d has credit in %2$s and invoice #%3$s is in %4$s. The credit was not applied.', $user_id, Balance::currency( $user_id ), $order->get_order_number(), $currency ) ),
-						null,
-						'beltoft_services_credit_wrongcur_' . $user_id
-					);
+					$wrong = sprintf( 'Customer %1$d has credit in %2$s and invoice #%3$s is in %4$s. The credit was not applied.', $user_id, Balance::currency( $user_id ), $order->get_order_number(), $currency );
 				}
 
 				if ( $cents < 1 || Balance::exists( Balance::INVOICE, self::REF_TYPE, (string) $order->get_id() ) ) {
@@ -141,6 +137,17 @@ final class Invoice {
 				return $debited ? $cents : 0;
 			}
 		);
+
+		// Told after the balance lock is released.
+		if ( '' !== $wrong ) {
+			Alerts::notify(
+				/* translators: %d: customer id */
+				sprintf( __( 'Credit in another currency than the invoice, customer %d', 'beltoft-services' ), $user_id ),
+				array( $wrong ),
+				null,
+				'beltoft_services_credit_wrongcur_' . $user_id
+			);
+		}
 
 		if ( ! $locked || ! is_int( $used ) || $used < 1 ) {
 			return 0;

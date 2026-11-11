@@ -108,8 +108,22 @@ final class Meter {
 
 		$rows = Licenses::resources_of_source( 'usage', gmdate( 'Y-m-d H:i:s', $horizon ) );
 
+		$seen = array();
+
 		foreach ( (array) $rows as $row ) {
-			$written += self::meter( (int) $row['id'], $row, $horizon, $last );
+			$seen[ (int) $row['id'] ] = true;
+			$written                 += self::meter( (int) $row['id'], $row, $horizon, $last );
+		}
+
+		// A resource that carries a marker is owed hours even when it was closed long ago (it is not listed above any more).
+		foreach ( Resource::ids_with_meta_value( self::UNMETERED_SINCE ) as $id ) {
+			$id  = (int) $id;
+			$row = isset( $seen[ $id ] ) ? null : Licenses::activation( $id );
+			$own = $row ? Resource::find( $id ) : null;
+
+			if ( $row && $own && 'usage' === (string) ( $own->license()['source'] ?? '' ) ) {
+				$written += self::meter( $id, $row, $horizon, $last );
+			}
 		}
 
 		return $written;
@@ -142,10 +156,20 @@ final class Meter {
 			return 0;
 		}
 
-		$start   = max( $horizon, Ledger::hour( (int) strtotime( $row['activated_at'] . ' UTC' ) ), Ledger::hour( (int) $ready ) );
-		$end     = $closed ? min( $last, Ledger::hour( (int) strtotime( $row['deactivated_at'] . ' UTC' ) ) ) : $last;
+		// A resource with a marker (it could not be metered for a while) starts at its first unmetered hour, within MAX_CATCHUP_HOURS,
+		// also when it was closed long ago: the gap is still owed. Others look back BACKFILL_HOURS.
+		$since = $resource->get( self::UNMETERED_SINCE );
+		$floor = $last - ( self::MAX_CATCHUP_HOURS - 1 ) * HOUR_IN_SECONDS;
+		$first = max( Ledger::hour( (int) strtotime( $row['activated_at'] . ' UTC' ) ), Ledger::hour( (int) $ready ) );
+		$start = null !== $since ? max( $floor, $first, Ledger::hour( (int) $since ) ) : max( $horizon, $first );
+		$end   = $closed ? min( $last, Ledger::hour( (int) strtotime( $row['deactivated_at'] . ' UTC' ) ) ) : $last;
 
 		if ( $user_id < 1 || $start > $end ) {
+			// Nothing of the gap is left to write (it ended before the marker): the gap is closed.
+			if ( null !== $since && $user_id > 0 ) {
+				$resource->set( array( self::UNMETERED_SINCE => null ) );
+			}
+
 			return 0;
 		}
 
@@ -181,11 +205,7 @@ final class Meter {
 		}
 
 		// A gap is caught up from its first hour, not only 48 hours back, within MAX_CATCHUP_HOURS.
-		$since = $resource->get( self::UNMETERED_SINCE );
-
 		if ( null !== $since ) {
-			$floor = $last - ( self::MAX_CATCHUP_HOURS - 1 ) * HOUR_IN_SECONDS;
-
 			if ( (int) $since < $floor ) {
 				Alerts::notify(
 					/* translators: %d: resource id */
@@ -195,8 +215,6 @@ final class Meter {
 					'beltoft_services_usage_gap_' . $id
 				);
 			}
-
-			$start = max( $floor, Ledger::hour( (int) strtotime( $row['activated_at'] . ' UTC' ) ), Ledger::hour( (int) $ready ), Ledger::hour( (int) $since ) );
 		}
 
 		$have    = Ledger::written( $id, $start );
@@ -214,8 +232,18 @@ final class Meter {
 			}
 		}
 
-		// Every hour of the gap is written now: the gap is closed.
+		// The gap is closed only when every hour of it is in the ledger: an insert that failed keeps the marker for the next run.
 		if ( null !== $since ) {
+			$have = Ledger::written( $id, $start );
+
+			for ( $hour = $start; $hour <= $end; $hour += HOUR_IN_SECONDS ) {
+				foreach ( $items as $item ) {
+					if ( ! isset( $have[ $item['item'] . '|' . $hour ] ) ) {
+						return $written;
+					}
+				}
+			}
+
 			$resource->set( array( self::UNMETERED_SINCE => null ) );
 		}
 

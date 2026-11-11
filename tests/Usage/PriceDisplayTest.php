@@ -92,10 +92,10 @@ class PriceDisplayTest extends UsageTestCase {
 		$id = $v['m-None']->get_id();
 		$this->both();
 
-		$this->assertSame( '€16.50 | €20.63', apply_filters( 'bricks/frontend/render_data', '{beltoft_usage_cap:' . $id . '}', null ) );
+		$this->assertSame( '€16.50 | €20.63', apply_filters( 'bricks/dynamic_data/render_content', '{beltoft_usage_cap:' . $id . '}', null, 'text' ) );
 
 		$this->display( 'incl' );
-		$this->assertSame( '€16.50 | €20.63', apply_filters( 'bricks/frontend/render_data', '{beltoft_usage_cap:' . $id . '}', null ) );
+		$this->assertSame( '€16.50 | €20.63', apply_filters( 'bricks/dynamic_data/render_content', '{beltoft_usage_cap:' . $id . '}', null, 'text' ) );
 	}
 
 	public function test_a_tag_with_no_offer_stays_empty_and_calls_no_listener(): void {
@@ -225,7 +225,7 @@ class PriceDisplayTest extends UsageTestCase {
 		$this->assertSame( array( '{beltoft_domain_register:com}', '{beltoft_domain_renew:com}', '{beltoft_domain_transfer:com}' ), $tags );
 
 		$this->both();
-		$this->assertSame( '€12 | €12', apply_filters( 'bricks/frontend/render_data', '{beltoft_domain_register:com}', null ), 'No domain product: no tax context, the amount as given in both.' );
+		$this->assertSame( '€12 | €12', apply_filters( 'bricks/dynamic_data/render_content', '{beltoft_domain_register:com}', null, 'text' ), 'No domain product: no tax context, the amount as given in both.' );
 	}
 
 	public function test_a_domain_price_in_another_currency_needs_a_line_there_and_the_euro_price_is_never_relabelled(): void {

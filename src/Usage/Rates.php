@@ -104,8 +104,15 @@ final class Rates {
 	 * @param \WC_Product|null $tax Product for the tax display, null for the amount as given.
 	 */
 	public static function cap_money( float $cap, ?\WC_Product $tax = null ): string {
-		$shown = TaxNote::usage_figure( $cap, $tax );
+		return self::cap_shown( TaxNote::usage_figure( $cap, $tax ) );
+	}
 
+	/**
+	 * An amount that is already the figure to show, formatted like cap_money(): whole amounts have no decimals.
+	 *
+	 * @param float $shown Amount as shown.
+	 */
+	public static function cap_shown( float $shown ): string {
 		return TaxNote::plain( $shown, abs( $shown - round( $shown ) ) < 0.005 ? 0 : 2 );
 	}
 
@@ -114,10 +121,11 @@ final class Rates {
 	 *
 	 * @param float            $amount Monthly amount.
 	 * @param \WC_Product|null $tax    Product for the tax display, null for the amount as given.
+	 * @param float|null       $shown  The figure to show, already worked out (it replaces the amount).
 	 */
-	public static function per_month_line( float $amount, ?\WC_Product $tax = null ): string {
+	public static function per_month_line( float $amount, ?\WC_Product $tax = null, ?float $shown = null ): string {
 		/* translators: %s: monthly amount such as €45 */
-		return sprintf( __( '%s / month', 'beltoft-services' ), self::cap_money( $amount, $tax ) );
+		return sprintf( __( '%s / month', 'beltoft-services' ), null !== $shown ? self::cap_shown( $shown ) : self::cap_money( $amount, $tax ) );
 	}
 
 	/**
@@ -125,10 +133,11 @@ final class Rates {
 	 *
 	 * @param float            $amount Monthly amount.
 	 * @param \WC_Product|null $tax    Product for the tax display, null for the amount as given.
+	 * @param float|null       $shown  The figure to show, already worked out (it replaces the amount).
 	 */
-	public static function plus_per_month_line( float $amount, ?\WC_Product $tax = null ): string {
+	public static function plus_per_month_line( float $amount, ?\WC_Product $tax = null, ?float $shown = null ): string {
 		/* translators: %s: monthly amount such as €5 */
-		return sprintf( __( '+%s / month', 'beltoft-services' ), self::cap_money( $amount, $tax ) );
+		return sprintf( __( '+%s / month', 'beltoft-services' ), null !== $shown ? self::cap_shown( $shown ) : self::cap_money( $amount, $tax ) );
 	}
 
 	/**

@@ -28,6 +28,39 @@ final class Apps {
 		return $ids;
 	}
 
+	/**
+	 * A text of an app definition for the customer: translated through the plugin's strings (AppTexts), then passed through the filter
+	 * beltoft_services_app_text( string $text, string $app_id, string $field ). Fields: summary, getting_started.
+	 *
+	 * @param string $text   Text as app.json has it.
+	 * @param string $id     App id.
+	 * @param string $field  Field.
+	 */
+	public static function text( string $text, string $id, string $field ): string {
+		return (string) apply_filters( 'beltoft_services_app_text', AppTexts::translate( $text ), $id, $field );
+	}
+
+	/**
+	 * The customer-visible texts of a definition (summary and getting started; port labels are technical and stored in firewall rules, so they stay as they are) in the current language.
+	 *
+	 * @param mixed  $data Definition.
+	 * @param string $id   App id.
+	 * @return mixed
+	 */
+	public static function localise( $data, string $id ) {
+		if ( ! is_array( $data ) ) {
+			return $data;
+		}
+
+		foreach ( array( 'summary', 'getting_started' ) as $field ) {
+			if ( isset( $data[ $field ] ) && is_string( $data[ $field ] ) ) {
+				$data[ $field ] = self::text( $data[ $field ], $id, $field );
+			}
+		}
+
+		return $data;
+	}
+
 	/** The app's definition, without choosing a version. */
 	public static function definition( string $id ): ?array {
 		if ( ! preg_match( '/^[a-z0-9-]+$/D', $id ) ) {
@@ -35,7 +68,7 @@ final class Apps {
 		}
 		$file = BELTOFT_SERVICES_PATH . 'apps/' . $id . '/app.json';
 		$data = is_readable( $file ) ? json_decode( (string) file_get_contents( $file ), true ) : null;
-		$data = apply_filters( 'beltoft_services_apps', $data, $id );
+		$data = self::localise( apply_filters( 'beltoft_services_apps', $data, $id ), $id );
 		return is_array( $data ) && ( $data['id'] ?? '' ) === $id && is_array( $data['versions'] ?? null ) ? $data : null;
 	}
 
@@ -294,7 +327,7 @@ final class Apps {
 		}
 		$file = BELTOFT_SERVICES_PATH . 'apps/' . $id . '/app.json';
 		$data = is_readable( $file ) ? json_decode( (string) file_get_contents( $file ), true ) : null;
-		$data = apply_filters( 'beltoft_services_apps', $data, $id );
+		$data = self::localise( apply_filters( 'beltoft_services_apps', $data, $id ), $id );
 		if ( ! is_array( $data ) || ( $data['id'] ?? '' ) !== $id || ! isset( $data['versions'] ) || ! is_array( $data['versions'] ) ) {
 			return null;
 		}

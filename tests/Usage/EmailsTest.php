@@ -115,4 +115,20 @@ class EmailsTest extends UsageTestCase {
 		}
 		$this->assertSame( 'New subscription renewal order', $this->email( 'new_renewal_order', $order )->get_heading() );
 	}
+
+	public function test_the_usage_subject_and_heading_go_through_the_per_email_filters_so_a_language_plugin_sees_them(): void {
+		$order = $this->usage_order( true );
+		$order->update_status( 'completed' );
+		$order = wc_get_order( $order->get_id() );
+
+		foreach ( array( 'subject' => 'usage invoice', 'heading' => 'Usage invoice' ) as $kind => $needle ) {
+			$f = static fn( $text ) => false !== stripos( (string) $text, $needle ) ? $text . ' [da]' : $text;
+			add_filter( 'woocommerce_email_' . $kind . '_customer_completed_renewal_order', $f, 10 );
+			$email = $this->email( 'customer_completed_renewal_order', $order );
+			$out   = 'subject' === $kind ? $email->get_subject() : $email->get_heading();
+			remove_filter( 'woocommerce_email_' . $kind . '_customer_completed_renewal_order', $f, 10 );
+
+			$this->assertStringEndsWith( '[da]', $out, $kind );
+		}
+	}
 }

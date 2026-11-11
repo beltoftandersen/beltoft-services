@@ -41,7 +41,7 @@ final class PriceTags {
 	public static function register(): void {
 		add_filter( 'bricks/dynamic_tags_list', array( __CLASS__, 'tags_list' ) );
 		add_filter( 'bricks/dynamic_data/render_content', array( __CLASS__, 'render' ), 20, 3 );
-		add_filter( 'bricks/frontend/render_data', array( __CLASS__, 'render' ), 20, 3 );
+		add_filter( 'bricks/frontend/render_data', array( __CLASS__, 'render_data' ), 20, 2 );
 	}
 
 	/**
@@ -64,6 +64,17 @@ final class PriceTags {
 		}
 
 		return $tags;
+	}
+
+	/**
+	 * The same for bricks/frontend/render_data, whose second argument is the area, not a context: the plain figure.
+	 *
+	 * @param mixed $content Content.
+	 * @param mixed $post    Current post or area.
+	 * @return mixed
+	 */
+	public static function render_data( $content, $post = null ) {
+		return self::render( $content, $post, 'plain' );
 	}
 
 	/**

@@ -183,6 +183,14 @@ final class Code {
 			return self::fail( __( 'That code is not valid.', 'beltoft-services' ) );
 		}
 
+		// A code is in the shop's currency unless the coupon says otherwise (its meta); it is only credited to a balance in that currency.
+		$currency = (string) $coupon->get_meta( '_beltoft_services_credit_currency', true );
+		$currency = '' !== Currency::clean( $currency ) ? Currency::clean( $currency ) : Currency::base();
+
+		if ( ! Balance::allows( $user_id, $currency ) ) {
+			return self::fail( __( 'This code is in another currency than your account.', 'beltoft-services' ) );
+		}
+
 		$expires = $coupon->get_date_expires();
 
 		if ( $expires && time() > $expires->getTimestamp() ) {
@@ -230,15 +238,6 @@ final class Code {
 		}
 
 		$note = sprintf( /* translators: %s: the code. */ __( 'Credit code %s', 'beltoft-services' ), strtoupper( $coupon->get_code() ) );
-
-		// A code is in the shop's currency unless the coupon says otherwise (its meta); it is only credited to a balance in that currency.
-		$currency = (string) $coupon->get_meta( '_beltoft_services_credit_currency', true );
-		$currency = '' !== Currency::clean( $currency ) ? Currency::clean( $currency ) : Currency::base();
-		$own      = Balance::currency( $user_id );
-
-		if ( '' !== $own && $own !== $currency ) {
-			return self::fail( __( 'This code is in another currency than your credit.', 'beltoft-services' ) );
-		}
 
 		if ( ! Balance::credit( $user_id, $cents, Balance::PROMO, 'code', $ref, $note, $currency ) ) {
 			return self::fail( __( 'The credit could not be added. Try again.', 'beltoft-services' ) );

@@ -47,6 +47,8 @@ final class PricingTest extends UsageTestCase {
 	public function set_up(): void {
 		parent::set_up();
 
+		// The shop currency first: the usage account is made in it, and a customer's credit has to be in their account's currency.
+		update_option( 'woocommerce_currency', 'EUR' );
 		$this->user = $this->new_user();
 		$this->usage_account( $this->user );
 		$this->save_cluster( array( 'templates' => "9000 = Debian 12", 'default_template' => '9000' ) );

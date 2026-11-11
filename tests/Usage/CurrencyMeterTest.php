@@ -317,4 +317,76 @@ class CurrencyMeterTest extends UsageTestCase {
 		Meter::run( time() );
 		$this->assertStringContainsString( 'no price in that currency', implode( ' ', $this->bodies ) );
 	}
+
+	public function test_the_marker_is_the_first_unmetered_hour(): void {
+		$v    = $this->usage_product();
+		$user = $this->new_user();
+		$this->fake_currency_up( 'EUR' );
+		$this->fake_runner();
+		list( , $r ) = $this->dkk_server( $v, $user );
+		$this->activated_ago( $r->id(), 30 );
+		$r     = \BeltoftServices\Resource::find( $r->id() );
+		$first = max( Ledger::hour( (int) strtotime( \BeltoftLicenses\Licenses::activation( $r->id() )['activated_at'] . ' UTC' ) ), Ledger::hour( (int) $r->get( Meter::READY_AT ) ) );
+
+		Meter::run( time() );
+
+		$this->assertSame( $first, (int) \BeltoftServices\Resource::find( $r->id() )->get( Meter::UNMETERED_SINCE ) );
+	}
+
+	public function test_a_resource_closed_long_ago_with_a_marker_is_caught_up_to_its_end_hour_and_then_never_again(): void {
+		global $wpdb;
+		$v    = $this->usage_product();
+		$user = $this->new_user();
+		$this->fake_currency_up( 'EUR' );
+		$this->fake_runner();
+		list( , $r ) = $this->dkk_server( $v, $user );
+		$this->activated_ago( $r->id(), 300 );
+		Meter::run( time() );
+		$this->assertSame( array(), $this->rows( $r->id() ) );
+
+		// Closed 200 hours ago: more than 48 hours back, so it is not listed any more.
+		$closed = time() - 200 * HOUR_IN_SECONDS;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture.
+		$wpdb->update( \BeltoftLicenses\Install::tables()['activations'], array( 'deactivated_at' => gmdate( 'Y-m-d H:i:s', $closed ) ), array( 'id' => $r->id() ) );
+		$this->fake_price( $v['m-None']->get_id(), 'DKK', '30' );
+
+		Meter::run( time() );
+		$rows = $this->rows( $r->id() );
+
+		$this->assertGreaterThan( 90, count( $rows ), 'The gap from the first hour to the closing hour.' );
+		$this->assertLessThanOrEqual( Ledger::hour( $closed ), (int) strtotime( end( $rows )['hour_bucket'] . ' UTC' ), 'Nothing after it was closed.' );
+		$this->assertNull( \BeltoftServices\Resource::find( $r->id() )->get( Meter::UNMETERED_SINCE ) );
+		$this->assertNotContains( $r->id(), \BeltoftServices\Resource::ids_with_meta_value( Meter::UNMETERED_SINCE ) );
+
+		$count = count( $rows );
+		Meter::run( time() );
+		$this->assertCount( $count, $this->rows( $r->id() ), 'Never again.' );
+	}
+
+	public function test_a_failed_insert_keeps_the_marker_for_the_next_run(): void {
+		$v    = $this->usage_product();
+		$user = $this->new_user();
+		$this->fake_currency_up( 'EUR' );
+		$this->fake_runner();
+		list( , $r ) = $this->dkk_server( $v, $user );
+		$this->activated_ago( $r->id(), 80 );
+		Meter::run( time() );
+		$this->fake_price( $v['m-None']->get_id(), 'DKK', '30' );
+
+		$break = static function ( $query ) {
+			return false !== stripos( $query, 'INSERT IGNORE INTO' ) && false !== stripos( $query, 'bs_usage' ) ? 'SELECT * FROM zz_no_such_table' : $query;
+		};
+		add_filter( 'query', $break );
+		ob_start();
+		Meter::run( time() );
+		ob_end_clean();
+		remove_filter( 'query', $break );
+
+		$this->assertSame( array(), $this->rows( $r->id() ) );
+		$this->assertNotNull( \BeltoftServices\Resource::find( $r->id() )->get( Meter::UNMETERED_SINCE ), 'The marker stays.' );
+
+		Meter::run( time() );
+		$this->assertGreaterThanOrEqual( 79, count( $this->rows( $r->id() ) ) );
+		$this->assertNull( \BeltoftServices\Resource::find( $r->id() )->get( Meter::UNMETERED_SINCE ) );
+	}
 }

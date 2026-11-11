@@ -80,7 +80,7 @@ final class Balance {
 	 * @return mixed
 	 */
 	public static function user_currency( $code, $user_id = 0 ) {
-		if ( is_string( $code ) && '' !== $code ) {
+		if ( ( is_string( $code ) && '' !== $code ) || self::$skip ) {
 			return $code;
 		}
 
@@ -111,6 +111,53 @@ final class Balance {
 		update_user_meta( $user_id, self::META_CURRENCY, $have );
 
 		return $have;
+	}
+
+	/** @var bool While true the filter callback of this class answers nothing (see fixed_currency()). */
+	private static bool $skip = false;
+
+	/**
+	 * The currency someone else has fixed for the customer: the answer of the user currency chain WITHOUT the credit's own callback (a
+	 * bridge, the usage account), or '' when nobody has. The rule that keeps credit and usage from disagreeing: the first credit row
+	 * of a customer must be in this currency when it exists, so the credit callback (priority 10) can never flip an answer the
+	 * usage account (priority 20) or the bridge (5) gave.
+	 *
+	 * @param int $user_id Customer.
+	 */
+	public static function fixed_currency( int $user_id ): string {
+		self::$skip = true;
+
+		try {
+			return Currency::clean( apply_filters( 'beltoft_services_user_currency', '', $user_id ) );
+		} finally {
+			self::$skip = false;
+		}
+	}
+
+	/**
+	 * The currency a customer's credit is, or has to be: their credit currency when they have credit, else the one fixed for them, else ''.
+	 *
+	 * @param int $user_id Customer.
+	 */
+	public static function account_currency( int $user_id ): string {
+		$own = self::currency( $user_id );
+
+		return '' !== $own ? $own : self::fixed_currency( $user_id );
+	}
+
+	/**
+	 * Whether a credit in a currency may be written for the customer (or put in their cart): it is their credit currency, or, with no
+	 * credit yet, the one fixed for them, or nothing is fixed.
+	 *
+	 * @param int    $user_id  Customer.
+	 * @param string $currency Currency code, '' for the shop's.
+	 */
+	public static function allows( int $user_id, string $currency ): bool {
+		$want = Currency::clean( $currency );
+		$want = '' !== $want ? $want : Currency::base();
+		$have = self::account_currency( $user_id );
+
+		return '' === $have || $have === $want;
 	}
 
 	/**
@@ -302,20 +349,19 @@ final class Balance {
 
 		$target = '' !== $target ? $target : Currency::base();
 
+		$refused = null;
+
 		list( $locked, $written ) = self::locked(
 			$user_id,
-			static function () use ( $wpdb, $user_id, $signed, $kind, $ref_type, $ref_id, $note, $target ): bool {
-				// One currency per customer, also at a zero balance: another currency is refused and told once.
-				$have = self::row_currency( $user_id );
+			static function () use ( $wpdb, $user_id, $signed, $kind, $ref_type, $ref_id, $note, $target, &$refused ): bool {
+				// One currency per customer, also at a zero balance: another currency is refused. With no rows yet, the currency someone
+				// else fixed for the customer (the usage account, a bridge) counts as theirs. The mail is sent after the lock is released.
+				$have  = self::row_currency( $user_id );
+				$fixed = null === $have ? self::fixed_currency( $user_id ) : '';
+				$is    = $have ?? ( '' !== $fixed ? $fixed : $target );
 
-				if ( ( null !== $have && $have !== $target ) || ( ! Schema::has_currency() && Currency::base() !== $target ) ) {
-					Alerts::notify(
-						/* translators: %d: customer id */
-						sprintf( __( 'Credit in two currencies for customer %d', 'beltoft-services' ), $user_id ),
-						array( sprintf( 'A credit change of %1$d cents in %2$s was refused for customer %3$d: their credit is in %4$s (kind %5$s, reference %6$s %7$s). Nothing was written.', $signed, $target, $user_id, $have ?? Currency::base(), $kind, $ref_type, $ref_id ) ),
-						null,
-						'beltoft_services_credit_mixed_' . $user_id
-					);
+				if ( $is !== $target || ( ! Schema::has_currency() && Currency::base() !== $target ) ) {
+					$refused = array( $is, sprintf( 'A credit change of %1$d cents in %2$s was refused for customer %3$d: their credit currency is %4$s (kind %5$s, reference %6$s %7$s). Nothing was written.', $signed, $target, $user_id, $is, $kind, $ref_type, $ref_id ) );
 
 					return false;
 				}
@@ -353,6 +399,16 @@ final class Balance {
 				return 1 === (int) $done;
 			}
 		);
+
+		if ( null !== $refused ) {
+			Alerts::notify(
+				/* translators: %d: customer id */
+				sprintf( __( 'Credit in two currencies for customer %d', 'beltoft-services' ), $user_id ),
+				array( $refused[1] ),
+				null,
+				'beltoft_services_credit_mixed_' . $user_id
+			);
+		}
 
 		return $locked && true === $written;
 	}
