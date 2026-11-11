@@ -243,7 +243,7 @@ class CapacityMemoTest extends HostingCase {
 		$this->assertFalse( has_action( 'woocommerce_checkout_process', array( HostingCapacity::class, 'forget' ) ) );
 		$this->assertFalse( has_filter( 'woocommerce_is_purchasable', array( \BeltoftServices\Hosting\Stock::class, 'filter' ) ) );
 
-		$validation = has_filter( 'woocommerce_add_to_cart_validation', array( \BeltoftServices\Hosting\Stock::class, 'validation' ) );
+		$validation = has_filter( 'woocommerce_add_to_cart_validation', array( \BeltoftServices\Billing\ExistingFlow::class, 'validation' ) );
 		$this->assertNotFalse( $validation );
 		$this->assertLessThan( 1, (int) $validation, 'Before the validation filters WooCommerce registers at priority 1.' );
 	}
