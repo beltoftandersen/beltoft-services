@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.8.1
+Stable tag: 0.8.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -253,6 +253,11 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.8.2 =
+* A WordPress hosting tab in My Account for every customer, with an empty state and an Order hosting button. The button goes to the setting "Hosting order page", else the first hosting product, or what the filter `beltoft_services_hosting_add_url` returns.
+* A customer's first credit row (a credit code, a top-up or an admin grant) fixes their currency for good. The new action `beltoft_services_credit_currency_set( $user_id, $currency )` tells the site, so a shop side that offers more than one currency can fix the customer to it and no credit is left that cannot be applied.
+* An error or a confirmation in My Account is shown once, in the status bar at the top, and is no longer repeated under the field it belongs to: the field is marked invalid and focused. The hosting panel uses the status bar too. A notice that a form left behind and nothing printed is handed to the status bar.
 
 = 0.8.1 =
 * The prices on pages a cache may keep (the Bricks usage tags, the domain tags, the domain search results and the Bricks domain rows) are renderers that work the figure out again for the currency in force when a listener of `beltoft_services_price_html` calls `$render`, and give an empty answer where there is no price in that currency. A site that prints every currency calls `$render` once per currency and display and prints no variant for an empty answer. For such a renderer `$amount` is null and `$currency` is the currency of the first render. With no listener and one currency the output is as in 0.8.0. The domain rows keep their memo per currency.
