@@ -15,6 +15,7 @@ final class DomainSettings {
 		add_filter( 'beltoft_services_settings_tabs', array( __CLASS__, 'tabs' ) );
 		add_filter( 'beltoft_services_settings_sections', array( __CLASS__, 'sections' ) );
 		add_filter( 'beltoft_services_settings_fields', array( __CLASS__, 'fields' ) );
+		add_filter( 'beltoft_services_setting_bad_lines', array( __CLASS__, 'bad_lines' ), 10, 3 );
 		add_action( 'beltoft_services_settings_tab_' . self::TAB, array( __CLASS__, 'render' ) );
 		add_action( 'admin_post_beltoft_services_save_domains_account', array( __CLASS__, 'save_account' ) );
 		add_action( 'beltoft_services_domain_prices', array( __CLASS__, 'sync_prices' ) );
@@ -57,6 +58,18 @@ final class DomainSettings {
 		return $sections;
 	}
 
+	/**
+	 * The override lines that cannot be read, for the settings screen.
+	 *
+	 * @param mixed  $bad  Lines so far.
+	 * @param string $key  Setting key.
+	 * @param mixed  $text Text.
+	 * @return mixed
+	 */
+	public static function bad_lines( $bad, $key = '', $text = '' ) {
+		return 'domain_price_overrides' === $key && is_array( $bad ) ? array_merge( $bad, Prices::bad_override_lines( (string) $text ) ) : $bad;
+	}
+
 	public static function fields( $fields ) {
 		if ( ! is_array( $fields ) ) { return $fields; }
 		$base = array( 'tab' => self::TAB, 'section' => self::TAB );
@@ -64,7 +77,7 @@ final class DomainSettings {
 		$fields['domain_nameservers'] = $base + array( 'type' => 'text', 'default' => '', 'label' => __( 'Name servers', 'beltoft-services' ), 'desc' => __( 'Comma separated host names. Leave empty to disable automatic zones.', 'beltoft-services' ) );
 		$fields['domain_markup_percent'] = $base + array( 'type' => 'number', 'default' => 30, 'min' => 0, 'max' => 500, 'label' => __( 'Markup percent', 'beltoft-services' ) );
 		$fields['domain_min_margin'] = $base + array( 'type' => 'number', 'default' => 4, 'min' => 0, 'max' => 1000, 'label' => __( 'Minimum margin in EUR', 'beltoft-services' ) );
-		$fields['domain_price_overrides'] = $base + array( 'type' => 'textarea', 'default' => '', 'label' => __( 'Price overrides', 'beltoft-services' ), 'desc' => __( 'One TLD and whole euro price per line, for example com=15.', 'beltoft-services' ) );
+		$fields['domain_price_overrides'] = $base + array( 'type' => 'textarea', 'default' => '', 'label' => __( 'Price overrides', 'beltoft-services' ), 'desc' => __( 'One extension and its yearly price excluding tax per line, for example com=15 or dk=95.20 (a dot, at most two decimals). A line that cannot be read stops the save.', 'beltoft-services' ) );
 		$fields['domain_restricted_allowlist'] = $base + array( 'type' => 'text', 'default' => 'dk', 'label' => __( 'Allowed restricted TLDs', 'beltoft-services' ) );
 		$fields['domain_featured_tlds'] = $base + array( 'type' => 'text', 'default' => 'com,net,org,eu', 'label' => __( 'Featured TLDs', 'beltoft-services' ) );
 		$fields['domain_renew_days_before'] = $base + array( 'type' => 'number', 'default' => 30, 'min' => 1, 'max' => 60, 'label' => __( 'Charge renewals before expiry, in days', 'beltoft-services' ) );

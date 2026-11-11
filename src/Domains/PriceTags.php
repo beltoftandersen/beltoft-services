@@ -105,11 +105,12 @@ final class PriceTags {
 	public static function value( string $tld, bool $markup = true ): string {
 		$price = Prices::price( $tld );
 
-		if ( null === $price ) {
-			return '';
+		// Only text content takes the filtered markup; elsewhere (an attribute, a link) it is the plain figure in the shop's display. The
+		// markup is a renderer that reads the price table again for the currency in force when a listener calls it (see Search::price_html()).
+		if ( $markup ) {
+			return null === $price ? '' : Search::price_html( $price, 'domain-tag', true, $tld );
 		}
 
-		// Only text content takes the filtered markup; elsewhere (an attribute, a link) it is the plain figure in the shop's display.
-		return $markup ? Search::price_html( $price, 'domain-tag', true ) : esc_html( Search::price_text( $price ) );
+		return null === $price ? '' : esc_html( Search::price_text( $price ) );
 	}
 }

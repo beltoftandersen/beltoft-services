@@ -421,6 +421,23 @@ final class Settings {
 				case 'textarea':
 					$clean[ $key ] = sanitize_textarea_field( (string) $raw );
 
+					// A feature that reads lines out of a text setting names the lines it cannot read: the old value stays and the screen says which.
+					$bad = (array) apply_filters( 'beltoft_services_setting_bad_lines', array(), $key, $clean[ $key ] );
+
+					if ( array() !== $bad ) {
+						add_settings_error(
+							self::OPTION,
+							'beltoft_services_bad_lines_' . $key,
+							sprintf(
+								/* translators: 1: the name of the setting, 2: the lines that were not accepted */
+								__( '%1$s was not saved. Not accepted: %2$s', 'beltoft-services' ),
+								(string) ( $field['label'] ?? $key ),
+								implode( ', ', array_map( 'strval', $bad ) )
+							)
+						);
+						$clean[ $key ] = (string) self::get( $key );
+					}
+
 					if ( 'currency_guard_rates' === $key ) {
 						$parsed = Currency::parse_guard_rates( $clean[ $key ] );
 

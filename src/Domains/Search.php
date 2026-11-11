@@ -79,9 +79,12 @@ final class Search {
 	 */
 	public static function decorate( array $found ): array {
 		foreach ( (array) ( $found['results'] ?? array() ) as $i => $item ) {
-			$price = isset( $item['price'] ) && null !== $item['price'] ? (int) $item['price'] : null;
+			$price = isset( $item['price'] ) && null !== $item['price'] && is_numeric( $item['price'] ) ? $item['price'] + 0 : null;
+			$tld   = null !== $price ? self::tld_of( (string) ( $item['domain'] ?? '' ) ) : '';
 			$found['results'][ $i ]['price_text'] = self::price_text( $price );
-			$found['results'][ $i ]['price_html'] = self::price_html( $price );
+			$found['results'][ $i ]['price_html'] = self::price_html( $price, 'domain-price', false, $tld );
+			// The plain figure as a renderer too (a Bricks row prints it inside a sentence): the same listener rule as price_html.
+			$found['results'][ $i ]['price_text_html'] = null !== $price ? self::price_html( $price, 'domain-price', true, $tld ) : '';
 		}
 		$found['tax']      = TaxNote::display();
 		$found['currency'] = (string) get_woocommerce_currency();
@@ -198,19 +201,43 @@ final class Search {
 	}
 
 	/** A yearly price (whole units, excluding tax) as the catalogue shows it: whole amounts without decimals, the shop's tax display, plain text. Empty for none. */
-	public static function price_text( ?int $price ): string {
+	public static function price_text( int|float|null $price ): string {
 		if ( null === $price ) { return ''; }
 		return TaxNote::text( (float) $price, self::decimals( $price ), Cart::domain_product(), '', false );
 	}
 
-	/** The same price as HTML for a page: it passes beltoft_services_price_html, so a site can show both tax displays. $plain: escaped plain text instead of the price markup (a Bricks tag). Empty for none. */
-	public static function price_html( ?int $price, string $context = 'domain-price', bool $plain = false ): string {
+	/**
+	 * The same price as HTML for a page: it passes beltoft_services_price_html, so a site can show both tax displays. $plain: escaped plain
+	 * text instead of the price markup (a Bricks tag). Empty for none.
+	 *
+	 * With an extension ($tld) the price is a renderer that works the price out again from the price table WHEN IT IS CALLED, for the
+	 * currency then in force: a listener on a cacheable page that calls $render inside a window for another currency gets that currency's
+	 * figure (or '' where the extension has no price in it), never this one relabelled. Without an extension the amount is fixed.
+	 */
+	public static function price_html( int|float|null $price, string $context = 'domain-price', bool $plain = false, string $tld = '' ): string {
+		if ( '' !== $tld ) {
+			return wp_kses_post( TaxNote::html( static fn( string $display = '' ): string => self::price_now( $tld, $plain ), $context ) );
+		}
 		if ( null === $price ) { return ''; }
 		return wp_kses_post( TaxNote::html( (float) $price, $context, array( 'product' => Cart::domain_product(), 'decimals' => self::decimals( $price ), 'plain' => $plain ) ) );
 	}
 
+	/** The price of an extension in the currency and the tax display in force right now: price markup, or escaped plain text. '' for none. */
+	private static function price_now( string $tld, bool $plain ): string {
+		$price = Prices::price( $tld );
+		if ( null === $price ) { return ''; }
+		if ( $plain ) { return esc_html( self::price_text( $price ) ); }
+		return wc_price( TaxNote::figure( (float) $price, Cart::domain_product() ), array( 'decimals' => self::decimals( $price ) ) );
+	}
+
+	/** The extension of a domain name: what follows its first dot. */
+	public static function tld_of( string $domain ): string {
+		$at = strpos( $domain, '.' );
+		return false === $at ? '' : strtolower( substr( $domain, $at + 1 ) );
+	}
+
 	/** Whole amounts have no decimals ("€12"), others two ("€15.50"), in the display in force. */
-	private static function decimals( int $price ): int {
+	private static function decimals( int|float $price ): int {
 		$shown = TaxNote::figure( (float) $price, Cart::domain_product() );
 		return abs( $shown - round( $shown ) ) < 0.005 ? 0 : 2;
 	}

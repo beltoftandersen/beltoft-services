@@ -429,7 +429,7 @@ final class Cart {
 		return true;
 	}
 
-	public static function price_for( array $item ): ?int {
+	public static function price_for( array $item ): int|float|null {
 		if ( CartFlow::has_value( $item, CartFlow::BOUGHT_BEFORE ) ) { return null; }
 		$domain = $item['beltoft_services_domain'] ?? null;
 		if ( ! is_array( $domain ) || 'dns' === ( $domain['mode'] ?? '' ) ) { return null; }

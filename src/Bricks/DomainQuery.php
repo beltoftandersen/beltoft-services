@@ -86,7 +86,9 @@ final class DomainQuery {
 	/** The search of this request (once): array( term, rows, error ). */
 	public static function search(): array {
 		$term = self::term();
-		if ( isset( self::$memo[ $term ] ) ) { return self::$memo[ $term ]; }
+		// The rows hold prices: kept per currency, so a window in another one never reads the page's.
+		$key  = \BeltoftServices\Currency::current() . '|' . $term;
+		if ( isset( self::$memo[ $key ] ) ) { return self::$memo[ $key ]; }
 		$out = array( 'term' => $term, 'rows' => array(), 'error' => '' );
 		if ( '' !== $term ) {
 			$reply = Search::visitor_search( $term );
@@ -96,7 +98,7 @@ final class DomainQuery {
 				$out['rows'] = self::rows( (array) ( $reply['results'] ?? array() ), $term );
 			}
 		}
-		self::$memo = array( $term => $out );
+		self::$memo = array( $key => $out );
 		return $out;
 	}
 
@@ -110,7 +112,10 @@ final class DomainQuery {
 			if ( 'not_sold' === $status && ! ( $typed_extension && 0 === $index ) ) { continue; }
 			$free   = 'free' === $status;
 			$domain = (string) $item['domain'];
-			$shown  = isset( $item['price_text'] ) ? (string) $item['price_text'] : ( isset( $item['price'] ) && null !== $item['price'] ? \BeltoftServices\Domains\Search::price_text( (int) $item['price'] ) : '' );
+			$shown  = isset( $item['price_text'] ) ? (string) $item['price_text'] : ( isset( $item['price'] ) && null !== $item['price'] ? \BeltoftServices\Domains\Search::price_text( $item['price'] + 0 ) : '' );
+			// What a listener on beltoft_services_price_html makes of the figure (the other tax display, every currency). Only kept when it
+			// is not the plain figure itself, so a site with no listener prints exactly what it always did.
+			$markup = isset( $item['price_text_html'] ) && '' !== (string) $item['price_text_html'] && (string) $item['price_text_html'] !== esc_html( $shown ) ? (string) $item['price_text_html'] : '';
 			$rows[] = array(
 				'__bds'         => 1,
 				'domain'        => $domain,
@@ -124,7 +129,12 @@ final class DomainQuery {
 				'primary'       => 0 === count( $rows ) ? 1 : 0,
 				'row_class'     => 0 === count( $rows ) ? 'beltoft-domain-result--primary' : '',
 				'add_url'       => $free ? self::add_url( $domain ) : '',
-			);
+			) + ( '' !== $markup ? array(
+				/* translators: %s: price with its currency symbol, such as the euro symbol and 12 */
+				'price_markup'   => sprintf( __( '%s / year', 'beltoft-services' ), $markup ),
+				/* translators: %s: price with its currency symbol, such as the euro symbol and 12 */
+				'renewal_markup' => $free ? sprintf( __( 'Renews at %s / year', 'beltoft-services' ), $markup ) : '',
+			) : array() );
 		}
 		return $rows;
 	}
@@ -199,6 +209,13 @@ final class DomainQuery {
 		return isset( $row[ $key ] ) ? (string) $row[ $key ] : '';
 	}
 
+	/** The listener's markup of a price tag of the current row ('' when there is none). */
+	private static function markup( string $name ): string {
+		$row = self::current_row();
+		$key = 'bds_price' === $name ? 'price_markup' : 'renewal_markup';
+		return is_array( $row ) && isset( $row[ $key ] ) ? (string) $row[ $key ] : '';
+	}
+
 	public static function render_tag( $value, $post = null, $context = 'text' ) {
 		unset( $post, $context );
 		if ( ! is_string( $value ) ) { return $value; }
@@ -214,6 +231,8 @@ final class DomainQuery {
 			static function ( $m ) use ( $context ) {
 				if ( ! isset( self::labels()[ $m[1] ] ) ) { return $m[0]; }
 				$value = self::value( $m[1] );
+				$html  = 'text' === $context && in_array( $m[1], array( 'bds_price', 'bds_renewal_price' ), true ) ? self::markup( $m[1] ) : '';
+				if ( '' !== $html ) { return wp_kses_post( $html ); }
 				return 'link' === $context ? esc_url_raw( $value ) : esc_html( $value );
 			},
 			$content

@@ -287,6 +287,14 @@ final class TaxNote {
 	 * printed (for example 'server-picker'), and $render ( string $display = '' ): string renders the same price in a
 	 * tax display, so a listener can print both figures or the other one. A caller outputs the result with wp_kses_post().
 	 *
+	 * A renderer ($price a callable) on a page a cache may keep (the Bricks usage and domain tags, the domain rows) works its figure out
+	 * AGAIN every time it is called, for the currency and the tax display in force at that moment, and returns '' where the product, plan or
+	 * extension has no price in that currency (the null rule). A listener that prints another currency calls $render inside that
+	 * currency's window (the site's runner), once per currency and display, and prints no variant for an empty answer. Then $amount is
+	 * null and $currency is the currency at the time of the first render: a listener must call $render for anything it prints, never
+	 * reuse $amount. A float price (account pages, pickers, the checkout: pages that are never cached) is a fixed figure, and its renderer
+	 * only changes the tax display.
+	 *
 	 * @param float|callable       $price   Amount or renderer.
 	 * @param string               $context Where it is printed.
 	 * @param array<string, mixed> $args    Arguments.

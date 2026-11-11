@@ -710,7 +710,7 @@
         "type": "textarea",
         "default": "",
         "label": "Price overrides",
-        "desc": "One TLD and whole euro price per line, for example com=15."
+        "desc": "One extension and its yearly price excluding tax per line, for example com=15 or dk=95.20 (a dot, at most two decimals). A line that cannot be read stops the save."
     },
     "domain_restricted_allowlist": {
         "tab": "domains",

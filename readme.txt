@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.8.0
+Stable tag: 0.8.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -252,6 +252,10 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.8.1 =
+* The prices on pages a cache may keep (the Bricks usage tags, the domain tags, the domain search results and the Bricks domain rows) are renderers that work the figure out again for the currency in force when a listener of `beltoft_services_price_html` calls `$render`, and give an empty answer where there is no price in that currency. A site that prints every currency calls `$render` once per currency and display and prints no variant for an empty answer. For such a renderer `$amount` is null and `$currency` is the currency of the first render. With no listener and one currency the output is as in 0.8.0. The domain rows keep their memo per currency.
+* Domain price override lines take a dot and up to two decimals (`dk=95.20`), so a price that ends in 9 including 25 percent tax can be written. A line that cannot be read stops the save, the old value stays and the screen names the lines. New filter `beltoft_services_setting_bad_lines` for a feature to do the same for another text setting.
 
 = 0.8.0 =
 * More than one shop currency. A customer is priced, invoiced and charged in one currency, and nothing is ever converted for a customer: an amount with no value in a currency is not offered in it. See "More than one currency" in the FAQ.

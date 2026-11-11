@@ -21,11 +21,11 @@ final class Prices {
 	}
 
 	/**
-	 * The public yearly price of an extension in a currency (the current one by default), whole units. In the shop's currency it is the override
+	 * The public yearly price of an extension in a currency (the current one by default), whole units, or with decimals for an override line that has them (up to two, excluding tax: 95.20 is 119.00 including 25 percent). In the shop's currency it is the override
 	 * or the price the markup rule gave. In another currency only an override line of that currency counts (the amount filter answers it, see
 	 * Currency::amount()): the euro price is never shown as another currency, so an extension with no line there has no price.
 	 */
-	public static function price( string $tld, string $currency = '' ): ?int {
+	public static function price( string $tld, string $currency = '' ): int|float|null {
 		$tld = strtolower( ltrim( $tld, '.' ) );
 		$currency = Currency::or_current( $currency );
 		// sellable() holds the table and, outside the shop's currency, the override line: nothing else is needed to know the price exists.
@@ -74,16 +74,40 @@ final class Prices {
 		return in_array( $tld, $allowed, true );
 	}
 
+	/** One override line: an extension, an equals sign and a price: whole, or with a dot and one or two decimals. */
+	private const LINE = '/^\s*([a-z0-9][a-z0-9.-]*)\s*=\s*([1-9][0-9]*(?:\.[0-9]{1,2})?)\s*$/iD';
+
+	/** The price of a matching line: an int for a whole amount, a float with decimals. */
+	private static function amount_of( string $text ): int|float {
+		$value = round( (float) $text, 2 );
+		return abs( $value - round( $value ) ) < 0.000001 ? (int) round( $value ) : $value;
+	}
+
 	private static function overrides( string $currency = '' ): array {
 		$raw = Currency::amount( 'domain_price_overrides', $currency );
 		if ( ! is_string( $raw ) ) { return array(); }
 		$result = array();
 		foreach ( preg_split( '/\r?\n/', $raw ) as $line ) {
-			if ( preg_match( '/^\s*([a-z0-9.-]+)\s*=\s*([1-9][0-9]*)\s*$/iD', $line, $match ) ) {
-				$result[ strtolower( $match[1] ) ] = (int) $match[2];
+			if ( preg_match( self::LINE, $line, $match ) ) {
+				$result[ strtolower( $match[1] ) ] = self::amount_of( $match[2] );
 			}
 		}
 		return $result;
+	}
+
+	/**
+	 * The lines of an override text that cannot be read (a comma, more than two decimals, a zero or no price, no extension), for the
+	 * settings screen. Empty lines are fine.
+	 *
+	 * @return string[]
+	 */
+	public static function bad_override_lines( string $text ): array {
+		$bad = array();
+		foreach ( preg_split( '/\r?\n/', $text ) as $line ) {
+			$line = trim( $line );
+			if ( '' !== $line && 1 !== preg_match( self::LINE, $line ) ) { $bad[] = $line; }
+		}
+		return $bad;
 	}
 
 	/** Complete fetch before replacing the saved table. */

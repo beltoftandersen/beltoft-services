@@ -2,14 +2,14 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Beltoft Services for WooCommerce 0.8.0\n"
+"Project-Id-Version: Beltoft Services for WooCommerce 0.8.1\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/beltoft-services\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-11T10:23:34+00:00\n"
+"POT-Creation-Date: 2026-11-11T11:19:55+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-services\n"
@@ -482,7 +482,7 @@ msgid "DNS records"
 msgstr ""
 
 #: src/Account/DomainPage.php:178
-#: src/Domains/DomainSettings.php:64
+#: src/Domains/DomainSettings.php:77
 #: src/Domains/EmailDetails.php:20
 #: src/Proxmox/Pve/ClustersScreen.php:334
 #: templates/account/domain-page.php:59
@@ -850,7 +850,7 @@ msgstr ""
 #: src/Api/Reference.php:203
 #: src/Domains/DnsClaimPanel.php:59
 #: src/Domains/DnsClaimPanel.php:66
-#: src/Domains/DomainSettings.php:51
+#: src/Domains/DomainSettings.php:52
 msgid "Domains"
 msgstr ""
 
@@ -863,7 +863,7 @@ msgid "Register a new domain or move one you have, with DNS hosting included."
 msgstr ""
 
 #: src/Account/OverviewData.php:599
-#: src/Domains/Search.php:221
+#: src/Domains/Search.php:248
 msgid "Find a domain"
 msgstr ""
 
@@ -2965,7 +2965,7 @@ msgid "Sidebar"
 msgstr ""
 
 #: src/Bricks/ApiReferenceElement.php:65
-#: src/Domains/Search.php:223
+#: src/Domains/Search.php:250
 msgid "Search"
 msgstr ""
 
@@ -3181,7 +3181,8 @@ msgstr ""
 
 #. translators: %s: price with its currency symbol, such as the euro symbol and 12
 #. translators: %s: the price with its currency symbol, such as the euro symbol and 12
-#: src/Bricks/DomainQuery.php:120
+#: src/Bricks/DomainQuery.php:125
+#: src/Bricks/DomainQuery.php:134
 #: assets/domain-search.js:136
 #: assets/domain-search.js:336
 #: assets/domain-search.js:349
@@ -3191,46 +3192,47 @@ msgstr ""
 
 #. translators: %s: price with its currency symbol, such as the euro symbol and 12
 #. translators: %s: the price with its currency symbol, such as the euro symbol and 12
-#: src/Bricks/DomainQuery.php:121
+#: src/Bricks/DomainQuery.php:126
+#: src/Bricks/DomainQuery.php:136
 #: assets/domain-search.js:139
 #, php-format,js-format
 msgid "Renews at %s / year"
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:135
+#: src/Bricks/DomainQuery.php:145
 #: assets/domain-search.js:125
 msgid "Available to register"
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:136
+#: src/Bricks/DomainQuery.php:146
 msgid "Already registered"
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:137
+#: src/Bricks/DomainQuery.php:147
 #: assets/domain-search.js:127
 msgid "Premium domain. Online ordering is unavailable."
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:138
+#: src/Bricks/DomainQuery.php:148
 #: assets/domain-search.js:128
 msgid "This domain extension is not available to order here."
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:140
+#: src/Bricks/DomainQuery.php:150
 #: assets/domain-search.js:130
 msgid "Availability could not be confirmed."
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:187
+#: src/Bricks/DomainQuery.php:197
 #: src/Bricks/DomainSearchElement.php:28
 msgid "Domain search"
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:230
+#: src/Bricks/DomainQuery.php:249
 msgid "This link has expired. Go back, search again and try again."
 msgstr ""
 
-#: src/Bricks/DomainQuery.php:233
+#: src/Bricks/DomainQuery.php:252
 #: src/Domains/Cart.php:78
 #: src/Domains/TransferDns.php:482
 #: src/Mcp/Confirmations.php:86
@@ -4921,21 +4923,21 @@ msgstr ""
 msgid "Final checks"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:56
+#: src/Domains/DomainSettings.php:57
 msgid "Domain registration and DNS"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:63
+#: src/Domains/DomainSettings.php:76
 #: src/Hosting/NodesScreen.php:230
 #: src/Proxmox/Pve/ClustersScreen.php:194
 msgid "Fake"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:63
+#: src/Domains/DomainSettings.php:76
 msgid "Sandbox"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:63
+#: src/Domains/DomainSettings.php:76
 #: src/Hosting/NodesScreen.php:230
 #: src/Hosting/NodesScreen.php:336
 #: src/Proxmox/Pve/ClustersScreen.php:194
@@ -4943,128 +4945,128 @@ msgstr ""
 msgid "Live"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:63
+#: src/Domains/DomainSettings.php:76
 msgid "Registrar API mode"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:64
+#: src/Domains/DomainSettings.php:77
 msgid "Comma separated host names. Leave empty to disable automatic zones."
 msgstr ""
 
-#: src/Domains/DomainSettings.php:65
+#: src/Domains/DomainSettings.php:78
 msgid "Markup percent"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:66
+#: src/Domains/DomainSettings.php:79
 msgid "Minimum margin in EUR"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:67
+#: src/Domains/DomainSettings.php:80
 msgid "Price overrides"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:67
-msgid "One TLD and whole euro price per line, for example com=15."
+#: src/Domains/DomainSettings.php:80
+msgid "One extension and its yearly price excluding tax per line, for example com=15 or dk=95.20 (a dot, at most two decimals). A line that cannot be read stops the save."
 msgstr ""
 
-#: src/Domains/DomainSettings.php:68
+#: src/Domains/DomainSettings.php:81
 msgid "Allowed restricted TLDs"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:69
+#: src/Domains/DomainSettings.php:82
 msgid "Featured TLDs"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:70
+#: src/Domains/DomainSettings.php:83
 #: src/Ssl/SslSettings.php:133
 msgid "Charge renewals before expiry, in days"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:71
+#: src/Domains/DomainSettings.php:84
 msgid "Lock an unlocked domain again after, in days"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:71
+#: src/Domains/DomainSettings.php:84
 msgid "A domain left unlocked for transfer is locked again after this many days. 0 turns it off. Turn it on only once you have confirmed how the registrar reports an outgoing transfer, because a transfer under way must not be locked."
 msgstr ""
 
-#: src/Domains/DomainSettings.php:72
+#: src/Domains/DomainSettings.php:85
 msgid "Low registrar balance in EUR"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:73
+#: src/Domains/DomainSettings.php:86
 msgid "Seller name in the .dk agreement"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:73
+#: src/Domains/DomainSettings.php:86
 msgid "The company that is paid for the registration, as named in the .dk checkout agreement. Empty uses the site name."
 msgstr ""
 
-#: src/Domains/DomainSettings.php:74
+#: src/Domains/DomainSettings.php:87
 msgid "Own zones on the DNS server"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:74
+#: src/Domains/DomainSettings.php:87
 msgid "Comma separated zones that belong to the site itself, for example its name server domain. The orphan zone check skips them."
 msgstr ""
 
-#: src/Domains/DomainSettings.php:75
+#: src/Domains/DomainSettings.php:88
 msgid "DNS API URL"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:76
+#: src/Domains/DomainSettings.php:89
 msgid "Primary DNS query address"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:76
+#: src/Domains/DomainSettings.php:89
 msgid "Local IP address used to check the first name server when its public address cannot be reached from this server."
 msgstr ""
 
-#: src/Domains/DomainSettings.php:77
+#: src/Domains/DomainSettings.php:90
 msgid "DNS hosting for domains registered elsewhere"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:77
+#: src/Domains/DomainSettings.php:90
 msgid "Customers can verify a domain with a TXT record and add DNS hosting for it. Needs at least two name servers below."
 msgstr ""
 
-#: src/Domains/DomainSettings.php:78
+#: src/Domains/DomainSettings.php:91
 msgid "Domain search page"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:78
+#: src/Domains/DomainSettings.php:91
 msgid "The address of the page where customers search for and register a domain, for example /domains/. The account shows a Register a domain button when it is set. Leave empty to hide the button."
 msgstr ""
 
-#: src/Domains/DomainSettings.php:79
+#: src/Domains/DomainSettings.php:92
 msgid "DNS hosting domains per customer"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:85
+#: src/Domains/DomainSettings.php:98
 msgid "Live mode is blocked until BELTOFT_SERVICES_DOMAINS_LIVE is enabled in wp-config.php."
 msgstr ""
 
-#: src/Domains/DomainSettings.php:93
+#: src/Domains/DomainSettings.php:106
 msgid "Registrar and DNS credentials"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:98
+#: src/Domains/DomainSettings.php:111
 msgid "Registrar username"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:98
+#: src/Domains/DomainSettings.php:111
 msgid "Reseller handle"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:98
+#: src/Domains/DomainSettings.php:111
 msgid "Registrar password"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:98
+#: src/Domains/DomainSettings.php:111
 msgid "DNS API key"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:101
+#: src/Domains/DomainSettings.php:114
 #: src/Hosting/NodesScreen.php:272
 #: src/Hosting/NodesScreen.php:290
 #: src/Http/ConnectionsScreen.php:305
@@ -5074,18 +5076,18 @@ msgstr ""
 msgid "Saved"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:105
+#: src/Domains/DomainSettings.php:118
 msgid "Save credentials"
 msgstr ""
 
-#: src/Domains/DomainSettings.php:110
+#: src/Domains/DomainSettings.php:123
 #: src/Proxmox/Network/Flows.php:99
 #: src/Proxmox/Network/Flows.php:114
 #: src/Ssl/SslSettings.php:189
 msgid "Not allowed."
 msgstr ""
 
-#: src/Domains/DomainSettings.php:117
+#: src/Domains/DomainSettings.php:130
 msgid "Configure the encryption key before saving credentials."
 msgstr ""
 
@@ -5415,45 +5417,45 @@ msgid "Too many searches. Please wait a minute."
 msgstr ""
 
 #: src/Domains/Search.php:67
-#: src/Domains/Search.php:94
-#: src/Domains/Search.php:181
+#: src/Domains/Search.php:97
+#: src/Domains/Search.php:184
 msgid "A valid domain name is required."
 msgstr ""
 
-#: src/Domains/Search.php:130
+#: src/Domains/Search.php:133
 msgid "Domain search is busy. Please try again in a few minutes."
 msgstr ""
 
-#: src/Domains/Search.php:135
+#: src/Domains/Search.php:138
 msgid "Domain search is not available right now. Try again in a few minutes."
 msgstr ""
 
-#: src/Domains/Search.php:147
-#: src/Domains/Search.php:148
+#: src/Domains/Search.php:150
+#: src/Domains/Search.php:151
 msgid "Websites on this extension need HTTPS."
 msgstr ""
 
-#: src/Domains/Search.php:149
+#: src/Domains/Search.php:152
 msgid "The registrant must be in the EU."
 msgstr ""
 
-#: src/Domains/Search.php:150
+#: src/Domains/Search.php:153
 msgid "A business needs a VAT number to register this extension."
 msgstr ""
 
-#: src/Domains/Search.php:171
+#: src/Domains/Search.php:174
 msgid "A valid domain label is required."
 msgstr ""
 
-#: src/Domains/Search.php:224
+#: src/Domains/Search.php:251
 msgid "Transfer a domain you already own"
 msgstr ""
 
-#: src/Domains/Search.php:231
+#: src/Domains/Search.php:258
 msgid "Domain to transfer"
 msgstr ""
 
-#: src/Domains/Search.php:233
+#: src/Domains/Search.php:260
 msgid "Continue"
 msgstr ""
 
@@ -8339,7 +8341,7 @@ msgstr ""
 
 #: src/Http/Connections.php:628
 #: src/Proxmox/Pve/Clusters.php:740
-#: src/Settings.php:467
+#: src/Settings.php:484
 msgid "Add BELTOFT_SERVICES_KEY to wp-config.php before saving secrets."
 msgstr ""
 
@@ -14230,8 +14232,14 @@ msgstr ""
 msgid "Open Settings → Licenses"
 msgstr ""
 
+#. translators: 1: the name of the setting, 2: the lines that were not accepted
+#: src/Settings.php:433
+#, php-format
+msgid "%1$s was not saved. Not accepted: %2$s"
+msgstr ""
+
 #. translators: %s: the lines that were not accepted
-#: src/Settings.php:434
+#: src/Settings.php:451
 #, php-format
 msgid "The guard rates were not saved. Each line must be a currency code, an equals sign and a number with a dot, such as DKK=7.60, from 1 to 1000. Not accepted: %s"
 msgstr ""
