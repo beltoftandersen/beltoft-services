@@ -260,13 +260,16 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 * Domains, certificates and licence keys can be sold in a second currency: a price per extension per currency, and a guard rate (setting `currency_guard_rates`) so an order is only placed with the supplier when what was paid covers its cost in euro. Without a guard rate such an order is refused and the admin is mailed.
 * The MCP endpoint, the API routes that return prices and the renewal reminder use the currency of the token owner or of the subscription. A call that cannot be answered in that currency is refused; amounts stay excluding tax and carry their currency code.
 * The credit box on a user profile names the currency, credit codes have a currency, and the Currencies settings section explains the fields.
-* New hooks: `beltoft_services_currency_runner`, `_user_currency`, `_amount_setting`, `_guard_rate`, `_currencies`, `_price_html`, `_app_text`, `_checkout_field_heading` and the action `beltoft_services_usage_account_created`. Pinned for a theme: `Usage\Rates::in_cart()`.
+* New hooks: `beltoft_services_guard_rate`, `beltoft_services_guard_rate_bounds` (a guard rate must be from 1 to 1000 unless this says otherwise; a line that is not a plain number with a dot is refused on save), `beltoft_services_currencies` and `beltoft_services_app_text`. Pinned for a theme: `Usage\Rates::in_cart()`.
+* A usage account in another currency than the shop no longer stops the MCP endpoint: only the tools that return or move money are refused (with a tool error), the others work. A token request is counted once by the rate limit.
+* A domain, certificate or licence key in a currency with no guard rate is refused in the cart, before payment.
 
 = 0.7.2 =
 * Groundwork for a second shop currency, with no change on a shop with one currency: pay as you go usage is metered, invoiced and capped in the currency of the customer's usage account, account credit and top-ups have one currency per customer, and amount settings can be given per currency through filters. Nothing is ever converted: an amount with no value in a currency is not offered in it.
 * Every catalogue price the plugin prints follows WooCommerce's tax display and can be re-rendered in the other display through the `beltoft_services_price_html` filter. Invoices, order lines, the API and MCP stay excluding tax.
 * The domain search and the Bricks domain rows print the shop's currency format. New Bricks tags print a domain's register, renew and transfer price.
 * A checkout that shows the setup fields in a step with its own heading can leave the fields' heading out (`beltoft_services_checkout_field_heading`).
+* New hooks: `beltoft_services_currency_runner`, `beltoft_services_user_currency`, `beltoft_services_amount_setting`, `beltoft_services_price_html` and the action `beltoft_services_usage_account_created`.
 
 = 0.7.1 =
 * The pay as you go ledger and the credit ledger get a currency column. Existing rows are set to the shop's currency in batches on the first request after the update, and a row with no currency counts as the shop's currency. Nothing else changes for customers.

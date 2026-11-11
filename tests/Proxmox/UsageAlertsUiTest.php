@@ -161,6 +161,7 @@ class UsageAlertsUiTest extends BackupTestCase {
 		$sub = wcs_get_subscription( (int) $r->license()['subscription_id'] );
 		$sub->set_currency( 'DKK' );
 		$sub->save();
+		\BeltoftServices\Currency::reset();
 		$this->fake_currency_up( \BeltoftServices\Currency::base() );
 		$this->fake_runner();
 		Offers::reset();

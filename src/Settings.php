@@ -420,6 +420,24 @@ final class Settings {
 					break;
 				case 'textarea':
 					$clean[ $key ] = sanitize_textarea_field( (string) $raw );
+
+					if ( 'currency_guard_rates' === $key ) {
+						$parsed = Currency::parse_guard_rates( $clean[ $key ] );
+
+						// A line that cannot be read is never guessed: the old value stays and the screen says which lines.
+						if ( array() !== $parsed['bad'] ) {
+							add_settings_error(
+								self::OPTION,
+								'beltoft_services_guard_rates',
+								sprintf(
+									/* translators: %s: the lines that were not accepted */
+									__( 'The guard rates were not saved. Each line must be a currency code, an equals sign and a number with a dot, such as DKK=7.60, from 1 to 1000. Not accepted: %s', 'beltoft-services' ),
+									implode( ', ', $parsed['bad'] )
+								)
+							);
+							$clean[ $key ] = (string) self::get( $key );
+						}
+					}
 					break;
 				case 'url':
 					$clean[ $key ] = esc_url_raw( trim( (string) $raw ) );

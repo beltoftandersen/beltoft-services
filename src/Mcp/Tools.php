@@ -821,7 +821,7 @@ final class Tools {
 	 * @param string $message Words for the customer.
 	 * @return array<string, mixed>
 	 */
-	private static function failure( string $message ): array {
+	public static function failure( string $message ): array {
 		return array(
 			'content' => array( array( 'type' => 'text', 'text' => $message ) ),
 			'isError' => true,

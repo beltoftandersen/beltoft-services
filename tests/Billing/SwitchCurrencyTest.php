@@ -25,9 +25,20 @@ class SwitchCurrencyTest extends UsageTestCase {
 		$sub->set_currency( 'DKK' );
 		$sub->save();
 		$this->fake_currency_up( 'EUR' );
+		$flag = new \ReflectionProperty( SwitchCurrency::class, 'noticed' );
+		$flag->setAccessible( true );
+		$flag->setValue( null, false );
+		wc_clear_notices();
 
+		// A view of the subscription: refused, no notice.
+		$this->assertFalse( SwitchCurrency::can_switch( true, null, $sub ) );
+		$this->assertCount( 0, wc_get_notices( 'notice' ) );
+
+		// A switch being added to the cart: refused, one notice.
+		$_GET['switch-subscription'] = (string) $sub->get_id();
 		$this->assertFalse( SwitchCurrency::can_switch( true, null, $sub ) );
 		$this->assertFalse( SwitchCurrency::can_switch( true, null, $sub ) );
+		unset( $_GET['switch-subscription'] );
 		$this->assertCount( 1, wc_get_notices( 'notice' ) );
 
 		$this->fake_set_currency( 'DKK' );

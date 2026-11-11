@@ -86,14 +86,14 @@ class CostGuardCurrencyTest extends TestCase {
 	}
 
 	public function test_a_dkk_order_is_converted_at_the_guard_rate_for_the_comparison(): void {
-		$this->settings( array( 'currency_guard_rates' => "DKK=7.60\nSEK = 11,5" ) );
+		$this->settings( array( 'currency_guard_rates' => "DKK=7.60\nSEK = 11.5" ) );
 		$cost_dkk = 8.0 * 7.6; // 60.80.
 
 		$this->assertSame( SpendGuard::MESSAGE, SpendGuard::problem( 'a.com', 'create', $this->line( $cost_dkk - 0.5, 'DKK' ) ), 'Under the cost at the guard rate: refused, no matter what it looks like in kroner.' );
 		$this->assertNull( SpendGuard::problem( 'a.com', 'create', $this->line( $cost_dkk, 'DKK' ) ) );
 		$this->assertNull( SpendGuard::problem( 'a.com', 'create', $this->line( $cost_dkk + 20, 'DKK' ) ) );
 		$this->assertSame( 7.6, Currency::guard_rate( 'dkk' ) );
-		$this->assertSame( 11.5, Currency::guard_rate( 'SEK' ), 'A comma is accepted.' );
+		$this->assertSame( 11.5, Currency::guard_rate( 'SEK' ), 'Spaces around the equals sign are accepted.' );
 		$this->assertNull( Currency::guard_rate( 'NOK' ) );
 		$this->assertEqualsWithDelta( 10.0, Currency::to_cost( 76.0, 'DKK' ), 0.0001 );
 		$this->assertSame( 8.0, Currency::to_cost( 8.0, 'EUR' ) );
@@ -106,6 +106,110 @@ class CostGuardCurrencyTest extends TestCase {
 		$this->assertNull( SpendGuard::problem( 'a.com', 'create', $this->line( 60.0, 'DKK' ) ) );
 
 		remove_filter( 'beltoft_services_guard_rate', $f, 10 );
+	}
+
+	public function test_a_comma_is_not_a_decimal_point_and_a_bad_line_is_no_rate(): void {
+		foreach ( array( 'DKK=1,000', 'DKK=7,60', 'DKK = 7.6.1', 'DKK=abc', 'DKK=7.60 EUR' ) as $text ) {
+			$this->settings( array( 'currency_guard_rates' => $text ) );
+
+			$this->assertNull( Currency::guard_rate( 'DKK' ), $text );
+			$this->assertSame( array( $text ), Currency::parse_guard_rates( $text )['bad'], $text );
+			$this->assertNull( Currency::to_cost( 119.0, 'DKK' ), $text );
+		}
+
+		$this->settings( array( 'currency_guard_rates' => " dkk = 7.60 \n\nSEK=11.5" ) );
+		$this->assertSame( 7.6, Currency::guard_rate( 'DKK' ) );
+		$this->assertSame( 11.5, Currency::guard_rate( 'SEK' ) );
+	}
+
+	public function test_a_rate_outside_the_bounds_needs_the_filter_to_allow_it(): void {
+		$this->settings( array( 'currency_guard_rates' => "GBP=0.87\nIDR=17500\nDKK=7.60" ) );
+
+		$this->assertNull( Currency::guard_rate( 'GBP' ), 'Below 1.' );
+		$this->assertNull( Currency::guard_rate( 'IDR' ), 'Above 1000.' );
+		$this->assertSame( 7.6, Currency::guard_rate( 'DKK' ) );
+
+		add_filter( 'beltoft_services_guard_rate_bounds', static fn( $b, $code ) => 'GBP' === $code ? array( 0.5, 1.0 ) : $b, 10, 2 );
+		$this->assertSame( 0.87, Currency::guard_rate( 'GBP' ) );
+		$this->assertNull( Currency::guard_rate( 'IDR' ) );
+		remove_all_filters( 'beltoft_services_guard_rate_bounds' );
+	}
+
+	public function test_saving_a_bad_guard_rate_line_keeps_the_old_value_and_says_so_on_the_screen(): void {
+		$this->settings( array( 'currency_guard_rates' => 'DKK=7.60' ) );
+		global $wp_settings_errors;
+		$wp_settings_errors = array();
+
+		$out = \BeltoftServices\Settings::sanitize( array( 'currency_guard_rates' => "DKK=1,000\nSEK=11.5" ) );
+
+		$this->assertSame( 'DKK=7.60', $out['currency_guard_rates'] );
+		$codes = array_column( (array) $wp_settings_errors, 'code' );
+		$this->assertContains( 'beltoft_services_guard_rates', $codes );
+
+		$wp_settings_errors = array();
+		$out                = \BeltoftServices\Settings::sanitize( array( 'currency_guard_rates' => "DKK=7.55\nSEK=11.5" ) );
+		$this->assertSame( "DKK=7.55\nSEK=11.5", $out['currency_guard_rates'] );
+		$this->assertSame( array(), (array) $wp_settings_errors );
+	}
+
+	/**
+	 * Puts a product into the cart without the add to cart checks (the checks of a field belong to other tests).
+	 */
+	private function cart_with( \WC_Product $product ): void {
+		if ( null === WC()->cart ) {
+			wc_load_cart();
+		}
+
+		WC()->cart->empty_cart();
+		WC()->cart->cart_contents['k' . $product->get_id()] = array( 'product_id' => $product->get_id(), 'variation_id' => 0, 'quantity' => 1, 'data' => $product );
+	}
+
+	/** @return array<string, array{0: string}> */
+	public function supplier_drivers(): array {
+		return array( 'domain' => array( 'domain' ), 'ssl' => array( 'ssl' ), 'licence key' => array( 'licence-key' ) );
+	}
+
+	/**
+	 * @dataProvider supplier_drivers
+	 */
+	public function test_a_cart_in_a_currency_with_no_guard_rate_is_refused_before_payment_with_one_alert_per_currency( string $driver ): void {
+		$this->fake_currency_up( 'EUR' );
+		$this->cart_with( $this->service_product( $driver, array(), array( 'slug' => 'guard-' . $driver ) ) );
+		$this->fake_set_currency( 'DKK' );
+		wc_clear_notices();
+
+		\BeltoftServices\Billing\CostGuardCart::cart();
+		\BeltoftServices\Billing\CostGuardCart::cart();
+
+		$this->assertCount( 2, wc_get_notices( 'error' ) );
+		$this->assertStringContainsString( 'DKK', wc_get_notices( 'error' )[0]['notice'] );
+		$errors = new \WP_Error();
+		\BeltoftServices\Billing\CostGuardCart::checkout( array(), $errors );
+		$this->assertSame( array( 'beltoft_services_cost_guard' ), $errors->get_error_codes() );
+		$this->assertCount( 1, array_filter( $this->sent, static fn( $s ) => false !== strpos( $s, 'No guard rate for DKK' ) ), 'One alert per currency.' );
+	}
+
+	/**
+	 * @dataProvider supplier_drivers
+	 */
+	public function test_a_cart_with_a_guard_rate_or_in_the_base_currency_or_without_a_supplier_driver_is_untouched( string $driver ): void {
+		$this->fake_currency_up( 'EUR' );
+		$product = $this->service_product( $driver, array(), array( 'slug' => 'guard-ok-' . $driver ) );
+		$this->cart_with( $product );
+
+		// Base currency.
+		$this->assertSame( '', \BeltoftServices\Billing\CostGuardCart::problem() );
+
+		// A guard rate.
+		$this->fake_set_currency( 'DKK' );
+		$this->settings( array( 'currency_guard_rates' => 'DKK=7.60' ) );
+		$this->assertSame( '', \BeltoftServices\Billing\CostGuardCart::problem() );
+
+		// A product with no supplier cost, in a currency with no rate.
+		$this->settings( array( 'currency_guard_rates' => '' ) );
+		$this->cart_with( $this->service_product( 'fake', array(), array( 'slug' => 'guard-fake-' . $driver ) ) );
+		$this->assertSame( '', \BeltoftServices\Billing\CostGuardCart::problem() );
+		$this->assertSame( array(), $this->sent );
 	}
 
 	public function test_the_certificate_guard_follows_the_same_rule(): void {

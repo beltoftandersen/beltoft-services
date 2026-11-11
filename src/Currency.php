@@ -23,6 +23,9 @@ final class Currency {
 	/** Cart item key: the currency a runtime price (a domain line, a top-up line) was worked out in. A site's bridge reads it as a string. */
 	public const CART_KEY = 'beltoft_services_price_currency';
 
+	/** @var array<string, string> Currency of a resource's subscription by resource and subscription id, for the request. */
+	private static array $resource_codes = array();
+
 	/**
 	 * The shop's own currency: the option, never the filtered getter, so a forced currency does not change it.
 	 */
@@ -68,12 +71,9 @@ final class Currency {
 	 */
 	public static function known_codes(): array {
 		$codes = array( self::base() );
-		$text  = Settings::get( 'currency_guard_rates' );
 
-		foreach ( is_string( $text ) ? preg_split( '/\r?\n/', $text ) : array() as $line ) {
-			if ( 1 === preg_match( '/^\s*([A-Za-z]{3})\s*=/', (string) $line, $m ) ) {
-				$codes[] = strtoupper( $m[1] );
-			}
+		foreach ( array_keys( self::parse_guard_rates( (string) Settings::get( 'currency_guard_rates' ) )['rates'] ) as $code ) {
+			$codes[] = $code;
 		}
 
 		/**
@@ -104,9 +104,22 @@ final class Currency {
 	 */
 	public static function of_resource( Resource $r ): string {
 		$id  = (int) ( $r->license()['subscription_id'] ?? 0 );
-		$sub = $id > 0 && function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( $id ) : false;
+		$key = $r->id() . ':' . $id;
 
-		return $sub instanceof \WC_Subscription ? self::of_order( $sub ) : '';
+		// One answer per resource for the request: a panel asks for it once per option otherwise (one subscription query each).
+		if ( ! isset( self::$resource_codes[ $key ] ) ) {
+			$sub                          = $id > 0 && function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( $id ) : false;
+			self::$resource_codes[ $key ] = $sub instanceof \WC_Subscription ? self::of_order( $sub ) : '';
+		}
+
+		return self::$resource_codes[ $key ];
+	}
+
+	/**
+	 * Forgets the per-request answers (tests, and a request that changes a subscription's currency).
+	 */
+	public static function reset(): void {
+		self::$resource_codes = array();
 	}
 
 	/**
@@ -220,13 +233,8 @@ final class Currency {
 			return null;
 		}
 
-		$text = Settings::get( 'currency_guard_rates' );
-
-		foreach ( is_string( $text ) ? preg_split( '/\r?\n/', $text ) : array() as $line ) {
-			if ( 1 === preg_match( '/^\s*([A-Za-z]{3})\s*=\s*([0-9]+(?:[.,][0-9]+)?)\s*$/D', (string) $line, $m ) && strtoupper( $m[1] ) === $code ) {
-				$rate = (float) str_replace( ',', '.', $m[2] );
-			}
-		}
+		$parsed = self::parse_guard_rates( (string) Settings::get( 'currency_guard_rates' ) );
+		$rate   = $parsed['rates'][ $code ] ?? null;
 
 		/**
 		 * The guard rate of a currency against the cost currency: units of the currency per unit of EUR, a little above the real rate.
@@ -236,7 +244,57 @@ final class Currency {
 		 */
 		$rate = apply_filters( 'beltoft_services_guard_rate', $rate, $code );
 
-		return is_numeric( $rate ) && (float) $rate > 0 ? (float) $rate : null;
+		return is_numeric( $rate ) && self::plausible_rate( (float) $rate, $code ) ? (float) $rate : null;
+	}
+
+	/**
+	 * Reads the guard rates text strictly: one line per currency, a code, an equals sign and a plain decimal with a dot (DKK=7.60). A comma
+	 * is not a decimal point here (DKK=1,000 is not 1.0), so anything else is a bad line, never a guessed rate.
+	 *
+	 * @param string $text The setting.
+	 * @return array{rates: array<string, float>, bad: string[]} Rates by code (the last line of a code wins, a rate outside its bounds is bad) and the lines that are not usable.
+	 */
+	public static function parse_guard_rates( string $text ): array {
+		$rates = array();
+		$bad   = array();
+
+		foreach ( preg_split( '/\r?\n/', $text ) as $line ) {
+			$line = trim( (string) $line );
+
+			if ( '' === $line ) {
+				continue;
+			}
+
+			if ( 1 !== preg_match( '/^([A-Za-z]{3})\s*=\s*([0-9]+(?:\.[0-9]+)?)$/D', $line, $m ) || ! self::plausible_rate( (float) $m[2], strtoupper( $m[1] ) ) ) {
+				$bad[] = $line;
+				continue;
+			}
+
+			$rates[ strtoupper( $m[1] ) ] = (float) $m[2];
+		}
+
+		return array( 'rates' => $rates, 'bad' => $bad );
+	}
+
+	/**
+	 * Whether a guard rate is believable: by default from 1 to 1000 units per euro. A currency outside that (the pound is below 1, some
+	 * currencies are in the thousands) needs the filter beltoft_services_guard_rate_bounds to say so.
+	 *
+	 * @param float  $rate Rate.
+	 * @param string $code Currency code.
+	 */
+	public static function plausible_rate( float $rate, string $code ): bool {
+		/**
+		 * The lowest and highest guard rate that is accepted for a currency.
+		 *
+		 * @param float[] $bounds Lowest and highest, 1 and 1000 by default.
+		 * @param string  $code   Currency code.
+		 */
+		$bounds = (array) apply_filters( 'beltoft_services_guard_rate_bounds', array( 1.0, 1000.0 ), strtoupper( $code ) );
+		$low    = isset( $bounds[0] ) ? (float) $bounds[0] : 1.0;
+		$high   = isset( $bounds[1] ) ? (float) $bounds[1] : 1000.0;
+
+		return $rate > 0 && $rate >= $low && $rate <= $high;
 	}
 
 	/**

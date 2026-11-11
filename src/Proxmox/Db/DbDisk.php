@@ -248,6 +248,7 @@ final class DbDisk {
 
 		$own     = self::extra( $plan );
 		$larger  = false;
+		$steps   = array();
 
 		foreach ( self::ladder( $current ) as $extra => $step ) {
 			if ( $extra <= $own ) {
@@ -270,9 +271,25 @@ final class DbDisk {
 			$out['options'][] = array(
 				'extra' => $extra,
 				'total' => $out['gb'] + $more,
-				'price' => (string) \BeltoftServices\Currency::with_resource( $r, static fn() => self::price_label( $current, $step ), '' ),
+				'price' => '',
 				'url'   => $url,
 			);
+			$steps[ count( $out['options'] ) - 1 ] = $step;
+		}
+
+		// The prices are read in the subscription's currency: one window for all the options, not one each.
+		if ( array() !== $steps ) {
+			$labels = (array) \BeltoftServices\Currency::with_resource(
+				$r,
+				static function () use ( $current, $steps ) {
+					return array_map( static fn( $step ) => self::price_label( $current, $step ), $steps );
+				},
+				array()
+			);
+
+			foreach ( $labels as $i => $label ) {
+				$out['options'][ $i ]['price'] = (string) $label;
+			}
 		}
 
 		$out['full'] = $larger && array() === $out['options'];

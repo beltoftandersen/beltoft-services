@@ -159,13 +159,7 @@ final class Endpoint {
 			return self::http( self::error( null, -32600, 'Invalid Request: batches are not supported' ), 400 );
 		}
 
-		// The whole message is answered in the currency of the token's owner (the tools call the REST routes inside this window). With no way
-		// to put that currency in force the call is refused: a price in the wrong currency is never given.
-		list( $ok, $reply ) = Currency::with( Currency::of_user( (int) $token['user'] ), static fn() => self::message( $body, $token ) );
-
-		if ( ! $ok ) {
-			return self::http( array( 'error' => 'currency_unavailable', 'message' => __( 'Prices are not available for the currency of this account.', 'beltoft-services' ) ), 503 );
-		}
+		$reply = self::message( $body, $token );
 
 		return null === $reply ? self::http( null, 202 ) : self::http( $reply, 200 );
 	}
@@ -228,6 +222,17 @@ final class Endpoint {
 
 				if ( ! Tools::exists( $name ) ) {
 					return self::error( $id, -32602, 'Unknown tool' );
+				}
+
+				// A tool that returns or moves money runs in the currency of the token's owner. With no way to put that currency in force it is
+				// refused as a tool error (the JSON-RPC answer stays a 200): a price in the wrong currency is never given. Everything else, and the
+				// protocol methods, work in the shop's currency whatever the owner's currency is.
+				if ( MoneyTools::is_money( $name ) ) {
+					$code = Currency::of_user( (int) $token['user'] );
+
+					list( $ok, $result ) = Currency::with( $code, static fn() => Tools::call( $name, $args, $token ) );
+
+					return self::result( $id, $ok ? $result : Tools::failure( sprintf( /* translators: %s: currency code */ __( 'This tool needs prices in %s, and that is not available on this site right now. Everything else still works.', 'beltoft-services' ), $code ) ) );
 				}
 
 				return self::result( $id, Tools::call( $name, $args, $token ) );

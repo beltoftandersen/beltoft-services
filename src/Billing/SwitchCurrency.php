@@ -47,12 +47,20 @@ final class SwitchCurrency {
 			return $can;
 		}
 
-		if ( ! self::$noticed && function_exists( 'wc_add_notice' ) ) {
+		// The refusal is silent on a mere view of the subscription; the notice is for the visitor who is adding a switch to the cart.
+		if ( ! self::$noticed && self::adding_a_switch() && function_exists( 'wc_add_notice' ) ) {
 			self::$noticed = true;
 			/* translators: %s: currency code such as DKK */
 			wc_add_notice( sprintf( __( 'This subscription is in %s. Switch it from a page in that currency.', 'beltoft-services' ), $code ), 'notice' );
 		}
 
 		return false;
+	}
+
+	/**
+	 * Whether this request is adding a switch to the cart.
+	 */
+	private static function adding_a_switch(): bool {
+		return 0 !== (int) ( \BeltoftServices\SwitchLink::requested()['subscription'] ?? 0 );
 	}
 }

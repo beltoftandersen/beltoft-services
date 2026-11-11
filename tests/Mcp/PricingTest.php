@@ -240,14 +240,23 @@ final class PricingTest extends UsageTestCase {
 		$this->assertSame( 'EUR', \BeltoftServices\Currency::current(), 'The window is closed.' );
 	}
 
-	public function test_with_no_way_to_put_the_owners_currency_in_force_the_call_is_refused(): void {
+	public function test_with_no_way_to_put_the_owners_currency_in_force_only_the_money_tools_are_refused_and_as_a_tool_error(): void {
 		$this->dkk_owner();
 		$this->fake_runner( false );
 
-		$response = $this->post( array( 'jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => array( 'name' => 'catalog', 'arguments' => array( 'kind' => 'domain_prices' ) ) ), $this->read() );
+		$money = $this->post( array( 'jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => array( 'name' => 'catalog', 'arguments' => array( 'kind' => 'domain_prices' ) ) ), $this->read() );
+		$this->assertSame( 200, $money->get_status(), 'A tool error is still a JSON-RPC answer.' );
+		$result = $money->get_data()['result'];
+		$this->assertTrue( $result['isError'] );
+		$this->assertStringContainsString( 'DKK', $result['content'][0]['text'] );
 
-		$this->assertSame( 503, $response->get_status() );
-		$this->assertSame( 'currency_unavailable', $response->get_data()['error'] );
+		$init = $this->post( array( 'jsonrpc' => '2.0', 'id' => 2, 'method' => 'initialize', 'params' => array() ), $this->read() );
+		$this->assertSame( 200, $init->get_status() );
+		$this->assertArrayHasKey( 'result', $init->get_data() );
+		$list = $this->post( array( 'jsonrpc' => '2.0', 'id' => 3, 'method' => 'tools/list', 'params' => array() ), $this->read() );
+		$this->assertNotEmpty( $list->get_data()['result']['tools'] );
+
+		$this->assertFalse( $this->tool( 'list_services', array(), $this->read() )['isError'], 'A tool with no money works.' );
 	}
 
 	public function test_an_owner_in_the_shop_currency_is_answered_as_before_with_the_currency_code_added(): void {
@@ -280,9 +289,23 @@ final class PricingTest extends UsageTestCase {
 		$this->assertSame( 'EUR', \BeltoftServices\Currency::current() );
 	}
 
-	public function test_a_pay_as_you_go_order_is_refused_when_the_plan_has_no_price_in_the_currency(): void {
-		$src = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'src/Mcp/Purchase.php' );
+	public function test_a_token_request_through_the_currency_window_is_counted_once_by_the_rate_limit(): void {
+		$this->dkk_owner();
+		$this->fake_runner();
+		add_filter( 'beltoft_services_token_rate_limit', static fn() => 4 );
+		$prop = new \ReflectionProperty( Tokens::class, 'current' );
+		$prop->setAccessible( true );
+		$prop->setValue( null, array( 'uuid' => 'rate-' . wp_generate_uuid4(), 'user' => $this->user, 'scope' => Tokens::READ ) );
+		wp_set_current_user( $this->user );
 
-		$this->assertStringContainsString( "'' === (string) \$variant->get_price()", $src, 'A missing price is not free.' );
+		$statuses = array();
+		for ( $i = 0; $i < 5; $i++ ) {
+			$gate       = Tokens::gate( null, rest_get_server(), new \WP_REST_Request( 'GET', '/beltoft-services/v1/domains/check' ) );
+			$statuses[] = $gate instanceof \WP_REST_Response ? $gate->get_status() : ( is_wp_error( $gate ) ? (int) ( $gate->get_error_data()['status'] ?? 0 ) : 0 );
+		}
+		$prop->setValue( null, null );
+
+		$this->assertNotContains( 429, array_slice( $statuses, 0, 4 ), 'A limit of 4 allows four calls: the nested dispatch is not a second count.' );
+		$this->assertSame( 429, $statuses[4], 'The fifth is over the limit.' );
 	}
 }

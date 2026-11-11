@@ -217,6 +217,30 @@ final class PurchaseTest extends UsageTestCase {
 
 	// -- The direct path -----------------------------------------------------------------------------
 
+	public function test_a_plan_with_an_empty_price_is_refused_but_one_priced_zero_is_ordered(): void {
+		$token = $this->oauth( $this->user, Tokens::FULL );
+		wp_set_current_user( 0 );
+		$target = $this->v['u-None'];
+
+		// An empty price (nothing set in the owner's currency) is not free.
+		update_post_meta( $target->get_id(), '_price', '' );
+		update_post_meta( $target->get_id(), '_subscription_price', '' );
+		wc_delete_product_transients( $target->get_id() );
+		$empty = $this->tool( 'order_server', $this->args( array( 'confirm' => 'x' ) ), $token );
+
+		$this->assertTrue( $empty['isError'] );
+		$this->assertCount( 0, $this->orders( $this->user ), 'Nothing was ordered.' );
+
+		// Priced "0" it passes the price check: the call goes on to the summary.
+		update_post_meta( $target->get_id(), '_price', '0' );
+		update_post_meta( $target->get_id(), '_subscription_price', '0' );
+		wc_delete_product_transients( $target->get_id() );
+		$zero = $this->tool( 'order_server', $this->args(), $token );
+
+		$this->assertFalse( $zero['isError'] );
+		$this->assertTrue( ! empty( $this->json( $zero )['requires_confirmation'] ) );
+	}
+
 	/**
 	 * WooCommerce's checkout defines WOOCOMMERCE_CHECKOUT for good: a process of its own keeps it from the other tests.
 	 *

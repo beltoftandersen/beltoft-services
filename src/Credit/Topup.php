@@ -614,8 +614,6 @@ final class Topup {
 			if ( $cents > 0 && Balance::credit( $user_id, $cents, Balance::TOPUP, 'order_item', $ref, __( 'Top-up', 'beltoft-services' ), (string) $order->get_currency() ) ) {
 				$order->add_order_note( sprintf( /* translators: %s: amount. */ __( 'Account credit of %s added to the balance.', 'beltoft-services' ), self::label_amount( $cents, $order->get_currency() ) ) );
 			} elseif ( $cents > 0 && ! Balance::exists( Balance::TOPUP, 'order_item', $ref ) ) {
-				$own = Balance::currency( $user_id );
-
 				if ( ! Balance::allows( $user_id, (string) $order->get_currency() ) ) {
 					self::block( $order, $user_id, Balance::account_currency( $user_id ) );
 				} else {

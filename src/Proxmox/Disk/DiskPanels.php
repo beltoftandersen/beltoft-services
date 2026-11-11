@@ -21,7 +21,15 @@ defined( 'ABSPATH' ) || exit;
 final class DiskPanels {
 	public static function server( Resource $server ): array {
 		// The sizes and their prices are those of the server's subscription currency.
-		return \BeltoftServices\Currency::with_resource( $server, static fn() => self::server_now( $server ), array( 'items' => array(), 'add' => array(), 'mode' => (string) Settings::get( 'deletion_mode' ) ) );
+		$out = \BeltoftServices\Currency::with_resource( $server, static fn() => self::server_now( $server ), null );
+
+		if ( null === $out ) {
+			// The subscription's currency cannot be put in force: the disks (no money in them) are still shown, the sizes to add (priced) are not.
+			$out        = self::server_now( $server );
+			$out['add'] = array();
+		}
+
+		return $out;
 	}
 
 	/**

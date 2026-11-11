@@ -78,6 +78,7 @@ abstract class TestCase extends \WP_UnitTestCase {
 
 	public function tear_down(): void {
 		remove_filter( 'pre_http_request', array( $this, 'record_http' ), 10 );
+		\BeltoftServices\Currency::reset();
 
 		parent::tear_down();
 

@@ -150,9 +150,9 @@ final class Tokens {
 	private static $current = null;
 
 	/** Routes whose answers hold money: a token request to them runs in its owner's currency. */
-	private const MONEY_ROUTES = '#/(domains/check|[^/]+/\d+/addons|addons)$#D';
+	private const MONEY_ROUTES = '#/domains/check$#D';
 
-	/** @var bool Inside the window of a token request (the nested dispatch skips the gate's window). */
+	/** @var bool Inside the window of a token request: the nested dispatch skips the window and the rate limit (both ran already). */
 	private static bool $windowed = false;
 
 	/**
@@ -448,7 +448,8 @@ final class Tokens {
 		 */
 		$max = (int) apply_filters( 'beltoft_services_token_rate_limit', self::RATE_LIMIT );
 
-		if ( RateLimit::exceeded( 'token_' . self::$current['uuid'], 'beltoft-services:token', $max, MINUTE_IN_SECONDS ) ) {
+		// The window below dispatches the same request again, through this gate: that inner pass was counted already.
+		if ( ! self::$windowed && RateLimit::exceeded( 'token_' . self::$current['uuid'], 'beltoft-services:token', $max, MINUTE_IN_SECONDS ) ) {
 			return self::refuse( 'beltoft_services_rate_limited', __( 'Too many requests. Please wait a minute and try again.', 'beltoft-services' ), 429 );
 		}
 
