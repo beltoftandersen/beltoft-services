@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Usage;
 
+use BeltoftServices\Billing\TaxNote;
 use BeltoftServices\Currency;
 use BeltoftServices\Product;
 use BeltoftServices\Apps\AppLicenceDriver;
@@ -87,59 +88,58 @@ final class Rates {
 	 * An amount for people as plain text, the way the shop shows prices ("€16.50", "€0.0226"): wc_price without its
 	 * markup. Spaces in it are non-breaking, so an amount never wraps inside.
 	 *
-	 * @param float  $amount   Amount.
-	 * @param int    $decimals Decimals.
-	 * @param string $currency Currency code, '' for the shop's.
+	 * @param float            $amount   Amount.
+	 * @param int              $decimals Decimals.
+	 * @param string           $currency Currency code, '' for the shop's.
+	 * @param \WC_Product|null $tax      A catalogue price: the product it belongs to, so the figure is the shop's tax display of it (see TaxNote::figure()). Null (invoices, API answers): the amount as given.
 	 */
-	public static function money( float $amount, int $decimals = 2, string $currency = '' ): string {
-		$args = array( 'decimals' => $decimals );
-
-		if ( '' !== $currency ) {
-			$args['currency'] = $currency;
-		}
-
-		$text = html_entity_decode( wp_strip_all_tags( wc_price( $amount, $args ) ), ENT_QUOTES, 'UTF-8' );
-
-		return str_replace( ' ', "\xC2\xA0", trim( $text ) );
+	public static function money( float $amount, int $decimals = 2, string $currency = '', ?\WC_Product $tax = null ): string {
+		return TaxNote::plain( TaxNote::figure( $amount, $tax ), $decimals, $currency );
 	}
 
 	/**
 	 * A monthly cap for people: a whole amount has no decimals ("€55"), any other has two ("€16.50").
 	 *
-	 * @param float $cap Monthly cap.
+	 * @param float            $cap Monthly cap.
+	 * @param \WC_Product|null $tax Product for the tax display, null for the amount as given.
 	 */
-	public static function cap_money( float $cap ): string {
-		return self::money( $cap, abs( $cap - round( $cap ) ) < 0.005 ? 0 : 2 );
+	public static function cap_money( float $cap, ?\WC_Product $tax = null ): string {
+		$shown = TaxNote::figure( $cap, $tax );
+
+		return TaxNote::plain( $shown, abs( $shown - round( $shown ) ) < 0.005 ? 0 : 2 );
 	}
 
 	/**
 	 * "€45 / month": a monthly amount in whole euros (see cap_money()) in the order summary.
 	 *
-	 * @param float $amount Monthly amount.
+	 * @param float            $amount Monthly amount.
+	 * @param \WC_Product|null $tax    Product for the tax display, null for the amount as given.
 	 */
-	public static function per_month_line( float $amount ): string {
+	public static function per_month_line( float $amount, ?\WC_Product $tax = null ): string {
 		/* translators: %s: monthly amount such as €45 */
-		return sprintf( __( '%s / month', 'beltoft-services' ), self::cap_money( $amount ) );
+		return sprintf( __( '%s / month', 'beltoft-services' ), self::cap_money( $amount, $tax ) );
 	}
 
 	/**
 	 * "+€5 / month": an add-on's monthly amount in the order summary.
 	 *
-	 * @param float $amount Monthly amount.
+	 * @param float            $amount Monthly amount.
+	 * @param \WC_Product|null $tax    Product for the tax display, null for the amount as given.
 	 */
-	public static function plus_per_month_line( float $amount ): string {
+	public static function plus_per_month_line( float $amount, ?\WC_Product $tax = null ): string {
 		/* translators: %s: monthly amount such as €5 */
-		return sprintf( __( '+%s / month', 'beltoft-services' ), self::cap_money( $amount ) );
+		return sprintf( __( '+%s / month', 'beltoft-services' ), self::cap_money( $amount, $tax ) );
 	}
 
 	/**
 	 * "+€5 per month": an add-on's monthly amount in a label.
 	 *
-	 * @param float $amount Monthly amount.
+	 * @param float            $amount Monthly amount.
+	 * @param \WC_Product|null $tax    Product for the tax display, null for the amount as given.
 	 */
-	public static function plus_per_month( float $amount ): string {
+	public static function plus_per_month( float $amount, ?\WC_Product $tax = null ): string {
 		/* translators: %s: monthly amount such as €5 */
-		return sprintf( __( '+%s per month', 'beltoft-services' ), self::cap_money( $amount ) );
+		return sprintf( __( '+%s per month', 'beltoft-services' ), self::cap_money( $amount, $tax ) );
 	}
 
 	/**
@@ -164,7 +164,7 @@ final class Rates {
 	 * @param \WC_Product_Variation $to   To.
 	 */
 	public static function addon_per_month( \WC_Product_Variation $from, \WC_Product_Variation $to ): ?string {
-		return self::is_usage( $to ) ? self::plus_per_month( self::monthly_difference( $from, $to ) ) : null;
+		return self::is_usage( $to ) ? self::plus_per_month( self::monthly_difference( $from, $to ), $to ) : null;
 	}
 
 	/**
@@ -213,18 +213,24 @@ final class Rates {
 		}
 
 		/* translators: 1: hourly price such as €0.0226, 2: monthly cap such as €16.50 */
-		return str_replace( '/', "/\u{2060}", sprintf( __( 'Or %1$s/hour, max %2$s/month, pay as you go', 'beltoft-services' ), self::money( $rates['hourly'], 4 ), self::cap_money( $rates['cap'] ) ) );
+		return str_replace( '/', "/\u{2060}", sprintf( __( 'Or %1$s/hour, max %2$s/month, pay as you go', 'beltoft-services' ), self::money( $rates['hourly'], 4, '', $monthly ), self::cap_money( $rates['cap'], $monthly ) ) );
 	}
 
 	/**
 	 * The terms of pay as you go, next to the choice: "€0.0226 per hour, max €16.50 per month excluding VAT".
 	 *
-	 * @param float $hourly Price per hour.
-	 * @param float $cap    Monthly cap.
+	 * @param float            $hourly Price per hour.
+	 * @param float            $cap    Monthly cap.
+	 * @param \WC_Product|null $tax    Product for the tax display, null for the amounts as given (excluding VAT).
 	 */
-	public static function terms( float $hourly, float $cap ): string {
+	public static function terms( float $hourly, float $cap, ?\WC_Product $tax = null ): string {
+		if ( null !== $tax && 'incl' === TaxNote::display() ) {
+			/* translators: %s: the terms, such as "€0.0283 per hour, max €20.60 per month" */
+			return sprintf( __( '%s including VAT', 'beltoft-services' ), self::tile_terms( $hourly, $cap, $tax ) );
+		}
+
 		/* translators: %s: the terms, such as "€0.0226 per hour, max €16.50 per month" */
-		return sprintf( __( '%s excluding VAT', 'beltoft-services' ), self::tile_terms( $hourly, $cap ) );
+		return sprintf( __( '%s excluding VAT', 'beltoft-services' ), self::tile_terms( $hourly, $cap, $tax ) );
 	}
 
 	/**
@@ -267,42 +273,46 @@ final class Rates {
 	/**
 	 * "€0.0829 per hour".
 	 *
-	 * @param float $hourly Price per hour.
+	 * @param float            $hourly Price per hour.
+	 * @param \WC_Product|null $tax    Product for the tax display, null for the amount as given.
 	 */
-	public static function per_hour( float $hourly ): string {
+	public static function per_hour( float $hourly, ?\WC_Product $tax = null ): string {
 		/* translators: %s: price per hour such as €0.0829 */
-		return sprintf( __( '%s per hour', 'beltoft-services' ), self::money( $hourly, 4 ) );
+		return sprintf( __( '%s per hour', 'beltoft-services' ), self::money( $hourly, 4, '', $tax ) );
 	}
 
 	/**
 	 * "max €55.00 per month".
 	 *
-	 * @param float $cap Monthly cap.
+	 * @param float            $cap Monthly cap.
+	 * @param \WC_Product|null $tax Product for the tax display, null for the amount as given.
 	 */
-	public static function max_per_month( float $cap ): string {
+	public static function max_per_month( float $cap, ?\WC_Product $tax = null ): string {
 		/* translators: %s: monthly cap such as €55.00 */
-		return sprintf( __( 'max %s per month', 'beltoft-services' ), self::cap_money( $cap ) );
+		return sprintf( __( 'max %s per month', 'beltoft-services' ), self::cap_money( $cap, $tax ) );
 	}
 
 	/**
 	 * The two billing tiles' first line for pay as you go: "€0.0829 per hour, max €55.00 per month".
 	 *
-	 * @param float $hourly Price per hour.
-	 * @param float $cap    Monthly cap.
+	 * @param float            $hourly Price per hour.
+	 * @param float            $cap    Monthly cap.
+	 * @param \WC_Product|null $tax    Product for the tax display, null for the amounts as given.
 	 */
-	public static function tile_terms( float $hourly, float $cap ): string {
+	public static function tile_terms( float $hourly, float $cap, ?\WC_Product $tax = null ): string {
 		/* translators: 1: "€0.0829 per hour", 2: "max €55.00 per month" */
-		return sprintf( __( '%1$s, %2$s', 'beltoft-services' ), self::per_hour( $hourly ), self::max_per_month( $cap ) );
+		return sprintf( __( '%1$s, %2$s', 'beltoft-services' ), self::per_hour( $hourly, $tax ), self::max_per_month( $cap, $tax ) );
 	}
 
 	/**
 	 * The monthly tile's line: "€55.00 per month, paid in advance".
 	 *
-	 * @param float $monthly Monthly price.
+	 * @param float            $monthly Monthly price.
+	 * @param \WC_Product|null $tax     Product for the tax display, null for the amount as given.
 	 */
-	public static function tile_monthly( float $monthly ): string {
+	public static function tile_monthly( float $monthly, ?\WC_Product $tax = null ): string {
 		/* translators: %s: monthly price such as €55.00 */
-		return sprintf( __( '%s per month, paid in advance', 'beltoft-services' ), self::money( $monthly ) );
+		return sprintf( __( '%s per month, paid in advance', 'beltoft-services' ), self::money( $monthly, 2, '', $tax ) );
 	}
 
 	/**

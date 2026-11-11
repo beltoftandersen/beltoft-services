@@ -169,7 +169,7 @@ final class UsageDisk {
 		$to   = self::next( $disk );
 		$from = wc_get_product( (int) ( $disk->license()['variation_id'] ?? 0 ) );
 
-		return $to && $from instanceof \WC_Product_Variation ? Rates::plus_per_month( max( 0.0, Rates::monthly_difference( $from, $to ) ) ) : '';
+		return $to && $from instanceof \WC_Product_Variation ? Rates::plus_per_month( max( 0.0, Rates::monthly_difference( $from, $to ) ), $to ) : '';
 	}
 
 	/**

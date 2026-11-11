@@ -151,12 +151,12 @@ final class BillingField {
 		$usage   = static function ( ?\WC_Product_Variation $v ): string {
 			$rates = $v ? Rates::for_plan( $v ) : null;
 
-			return null === $rates ? '' : Rates::tile_terms( $rates['hourly'], $rates['cap'] );
+			return null === $rates ? '' : Rates::tile_terms( $rates['hourly'], $rates['cap'], $v );
 		};
 		$month   = static function ( ?\WC_Product_Variation $v ): string {
 			$rates = $v ? Rates::for_plan( $v ) : null;
 
-			return null === $rates ? '' : Rates::tile_monthly( $rates['monthly'] );
+			return null === $rates ? '' : Rates::tile_monthly( $rates['monthly'], $v );
 		};
 
 		return array(

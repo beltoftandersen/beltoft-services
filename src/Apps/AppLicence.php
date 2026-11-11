@@ -228,7 +228,7 @@ final class AppLicence {
 	public static function usage_price( array $tier ): string {
 		$rates = null !== self::usage_variation( $tier ) ? Rates::for_plan( $tier['variation'] ) : null;
 
-		return null === $rates ? '' : Rates::terms( $rates['hourly'], $rates['cap'] );
+		return null === $rates ? '' : Rates::terms( $rates['hourly'], $rates['cap'], $tier['variation'] );
 	}
 
 	/**
@@ -280,7 +280,7 @@ final class AppLicence {
 			? ' / ' . (string) wcs_get_subscription_period_strings( max( 1, (int) \WC_Subscriptions_Product::get_interval( $variation ) ), (string) \WC_Subscriptions_Product::get_period( $variation ) )
 			: '';
 
-		return sprintf( '%s%s %s', wp_strip_all_tags( wc_price( wc_get_price_excluding_tax( $variation ) ) ), $period, __( 'excl. VAT', 'beltoft-services' ) );
+		return sprintf( '%s%s %s', \BeltoftServices\Billing\TaxNote::text( (float) wc_get_price_excluding_tax( $variation ), null, $variation, '', false ), $period, \BeltoftServices\Billing\TaxNote::incl_for( $variation ) ? __( 'incl. VAT', 'beltoft-services' ) : __( 'excl. VAT', 'beltoft-services' ) );
 	}
 
 	// -- The licence of a server's app ----------------------------------------------------------
@@ -450,7 +450,7 @@ final class AppLicence {
 		if ( self::usage_billed( $licence ) ) {
 			// Billed by the hour with the server: no subscription of its own to switch.
 			$items = Rates::items( $licence );
-			$usage = $items ? Rates::terms( (float) $items[0]['rate'], round( (float) $items[0]['rate'] * Rates::HOURS, 2 ) ) : '';
+			$usage = $items ? Rates::terms( (float) $items[0]['rate'], round( (float) $items[0]['rate'] * Rates::HOURS, 2 ), wc_get_product( (int) ( $licence->license()['variation_id'] ?? 0 ) ) ?: null ) : '';
 		} elseif ( 'active' === $state && get_current_user_id() === (int) ( $licence->license()['user_id'] ?? 0 ) ) {
 			foreach ( self::tiers( $app ) as $key => $tier ) {
 				$url = $key === $own ? '' : Backups::switch_to( $licence, $tier['variation'] );

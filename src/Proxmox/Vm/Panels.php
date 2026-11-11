@@ -399,7 +399,7 @@ final class Panels {
 			$out[] = array(
 				'slots' => SnapshotCart::slots_of( $variation ),
 				'url'   => $url,
-				'price' => wp_strip_all_tags( wc_price( wc_get_price_excluding_tax( $variation ) ) ) . self::per( $variation ),
+				'price' => \BeltoftServices\Billing\TaxNote::text( (float) wc_get_price_excluding_tax( $variation ), null, $variation, '', false ) . self::per( $variation ),
 				'days'  => $days > 0 ? $days : max( 1, (int) Settings::get( 'snapshot_paid_days' ) ),
 			);
 		}

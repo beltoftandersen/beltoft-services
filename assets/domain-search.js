@@ -4,6 +4,20 @@
   const __ = wp.i18n.__;
   const sprintf = wp.i18n.sprintf;
 
+  // The tax display of the last answer: 'incl' or 'excl' (the shop's display for the visitor's currency).
+  let taxMode = 'excl';
+
+  function escapeHtml(text) {
+    const node = document.createElement('span');
+    node.textContent = text;
+    return node.innerHTML;
+  }
+
+  // A price the way the server printed it (its tax display, and both figures when a site shows them); its plain text when no markup came.
+  function priceMarkup(item) {
+    return item.price_html || escapeHtml(item.price_text || '');
+  }
+
   function element(tag, className, content) {
     const node = document.createElement(tag);
     node.className = className;
@@ -61,6 +75,7 @@
     const response = await fetch(root.dataset.check + '?name=' + encodeURIComponent(name), { credentials: 'same-origin' });
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || __('The search could not be completed.', 'beltoft-services'));
+    taxMode = data.tax === 'incl' ? 'incl' : 'excl';
     return data;
   }
 
@@ -117,9 +132,12 @@
       row.appendChild(information);
 
       if (item.status === 'free' && item.price !== null && item.price !== undefined) {
-        const price = element('div', 'beltoft-domain-result__price', sprintf(/* translators: %s: price in euro */ __('€%s / year', 'beltoft-services'), item.price));
+        const price = element('div', 'beltoft-domain-result__price', '');
+        price.innerHTML = sprintf(/* translators: %s: the price with its currency symbol, such as the euro symbol and 12 */ __('%s / year', 'beltoft-services'), priceMarkup(item));
         // The renewal price is the same as the first year's; saying so under the price answers the question before it is asked.
-        price.appendChild(element('span', 'beltoft-domain-result__renewal', sprintf(/* translators: %s: price in euro */ __('Renews at €%s / year', 'beltoft-services'), item.price)));
+        const renewal = element('span', 'beltoft-domain-result__renewal', '');
+        renewal.innerHTML = sprintf(/* translators: %s: the price with its currency symbol, such as the euro symbol and 12 */ __('Renews at %s / year', 'beltoft-services'), priceMarkup(item));
+        price.appendChild(renewal);
         row.appendChild(price);
       }
 
@@ -154,7 +172,7 @@
       const typedExtension = typed.indexOf('.') > 0;
       const shown = data.results.filter(function (item, index) { return item.status !== 'not_sold' || (typedExtension && index === 0); });
       if (shown.some(function (item) { return item.status === 'free'; })) {
-        results.appendChild(element('p', 'beltoft-domain-note', __('Prices are per year, excluding VAT. The renewal price is the same as the first year. DNS hosting and the transfer lock are included.', 'beltoft-services')));
+        results.appendChild(element('p', 'beltoft-domain-note', taxMode === 'incl' ? __('Prices are per year, including VAT. The renewal price is the same as the first year. DNS hosting and the transfer lock are included.', 'beltoft-services') : __('Prices are per year, excluding VAT. The renewal price is the same as the first year. DNS hosting and the transfer lock are included.', 'beltoft-services')));
       }
       // The first result is what the customer typed (or the first extension): it leads, the rest are alternatives.
       shown.forEach(function (item, index) { results.appendChild(result(item, index === 0)); });
@@ -314,8 +332,10 @@
       if (item.status === 'taken') {
         information.appendChild(element('span', 'beltoft-domain-result__status', __('Registered, can be transferred', 'beltoft-services')));
         if (hasPrice) {
-          card.insertBefore(element('div', 'beltoft-domain-result__price', sprintf(/* translators: %s: price in euro */ __('€%s / year', 'beltoft-services'), item.price)), actions);
-          information.appendChild(element('span', 'beltoft-domain-result__note', __('The transfer is charged as one year and adds that year to the registration. Price excluding VAT.', 'beltoft-services')));
+          const transferPrice = element('div', 'beltoft-domain-result__price', '');
+          transferPrice.innerHTML = sprintf(/* translators: %s: the price with its currency symbol, such as the euro symbol and 12 */ __('%s / year', 'beltoft-services'), priceMarkup(item));
+          card.insertBefore(transferPrice, actions);
+          information.appendChild(element('span', 'beltoft-domain-result__note', taxMode === 'incl' ? __('The transfer is charged as one year and adds that year to the registration. Price including VAT.', 'beltoft-services') : __('The transfer is charged as one year and adds that year to the registration. Price excluding VAT.', 'beltoft-services')));
         }
         const code = codeForm(item.domain, item.display);
         actions.appendChild(code.form);
@@ -324,7 +344,11 @@
       }
       if (item.status === 'free') {
         information.appendChild(element('span', 'beltoft-domain-result__status', __('Not registered, so there is nothing to transfer. You can register it instead.', 'beltoft-services')));
-        if (hasPrice) card.insertBefore(element('div', 'beltoft-domain-result__price', sprintf(/* translators: %s: price in euro */ __('€%s / year', 'beltoft-services'), item.price)), actions);
+        if (hasPrice) {
+          const registerPrice = element('div', 'beltoft-domain-result__price', '');
+          registerPrice.innerHTML = sprintf(/* translators: %s: the price with its currency symbol, such as the euro symbol and 12 */ __('%s / year', 'beltoft-services'), priceMarkup(item));
+          card.insertBefore(registerPrice, actions);
+        }
         actions.appendChild(registerButton(root, item.domain, out));
         return;
       }

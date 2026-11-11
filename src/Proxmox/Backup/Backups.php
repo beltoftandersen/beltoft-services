@@ -821,11 +821,11 @@ final class Backups {
 			$rate = null === $was || null === $now ? 0.0 : \BeltoftServices\Usage\Rates::hourly( $now - $was, \BeltoftServices\Usage\Rates::premium( $to->get_parent_id() ) );
 
 			/* translators: %s: price per hour such as €0.0041 */
-			return sprintf( __( '%s / hour', 'beltoft-services' ), ( $rate < 0 ? '-' : '+' ) . \BeltoftServices\Usage\Rates::money( abs( $rate ), 4 ) );
+			return sprintf( __( '%s / hour', 'beltoft-services' ), ( $rate < 0 ? '-' : '+' ) . \BeltoftServices\Usage\Rates::money( abs( $rate ), 4, '', $to ) );
 		}
 
 		$diff = (float) wc_get_price_excluding_tax( $to ) - (float) wc_get_price_excluding_tax( $from );
-		$text = ( $diff < 0 ? '-' : '+' ) . html_entity_decode( wp_strip_all_tags( wc_price( abs( $diff ) ) ), ENT_QUOTES, 'UTF-8' );
+		$text = ( $diff < 0 ? '-' : '+' ) . \BeltoftServices\Billing\TaxNote::text( abs( $diff ), null, $to, '', false );
 
 		if ( class_exists( '\WC_Subscriptions_Product' ) && \WC_Subscriptions_Product::is_subscription( $to ) ) {
 			$period = (string) \WC_Subscriptions_Product::get_period( $to );

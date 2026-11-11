@@ -56,8 +56,10 @@ final class DomainQueryTest extends TestCase {
 		$this->assertSame( 'available', $rows[0]['status'] );
 		$this->assertSame( 1, $rows[0]['available'] );
 		$this->assertSame( 1, $rows[0]['primary'] );
-		$this->assertSame( '€14 / year', $rows[0]['price'] );
-		$this->assertSame( 'Renews at €14 / year', $rows[0]['renewal_price'] );
+		// The price is in the shop's currency (no euro sign is hard-coded any more).
+		$money = \BeltoftServices\Usage\Rates::money( 14.0, 0 );
+		$this->assertSame( $money . ' / year', $rows[0]['price'] );
+		$this->assertSame( 'Renews at ' . $money . ' / year', $rows[0]['renewal_price'] );
 		$this->assertStringContainsString( 'action=' . DomainQuery::ACTION, $rows[0]['add_url'] );
 		$this->assertStringContainsString( 'domain=' . $name . '.com', $rows[0]['add_url'] );
 		$this->assertSame( 'taken', $rows[1]['status'] );

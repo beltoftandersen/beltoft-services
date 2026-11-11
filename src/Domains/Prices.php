@@ -2,6 +2,7 @@
 /** Registrar cost table and public yearly prices. @package BeltoftServices */
 namespace BeltoftServices\Domains;
 
+use BeltoftServices\Currency;
 use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
@@ -19,11 +20,18 @@ final class Prices {
 		return (int) ceil( max( $cost * ( 1.0 + $percent / 100.0 ), $cost + $margin ) );
 	}
 
-	public static function price( string $tld ): ?int {
+	/**
+	 * The public yearly price of an extension in a currency (the current one by default), whole units. In the shop's currency it is the override
+	 * or the price the markup rule gave. In another currency only an override line of that currency counts (the amount filter answers it, see
+	 * Currency::amount()): the euro price is never shown as another currency, so an extension with no line there has no price.
+	 */
+	public static function price( string $tld, string $currency = '' ): ?int {
 		$tld = strtolower( ltrim( $tld, '.' ) );
+		$currency = Currency::or_current( $currency );
 		$table = get_option( self::OPTION, array() );
-		if ( ! is_array( $table ) || ! isset( $table[ $tld ] ) || ! self::sellable( $tld ) ) { return null; }
-		$overrides = self::overrides();
+		if ( ! is_array( $table ) || ! isset( $table[ $tld ] ) || ! self::sellable( $tld, $currency ) ) { return null; }
+		$overrides = self::overrides( $currency );
+		if ( Currency::base() !== $currency ) { return $overrides[ $tld ] ?? null; }
 		return $overrides[ $tld ] ?? (int) $table[ $tld ]['price'];
 	}
 
@@ -51,8 +59,11 @@ final class Prices {
 		return null;
 	}
 
-	public static function sellable( string $tld ): bool {
+	/** Whether an extension is sold: in the table, allowed when restricted, and in a currency other than the shop's only with a price in it. */
+	public static function sellable( string $tld, string $currency = '' ): bool {
 		$tld = strtolower( ltrim( $tld, '.' ) );
+		$currency = Currency::or_current( $currency );
+		if ( Currency::base() !== $currency && ! isset( self::overrides( $currency )[ $tld ] ) ) { return false; }
 		$table = get_option( self::OPTION, array() );
 		if ( ! is_array( $table ) || ! isset( $table[ $tld ] ) ) { return false; }
 		if ( empty( $table[ $tld ]['restricted'] ) ) { return true; }
@@ -62,8 +73,8 @@ final class Prices {
 		return in_array( $tld, $allowed, true );
 	}
 
-	private static function overrides(): array {
-		$raw = Settings::get( 'domain_price_overrides' );
+	private static function overrides( string $currency = '' ): array {
+		$raw = Currency::amount( 'domain_price_overrides', $currency );
 		if ( ! is_string( $raw ) ) { return array(); }
 		$result = array();
 		foreach ( preg_split( '/\r?\n/', $raw ) as $line ) {

@@ -208,7 +208,7 @@ final class DomainSearchElementTest extends TestCase {
 
 		$this->assertSame( 'x ', apply_filters( 'bricks/dynamic_data/render_content', 'x {bds_domain}', null, 'text' ), 'Outside a loop row the tag is empty.' );
 		\Bricks\Query::$object = $row;
-		$this->assertSame( '<b>a.com</b> 1 €14 / year', apply_filters( 'bricks/frontend/render_data', '<b>{bds_domain}</b> {bds_available} {bds_price}', null ) );
+		$this->assertSame( '<b>a.com</b> 1 ' . \BeltoftServices\Usage\Rates::money( 14.0, 0 ) . ' / year', apply_filters( 'bricks/frontend/render_data', '<b>{bds_domain}</b> {bds_available} {bds_price}', null ) );
 		$this->assertSame( 'available', apply_filters( 'bricks/dynamic_data/render_tag', 'bds_status', null, 'text' ) );
 		$this->assertSame( 'com', apply_filters( 'bricks/dynamic_data/render_tag', '{bds_tld}', null, 'text' ) );
 		$this->assertSame( 'other', apply_filters( 'bricks/dynamic_data/render_tag', 'other', null, 'text' ), 'Other tags are not touched.' );

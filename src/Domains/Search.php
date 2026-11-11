@@ -3,6 +3,7 @@
 namespace BeltoftServices\Domains;
 
 use BeltoftServices\Api\Routes;
+use BeltoftServices\Billing\TaxNote;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Settings;
 
@@ -168,9 +169,28 @@ final class Search {
 			$available = Prices::sellable( $entry['tld'] ) && ( 'dk' !== $entry['tld'] || DkAgreement::ready() );
 			$item = $found[ $entry['domain'] ] ?? array();
 			$status = ! $available ? 'not_sold' : ( ! empty( $item['is_premium'] ) ? 'premium' : ( 'free' === ( $item['status'] ?? '' ) ? 'free' : 'taken' ) );
-			$results[] = array( 'domain' => $entry['domain'], 'display' => HostName::display( $entry['domain'] ), 'status' => $status, 'price' => in_array( $status, array( 'free', 'taken' ), true ) ? Prices::price( $entry['tld'] ) : null, 'transfer' => 'taken' === $status, 'note' => self::note( $entry['tld'] ) );
+			$price = in_array( $status, array( 'free', 'taken' ), true ) ? Prices::price( $entry['tld'] ) : null;
+			$results[] = array( 'domain' => $entry['domain'], 'display' => HostName::display( $entry['domain'] ), 'status' => $status, 'price' => $price, 'price_text' => self::price_text( $price ), 'price_html' => self::price_html( $price ), 'transfer' => 'taken' === $status, 'note' => self::note( $entry['tld'] ) );
 		}
-		return array( 'results' => $results );
+		return array( 'results' => $results, 'tax' => TaxNote::display(), 'currency' => (string) get_woocommerce_currency() );
+	}
+
+	/** A yearly price (whole units, excluding tax) as the catalogue shows it: whole amounts without decimals, the shop's tax display, plain text. Empty for none. */
+	public static function price_text( ?int $price ): string {
+		if ( null === $price ) { return ''; }
+		return TaxNote::text( (float) $price, self::decimals( $price ), Cart::domain_product(), '', false );
+	}
+
+	/** The same price as HTML for a page: it passes beltoft_services_price_html, so a site can show both tax displays. $plain: escaped plain text instead of the price markup (a Bricks tag). Empty for none. */
+	public static function price_html( ?int $price, string $context = 'domain-price', bool $plain = false ): string {
+		if ( null === $price ) { return ''; }
+		return wp_kses_post( TaxNote::html( (float) $price, $context, array( 'product' => Cart::domain_product(), 'decimals' => self::decimals( $price ), 'plain' => $plain ) ) );
+	}
+
+	/** Whole amounts have no decimals ("€12"), others two ("€15.50"), in the display in force. */
+	private static function decimals( int $price ): int {
+		$shown = TaxNote::figure( (float) $price, Cart::domain_product() );
+		return abs( $shown - round( $shown ) ) < 0.005 ? 0 : 2;
 	}
 
 	/** The default visible strings of the form: the shortcode prints these, the Bricks element offers them as editable content. */

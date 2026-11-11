@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Usage;
 
+use BeltoftServices\Billing\TaxNote;
 use BeltoftServices\Brand;
 
 defined( 'ABSPATH' ) || exit;
@@ -23,6 +24,8 @@ defined( 'ABSPATH' ) || exit;
  *   {beltoft_usage_line}    "Or €0.0226/hour, max €16.50/month, pay as you go", empty when there is no offer
  *   {beltoft_usage_hourly}  "€0.0226"
  *   {beltoft_usage_cap}     "€16.50" ("€15" for a whole amount)
+ *
+ * The figures are in the shop's tax display for the visitor's currency (including tax when the shop shows prices that way).
  *
  * The tags are empty for a variation without a pay-as-you-go sibling, so a text element can hide itself with the
  * condition "dynamic data is not empty".
@@ -129,7 +132,19 @@ final class Catalog {
 			static function ( $m ) use ( $post ) {
 				$id = ! empty( $m[2] ) ? (int) $m[2] : ( isset( $post->ID ) ? (int) $post->ID : 0 );
 
-				return esc_html( self::value( $m[1], $id ) );
+				$tag  = $m[1];
+				$text = esc_html( self::value( $tag, $id ) );
+
+				if ( '' === $text ) {
+					return '';
+				}
+
+				// The figure is in the shop's tax display. The html passes beltoft_services_price_html, so a site can show both
+				// figures; the default is exactly the escaped text. Nothing here is cached by the plugin: a page cache must vary
+				// by currency and tax display, as it does for the prices themselves.
+				$html = TaxNote::html( static fn( string $display = '' ): string => esc_html( self::value( $tag, $id ) ), 'usage-tag' );
+
+				return $html === $text ? $text : wp_kses_post( $html );
 			},
 			$content
 		);
@@ -156,9 +171,9 @@ final class Catalog {
 
 		switch ( $tag ) {
 			case 'beltoft_usage_hourly':
-				return Rates::money( $rates['hourly'], 4 );
+				return Rates::money( $rates['hourly'], 4, '', $v );
 			case 'beltoft_usage_cap':
-				return Rates::cap_money( $rates['cap'] );
+				return Rates::cap_money( $rates['cap'], $v );
 			default:
 				return Rates::line( $v );
 		}

@@ -503,6 +503,11 @@ final class Cart {
 		return self::product_for( 'dns' );
 	}
 
+	/** The domain product, for the tax class of a domain price. */
+	public static function domain_product(): ?\WC_Product {
+		return self::product_for( 'domain' );
+	}
+
 	private static function product_for( string $driver ): ?\WC_Product {
 		$ids = get_posts( array( 'post_type' => 'product', 'post_status' => 'publish', 'fields' => 'ids', 'posts_per_page' => 20, 'meta_key' => Product::META_DRIVER, 'meta_value' => $driver ) ); // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key,WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Small published service-product catalogue, capped at 20.
 		foreach ( $ids as $id ) {

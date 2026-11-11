@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Usage;
 
+use BeltoftServices\Billing\TaxNote;
 use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\LineNames;
 use BeltoftServices\Product;
@@ -212,29 +213,30 @@ final class Breakdown {
 	 * The rows of the amounts: label and text.
 	 *
 	 * @param array<string, mixed> $parts parts(), with an optional disk and disk_gb (the extra disk of a new server).
+	 * @param \WC_Product|null     $tax   Product for the tax display, null for the amounts as given (API answers).
 	 * @return array<int, array{0: string, 1: string}>
 	 */
-	public static function rows( array $parts, string $plan_name = '' ): array {
+	public static function rows( array $parts, string $plan_name = '', ?\WC_Product $tax = null ): array {
 		/* translators: %s: plan name such as Standard */
-		$rows = array( array( '' !== $plan_name ? sprintf( __( '%s plan', 'beltoft-services' ), $plan_name ) : __( 'Plan', 'beltoft-services' ), Rates::per_month_line( (float) $parts['plan'] ) ) );
+		$rows = array( array( '' !== $plan_name ? sprintf( __( '%s plan', 'beltoft-services' ), $plan_name ) : __( 'Plan', 'beltoft-services' ), Rates::per_month_line( (float) $parts['plan'], $tax ) ) );
 
 		if ( $parts['ip'] > 0 ) {
-			$rows[] = array( __( 'Public IPv4 address', 'beltoft-services' ), Rates::plus_per_month_line( (float) $parts['ip'] ) );
+			$rows[] = array( __( 'Public IPv4 address', 'beltoft-services' ), Rates::plus_per_month_line( (float) $parts['ip'], $tax ) );
 		}
 
 		if ( $parts['storage'] > 0 ) {
 			/* translators: %d: extra storage in GB */
-			$rows[] = array( $parts['storage_gb'] > 0 ? sprintf( __( 'Extra storage, %d GB', 'beltoft-services' ), (int) $parts['storage_gb'] ) : __( 'Extra storage', 'beltoft-services' ), Rates::plus_per_month_line( (float) $parts['storage'] ) );
+			$rows[] = array( $parts['storage_gb'] > 0 ? sprintf( __( 'Extra storage, %d GB', 'beltoft-services' ), (int) $parts['storage_gb'] ) : __( 'Extra storage', 'beltoft-services' ), Rates::plus_per_month_line( (float) $parts['storage'], $tax ) );
 		}
 
 		if ( $parts['backups'] > 0 ) {
-			$rows[] = array( __( 'Daily backups', 'beltoft-services' ), Rates::plus_per_month_line( (float) $parts['backups'] ) );
+			$rows[] = array( __( 'Daily backups', 'beltoft-services' ), Rates::plus_per_month_line( (float) $parts['backups'], $tax ) );
 		}
 
 		// The extra disk of a new server is a cart line of its own: its row is added by the caller that quotes it (parts['disk']).
 		if ( ( $parts['disk'] ?? 0 ) > 0 ) {
 			/* translators: %d: extra disk in GB */
-			$rows[] = array( ( $parts['disk_gb'] ?? 0 ) > 0 ? sprintf( __( 'Extra disk, %d GB', 'beltoft-services' ), (int) $parts['disk_gb'] ) : __( 'Extra disk', 'beltoft-services' ), Rates::plus_per_month_line( (float) $parts['disk'] ) );
+			$rows[] = array( ( $parts['disk_gb'] ?? 0 ) > 0 ? sprintf( __( 'Extra disk, %d GB', 'beltoft-services' ), (int) $parts['disk_gb'] ) : __( 'Extra disk', 'beltoft-services' ), Rates::plus_per_month_line( (float) $parts['disk'], $tax ) );
 		}
 
 		return $rows;
@@ -254,13 +256,22 @@ final class Breakdown {
 		$head = '<span class="beltoft-services-payg__head"><span class="beltoft-services-payg__name">' . esc_html( $name ) . '</span><span class="beltoft-services-payg__plan">' . esc_html( self::specs( $usage, (string) $parts['driver'] ) ) . '</span></span>';
 		$out  = '<span class="beltoft-services-payg__sum">';
 
-		foreach ( self::rows( $parts, $plan ) as $row ) {
-			$out .= '<span class="beltoft-services-payg__row"><span>' . esc_html( $row[0] ) . '</span><span>' . esc_html( $row[1] ) . '</span></span>';
-		}
+		// The order summary is in the cart: its figures follow the cart's tax display.
+		$out .= TaxNote::in_cart(
+			static function () use ( $parts, $plan, $usage ): string {
+				$rows = '';
 
-		$out .= '<span class="beltoft-services-payg__row beltoft-services-payg__row--max"><span>' . esc_html__( 'Max per month', 'beltoft-services' ) . '</span><span>' . esc_html( Rates::cap_money( (float) $parts['max'] ) ) . '</span></span>';
-		/* translators: %s: price per hour such as €0.0740 */
-		$out .= '<span class="beltoft-services-payg__hourly">' . esc_html( sprintf( __( 'That is %s per hour, billed for the hours used.', 'beltoft-services' ), Rates::money( (float) $parts['hourly'], 4 ) ) ) . '</span></span>';
+				foreach ( self::rows( $parts, $plan, $usage ) as $row ) {
+					$rows .= '<span class="beltoft-services-payg__row"><span>' . esc_html( $row[0] ) . '</span><span>' . esc_html( $row[1] ) . '</span></span>';
+				}
+
+				$rows .= '<span class="beltoft-services-payg__row beltoft-services-payg__row--max"><span>' . esc_html__( 'Max per month', 'beltoft-services' ) . '</span><span>' . esc_html( Rates::cap_money( (float) $parts['max'], $usage ) ) . '</span></span>';
+				/* translators: %s: price per hour such as €0.0740 */
+				$rows .= '<span class="beltoft-services-payg__hourly">' . esc_html( sprintf( __( 'That is %s per hour, billed for the hours used.', 'beltoft-services' ), Rates::money( (float) $parts['hourly'], 4, '', $usage ) ) ) . '</span></span>';
+
+				return $rows;
+			}
+		);
 
 		return array( $head, $out );
 	}

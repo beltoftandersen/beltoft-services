@@ -19,6 +19,138 @@ defined( 'ABSPATH' ) || exit;
  */
 final class TaxNote {
 
+	/** @var string Display forced for the duration of a render ('' for the shop's own). */
+	private static string $forced = '';
+
+	/**
+	 * Runs a callback with a tax display in force (a price listener renders the other display through this).
+	 *
+	 * @param string   $display 'incl' or 'excl'.
+	 * @param callable $fn      Callback.
+	 * @return mixed
+	 */
+	public static function in( string $display, callable $fn ) {
+		if ( ! in_array( $display, array( 'incl', 'excl' ), true ) ) {
+			return $fn();
+		}
+
+		$before       = self::$forced;
+		self::$forced = $display;
+
+		try {
+			return $fn();
+		} finally {
+			self::$forced = $before;
+		}
+	}
+
+	/**
+	 * The display a catalogue price is shown in: a forced one, else the shop's. 'excl' when the shop charges no tax.
+	 *
+	 * @param string $context 'shop' or 'cart'.
+	 */
+	public static function display( string $context = 'shop' ): string {
+		if ( '' !== self::$forced && wc_tax_enabled() ) {
+			return self::$forced;
+		}
+
+		return 'incl' === self::mode( $context ) ? 'incl' : 'excl';
+	}
+
+	/**
+	 * "incl. VAT" or "excl. VAT" for the display in force. Unlike note() it never says nothing: a shop with no tax
+	 * says "excl. VAT", as the plugin always did.
+	 */
+	public static function label(): string {
+		return 'incl' === self::display() ? __( 'incl. VAT', 'beltoft-services' ) : __( 'excl. VAT', 'beltoft-services' );
+	}
+
+	/**
+	 * The catalogue figure for an amount excluding tax: the amount with its tax added when the display in force is
+	 * including, from the product's tax class (a non-taxable product keeps the amount) or a given tax class. Nothing is
+	 * rounded here; the caller formats with the decimals it wants. Without a product and without a class the amount is kept.
+	 *
+	 * @param float            $excl      Amount excluding tax.
+	 * @param \WC_Product|null $product   Product the amount belongs to.
+	 * @param string|null      $tax_class Tax class slug, used when there is no product.
+	 */
+	public static function figure( float $excl, ?\WC_Product $product = null, ?string $tax_class = null ): float {
+		if ( 'incl' !== self::display() ) {
+			return $excl;
+		}
+
+		if ( $product instanceof \WC_Product ) {
+			if ( ! $product->is_taxable() ) {
+				return $excl;
+			}
+
+			$class = $product->get_tax_class();
+		} elseif ( null !== $tax_class ) {
+			$class = $tax_class;
+		} else {
+			return $excl;
+		}
+
+		return round( $excl + array_sum( \WC_Tax::calc_tax( $excl, \WC_Tax::get_rates( $class ), false ) ), 8 );
+	}
+
+	/**
+	 * An amount as plain text, the way the shop shows prices ("€16.50", "€0.0226"): wc_price() without its markup. No tax is added.
+	 *
+	 * @param float    $amount   Amount.
+	 * @param int|null $decimals Decimals, null for the shop's price decimals.
+	 * @param string   $currency Currency code, '' for the current one.
+	 * @param bool     $nbsp     Spaces in it become non-breaking, so an amount never wraps inside (Rates::money() does; some labels never did).
+	 */
+	public static function plain( float $amount, ?int $decimals = 2, string $currency = '', bool $nbsp = true ): string {
+		$args = array();
+
+		if ( null !== $decimals ) {
+			$args['decimals'] = $decimals;
+		}
+
+		if ( '' !== $currency ) {
+			$args['currency'] = $currency;
+		}
+
+		$text = html_entity_decode( wp_strip_all_tags( wc_price( $amount, $args ) ), ENT_QUOTES, 'UTF-8' );
+
+		return $nbsp ? str_replace( ' ', "\xC2\xA0", trim( $text ) ) : $text;
+	}
+
+	/**
+	 * A catalogue figure as plain text in the display in force: for a label, an attribute or a script, where HTML does not go.
+	 *
+	 * @param float            $excl     Amount excluding tax.
+	 * @param int|null         $decimals Decimals, null for the shop's price decimals.
+	 * @param \WC_Product|null $product  Product the amount belongs to (null: shown as given).
+	 * @param string           $currency Currency code, '' for the current one.
+	 * @param bool             $nbsp     See plain().
+	 */
+	public static function text( float $excl, ?int $decimals = 2, ?\WC_Product $product = null, string $currency = '', bool $nbsp = true ): string {
+		return self::plain( self::figure( $excl, $product ), $decimals, $currency, $nbsp );
+	}
+
+	/**
+	 * Runs a callback in the display of the cart (woocommerce_tax_display_cart): for prices printed in the cart and the order summary.
+	 *
+	 * @param callable $fn Callback.
+	 * @return mixed
+	 */
+	public static function in_cart( callable $fn ) {
+		return self::in( self::display( 'cart' ), $fn );
+	}
+
+	/**
+	 * Whether a catalogue figure of this product is shown including tax: the display in force is including and the amount belongs to a
+	 * product. Without a product the amount is shown as given (excluding tax) and the sentence around it says so.
+	 *
+	 * @param \WC_Product|null $product Product the amount belongs to.
+	 */
+	public static function incl_for( ?\WC_Product $product ): bool {
+		return null !== $product && 'incl' === self::display();
+	}
+
 	/**
 	 * Whether prices are shown including or excluding tax: 'incl', 'excl', or '' when the shop charges no tax.
 	 *
@@ -63,17 +195,18 @@ final class TaxNote {
 	 * A catalogue price as HTML.
 	 *
 	 * $price is either the amount as this plugin prints it today (a float, excluding tax) or a callable
-	 * function ( string $display = '' ): string that renders the price ('' for the plugin's own display, 'incl' or
-	 * 'excl' for that tax display). Without a listener the result is exactly what the plugin printed before: wc_price() of the amount, or the
-	 * callable's output.
+	 * function ( string $display = '' ): string that renders the price ('' for the shop's display, 'incl' or 'excl' for that
+	 * display). Without a listener the result is the shop's display of it: wc_price() of the amount, or the callable's output.
+	 * With the display excluding tax, or no tax context, that is exactly what the plugin printed before.
 	 *
-	 * Arguments ($args): currency (code, default the current one), decimals, product (a \WC_Product that gives the
-	 * tax rates), tax_class (a tax class slug, used when there is no product).
+	 * Arguments ($args): currency (code, default the current one), decimals, product (a \WC_Product that gives the tax
+	 * class), tax_class (a tax class slug, used when there is no product), plain (true: the figure is plain text escaped
+	 * with esc_html(), the way text printed in a page was before, not wc_price() markup).
 	 *
 	 * The result passes through the filter beltoft_services_price_html ( string $html, ?float $amount, string $currency,
 	 * string $context, callable $render ): $amount is null when $price was a callable, $context says where the price is
 	 * printed (for example 'server-picker'), and $render ( string $display = '' ): string renders the same price in a
-	 * tax display, so a listener can print both figures or the other one.
+	 * tax display, so a listener can print both figures or the other one. A caller outputs the result with wp_kses_post().
 	 *
 	 * @param float|callable       $price   Amount or renderer.
 	 * @param string               $context Where it is printed.
@@ -84,48 +217,35 @@ final class TaxNote {
 		$amount    = $is_render ? null : (float) $price;
 		$currency  = isset( $args['currency'] ) && '' !== (string) $args['currency'] ? (string) $args['currency'] : (string) get_woocommerce_currency();
 
-		$render = $is_render ? $price : function ( string $display = '' ) use ( $amount, $args ): string {
-			$wc = array();
+		$render = $is_render ? static function ( string $display = '' ) use ( $price ): string {
+			return (string) self::in( $display, static fn() => $price( $display ) );
+		} : function ( string $display = '' ) use ( $amount, $args ): string {
+			return self::in(
+				$display,
+				static function () use ( $amount, $args ): string {
+					$product = isset( $args['product'] ) && $args['product'] instanceof \WC_Product ? $args['product'] : null;
+					$figure  = self::figure( (float) $amount, $product, isset( $args['tax_class'] ) ? (string) $args['tax_class'] : null );
+					$code    = isset( $args['currency'] ) ? (string) $args['currency'] : '';
 
-			if ( isset( $args['decimals'] ) ) {
-				$wc['decimals'] = (int) $args['decimals'];
-			}
+					if ( ! empty( $args['plain'] ) ) {
+						return esc_html( self::plain( $figure, isset( $args['decimals'] ) ? (int) $args['decimals'] : null, $code, false ) );
+					}
 
-			if ( isset( $args['currency'] ) && '' !== (string) $args['currency'] ) {
-				$wc['currency'] = (string) $args['currency'];
-			}
+					$wc = array();
 
-			return wc_price( 'incl' === $display ? self::including( (float) $amount, $args ) : (float) $amount, $wc );
+					if ( isset( $args['decimals'] ) ) {
+						$wc['decimals'] = (int) $args['decimals'];
+					}
+
+					if ( '' !== $code ) {
+						$wc['currency'] = $code;
+					}
+
+					return wc_price( $figure, $wc );
+				}
+			);
 		};
 
 		return (string) apply_filters( 'beltoft_services_price_html', (string) $render(), $amount, $currency, $context, $render );
-	}
-
-	/**
-	 * An amount excluding tax with its tax added, from the product's tax class or the tax class of the arguments. The amount is always
-	 * excluding tax (whatever prices_include_tax says), so the rates are applied to it as they are and nothing is rounded to the shop's
-	 * price decimals: the figure is formatted by wc_price() with the decimals the caller asked for.
-	 *
-	 * @param float                $amount Amount excluding tax.
-	 * @param array<string, mixed> $args   Arguments of html().
-	 */
-	private static function including( float $amount, array $args ): float {
-		if ( ! wc_tax_enabled() ) {
-			return $amount;
-		}
-
-		if ( isset( $args['product'] ) && $args['product'] instanceof \WC_Product ) {
-			if ( ! $args['product']->is_taxable() ) {
-				return $amount;
-			}
-
-			$class = $args['product']->get_tax_class();
-		} elseif ( isset( $args['tax_class'] ) ) {
-			$class = (string) $args['tax_class'];
-		} else {
-			return $amount;
-		}
-
-		return round( $amount + array_sum( \WC_Tax::calc_tax( $amount, \WC_Tax::get_rates( $class ), false ) ), 8 );
 	}
 }

@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Account;
 
+use BeltoftServices\Billing\TaxNote;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Db\DbDriver;
@@ -518,18 +519,20 @@ final class DbPicker {
 	private static function summary( array $plan, bool $usage = false ): string {
 		if ( $usage && ! empty( $plan['usage'] ) ) {
 			/* translators: 1: plan name, 2: price such as "€0.0226 per hour, max €16.50 per month excluding VAT" */
-			return sprintf( __( '%1$s, pay as you go: %2$s', 'beltoft-services' ), (string) $plan['name'], Rates::terms( (float) $plan['usage']['hourly'], (float) $plan['usage']['cap'] ) );
+			return sprintf( __( '%1$s, pay as you go: %2$s', 'beltoft-services' ), (string) $plan['name'], Rates::terms( (float) $plan['usage']['hourly'], (float) $plan['usage']['cap'], ServerPicker::tax_of( $plan ) ) );
 		}
 
-		$money = html_entity_decode( wp_strip_all_tags( wc_price( (float) $plan['price'] ) ), ENT_QUOTES, 'UTF-8' );
+		$tax   = ServerPicker::tax_of( $plan );
+		$money = TaxNote::text( (float) $plan['price'], null, $tax, '', false );
+		$incl  = TaxNote::incl_for( $tax );
 
 		if ( '' === (string) $plan['period'] ) {
 			/* translators: 1: plan name, 2: price such as €25.00 */
-			return sprintf( __( '%1$s: %2$s excluding VAT', 'beltoft-services' ), (string) $plan['name'], $money );
+			return sprintf( $incl ? __( '%1$s: %2$s including VAT', 'beltoft-services' ) : __( '%1$s: %2$s excluding VAT', 'beltoft-services' ), (string) $plan['name'], $money );
 		}
 
 		/* translators: 1: plan name, 2: price such as €25.00, 3: period such as month */
-		return sprintf( __( '%1$s: %2$s per %3$s excluding VAT', 'beltoft-services' ), (string) $plan['name'], $money, (string) $plan['period'] );
+		return sprintf( $incl ? __( '%1$s: %2$s per %3$s including VAT', 'beltoft-services' ) : __( '%1$s: %2$s per %3$s excluding VAT', 'beltoft-services' ), (string) $plan['name'], $money, (string) $plan['period'] );
 	}
 
 	/**
@@ -541,6 +544,7 @@ final class DbPicker {
 	 */
 	private static function card( array $plan, bool $selected, bool $hidden = false ): void {
 		$stock = ! empty( $plan['in_stock'] );
+		$tax   = ServerPicker::tax_of( $plan );
 		$attrs = array(
 			'data-cores'       => (string) $plan['cores'],
 			'data-memory'      => (string) $plan['memory_mb'],
@@ -553,8 +557,8 @@ final class DbPicker {
 
 		if ( ! empty( $plan['usage'] ) ) {
 			$attrs += array(
-				'data-card-cap'      => Rates::cap_money( (float) $plan['usage']['cap'] ),
-				'data-card-hourly'   => Rates::per_hour( (float) $plan['usage']['hourly'] ),
+				'data-card-cap'      => Rates::cap_money( (float) $plan['usage']['cap'], $tax ),
+				'data-card-hourly'   => Rates::per_hour( (float) $plan['usage']['hourly'], $tax ),
 				'data-summary-usage' => self::summary( $plan, true ),
 			);
 		}
@@ -573,10 +577,10 @@ final class DbPicker {
 		echo '<span class="beltoft-services-plan__name">' . esc_html( (string) $plan['name'] ) . '</span>';
 
 		if ( self::payg_only( $plan ) ) {
-			echo '<span class="beltoft-services-plan__price"><b>' . esc_html( Rates::cap_money( (float) $plan['usage']['cap'] ) ) . '</b> <span>' . esc_html__( 'max per month, excl. VAT', 'beltoft-services' ) . '</span></span>';
-			echo '<span class="beltoft-services-plan__hourly">' . esc_html( Rates::per_hour( (float) $plan['usage']['hourly'] ) ) . '</span>';
+			echo '<span class="beltoft-services-plan__price"><b>' . esc_html( Rates::cap_money( (float) $plan['usage']['cap'], $tax ) ) . '</b> <span>' . esc_html( TaxNote::incl_for( $tax ) ? __( 'max per month, incl. VAT', 'beltoft-services' ) : __( 'max per month, excl. VAT', 'beltoft-services' ) ) . '</span></span>';
+			echo '<span class="beltoft-services-plan__hourly">' . esc_html( Rates::per_hour( (float) $plan['usage']['hourly'], $tax ) ) . '</span>';
 		} else {
-			echo '<span class="beltoft-services-plan__price"><b>' . wp_kses_post( wc_price( (float) $plan['price'] ) ) . '</b> <span>' . esc_html( ServerPicker::per( (string) $plan['period'] ) ) . '</span></span>';
+			echo '<span class="beltoft-services-plan__price"><b>' . wp_kses_post( TaxNote::html( (float) $plan['price'], 'db-picker', array( 'product' => $tax ) ) ) . '</b> <span>' . esc_html( ServerPicker::per( (string) $plan['period'] ) ) . '</span></span>';
 		}
 
 		echo '<span class="beltoft-services-plan__specs">';

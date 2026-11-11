@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-11T05:53:21+00:00\n"
+"POT-Creation-Date: 2026-11-11T06:19:47+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-services\n"
@@ -168,7 +168,7 @@ msgid "My Account shows one Billing item instead of Orders, Subscriptions, Payme
 msgstr ""
 
 #: src/Account/Billing.php:324
-#: src/Account/ServerPicker.php:824
+#: src/Account/ServerPicker.php:855
 #: src/LineNames.php:340
 #: src/LineNames.php:391
 #: src/Usage/BillingField.php:191
@@ -263,115 +263,132 @@ msgstr ""
 msgid "New password"
 msgstr ""
 
-#: src/Account/DbPicker.php:168
-#: src/Account/ServerPicker.php:169
+#: src/Account/DbPicker.php:169
+#: src/Account/ServerPicker.php:170
 msgid "Your session has expired. Reload the page and try again."
 msgstr ""
 
-#: src/Account/DbPicker.php:173
-#: src/Account/ServerPicker.php:178
+#: src/Account/DbPicker.php:174
+#: src/Account/ServerPicker.php:179
 msgid "Too many tries. Please wait a while and try again."
 msgstr ""
 
-#: src/Account/DbPicker.php:180
-#: src/Account/ServerPicker.php:251
+#: src/Account/DbPicker.php:181
+#: src/Account/ServerPicker.php:252
 msgid "Choose a plan."
 msgstr ""
 
-#: src/Account/DbPicker.php:188
-#: src/Account/ServerPicker.php:257
+#: src/Account/DbPicker.php:189
+#: src/Account/ServerPicker.php:258
 #: src/Mcp/PurchaseDb.php:101
 msgid "That plan is out of stock. Choose another plan."
 msgstr ""
 
-#: src/Account/DbPicker.php:199
-#: src/Account/ServerPicker.php:270
+#: src/Account/DbPicker.php:200
+#: src/Account/ServerPicker.php:271
 #: src/Mcp/PurchaseDb.php:106
 msgid "This plan cannot be ordered right now."
 msgstr ""
 
-#: src/Account/DbPicker.php:230
-#: src/Account/DbPicker.php:277
+#: src/Account/DbPicker.php:231
+#: src/Account/DbPicker.php:278
 msgid "The database could not be added. Please try again."
 msgstr ""
 
-#: src/Account/DbPicker.php:238
-#: src/Account/ServerPicker.php:392
+#: src/Account/DbPicker.php:239
+#: src/Account/ServerPicker.php:393
 msgid "Finish or remove the subscription payment in your cart first."
 msgstr ""
 
-#: src/Account/DbPicker.php:328
+#: src/Account/DbPicker.php:329
 msgid "New database"
 msgstr ""
 
-#: src/Account/DbPicker.php:331
+#: src/Account/DbPicker.php:332
 msgid "No database can be ordered right now."
 msgstr ""
 
-#: src/Account/DbPicker.php:336
+#: src/Account/DbPicker.php:337
 msgid "Choose a plan. You pay on the next page."
 msgstr ""
 
 #. translators: %s: plan name such as Standard
-#: src/Account/DbPicker.php:366
-#: src/Account/ServerPicker.php:548
-#: src/Usage/Breakdown.php:219
+#: src/Account/DbPicker.php:367
+#: src/Account/ServerPicker.php:561
+#: src/Usage/Breakdown.php:221
 #: templates/account/mail.php:56
 #: templates/account/vm.php:132
 #: templates/account/vm.php:162
 msgid "Plan"
 msgstr ""
 
-#: src/Account/DbPicker.php:369
-#: src/Account/ServerPicker.php:551
+#: src/Account/DbPicker.php:370
+#: src/Account/ServerPicker.php:564
 msgid "Every plan is out of stock right now. Please check back soon."
 msgstr ""
 
-#: src/Account/DbPicker.php:384
-#: src/Account/ServerPicker.php:583
+#: src/Account/DbPicker.php:385
+#: src/Account/ServerPicker.php:596
 #: src/Domains/DnsClaimPanel.php:173
 #: templates/account/credit.php:86
 msgid "Continue to checkout"
 msgstr ""
 
-#: src/Account/DbPicker.php:387
+#: src/Account/DbPicker.php:388
 msgid "Continue is unavailable until new databases can be ordered."
 msgstr ""
 
-#: src/Account/DbPicker.php:401
+#: src/Account/DbPicker.php:402
 #: templates/account/db.php:56
 msgid "Database"
 msgstr ""
 
 #. translators: 1: plan name, 2: price such as "€0.0226 per hour, max €16.50 per month excluding VAT"
 #. translators: 1: plan name, 2: price
-#: src/Account/DbPicker.php:521
-#: src/Account/ServerPicker.php:764
+#: src/Account/DbPicker.php:522
+#: src/Account/ServerPicker.php:782
 #, php-format
 msgid "%1$s, pay as you go: %2$s"
 msgstr ""
 
 #. translators: 1: plan name, 2: price such as €25.00
-#: src/Account/DbPicker.php:528
+#: src/Account/DbPicker.php:531
+#, php-format
+msgid "%1$s: %2$s including VAT"
+msgstr ""
+
+#. translators: 1: plan name, 2: price such as €25.00
+#: src/Account/DbPicker.php:531
 #, php-format
 msgid "%1$s: %2$s excluding VAT"
 msgstr ""
 
 #. translators: 1: plan name, 2: price such as €25.00, 3: period such as month
-#: src/Account/DbPicker.php:532
+#: src/Account/DbPicker.php:535
+#, php-format
+msgid "%1$s: %2$s per %3$s including VAT"
+msgstr ""
+
+#. translators: 1: plan name, 2: price such as €25.00, 3: period such as month
+#: src/Account/DbPicker.php:535
 #, php-format
 msgid "%1$s: %2$s per %3$s excluding VAT"
 msgstr ""
 
-#: src/Account/DbPicker.php:576
-#: src/Account/ServerPicker.php:670
+#: src/Account/DbPicker.php:580
+#: src/Account/ServerPicker.php:684
+msgid "max per month, incl. VAT"
+msgstr ""
+
+#: src/Account/DbPicker.php:580
+#: src/Account/ServerPicker.php:684
 msgid "max per month, excl. VAT"
 msgstr ""
 
 #. translators: %d: number of virtual CPU cores
-#: src/Account/DbPicker.php:585
-#: src/Account/ServerPicker.php:678
-#: src/Usage/Breakdown.php:189
+#: src/Account/DbPicker.php:589
+#: src/Account/ServerPicker.php:692
+#: src/Usage/Breakdown.php:190
 #, php-format
 msgid "%d vCPU"
 msgid_plural "%d vCPU"
@@ -379,22 +396,22 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. translators: %d: data disk size in gigabytes
-#: src/Account/DbPicker.php:588
-#: src/Usage/Breakdown.php:203
+#: src/Account/DbPicker.php:592
+#: src/Usage/Breakdown.php:204
 #, php-format
 msgid "%d GB data disk"
 msgstr ""
 
 #. translators: %d: number of days backups are kept
-#: src/Account/DbPicker.php:590
+#: src/Account/DbPicker.php:594
 #, php-format
 msgid "Daily backups, kept %d day"
 msgid_plural "Daily backups, kept %d days"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Account/DbPicker.php:594
-#: src/Account/ServerPicker.php:685
+#: src/Account/DbPicker.php:598
+#: src/Account/ServerPicker.php:699
 msgid "Out of stock"
 msgstr ""
 
@@ -842,7 +859,7 @@ msgid "Register a new domain or move one you have, with DNS hosting included."
 msgstr ""
 
 #: src/Account/OverviewData.php:599
-#: src/Domains/Search.php:179
+#: src/Domains/Search.php:199
 msgid "Find a domain"
 msgstr ""
 
@@ -1026,51 +1043,64 @@ msgstr ""
 msgid "Renews %s"
 msgstr ""
 
-#: src/Account/ServerPicker.php:280
+#: src/Account/ServerPicker.php:281
 msgid "Backups are not offered for this plan."
 msgstr ""
 
-#: src/Account/ServerPicker.php:294
+#: src/Account/ServerPicker.php:295
 msgid "Pay as you go is not offered for this plan."
 msgstr ""
 
-#: src/Account/ServerPicker.php:296
+#: src/Account/ServerPicker.php:297
 msgid "Pay as you go is not offered with daily backups for this plan."
 msgstr ""
 
-#: src/Account/ServerPicker.php:306
+#: src/Account/ServerPicker.php:307
 #: src/Apps/AppField.php:536
 msgid "Apps are not available for this server. Choose none."
 msgstr ""
 
-#: src/Account/ServerPicker.php:384
-#: src/Account/ServerPicker.php:446
+#: src/Account/ServerPicker.php:385
+#: src/Account/ServerPicker.php:447
 msgid "The server could not be added. Please try again."
 msgstr ""
 
-#: src/Account/ServerPicker.php:426
+#: src/Account/ServerPicker.php:427
 msgid "The app licence could not be added. Please try again."
 msgstr ""
 
 #. translators: %s: memory in gigabytes, such as 4 or 1.5
-#: src/Account/ServerPicker.php:478
+#: src/Account/ServerPicker.php:479
 #, php-format
 msgid "%s GB RAM"
 msgstr ""
 
 #. translators: %d: memory in megabytes
-#: src/Account/ServerPicker.php:482
+#: src/Account/ServerPicker.php:483
 #, php-format
 msgid "%d MB RAM"
 msgstr ""
 
 #. translators: %s: price such as €4.00
 #. translators: %s: monthly maximum of the add-on such as +€3 per month
+#. translators: %s: the terms, such as "€0.0283 per hour, max €20.60 per month"
+#. translators: %s: price
+#: src/Account/ServerPicker.php:498
+#: src/Account/ServerPicker.php:744
+#: src/Usage/Rates.php:229
+#: templates/account/vm.php:490
+#: templates/account/vm.php:647
+#, php-format
+msgid "%s including VAT"
+msgstr ""
+
+#. translators: %s: price such as €4.00
+#. translators: %s: monthly maximum of the add-on such as +€3 per month
 #. translators: %s: the terms, such as "€0.0226 per hour, max €16.50 per month"
 #. translators: %s: price
-#: src/Account/ServerPicker.php:496
-#: src/Account/ServerPicker.php:727
-#: src/Usage/Rates.php:227
+#: src/Account/ServerPicker.php:498
+#: src/Account/ServerPicker.php:744
+#: src/Usage/Rates.php:233
 #: templates/account/vm.php:490
 #: templates/account/vm.php:647
 #, php-format
@@ -1078,61 +1108,73 @@ msgid "%s excluding VAT"
 msgstr ""
 
 #. translators: 1: price such as €4.00, 2: period such as month
-#: src/Account/ServerPicker.php:500
+#: src/Account/ServerPicker.php:502
+#, php-format
+msgid "%1$s per %2$s including VAT"
+msgstr ""
+
+#. translators: 1: price such as €4.00, 2: period such as month
+#: src/Account/ServerPicker.php:502
 #, php-format
 msgid "%1$s per %2$s excluding VAT"
 msgstr ""
 
-#: src/Account/ServerPicker.php:528
+#: src/Account/ServerPicker.php:541
 #: src/Account/Servers.php:221
 #: templates/account/overview/servers.php:19
 #: templates/account/server.php:24
 msgid "All servers"
 msgstr ""
 
-#: src/Account/ServerPicker.php:529
+#: src/Account/ServerPicker.php:542
 msgid "New server"
 msgstr ""
 
-#: src/Account/ServerPicker.php:532
+#: src/Account/ServerPicker.php:545
 msgid "No server can be ordered right now."
 msgstr ""
 
-#: src/Account/ServerPicker.php:537
+#: src/Account/ServerPicker.php:550
 msgid "Choose a plan and what the server starts with. You pay on the next page."
 msgstr ""
 
 #. translators: %d: disk size in gigabytes
-#: src/Account/ServerPicker.php:681
-#: src/Usage/Breakdown.php:205
+#: src/Account/ServerPicker.php:695
+#: src/Usage/Breakdown.php:206
 #, php-format
 msgid "%d GB disk"
 msgstr ""
 
-#: src/Account/ServerPicker.php:707
+#: src/Account/ServerPicker.php:721
 msgid "excluding VAT"
 msgstr ""
 
 #. translators: %s: period such as month
-#: src/Account/ServerPicker.php:711
+#: src/Account/ServerPicker.php:725
 #, php-format
 msgid "per %s excluding VAT"
 msgstr ""
 
 #. translators: %s: period such as month
-#: src/Account/ServerPicker.php:730
+#: src/Account/ServerPicker.php:748
 #, php-format
 msgid "per %s"
 msgstr ""
 
 #. translators: 1: price difference such as €2.00, 2: " per month" or empty
-#: src/Account/ServerPicker.php:733
+#: src/Account/ServerPicker.php:751
+#, php-format
+msgid "+%1$s%2$s including VAT"
+msgstr ""
+
+#. translators: 1: price difference such as €2.00, 2: " per month" or empty
+#: src/Account/ServerPicker.php:751
 #, php-format
 msgid "+%1$s%2$s excluding VAT"
 msgstr ""
 
 #. translators: 1: number of days, 2: price
-#: src/Account/ServerPicker.php:738
+#: src/Account/ServerPicker.php:756
 #, php-format
 msgid "Daily backups, kept for %1$d day (%2$s)"
 msgid_plural "Daily backups, kept for %1$d days (%2$s)"
@@ -1141,36 +1183,36 @@ msgstr[1] ""
 
 #. translators: %s: price
 #. translators: %s: price difference such as +€12.00 / month
-#: src/Account/ServerPicker.php:742
+#: src/Account/ServerPicker.php:760
 #: src/Proxmox/Backup/BackupField.php:172
 #, php-format
 msgid "Daily backups (%s)"
 msgstr ""
 
 #. translators: 1: plan name, 2: price
-#: src/Account/ServerPicker.php:760
+#: src/Account/ServerPicker.php:778
 #, php-format
 msgid "%1$s with daily backups, pay as you go: %2$s"
 msgstr ""
 
 #. translators: 1: plan name, 2: price
-#: src/Account/ServerPicker.php:772
+#: src/Account/ServerPicker.php:790
 #, php-format
 msgid "%1$s with daily backups: %2$s"
 msgstr ""
 
 #. translators: 1: plan name, 2: price
-#: src/Account/ServerPicker.php:776
+#: src/Account/ServerPicker.php:794
 #, php-format
 msgid "%1$s: %2$s"
 msgstr ""
 
-#: src/Account/ServerPicker.php:828
+#: src/Account/ServerPicker.php:859
 #: src/Usage/BillingField.php:195
 msgid "Monthly"
 msgstr ""
 
-#: src/Account/ServerPicker.php:832
+#: src/Account/ServerPicker.php:863
 #: src/Settings.php:126
 #: src/Usage/BillingField.php:196
 msgid "Pay as you go"
@@ -2143,7 +2185,15 @@ msgid "The tier could not be changed. Reload checkout and try again."
 msgstr ""
 
 #: src/Apps/AppLicence.php:283
-#: src/Billing/TaxNote.php:49
+#: src/Billing/TaxNote.php:65
+#: src/Billing/TaxNote.php:178
+#: src/Proxmox/Disk/DiskField.php:164
+msgid "incl. VAT"
+msgstr ""
+
+#: src/Apps/AppLicence.php:283
+#: src/Billing/TaxNote.php:65
+#: src/Billing/TaxNote.php:181
 #: src/Proxmox/Disk/DiskField.php:164
 msgid "excl. VAT"
 msgstr ""
@@ -2786,10 +2836,6 @@ msgstr ""
 msgid "This order started a subscription, so cancelling it would cancel the subscription. The customer does that in the dashboard."
 msgstr ""
 
-#: src/Billing/TaxNote.php:46
-msgid "incl. VAT"
-msgstr ""
-
 #: src/BillingRequirements.php:111
 msgid "Enter all required billing details to order this service."
 msgstr ""
@@ -2811,7 +2857,7 @@ msgid "Sidebar"
 msgstr ""
 
 #: src/Bricks/ApiReferenceElement.php:65
-#: src/Domains/Search.php:181
+#: src/Domains/Search.php:201
 msgid "Search"
 msgstr ""
 
@@ -3025,24 +3071,26 @@ msgstr ""
 msgid "Domain availability"
 msgstr ""
 
-#. translators: %s: price in euro
+#. translators: %s: price with its currency symbol, such as the euro symbol and 12
+#. translators: %s: the price with its currency symbol, such as the euro symbol and 12
 #: src/Bricks/DomainQuery.php:120
-#: assets/domain-search.js:120
-#: assets/domain-search.js:317
-#: assets/domain-search.js:327
+#: assets/domain-search.js:136
+#: assets/domain-search.js:336
+#: assets/domain-search.js:349
 #, php-format,js-format
-msgid "€%s / year"
+msgid "%s / year"
 msgstr ""
 
-#. translators: %s: price in euro
+#. translators: %s: price with its currency symbol, such as the euro symbol and 12
+#. translators: %s: the price with its currency symbol, such as the euro symbol and 12
 #: src/Bricks/DomainQuery.php:121
-#: assets/domain-search.js:122
+#: assets/domain-search.js:139
 #, php-format,js-format
-msgid "Renews at €%s / year"
+msgid "Renews at %s / year"
 msgstr ""
 
 #: src/Bricks/DomainQuery.php:135
-#: assets/domain-search.js:110
+#: assets/domain-search.js:125
 msgid "Available to register"
 msgstr ""
 
@@ -3051,17 +3099,17 @@ msgid "Already registered"
 msgstr ""
 
 #: src/Bricks/DomainQuery.php:137
-#: assets/domain-search.js:112
+#: assets/domain-search.js:127
 msgid "Premium domain. Online ordering is unavailable."
 msgstr ""
 
 #: src/Bricks/DomainQuery.php:138
-#: assets/domain-search.js:113
+#: assets/domain-search.js:128
 msgid "This domain extension is not available to order here."
 msgstr ""
 
 #: src/Bricks/DomainQuery.php:140
-#: assets/domain-search.js:115
+#: assets/domain-search.js:130
 msgid "Availability could not be confirmed."
 msgstr ""
 
@@ -5041,6 +5089,18 @@ msgstr ""
 msgid "Subscription"
 msgstr ""
 
+#: src/Domains/PriceTags.php:32
+msgid "Domain: price to register for a year"
+msgstr ""
+
+#: src/Domains/PriceTags.php:33
+msgid "Domain: price to renew for a year"
+msgstr ""
+
+#: src/Domains/PriceTags.php:34
+msgid "Domain: price to transfer"
+msgstr ""
+
 #: src/Domains/PublicDns.php:44
 msgid "The name did not resolve."
 msgstr ""
@@ -5194,50 +5254,50 @@ msgstr ""
 msgid "A record of this type already exists at that name."
 msgstr ""
 
-#: src/Domains/Search.php:59
+#: src/Domains/Search.php:60
 msgid "Too many searches. Please wait a minute."
 msgstr ""
 
-#: src/Domains/Search.php:62
-#: src/Domains/Search.php:70
-#: src/Domains/Search.php:157
+#: src/Domains/Search.php:63
+#: src/Domains/Search.php:71
+#: src/Domains/Search.php:158
 msgid "A valid domain name is required."
 msgstr ""
 
-#: src/Domains/Search.php:106
+#: src/Domains/Search.php:107
 msgid "Domain search is busy. Please try again in a few minutes."
 msgstr ""
 
-#: src/Domains/Search.php:111
+#: src/Domains/Search.php:112
 msgid "Domain search is not available right now. Try again in a few minutes."
 msgstr ""
 
-#: src/Domains/Search.php:123
 #: src/Domains/Search.php:124
+#: src/Domains/Search.php:125
 msgid "Websites on this extension need HTTPS."
 msgstr ""
 
-#: src/Domains/Search.php:125
+#: src/Domains/Search.php:126
 msgid "The registrant must be in the EU."
 msgstr ""
 
-#: src/Domains/Search.php:126
+#: src/Domains/Search.php:127
 msgid "A business needs a VAT number to register this extension."
 msgstr ""
 
-#: src/Domains/Search.php:147
+#: src/Domains/Search.php:148
 msgid "A valid domain label is required."
 msgstr ""
 
-#: src/Domains/Search.php:182
+#: src/Domains/Search.php:202
 msgid "Transfer a domain you already own"
 msgstr ""
 
-#: src/Domains/Search.php:189
+#: src/Domains/Search.php:209
 msgid "Domain to transfer"
 msgstr ""
 
-#: src/Domains/Search.php:191
+#: src/Domains/Search.php:211
 msgid "Continue"
 msgstr ""
 
@@ -5255,7 +5315,7 @@ msgstr ""
 #. translators: 1: domain, 2: the current registrar.
 #. translators: 1: domain name, 2: registrar name
 #: src/Domains/TransferDns.php:387
-#: assets/domain-search.js:281
+#: assets/domain-search.js:299
 #, php-format,js-format
 msgid "%1$s is locked at %2$s. Unlock it there, then come back."
 msgstr ""
@@ -5282,7 +5342,7 @@ msgstr ""
 #: templates/emails/beltoft-services-domain-transfer-fix.php:20
 #: templates/emails/plain/beltoft-services-domain-action-needed.php:12
 #: templates/emails/plain/beltoft-services-domain-transfer-fix.php:10
-#: assets/domain-search.js:279
+#: assets/domain-search.js:297
 msgid "your current registrar"
 msgstr ""
 
@@ -9641,7 +9701,7 @@ msgstr ""
 
 #. translators: %s: price per hour such as €0.0740
 #: src/Mcp/Pricing.php:404
-#: src/Usage/Breakdown.php:263
+#: src/Usage/Breakdown.php:270
 #, php-format
 msgid "That is %s per hour, billed for the hours used."
 msgstr ""
@@ -10393,7 +10453,7 @@ msgid "Connect an app"
 msgstr ""
 
 #. translators: %s: comma separated plugin names.
-#: src/Plugin.php:365
+#: src/Plugin.php:366
 #, php-format
 msgid "Beltoft Services is inactive until these are active: %s."
 msgstr ""
@@ -10552,8 +10612,8 @@ msgid "Enabled"
 msgstr ""
 
 #: src/Proxmox/Backup/BackupField.php:80
-#: src/Usage/Breakdown.php:231
-#: src/Usage/Breakdown.php:400
+#: src/Usage/Breakdown.php:233
+#: src/Usage/Breakdown.php:411
 msgid "Daily backups"
 msgstr ""
 
@@ -10586,7 +10646,7 @@ msgstr ""
 #. translators: %s: price per hour such as €0.0041
 #. translators: %s: price per hour such as €0.0829
 #: src/Proxmox/Backup/Backups.php:824
-#: src/Usage/Summary.php:102
+#: src/Usage/Summary.php:106
 #, php-format
 msgid "%s / hour"
 msgstr ""
@@ -10895,8 +10955,8 @@ msgstr ""
 #. translators: %d: extra storage in GB
 #: src/Proxmox/Db/DbDiskField.php:133
 #: src/Proxmox/Db/DbDiskField.php:222
-#: src/Usage/Breakdown.php:227
-#: src/Usage/Breakdown.php:400
+#: src/Usage/Breakdown.php:229
+#: src/Usage/Breakdown.php:411
 msgid "Extra storage"
 msgstr ""
 
@@ -11047,8 +11107,8 @@ msgid "No public IP address is available right now. Please try again later."
 msgstr ""
 
 #: src/Proxmox/Db/DbIpField.php:80
-#: src/Usage/Breakdown.php:222
-#: src/Usage/Breakdown.php:400
+#: src/Usage/Breakdown.php:224
+#: src/Usage/Breakdown.php:411
 msgid "Public IPv4 address"
 msgstr ""
 
@@ -11347,7 +11407,7 @@ msgstr ""
 #: src/Proxmox/Disk/DiskField.php:151
 #: src/Proxmox/Disk/DiskPanels.php:202
 #: src/Proxmox/Vm/EmailDetails.php:179
-#: src/Usage/Breakdown.php:237
+#: src/Usage/Breakdown.php:239
 #: src/Usage/Renewal.php:241
 msgid "Extra disk"
 msgstr ""
@@ -11370,6 +11430,10 @@ msgstr ""
 
 #: src/Proxmox/Disk/DiskField.php:152
 msgid "None"
+msgstr ""
+
+#: src/Proxmox/Disk/DiskField.php:157
+msgid "incl. VAT, billed by the hour"
 msgstr ""
 
 #: src/Proxmox/Disk/DiskField.php:157
@@ -14760,44 +14824,44 @@ msgid "The billing choice could not be changed. Please reload the page and try a
 msgstr ""
 
 #. translators: %s: memory in gigabytes, such as 4 or 1.5
-#: src/Usage/Breakdown.php:194
+#: src/Usage/Breakdown.php:195
 #, php-format
 msgid "%s GB memory"
 msgstr ""
 
 #. translators: %d: memory in megabytes
-#: src/Usage/Breakdown.php:197
+#: src/Usage/Breakdown.php:198
 #, php-format
 msgid "%d MB memory"
 msgstr ""
 
 #. translators: %s: plan name such as Standard
-#: src/Usage/Breakdown.php:219
+#: src/Usage/Breakdown.php:221
 #, php-format
 msgid "%s plan"
 msgstr ""
 
 #. translators: %d: extra storage in GB
-#: src/Usage/Breakdown.php:227
+#: src/Usage/Breakdown.php:229
 #, php-format
 msgid "Extra storage, %d GB"
 msgstr ""
 
 #. translators: %d: extra disk in GB
-#: src/Usage/Breakdown.php:237
+#: src/Usage/Breakdown.php:239
 #, php-format
 msgid "Extra disk, %d GB"
 msgstr ""
 
-#: src/Usage/Breakdown.php:261
+#: src/Usage/Breakdown.php:268
 msgid "Max per month"
 msgstr ""
 
-#: src/Usage/Breakdown.php:426
+#: src/Usage/Breakdown.php:437
 msgid "Billed by the hour, like the database."
 msgstr ""
 
-#: src/Usage/Breakdown.php:426
+#: src/Usage/Breakdown.php:437
 msgid "Billed by the hour, like the server."
 msgstr ""
 
@@ -14821,15 +14885,15 @@ msgid_plural "A new account can run %d pay as you go services until its first us
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Usage/Catalog.php:35
+#: src/Usage/Catalog.php:38
 msgid "Pay as you go: hourly price and monthly cap as one line"
 msgstr ""
 
-#: src/Usage/Catalog.php:36
+#: src/Usage/Catalog.php:39
 msgid "Pay as you go: price per hour"
 msgstr ""
 
-#: src/Usage/Catalog.php:37
+#: src/Usage/Catalog.php:40
 msgid "Pay as you go: monthly cap"
 msgstr ""
 
@@ -14949,7 +15013,7 @@ msgstr ""
 #. translators: 1: product name, 2: the database's address.
 #. translators: 1: "€0.0829 per hour", 2: "max €55.00 per month"
 #: src/Usage/Estimate.php:119
-#: src/Usage/Rates.php:295
+#: src/Usage/Rates.php:304
 #, php-format
 msgid "%1$s, %2$s"
 msgstr ""
@@ -15035,13 +15099,13 @@ msgid "Usage of %1$s carried to next month (under the %2$s minimum)."
 msgstr ""
 
 #. translators: %s: monthly amount such as €45
-#: src/Usage/Rates.php:122
+#: src/Usage/Rates.php:120
 #, php-format
 msgid "%s / month"
 msgstr ""
 
 #. translators: %s: monthly amount such as €5
-#: src/Usage/Rates.php:132
+#: src/Usage/Rates.php:131
 #, php-format
 msgid "+%s / month"
 msgstr ""
@@ -15058,24 +15122,24 @@ msgstr ""
 msgid "Or %1$s/hour, max %2$s/month, pay as you go"
 msgstr ""
 
-#: src/Usage/Rates.php:257
+#: src/Usage/Rates.php:263
 msgid "Billed monthly for the hours used"
 msgstr ""
 
 #. translators: %s: price per hour such as €0.0829
-#: src/Usage/Rates.php:274
+#: src/Usage/Rates.php:281
 #, php-format
 msgid "%s per hour"
 msgstr ""
 
 #. translators: %s: monthly cap such as €55.00
-#: src/Usage/Rates.php:284
+#: src/Usage/Rates.php:292
 #, php-format
 msgid "max %s per month"
 msgstr ""
 
 #. translators: %s: monthly price such as €55.00
-#: src/Usage/Rates.php:305
+#: src/Usage/Rates.php:315
 #, php-format
 msgid "%s per month, paid in advance"
 msgstr ""
@@ -15184,34 +15248,34 @@ msgid "%1$s: %2$s%3$s at %4$s per %5$s%6$s"
 msgstr ""
 
 #. translators: %s: monthly cap such as €55
-#: src/Usage/Summary.php:136
+#: src/Usage/Summary.php:143
 #, php-format
 msgid "max %s / month"
 msgstr ""
 
 #. translators: 1: price per hour such as €0.0829, 2: monthly cap such as €55
-#: src/Usage/Summary.php:146
+#: src/Usage/Summary.php:153
 #, php-format
 msgid "%1$s / hour, max %2$s / month"
 msgstr ""
 
 #. translators: 1: how pay as you go is billed, 2: what happens to the card
-#: src/Usage/Summary.php:158
+#: src/Usage/Summary.php:165
 #, php-format
 msgid "%1$s. %2$s"
 msgstr ""
 
 #. translators: 1: how pay as you go is billed, 2: what happens to the card
-#: src/Usage/Summary.php:158
+#: src/Usage/Summary.php:165
 msgid "Your saved card is charged after each month."
 msgstr ""
 
 #. translators: 1: how pay as you go is billed, 2: what happens to the card
-#: src/Usage/Summary.php:158
+#: src/Usage/Summary.php:165
 msgid "Your card is saved now and charged after each month."
 msgstr ""
 
-#: src/Usage/Summary.php:176
+#: src/Usage/Summary.php:183
 msgid "Due today"
 msgstr ""
 
@@ -16677,6 +16741,13 @@ msgstr ""
 #: templates/account/domain-page.php:283
 #: templates/account/domain.php:64
 #, php-format
+msgid "At your current registrar, turn off DNSSEC if it is on, unlock the domain and copy the transfer code (also called auth or EPP code). The transfer adds one year to the registration: %s per year, including VAT."
+msgstr ""
+
+#. translators: %s: transfer price per year
+#: templates/account/domain-page.php:283
+#: templates/account/domain.php:64
+#, php-format
 msgid "At your current registrar, turn off DNSSEC if it is on, unlock the domain and copy the transfer code (also called auth or EPP code). The transfer adds one year to the registration: %s per year, excluding VAT."
 msgstr ""
 
@@ -16689,7 +16760,7 @@ msgstr ""
 #: templates/account/domain-page.php:312
 #: templates/account/domain.php:71
 #: templates/account/domain.php:160
-#: assets/domain-search.js:269
+#: assets/domain-search.js:287
 msgid "Transfer code"
 msgstr ""
 
@@ -17685,7 +17756,7 @@ msgid "Snapshot"
 msgstr ""
 
 #: templates/account/vm.php:661
-#: assets/domain-search.js:111
+#: assets/domain-search.js:126
 msgid "Taken"
 msgstr ""
 
@@ -19774,101 +19845,109 @@ msgstr ""
 msgid "Enter the billing address above"
 msgstr ""
 
-#: assets/domain-search.js:35
+#: assets/domain-search.js:49
 msgid "Could not add this domain."
 msgstr ""
 
-#: assets/domain-search.js:55
+#: assets/domain-search.js:69
 msgid "This takes a few seconds."
 msgstr ""
 
-#: assets/domain-search.js:63
+#: assets/domain-search.js:77
 msgid "The search could not be completed."
 msgstr ""
 
-#: assets/domain-search.js:69
-#: assets/domain-search.js:77
+#: assets/domain-search.js:84
+#: assets/domain-search.js:92
 msgid "Register domain"
 msgstr ""
 
-#: assets/domain-search.js:72
-#: assets/domain-search.js:292
+#: assets/domain-search.js:87
+#: assets/domain-search.js:310
 msgid "Adding to order…"
 msgstr ""
 
-#: assets/domain-search.js:130
+#: assets/domain-search.js:148
 msgid "Transfer this domain"
 msgstr ""
 
-#: assets/domain-search.js:150
+#: assets/domain-search.js:168
 msgid "No results found."
 msgstr ""
 
-#: assets/domain-search.js:157
+#: assets/domain-search.js:175
+msgid "Prices are per year, including VAT. The renewal price is the same as the first year. DNS hosting and the transfer lock are included."
+msgstr ""
+
+#: assets/domain-search.js:175
 msgid "Prices are per year, excluding VAT. The renewal price is the same as the first year. DNS hosting and the transfer lock are included."
 msgstr ""
 
-#: assets/domain-search.js:183
+#: assets/domain-search.js:201
 msgid "Searching for domains…"
 msgstr ""
 
 #. translators: %s: domain name
-#: assets/domain-search.js:263
+#: assets/domain-search.js:281
 #, js-format
 msgid "Unlock %s at your current registrar and copy its transfer code, also called EPP or auth code. You find it in their domain settings. Turn off DNSSEC at your current registrar first."
 msgstr ""
 
 #. translators: %s: domain name
-#: assets/domain-search.js:268
+#: assets/domain-search.js:286
 #, js-format
 msgid "Transfer code for %s"
 msgstr ""
 
-#: assets/domain-search.js:270
-#: assets/domain-search.js:297
+#: assets/domain-search.js:288
+#: assets/domain-search.js:315
 msgid "Add transfer to order"
 msgstr ""
 
-#: assets/domain-search.js:276
+#: assets/domain-search.js:294
 msgid "The transfer takes up to 5 days and adds one year to the registration."
 msgstr ""
 
 #. translators: %s: registrar name
-#: assets/domain-search.js:285
+#: assets/domain-search.js:303
 #, js-format
 msgid "Your DNS is run by %s and stops when the domain moves. After you order, you import your records here before the transfer starts."
 msgstr ""
 
-#: assets/domain-search.js:315
+#: assets/domain-search.js:333
 msgid "Registered, can be transferred"
 msgstr ""
 
-#: assets/domain-search.js:318
+#: assets/domain-search.js:338
+msgid "The transfer is charged as one year and adds that year to the registration. Price including VAT."
+msgstr ""
+
+#: assets/domain-search.js:338
 msgid "The transfer is charged as one year and adds that year to the registration. Price excluding VAT."
 msgstr ""
 
-#: assets/domain-search.js:326
+#: assets/domain-search.js:346
 msgid "Not registered, so there is nothing to transfer. You can register it instead."
 msgstr ""
 
-#: assets/domain-search.js:332
+#: assets/domain-search.js:356
 msgid "Premium domain. It cannot be transferred online."
 msgstr ""
 
-#: assets/domain-search.js:333
+#: assets/domain-search.js:357
 msgid "This domain extension is not available here."
 msgstr ""
 
-#: assets/domain-search.js:335
-#: assets/domain-search.js:354
+#: assets/domain-search.js:359
+#: assets/domain-search.js:378
 msgid "The domain could not be checked. Try again in a minute."
 msgstr ""
 
-#: assets/domain-search.js:343
+#: assets/domain-search.js:367
 msgid "Enter the full domain, for example example.com."
 msgstr ""
 
-#: assets/domain-search.js:347
+#: assets/domain-search.js:371
 msgid "Checking the domain…"
 msgstr ""
 

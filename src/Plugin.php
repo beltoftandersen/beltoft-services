@@ -240,6 +240,7 @@ final class Plugin {
 		Usage\Breakdown::register();
 		Usage\BillingField::register();
 		Usage\Catalog::register();
+		Domains\PriceTags::register();
 		Usage\Renewal::register();
 		Usage\Emails::register();
 		Usage\Minimum::register();

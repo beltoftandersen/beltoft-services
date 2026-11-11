@@ -280,8 +280,8 @@ if ( $d['dns_only'] ) {
 						echo wp_kses_post(
 							sprintf(
 								/* translators: %s: transfer price per year */
-								__( 'At your current registrar, turn off DNSSEC if it is on, unlock the domain and copy the transfer code (also called auth or EPP code). The transfer adds one year to the registration: %s per year, excluding VAT.', 'beltoft-services' ),
-								wc_price( $d['transfer_price'] )
+								\BeltoftServices\Billing\TaxNote::incl_for( \BeltoftServices\Domains\Cart::domain_product() ) ? __( 'At your current registrar, turn off DNSSEC if it is on, unlock the domain and copy the transfer code (also called auth or EPP code). The transfer adds one year to the registration: %s per year, including VAT.', 'beltoft-services' ) : __( 'At your current registrar, turn off DNSSEC if it is on, unlock the domain and copy the transfer code (also called auth or EPP code). The transfer adds one year to the registration: %s per year, excluding VAT.', 'beltoft-services' ),
+								\BeltoftServices\Billing\TaxNote::html( (float) $d['transfer_price'], 'domain-transfer', array( 'product' => \BeltoftServices\Domains\Cart::domain_product() ) )
 							)
 						);
 						?>

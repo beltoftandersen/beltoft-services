@@ -110,15 +110,15 @@ final class DomainQuery {
 			if ( 'not_sold' === $status && ! ( $typed_extension && 0 === $index ) ) { continue; }
 			$free   = 'free' === $status;
 			$domain = (string) $item['domain'];
-			$price  = isset( $item['price'] ) && null !== $item['price'] ? (string) $item['price'] : '';
+			$shown  = isset( $item['price_text'] ) ? (string) $item['price_text'] : ( isset( $item['price'] ) && null !== $item['price'] ? \BeltoftServices\Domains\Search::price_text( (int) $item['price'] ) : '' );
 			$rows[] = array(
 				'__bds'         => 1,
 				'domain'        => $domain,
 				'tld'           => (string) substr( $domain, (int) strpos( $domain, '.' ) + 1 ),
 				'status'        => $free ? 'available' : ( 'taken' === $status ? 'taken' : 'unknown' ),
 				'available'     => $free ? 1 : 0,
-				'price'         => '' !== $price ? sprintf( /* translators: %s: price in euro */ __( '€%s / year', 'beltoft-services' ), $price ) : '',
-				'renewal_price' => $free && '' !== $price ? sprintf( /* translators: %s: price in euro */ __( 'Renews at €%s / year', 'beltoft-services' ), $price ) : '',
+				'price'         => '' !== $shown ? sprintf( /* translators: %s: price with its currency symbol, such as the euro symbol and 12 */ __( '%s / year', 'beltoft-services' ), $shown ) : '',
+				'renewal_price' => $free && '' !== $shown ? sprintf( /* translators: %s: price with its currency symbol, such as the euro symbol and 12 */ __( 'Renews at %s / year', 'beltoft-services' ), $shown ) : '',
 				'note'          => $free ? (string) ( $item['note'] ?? '' ) : '',
 				'status_text'   => self::status_text( $status ),
 				'primary'       => 0 === count( $rows ) ? 1 : 0,

@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Usage;
 
+use BeltoftServices\Billing\TaxNote;
 use BeltoftServices\Billing\CartFlow;
 
 defined( 'ABSPATH' ) || exit;
@@ -98,8 +99,11 @@ final class Summary {
 			return $price;
 		}
 
+		$product = $item['data'] ?? null;
+		$product = $product instanceof \WC_Product ? $product : null;
+
 		/* translators: %s: price per hour such as €0.0829 */
-		return esc_html( sprintf( __( '%s / hour', 'beltoft-services' ), Rates::money( $rates['hourly'], 4 ) ) );
+		return TaxNote::in_cart( static fn() => esc_html( sprintf( __( '%s / hour', 'beltoft-services' ), Rates::money( $rates['hourly'], 4, '', $product ) ) ) );
 	}
 
 	/**
@@ -111,7 +115,9 @@ final class Summary {
 	public static function cart_subtotal( $subtotal, $item = array() ) {
 		$rates = is_array( $item ) && ! CartFlow::is_renewal( $item ) ? Rates::for_usage( $item['data'] ?? null ) : null;
 
-		return null === $rates ? $subtotal : self::cap_text( $rates['cap'] );
+		$product = $item['data'] ?? null;
+
+		return null === $rates ? $subtotal : TaxNote::in_cart( static fn() => self::cap_text( $rates['cap'], $product instanceof \WC_Product ? $product : null ) );
 	}
 
 	/**
@@ -129,11 +135,12 @@ final class Summary {
 	/**
 	 * "max €55.00 / month".
 	 *
-	 * @param float $cap Cap.
+	 * @param float            $cap Cap.
+	 * @param \WC_Product|null $tax Product for the tax display, null for the amount as given.
 	 */
-	private static function cap_text( float $cap ): string {
+	private static function cap_text( float $cap, ?\WC_Product $tax = null ): string {
 		/* translators: %s: monthly cap such as €55 */
-		return esc_html( sprintf( __( 'max %s / month', 'beltoft-services' ), Rates::cap_money( $cap ) ) );
+		return esc_html( sprintf( __( 'max %s / month', 'beltoft-services' ), Rates::cap_money( $cap, $tax ) ) );
 	}
 
 	/**

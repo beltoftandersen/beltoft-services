@@ -154,14 +154,14 @@ final class DiskField {
 			$plan = Product::plan( $variation->get_parent_id(), $id );
 			if ( $usage ) {
 				$rates = (array) Rates::for_usage( $variation );
-				$label = sprintf( '%d GB: %s %s', (int) $plan['disk_gb'], Rates::plus_per_month( (float) ( $rates['cap'] ?? 0 ) ), __( 'excl. VAT, billed by the hour', 'beltoft-services' ) );
+				$label = sprintf( '%d GB: %s %s', (int) $plan['disk_gb'], Rates::plus_per_month( (float) ( $rates['cap'] ?? 0 ), $variation ), \BeltoftServices\Billing\TaxNote::incl_for( $variation ) ? __( 'incl. VAT, billed by the hour', 'beltoft-services' ) : __( 'excl. VAT, billed by the hour', 'beltoft-services' ) );
 				echo '<option value="' . esc_attr( (string) $id ) . '" ' . selected( $selected, $id, false ) . '>' . esc_html( $label ) . '</option>';
 				continue;
 			}
 			$period = class_exists( '\\WC_Subscriptions_Product' ) && \WC_Subscriptions_Product::is_subscription( $variation )
 				? ' / ' . (string) wcs_get_subscription_period_strings( max( 1, (int) \WC_Subscriptions_Product::get_interval( $variation ) ), (string) \WC_Subscriptions_Product::get_period( $variation ) )
 				: '';
-			$label = sprintf( '%d GB: %s%s %s', (int) $plan['disk_gb'], wp_strip_all_tags( wc_price( wc_get_price_excluding_tax( $variation ) ) ), $period, __( 'excl. VAT', 'beltoft-services' ) );
+			$label = sprintf( '%d GB: %s%s %s', (int) $plan['disk_gb'], \BeltoftServices\Billing\TaxNote::text( (float) wc_get_price_excluding_tax( $variation ), null, $variation, '', false ), $period, \BeltoftServices\Billing\TaxNote::incl_for( $variation ) ? __( 'incl. VAT', 'beltoft-services' ) : __( 'excl. VAT', 'beltoft-services' ) );
 			echo '<option value="' . esc_attr( (string) $id ) . '" ' . selected( $selected, $id, false ) . '>' . esc_html( $label ) . '</option>';
 		}
 		echo '</select></p>';

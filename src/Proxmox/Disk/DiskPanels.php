@@ -100,7 +100,7 @@ final class DiskPanels {
 				}
 				$url = DiskCart::add_url( $server, $variation );
 				if ( $url ) {
-					$price = $server_usage ? self::usage_terms_of( $variation ) : wp_strip_all_tags( wc_price( wc_get_price_excluding_tax( $variation ) ) ) . Panels::per( $variation );
+					$price = $server_usage ? self::usage_terms_of( $variation ) : \BeltoftServices\Billing\TaxNote::text( (float) wc_get_price_excluding_tax( $variation ), null, $variation, '', false ) . Panels::per( $variation );
 					$add[] = array( 'size' => $size, 'url' => $url, 'price' => $price );
 				}
 			}
@@ -117,7 +117,7 @@ final class DiskPanels {
 		$rates = Rates::for_usage( $variation );
 
 		/* translators: %s: monthly amount such as +€4.40 per month */
-		return null === $rates ? '' : sprintf( __( '%s at most, billed by the hour', 'beltoft-services' ), Rates::plus_per_month( $rates['cap'] ) );
+		return null === $rates ? '' : sprintf( __( '%s at most, billed by the hour', 'beltoft-services' ), Rates::plus_per_month( $rates['cap'], $variation ) );
 	}
 
 	/**
