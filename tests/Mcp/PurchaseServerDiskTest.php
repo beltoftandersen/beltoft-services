@@ -252,14 +252,28 @@ final class PurchaseServerDiskTest extends UsageTestCase {
 		$this->assertSame( array(), $this->orders( $this->user ) );
 	}
 
+	/**
+	 * The checkout defines WOOCOMMERCE_CHECKOUT for good: a process of its own keeps it from the other tests.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
 	public function test_no_capacity_does_not_refuse_the_order(): void {
 		// Changed on purpose (stock policy 2026-11-11): capacity never stops an order.
 		$this->capacity( 70 );
-		$out = $this->tool( 'order_server', $this->args( array( 'extra_disk_gb' => 50 ) ), $this->oauth( $this->user, Tokens::FULL ) );
+		$token = $this->oauth( $this->user, Tokens::FULL );
+		$args  = $this->args( array( 'extra_disk_gb' => 50 ) );
+		$out   = $this->tool( 'order_server', $args, $token );
 		$this->assertFalse( $out['isError'] ?? false, wp_json_encode( $out ) );
 		$this->assertStringNotContainsString( 'does not fit', wp_json_encode( $out ) );
-		$this->assertNotEmpty( $this->orders( $this->user ), 'The order exists although no node has the room.' );
+
+		$done = $this->json( $this->tool( 'order_server', $args + array( 'confirm' => $this->json( $out )['confirm'] ), $token ) );
+		$this->assertTrue( $done['ordered'], wp_json_encode( $done ) );
+		$orders = $this->orders( $this->user );
+		$this->assertCount( 1, $orders, 'The order exists although no node has the room.' );
+		$this->assertCount( 2, $orders[0]->get_items(), 'The server and the disk.' );
 	}
+
 	/**
 	 * WooCommerce's checkout defines WOOCOMMERCE_CHECKOUT for good: a process of its own keeps it from the other tests.
 	 *
