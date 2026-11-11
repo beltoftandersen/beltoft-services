@@ -487,7 +487,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 				<?php foreach ( $extra_disks['add'] as $beltoft_disk_size ) : ?>
 					<a class="beltoft-services-add__tile" href="<?php echo esc_url( $beltoft_disk_size['url'] ); ?>">
 						<span class="beltoft-services-add__name"><?php echo esc_html( $beltoft_disk_size['size'] . ' GB' ); ?></span>
-						<span class="beltoft-services-add__price"><?php /* translators: %s: price */ echo esc_html( sprintf( 'incl' === \BeltoftServices\Billing\TaxNote::display() ? __( '%s including VAT', 'beltoft-services' ) : __( '%s excluding VAT', 'beltoft-services' ), $beltoft_disk_size['price'] ) ); ?></span>
+						<span class="beltoft-services-add__price"><?php /* translators: %s: price */ echo esc_html( sprintf( \BeltoftServices\Billing\TaxNote::pick_mode( (string) ( $beltoft_disk_size['vat'] ?? 'excl' ), __( '%s excluding VAT', 'beltoft-services' ), __( '%s including VAT', 'beltoft-services' ), __( '%s', 'beltoft-services' ) ), $beltoft_disk_size['price'] ) ); ?></span>
 					</a>
 				<?php endforeach; ?>
 				</div>
@@ -644,7 +644,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 					<?php foreach ( $snapshots['buy'] as $beltoft_services_pack ) : ?>
 						<a class="beltoft-services-add__tile" href="<?php echo esc_url( $beltoft_services_pack['url'] ); ?>">
 							<span class="beltoft-services-add__name"><?php /* translators: %d: snapshot slots in the pack */ echo esc_html( sprintf( _n( '+%d snapshot', '+%d snapshots', (int) $beltoft_services_pack['slots'], 'beltoft-services' ), (int) $beltoft_services_pack['slots'] ) ); ?></span>
-							<span class="beltoft-services-add__price"><?php /* translators: %s: price */ echo esc_html( sprintf( 'incl' === \BeltoftServices\Billing\TaxNote::display() ? __( '%s including VAT', 'beltoft-services' ) : __( '%s excluding VAT', 'beltoft-services' ), $beltoft_services_pack['price'] ) ); ?></span>
+							<span class="beltoft-services-add__price"><?php /* translators: %s: price */ echo esc_html( sprintf( \BeltoftServices\Billing\TaxNote::pick_mode( (string) ( $beltoft_services_pack['vat'] ?? 'excl' ), __( '%s excluding VAT', 'beltoft-services' ), __( '%s including VAT', 'beltoft-services' ), __( '%s', 'beltoft-services' ) ), $beltoft_services_pack['price'] ) ); ?></span>
 						</a>
 					<?php endforeach; ?>
 					</div>

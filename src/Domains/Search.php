@@ -3,6 +3,7 @@
 namespace BeltoftServices\Domains;
 
 use BeltoftServices\Api\Routes;
+use BeltoftServices\Api\Tokens;
 use BeltoftServices\Billing\TaxNote;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Settings;
@@ -39,7 +40,8 @@ final class Search {
 	}
 
 	public static function rest_check( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
-		$result = self::visitor_search( (string) $request['name'] );
+		// A token holder (REST token, OAuth, MCP) gets the plain answer; the browser of a visitor also gets the prices as the page prints them.
+		$result = self::visitor_search( (string) $request['name'], null === Tokens::current() );
 		if ( is_wp_error( $result ) ) { return $result; }
 		$response = new \WP_REST_Response( $result, 200 );
 		// Only this browser may keep it, briefly: shared caches must not hold availability.
@@ -51,7 +53,7 @@ final class Search {
 	 * A search made for the visitor of this request: the per-visitor limits, the length check and find().
 	 * The REST route and the Bricks query type both come through here, so they cannot differ.
 	 */
-	public static function visitor_search( string $name ): array|\WP_Error {
+	public static function visitor_search( string $name, bool $decorate = true ): array|\WP_Error {
 		$id = RateLimit::visitor();
 		/** Searches allowed per visitor: per minute and per hour. */
 		$per_minute = (int) apply_filters( 'beltoft_services_domain_search_limit', 20 );
@@ -62,7 +64,26 @@ final class Search {
 		if ( strlen( $name ) > 253 ) {
 			return new \WP_Error( 'bad_domain', __( 'A valid domain name is required.', 'beltoft-services' ), array( 'status' => 400 ) );
 		}
-		return self::find( $name );
+		$found = self::find( $name );
+		return $decorate && ! is_wp_error( $found ) ? self::decorate( $found ) : $found;
+	}
+
+	/**
+	 * Adds what a page needs to print the prices: per result price_text (plain, the shop's tax display) and price_html (passes
+	 * beltoft_services_price_html), and per answer tax ('incl' or 'excl') and currency. find() itself keeps its shape (API and MCP answers).
+	 *
+	 * @param array<string, mixed> $found Answer of find().
+	 * @return array<string, mixed>
+	 */
+	public static function decorate( array $found ): array {
+		foreach ( (array) ( $found['results'] ?? array() ) as $i => $item ) {
+			$price = isset( $item['price'] ) && null !== $item['price'] ? (int) $item['price'] : null;
+			$found['results'][ $i ]['price_text'] = self::price_text( $price );
+			$found['results'][ $i ]['price_html'] = self::price_html( $price );
+		}
+		$found['tax']      = TaxNote::display();
+		$found['currency'] = (string) get_woocommerce_currency();
+		return $found;
 	}
 
 	/** IDNA and DNS label validation for a full name: the same rules as HostName::normalise(), so the search and the rest of the plugin accept the same names. */
@@ -169,10 +190,9 @@ final class Search {
 			$available = Prices::sellable( $entry['tld'] ) && ( 'dk' !== $entry['tld'] || DkAgreement::ready() );
 			$item = $found[ $entry['domain'] ] ?? array();
 			$status = ! $available ? 'not_sold' : ( ! empty( $item['is_premium'] ) ? 'premium' : ( 'free' === ( $item['status'] ?? '' ) ? 'free' : 'taken' ) );
-			$price = in_array( $status, array( 'free', 'taken' ), true ) ? Prices::price( $entry['tld'] ) : null;
-			$results[] = array( 'domain' => $entry['domain'], 'display' => HostName::display( $entry['domain'] ), 'status' => $status, 'price' => $price, 'price_text' => self::price_text( $price ), 'price_html' => self::price_html( $price ), 'transfer' => 'taken' === $status, 'note' => self::note( $entry['tld'] ) );
+			$results[] = array( 'domain' => $entry['domain'], 'display' => HostName::display( $entry['domain'] ), 'status' => $status, 'price' => in_array( $status, array( 'free', 'taken' ), true ) ? Prices::price( $entry['tld'] ) : null, 'transfer' => 'taken' === $status, 'note' => self::note( $entry['tld'] ) );
 		}
-		return array( 'results' => $results, 'tax' => TaxNote::display(), 'currency' => (string) get_woocommerce_currency() );
+		return array( 'results' => $results );
 	}
 
 	/** A yearly price (whole units, excluding tax) as the catalogue shows it: whole amounts without decimals, the shop's tax display, plain text. Empty for none. */

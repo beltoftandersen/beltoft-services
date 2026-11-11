@@ -50,11 +50,23 @@ final class TaxNote {
 	 * @param string $context 'shop' or 'cart'.
 	 */
 	public static function display( string $context = 'shop' ): string {
+		// A VAT-exempt customer is shown, and charged, no tax: WooCommerce shows them the excluding figure (see wc_get_price_including_tax()).
+		if ( self::exempt() ) {
+			return 'excl';
+		}
+
 		if ( '' !== self::$forced && wc_tax_enabled() ) {
 			return self::$forced;
 		}
 
 		return 'incl' === self::mode( $context ) ? 'incl' : 'excl';
+	}
+
+	/**
+	 * Whether the customer of this request is exempt from VAT, as WooCommerce decides it.
+	 */
+	private static function exempt(): bool {
+		return function_exists( 'WC' ) && ! empty( WC()->customer ) && WC()->customer->get_is_vat_exempt();
 	}
 
 	/**
@@ -148,7 +160,58 @@ final class TaxNote {
 	 * @param \WC_Product|null $product Product the amount belongs to.
 	 */
 	public static function incl_for( ?\WC_Product $product ): bool {
-		return null !== $product && 'incl' === self::display();
+		return 'incl' === self::vat_mode( $product );
+	}
+
+	/**
+	 * What the words next to a catalogue figure of a product say: 'incl' (display including tax, taxable product), 'excl' (display
+	 * excluding tax, or no product: as the plugin always printed it) or 'none' (display including tax and the product is not taxable: the
+	 * figure has no VAT in it and no VAT words belong next to it).
+	 *
+	 * @param \WC_Product|null $product Product the amount belongs to.
+	 */
+	public static function vat_mode( ?\WC_Product $product ): string {
+		if ( null === $product || 'incl' !== self::display() ) {
+			return 'excl';
+		}
+
+		return $product->is_taxable() ? 'incl' : 'none';
+	}
+
+	/**
+	 * Picks the sentence for the VAT mode of a product, from three already translated texts.
+	 *
+	 * @param \WC_Product|null $product Product.
+	 * @param string           $excl    Text with "excluding VAT".
+	 * @param string           $incl    Text with "including VAT".
+	 * @param string           $none    Text with no VAT words.
+	 */
+	public static function pick( ?\WC_Product $product, string $excl, string $incl, string $none ): string {
+		return self::pick_mode( self::vat_mode( $product ), $excl, $incl, $none );
+	}
+
+	/**
+	 * Picks the text for a VAT mode that was worked out earlier (see vat_mode()).
+	 *
+	 * @param string $mode 'incl', 'excl' or 'none'.
+	 * @param string $excl Text with "excluding VAT".
+	 * @param string $incl Text with "including VAT".
+	 * @param string $none Text with no VAT words.
+	 */
+	public static function pick_mode( string $mode, string $excl, string $incl, string $none ): string {
+		return 'incl' === $mode ? $incl : ( 'none' === $mode ? $none : $excl );
+	}
+
+	/**
+	 * The figure of a pay as you go amount (an hourly rate, a monthly cap): the usage invoice is taxed at the standard tax class whatever
+	 * the product says, so the figure shown including tax is the one that will be charged. The amount as given when there is no product
+	 * (API and MCP answers, invoices) or the display excludes tax.
+	 *
+	 * @param float            $excl    Amount excluding tax.
+	 * @param \WC_Product|null $product Product the amount belongs to, or null for the amount as given.
+	 */
+	public static function usage_figure( float $excl, ?\WC_Product $product ): float {
+		return null === $product ? $excl : self::figure( $excl, null, '' );
 	}
 
 	/**

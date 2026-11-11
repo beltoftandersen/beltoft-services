@@ -28,11 +28,12 @@ final class Prices {
 	public static function price( string $tld, string $currency = '' ): ?int {
 		$tld = strtolower( ltrim( $tld, '.' ) );
 		$currency = Currency::or_current( $currency );
+		// sellable() holds the table and, outside the shop's currency, the override line: nothing else is needed to know the price exists.
+		if ( ! self::sellable( $tld, $currency ) ) { return null; }
+		$override = self::overrides( $currency )[ $tld ] ?? null;
+		if ( null !== $override ) { return $override; }
 		$table = get_option( self::OPTION, array() );
-		if ( ! is_array( $table ) || ! isset( $table[ $tld ] ) || ! self::sellable( $tld, $currency ) ) { return null; }
-		$overrides = self::overrides( $currency );
-		if ( Currency::base() !== $currency ) { return $overrides[ $tld ] ?? null; }
-		return $overrides[ $tld ] ?? (int) $table[ $tld ]['price'];
+		return (int) $table[ $tld ]['price'];
 	}
 
 	/** The registrar's transfer cost for a full domain, or null if no price is stored. */

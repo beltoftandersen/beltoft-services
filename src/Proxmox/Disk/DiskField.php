@@ -152,19 +152,32 @@ final class DiskField {
 		echo '<select id="beltoft_services_disk_size" data-nonce="' . esc_attr( wp_create_nonce( self::NONCE ) ) . '"><option value="0">' . esc_html__( 'None', 'beltoft-services' ) . '</option>';
 		foreach ( self::sizes_for( $usage ) as $id => $variation ) {
 			$plan = Product::plan( $variation->get_parent_id(), $id );
-			if ( $usage ) {
-				$rates = (array) Rates::for_usage( $variation );
-				$label = sprintf( '%d GB: %s %s', (int) $plan['disk_gb'], Rates::plus_per_month( (float) ( $rates['cap'] ?? 0 ), $variation ), \BeltoftServices\Billing\TaxNote::incl_for( $variation ) ? __( 'incl. VAT, billed by the hour', 'beltoft-services' ) : __( 'excl. VAT, billed by the hour', 'beltoft-services' ) );
-				echo '<option value="' . esc_attr( (string) $id ) . '" ' . selected( $selected, $id, false ) . '>' . esc_html( $label ) . '</option>';
-				continue;
-			}
-			$period = class_exists( '\\WC_Subscriptions_Product' ) && \WC_Subscriptions_Product::is_subscription( $variation )
-				? ' / ' . (string) wcs_get_subscription_period_strings( max( 1, (int) \WC_Subscriptions_Product::get_interval( $variation ) ), (string) \WC_Subscriptions_Product::get_period( $variation ) )
-				: '';
-			$label = sprintf( '%d GB: %s%s %s', (int) $plan['disk_gb'], \BeltoftServices\Billing\TaxNote::text( (float) wc_get_price_excluding_tax( $variation ), null, $variation, '', false ), $period, \BeltoftServices\Billing\TaxNote::incl_for( $variation ) ? __( 'incl. VAT', 'beltoft-services' ) : __( 'excl. VAT', 'beltoft-services' ) );
+			$label = self::size_label( (int) $plan['disk_gb'], $variation, (bool) $usage );
 			echo '<option value="' . esc_attr( (string) $id ) . '" ' . selected( $selected, $id, false ) . '>' . esc_html( $label ) . '</option>';
 		}
 		echo '</select></p>';
+	}
+
+	/**
+	 * The text of one size in the select: "10 GB: +€4 per month incl. VAT, billed by the hour" (pay as you go) or "10 GB: €5.00 / month excl. VAT".
+	 * The figure is in the shop's tax display and the words say which.
+	 *
+	 * @param int                   $gb        Size.
+	 * @param \WC_Product_Variation $variation Size variation.
+	 * @param bool                  $usage     The server is pay as you go.
+	 */
+	public static function size_label( int $gb, \WC_Product_Variation $variation, bool $usage ): string {
+		if ( $usage ) {
+			$rates = (array) Rates::for_usage( $variation );
+
+			return sprintf( '%d GB: %s %s', $gb, Rates::plus_per_month( (float) ( $rates['cap'] ?? 0 ), $variation ), 'incl' === \BeltoftServices\Billing\TaxNote::display() ? __( 'incl. VAT, billed by the hour', 'beltoft-services' ) : __( 'excl. VAT, billed by the hour', 'beltoft-services' ) );
+		}
+
+		$period = class_exists( '\\WC_Subscriptions_Product' ) && \WC_Subscriptions_Product::is_subscription( $variation )
+			? ' / ' . (string) wcs_get_subscription_period_strings( max( 1, (int) \WC_Subscriptions_Product::get_interval( $variation ) ), (string) \WC_Subscriptions_Product::get_period( $variation ) )
+			: '';
+
+		return rtrim( sprintf( '%d GB: %s%s %s', $gb, \BeltoftServices\Billing\TaxNote::text( (float) wc_get_price_excluding_tax( $variation ), null, $variation, '', false ), $period, \BeltoftServices\Billing\TaxNote::pick( $variation, __( 'excl. VAT', 'beltoft-services' ), __( 'incl. VAT', 'beltoft-services' ), '' ) ) );
 	}
 
 	public static function assets(): void {

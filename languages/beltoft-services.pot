@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-11T06:55:51+00:00\n"
+"POT-Creation-Date: 2026-11-11T07:03:32+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-services\n"
@@ -168,9 +168,9 @@ msgid "My Account shows one Billing item instead of Orders, Subscriptions, Payme
 msgstr ""
 
 #: src/Account/Billing.php:324
-#: src/Account/ServerPicker.php:855
-#: src/LineNames.php:340
-#: src/LineNames.php:391
+#: src/Account/ServerPicker.php:893
+#: src/LineNames.php:343
+#: src/LineNames.php:394
 #: src/Usage/BillingField.php:191
 #: src/Usage/Cart.php:61
 #: templates/account/overview/next-payment.php:19
@@ -243,8 +243,8 @@ msgstr ""
 #: src/Account/Databases.php:146
 #: src/Hosting/HostingAccount.php:450
 #: src/Proxmox/Vm/EmailDetails.php:183
-#: src/Proxmox/Vm/Panels.php:518
-#: src/Proxmox/Vm/Panels.php:585
+#: src/Proxmox/Vm/Panels.php:528
+#: src/Proxmox/Vm/Panels.php:595
 #: src/Usage/Renewal.php:240
 #: templates/account/db.php:46
 #: templates/account/db.php:280
@@ -314,7 +314,7 @@ msgstr ""
 
 #. translators: %s: plan name such as Standard
 #: src/Account/DbPicker.php:367
-#: src/Account/ServerPicker.php:561
+#: src/Account/ServerPicker.php:560
 #: src/Usage/Breakdown.php:221
 #: templates/account/mail.php:56
 #: templates/account/vm.php:132
@@ -323,12 +323,12 @@ msgid "Plan"
 msgstr ""
 
 #: src/Account/DbPicker.php:370
-#: src/Account/ServerPicker.php:564
+#: src/Account/ServerPicker.php:563
 msgid "Every plan is out of stock right now. Please check back soon."
 msgstr ""
 
 #: src/Account/DbPicker.php:385
-#: src/Account/ServerPicker.php:596
+#: src/Account/ServerPicker.php:595
 #: src/Domains/DnsClaimPanel.php:173
 #: templates/account/credit.php:86
 msgid "Continue to checkout"
@@ -346,48 +346,52 @@ msgstr ""
 #. translators: 1: plan name, 2: price such as "€0.0226 per hour, max €16.50 per month excluding VAT"
 #. translators: 1: plan name, 2: price
 #: src/Account/DbPicker.php:522
-#: src/Account/ServerPicker.php:782
+#: src/Account/ServerPicker.php:820
 #, php-format
 msgid "%1$s, pay as you go: %2$s"
 msgstr ""
 
 #. translators: 1: plan name, 2: price such as €25.00
-#: src/Account/DbPicker.php:531
+#: src/Account/DbPicker.php:530
+#, php-format
+msgid "%1$s: %2$s excluding VAT"
+msgstr ""
+
+#. translators: 1: plan name, 2: price such as €25.00
+#: src/Account/DbPicker.php:530
 #, php-format
 msgid "%1$s: %2$s including VAT"
 msgstr ""
 
 #. translators: 1: plan name, 2: price such as €25.00
-#: src/Account/DbPicker.php:531
+#. translators: 1: plan name, 2: price
+#: src/Account/DbPicker.php:530
+#: src/Account/ServerPicker.php:832
 #, php-format
-msgid "%1$s: %2$s excluding VAT"
+msgid "%1$s: %2$s"
 msgstr ""
 
 #. translators: 1: plan name, 2: price such as €25.00, 3: period such as month
-#: src/Account/DbPicker.php:535
+#: src/Account/DbPicker.php:534
+#, php-format
+msgid "%1$s: %2$s per %3$s excluding VAT"
+msgstr ""
+
+#. translators: 1: plan name, 2: price such as €25.00, 3: period such as month
+#: src/Account/DbPicker.php:534
 #, php-format
 msgid "%1$s: %2$s per %3$s including VAT"
 msgstr ""
 
 #. translators: 1: plan name, 2: price such as €25.00, 3: period such as month
-#: src/Account/DbPicker.php:535
+#: src/Account/DbPicker.php:534
 #, php-format
-msgid "%1$s: %2$s per %3$s excluding VAT"
-msgstr ""
-
-#: src/Account/DbPicker.php:580
-#: src/Account/ServerPicker.php:684
-msgid "max per month, incl. VAT"
-msgstr ""
-
-#: src/Account/DbPicker.php:580
-#: src/Account/ServerPicker.php:684
-msgid "max per month, excl. VAT"
+msgid "%1$s: %2$s per %3$s"
 msgstr ""
 
 #. translators: %d: number of virtual CPU cores
-#: src/Account/DbPicker.php:589
-#: src/Account/ServerPicker.php:692
+#: src/Account/DbPicker.php:587
+#: src/Account/ServerPicker.php:690
 #: src/Usage/Breakdown.php:190
 #, php-format
 msgid "%d vCPU"
@@ -396,22 +400,22 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. translators: %d: data disk size in gigabytes
-#: src/Account/DbPicker.php:592
+#: src/Account/DbPicker.php:590
 #: src/Usage/Breakdown.php:204
 #, php-format
 msgid "%d GB data disk"
 msgstr ""
 
 #. translators: %d: number of days backups are kept
-#: src/Account/DbPicker.php:594
+#: src/Account/DbPicker.php:592
 #, php-format
 msgid "Daily backups, kept %d day"
 msgid_plural "Daily backups, kept %d days"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Account/DbPicker.php:598
-#: src/Account/ServerPicker.php:699
+#: src/Account/DbPicker.php:596
+#: src/Account/ServerPicker.php:697
 msgid "Out of stock"
 msgstr ""
 
@@ -859,7 +863,7 @@ msgid "Register a new domain or move one you have, with DNS hosting included."
 msgstr ""
 
 #: src/Account/OverviewData.php:599
-#: src/Domains/Search.php:199
+#: src/Domains/Search.php:219
 msgid "Find a domain"
 msgstr ""
 
@@ -1083,11 +1087,24 @@ msgstr ""
 
 #. translators: %s: price such as €4.00
 #. translators: %s: monthly maximum of the add-on such as +€3 per month
+#. translators: %s: the terms, such as "€0.0226 per hour, max €16.50 per month"
+#. translators: %s: price
+#: src/Account/ServerPicker.php:497
+#: src/Account/ServerPicker.php:782
+#: src/Usage/Rates.php:234
+#: templates/account/vm.php:490
+#: templates/account/vm.php:647
+#, php-format
+msgid "%s excluding VAT"
+msgstr ""
+
+#. translators: %s: price such as €4.00
+#. translators: %s: monthly maximum of the add-on such as +€3 per month
 #. translators: %s: the terms, such as "€0.0283 per hour, max €20.60 per month"
 #. translators: %s: price
-#: src/Account/ServerPicker.php:498
-#: src/Account/ServerPicker.php:744
-#: src/Usage/Rates.php:229
+#: src/Account/ServerPicker.php:497
+#: src/Account/ServerPicker.php:782
+#: src/Usage/Rates.php:230
 #: templates/account/vm.php:490
 #: templates/account/vm.php:647
 #, php-format
@@ -1095,86 +1112,113 @@ msgid "%s including VAT"
 msgstr ""
 
 #. translators: %s: price such as €4.00
-#. translators: %s: monthly maximum of the add-on such as +€3 per month
-#. translators: %s: the terms, such as "€0.0226 per hour, max €16.50 per month"
 #. translators: %s: price
-#: src/Account/ServerPicker.php:498
-#: src/Account/ServerPicker.php:744
-#: src/Usage/Rates.php:233
+#: src/Account/ServerPicker.php:497
 #: templates/account/vm.php:490
 #: templates/account/vm.php:647
 #, php-format
-msgid "%s excluding VAT"
+msgid "%s"
 msgstr ""
 
 #. translators: 1: price such as €4.00, 2: period such as month
-#: src/Account/ServerPicker.php:502
+#: src/Account/ServerPicker.php:501
+#, php-format
+msgid "%1$s per %2$s excluding VAT"
+msgstr ""
+
+#. translators: 1: price such as €4.00, 2: period such as month
+#: src/Account/ServerPicker.php:501
 #, php-format
 msgid "%1$s per %2$s including VAT"
 msgstr ""
 
 #. translators: 1: price such as €4.00, 2: period such as month
-#: src/Account/ServerPicker.php:502
+#: src/Account/ServerPicker.php:501
 #, php-format
-msgid "%1$s per %2$s excluding VAT"
+msgid "%1$s per %2$s"
 msgstr ""
 
-#: src/Account/ServerPicker.php:541
+#: src/Account/ServerPicker.php:540
 #: src/Account/Servers.php:221
 #: templates/account/overview/servers.php:19
 #: templates/account/server.php:24
 msgid "All servers"
 msgstr ""
 
-#: src/Account/ServerPicker.php:542
+#: src/Account/ServerPicker.php:541
 msgid "New server"
 msgstr ""
 
-#: src/Account/ServerPicker.php:545
+#: src/Account/ServerPicker.php:544
 msgid "No server can be ordered right now."
 msgstr ""
 
-#: src/Account/ServerPicker.php:550
+#: src/Account/ServerPicker.php:549
 msgid "Choose a plan and what the server starts with. You pay on the next page."
 msgstr ""
 
 #. translators: %d: disk size in gigabytes
-#: src/Account/ServerPicker.php:695
+#: src/Account/ServerPicker.php:693
 #: src/Usage/Breakdown.php:206
 #, php-format
 msgid "%d GB disk"
 msgstr ""
 
-#: src/Account/ServerPicker.php:721
+#: src/Account/ServerPicker.php:719
 msgid "excluding VAT"
 msgstr ""
 
+#: src/Account/ServerPicker.php:719
+msgid "including VAT"
+msgstr ""
+
 #. translators: %s: period such as month
-#: src/Account/ServerPicker.php:725
+#: src/Account/ServerPicker.php:723
 #, php-format
 msgid "per %s excluding VAT"
 msgstr ""
 
 #. translators: %s: period such as month
-#: src/Account/ServerPicker.php:748
+#: src/Account/ServerPicker.php:723
+#, php-format
+msgid "per %s including VAT"
+msgstr ""
+
+#. translators: %s: period such as month
+#: src/Account/ServerPicker.php:723
+#: src/Account/ServerPicker.php:786
 #, php-format
 msgid "per %s"
 msgstr ""
 
+#: src/Account/ServerPicker.php:756
+msgid "max per month, incl. VAT"
+msgstr ""
+
+#: src/Account/ServerPicker.php:756
+msgid "max per month, excl. VAT"
+msgstr ""
+
 #. translators: 1: price difference such as €2.00, 2: " per month" or empty
-#: src/Account/ServerPicker.php:751
+#: src/Account/ServerPicker.php:789
+#, php-format
+msgid "+%1$s%2$s excluding VAT"
+msgstr ""
+
+#. translators: 1: price difference such as €2.00, 2: " per month" or empty
+#: src/Account/ServerPicker.php:789
 #, php-format
 msgid "+%1$s%2$s including VAT"
 msgstr ""
 
 #. translators: 1: price difference such as €2.00, 2: " per month" or empty
-#: src/Account/ServerPicker.php:751
+#: src/Account/ServerPicker.php:789
 #, php-format
-msgid "+%1$s%2$s excluding VAT"
+msgid "+%1$s%2$s"
 msgstr ""
 
 #. translators: 1: number of days, 2: price
-#: src/Account/ServerPicker.php:756
+#: src/Account/ServerPicker.php:794
 #, php-format
 msgid "Daily backups, kept for %1$d day (%2$s)"
 msgid_plural "Daily backups, kept for %1$d days (%2$s)"
@@ -1183,36 +1227,30 @@ msgstr[1] ""
 
 #. translators: %s: price
 #. translators: %s: price difference such as +€12.00 / month
-#: src/Account/ServerPicker.php:760
+#: src/Account/ServerPicker.php:798
 #: src/Proxmox/Backup/BackupField.php:172
 #, php-format
 msgid "Daily backups (%s)"
 msgstr ""
 
 #. translators: 1: plan name, 2: price
-#: src/Account/ServerPicker.php:778
+#: src/Account/ServerPicker.php:816
 #, php-format
 msgid "%1$s with daily backups, pay as you go: %2$s"
 msgstr ""
 
 #. translators: 1: plan name, 2: price
-#: src/Account/ServerPicker.php:790
+#: src/Account/ServerPicker.php:828
 #, php-format
 msgid "%1$s with daily backups: %2$s"
 msgstr ""
 
-#. translators: 1: plan name, 2: price
-#: src/Account/ServerPicker.php:794
-#, php-format
-msgid "%1$s: %2$s"
-msgstr ""
-
-#: src/Account/ServerPicker.php:859
+#: src/Account/ServerPicker.php:897
 #: src/Usage/BillingField.php:195
 msgid "Monthly"
 msgstr ""
 
-#: src/Account/ServerPicker.php:863
+#: src/Account/ServerPicker.php:901
 #: src/Settings.php:126
 #: src/Usage/BillingField.php:196
 msgid "Pay as you go"
@@ -1356,7 +1394,7 @@ msgstr ""
 #. translators: %s: what the server waits for.
 #: src/Admin/ListTable.php:59
 #: src/Admin/Panel.php:441
-#: src/Proxmox/Vm/Panels.php:596
+#: src/Proxmox/Vm/Panels.php:606
 msgid "Last error"
 msgstr ""
 
@@ -1384,7 +1422,7 @@ msgstr ""
 #. translators: %s: what the server waits for.
 #: src/Admin/ListTable.php:155
 #: src/Admin/Panel.php:440
-#: src/Proxmox/Vm/Panels.php:595
+#: src/Proxmox/Vm/Panels.php:605
 #, php-format
 msgid "Waiting: %s"
 msgstr ""
@@ -1614,7 +1652,7 @@ msgstr ""
 
 #: src/Admin/Panel.php:440
 #: src/Progress.php:540
-#: src/Proxmox/Vm/Panels.php:595
+#: src/Proxmox/Vm/Panels.php:605
 msgid "Waiting"
 msgstr ""
 
@@ -1624,9 +1662,9 @@ msgstr ""
 
 #: src/Admin/Panel.php:442
 #: src/Product.php:668
-#: src/Proxmox/Vm/Panels.php:590
-#: src/Proxmox/Vm/Panels.php:591
-#: src/Proxmox/Vm/Panels.php:592
+#: src/Proxmox/Vm/Panels.php:600
+#: src/Proxmox/Vm/Panels.php:601
+#: src/Proxmox/Vm/Panels.php:602
 #: src/Ssl/SslSettings.php:177
 #: templates/api-reference-full.php:310
 #: templates/api-reference.php:151
@@ -1636,10 +1674,10 @@ msgstr ""
 #. translators: %s: date and time.
 #: src/Admin/Panel.php:442
 #: src/Product.php:669
-#: src/Proxmox/Vm/Panels.php:590
-#: src/Proxmox/Vm/Panels.php:591
-#: src/Proxmox/Vm/Panels.php:592
-#: src/Proxmox/Vm/Panels.php:593
+#: src/Proxmox/Vm/Panels.php:600
+#: src/Proxmox/Vm/Panels.php:601
+#: src/Proxmox/Vm/Panels.php:602
+#: src/Proxmox/Vm/Panels.php:603
 #: src/Ssl/SslSettings.php:177
 #: templates/api-reference-full.php:310
 #: templates/api-reference.php:151
@@ -2185,17 +2223,17 @@ msgid "The tier could not be changed. Reload checkout and try again."
 msgstr ""
 
 #: src/Apps/AppLicence.php:283
-#: src/Billing/TaxNote.php:65
-#: src/Billing/TaxNote.php:178
-#: src/Proxmox/Disk/DiskField.php:164
-msgid "incl. VAT"
+#: src/Billing/TaxNote.php:77
+#: src/Billing/TaxNote.php:244
+#: src/Proxmox/Disk/DiskField.php:180
+msgid "excl. VAT"
 msgstr ""
 
 #: src/Apps/AppLicence.php:283
-#: src/Billing/TaxNote.php:65
-#: src/Billing/TaxNote.php:181
-#: src/Proxmox/Disk/DiskField.php:164
-msgid "excl. VAT"
+#: src/Billing/TaxNote.php:77
+#: src/Billing/TaxNote.php:241
+#: src/Proxmox/Disk/DiskField.php:180
+msgid "incl. VAT"
 msgstr ""
 
 #: src/Apps/AppLicenceCart.php:212
@@ -2281,7 +2319,7 @@ msgid "Licence state"
 msgstr ""
 
 #: src/Apps/AppLicenceDriver.php:229
-#: src/Proxmox/Disk/DiskPanels.php:188
+#: src/Proxmox/Disk/DiskPanels.php:190
 #: src/Proxmox/Snapshot/SnapshotDriver.php:135
 msgid "Server license"
 msgstr ""
@@ -2857,7 +2895,7 @@ msgid "Sidebar"
 msgstr ""
 
 #: src/Bricks/ApiReferenceElement.php:65
-#: src/Domains/Search.php:201
+#: src/Domains/Search.php:221
 msgid "Search"
 msgstr ""
 
@@ -5284,50 +5322,50 @@ msgstr ""
 msgid "A record of this type already exists at that name."
 msgstr ""
 
-#: src/Domains/Search.php:60
+#: src/Domains/Search.php:62
 msgid "Too many searches. Please wait a minute."
 msgstr ""
 
-#: src/Domains/Search.php:63
-#: src/Domains/Search.php:71
-#: src/Domains/Search.php:158
+#: src/Domains/Search.php:65
+#: src/Domains/Search.php:92
+#: src/Domains/Search.php:179
 msgid "A valid domain name is required."
 msgstr ""
 
-#: src/Domains/Search.php:107
+#: src/Domains/Search.php:128
 msgid "Domain search is busy. Please try again in a few minutes."
 msgstr ""
 
-#: src/Domains/Search.php:112
+#: src/Domains/Search.php:133
 msgid "Domain search is not available right now. Try again in a few minutes."
 msgstr ""
 
-#: src/Domains/Search.php:124
-#: src/Domains/Search.php:125
+#: src/Domains/Search.php:145
+#: src/Domains/Search.php:146
 msgid "Websites on this extension need HTTPS."
 msgstr ""
 
-#: src/Domains/Search.php:126
+#: src/Domains/Search.php:147
 msgid "The registrant must be in the EU."
 msgstr ""
 
-#: src/Domains/Search.php:127
+#: src/Domains/Search.php:148
 msgid "A business needs a VAT number to register this extension."
 msgstr ""
 
-#: src/Domains/Search.php:148
+#: src/Domains/Search.php:169
 msgid "A valid domain label is required."
 msgstr ""
 
-#: src/Domains/Search.php:202
+#: src/Domains/Search.php:222
 msgid "Transfer a domain you already own"
 msgstr ""
 
-#: src/Domains/Search.php:209
+#: src/Domains/Search.php:229
 msgid "Domain to transfer"
 msgstr ""
 
-#: src/Domains/Search.php:211
+#: src/Domains/Search.php:231
 msgid "Continue"
 msgstr ""
 
@@ -6686,9 +6724,9 @@ msgid "Kind"
 msgstr ""
 
 #: src/Hosting/HostingAccount.php:459
-#: src/Proxmox/Disk/DiskPanels.php:191
+#: src/Proxmox/Disk/DiskPanels.php:193
 #: src/Proxmox/Vm/EmailDetails.php:229
-#: src/Proxmox/Vm/Panels.php:577
+#: src/Proxmox/Vm/Panels.php:587
 #: templates/account/db.php:44
 #: templates/account/db.php:293
 #: templates/account/vm.php:536
@@ -6925,7 +6963,7 @@ msgid "No hosting record yet."
 msgstr ""
 
 #: src/Hosting/HostingDriver.php:238
-#: src/Proxmox/Vm/Panels.php:572
+#: src/Proxmox/Vm/Panels.php:582
 msgid "Node"
 msgstr ""
 
@@ -7627,9 +7665,9 @@ msgid "Client"
 msgstr ""
 
 #: src/Hosting/NodesScreen.php:228
-#: src/Proxmox/Vm/Panels.php:450
-#: src/Proxmox/Vm/Panels.php:505
-#: src/Proxmox/Vm/Panels.php:546
+#: src/Proxmox/Vm/Panels.php:460
+#: src/Proxmox/Vm/Panels.php:515
+#: src/Proxmox/Vm/Panels.php:556
 msgid "off"
 msgstr ""
 
@@ -8657,33 +8695,33 @@ msgstr ""
 msgid "Fields the vendor answered"
 msgstr ""
 
-#: src/LineNames.php:116
+#: src/LineNames.php:119
 msgid "Pay as you go account"
 msgstr ""
 
 #. translators: %s: backup frequency, such as "daily".
-#: src/LineNames.php:154
+#: src/LineNames.php:157
 #, php-format
 msgid "%s backups"
 msgstr ""
 
-#: src/LineNames.php:156
+#: src/LineNames.php:159
 msgid "pay as you go"
 msgstr ""
 
 #. translators: %s: billing period, such as "monthly".
-#: src/LineNames.php:156
+#: src/LineNames.php:159
 #, php-format
 msgid "billed %s"
 msgstr ""
 
 #. translators: %s: size, such as "100 GB".
-#: src/LineNames.php:162
+#: src/LineNames.php:165
 #, php-format
 msgid "%s extra storage"
 msgstr ""
 
-#: src/LineNames.php:167
+#: src/LineNames.php:170
 msgid "public IPv4"
 msgstr ""
 
@@ -9731,7 +9769,7 @@ msgstr ""
 
 #. translators: %s: price per hour such as €0.0740
 #: src/Mcp/Pricing.php:404
-#: src/Usage/Breakdown.php:270
+#: src/Usage/Breakdown.php:296
 #, php-format
 msgid "That is %s per hour, billed for the hours used."
 msgstr ""
@@ -10643,7 +10681,7 @@ msgstr ""
 
 #: src/Proxmox/Backup/BackupField.php:80
 #: src/Usage/Breakdown.php:233
-#: src/Usage/Breakdown.php:411
+#: src/Usage/Breakdown.php:437
 msgid "Daily backups"
 msgstr ""
 
@@ -10986,7 +11024,7 @@ msgstr ""
 #: src/Proxmox/Db/DbDiskField.php:133
 #: src/Proxmox/Db/DbDiskField.php:222
 #: src/Usage/Breakdown.php:229
-#: src/Usage/Breakdown.php:411
+#: src/Usage/Breakdown.php:437
 msgid "Extra storage"
 msgstr ""
 
@@ -11138,7 +11176,7 @@ msgstr ""
 
 #: src/Proxmox/Db/DbIpField.php:80
 #: src/Usage/Breakdown.php:224
-#: src/Usage/Breakdown.php:411
+#: src/Usage/Breakdown.php:437
 msgid "Public IPv4 address"
 msgstr ""
 
@@ -11435,7 +11473,7 @@ msgstr ""
 #. translators: %d: extra disk in GB
 #: src/Proxmox/Disk/DiskDriver.php:69
 #: src/Proxmox/Disk/DiskField.php:151
-#: src/Proxmox/Disk/DiskPanels.php:202
+#: src/Proxmox/Disk/DiskPanels.php:204
 #: src/Proxmox/Vm/EmailDetails.php:179
 #: src/Usage/Breakdown.php:239
 #: src/Usage/Renewal.php:241
@@ -11462,15 +11500,15 @@ msgstr ""
 msgid "None"
 msgstr ""
 
-#: src/Proxmox/Disk/DiskField.php:157
+#: src/Proxmox/Disk/DiskField.php:173
 msgid "incl. VAT, billed by the hour"
 msgstr ""
 
-#: src/Proxmox/Disk/DiskField.php:157
+#: src/Proxmox/Disk/DiskField.php:173
 msgid "excl. VAT, billed by the hour"
 msgstr ""
 
-#: src/Proxmox/Disk/DiskField.php:176
+#: src/Proxmox/Disk/DiskField.php:189
 msgid "The extra disk could not be changed. Reload checkout and try again."
 msgstr ""
 
@@ -11546,34 +11584,34 @@ msgid "Data disk"
 msgstr ""
 
 #. translators: %s: monthly amount such as +€4.40 per month
-#: src/Proxmox/Disk/DiskPanels.php:120
+#: src/Proxmox/Disk/DiskPanels.php:122
 #, php-format
 msgid "%s at most, billed by the hour"
 msgstr ""
 
-#: src/Proxmox/Disk/DiskPanels.php:189
+#: src/Proxmox/Disk/DiskPanels.php:191
 msgid "Slot"
 msgstr ""
 
-#: src/Proxmox/Disk/DiskPanels.php:190
+#: src/Proxmox/Disk/DiskPanels.php:192
 msgid "Volume name"
 msgstr ""
 
-#: src/Proxmox/Disk/DiskPanels.php:192
+#: src/Proxmox/Disk/DiskPanels.php:194
 msgid "Completed steps"
 msgstr ""
 
-#: src/Proxmox/Disk/DiskPanels.php:196
+#: src/Proxmox/Disk/DiskPanels.php:198
 msgid "Reserved capacity"
 msgstr ""
 
 #. translators: %d: WooCommerce order ID to review for a refund.
-#: src/Proxmox/Disk/DiskPanels.php:200
+#: src/Proxmox/Disk/DiskPanels.php:202
 msgid "Paid but not delivered"
 msgstr ""
 
 #. translators: %d: WooCommerce order ID to review for a refund.
-#: src/Proxmox/Disk/DiskPanels.php:200
+#: src/Proxmox/Disk/DiskPanels.php:202
 #, php-format
 msgid "Check and refund order #%d if the disk could not be delivered."
 msgstr ""
@@ -11694,7 +11732,7 @@ msgstr ""
 
 #: src/Proxmox/Network/FirewallTab.php:43
 #: src/Proxmox/Pve/ClustersScreen.php:354
-#: src/Proxmox/Vm/Panels.php:586
+#: src/Proxmox/Vm/Panels.php:596
 #: templates/account/firewall.php:16
 msgid "Firewall"
 msgstr ""
@@ -12858,7 +12896,7 @@ msgstr ""
 #. translators: %s: date and time.
 #: src/Proxmox/Pve/ProxmoxSettings.php:325
 #: src/Proxmox/Pve/ProxmoxSettings.php:364
-#: src/Proxmox/Vm/Panels.php:594
+#: src/Proxmox/Vm/Panels.php:604
 msgid "On"
 msgstr ""
 
@@ -13245,7 +13283,7 @@ msgstr[0] ""
 msgstr[1] ""
 
 #: src/Proxmox/Vm/EmailDetails.php:221
-#: src/Proxmox/Vm/Panels.php:574
+#: src/Proxmox/Vm/Panels.php:584
 #: templates/account/vm.php:128
 #: templates/account/vm.php:157
 msgid "IP address"
@@ -13267,7 +13305,7 @@ msgstr ""
 
 #. translators: 1: number of vCPUs, 2: memory in MB, 3: disk in GB
 #: src/Proxmox/Vm/EmailDetails.php:231
-#: src/Proxmox/Vm/Panels.php:579
+#: src/Proxmox/Vm/Panels.php:589
 #: templates/account/vm.php:138
 #: templates/account/vm.php:168
 #, php-format
@@ -13613,24 +13651,24 @@ msgstr ""
 msgid "%s Mbit/s"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:421
+#: src/Proxmox/Vm/Panels.php:431
 msgid "a day"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:422
+#: src/Proxmox/Vm/Panels.php:432
 msgid "a week"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:423
+#: src/Proxmox/Vm/Panels.php:433
 msgid "a month"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:424
+#: src/Proxmox/Vm/Panels.php:434
 msgid "a year"
 msgstr ""
 
 #. translators: %d: days of backups kept
-#: src/Proxmox/Vm/Panels.php:449
+#: src/Proxmox/Vm/Panels.php:459
 #, php-format
 msgid "daily, kept %d day"
 msgid_plural "daily, kept %d days"
@@ -13638,28 +13676,28 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. translators: %s: date and time
-#: src/Proxmox/Vm/Panels.php:453
+#: src/Proxmox/Vm/Panels.php:463
 #, php-format
 msgid "last OK %s"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:454
+#: src/Proxmox/Vm/Panels.php:464
 msgid "no backup yet"
 msgstr ""
 
 #. translators: %d: number of backups kept
-#: src/Proxmox/Vm/Panels.php:459
+#: src/Proxmox/Vm/Panels.php:469
 #, php-format
 msgid "%d kept"
 msgstr ""
 
 #. translators: %s: error text
-#: src/Proxmox/Vm/Panels.php:464
+#: src/Proxmox/Vm/Panels.php:474
 #, php-format
 msgid "last error: %s"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:500
+#: src/Proxmox/Vm/Panels.php:510
 #: templates/account/vm.php:46
 #: templates/account/vm.php:278
 #: templates/account/vm.php:602
@@ -13667,117 +13705,117 @@ msgid "Snapshots"
 msgstr ""
 
 #. translators: 1: snapshots in use, 2: slots, 3: on or off
-#: src/Proxmox/Vm/Panels.php:502
+#: src/Proxmox/Vm/Panels.php:512
 #, php-format
 msgid "%1$d of %2$d slots, %3$s"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:505
-#: src/Proxmox/Vm/Panels.php:546
+#: src/Proxmox/Vm/Panels.php:515
+#: src/Proxmox/Vm/Panels.php:556
 msgid "on"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:507
+#: src/Proxmox/Vm/Panels.php:517
 msgid "Oldest snapshot"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:508
+#: src/Proxmox/Vm/Panels.php:518
 msgid "Next snapshot expiry"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:509
+#: src/Proxmox/Vm/Panels.php:519
 msgid "Snapshot error"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:510
+#: src/Proxmox/Vm/Panels.php:520
 msgid "Snapshot running"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:534
+#: src/Proxmox/Vm/Panels.php:544
 msgid "Managed with the databases (the customer cannot edit it)"
 msgstr ""
 
 #. translators: 1: on or off, 2: number of rules, 3: state (idle, applying, failed), 4: revision applied, 5: revision asked for
-#: src/Proxmox/Vm/Panels.php:545
+#: src/Proxmox/Vm/Panels.php:555
 #, php-format
 msgid "%1$s, %2$d rules, %3$s (applied %4$d of %5$d)"
 msgstr ""
 
 #. translators: 1: date and time, 2: user id
-#: src/Proxmox/Vm/Panels.php:555
+#: src/Proxmox/Vm/Panels.php:565
 #, php-format
 msgid "Last change %1$s by user %2$d"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:571
+#: src/Proxmox/Vm/Panels.php:581
 #: src/Proxmox/Vm/ProxmoxDriver.php:110
 msgid "Cluster"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:573
+#: src/Proxmox/Vm/Panels.php:583
 msgid "VMID"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:575
+#: src/Proxmox/Vm/Panels.php:585
 msgid "Ownership tag"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:576
+#: src/Proxmox/Vm/Panels.php:586
 #: templates/account/db.php:50
 #: templates/account/vm.php:185
 #: templates/account/vm.php:188
 msgid "Power"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:584
+#: src/Proxmox/Vm/Panels.php:594
 msgid "Template"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:587
+#: src/Proxmox/Vm/Panels.php:597
 msgid "Firewall error"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:588
+#: src/Proxmox/Vm/Panels.php:598
 msgid "Disk reading"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:589
+#: src/Proxmox/Vm/Panels.php:599
 msgid "Down since"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:590
+#: src/Proxmox/Vm/Panels.php:600
 msgid "Down alert sent"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:591
+#: src/Proxmox/Vm/Panels.php:601
 msgid "Disk alert sent"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:592
+#: src/Proxmox/Vm/Panels.php:602
 msgid "Urgent disk alert sent"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:593
+#: src/Proxmox/Vm/Panels.php:603
 msgid "CPU alert"
 msgstr ""
 
 #. translators: %s: date and time.
-#: src/Proxmox/Vm/Panels.php:593
+#: src/Proxmox/Vm/Panels.php:603
 #, php-format
 msgid "Sent, high since %s"
 msgstr ""
 
 #. translators: %s: date and time.
-#: src/Proxmox/Vm/Panels.php:594
+#: src/Proxmox/Vm/Panels.php:604
 msgid "Usage emails"
 msgstr ""
 
 #. translators: %s: date and time.
-#: src/Proxmox/Vm/Panels.php:594
+#: src/Proxmox/Vm/Panels.php:604
 msgid "Turned off by the customer"
 msgstr ""
 
-#: src/Proxmox/Vm/Panels.php:601
+#: src/Proxmox/Vm/Panels.php:611
 msgid "Virtual machine"
 msgstr ""
 
@@ -14883,15 +14921,15 @@ msgstr ""
 msgid "Extra disk, %d GB"
 msgstr ""
 
-#: src/Usage/Breakdown.php:268
+#: src/Usage/Breakdown.php:294
 msgid "Max per month"
 msgstr ""
 
-#: src/Usage/Breakdown.php:437
+#: src/Usage/Breakdown.php:463
 msgid "Billed by the hour, like the database."
 msgstr ""
 
-#: src/Usage/Breakdown.php:437
+#: src/Usage/Breakdown.php:463
 msgid "Billed by the hour, like the server."
 msgstr ""
 
@@ -14928,16 +14966,22 @@ msgid "Pay as you go: monthly cap"
 msgstr ""
 
 #. translators: %s: how pay as you go is billed
-#: src/Usage/CoreHooks.php:46
+#: src/Usage/CoreHooks.php:49
+#, php-format
+msgid "%s, incl. VAT"
+msgstr ""
+
+#. translators: %s: how pay as you go is billed
+#: src/Usage/CoreHooks.php:53
 #, php-format
 msgid "%s, excl. VAT"
 msgstr ""
 
-#: src/Usage/CoreHooks.php:72
+#: src/Usage/CoreHooks.php:79
 msgid "Pay as you go premium (%)"
 msgstr ""
 
-#: src/Usage/CoreHooks.php:73
+#: src/Usage/CoreHooks.php:80
 msgid "Added to the monthly price for the hourly rate and the monthly cap of pay as you go variations. Empty means 10."
 msgstr ""
 
@@ -15043,7 +15087,7 @@ msgstr ""
 #. translators: 1: product name, 2: the database's address.
 #. translators: 1: "€0.0829 per hour", 2: "max €55.00 per month"
 #: src/Usage/Estimate.php:119
-#: src/Usage/Rates.php:304
+#: src/Usage/Rates.php:305
 #, php-format
 msgid "%1$s, %2$s"
 msgstr ""
@@ -15158,24 +15202,24 @@ msgstr ""
 msgid "Or %1$s/hour, max %2$s/month, pay as you go"
 msgstr ""
 
-#: src/Usage/Rates.php:263
+#: src/Usage/Rates.php:264
 msgid "Billed monthly for the hours used"
 msgstr ""
 
 #. translators: %s: price per hour such as €0.0829
-#: src/Usage/Rates.php:281
+#: src/Usage/Rates.php:282
 #, php-format
 msgid "%s per hour"
 msgstr ""
 
 #. translators: %s: monthly cap such as €55.00
-#: src/Usage/Rates.php:292
+#: src/Usage/Rates.php:293
 #, php-format
 msgid "max %s per month"
 msgstr ""
 
 #. translators: %s: monthly price such as €55.00
-#: src/Usage/Rates.php:315
+#: src/Usage/Rates.php:316
 #, php-format
 msgid "%s per month, paid in advance"
 msgstr ""
@@ -16777,6 +16821,13 @@ msgstr ""
 #: templates/account/domain-page.php:283
 #: templates/account/domain.php:64
 #, php-format
+msgid "At your current registrar, turn off DNSSEC if it is on, unlock the domain and copy the transfer code (also called auth or EPP code). The transfer adds one year to the registration: %s per year, excluding VAT."
+msgstr ""
+
+#. translators: %s: transfer price per year
+#: templates/account/domain-page.php:283
+#: templates/account/domain.php:64
+#, php-format
 msgid "At your current registrar, turn off DNSSEC if it is on, unlock the domain and copy the transfer code (also called auth or EPP code). The transfer adds one year to the registration: %s per year, including VAT."
 msgstr ""
 
@@ -16784,7 +16835,7 @@ msgstr ""
 #: templates/account/domain-page.php:283
 #: templates/account/domain.php:64
 #, php-format
-msgid "At your current registrar, turn off DNSSEC if it is on, unlock the domain and copy the transfer code (also called auth or EPP code). The transfer adds one year to the registration: %s per year, excluding VAT."
+msgid "At your current registrar, turn off DNSSEC if it is on, unlock the domain and copy the transfer code (also called auth or EPP code). The transfer adds one year to the registration: %s per year."
 msgstr ""
 
 #: templates/account/domain-page.php:289

@@ -243,6 +243,32 @@ final class Breakdown {
 	}
 
 	/**
+	 * The maximum per month to show. In the including display each row is rounded to cents on its own and the maximum is the sum of the
+	 * rows shown, so the rows add up to it (the usage invoice has a line per item and taxes each line); otherwise the maximum as it is.
+	 * The figure given back is excluding tax: cap_money() turns it into the shown one, so the sum is divided back by the same factor.
+	 *
+	 * @param array<string, mixed> $parts  parts().
+	 * @param \WC_Product|null     $usage  Product for the tax display.
+	 */
+	private static function shown_max( array $parts, ?\WC_Product $usage ): float {
+		if ( null === $usage || 'incl' !== TaxNote::display() ) {
+			return (float) $parts['max'];
+		}
+
+		$sum = 0.0;
+
+		foreach ( array( 'plan', 'ip', 'storage', 'backups', 'disk' ) as $key ) {
+			$sum += round( TaxNote::usage_figure( (float) ( $parts[ $key ] ?? 0 ), $usage ), 2 );
+		}
+
+		// The sum of the shown rows is already including tax: Rates::cap_money() would add it again, so the max is passed through the
+		// same function with the tax taken off by the factor of the standard class.
+		$factor = TaxNote::usage_figure( 1.0, $usage );
+
+		return $factor > 0 ? $sum / $factor : (float) $parts['max'];
+	}
+
+	/**
 	 * The two blocks of the line: name and plan, then the amounts. Siblings, so a theme can place the cart's
 	 * other meta lines (the operating system) between them.
 	 *
@@ -265,7 +291,7 @@ final class Breakdown {
 					$rows .= '<span class="beltoft-services-payg__row"><span>' . esc_html( $row[0] ) . '</span><span>' . esc_html( $row[1] ) . '</span></span>';
 				}
 
-				$rows .= '<span class="beltoft-services-payg__row beltoft-services-payg__row--max"><span>' . esc_html__( 'Max per month', 'beltoft-services' ) . '</span><span>' . esc_html( Rates::cap_money( (float) $parts['max'], $usage ) ) . '</span></span>';
+				$rows .= '<span class="beltoft-services-payg__row beltoft-services-payg__row--max"><span>' . esc_html__( 'Max per month', 'beltoft-services' ) . '</span><span>' . esc_html( Rates::cap_money( self::shown_max( $parts, $usage ), $usage ) ) . '</span></span>';
 				/* translators: %s: price per hour such as €0.0740 */
 				$rows .= '<span class="beltoft-services-payg__hourly">' . esc_html( sprintf( __( 'That is %s per hour, billed for the hours used.', 'beltoft-services' ), Rates::money( (float) $parts['hourly'], 4, '', $usage ) ) ) . '</span></span>';
 

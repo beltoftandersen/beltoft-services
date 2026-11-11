@@ -276,11 +276,11 @@ final class AppLicence {
 	 * @param \WC_Product_Variation $variation Variation.
 	 */
 	private static function price( \WC_Product_Variation $variation ): string {
-		$period = function_exists( 'wcs_get_subscription_period_strings' )
+		$period = function_exists( 'wcs_get_subscription_period_strings' ) && \WC_Subscriptions_Product::is_subscription( $variation )
 			? ' / ' . (string) wcs_get_subscription_period_strings( max( 1, (int) \WC_Subscriptions_Product::get_interval( $variation ) ), (string) \WC_Subscriptions_Product::get_period( $variation ) )
 			: '';
 
-		return sprintf( '%s%s %s', \BeltoftServices\Billing\TaxNote::text( (float) wc_get_price_excluding_tax( $variation ), null, $variation, '', false ), $period, \BeltoftServices\Billing\TaxNote::incl_for( $variation ) ? __( 'incl. VAT', 'beltoft-services' ) : __( 'excl. VAT', 'beltoft-services' ) );
+		return rtrim( sprintf( '%s%s %s', \BeltoftServices\Billing\TaxNote::text( (float) wc_get_price_excluding_tax( $variation ), null, $variation, '', false ), $period, \BeltoftServices\Billing\TaxNote::pick( $variation, __( 'excl. VAT', 'beltoft-services' ), __( 'incl. VAT', 'beltoft-services' ), '' ) ) );
 	}
 
 	// -- The licence of a server's app ----------------------------------------------------------

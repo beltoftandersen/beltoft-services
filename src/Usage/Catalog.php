@@ -49,7 +49,7 @@ final class Catalog {
 		add_filter( 'bricks/posts/query_vars', array( __CLASS__, 'query_vars' ), 20 );
 		add_filter( 'bricks/dynamic_tags_list', array( __CLASS__, 'tags_list' ) );
 		add_filter( 'bricks/dynamic_data/render_content', array( __CLASS__, 'render' ), 20, 3 );
-		add_filter( 'bricks/frontend/render_data', array( __CLASS__, 'render' ), 20, 2 );
+		add_filter( 'bricks/frontend/render_data', array( __CLASS__, 'render' ), 20, 3 );
 	}
 
 	/**
@@ -120,23 +120,25 @@ final class Catalog {
 	 *
 	 * @param mixed $content Content.
 	 * @param mixed $post    Current post.
+	 * @param mixed $context Bricks content context: 'text', 'link', 'image' or 'media'.
 	 * @return mixed
 	 */
-	public static function render( $content, $post = null ) {
+	public static function render( $content, $post = null, $context = 'text' ) {
 		if ( ! is_string( $content ) || false === strpos( $content, '{beltoft_usage_' ) ) {
 			return $content;
 		}
 
 		return preg_replace_callback(
 			'/\{(beltoft_usage_(?:line|hourly|cap))(?::(\d+))?\}/',
-			static function ( $m ) use ( $post ) {
+			static function ( $m ) use ( $post, $context ) {
 				$id = ! empty( $m[2] ) ? (int) $m[2] : ( isset( $post->ID ) ? (int) $post->ID : 0 );
 
 				$tag  = $m[1];
 				$text = esc_html( self::value( $tag, $id ) );
 
-				if ( '' === $text ) {
-					return '';
+				// Only text content takes markup. In an attribute, a link or an image field the figure is the plain text in the shop's display.
+				if ( '' === $text || 'text' !== $context ) {
+					return $text;
 				}
 
 				// The figure is in the shop's tax display. The html passes beltoft_services_price_html, so a site can show both

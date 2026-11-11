@@ -491,15 +491,14 @@ final class ServerPicker {
 	 */
 	public static function price_text( float $amount, string $period, ?\WC_Product $tax = null ): string {
 		$money = TaxNote::text( $amount, null, $tax, '', false );
-		$incl  = TaxNote::incl_for( $tax );
 
 		if ( '' === $period ) {
 			/* translators: %s: price such as €4.00 */
-			return sprintf( $incl ? __( '%s including VAT', 'beltoft-services' ) : __( '%s excluding VAT', 'beltoft-services' ), $money );
+			return sprintf( TaxNote::pick( $tax, __( '%s excluding VAT', 'beltoft-services' ), __( '%s including VAT', 'beltoft-services' ), __( '%s', 'beltoft-services' ) ), $money );
 		}
 
 		/* translators: 1: price such as €4.00, 2: period such as month */
-		return sprintf( $incl ? __( '%1$s per %2$s including VAT', 'beltoft-services' ) : __( '%1$s per %2$s excluding VAT', 'beltoft-services' ), $money, $period );
+		return sprintf( TaxNote::pick( $tax, __( '%1$s per %2$s excluding VAT', 'beltoft-services' ), __( '%1$s per %2$s including VAT', 'beltoft-services' ), __( '%1$s per %2$s', 'beltoft-services' ) ), $money, $period );
 	}
 
 	/**
@@ -681,10 +680,9 @@ final class ServerPicker {
 		if ( self::payg_only( $plan ) ) {
 			$rates = self::usage_rates( $plan, false );
 
-			echo '<span class="beltoft-services-plan__price"><b>' . esc_html( Rates::cap_money( $rates['cap'], $tax ) ) . '</b> <span>' . esc_html( TaxNote::incl_for( $tax ) ? __( 'max per month, incl. VAT', 'beltoft-services' ) : __( 'max per month, excl. VAT', 'beltoft-services' ) ) . '</span></span>';
-			echo '<span class="beltoft-services-plan__hourly">' . esc_html( Rates::per_hour( $rates['hourly'], $tax ) ) . '</span>';
+			echo self::payg_spans( $rates['cap'], $rates['hourly'], $tax, 'server-picker-payg' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
 		} else {
-			echo '<span class="beltoft-services-plan__price"><b>' . wp_kses_post( TaxNote::html( (float) $plan['price'], 'server-picker', array( 'product' => $tax ) ) ) . '</b> <span>' . esc_html( self::per( (string) $plan['period'] ) ) . '</span></span>';
+			echo self::price_span( (float) $plan['price'], (string) $plan['period'], $tax, 'server-picker' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
 		}
 
 		echo '<span class="beltoft-services-plan__specs">';
@@ -716,13 +714,53 @@ final class ServerPicker {
 	 *
 	 * @param string $period Period.
 	 */
-	public static function per( string $period ): string {
+	public static function per( string $period, ?\WC_Product $tax = null ): string {
 		if ( '' === $period ) {
-			return __( 'excluding VAT', 'beltoft-services' );
+			return TaxNote::pick( $tax, __( 'excluding VAT', 'beltoft-services' ), __( 'including VAT', 'beltoft-services' ), '' );
 		}
 
 		/* translators: %s: period such as month */
-		return sprintf( __( 'per %s excluding VAT', 'beltoft-services' ), $period );
+		return TaxNote::pick( $tax, sprintf( __( 'per %s excluding VAT', 'beltoft-services' ), $period ), sprintf( __( 'per %s including VAT', 'beltoft-services' ), $period ), sprintf( __( 'per %s', 'beltoft-services' ), $period ) );
+	}
+
+	/**
+	 * The price of a plan card: the figure and the words next to it, rendered together through TaxNote::html(), so a site's listener
+	 * on beltoft_services_price_html flips both. Escaped; the text of the span is what the card always had.
+	 *
+	 * @param float            $price   Amount excluding tax.
+	 * @param string           $period  Period.
+	 * @param \WC_Product|null $tax     Product for the tax display.
+	 * @param string           $context Context for the filter.
+	 */
+	public static function price_span( float $price, string $period, ?\WC_Product $tax, string $context ): string {
+		$html = TaxNote::html(
+			static fn( string $display = '' ): string => '<b>' . wp_kses_post( wc_price( TaxNote::figure( $price, $tax ) ) ) . '</b> <span>' . esc_html( self::per( $period, $tax ) ) . '</span>',
+			$context
+		);
+
+		return '<span class="beltoft-services-plan__price">' . wp_kses_post( $html ) . '</span>';
+	}
+
+	/**
+	 * The price and the hourly rate of a pay as you go plan card (the maximum per month with its words, then the rate), through TaxNote::html().
+	 *
+	 * @param float            $cap     Monthly cap excluding tax.
+	 * @param float            $hourly  Hourly rate excluding tax.
+	 * @param \WC_Product|null $tax     Product for the tax display.
+	 * @param string           $context Context for the filter.
+	 */
+	public static function payg_spans( float $cap, float $hourly, ?\WC_Product $tax, string $context ): string {
+		$html = TaxNote::html(
+			static function ( string $display = '' ) use ( $cap, $hourly, $tax ): string {
+				// Pay as you go is taxed on the invoice whatever the product's status: the words follow the display.
+				$words = null !== $tax && 'incl' === TaxNote::display() ? __( 'max per month, incl. VAT', 'beltoft-services' ) : __( 'max per month, excl. VAT', 'beltoft-services' );
+
+				return '<span class="beltoft-services-plan__price"><b>' . esc_html( Rates::cap_money( $cap, $tax ) ) . '</b> <span>' . esc_html( $words ) . '</span></span><span class="beltoft-services-plan__hourly">' . esc_html( Rates::per_hour( $hourly, $tax ) ) . '</span>';
+			},
+			$context
+		);
+
+		return wp_kses_post( $html );
 	}
 
 	/**
@@ -741,14 +779,14 @@ final class ServerPicker {
 			$add = Rates::plus_per_month( max( 0.0, $rates['cap'] - $base['cap'] ), $tax );
 
 			/* translators: %s: monthly maximum of the add-on such as +€3 per month */
-			$price = sprintf( TaxNote::incl_for( $tax ) ? __( '%s including VAT', 'beltoft-services' ) : __( '%s excluding VAT', 'beltoft-services' ), $add );
+			$price = sprintf( null !== $tax && 'incl' === TaxNote::display() ? __( '%s including VAT', 'beltoft-services' ) : __( '%s excluding VAT', 'beltoft-services' ), $add );
 		} else {
 			$tax   = self::tax_of( $plan );
 			$money = TaxNote::text( (float) $extra['extra'], null, $tax, '', false );
 			$per   = '' === (string) $plan['period'] ? '' : ' ' . sprintf( /* translators: %s: period such as month */ __( 'per %s', 'beltoft-services' ), (string) $plan['period'] );
 
 			/* translators: 1: price difference such as €2.00, 2: " per month" or empty */
-			$price = sprintf( TaxNote::incl_for( $tax ) ? __( '+%1$s%2$s including VAT', 'beltoft-services' ) : __( '+%1$s%2$s excluding VAT', 'beltoft-services' ), $money, $per );
+			$price = sprintf( TaxNote::pick( $tax, __( '+%1$s%2$s excluding VAT', 'beltoft-services' ), __( '+%1$s%2$s including VAT', 'beltoft-services' ), __( '+%1$s%2$s', 'beltoft-services' ) ), $money, $per );
 		}
 
 		if ( (int) $extra['days'] > 0 ) {

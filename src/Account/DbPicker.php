@@ -524,15 +524,14 @@ final class DbPicker {
 
 		$tax   = ServerPicker::tax_of( $plan );
 		$money = TaxNote::text( (float) $plan['price'], null, $tax, '', false );
-		$incl  = TaxNote::incl_for( $tax );
 
 		if ( '' === (string) $plan['period'] ) {
 			/* translators: 1: plan name, 2: price such as €25.00 */
-			return sprintf( $incl ? __( '%1$s: %2$s including VAT', 'beltoft-services' ) : __( '%1$s: %2$s excluding VAT', 'beltoft-services' ), (string) $plan['name'], $money );
+			return sprintf( TaxNote::pick( $tax, __( '%1$s: %2$s excluding VAT', 'beltoft-services' ), __( '%1$s: %2$s including VAT', 'beltoft-services' ), __( '%1$s: %2$s', 'beltoft-services' ) ), (string) $plan['name'], $money );
 		}
 
 		/* translators: 1: plan name, 2: price such as €25.00, 3: period such as month */
-		return sprintf( $incl ? __( '%1$s: %2$s per %3$s including VAT', 'beltoft-services' ) : __( '%1$s: %2$s per %3$s excluding VAT', 'beltoft-services' ), (string) $plan['name'], $money, (string) $plan['period'] );
+		return sprintf( TaxNote::pick( $tax, __( '%1$s: %2$s per %3$s excluding VAT', 'beltoft-services' ), __( '%1$s: %2$s per %3$s including VAT', 'beltoft-services' ), __( '%1$s: %2$s per %3$s', 'beltoft-services' ) ), (string) $plan['name'], $money, (string) $plan['period'] );
 	}
 
 	/**
@@ -577,10 +576,9 @@ final class DbPicker {
 		echo '<span class="beltoft-services-plan__name">' . esc_html( (string) $plan['name'] ) . '</span>';
 
 		if ( self::payg_only( $plan ) ) {
-			echo '<span class="beltoft-services-plan__price"><b>' . esc_html( Rates::cap_money( (float) $plan['usage']['cap'], $tax ) ) . '</b> <span>' . esc_html( TaxNote::incl_for( $tax ) ? __( 'max per month, incl. VAT', 'beltoft-services' ) : __( 'max per month, excl. VAT', 'beltoft-services' ) ) . '</span></span>';
-			echo '<span class="beltoft-services-plan__hourly">' . esc_html( Rates::per_hour( (float) $plan['usage']['hourly'], $tax ) ) . '</span>';
+			echo ServerPicker::payg_spans( (float) $plan['usage']['cap'], (float) $plan['usage']['hourly'], $tax, 'db-picker-payg' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
 		} else {
-			echo '<span class="beltoft-services-plan__price"><b>' . wp_kses_post( TaxNote::html( (float) $plan['price'], 'db-picker', array( 'product' => $tax ) ) ) . '</b> <span>' . esc_html( ServerPicker::per( (string) $plan['period'] ) ) . '</span></span>';
+			echo ServerPicker::price_span( (float) $plan['price'], (string) $plan['period'], $tax, 'db-picker' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
 		}
 
 		echo '<span class="beltoft-services-plan__specs">';

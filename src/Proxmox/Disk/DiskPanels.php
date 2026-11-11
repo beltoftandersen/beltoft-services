@@ -100,8 +100,10 @@ final class DiskPanels {
 				}
 				$url = DiskCart::add_url( $server, $variation );
 				if ( $url ) {
-					$price = $server_usage ? self::usage_terms_of( $variation ) : \BeltoftServices\Billing\TaxNote::text( (float) wc_get_price_excluding_tax( $variation ), null, $variation, '', false ) . Panels::per( $variation );
-					$add[] = array( 'size' => $size, 'url' => $url, 'price' => $price );
+					$price = $server_usage ? self::usage_terms_of( $variation ) : Panels::price_text( $variation );
+					// A pay as you go size is taxed on the invoice whatever the product says: its words follow the display alone.
+					$vat   = $server_usage ? ( 'incl' === \BeltoftServices\Billing\TaxNote::display() ? 'incl' : 'excl' ) : \BeltoftServices\Billing\TaxNote::vat_mode( $variation );
+					$add[] = array( 'size' => $size, 'url' => $url, 'price' => $price, 'vat' => $vat );
 				}
 			}
 		}

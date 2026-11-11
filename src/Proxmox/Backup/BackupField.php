@@ -76,7 +76,7 @@ final class BackupField {
 			return $data;
 		}
 		$without = Backups::sibling( $variation, false, true );
-		$value = $without ? Backups::price_difference( $without, $variation ) : __( 'Enabled', 'beltoft-services' );
+		$value = $without ? \BeltoftServices\Billing\TaxNote::in_cart( static fn() => Backups::price_difference( $without, $variation ) ) : __( 'Enabled', 'beltoft-services' );
 		$data[] = array( 'key' => __( 'Daily backups', 'beltoft-services' ), 'value' => $value );
 		return $data;
 	}

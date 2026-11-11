@@ -399,12 +399,22 @@ final class Panels {
 			$out[] = array(
 				'slots' => SnapshotCart::slots_of( $variation ),
 				'url'   => $url,
-				'price' => \BeltoftServices\Billing\TaxNote::text( (float) wc_get_price_excluding_tax( $variation ), null, $variation, '', false ) . self::per( $variation ),
+				'vat'   => \BeltoftServices\Billing\TaxNote::vat_mode( $variation ),
+				'price' => self::price_text( $variation ),
 				'days'  => $days > 0 ? $days : max( 1, (int) Settings::get( 'snapshot_paid_days' ) ),
 			);
 		}
 
 		return $out;
+	}
+
+	/**
+	 * A fixed price as plain text in the shop's tax display, with its period: "€5.00 / month".
+	 *
+	 * @param \WC_Product_Variation $variation Variation.
+	 */
+	public static function price_text( \WC_Product_Variation $variation ): string {
+		return \BeltoftServices\Billing\TaxNote::text( (float) wc_get_price_excluding_tax( $variation ), null, $variation, '', false ) . self::per( $variation );
 	}
 
 	/**

@@ -76,7 +76,7 @@ final class DbIpField {
 			return $data;
 		}
 		$without = Backups::sibling_by( $variation, 'public_ip', false );
-		$value   = $without ? Backups::price_difference( $without, $variation ) : __( 'Enabled', 'beltoft-services' );
+		$value   = $without ? \BeltoftServices\Billing\TaxNote::in_cart( static fn() => Backups::price_difference( $without, $variation ) ) : __( 'Enabled', 'beltoft-services' );
 		$data[]  = array( 'key' => __( 'Public IPv4 address', 'beltoft-services' ), 'value' => $value );
 		return $data;
 	}

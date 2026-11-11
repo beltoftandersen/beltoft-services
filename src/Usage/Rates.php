@@ -91,10 +91,10 @@ final class Rates {
 	 * @param float            $amount   Amount.
 	 * @param int              $decimals Decimals.
 	 * @param string           $currency Currency code, '' for the shop's.
-	 * @param \WC_Product|null $tax      A catalogue price: the product it belongs to, so the figure is the shop's tax display of it (see TaxNote::figure()). Null (invoices, API answers): the amount as given.
+	 * @param \WC_Product|null $tax      A pay as you go catalogue figure: the product it belongs to, so the figure is the shop's tax display of it at the standard tax class, the one the usage invoice is taxed at (see TaxNote::usage_figure()). Null (invoices, API answers): the amount as given.
 	 */
 	public static function money( float $amount, int $decimals = 2, string $currency = '', ?\WC_Product $tax = null ): string {
-		return TaxNote::plain( TaxNote::figure( $amount, $tax ), $decimals, $currency );
+		return TaxNote::plain( TaxNote::usage_figure( $amount, $tax ), $decimals, $currency );
 	}
 
 	/**
@@ -104,7 +104,7 @@ final class Rates {
 	 * @param \WC_Product|null $tax Product for the tax display, null for the amount as given.
 	 */
 	public static function cap_money( float $cap, ?\WC_Product $tax = null ): string {
-		$shown = TaxNote::figure( $cap, $tax );
+		$shown = TaxNote::usage_figure( $cap, $tax );
 
 		return TaxNote::plain( $shown, abs( $shown - round( $shown ) ) < 0.005 ? 0 : 2 );
 	}
@@ -224,6 +224,7 @@ final class Rates {
 	 * @param \WC_Product|null $tax    Product for the tax display, null for the amounts as given (excluding VAT).
 	 */
 	public static function terms( float $hourly, float $cap, ?\WC_Product $tax = null ): string {
+		// A pay as you go figure is taxed on the invoice whatever the product's own tax status, so the words follow the display alone.
 		if ( null !== $tax && 'incl' === TaxNote::display() ) {
 			/* translators: %s: the terms, such as "€0.0283 per hour, max €20.60 per month" */
 			return sprintf( __( '%s including VAT', 'beltoft-services' ), self::tile_terms( $hourly, $cap, $tax ) );
@@ -312,7 +313,7 @@ final class Rates {
 	 */
 	public static function tile_monthly( float $monthly, ?\WC_Product $tax = null ): string {
 		/* translators: %s: monthly price such as €55.00 */
-		return sprintf( __( '%s per month, paid in advance', 'beltoft-services' ), self::money( $monthly, 2, '', $tax ) );
+		return sprintf( __( '%s per month, paid in advance', 'beltoft-services' ), TaxNote::text( $monthly, 2, $tax ) );
 	}
 
 	/**

@@ -41,7 +41,7 @@ final class PriceTags {
 	public static function register(): void {
 		add_filter( 'bricks/dynamic_tags_list', array( __CLASS__, 'tags_list' ) );
 		add_filter( 'bricks/dynamic_data/render_content', array( __CLASS__, 'render' ), 20, 3 );
-		add_filter( 'bricks/frontend/render_data', array( __CLASS__, 'render' ), 20, 2 );
+		add_filter( 'bricks/frontend/render_data', array( __CLASS__, 'render' ), 20, 3 );
 	}
 
 	/**
@@ -72,14 +72,14 @@ final class PriceTags {
 	 * @param mixed $content Content.
 	 * @return mixed
 	 */
-	public static function render( $content ) {
+	public static function render( $content, $post = null, $context = 'text' ) {
 		if ( ! is_string( $content ) || false === strpos( $content, '{beltoft_domain_' ) ) {
 			return $content;
 		}
 
 		return preg_replace_callback(
 			'/\{beltoft_domain_(?:register|renew|transfer):([a-z0-9][a-z0-9.-]*)\}/iD',
-			static fn( $m ) => self::value( (string) $m[1] ),
+			static fn( $m ) => self::value( (string) $m[1], 'text' === $context ),
 			$content
 		);
 	}
@@ -88,11 +88,17 @@ final class PriceTags {
 	 * The price of an extension as HTML for a page ('' when it has none in the current currency). Registering, renewing and transferring
 	 * share one yearly price today; the three tags keep their own names so they can differ later.
 	 *
-	 * @param string $tld Extension without the dot.
+	 * @param string $tld    Extension without the dot.
+	 * @param bool   $markup Whether the figure may pass beltoft_services_price_html (text content only).
 	 */
-	public static function value( string $tld ): string {
+	public static function value( string $tld, bool $markup = true ): string {
 		$price = Prices::price( $tld );
 
-		return null === $price ? '' : Search::price_html( $price, 'domain-tag', true );
+		if ( null === $price ) {
+			return '';
+		}
+
+		// Only text content takes the filtered markup; elsewhere (an attribute, a link) it is the plain figure in the shop's display.
+		return $markup ? Search::price_html( $price, 'domain-tag', true ) : esc_html( Search::price_text( $price ) );
 	}
 }

@@ -21,7 +21,7 @@ final class CoreHooks {
 		add_action( 'beltoft_services_product_panel_after_reminder', array( __CLASS__, 'premium_field' ), 10, 2 );
 		add_action( 'beltoft_services_product_save', array( __CLASS__, 'save_premium' ), 30, 2 );
 		add_filter( 'beltoft_services_line_is_usage', array( __CLASS__, 'line_is_usage' ), 10, 2 );
-		add_filter( 'beltoft_services_line_usage_note', array( __CLASS__, 'line_usage_note' ) );
+		add_filter( 'beltoft_services_line_usage_note', array( __CLASS__, 'line_usage_note' ), 10, 2 );
 		add_filter( 'beltoft_services_line_account_product_id', array( __CLASS__, 'line_account_product_id' ) );
 	}
 
@@ -39,9 +39,16 @@ final class CoreHooks {
 	/**
 	 * The note under a pay-as-you-go line.
 	 *
-	 * @param mixed $note The note so far.
+	 * @param mixed $note    The note so far.
+	 * @param mixed $context 'order' or 'cart'.
 	 */
-	public static function line_usage_note( $note = '' ): string {
+	public static function line_usage_note( $note = '', $context = 'order' ): string {
+		// An order line says what the invoice is: excluding VAT. In the cart the note follows the cart's tax display, like the figures next to it.
+		if ( 'cart' === $context && 'incl' === \BeltoftServices\Billing\TaxNote::in_cart( static fn() => \BeltoftServices\Billing\TaxNote::display() ) ) {
+			/* translators: %s: how pay as you go is billed */
+			return sprintf( __( '%s, incl. VAT', 'beltoft-services' ), Rates::billed_note() );
+		}
+
 		/* translators: %s: how pay as you go is billed */
 		return sprintf( __( '%s, excl. VAT', 'beltoft-services' ), Rates::billed_note() );
 	}

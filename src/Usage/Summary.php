@@ -162,7 +162,7 @@ final class Summary {
 		$saved = $user_id > 0 && null !== Account::for_user( $user_id, Account::ESTABLISHED );
 
 		/* translators: 1: how pay as you go is billed, 2: what happens to the card */
-		return sprintf( __( '%1$s. %2$s', 'beltoft-services' ), \BeltoftServices\LineNames::usage_note(), $saved ? __( 'Your saved card is charged after each month.', 'beltoft-services' ) : __( 'Your card is saved now and charged after each month.', 'beltoft-services' ) );
+		return sprintf( __( '%1$s. %2$s', 'beltoft-services' ), \BeltoftServices\LineNames::usage_note( 'cart' ), $saved ? __( 'Your saved card is charged after each month.', 'beltoft-services' ) : __( 'Your card is saved now and charged after each month.', 'beltoft-services' ) );
 	}
 
 	/**

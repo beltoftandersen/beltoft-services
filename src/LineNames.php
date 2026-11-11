@@ -59,14 +59,17 @@ final class LineNames {
 
 	/**
 	 * The note under a pay-as-you-go line.
+	 *
+	 * @param string $context 'order' or 'cart'.
 	 */
-	public static function usage_note(): string {
+	public static function usage_note( string $context = 'order' ): string {
 		/**
 		 * The note under a pay-as-you-go line, for the feature that bills it.
 		 *
-		 * @param string $note Empty until the feature says it.
+		 * @param string $note    Empty until the feature says it.
+		 * @param string $context 'order' (an order line: the invoice is excluding VAT) or 'cart' (the cart's tax display).
 		 */
-		return (string) apply_filters( 'beltoft_services_line_usage_note', '' );
+		return (string) apply_filters( 'beltoft_services_line_usage_note', '', $context );
 	}
 
 	/**
@@ -389,7 +392,7 @@ final class LineNames {
 		if ( ( self::is_account_product( $product->get_id() ) || self::is_usage( $product ) ) && ! self::at_checkout() ) {
 			$data[] = array(
 				'key'   => __( 'Billing', 'beltoft-services' ),
-				'value' => self::usage_note(),
+				'value' => self::usage_note( 'cart' ),
 			);
 		}
 
