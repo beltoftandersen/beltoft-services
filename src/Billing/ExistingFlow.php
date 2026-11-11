@@ -18,15 +18,16 @@ defined( 'ABSPATH' ) || exit;
  * proves nothing. So a flow counts only when ALL of this holds:
  *
  * - a user is logged in;
- * - the subscription the request names (`switch-subscription` in the request, `resubscribe` in the query) or the cart
- *   item keys carry (`subscription_renewal`, `subscription_switch`, `subscription_resubscribe`, each holding the
- *   `subscription_id`) exists and belongs to that user;
+ * - the subscription a verified switch link names (`switch-subscription` and a valid `_wcsnonce` in the query, see
+ *   SwitchLink::verified()) or the cart item keys carry (`subscription_renewal`, `subscription_switch`,
+ *   `subscription_resubscribe`, each holding the `subscription_id`) exists and belongs to that user. A bare request
+ *   argument counts for nothing: Subscriptions turns the add into a flow only for a real switch link, and adds a
+ *   resubscribe through add_to_cart() with its cart item key, so an argument alone would let a holder buy new units;
  * - one of its line items is this product, or another variation of the same parent product (a switch moves between
  *   variations of one product; a renewal and a resubscribe are the same product);
  * - for a switch, WooCommerce Subscriptions allows this user to switch that line item
  *   (`WC_Subscriptions_Switcher::can_item_be_switched_by_user()`: active subscription, switchable type and payment
- *   method); for a resubscribe named in the request, `wcs_can_user_resubscribe_to()` says yes, and for one carried by
- *   the cart the subscription is pending-cancel, cancelled or expired.
+ *   method); for a resubscribe the subscription is pending-cancel, cancelled or expired.
  *
  * kinds() answers which flows hold, so a caller can treat them differently: a resubscribe builds a new service, a
  * renewal and a switch act on one that exists.
@@ -113,8 +114,8 @@ final class ExistingFlow {
 
 		$found = array();
 
-		foreach ( self::candidates( $product ) as list( $kind, $subscription_id, $from_request ) ) {
-			if ( ! in_array( $kind, $found, true ) && self::holds( $kind, $subscription_id, $product, $user, $from_request ) ) {
+		foreach ( self::candidates( $product ) as list( $kind, $subscription_id ) ) {
+			if ( ! in_array( $kind, $found, true ) && self::holds( $kind, $subscription_id, $product, $user ) ) {
 				$found[] = $kind;
 			}
 		}
@@ -123,25 +124,18 @@ final class ExistingFlow {
 	}
 
 	/**
-	 * Every claim of a flow that this request makes for the product: kind, subscription id, named by the request.
+	 * Every claim of a flow that this request makes for the product: kind and subscription id.
 	 *
 	 * @param \WC_Product $product Product or variation.
-	 * @return array<int, array{0: string, 1: int, 2: bool}>
+	 * @return array<int, array{0: string, 1: int}>
 	 */
 	private static function candidates( \WC_Product $product ): array {
 		$out = array();
 
-		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- Only an id is read; holds() checks the subscription belongs to the logged-in user and holds the product, and WooCommerce Subscriptions verifies its own nonces.
-		$switch      = SwitchLink::requested( true )['subscription'];
-		$resubscribe = isset( $_GET['resubscribe'] ) ? absint( wp_unslash( $_GET['resubscribe'] ) ) : 0;
-		// phpcs:enable
+		$switch = SwitchLink::verified();
 
 		if ( $switch > 0 ) {
-			$out[] = array( self::SWITCH, $switch, true );
-		}
-
-		if ( $resubscribe > 0 ) {
-			$out[] = array( self::RESUBSCRIBE, $resubscribe, true );
+			$out[] = array( self::SWITCH, $switch );
 		}
 
 		$ids = array( $product->get_id() );
@@ -168,7 +162,7 @@ final class ExistingFlow {
 	 * The flows a cart item or item data claims, with the subscription each names.
 	 *
 	 * @param array<string, mixed> $data Cart item or add-to-cart data.
-	 * @return array<int, array{0: string, 1: int, 2: bool}>
+	 * @return array<int, array{0: string, 1: int}>
 	 */
 	private static function from_data( array $data ): array {
 		$map = array(
@@ -182,7 +176,7 @@ final class ExistingFlow {
 			$id = isset( $data[ $key ]['subscription_id'] ) ? absint( $data[ $key ]['subscription_id'] ) : 0;
 
 			if ( $id > 0 ) {
-				$out[] = array( $kind, $id, false );
+				$out[] = array( $kind, $id );
 			}
 		}
 
@@ -196,23 +190,16 @@ final class ExistingFlow {
 	 * @param int         $subscription_id Subscription named.
 	 * @param \WC_Product $product         Product or variation.
 	 * @param int         $user            Logged-in user.
-	 * @param bool        $from_request    True when a request argument named it, false when cart data did.
 	 */
-	private static function holds( string $kind, int $subscription_id, \WC_Product $product, int $user, bool $from_request ): bool {
+	private static function holds( string $kind, int $subscription_id, \WC_Product $product, int $user ): bool {
 		$subscription = wcs_get_subscription( $subscription_id );
 
 		if ( ! $subscription instanceof \WC_Subscription || (int) $subscription->get_user_id() !== $user ) {
 			return false;
 		}
 
-		if ( self::RESUBSCRIBE === $kind ) {
-			$allowed = $from_request && function_exists( 'wcs_can_user_resubscribe_to' )
-				? wcs_can_user_resubscribe_to( $subscription, $user )
-				: $subscription->has_status( array( 'pending-cancel', 'cancelled', 'expired' ) );
-
-			if ( ! $allowed ) {
-				return false;
-			}
+		if ( self::RESUBSCRIBE === $kind && ! $subscription->has_status( array( 'pending-cancel', 'cancelled', 'expired' ) ) ) {
+			return false;
 		}
 
 		foreach ( $subscription->get_items() as $item ) {

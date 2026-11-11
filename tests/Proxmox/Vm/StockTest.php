@@ -73,7 +73,7 @@ class StockTest extends TestCase {
 	public function tear_down(): void {
 		remove_all_filters( 'beltoft_services_key' );
 		delete_option( Clusters::OPTION );
-		unset( $_REQUEST['switch-subscription'], $_GET['resubscribe'] );
+		$this->clear_link();
 		WC()->cart->empty_cart();
 		$this->wipe();
 
@@ -558,12 +558,27 @@ class StockTest extends TestCase {
 		$this->assertFalse( (bool) apply_filters( 'woocommerce_pay_order_product_in_stock', $p->is_in_stock(), $p, $plain ), 'An ordinary order for a new server cannot.' );
 	}
 
-	public function test_request_args_only_count_for_a_subscription_the_user_owns_that_holds_the_product(): void {
+	/**
+	 * A switch link as Subscriptions builds it: the id and the nonce, in the query.
+	 *
+	 * @param int $id Subscription id.
+	 */
+	private function switch_link( int $id ): void {
+		$_GET['switch-subscription'] = (string) $id;
+		$_GET['item']                = '1';
+		$_GET['_wcsnonce']           = wp_create_nonce( 'wcs_switch_request' );
+	}
+
+	private function clear_link(): void {
+		unset( $_GET['switch-subscription'], $_GET['item'], $_GET['_wcsnonce'], $_REQUEST['switch-subscription'], $_POST['switch-subscription'], $_GET['resubscribe'], $_REQUEST['resubscribe'] );
+	}
+
+	public function test_a_real_switch_link_counts_only_for_a_subscription_the_user_owns_that_holds_the_product(): void {
 		$product = $this->hand_closed_product();
 		$other   = $this->product();
 		$this->allow_switching();
-		$mine    = self::factory()->user->create();
-		$theirs  = self::factory()->user->create();
+		$mine   = self::factory()->user->create();
+		$theirs = self::factory()->user->create();
 
 		$own = $this->subscription( $mine );
 		$own->add_product( $product );
@@ -579,62 +594,120 @@ class StockTest extends TestCase {
 		$foreign = $this->subscription( $theirs );
 		$foreign->add_product( $product );
 		$foreign->save();
-		// WooCommerce Subscriptions' own resubscribe rule needs a payment made; the filter is the one that rule ends in.
-		add_filter( 'wcs_can_user_resubscribe_to_subscription', static fn( $can, $sub ) => $sub instanceof \WC_Subscription && $sub->has_status( array( 'cancelled', 'expired', 'pending-cancel' ) ), 10, 2 );
 
-		$set = static function ( string $arg, ?string $value ): void {
-			if ( 'switch-subscription' === $arg ) {
-				if ( null === $value ) {
-					unset( $_REQUEST[ $arg ] );
-					return;
-				}
+		wp_set_current_user( $mine );
+		$this->switch_link( $own->get_id() );
+		$this->assertTrue( $this->in_stock( $product ), 'A real switch link of an own subscription that holds the product.' );
 
-				$_REQUEST[ $arg ] = $value;
-				return;
-			}
+		$this->switch_link( $unrelated->get_id() );
+		$this->assertFalse( $this->in_stock( $product ), 'An own subscription of another product.' );
+		$this->switch_link( $foreign->get_id() );
+		$this->assertFalse( $this->in_stock( $product ), 'Somebody else\'s subscription.' );
+		$this->switch_link( 1 );
+		$this->assertFalse( $this->in_stock( $product ), 'A forged id.' );
+		$this->switch_link( 999999 );
+		$this->assertFalse( $this->in_stock( $product ), 'Naming nothing.' );
+		$this->switch_link( $cancelled->get_id() );
+		$this->assertFalse( $this->in_stock( $product ), 'A cancelled subscription cannot be switched.' );
 
-			if ( null === $value ) {
-				unset( $_GET[ $arg ] );
-				return;
-			}
+		// A link with no nonce, a wrong nonce, or the id only in a posted form is no link.
+		$this->clear_link();
+		$_GET['switch-subscription'] = (string) $own->get_id();
+		$this->assertFalse( $this->in_stock( $product ), 'No nonce.' );
+		$_GET['_wcsnonce'] = 'abc123';
+		$this->assertFalse( $this->in_stock( $product ), 'A wrong nonce.' );
+		$this->clear_link();
+		$_POST['switch-subscription'] = (string) $own->get_id();
+		$_REQUEST['switch-subscription'] = (string) $own->get_id();
+		$_GET['_wcsnonce'] = wp_create_nonce( 'wcs_switch_request' );
+		$this->assertFalse( $this->in_stock( $product ), 'The id only in the posted form: Subscriptions reads the query only.' );
+		$this->clear_link();
 
-			$_GET[ $arg ] = $value;
-		};
+		// A guest with a real-looking link.
+		$this->switch_link( $own->get_id() );
+		wp_set_current_user( 0 );
+		$this->assertFalse( $this->in_stock( $product ), 'Without a login.' );
+		$this->clear_link();
 
-		foreach ( array( 'switch-subscription' => $own, 'resubscribe' => $cancelled ) as $arg => $good ) {
-			wp_set_current_user( $mine );
-			$set( $arg, (string) $good->get_id() );
-			$this->assertTrue( $this->in_stock( $product ), $arg . ' with an own subscription that holds the product.' );
+		// A bare resubscribe argument is nothing, nonce or not: Subscriptions adds a resubscribe with its cart key.
+		wp_set_current_user( $mine );
+		$_GET['resubscribe'] = (string) $cancelled->get_id();
+		$this->assertFalse( $this->in_stock( $product ), 'A resubscribe argument alone.' );
+		$_GET['_wpnonce'] = wp_create_nonce( 'woocommerce_subscriptions_resubscribe_' . $cancelled->get_id() );
+		$this->assertFalse( $this->in_stock( $product ), 'Not even with its nonce: the cart key is what counts.' );
+		unset( $_GET['_wpnonce'] );
+		$this->clear_link();
+	}
 
-			$set( $arg, (string) $unrelated->get_id() );
-			$this->assertFalse( $this->in_stock( $product ), $arg . ' with an own subscription of another product.' );
+	public function test_a_holder_cannot_buy_new_units_with_a_bare_request_argument(): void {
+		$product = $this->hand_closed_product();
+		$this->allow_switching();
+		$cancelled = $this->holder( $product, 'cancelled' );
+		$active    = $this->holder( $product );
 
-			$set( $arg, (string) $foreign->get_id() );
-			$this->assertFalse( $this->in_stock( $product ), $arg . ' with somebody else\'s subscription.' );
+		$tries = array(
+			'forged POST switch'    => static function () use ( $active ): void {
+				$_POST['switch-subscription']    = (string) $active->get_id();
+				$_REQUEST['switch-subscription'] = (string) $active->get_id();
+			},
+			'GET switch, no nonce'  => static function () use ( $active ): void {
+				$_GET['switch-subscription'] = (string) $active->get_id();
+			},
+			'resubscribe, no nonce' => static function () use ( $cancelled ): void {
+				$_GET['resubscribe'] = (string) $cancelled->get_id();
+			},
+		);
 
-			$set( $arg, '1' );
-			$this->assertFalse( $this->in_stock( $product ), 'A forged ' . $arg . '=1 stays refused.' );
-
-			$set( $arg, '999999' );
-			$this->assertFalse( $this->in_stock( $product ), $arg . ' naming nothing.' );
-
-			wp_set_current_user( 0 );
-			$set( $arg, (string) $good->get_id() );
-			$this->assertFalse( $this->in_stock( $product ), $arg . ' without a login.' );
-			$set( $arg, '1' );
-			$this->assertFalse( $this->in_stock( $product ), 'A guest with a forged ' . $arg . '=1.' );
-
-			$set( $arg, null );
+		foreach ( $tries as $what => $arm ) {
+			wp_set_current_user( (int) $active->get_user_id() );
+			$_REQUEST['add-to-cart'] = $product->get_id();
+			$arm();
+			WC()->cart->empty_cart();
+			$this->assertTrue( (bool) apply_filters( 'woocommerce_add_to_cart_validation', true, $product->get_id(), 3 ) );
+			$this->assertFalse( WC()->cart->add_to_cart( $product->get_id(), 3 ), $what . ': three new units are refused as a new purchase.' );
+			$this->assertSame( array(), WC()->cart->get_cart(), $what );
+			wc_clear_notices();
+			unset( $_REQUEST['add-to-cart'] );
+			$this->clear_link();
 		}
 
-		// A switch of a subscription that is not active, and a resubscribe of one that is.
-		wp_set_current_user( $mine );
-		$_REQUEST['switch-subscription'] = (string) $cancelled->get_id();
-		$this->assertFalse( $this->in_stock( $product ), 'A cancelled subscription cannot be switched.' );
-		unset( $_REQUEST['switch-subscription'] );
-		$_GET['resubscribe'] = (string) $own->get_id();
-		$this->assertFalse( $this->in_stock( $product ), 'An active subscription cannot be resubscribed.' );
-		unset( $_GET['resubscribe'] );
+		// The same through the Store API.
+		$_GET['switch-subscription'] = (string) $active->get_id();
+		$request = new \WP_REST_Request( 'POST', '/wc/store/v1/cart/add-item' );
+		$request->set_param( 'id', $product->get_id() );
+		$request->set_param( 'quantity', 3 );
+		$response = rest_do_request( $request );
+		$this->assertNotSame( 201, $response->get_status(), 'The Store API refuses it too.' );
+		$this->clear_link();
+		WC()->cart->empty_cart();
+	}
+
+	public function test_a_real_switch_link_adds_the_closed_product(): void {
+		$product = $this->hand_closed_product();
+		$this->allow_switching();
+		$sub = $this->holder( $product );
+		$this->switch_link( $sub->get_id() );
+
+		WC()->cart->empty_cart();
+		$this->assertNotFalse( WC()->cart->add_to_cart( $product->get_id() ), 'A real switch from the account page carries the nonce: ' . wp_json_encode( wc_get_notices() ) );
+		$this->clear_link();
+		WC()->cart->empty_cart();
+	}
+
+	public function test_a_resubscribe_never_opens_a_server_product_while_no_address_is_free(): void {
+		$product = $this->hand_closed_product();
+		$this->assertTrue( IpPool::block( '192.0.2.10' ) );
+		$this->assertSame( '', (string) get_post_meta( $product->get_id(), Stock::META_CLOSED, true ), 'Closed by hand: no marker.' );
+		$cancelled = $this->holder( $product, 'cancelled' );
+
+		WC()->cart->empty_cart();
+		$this->assertFalse( WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), $this->flow( 'subscription_resubscribe', $cancelled->get_id() ) ), 'A new machine with no address is not sold.' );
+		wc_clear_notices();
+
+		$this->assertTrue( IpPool::unblock( '192.0.2.10' ) );
+		WC()->cart->empty_cart();
+		$this->assertNotFalse( WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), $this->flow( 'subscription_resubscribe', $cancelled->get_id() ) ), 'With an address it passes on a hand-closed product.' );
+		WC()->cart->empty_cart();
 	}
 
 	public function test_the_stored_status_follows_the_pool(): void {
@@ -900,11 +973,10 @@ class StockTest extends TestCase {
 		$product->set_stock_status( 'outofstock' );
 		$product->save();
 		$own = $this->holder( $product, 'cancelled' );
-		add_filter( 'wcs_can_user_resubscribe_to_subscription', '__return_true' ); // WooCommerce Subscriptions' payment-made rule.
 
-		$_GET['resubscribe'] = (string) $own->get_id();
-		$this->assertTrue( $this->in_stock( $product ), 'Renewals, switches and resubscribes of a subscription that holds it are never blocked by the stored status.' );
-		unset( $_GET['resubscribe'] );
+		WC()->cart->empty_cart();
+		$this->assertNotFalse( WC()->cart->add_to_cart( $product->get_id(), 1, 0, array(), $this->flow( 'subscription_resubscribe', $own->get_id() ) ), 'Renewals, switches and resubscribes of a subscription that holds it are never blocked by the stored status.' );
+		WC()->cart->empty_cart();
 		$this->assertFalse( $this->in_stock( $product ), 'A new customer sees out of stock.' );
 		wp_set_current_user( 0 );
 	}

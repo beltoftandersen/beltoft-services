@@ -32,6 +32,22 @@ final class SwitchLink {
 	}
 
 	/**
+	 * The subscription a switch link names, only when the link is real: the id is in the query (Subscriptions reads it
+	 * from the query only) and its `_wcsnonce` verifies against Subscriptions' switch action, as its own switch handler
+	 * requires. A bare argument, or one in a posted form, gives 0.
+	 *
+	 * @return int Subscription id, or 0.
+	 */
+	public static function verified(): int {
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- The nonce is verified right here.
+		$id    = isset( $_GET['switch-subscription'] ) ? absint( wp_unslash( $_GET['switch-subscription'] ) ) : 0;
+		$nonce = isset( $_GET['_wcsnonce'] ) ? sanitize_text_field( wp_unslash( $_GET['_wcsnonce'] ) ) : '';
+		// phpcs:enable
+
+		return $id > 0 && '' !== $nonce && false !== wp_verify_nonce( $nonce, 'wcs_switch_request' ) ? $id : 0;
+	}
+
+	/**
 	 * The WooCommerce Subscriptions switch link of the service's subscription item to another variation of the same
 	 * product. Empty when Subscriptions is inactive, the item cannot be switched by this customer, or the service has no
 	 * subscription item.

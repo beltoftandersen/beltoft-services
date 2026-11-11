@@ -207,32 +207,50 @@ class CapacityTest extends HostingCase {
 		$this->assertFalse( $sold->is_in_stock() );
 		$this->assertFalse( apply_filters( 'woocommerce_product_is_in_stock', $sold->is_in_stock(), $sold ) );
 
-		// A bare request argument opens nothing: not for a guest, not for a made-up id, not for a subscription of another product.
-		foreach ( array( 'switch-subscription', 'resubscribe' ) as $arg ) {
-			$set = static function ( ?string $value ) use ( $arg ): void {
-				$bag = 'switch-subscription' === $arg ? '_REQUEST' : '_GET';
-
-				if ( null === $value ) {
-					unset( $GLOBALS[ $bag ][ $arg ] );
-					return;
-				}
-
-				$GLOBALS[ $bag ][ $arg ] = $value;
-			};
-			$set( '5' );
-			$this->assertFalse( apply_filters( 'woocommerce_product_is_in_stock', false, $sold ), 'A guest with ' . $arg . '=5.' );
-			$set( null );
-		}
+		// A bare request argument opens nothing: not for a guest, not in a posted form, not without the nonce.
+		$_GET['switch-subscription']     = '5';
+		$_GET['_wcsnonce']               = wp_create_nonce( 'wcs_switch_request' );
+		$this->assertFalse( apply_filters( 'woocommerce_product_is_in_stock', false, $sold ), 'A guest with a switch link.' );
+		unset( $_GET['switch-subscription'], $_GET['_wcsnonce'] );
+		$_GET['resubscribe'] = '5';
+		$this->assertFalse( apply_filters( 'woocommerce_product_is_in_stock', false, $sold ), 'A guest with resubscribe=5.' );
+		unset( $_GET['resubscribe'] );
 
 		$user  = self::factory()->user->create();
 		$other = $this->service_product( 'fake' );
 		$mine  = wcs_create_subscription( array( 'customer_id' => $user, 'billing_period' => 'month', 'billing_interval' => 1, 'status' => 'active' ) );
 		$mine->add_product( $other );
 		$mine->save();
+		$holding = wcs_create_subscription( array( 'customer_id' => $user, 'billing_period' => 'month', 'billing_interval' => 1, 'status' => 'active' ) );
+		$holding->add_product( $product );
+		$holding->save();
 		wp_set_current_user( $user );
-		$_REQUEST['switch-subscription'] = (string) $mine->get_id();
+		$_GET['switch-subscription'] = (string) $mine->get_id();
+		$_GET['_wcsnonce']           = wp_create_nonce( 'wcs_switch_request' );
 		$this->assertFalse( apply_filters( 'woocommerce_product_is_in_stock', false, $sold ), 'A logged-in customer with an unrelated own subscription.' );
+		unset( $_GET['switch-subscription'], $_GET['_wcsnonce'] );
+
+		// The login rule: a subscription with no customer does not match a guest.
+		$guest_sub = wcs_create_subscription( array( 'customer_id' => $user, 'billing_period' => 'month', 'billing_interval' => 1, 'status' => 'active' ) );
+		$guest_sub->add_product( $product );
+		$guest_sub->set_customer_id( 0 );
+		$guest_sub->save();
+		wp_set_current_user( 0 );
+		ExistingFlow::note( array( 'subscription_renewal' => array( 'subscription_id' => $guest_sub->get_id() ) ), $product->get_id(), 0 );
+		$this->assertFalse( apply_filters( 'woocommerce_product_is_in_stock', false, $sold ), 'A guest naming a subscription with no customer.' );
+		ExistingFlow::clear();
+
+		// A bare switch argument of the holder is refused too (posted form, or no nonce).
+		wp_set_current_user( $user );
+		$add_filter = static fn( $can, $item, $s ) => $s instanceof \WC_Subscription && $s->has_status( 'active' );
+		add_filter( 'woocommerce_subscriptions_can_item_be_switched', $add_filter, 10, 3 );
+		$_REQUEST['switch-subscription'] = (string) $holding->get_id();
+		$this->assertFalse( apply_filters( 'woocommerce_product_is_in_stock', false, $sold ), 'Posted form only.' );
 		unset( $_REQUEST['switch-subscription'] );
+		$_GET['switch-subscription'] = (string) $holding->get_id();
+		$this->assertFalse( apply_filters( 'woocommerce_product_is_in_stock', false, $sold ), 'No nonce.' );
+		unset( $_GET['switch-subscription'] );
+		remove_filter( 'woocommerce_subscriptions_can_item_be_switched', $add_filter, 10 );
 		wp_set_current_user( 0 );
 
 		// Another product is left alone.
@@ -303,21 +321,24 @@ class CapacityTest extends HostingCase {
 		$sub->add_product( $product );
 		$sub->save();
 		wp_set_current_user( $user );
-		// Subscriptions' own switch and resubscribe rules end in these filters (the test plan is not a subscription product, and no payment was made).
+		// Subscriptions' own switch rule ends in this filter (the test plan is not a subscription product).
 		add_filter( 'woocommerce_subscriptions_can_item_be_switched', static fn( $can, $item, $s ) => $s instanceof \WC_Subscription && $s->has_status( 'active' ), 10, 3 );
-		add_filter( 'wcs_can_user_resubscribe_to_subscription', static fn( $can, $s ) => $s instanceof \WC_Subscription && $s->has_status( 'cancelled' ), 10, 2 );
 
-		$_REQUEST['switch-subscription'] = (string) $sub->get_id();
-		$this->assertTrue( apply_filters( 'woocommerce_product_is_in_stock', false, $sold ), 'A switch of an active subscription that holds the plan.' );
-		unset( $_REQUEST['switch-subscription'] );
+		$_GET['switch-subscription'] = (string) $sub->get_id();
+		$_GET['_wcsnonce']           = wp_create_nonce( 'wcs_switch_request' );
+		$this->assertTrue( apply_filters( 'woocommerce_product_is_in_stock', false, $sold ), 'A real switch link of an active subscription that holds the plan.' );
 
 		$sub->update_status( 'cancelled' );
-		$_GET['resubscribe'] = (string) $sub->get_id();
-		$this->assertTrue( apply_filters( 'woocommerce_product_is_in_stock', false, $sold ), 'A resubscribe of a cancelled subscription that holds the plan.' );
-		$_REQUEST['switch-subscription'] = (string) $sub->get_id();
-		unset( $_GET['resubscribe'] );
 		$this->assertFalse( apply_filters( 'woocommerce_product_is_in_stock', false, $sold ), 'A cancelled subscription is not switched.' );
-		unset( $_REQUEST['switch-subscription'] );
+		unset( $_GET['switch-subscription'], $_GET['_wcsnonce'] );
+
+		// A resubscribe is a cart line with Subscriptions' key; the argument alone is nothing.
+		$_GET['resubscribe'] = (string) $sub->get_id();
+		$this->assertFalse( apply_filters( 'woocommerce_product_is_in_stock', false, $sold ), 'The argument alone.' );
+		unset( $_GET['resubscribe'] );
+		ExistingFlow::note( array( 'subscription_resubscribe' => array( 'subscription_id' => $sub->get_id() ) ), $product->get_id(), 0 );
+		$this->assertTrue( apply_filters( 'woocommerce_product_is_in_stock', false, $sold ), 'A resubscribe of a cancelled subscription that holds the plan.' );
+		ExistingFlow::clear();
 		wp_set_current_user( 0 );
 	}
 

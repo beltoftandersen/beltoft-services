@@ -44,7 +44,7 @@ defined( 'ABSPATH' ) || exit;
  * blocked by a stored `outofstock`, because WooCommerce reads the stored status in is_in_stock() (add_to_cart(),
  * check_cart_item_stock(), the order-pay check). A renewal and a switch act on a machine that exists and has its
  * address, so they open a product the address pool closed; a resubscribe builds a new machine, so it opens a
- * hand-closed product but not one this class closed.
+ * hand-closed product only while an address is free and the cluster is saved (availability()).
  */
 final class Stock {
 
@@ -173,7 +173,8 @@ final class Stock {
 	/**
 	 * Filter woocommerce_product_is_in_stock: a renewal, switch or resubscribe of the logged-in customer's own
 	 * subscription that holds this product is in stock even when the stored status is `outofstock`. It never closes
-	 * anything. A product this class closed (marker) stays closed for a resubscribe, which builds a new machine.
+	 * anything. A resubscribe builds a new machine, so it opens a product only while availability() holds (a saved cluster and a free
+	 * address, whoever closed the product): a hand-closed product with an empty pool stays closed for it.
 	 *
 	 * @param mixed $value   Value so far.
 	 * @param mixed $product Product.
@@ -190,7 +191,7 @@ final class Stock {
 					return true;
 				}
 
-				if ( in_array( ExistingFlow::RESUBSCRIBE, $kinds, true ) && 'yes' !== (string) $product->get_meta( self::META_CLOSED ) ) {
+				if ( in_array( ExistingFlow::RESUBSCRIBE, $kinds, true ) && self::availability( $product ) ) {
 					return true;
 				}
 			}
