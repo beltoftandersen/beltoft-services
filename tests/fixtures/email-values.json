@@ -287,7 +287,7 @@
         "used": 0
     },
     "hosting": {
-        "account_url": "http://example.org?licenses",
+        "account_url": "http://example.org?hosting",
         "app_domain": "",
         "app_ip": "",
         "app_name": "",
