@@ -360,7 +360,7 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 
 .beltoft-services-vm__snapshot { padding: 12px 0; }
 
-.beltoft-services-vm__snapshot .beltoft-services-panel__actions { margin: 12px 0 0; }
+.beltoft-services-vm__snapshot .beltoft-services-panel__actions { display: flex; flex-wrap: wrap; gap: var(--bs-space-2, 8px); margin: 12px 0 0; }
 
 .beltoft-services-vm__snapshot .beltoft-services-panel__actions .button { margin: 0; }
 
@@ -513,8 +513,9 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .beltoft-services-glance__value { font-weight: var(--bs-fw-medium); }
 @media (max-width: 760px) { .beltoft-services-glance { grid-template-columns: minmax(0, 1fr); gap: 8px; } }
 .beltoft-services-slots { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 8px; }
-.beltoft-services-slots i { width: 28px; height: 8px; background: var(--bg-warm, #eeece6); }
-.beltoft-services-slots i.is-used { background: var(--green, #28513e); }
+/* One box per slot: a used one is filled, a free one is an outline. */
+.beltoft-services-slots i { box-sizing: border-box; width: 18px; height: 18px; border: 2px solid var(--rule, #d6d2c8); background: transparent; }
+.beltoft-services-slots i.is-used { border-color: var(--green, #28513e); background: var(--green, #28513e); }
 .beltoft-services-vm__more { margin: 12px 0 0; }
 div.beltoft-services-vm__more > h4 { margin-top: 16px; }
 .beltoft-services-tab > div.beltoft-services-vm__more:first-child > h4, .beltoft-services-tab > p:first-child + div.beltoft-services-vm__more > h4 { margin-top: 0; }

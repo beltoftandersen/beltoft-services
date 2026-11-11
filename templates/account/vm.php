@@ -682,7 +682,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 								<?php if ( 'full' === $snapshots['mode'] ) : ?>
 								<button type="button" class="button woocommerce-button" data-snapshot-rollback="<?php echo esc_attr( $beltoft_services_snapshot['id'] ); ?>" data-snapshot-name="<?php echo esc_attr( '' !== $beltoft_services_snapshot['label'] ? $beltoft_services_snapshot['label'] : $beltoft_services_snapshot['taken'] ); ?>"><?php esc_html_e( 'Go back to this snapshot', 'beltoft-services' ); ?></button>
 								<?php endif; ?>
-								<button type="button" class="button woocommerce-button" data-snapshot-delete="<?php echo esc_attr( $beltoft_services_snapshot['id'] ); ?>" data-snapshot-name="<?php echo esc_attr( '' !== $beltoft_services_snapshot['label'] ? $beltoft_services_snapshot['label'] : $beltoft_services_snapshot['taken'] ); ?>"><?php esc_html_e( 'Delete', 'beltoft-services' ); ?></button>
+								<button type="button" class="button woocommerce-button beltoft-services-btn" data-snapshot-delete="<?php echo esc_attr( $beltoft_services_snapshot['id'] ); ?>" data-snapshot-name="<?php echo esc_attr( '' !== $beltoft_services_snapshot['label'] ? $beltoft_services_snapshot['label'] : $beltoft_services_snapshot['taken'] ); ?>"><?php esc_html_e( 'Delete', 'beltoft-services' ); ?></button>
 							</p>
 						<?php endif; ?>
 					</div>
