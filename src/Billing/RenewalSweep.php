@@ -24,6 +24,8 @@ final class RenewalSweep {
 	 */
 	public static function next_payment_at( string $expiry, int $days_before, ?int $now = null ): int {
 		$now     = $now ?? time();
+		// strtotime( ' UTC' ) is the current time: an unknown expiry must not become "now".
+		if ( '' === trim( $expiry ) ) { return 0; }
 		$expires = strtotime( $expiry . ' UTC' );
 		if ( false === $expires ) { return 0; }
 		return max( $now + HOUR_IN_SECONDS, $expires - $days_before * DAY_IN_SECONDS );
@@ -45,7 +47,10 @@ final class RenewalSweep {
 		if ( ! $sub ) { return StepResult::retry( 3600, $no_subscription_text ); }
 		$next = self::next_payment_at( $expiry, $days_before );
 		if ( ! $next ) { return StepResult::retry( 3600, $no_expiry_text ); }
-		try { $saved = $sub->update_dates( array( 'next_payment' => gmdate( 'Y-m-d H:i:s', $next ) ), 'gmt' ); }
+		$dates = array( 'next_payment' => gmdate( 'Y-m-d H:i:s', $next ) );
+		// A trial end later than the new payment date is invalid in Subscriptions (a free transfer starts with a one year placeholder trial): the trial ends with the payment.
+		if ( (int) $sub->get_time( 'trial_end' ) > $next ) { $dates['trial_end'] = $dates['next_payment']; }
+		try { $saved = $sub->update_dates( $dates, 'gmt' ); }
 		catch ( \Exception $e ) { return StepResult::retry( 3600, 'The subscription billing date could not be set.' ); }
 		return $saved ? StepResult::done( array( 'next_payment_at' => $next ) ) : StepResult::retry( 3600, 'The subscription billing date could not be set.' );
 	}

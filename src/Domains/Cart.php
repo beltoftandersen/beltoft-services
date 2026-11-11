@@ -59,6 +59,42 @@ final class Cart {
 		add_action( 'woocommerce_trash_order', array( __CLASS__, 'release_dns_claims' ) );
 		add_action( 'wp_trash_post', array( __CLASS__, 'release_trashed_post' ) );
 		add_filter( 'woocommerce_subscriptions_recurring_cart_key', array( __CLASS__, 'recurring_key' ), 10, 2 );
+		// After Subscriptions and the core trial rule: a free transfer is a $0 cart that still needs a payment method, and is not a trial.
+		add_filter( 'woocommerce_cart_needs_payment', array( __CLASS__, 'needs_payment' ), 30, 2 );
+		add_filter( 'beltoft_services_trial_cart_item', array( __CLASS__, 'is_trial_item' ), 10, 2 );
+	}
+
+	/** The meta keys Subscriptions reads a trial from, set on the cart's own copy of the product. */
+	private const TRIAL_LENGTH = '_subscription_trial_length';
+	private const TRIAL_PERIOD = '_subscription_trial_period';
+	/** Set on the cart's copy of the product only, so a later pass can take the trial back. */
+	private const TRIAL_MARK = '_beltoft_services_free_trial';
+
+	/** Is this cart line a free transfer? Only a new transfer line can be. */
+	public static function is_free_transfer_item( array $item ): bool {
+		$line = $item['beltoft_services_domain'] ?? null;
+		return is_array( $line ) && ! empty( $line['free_transfer'] ) && 'transfer' === ( $line['mode'] ?? '' ) && ! self::is_continuation( $item );
+	}
+
+	/** Filter beltoft_services_trial_cart_item: a free transfer is a way of paying, not a trial of the service, so the one trial per customer rule skips it. */
+	public static function is_trial_item( $is_trial, $item = array() ) {
+		return is_array( $item ) && self::is_free_transfer_item( $item ) ? false : $is_trial;
+	}
+
+	/**
+	 * A cart with a free transfer needs a payment method although today's total is 0: the first yearly payment is taken from it when the
+	 * domain is up for renewal. Not when the store charges renewals by hand (Subscriptions' own rule).
+	 *
+	 * @param mixed $needs Whether the cart needs payment.
+	 * @param mixed $cart  Cart.
+	 */
+	public static function needs_payment( $needs, $cart = null ) {
+		if ( $needs || ! $cart instanceof \WC_Cart ) { return $needs; }
+		if ( function_exists( 'wcs_is_manual_renewal_required' ) && wcs_is_manual_renewal_required() ) { return $needs; }
+		foreach ( $cart->get_cart() as $item ) {
+			if ( self::is_free_transfer_item( $item ) ) { return true; }
+		}
+		return $needs;
 	}
 
 	public static function routes(): void {
@@ -164,6 +200,8 @@ final class Cart {
 		// The line carries the currency its price is worked out in, so a cart that is re-priced to another currency cannot keep it.
 		$data = array( 'beltoft_services_domain' => array( 'domain' => $domain, 'mode' => $mode ), Currency::CART_KEY => Currency::current() );
 		if ( 'transfer' === $mode && '' !== $dns ) { $data['beltoft_services_domain']['dns'] = $dns; }
+		// Free now, or not: the line keeps what was promised when it was added, and apply_prices() drops it if the rule stops holding.
+		if ( 'transfer' === $mode && Prices::free_transfer( $domain ) ) { $data['beltoft_services_domain']['free_transfer'] = true; }
 		if ( 'transfer' === $mode ) {
 			try { $data['beltoft_services_domain_auth'] = Crypto::encrypt( trim( $auth_code ) ); }
 			catch ( \RuntimeException $e ) { return new \WP_Error( 'encryption_unavailable', __( 'Transfer cannot start until secure storage is configured.', 'beltoft-services' ) ); }
@@ -463,14 +501,56 @@ final class Cart {
 					continue;
 				}
 			}
+			$free = self::settle_free_transfer( $cart, (string) $key, $item );
 			$price = self::price_for( $item );
 			if ( null !== $price && isset( $item['data'] ) && $item['data'] instanceof \WC_Product ) {
 				$cart->cart_contents[ $key ][ Currency::CART_KEY ] = Currency::current();
+				self::set_free_trial( $item['data'], $free );
 				// The regular price too: left at the product's own price, a cheaper extension showed as a sale ("Save").
 				$item['data']->set_regular_price( $price );
 				$item['data']->set_sale_price( '' );
 				$item['data']->set_price( $price );
 			}
+		}
+	}
+
+	/**
+	 * Does this line still qualify as a free transfer? A stamp the rule no longer backs (the setting was turned off, the registrar's price
+	 * changed, the extension left the table) is removed with one notice and the line is a paid transfer; a stamp on any other kind of
+	 * line is removed without a word. A line without the stamp never gains it here.
+	 *
+	 * @param \WC_Cart $cart Cart.
+	 * @param string   $key  Cart item key.
+	 * @param array    $item The item as it was before this call.
+	 */
+	private static function settle_free_transfer( \WC_Cart $cart, string $key, array $item ): bool {
+		$line = $item['beltoft_services_domain'] ?? null;
+		if ( ! is_array( $line ) || ! isset( $line['free_transfer'] ) ) { return false; }
+		if ( self::is_free_transfer_item( $item ) && Prices::free_transfer( (string) ( $line['domain'] ?? '' ) ) ) { return true; }
+		unset( $cart->cart_contents[ $key ]['beltoft_services_domain']['free_transfer'] );
+		if ( self::is_free_transfer_item( $item ) && ! self::$noticed_free && function_exists( 'wc_add_notice' ) ) {
+			self::$noticed_free = true;
+			wc_add_notice( __( 'A transfer in your cart is no longer free, so it is charged as one year.', 'beltoft-services' ), 'notice' );
+		}
+		return false;
+	}
+
+	private static bool $noticed_free = false;
+
+	/**
+	 * Today's amount of a free transfer is 0 and the yearly price comes after: the cart's own copy of the product gets a one year free
+	 * trial, the way Subscriptions prices that. The year is a placeholder: the first payment is dated from the domain's expiry once the
+	 * transfer is done (RenewalSweep::set_dates). The stored product is not touched.
+	 */
+	private static function set_free_trial( \WC_Product $product, bool $free ): void {
+		if ( $free ) {
+			$product->update_meta_data( self::TRIAL_LENGTH, '1' );
+			$product->update_meta_data( self::TRIAL_PERIOD, 'year' );
+			$product->update_meta_data( self::TRIAL_MARK, '1' );
+		} elseif ( '' !== (string) $product->get_meta( self::TRIAL_MARK ) ) {
+			// This copy got the trial earlier in the request and the line has lost its right to it.
+			$product->update_meta_data( self::TRIAL_LENGTH, '0' );
+			$product->delete_meta_data( self::TRIAL_MARK );
 		}
 	}
 

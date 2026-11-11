@@ -66,7 +66,7 @@ final class Renewals {
 	/** One scheduled event per prepaid transfer, queued when its registry renewal window opens. */
 	public static function on_transfer_due( int $resource_id ): void {
 		$r = Resource::find( $resource_id );
-		if ( $r && $r->is_live() && 'domain' === $r->get( 'driver' ) && ! $r->get( 'transfer_renewed' ) ) {
+		if ( $r && $r->is_live() && 'domain' === $r->get( 'driver' ) && ! $r->get( 'transfer_renewed' ) && ! $r->get( 'transfer_free' ) ) {
 			Jobs::queue_act( $resource_id, 'transfer_renew' );
 		}
 	}
@@ -74,6 +74,8 @@ final class Renewals {
 	/** Buy the prepaid year after a transfer that did not itself add one. */
 	public static function transfer_year( Resource $r ): StepResult {
 		if ( $r->get( 'transfer_renewed' ) ) { return StepResult::done(); }
+		// A free transfer promised no prepaid year: nothing is bought here, no registrar call, no spend guard. The first renewal order pays for the year (renew()).
+		if ( $r->get( 'transfer_free' ) ) { return StepResult::done(); }
 		$name = (string) $r->get( 'domain' );
 		$before = (string) $r->get( 'transfer_expiry_before' );
 		$baseline = (string) $r->get( 'transfer_renew_baseline' );

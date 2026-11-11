@@ -61,6 +61,17 @@ final class Checkout {
 				continue;
 			}
 
+			/**
+			 * Whether a cart line counts as a trial of its service. A line that only looks like one to Subscriptions (a way of paying set by
+			 * a feature, not a trial the customer takes) says false and is left out of the payment and one-trial-per-customer rules.
+			 *
+			 * @param bool                 $is_trial True.
+			 * @param array<string, mixed> $item     Cart item.
+			 */
+			if ( ! apply_filters( 'beltoft_services_trial_cart_item', true, $item ) ) {
+				continue;
+			}
+
 			$product = $item['data'] ?? false;
 
 			if ( self::is_service_trial( $product ) ) {

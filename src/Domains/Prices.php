@@ -48,6 +48,45 @@ final class Prices {
 		return null;
 	}
 
+	/**
+	 * Did the registrar's last answer state a transfer price for this extension? A missing price is stored as 0.0 too, so the cost alone
+	 * cannot tell "free" from "unknown". A row from before the flag existed counts as not stated until the next refresh.
+	 */
+	public static function transfer_known( string $domain ): bool {
+		$tld = self::tld_of( strtolower( $domain ) );
+		$table = get_option( self::OPTION, array() );
+		return '' !== $tld && true === ( $table[ $tld ]['transfer_known'] ?? false );
+	}
+
+	/**
+	 * Does moving this domain in cost the customer nothing? The setting is on, the registrar stated a transfer price of exactly 0, a renewal
+	 * costs more than 0 (the first payment is the renewal) and the extension is sold. The first yearly payment then falls due at the domain's
+	 * own renewal date and no year is bought at the registrar before it is paid.
+	 */
+	public static function free_transfer( string $domain ): bool {
+		$domain = strtolower( $domain );
+		$tld = self::tld_of( $domain );
+		$free = '' !== $tld && (bool) Settings::get( 'domain_free_transfers' ) && self::transfer_known( $domain ) && 0.0 === self::cost( $domain, 'transfer' ) && ( self::cost( $domain, 'renew' ) ?? 0.0 ) > 0.0 && self::sellable( $tld );
+		/**
+		 * Whether a transfer of this domain is free. A site can say no, or yes where the registrar's own price is not enough to know.
+		 *
+		 * @param bool   $free   The plugin's answer.
+		 * @param string $domain Full domain name.
+		 */
+		return (bool) apply_filters( 'beltoft_services_domain_free_transfer', $free, $domain );
+	}
+
+	/** The table extension a full domain ends with, or ''. */
+	private static function tld_of( string $domain ): string {
+		$table = get_option( self::OPTION, array() );
+		$tlds = is_array( $table ) ? array_keys( $table ) : array();
+		usort( $tlds, static fn( $a, $b ) => strlen( (string) $b ) <=> strlen( (string) $a ) );
+		foreach ( $tlds as $tld ) {
+			if ( str_ends_with( $domain, '.' . $tld ) ) { return (string) $tld; }
+		}
+		return '';
+	}
+
 	/** The registrar's cost for one action ('create', 'renew' or 'transfer') on a full domain, in EUR, or null if no price is stored. */
 	public static function cost( string $domain, string $key ): ?float {
 		$table = get_option( self::OPTION, array() );
@@ -141,9 +180,11 @@ final class Prices {
 		if ( ! preg_match( '/^[a-z0-9][a-z0-9.-]*$/D', $tld ) ) { return new \WP_Error( 'bad_response', 'A registrar TLD name is invalid.' ); }
 		$prices = $entry['prices'] ?? array();
 		$values = array();
+		$transfer_known = true;
 		foreach ( array( 'create' => 'create_price', 'renew' => 'renew_price', 'transfer' => 'transfer_price' ) as $key => $field ) {
 			$price = $prices[ $field ]['reseller'] ?? null;
-			if ( null === $price && 'transfer' === $key ) { $values[ $key ] = 0.0; continue; }
+			// A missing transfer price is stored as 0.0 but not as stated: only an explicit price can make a transfer free.
+			if ( null === $price && 'transfer' === $key ) { $values[ $key ] = 0.0; $transfer_known = false; continue; }
 			// The sandbox lists active TLDs without a create or renewal price; they cannot be sold.
 			if ( null === $price ) { return null; }
 			if ( ! is_array( $price ) || ! is_numeric( $price['price'] ?? null ) || 'EUR' !== strtoupper( (string) ( $price['currency'] ?? '' ) ) ) {
@@ -153,6 +194,6 @@ final class Prices {
 		}
 		if ( $values['create'] < 0 || $values['renew'] < 0 || $values['transfer'] < 0 ) { return new \WP_Error( 'bad_response', 'Registrar price is negative.' ); }
 		$restricted = ! empty( $entry['restrictions'] );
-		return array( $tld, array( 'create' => $values['create'], 'renew' => $values['renew'], 'transfer' => $values['transfer'], 'restricted' => $restricted, 'price' => self::rule( $values['create'], $values['renew'] ) ) );
+		return array( $tld, array( 'create' => $values['create'], 'renew' => $values['renew'], 'transfer' => $values['transfer'], 'transfer_known' => $transfer_known, 'restricted' => $restricted, 'price' => self::rule( $values['create'], $values['renew'] ) ) );
 	}
 }
