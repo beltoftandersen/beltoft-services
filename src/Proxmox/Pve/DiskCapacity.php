@@ -3,6 +3,7 @@
 
 namespace BeltoftServices\Proxmox\Pve;
 
+use BeltoftServices\Alerts;
 use BeltoftServices\Locks;
 use BeltoftServices\Proxmox\Db\DbDisk;
 use BeltoftServices\Proxmox\Db\DbDriver;
@@ -132,7 +133,54 @@ final class DiskCapacity {
 		return $locked && $ok;
 	}
 
+	/**
+	 * Tells the admin, once per job, that a disk create, disk grow or database grow waits because the storage does not have
+	 * the space free: the storage, the size asked and the free space. The first wait only: a job that waits again says
+	 * nothing more (the final failure alert of the reconciler stays). The mail never fails the step. Clearing happens in
+	 * release(), so the next job of the same resource says it again.
+	 *
+	 * @param Resource $r       Disk or database resource.
+	 * @param string   $op      What waits: create, grow or db-grow.
+	 * @param string   $cluster Cluster id.
+	 * @param string   $node    Node.
+	 * @param string   $storage Storage.
+	 * @param int      $gb      GB asked.
+	 */
+	public static function wait_alert( Resource $r, string $op, string $cluster, string $node, string $storage, int $gb ): void {
+		try {
+			$row  = self::reading( $cluster, $node, $storage );
+			$free = null === $row ? __( 'unknown (no fresh reading)', 'beltoft-services' ) : sprintf( '%.1f GB', ( (int) $row['avail'] ) / 1073741824 );
+
+			Alerts::notify(
+				sprintf( 'Storage %s has no room for a disk job: waiting', $storage ),
+				array(
+					sprintf( 'A %s job for resource %d is waiting because storage "%s" on node "%s" (cluster "%s") does not have the space free.', $op, $r->id(), $storage, $node, $cluster ),
+					sprintf( 'Size asked: %d GB. Free space on the storage: %s (after the kept-free reserve and the other waiting disks it is less).', $gb, $free ),
+					'The job tries again every hour and the customer is not told. Free space on the storage or add storage; the job then goes on by itself.',
+				),
+				null,
+				self::wait_key( $r, $op )
+			);
+		} catch ( \Throwable $e ) {
+			error_log( 'Beltoft Services: the storage wait alert failed: ' . $e->getMessage() ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- an alert never fails the step.
+		}
+	}
+
+	/**
+	 * The transient that holds back a second wait alert of the same job.
+	 *
+	 * @param Resource $r  Resource.
+	 * @param string   $op Operation.
+	 */
+	private static function wait_key( Resource $r, string $op ): string {
+		return 'beltoft_services_wait_' . $r->id() . '_' . $op;
+	}
+
 	public static function release( Resource $disk ): void {
+		foreach ( array( 'create', 'grow', 'db-grow' ) as $op ) {
+			delete_transient( self::wait_key( $disk, $op ) );
+		}
+
 		Locks::with( Locks::name( 'disk_capacity', 0 ), Locks::allocation_wait(), static function () use ( $disk ): void {
 			$entries = (array) get_option( self::RESERVATIONS, array() );
 			unset( $entries[ $disk->id() ] );

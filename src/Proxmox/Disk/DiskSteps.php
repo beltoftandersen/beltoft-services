@@ -220,7 +220,10 @@ final class DiskSteps {
 		if ( $size < 1 ) {
 			return StepResult::fail( 'The disk size is invalid.' );
 		}
+		// A fresh reading, not the hourly one: the disk made a moment ago is not in that one (as DbGrow does).
+		DiskCapacity::refresh( (string) $ctx['record']['cluster'], $ctx['node'], $ctx['storage'], $this->client );
 		if ( ! DiskCapacity::reserve( $this->r, (string) $ctx['record']['cluster'], $ctx['node'], $ctx['storage'], $size ) ) {
+			DiskCapacity::wait_alert( $this->r, 'create', (string) $ctx['record']['cluster'], $ctx['node'], $ctx['storage'], $size );
 			return StepResult::retry( 3600, 'There is not enough verified storage capacity for this disk.' );
 		}
 		$claim = $this->claim( $ctx );
@@ -339,7 +342,11 @@ final class DiskSteps {
 		}
 		if ( $target > $actual ) {
 			$delta = (int) ceil( $target - $actual );
+			if ( ! $regrow ) {
+				DiskCapacity::refresh( (string) $ctx['record']['cluster'], $ctx['node'], $ctx['storage'], $this->client );
+			}
 			if ( ! $regrow && ! DiskCapacity::reserve( $this->r, (string) $ctx['record']['cluster'], $ctx['node'], $ctx['storage'], $delta ) ) {
+				DiskCapacity::wait_alert( $this->r, 'grow', (string) $ctx['record']['cluster'], $ctx['node'], $ctx['storage'], $delta );
 				return StepResult::retry( 3600, 'There is not enough verified storage capacity to grow the disk.' );
 			}
 			if ( '' !== $ctx['lock'] ) {

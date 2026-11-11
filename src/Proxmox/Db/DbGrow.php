@@ -272,6 +272,8 @@ final class DbGrow {
 		DiskCapacity::refresh( $cluster, (string) $v['node'], $storage, $this->client );
 
 		if ( ! DiskCapacity::reserve( $this->r, $cluster, (string) $v['node'], $storage, (int) ceil( $target - $actual ) ) ) {
+			DiskCapacity::wait_alert( $this->r, 'db-grow', $cluster, (string) $v['node'], $storage, (int) ceil( $target - $actual ) );
+
 			return StepResult::retry( 3600, 'db_grow: there is not enough verified storage capacity to make the data disk larger' );
 		}
 

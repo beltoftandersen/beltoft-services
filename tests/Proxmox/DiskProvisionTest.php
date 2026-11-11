@@ -301,4 +301,57 @@ class DiskProvisionTest extends BackupTestCase {
 		$this->assertSame( 'deleted', Resource::find( $disk->id() )->get( 'state' ) );
 		$this->assertFalse( Resource::find( $disk->id() )->is_live() );
 	}
+
+	public function test_a_disk_is_created_against_a_fresh_storage_reading_not_the_hourly_one(): void {
+		$server = $this->ready_vm();
+		$disk   = $this->disk_for( $server );
+		// The hourly reading says nothing is free; the storage really has 4 TB (the fake).
+		set_transient( 'beltoft_services_disk_capacity_' . md5( 'lab|node-a|disk-store' ), array( 'total' => 1073741824, 'avail' => 0, 'read_at' => time() ), 2 * HOUR_IN_SECONDS );
+		$this->assertFalse( DiskCapacity::fits( 'lab', 'node-a', 'disk-store', 50 ) );
+
+		Jobs::run( $disk->id() );
+		$disk = Resource::find( $disk->id() );
+		$this->assertSame( 'ready', $disk->get( 'state' ), 'The reading is refreshed before the reservation: ' . (string) $disk->get( 'last_error' ) );
+	}
+
+	public function test_a_disk_create_and_a_disk_grow_that_wait_for_storage_mail_the_admin_once_each(): void {
+		$server = $this->ready_vm();
+		$mails  = array();
+		add_filter(
+			'pre_wp_mail',
+			static function ( $pre, $args ) use ( &$mails ) {
+				$mails[] = $args;
+
+				return true;
+			},
+			10,
+			2
+		);
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com', 'disk_reserve_gb' => 100000 ) );
+		$disk  = $this->disk_for( $server );
+		$waits = static function () use ( &$mails ): array {
+			return array_values( array_filter( $mails, static fn( $m ) => str_contains( (string) $m['message'], 'is waiting because' ) ) );
+		};
+
+		$first = Registry::get( 'proxmox-disk' )->provision( $disk );
+		$this->assertTrue( $first->is_retry() || 'retry' === $first->status(), 'The create waits.' );
+		Registry::get( 'proxmox-disk' )->provision( $disk );
+		$this->assertCount( 1, $waits(), 'One alert for the wait, naming storage and size.' );
+		$this->assertStringContainsString( 'disk-store', $waits()[0]['subject'] . $waits()[0]['message'] );
+		$this->assertStringContainsString( '50 GB', $waits()[0]['message'] );
+
+		// A disk that exists and is made larger while the storage has no room.
+		$this->settings( array( 'disk_reserve_gb' => 0 ) );
+		Jobs::run( $disk->id() );
+		$disk = Resource::find( $disk->id() );
+		$this->assertSame( 'ready', $disk->get( 'state' ), (string) $disk->get( 'last_error' ) );
+		$this->settings( array( 'disk_reserve_gb' => 100000 ) );
+		$plan            = (array) $disk->get( 'plan' );
+		$plan['disk_gb'] = 100;
+		$this->assertTrue( $disk->set( array( 'plan' => $plan ) ) );
+		Registry::get( 'proxmox-disk' )->update_plan( $disk );
+		Registry::get( 'proxmox-disk' )->update_plan( $disk );
+		$this->assertCount( 2, $waits(), 'The grow is its own job and says it once.' );
+		$this->assertStringContainsString( '50 GB', $waits()[1]['message'], 'The size asked is the growth (100 minus 50).' );
+	}
 }

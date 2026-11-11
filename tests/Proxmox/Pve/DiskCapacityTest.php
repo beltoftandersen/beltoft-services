@@ -108,4 +108,62 @@ class DiskCapacityTest extends BackupTestCase {
 		add_filter( 'beltoft_services_disk_capacity_enabled', '__return_false' );
 		$this->assertFalse( \BeltoftServices\Proxmox\Pve\DiskCapacity::wanted(), 'The filter can switch it off.' );
 	}
+
+	public function test_fits_counts_the_reservations_of_other_disks_but_not_its_own(): void {
+		$server = $this->ready_vm();
+		$this->assertTrue( DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) ); // The fake storage has 4 TB free.
+		$this->settings( array( 'disk_reserve_gb' => 0 ) );
+		$a = $this->disk_resource( $server );
+		$b = $this->disk_resource( $server );
+
+		$this->assertTrue( DiskCapacity::reserve( $a, 'lab', 'node-a', 'disk-store', 3000 ) );
+		$this->assertFalse( DiskCapacity::fits( 'lab', 'node-a', 'disk-store', 2000 ), '3000 GB are reserved for another disk: 2000 more do not fit in 4 TB.' );
+		$this->assertFalse( DiskCapacity::reserve( $b, 'lab', 'node-a', 'disk-store', 2000 ) );
+		$this->assertTrue( DiskCapacity::fits( 'lab', 'node-a', 'disk-store', 3500, $a->id() ), 'A disk does not count against itself.' );
+		$this->assertTrue( DiskCapacity::fits( 'lab', 'node-a', 'disk-store', 900 ), 'What is left (1096 GB) fits.' );
+	}
+
+	public function test_the_first_wait_of_a_disk_job_mails_the_admin_once_and_a_new_job_mails_again(): void {
+		$server = $this->ready_vm();
+		$mails  = array();
+		add_filter(
+			'pre_wp_mail',
+			static function ( $pre, $args ) use ( &$mails ) {
+				$mails[] = $args;
+
+				return true;
+			},
+			10,
+			2
+		);
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com', 'disk_reserve_gb' => 100000 ) ); // Nothing is free enough.
+		$disk = $this->disk_resource( $server );
+		$ctx  = array( 'lab', 'node-a', 'disk-store' );
+
+		DiskCapacity::wait_alert( $disk, 'create', $ctx[0], $ctx[1], $ctx[2], 50 );
+		DiskCapacity::wait_alert( $disk, 'create', $ctx[0], $ctx[1], $ctx[2], 50 );
+		$this->assertCount( 1, $mails, 'Once for the job.' );
+		$this->assertSame( 'christian.beltoft@gmail.com', $mails[0]['to'] );
+		$this->assertStringContainsString( 'disk-store', $mails[0]['subject'] . $mails[0]['message'], 'The storage is named.' );
+		$this->assertStringContainsString( '50 GB', $mails[0]['message'], 'The size asked.' );
+		$this->assertStringContainsString( 'Free space', $mails[0]['message'] );
+
+		DiskCapacity::wait_alert( $disk, 'grow', $ctx[0], $ctx[1], $ctx[2], 20 );
+		$this->assertCount( 2, $mails, 'A grow is another job.' );
+
+		DiskCapacity::release( $disk );
+		DiskCapacity::wait_alert( $disk, 'create', $ctx[0], $ctx[1], $ctx[2], 50 );
+		$this->assertCount( 3, $mails, 'The job finished: the next wait says it again.' );
+	}
+
+	public function test_a_failing_mailer_never_fails_a_wait(): void {
+		$server = $this->ready_vm();
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
+		add_filter( 'pre_wp_mail', static function () {
+			throw new \RuntimeException( 'mailer down' );
+		} );
+		$disk = $this->disk_resource( $server );
+		DiskCapacity::wait_alert( $disk, 'create', 'lab', 'node-a', 'disk-store', 50 );
+		$this->assertTrue( true );
+	}
 }
