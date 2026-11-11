@@ -10,6 +10,7 @@ namespace BeltoftServices\Usage;
 use BeltoftLicenses\Events;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Alerts;
+use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Disk\DiskDriver;
@@ -51,7 +52,7 @@ final class UsageDisk {
 	 * @param mixed $new New state.
 	 */
 	public static function on_state_changed( $r, $old = '', $new = '' ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- action signature.
-		if ( 'failed' !== $new || ! $r instanceof Resource || ! self::is_usage( $r ) ) {
+		if ( 'failed' !== $new || ! $r instanceof Resource || ! self::is_usage( $r ) || 'update_plan' !== (string) $r->get( 'failed_op' ) ) {
 			return;
 		}
 
@@ -77,19 +78,28 @@ final class UsageDisk {
 				}
 			}
 
-			$lines = array( sprintf( 'The pay as you go disk of resource %d could not be made larger (%d GB asked, %d GB it has): %s', $r->id(), $planned, $real, (string) $r->get( 'last_error' ) ) );
+			/* translators: 1: resource id, 2: GB asked, 3: GB the disk has, 4: error text. */
+			$lines = array( sprintf( __( 'The pay as you go disk of resource %1$d could not be made larger (%2$d GB asked, %3$d GB it has): %4$s', 'beltoft-services' ), $r->id(), $planned, $real, (string) $r->get( 'last_error' ) ) );
 
 			if ( $back ) {
 				$plan['disk_gb'] = $real;
-				$r->set( array( 'plan' => $plan ) );
+				// Plan equal to the size and the retries cleared: the update returns the disk to ready, and the customer can grow it again once there is room.
+				$r->set( array_merge( array( 'plan' => $plan ), Resource::retry_reset() ) );
 				Licenses::update( (int) $license['id'], array( 'variation_id' => $back->get_id() ) );
 				Events::add( (int) $license['id'], 'service', 'The disk could not be made larger: the licence is back on the ' . $back_gb . ' GB pay as you go size' );
-				$lines[] = sprintf( 'The licence is back on the %d GB size and is billed as such.', $back_gb );
+				Jobs::enqueue( $r->id() );
+				/* translators: 1: GB the disk has, 2: GB of the size the licence was put on. */
+				$lines[] = sprintf( __( 'The disk has %1$d GB. The licence was put back on the %2$d GB pay as you go size and is billed as such.', 'beltoft-services' ), $real, $back_gb );
+
+				if ( $back_gb !== $real ) {
+					$lines[] = __( 'No pay as you go size matches what the disk has exactly, so the licence sits on the next smaller size. Check the licence by hand.', 'beltoft-services' );
+				}
 			} else {
-				$lines[] = 'No pay as you go size matches what the disk has; check the licence by hand.';
+				$lines[] = __( 'No pay as you go size matches what the disk has; check the licence by hand.', 'beltoft-services' );
 			}
 
-			Alerts::notify( sprintf( 'Pay as you go disk %d could not be made larger', $r->id() ), $lines );
+			/* translators: %d: resource id. */
+			Alerts::notify( sprintf( __( 'Pay as you go disk %d could not be made larger', 'beltoft-services' ), $r->id() ), $lines );
 		} catch ( \Throwable $e ) {
 			error_log( 'Beltoft Services: the failed disk grow could not be undone: ' . $e->getMessage() ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- runs inside the failure.
 		}

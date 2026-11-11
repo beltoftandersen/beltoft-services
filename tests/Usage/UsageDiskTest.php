@@ -416,8 +416,9 @@ final class UsageDiskTest extends UsageTestCase {
 		$this->assertSame( $this->disk['u-100']->get_id(), (int) Licenses::find( (int) $disk->license()['id'] )['variation_id'] );
 		$mails = array();
 
-		// What the reconciler announces when the last retry has failed.
-		do_action( 'beltoft_services_state_changed', $failing, 'ready', 'failed' );
+		// What the reconciler announces when the last retry of the update has failed.
+		$failing->set( array( 'failed_op' => 'update_plan' ) );
+		do_action( 'beltoft_services_state_changed', Resource::find( $failing->id() ), 'ready', 'failed' );
 
 		$this->assertSame( $this->disk['u-50']->get_id(), (int) Licenses::find( (int) $disk->license()['id'] )['variation_id'], 'Back on the 50 GB size.' );
 		$this->assertSame( 50, (int) ( (array) Resource::find( $disk->id() )->get( 'plan' ) )['disk_gb'] );
@@ -430,6 +431,115 @@ final class UsageDiskTest extends UsageTestCase {
 		$mails = array();
 		do_action( 'beltoft_services_state_changed', Resource::find( $disk->id() ), 'ready', 'failed' );
 		$this->assertSame( array(), $mails );
+	}
+
+	/**
+	 * A pay as you go disk asked to grow while the storage has no room, with its mails captured.
+	 *
+	 * @param array<int, array<string, mixed>> $mails Captured mails.
+	 * @return Resource The disk waiting to grow.
+	 */
+	private function waiting_disk( array &$mails ): Resource {
+		$server = $this->server();
+		$disk   = $this->usage_disk( $server );
+		add_filter(
+			'pre_wp_mail',
+			static function ( $pre, $args ) use ( &$mails ) {
+				$mails[] = $args;
+
+				return true;
+			},
+			10,
+			2
+		);
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com', 'disk_reserve_gb' => 100000 ) );
+		$this->assertTrue( UsageDisk::grow( $disk, $this->user ) );
+		$this->run_jobs();
+
+		return Resource::find( $disk->id() );
+	}
+
+	public function test_a_grow_that_fails_through_the_reconciler_is_undone_and_the_disk_returns_to_ready_and_can_grow_again(): void {
+		$mails   = array();
+		$waiting = $this->waiting_disk( $mails );
+		$mails   = array();
+
+		// Every retry fails for lack of room; the last one is the failure.
+		for ( $i = 0; $i < 8 && 'failed' !== Resource::find( $waiting->id() )->get( 'state' ) && $this->disk['u-50']->get_id() !== (int) Licenses::find( (int) $waiting->license()['id'] )['variation_id']; $i++ ) {
+			Resource::find( $waiting->id() )->set( array( 'next_attempt_at' => null ) );
+			Jobs::run( $waiting->id() );
+		}
+
+		$this->assertSame( $this->disk['u-50']->get_id(), (int) Licenses::find( (int) $waiting->license()['id'] )['variation_id'], 'The licence is back on the size the disk has.' );
+		$this->settings( array( 'disk_reserve_gb' => 0 ) );
+		$this->run_jobs();
+		Jobs::run( $waiting->id() );
+		$fresh = Resource::find( $waiting->id() );
+		$this->assertSame( 'ready', $fresh->get( 'state' ), 'The disk is not left failed: ' . (string) $fresh->get( 'last_error' ) );
+		$this->assertSame( 0, (int) $fresh->get( 'attempts' ) );
+		$this->assertTrue( UsageDisk::grow( $fresh, $this->user ), 'The customer can ask again once there is room.' );
+		$this->assertNotEmpty( array_filter( $mails, static fn( $m ) => false !== strpos( (string) $m['subject'], 'could not be made larger' ) ) );
+	}
+
+	public function test_the_undo_is_only_for_a_failed_grow_of_a_pay_as_you_go_disk(): void {
+		$mails   = array();
+		$waiting = $this->waiting_disk( $mails );
+		$mails   = array();
+		$license = (int) $waiting->license()['id'];
+		$variation = static fn() => (int) Licenses::find( $license )['variation_id'];
+		$larger    = $this->disk['u-100']->get_id();
+
+		// Not the failed state.
+		$waiting->set( array( 'failed_op' => 'update_plan' ) );
+		do_action( 'beltoft_services_state_changed', Resource::find( $waiting->id() ), 'ready', 'ready' );
+		$this->assertSame( $larger, $variation(), 'Only a failure undoes it.' );
+
+		// A failure of another operation (a pause while the grow waits).
+		$waiting->set( array( 'failed_op' => 'pause' ) );
+		do_action( 'beltoft_services_state_changed', Resource::find( $waiting->id() ), 'ready', 'failed' );
+		$this->assertSame( $larger, $variation(), 'A failed pause is not a failed grow.' );
+		$this->assertSame( array(), $mails );
+
+		// A disk that is not pay as you go: its licence is a monthly one.
+		$monthly_var = $this->disk['m-50'];
+		$parent      = wc_get_product( $monthly_var->get_parent_id() );
+		$m_license   = $this->service_license( $parent, array( 'fire' => false, 'user_id' => $this->user, 'email' => self::MAIL, 'variation_id' => $monthly_var->get_id() ) );
+		$monthly     = Resource::create( $m_license, Registry::get( 'proxmox-disk' ), Product::plan( $parent->get_id(), $monthly_var->get_id() ), array( 'server_license' => $waiting->get( 'server_license' ) ) );
+		$this->assertInstanceOf( Resource::class, $monthly );
+		$plan            = (array) $monthly->get( 'plan' );
+		$plan['disk_gb'] = 100;
+		$monthly->set( array( 'plan' => $plan, 'size_gb' => 50, 'failed_op' => 'update_plan' ) );
+		do_action( 'beltoft_services_state_changed', Resource::find( $monthly->id() ), 'ready', 'failed' );
+		$this->assertSame( $monthly_var->get_id(), (int) Licenses::find( (int) $m_license['id'] )['variation_id'], 'A monthly disk is paid at checkout: left alone.' );
+		$this->assertSame( array(), $mails );
+	}
+
+	public function test_the_undo_mail_says_so_when_no_size_matches_the_disk_exactly(): void {
+		$mails   = array();
+		$waiting = $this->waiting_disk( $mails );
+		$mails   = array();
+		$waiting->set( array( 'size_gb' => 70, 'failed_op' => 'update_plan' ) ); // A size with no variation of its own.
+
+		do_action( 'beltoft_services_state_changed', Resource::find( $waiting->id() ), 'ready', 'failed' );
+
+		$this->assertSame( $this->disk['u-50']->get_id(), (int) Licenses::find( (int) $waiting->license()['id'] )['variation_id'] );
+		$this->assertCount( 1, $mails );
+		$this->assertStringContainsString( '70 GB', $mails[0]['message'], 'What the disk has.' );
+		$this->assertStringContainsString( '50 GB', $mails[0]['message'], 'What the licence was put on.' );
+		$this->assertStringContainsString( 'next smaller size', $mails[0]['message'] );
+	}
+
+	public function test_a_pending_grow_with_no_variation_of_the_real_size_is_metered_at_the_same_price_per_gb(): void {
+		$server = $this->server();
+		$disk   = $this->usage_disk( $server, 'u-100' );
+		$full   = Rates::items( $disk );
+		$this->assertSame( 100.0, $full[0]['quantity'] );
+
+		$disk->set( array( 'size_gb' => 70 ) ); // The disk has 70 of the 100 GB the plan asks for; no 70 GB variation exists.
+		$part = Rates::items( Resource::find( $disk->id() ) );
+
+		$this->assertSame( 70.0, $part[0]['quantity'] );
+		$this->assertEqualsWithDelta( $full[0]['rate'], $part[0]['rate'], 0.0000001, 'The same price per GB, for the GB it really has.' );
 	}
 
 	public function test_grow_is_refused_for_another_customer_and_not_for_room(): void {

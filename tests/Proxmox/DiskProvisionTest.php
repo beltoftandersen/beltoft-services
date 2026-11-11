@@ -14,6 +14,7 @@ use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
+require_once __DIR__ . '/Backup/BackupTestCase.php';
 require_once dirname( __DIR__ ) . '/Support/WpCliStub.php';
 
 class DiskProvisionTest extends BackupTestCase {

@@ -70,8 +70,8 @@ final class NodeHealth {
 			}
 		}
 
-		HostingCapacity::alert();
-		HostingCapacity::overage_alerts();
+		Alerts::quietly( static fn() => HostingCapacity::alert() );
+		Alerts::quietly( static fn() => HostingCapacity::overage_alerts() ); // A failing alert never fails the job.
 
 		return $found;
 	}

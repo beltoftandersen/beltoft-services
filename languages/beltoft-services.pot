@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-11T04:16:11+00:00\n"
+"POT-Creation-Date: 2026-11-11T04:44:51+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-services\n"
@@ -1845,7 +1845,7 @@ msgstr ""
 #: src/Proxmox/Network/MetricsRoute.php:50
 #: src/Proxmox/Network/MetricsRoute.php:69
 #: src/Usage/CustomerDelete.php:214
-#: src/Usage/UsageDisk.php:177
+#: src/Usage/UsageDisk.php:187
 msgid "This service is not available."
 msgstr ""
 
@@ -12534,6 +12534,40 @@ msgstr ""
 msgid "unknown (no fresh reading)"
 msgstr ""
 
+#: src/Proxmox/Pve/DiskCapacity.php:154
+msgid "disk create"
+msgstr ""
+
+#: src/Proxmox/Pve/DiskCapacity.php:155
+msgid "disk grow"
+msgstr ""
+
+#: src/Proxmox/Pve/DiskCapacity.php:156
+msgid "database disk grow"
+msgstr ""
+
+#. translators: %s: storage name.
+#: src/Proxmox/Pve/DiskCapacity.php:161
+#, php-format
+msgid "Storage %s has no room for a disk job: waiting"
+msgstr ""
+
+#. translators: 1: job (disk create, disk grow, database disk grow), 2: resource id, 3: storage, 4: node, 5: cluster.
+#: src/Proxmox/Pve/DiskCapacity.php:164
+#, php-format
+msgid "A %1$s job for resource %2$d is waiting because storage \"%3$s\" on node \"%4$s\" (cluster \"%5$s\") does not have the space free."
+msgstr ""
+
+#. translators: 1: GB asked, 2: free space, for example "12.0 GB".
+#: src/Proxmox/Pve/DiskCapacity.php:166
+#, php-format
+msgid "Size asked: %1$d GB. Free space on the storage: %2$s (after the kept-free reserve and the other waiting disks it is less)."
+msgstr ""
+
+#: src/Proxmox/Pve/DiskCapacity.php:167
+msgid "The job tries again every hour and the customer is not told. Free space on the storage or add storage; the job then goes on by itself."
+msgstr ""
+
 #. translators: %s: cluster ids.
 #: src/Proxmox/Pve/ProxmoxSettings.php:119
 #, php-format
@@ -15157,19 +15191,45 @@ msgstr ""
 msgid "Usage billed early: the unbilled usage reached the threshold."
 msgstr ""
 
-#: src/Usage/UsageDisk.php:186
+#. translators: 1: resource id, 2: GB asked, 3: GB the disk has, 4: error text.
+#: src/Usage/UsageDisk.php:82
+#, php-format
+msgid "The pay as you go disk of resource %1$d could not be made larger (%2$d GB asked, %3$d GB it has): %4$s"
+msgstr ""
+
+#. translators: 1: GB the disk has, 2: GB of the size the licence was put on.
+#: src/Usage/UsageDisk.php:92
+#, php-format
+msgid "The disk has %1$d GB. The licence was put back on the %2$d GB pay as you go size and is billed as such."
+msgstr ""
+
+#: src/Usage/UsageDisk.php:95
+msgid "No pay as you go size matches what the disk has exactly, so the licence sits on the next smaller size. Check the licence by hand."
+msgstr ""
+
+#: src/Usage/UsageDisk.php:98
+msgid "No pay as you go size matches what the disk has; check the licence by hand."
+msgstr ""
+
+#. translators: %d: resource id.
+#: src/Usage/UsageDisk.php:102
+#, php-format
+msgid "Pay as you go disk %d could not be made larger"
+msgstr ""
+
+#: src/Usage/UsageDisk.php:196
 msgid "This disk cannot be made larger right now. Please try again when it has finished what it is doing."
 msgstr ""
 
-#: src/Usage/UsageDisk.php:194
+#: src/Usage/UsageDisk.php:204
 msgid "There is no larger size of this disk that can be made now."
 msgstr ""
 
-#: src/Usage/UsageDisk.php:206
+#: src/Usage/UsageDisk.php:216
 msgid "The disk is busy. Please try again in a moment."
 msgstr ""
 
-#: src/Usage/UsageDisk.php:210
+#: src/Usage/UsageDisk.php:220
 msgid "The disk could not be made larger now."
 msgstr ""
 

@@ -149,14 +149,22 @@ final class DiskCapacity {
 	public static function wait_alert( Resource $r, string $op, string $cluster, string $node, string $storage, int $gb ): void {
 		try {
 			$row  = self::reading( $cluster, $node, $storage );
-			$free = null === $row ? __( 'unknown (no fresh reading)', 'beltoft-services' ) : sprintf( '%.1f GB', ( (int) $row['avail'] ) / 1073741824 );
+			$free  = null === $row ? __( 'unknown (no fresh reading)', 'beltoft-services' ) : sprintf( '%.1f GB', ( (int) $row['avail'] ) / 1073741824 );
+			$names = array(
+				'create'  => __( 'disk create', 'beltoft-services' ),
+				'grow'    => __( 'disk grow', 'beltoft-services' ),
+				'db-grow' => __( 'database disk grow', 'beltoft-services' ),
+			);
 
 			Alerts::notify(
-				sprintf( 'Storage %s has no room for a disk job: waiting', $storage ),
+				/* translators: %s: storage name. */
+				sprintf( __( 'Storage %s has no room for a disk job: waiting', 'beltoft-services' ), $storage ),
 				array(
-					sprintf( 'A %s job for resource %d is waiting because storage "%s" on node "%s" (cluster "%s") does not have the space free.', $op, $r->id(), $storage, $node, $cluster ),
-					sprintf( 'Size asked: %d GB. Free space on the storage: %s (after the kept-free reserve and the other waiting disks it is less).', $gb, $free ),
-					'The job tries again every hour and the customer is not told. Free space on the storage or add storage; the job then goes on by itself.',
+					/* translators: 1: job (disk create, disk grow, database disk grow), 2: resource id, 3: storage, 4: node, 5: cluster. */
+					sprintf( __( 'A %1$s job for resource %2$d is waiting because storage "%3$s" on node "%4$s" (cluster "%5$s") does not have the space free.', 'beltoft-services' ), $names[ $op ] ?? $op, $r->id(), $storage, $node, $cluster ),
+					/* translators: 1: GB asked, 2: free space, for example "12.0 GB". */
+					sprintf( __( 'Size asked: %1$d GB. Free space on the storage: %2$s (after the kept-free reserve and the other waiting disks it is less).', 'beltoft-services' ), $gb, $free ),
+					__( 'The job tries again every hour and the customer is not told. Free space on the storage or add storage; the job then goes on by itself.', 'beltoft-services' ),
 				),
 				null,
 				self::wait_key( $r, $op )

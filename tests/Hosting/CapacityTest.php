@@ -521,4 +521,18 @@ class CapacityTest extends HostingCase {
 		$this->provision_fully( $second ); // Over the budget: the alert throws, the placement goes on and the step is done, not retried.
 		$this->assertNotNull( \BeltoftServices\Hosting\Records::for_resource( $second->id() ), 'The account is placed.' );
 	}
+
+	public function test_a_failing_mailer_never_fails_the_health_job(): void {
+		add_filter(
+			'pre_wp_mail',
+			static function () {
+				throw new \RuntimeException( 'mailer down' );
+			}
+		);
+		$this->settings( array( 'hosting_mem_overcommit' => '1', 'hosting_reserve_gb' => '20', 'hosting_alert_percent' => '100' ) );
+		$r = $this->resource( array( 'memory_mb' => 13000, 'db_buffer_mb' => 0, 'disk_gb' => 1 ) );
+		Records::open( $r->id(), 'n1' );
+
+		$this->assertIsArray( \BeltoftServices\Hosting\NodeHealth::run(), 'The job ends although the overage alert threw.' );
+	}
 }

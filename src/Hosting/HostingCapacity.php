@@ -289,7 +289,7 @@ final class HostingCapacity {
 
 	/**
 	 * Mails the admin when the memory or the disk committed on a node passes its budget (100 percent), and again at each
-	 * further 10 percent, once per step, forgotten when the share falls back under the step (Alerts::overage()).
+	 * further 10 percent, once per step, forgotten only when the share has fallen 5 points under the step (Alerts::overage()).
 	 *
 	 * @param string|null $only One node id, or null for every node.
 	 * @return string[] Keys ("node:memory" or "node:disk") a mail was sent for.

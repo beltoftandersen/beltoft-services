@@ -119,7 +119,7 @@ final class Capacity {
 	/**
 	 * Mails the admin when the memory committed on a node passes its budget (the node memory minus the host reserve, setting
 	 * `host_reserve_gb`), and again at each further 10 percent, once per step, forgotten when the share falls back under the
-	 * step (Alerts::overage()). Reads the cache only.
+	 * step, and a step is forgotten only when the share has fallen 5 points under it (Alerts::overage()). Reads the cache only.
 	 *
 	 * @param string $cluster_id Cluster id.
 	 * @return string[] Nodes a mail was sent for.
