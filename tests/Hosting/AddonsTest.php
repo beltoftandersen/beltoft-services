@@ -24,6 +24,8 @@ use BeltoftServices\Resource;
  */
 class AddonsTest extends HostingCase {
 
+	use \BeltoftServices\Tests\Support\FakeCurrency;
+
 	/**
 	 * The fake mail server.
 	 *
@@ -58,6 +60,7 @@ class AddonsTest extends HostingCase {
 	}
 
 	public function tear_down(): void {
+		$this->fake_currency_down();
 		remove_all_filters( 'beltoft_services_mail_client' );
 		remove_all_filters( 'beltoft_services_dns_proof_result' );
 		remove_all_filters( 'beltoft_services_mail_dns_lookup' );
@@ -859,5 +862,88 @@ class AddonsTest extends HostingCase {
 		}
 
 		return implode( ',', $out ) . '=>' . $m->getReturnType();
+	}
+
+	/** A DKK subscription, with a stored DKK price on the domain add-on product when one is given. */
+	private function dkk_account( ?string $price ): Resource {
+		update_option( 'woocommerce_currency', 'EUR' );
+		$r = $this->account();
+		$this->fake_currency_up( 'EUR' );
+		$this->fake_runner();
+		$sub = $this->sub( $r );
+		$sub->set_currency( 'DKK' );
+		$sub->save();
+
+		if ( null !== $price ) {
+			update_post_meta( Addons::product( Addons::KIND_DOMAIN )->get_id(), '_test_price_DKK', $price );
+		}
+
+		return Resource::find( $r->id() );
+	}
+
+	public function test_the_quote_is_in_the_subscriptions_currency_while_the_page_is_in_another(): void {
+		$r = $this->dkk_account( '8' );
+
+		$q = Addons::quote( $r, Addons::KIND_DOMAIN );
+
+		$this->assertSame( 'DKK', $q['currency'] );
+		$this->assertSame( 8.0, $q['unit'], 'The DKK price, not the euro 1.' );
+		$this->assertSame( 'EUR', \BeltoftServices\Currency::current(), 'The page is back in its own currency.' );
+		$this->assertStringContainsString( 'kr.', html_entity_decode( Addons::money( 8.0, 'DKK' ) ) );
+		$text = html_entity_decode( Addons::confirm_text( Addons::KIND_DOMAIN, $q ) );
+		$this->assertStringContainsString( 'kr.', $text );
+		$this->assertStringNotContainsString( '€', $text, 'No figure is labelled with the page currency.' );
+	}
+
+	public function test_an_add_on_with_no_price_in_the_subscriptions_currency_is_not_offered_and_never_relabelled(): void {
+		$r = $this->dkk_account( null );
+
+		$this->assertNull( Addons::quote( $r, Addons::KIND_DOMAIN ), 'The euro 1 is not offered as 1 DKK.' );
+	}
+
+	public function test_a_currency_that_cannot_be_put_in_force_gives_no_quote(): void {
+		$r = $this->dkk_account( '8' );
+		$this->fake_currency_down();
+		$this->fake_currency_up( 'EUR' );
+		$this->fake_runner( false );
+
+		$this->assertNull( Addons::quote( $r, Addons::KIND_DOMAIN ) );
+	}
+
+	public function test_a_paid_dkk_add_on_order_adds_a_dkk_line_and_a_later_price_change_is_resynced_in_dkk(): void {
+		$this->card_pays();
+		$r = $this->dkk_account( '8' );
+
+		$bought = Addons::buy( $r, Addons::KIND_DOMAIN, 'kroner.example' );
+		$order  = wc_get_order( $bought['order'] );
+
+		$this->assertSame( 'DKK', $order->get_currency() );
+		$this->assertEquals( 8.0, (float) $order->get_total() );
+		$lines = Addons::lines( $r, Addons::KIND_DOMAIN, 'kroner.example' );
+		$this->assertCount( 1, $lines );
+		$this->assertEquals( 8.0, (float) array_values( $lines )[0]->get_total(), 'The line holds the DKK price.' );
+
+		update_post_meta( Addons::product( Addons::KIND_DOMAIN )->get_id(), '_test_price_DKK', '10' );
+		Addons::resync_prices( $this->sub( $r ) );
+		$this->assertEquals( 10.0, (float) array_values( Addons::lines( $r, Addons::KIND_DOMAIN, 'kroner.example' ) )[0]->get_total() );
+
+		update_post_meta( Addons::product( Addons::KIND_DOMAIN )->get_id(), '_test_price_DKK', '' );
+		Addons::resync_prices( $this->sub( $r ) );
+		$this->assertEquals( 10.0, (float) array_values( Addons::lines( $r, Addons::KIND_DOMAIN, 'kroner.example' ) )[0]->get_total(), 'With no DKK price the line keeps its price; the euro 1 is never written onto it.' );
+	}
+
+	public function test_an_add_on_order_in_another_currency_than_its_subscription_adds_no_line(): void {
+		$r = $this->dkk_account( '8' );
+		$this->assertWPError( Addons::buy( $r, Addons::KIND_PACK, 'info@mail.customer.example' ), 'The pack has no DKK price: not offered.' );
+
+		$order2 = wc_get_order( Addons::buy( $r, Addons::KIND_DOMAIN, 'mix.example' )['order'] );
+		$order2->set_currency( 'EUR' );
+		$order2->set_status( 'pending' );
+		$order2->save();
+		$meta = $order2->get_meta( Addons::ORDER_META );
+		$order2->payment_complete();
+
+		$this->assertSame( 'refused', wc_get_order( $order2->get_id() )->get_meta( Addons::ORDER_DONE ) );
+		$this->assertIsArray( $meta );
 	}
 }

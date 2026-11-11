@@ -388,7 +388,7 @@ final class HostingAccount {
 			sprintf(
 				/* translators: 1: price per month and pack, 2: most packs on one mailbox. */
 				__( 'Add 5 GB to a mailbox for %1$s per month, up to %2$d packs for each mailbox.', 'beltoft-services' ),
-				Addons::money( (float) $quote['unit'] ),
+				Addons::money( (float) $quote['unit'], (string) ( $quote['currency'] ?? '' ) ),
 				Addons::MAX_PACKS
 			)
 		) . '</p><ul class="beltoft-hosting-pack-list">';

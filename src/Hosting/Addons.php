@@ -163,10 +163,11 @@ final class Addons {
 	/**
 	 * A price as plain text.
 	 *
-	 * @param float $amount Amount.
+	 * @param float  $amount   Amount.
+	 * @param string $currency Currency code, '' for the current one (a quote names its own, the subscription's).
 	 */
-	public static function money( float $amount ): string {
-		return AddonBilling::money( $amount );
+	public static function money( float $amount, string $currency = '' ): string {
+		return AddonBilling::money( $amount, $currency );
 	}
 
 	/**

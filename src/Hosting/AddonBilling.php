@@ -9,6 +9,7 @@ namespace BeltoftServices\Hosting;
 
 use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Billing\Subscriptions;
+use BeltoftServices\Currency;
 use BeltoftServices\Jobs;
 use BeltoftServices\Locks;
 use BeltoftServices\Resource;
@@ -136,15 +137,27 @@ final class AddonBilling {
 	 * @return array{unit: float, months_now: int, now: float, period: int, recurring: float}|null Null without a product or a subscription.
 	 */
 	public static function quote( Resource $r, string $kind, ?int $now = null ): ?array {
-		$product = self::product( $kind );
-		$sub     = self::subscription( $r );
+		$sub = self::subscription( $r );
 
 		// A subscription that will not renew (pending cancel, on hold, no date) would deliver the add-on without ever billing it.
-		if ( null === $product || null === $sub || ! $sub->has_status( 'active' ) || (int) $sub->get_time( 'next_payment' ) <= ( $now ?? time() ) ) {
+		if ( null === $sub || ! $sub->has_status( 'active' ) || (int) $sub->get_time( 'next_payment' ) <= ( $now ?? time() ) ) {
 			return null;
 		}
 
-		$unit   = (float) wc_get_price_excluding_tax( $product );
+		// The price is read in the currency of the subscription, whatever the page or the job is in. An add-on with no price in that currency,
+		// or a currency that cannot be put in force, gives no quote: nothing is offered at a figure of another currency.
+		$code = self::currency_of( $sub );
+		list( $ok, $price ) = Currency::with( $code, static function () use ( $kind ) {
+			$product = self::product( $kind );
+
+			return null === $product ? null : (float) wc_get_price_excluding_tax( $product );
+		} );
+
+		if ( ! $ok || null === $price ) {
+			return null;
+		}
+
+		$unit   = (float) $price;
 		$months = self::months_to_renewal( $sub, $now );
 		$period = self::period_months( $sub );
 
@@ -154,16 +167,29 @@ final class AddonBilling {
 			'now'        => round( $unit * $months, 2 ),
 			'period'     => $period,
 			'recurring'  => round( $unit * $period, 2 ),
+			'currency'   => $code,
 		);
 	}
 
 	/**
-	 * A price as plain text.
+	 * The currency of a subscription: its own code, else the shop's.
 	 *
-	 * @param float $amount Amount.
+	 * @param \WC_Subscription $sub Subscription.
 	 */
-	public static function money( float $amount ): string {
-		return html_entity_decode( wp_strip_all_tags( wc_price( $amount ) ), ENT_QUOTES, 'UTF-8' );
+	public static function currency_of( \WC_Subscription $sub ): string {
+		$code = Currency::clean( $sub->get_currency() );
+
+		return '' !== $code ? $code : Currency::base();
+	}
+
+	/**
+	 * A price as plain text, in a currency (the current one when none is given): a quote names the subscription's currency.
+	 *
+	 * @param float  $amount   Amount.
+	 * @param string $currency Currency code, '' for the current one.
+	 */
+	public static function money( float $amount, string $currency = '' ): string {
+		return html_entity_decode( wp_strip_all_tags( wc_price( $amount, '' !== $currency ? array( 'currency' => $currency ) : array() ) ), ENT_QUOTES, 'UTF-8' );
 	}
 
 	/**
@@ -186,10 +212,10 @@ final class AddonBilling {
 				'beltoft-services'
 			),
 			$what,
-			self::money( (float) $quote['unit'] ),
-			self::money( (float) $quote['now'] ),
+			self::money( (float) $quote['unit'], (string) ( $quote['currency'] ?? '' ) ),
+			self::money( (float) $quote['now'], (string) ( $quote['currency'] ?? '' ) ),
 			(int) $quote['months_now'],
-			self::money( (float) $quote['recurring'] )
+			self::money( (float) $quote['recurring'], (string) ( $quote['currency'] ?? '' ) )
 		);
 	}
 
@@ -552,8 +578,25 @@ final class AddonBilling {
 		$sub     = function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( (int) ( $meta['sub'] ?? 0 ) ) : null;
 		$kind    = (string) ( $meta['kind'] ?? '' );
 		$target  = (string) ( $meta['target'] ?? '' );
-		$product = self::product( $kind );
 		$problem = '';
+		$price   = null;
+
+		// The product and its price are read in the subscription's currency, whatever request or job this runs in (a payment webhook has
+		// none): with no price in it, or a currency that cannot be put in force, no line is added and the order says why.
+		$product = null;
+		$ok      = true;
+
+		if ( $sub instanceof \WC_Subscription ) {
+			list( $ok, $found ) = Currency::with( self::currency_of( $sub ), static function () use ( $kind, $meta ) {
+				$p = self::product( $kind );
+
+				return null === $p ? null : array( $p, (string) round( (float) wc_get_price_excluding_tax( $p ) * (int) ( $meta['period'] ?? 1 ), 2 ) );
+			} );
+
+			if ( $ok && is_array( $found ) ) {
+				list( $product, $price ) = $found;
+			}
+		}
 
 		// A line of this very order is already on the subscription (saved, but the order was not marked): never add a second.
 		foreach ( $r ? self::lines( $r, $kind, $target ) : array() as $item ) {
@@ -566,7 +609,9 @@ final class AddonBilling {
 		}
 
 		if ( ! $r || ! $sub instanceof \WC_Subscription || null === $product ) {
-			$problem = 'the account, its subscription or the add-on product is gone';
+			$problem = $ok ? 'the account, its subscription or the add-on product (in the currency of the subscription) is gone' : 'the currency of the subscription could not be used for the price';
+		} elseif ( self::currency_of( $sub ) !== (string) $order->get_currency() ) {
+			$problem = 'the order is in another currency than the subscription';
 		} elseif ( (int) ( $meta['next'] ?? 0 ) > 0 && time() > (int) $meta['next'] ) {
 			$problem = 'it was paid after the renewal date it was quoted for, so the charge does not match the period';
 		} elseif ( Addons::KIND_DOMAIN === $kind && self::has( $r, $kind, $target ) ) {
@@ -576,7 +621,6 @@ final class AddonBilling {
 		}
 
 		if ( '' === $problem ) {
-			$price = (string) round( (float) wc_get_price_excluding_tax( $product ) * (int) ( $meta['period'] ?? 1 ), 2 );
 			$id    = $sub->add_product( $product, 1, array( 'subtotal' => $price, 'total' => $price ) );
 			$item  = $id ? $sub->get_item( (int) $id ) : null;
 
@@ -661,11 +705,21 @@ final class AddonBilling {
 		$changed = false;
 
 		foreach ( $sub->get_items() as $item ) {
-			$product = $item instanceof \WC_Order_Item_Product && '' !== (string) $item->get_meta( Addons::I_KIND ) ? self::product( (string) $item->get_meta( Addons::I_KIND ) ) : null;
+			if ( ! $item instanceof \WC_Order_Item_Product || '' === (string) $item->get_meta( Addons::I_KIND ) ) {
+				continue;
+			}
 
-			if ( $product ) {
-				$price = (string) round( (float) wc_get_price_excluding_tax( $product ) * self::period_months( $sub ), 2 );
+			// The unit price is read in the subscription's currency; with none in it the line keeps the price it has (a figure of
+			// another currency is never written onto it).
+			$kind   = (string) $item->get_meta( Addons::I_KIND );
+			$months = self::period_months( $sub );
+			list( $ok, $price ) = Currency::with( self::currency_of( $sub ), static function () use ( $kind, $months ) {
+				$product = self::product( $kind );
 
+				return null === $product ? null : (string) round( (float) wc_get_price_excluding_tax( $product ) * $months, 2 );
+			} );
+
+			if ( $ok && null !== $price ) {
 				if ( (float) $item->get_total() !== (float) $price ) {
 					$item->set_subtotal( $price );
 					$item->set_total( $price );
