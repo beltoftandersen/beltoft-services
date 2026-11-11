@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-11T06:19:47+00:00\n"
+"POT-Creation-Date: 2026-11-11T06:55:51+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-services\n"
@@ -186,7 +186,7 @@ msgid "Orders and invoices"
 msgstr ""
 
 #: src/Account/Billing.php:340
-#: src/Card/Card.php:70
+#: src/Card/Card.php:71
 msgid "Payment methods"
 msgstr ""
 
@@ -199,7 +199,7 @@ msgstr ""
 #. translators: 1: card brand, 2: last four digits
 #. translators: 1: card brand, 2: last four digits.
 #: src/Account/Cards.php:36
-#: src/Card/Card.php:143
+#: src/Card/Card.php:144
 #, php-format
 msgid "%1$s ending %2$s"
 msgstr ""
@@ -816,7 +816,7 @@ msgstr[0] ""
 msgstr[1] ""
 
 #: src/Account/OverviewData.php:514
-#: src/Card/Card.php:140
+#: src/Card/Card.php:141
 msgid "Card"
 msgstr ""
 
@@ -3564,33 +3564,33 @@ msgstr ""
 msgid "Heading, questions"
 msgstr ""
 
-#: src/Card/Card.php:101
+#: src/Card/Card.php:102
 msgid "Your default card is used for Pay as you go invoices."
 msgstr ""
 
-#: src/Card/Card.php:105
+#: src/Card/Card.php:106
 msgid "Pay as you go services are invoiced to your default card. Add a card to use them."
 msgstr ""
 
 #. translators: 1: card, 2: expiry as MM/YY.
-#: src/Card/Card.php:148
+#: src/Card/Card.php:149
 #, php-format
 msgid "%1$s, expires %2$s"
 msgstr ""
 
-#: src/Card/Card.php:526
+#: src/Card/Card.php:527
 msgid "Card changed: the default card is used for usage invoices."
 msgstr ""
 
-#: src/Card/Card.php:526
+#: src/Card/Card.php:527
 msgid "The default card is used for usage invoices."
 msgstr ""
 
-#: src/Card/Card.php:538
+#: src/Card/Card.php:539
 msgid "The customer has no saved card left."
 msgstr ""
 
-#: src/Card/Card.php:651
+#: src/Card/Card.php:652
 msgid "Card saved on My Account."
 msgstr ""
 
@@ -3661,83 +3661,93 @@ msgstr ""
 msgid "Extended validation"
 msgstr ""
 
-#: src/Credit/Code.php:59
+#. translators: %d: customer id
+#: src/Credit/Balance.php:314
+#, php-format
+msgid "Credit in two currencies for customer %d"
+msgstr ""
+
+#: src/Credit/Code.php:60
 msgid "Account credit (redeemed on the Billing page, amount in the store currency)"
 msgstr ""
 
-#: src/Credit/Code.php:69
+#: src/Credit/Code.php:70
 msgid "This is a credit code. Redeem it on your Billing page."
 msgstr ""
 
-#: src/Credit/Code.php:142
+#: src/Credit/Code.php:143
 msgid "Log in to redeem a code."
 msgstr ""
 
-#: src/Credit/Code.php:146
+#: src/Credit/Code.php:147
 #: src/Credit/Grant.php:66
 msgid "Account credit is switched off."
 msgstr ""
 
-#: src/Credit/Code.php:150
+#: src/Credit/Code.php:151
 #: src/Domains/DnsClaimRoutes.php:210
 msgid "Too many tries. Wait a while and try again."
 msgstr ""
 
-#: src/Credit/Code.php:156
-#: src/Credit/Code.php:182
+#: src/Credit/Code.php:157
+#: src/Credit/Code.php:183
 msgid "That code is not valid."
 msgstr ""
 
-#: src/Credit/Code.php:167
+#: src/Credit/Code.php:168
 msgid "The code is busy. Try again."
 msgstr ""
 
-#: src/Credit/Code.php:188
+#: src/Credit/Code.php:189
 msgid "That code has expired."
 msgstr ""
 
-#: src/Credit/Code.php:192
+#: src/Credit/Code.php:193
 msgid "That code has been used up."
 msgstr ""
 
-#: src/Credit/Code.php:198
+#: src/Credit/Code.php:199
 msgid "You have already used this code."
 msgstr ""
 
-#: src/Credit/Code.php:207
+#: src/Credit/Code.php:208
 msgid "This code is not available for your email address."
 msgstr ""
 
-#: src/Credit/Code.php:213
+#: src/Credit/Code.php:214
 msgid "Add a card first, then redeem the code."
 msgstr ""
 
-#: src/Credit/Code.php:220
+#: src/Credit/Code.php:221
 msgid "This card cannot be used to redeem a code. Add a credit or debit card."
 msgstr ""
 
-#: src/Credit/Code.php:228
+#: src/Credit/Code.php:229
 msgid "This code was already used with this card."
 msgstr ""
 
 #. translators: %s: the code.
-#: src/Credit/Code.php:231
+#: src/Credit/Code.php:232
 #, php-format
 msgid "Credit code %s"
 msgstr ""
 
-#: src/Credit/Code.php:234
+#: src/Credit/Code.php:240
+msgid "This code is in another currency than your credit."
+msgstr ""
+
+#: src/Credit/Code.php:244
 msgid "The credit could not be added. Try again."
 msgstr ""
 
 #. translators: %s: amount with currency.
-#: src/Credit/Code.php:244
+#: src/Credit/Code.php:254
 #, php-format
 msgid "%s credit added."
 msgstr ""
 
-#: src/Credit/Code.php:277
-#: src/Credit/Topup.php:317
+#: src/Credit/Code.php:287
+#: src/Credit/Topup.php:332
 msgid "The page expired. Please try again."
 msgstr ""
 
@@ -3746,7 +3756,7 @@ msgid "There is no such customer."
 msgstr ""
 
 #: src/Credit/Grant.php:74
-#: src/Credit/Grant.php:186
+#: src/Credit/Grant.php:189
 msgid "Enter an amount, such as 10 or -2.50."
 msgstr ""
 
@@ -3758,248 +3768,268 @@ msgstr ""
 msgid "The request has no valid id."
 msgstr ""
 
-#: src/Credit/Grant.php:96
+#: src/Credit/Grant.php:99
 msgid "That would take the balance below 0. Tick the box to allow it."
 msgstr ""
 
-#: src/Credit/Grant.php:102
+#: src/Credit/Grant.php:105
 msgid "The credit could not be written."
 msgstr ""
 
-#: src/Credit/Grant.php:106
+#: src/Credit/Grant.php:109
 msgid "The balance is busy. Try again."
 msgstr ""
 
-#: src/Credit/Grant.php:123
-#: src/Credit/Topup.php:212
-#: src/Credit/Topup.php:274
+#: src/Credit/Grant.php:126
+#: src/Credit/Topup.php:219
+#: src/Credit/Topup.php:281
 #: src/Settings.php:127
 msgid "Account credit"
 msgstr ""
 
-#: src/Credit/Grant.php:125
+#: src/Credit/Grant.php:128
 msgid "The credit was saved."
 msgstr ""
 
-#: src/Credit/Grant.php:131
+#: src/Credit/Grant.php:134
 #: templates/account/credit.php:45
 #: templates/account/credit.php:116
 msgid "Balance"
 msgstr ""
 
-#: src/Credit/Grant.php:135
+#: src/Credit/Grant.php:138
 msgid "Add account credit"
 msgstr ""
 
-#: src/Credit/Grant.php:138
-msgid "In the store currency, without VAT. A negative amount is a correction."
+#: src/Credit/Grant.php:141
+msgid "In the customer's credit currency, without VAT. A negative amount is a correction."
 msgstr ""
 
-#: src/Credit/Grant.php:139
+#: src/Credit/Grant.php:142
 msgid "Reason, for example Welcome credit"
 msgstr ""
 
-#: src/Credit/Grant.php:139
+#: src/Credit/Grant.php:142
 msgid "Reason"
 msgstr ""
 
-#: src/Credit/Grant.php:140
+#: src/Credit/Grant.php:143
 msgid "Allow a correction to take the balance below 0"
 msgstr ""
 
-#: src/Credit/Grant.php:141
+#: src/Credit/Grant.php:144
 msgid "Save credit"
 msgstr ""
 
-#: src/Credit/Grant.php:146
+#: src/Credit/Grant.php:149
 msgid "Latest rows"
 msgstr ""
 
-#: src/Credit/Grant.php:179
+#: src/Credit/Grant.php:182
 msgid "You are not allowed to do this."
 msgstr ""
 
+#. translators: %d: customer id
+#: src/Credit/Invoice.php:119
+#, php-format
+msgid "Credit in another currency than the invoice, customer %d"
+msgstr ""
+
 #. translators: %s: order number.
-#: src/Credit/Invoice.php:123
+#: src/Credit/Invoice.php:137
 #, php-format
 msgid "Used on invoice #%s"
 msgstr ""
 
-#: src/Credit/Invoice.php:135
+#: src/Credit/Invoice.php:150
 msgid "Paid from account credit"
 msgstr ""
 
 #. translators: %s: amount.
-#: src/Credit/Invoice.php:145
+#: src/Credit/Invoice.php:160
 #, php-format
 msgid "Paid from account credit: %s."
 msgstr ""
 
-#: src/Credit/Invoice.php:188
+#: src/Credit/Invoice.php:203
 msgid "The invoice was paid in full from account credit."
 msgstr ""
 
 #. translators: %s: order number.
-#: src/Credit/Invoice.php:208
+#: src/Credit/Invoice.php:223
 #, php-format
 msgid "Returned from invoice #%s"
 msgstr ""
 
 #. translators: %s: amount.
-#: src/Credit/Invoice.php:212
+#: src/Credit/Invoice.php:227
 #, php-format
 msgid "Account credit returned: %s."
 msgstr ""
 
-#: src/Credit/Page.php:88
-#: src/Credit/Page.php:129
-#: src/Credit/Page.php:139
+#: src/Credit/Page.php:89
+#: src/Credit/Page.php:130
+#: src/Credit/Page.php:140
 #: templates/account/credit.php:41
 msgid "Credit"
 msgstr ""
 
-#: src/Credit/Page.php:171
+#: src/Credit/Page.php:175
 msgid "Enter your credit code."
-msgstr ""
-
-#. translators: %s: reason.
-#: src/Credit/Page.php:208
-#, php-format
-msgid "Credit added: %s"
 msgstr ""
 
 #. translators: %s: reason.
 #: src/Credit/Page.php:212
 #, php-format
+msgid "Credit added: %s"
+msgstr ""
+
+#. translators: %s: reason.
+#: src/Credit/Page.php:216
+#, php-format
 msgid "Credit correction: %s"
 msgstr ""
 
-#: src/Credit/Page.php:225
-#: src/Credit/Topup.php:577
+#: src/Credit/Page.php:229
+#: src/Credit/Topup.php:610
 msgid "Top-up"
 msgstr ""
 
-#: src/Credit/Page.php:226
+#: src/Credit/Page.php:230
 msgid "Used on invoice"
 msgstr ""
 
-#: src/Credit/Page.php:227
+#: src/Credit/Page.php:231
 msgid "Credit added"
 msgstr ""
 
-#: src/Credit/Page.php:228
+#: src/Credit/Page.php:232
 msgid "Refund"
 msgstr ""
 
-#: src/Credit/Page.php:229
+#: src/Credit/Page.php:233
 msgid "Chargeback"
 msgstr ""
 
-#: src/Credit/Page.php:230
+#: src/Credit/Page.php:234
 msgid "Adjustment"
 msgstr ""
 
-#: src/Credit/Topup.php:42
+#: src/Credit/Topup.php:49
 msgid "Prepayment for Pay as you go usage. No VAT is charged on a top-up; VAT is charged on your usage invoices."
 msgstr ""
 
-#: src/Credit/Topup.php:92
+#: src/Credit/Topup.php:99
 msgid "Account credit for pay as you go"
 msgstr ""
 
-#: src/Credit/Topup.php:93
+#: src/Credit/Topup.php:100
 msgid "Customers prepay a balance, without VAT. It is applied first to their Pay as you go usage invoices, which carry the VAT. Off, nothing about credit shows."
 msgstr ""
 
-#: src/Credit/Topup.php:101
+#: src/Credit/Topup.php:108
 msgid "Smallest top-up"
 msgstr ""
 
-#: src/Credit/Topup.php:102
+#: src/Credit/Topup.php:109
 msgid "In the store currency. No VAT is charged on a top-up: the customer pays this amount and all of it is credited."
 msgstr ""
 
-#: src/Credit/Topup.php:110
+#: src/Credit/Topup.php:117
 msgid "Largest top-up"
 msgstr ""
 
-#: src/Credit/Topup.php:111
+#: src/Credit/Topup.php:118
 msgid "In the store currency."
 msgstr ""
 
-#: src/Credit/Topup.php:325
+#: src/Credit/Topup.php:340
 #: templates/account/credit.php:50
 msgid "Top-ups are not available in your currency."
 msgstr ""
 
 #. translators: 1: smallest amount, 2: largest amount (with currency).
-#: src/Credit/Topup.php:334
+#: src/Credit/Topup.php:349
 #, php-format
 msgid "Enter an amount from %1$s to %2$s."
 msgstr ""
 
-#: src/Credit/Topup.php:345
+#: src/Credit/Topup.php:360
 msgid "The top-up could not be added to the cart."
 msgstr ""
 
-#: src/Credit/Topup.php:463
-#: src/Credit/Topup.php:486
+#: src/Credit/Topup.php:450
+msgid "Your top-up was removed from the cart because the currency changed. Add it again in the new currency."
+msgstr ""
+
+#: src/Credit/Topup.php:494
+#: src/Credit/Topup.php:518
 msgid "Note"
 msgstr ""
 
-#: src/Credit/Topup.php:568
+#: src/Credit/Topup.php:600
 msgid "Account credit not added: the order has no customer account."
 msgstr ""
 
 #. translators: %s: amount.
-#: src/Credit/Topup.php:578
+#: src/Credit/Topup.php:611
 #, php-format
 msgid "Account credit of %s added to the balance."
 msgstr ""
 
-#: src/Credit/Topup.php:580
+#. translators: %s: currency code.
+#: src/Credit/Topup.php:616
+#, php-format
+msgid "Account credit not added: the customer's credit is in %s, not in the currency of this order. The admin was told."
+msgstr ""
+
+#: src/Credit/Topup.php:618
 msgid "Account credit could not be added now (balance busy). It is added when the order status is saved again."
 msgstr ""
 
 #. translators: %s: order number.
-#: src/Credit/Topup.php:613
+#: src/Credit/Topup.php:652
 #, php-format
 msgid "Chargeback undone, order #%s"
 msgstr ""
 
 #. translators: %s: order number.
-#: src/Credit/Topup.php:614
+#: src/Credit/Topup.php:653
 msgid "The order is paid again: the credit taken back for the chargeback was returned to the balance."
 msgstr ""
 
 #. translators: %s: order number.
-#: src/Credit/Topup.php:682
+#: src/Credit/Topup.php:721
 #, php-format
 msgid "Refund, order #%s"
 msgstr ""
 
 #. translators: %s: amount.
-#: src/Credit/Topup.php:685
+#: src/Credit/Topup.php:724
 #, php-format
 msgid "Refund: %s taken back from the account credit."
 msgstr ""
 
 #. translators: 1: order number, 2: new status.
-#: src/Credit/Topup.php:727
+#: src/Credit/Topup.php:766
 #, php-format
 msgid "Chargeback, order #%1$s is now %2$s"
 msgstr ""
 
 #. translators: %s: amount.
-#: src/Credit/Topup.php:728
+#: src/Credit/Topup.php:767
 #, php-format
 msgid "The order is no longer paid: %s taken back from the account credit."
 msgstr ""
 
 #. translators: 1: customer id, 2: balance.
-#: src/Credit/Topup.php:744
+#: src/Credit/Topup.php:783
 #, php-format
 msgid "The account credit of customer #%1$d is now negative: %2$s. The customer has used credit that was paid back."
+msgstr ""
+
+#: src/Currency.php:112
+msgid "A currency runner did not restore the currency"
 msgstr ""
 
 #: src/Domains/Actions.php:19
@@ -10453,7 +10483,7 @@ msgid "Connect an app"
 msgstr ""
 
 #. translators: %s: comma separated plugin names.
-#: src/Plugin.php:366
+#: src/Plugin.php:367
 #, php-format
 msgid "Beltoft Services is inactive until these are active: %s."
 msgstr ""
@@ -15080,8 +15110,14 @@ msgstr ""
 msgid "Your usage invoice for %s could not be charged. Pay it here: %%2$s"
 msgstr ""
 
+#. translators: %d: resource id
+#: src/Usage/Meter.php:192
+#, php-format
+msgid "Usage hours not caught up for resource %d"
+msgstr ""
+
 #. translators: %s: currency code
-#: src/Usage/Meter.php:211
+#: src/Usage/Meter.php:259
 #, php-format
 msgid "Usage not metered in %s"
 msgstr ""

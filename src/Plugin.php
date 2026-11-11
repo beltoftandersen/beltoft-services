@@ -246,6 +246,7 @@ final class Plugin {
 		Usage\Minimum::register();
 		Usage\InvoiceView::register();
 		Card\Card::register();
+		Credit\Balance::register();
 		Credit\Topup::register();
 		Credit\Page::register();
 		Credit\Invoice::register();

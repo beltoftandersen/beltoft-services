@@ -100,7 +100,7 @@ final class Minimum {
 			return false;
 		}
 
-		$credit = Config::enabled() && $user_id > 0 ? max( 0, min( Balance::get( $user_id ), $total_cents ) ) : 0;
+		$credit = Config::enabled() && $user_id > 0 ? max( 0, min( Balance::get_in( $user_id, Currency::or_current( $currency ) ), $total_cents ) ) : 0;
 		$rest   = $total_cents - $credit;
 
 		return $rest > 0 && $rest < $minimum;

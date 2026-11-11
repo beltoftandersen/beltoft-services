@@ -453,9 +453,12 @@ final class Pricing {
 		);
 
 		if ( Config::enabled() ) {
+			// Credit is in one currency, the customer's own, and is named with its code: it is never added to another currency.
+			$credit_currency          = Balance::currency_or_user( $user_id );
 			$cents                    = Balance::get( $user_id );
 			$out['credit']['balance'] = round( $cents / 100, 2 );
-			$out['credit']['text']    = Rates::money( $cents / 100, 2, $currency );
+			$out['credit']['currency'] = $credit_currency;
+			$out['credit']['text']    = Rates::money( $cents / 100, 2, $credit_currency );
 			$out['credit']['note']    = 'Credit is applied first on usage invoices as "Paid from account credit"; the rest goes to the card. Top-ups carry no VAT. Credit alone is not enough to order.';
 		}
 

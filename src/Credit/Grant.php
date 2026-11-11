@@ -89,15 +89,18 @@ final class Grant {
 			return true;
 		}
 
+		// An admin credit is in the customer's credit currency (the one they have, else the one they would be priced in).
+		$currency = Balance::currency_or_user( $user_id );
+
 		list( $locked, $result ) = Balance::locked(
 			$user_id,
-			static function () use ( $user_id, $cents, $reason, $ref, $cap, $allow_negative ) {
+			static function () use ( $user_id, $cents, $reason, $ref, $cap, $allow_negative, $currency ) {
 				if ( $cents < 0 && ! $allow_negative && Balance::get( $user_id ) + $cents < 0 ) {
 					return __( 'That would take the balance below 0. Tick the box to allow it.', 'beltoft-services' );
 				}
 
 				$note = substr( $reason, 0, 255 );
-				$done = $cents > 0 ? Balance::credit( $user_id, $cents, $cap, 'admin', $ref, $note ) : Balance::debit( $user_id, -$cents, $cap, 'admin', $ref, $note );
+				$done = $cents > 0 ? Balance::credit( $user_id, $cents, $cap, 'admin', $ref, $note, $currency ) : Balance::debit( $user_id, -$cents, $cap, 'admin', $ref, $note, $currency );
 
 				return $done ? true : __( 'The credit could not be written.', 'beltoft-services' );
 			}
@@ -116,7 +119,7 @@ final class Grant {
 			return;
 		}
 
-		$currency = get_woocommerce_currency();
+		$currency = Balance::currency_or_user( (int) $user->ID );
 		$notice   = isset( $_GET['beltoft_credit'] ) ? sanitize_text_field( wp_unslash( $_GET['beltoft_credit'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display only.
 		$rows     = Balance::history( (int) $user->ID, 10 );
 		?>
@@ -135,7 +138,7 @@ final class Grant {
 				<th><label for="beltoft-credit-amount"><?php esc_html_e( 'Add account credit', 'beltoft-services' ); ?></label></th>
 				<td>
 					<input type="text" id="beltoft-credit-amount" name="beltoft_credit_admin_amount" form="beltoft-credit-form" inputmode="decimal" autocomplete="off" placeholder="10.00" class="regular-text">
-					<p class="description"><?php esc_html_e( 'In the store currency, without VAT. A negative amount is a correction.', 'beltoft-services' ); ?></p>
+					<p class="description"><?php esc_html_e( 'In the customer\'s credit currency, without VAT. A negative amount is a correction.', 'beltoft-services' ); ?></p>
 					<p><input type="text" name="beltoft_credit_admin_reason" form="beltoft-credit-form" class="regular-text" placeholder="<?php esc_attr_e( 'Reason, for example Welcome credit', 'beltoft-services' ); ?>" aria-label="<?php esc_attr_e( 'Reason', 'beltoft-services' ); ?>"></p>
 					<p><label><input type="checkbox" name="beltoft_credit_admin_negative" value="1" form="beltoft-credit-form"> <?php esc_html_e( 'Allow a correction to take the balance below 0', 'beltoft-services' ); ?></label></p>
 					<p><button type="submit" form="beltoft-credit-form" class="button"><?php esc_html_e( 'Save credit', 'beltoft-services' ); ?></button></p>

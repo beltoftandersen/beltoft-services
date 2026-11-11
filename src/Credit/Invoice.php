@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Credit;
 
+use BeltoftServices\Alerts;
 use BeltoftServices\Usage\Renewal;
 
 defined( 'ABSPATH' ) || exit;
@@ -102,12 +103,25 @@ final class Invoice {
 			return 0;
 		}
 
+		$currency = (string) $order->get_currency();
+
 		list( $locked, $used ) = Balance::locked(
 			$user_id,
-			static function () use ( $order, $user_id ): int {
+			static function () use ( $order, $user_id, $currency ): int {
 				$due     = Balance::cents( $order->get_total() );
-				$balance = Balance::get( $user_id );
+				// Only credit in the order's own currency is applied: a balance in another currency is never used on this invoice.
+				$balance = Balance::get_in( $user_id, $currency );
 				$cents   = min( $balance, $due );
+
+				if ( $balance < 1 && Balance::currency( $user_id ) !== '' && Balance::currency( $user_id ) !== $currency && Balance::get( $user_id ) > 0 ) {
+					Alerts::notify(
+						/* translators: %d: customer id */
+						sprintf( __( 'Credit in another currency than the invoice, customer %d', 'beltoft-services' ), $user_id ),
+						array( sprintf( 'Customer %1$d has credit in %2$s and invoice #%3$s is in %4$s. The credit was not applied.', $user_id, Balance::currency( $user_id ), $order->get_order_number(), $currency ) ),
+						null,
+						'beltoft_services_credit_wrongcur_' . $user_id
+					);
+				}
 
 				if ( $cents < 1 || Balance::exists( Balance::INVOICE, self::REF_TYPE, (string) $order->get_id() ) ) {
 					return 0;
@@ -120,7 +134,8 @@ final class Invoice {
 					self::REF_TYPE,
 					(string) $order->get_id(),
 					/* translators: %s: order number. */
-					sprintf( __( 'Used on invoice #%s', 'beltoft-services' ), $order->get_order_number() )
+					sprintf( __( 'Used on invoice #%s', 'beltoft-services' ), $order->get_order_number() ),
+					$currency
 				);
 
 				return $debited ? $cents : 0;
@@ -205,7 +220,7 @@ final class Invoice {
 
 		$was = Balance::find( Balance::INVOICE, self::REF_TYPE, (string) $order->get_id() );
 
-		if ( ! $was || ! Balance::credit( (int) $order->get_customer_id(), abs( (int) $was['amount_cents'] ), Balance::ADJUST, self::REF_RETURN, (string) $order->get_id(), /* translators: %s: order number. */ sprintf( __( 'Returned from invoice #%s', 'beltoft-services' ), $order->get_order_number() ) ) ) {
+		if ( ! $was || ! Balance::credit( (int) $order->get_customer_id(), abs( (int) $was['amount_cents'] ), Balance::ADJUST, self::REF_RETURN, (string) $order->get_id(), /* translators: %s: order number. */ sprintf( __( 'Returned from invoice #%s', 'beltoft-services' ), $order->get_order_number() ), (string) $order->get_currency() ) ) {
 			return 0;
 		}
 

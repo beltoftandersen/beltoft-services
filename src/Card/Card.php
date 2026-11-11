@@ -9,6 +9,7 @@
 namespace BeltoftServices\Card;
 
 use BeltoftServices\Account\Panel;
+use BeltoftServices\Currency;
 use BeltoftServices\Jobs;
 use BeltoftServices\Usage\Account;
 
@@ -674,7 +675,8 @@ final class Card {
 				'billing_period'   => 'month',
 				'billing_interval' => 1,
 				'start_date'       => gmdate( 'Y-m-d H:i:s' ),
-				'currency'         => get_woocommerce_currency(),
+				// The customer's own currency when one is fixed (a credit balance, an account), else the page's.
+				'currency'         => Currency::of_user_or_current( $user_id ),
 			)
 		);
 
@@ -707,6 +709,15 @@ final class Card {
 
 		$sub->update_dates( array( 'next_payment' => gmdate( 'Y-m-d H:i:s', strtotime( '+1 month' ) ) ) );
 		$sub->update_status( 'active', $note );
+
+		/**
+		 * A usage account was made with no order behind it, in a currency. A site that fixes a customer's currency (so a later order cannot
+		 * put the customer in another one) does it here.
+		 *
+		 * @param int               $user_id Customer.
+		 * @param \WC_Subscription $account The new account.
+		 */
+		do_action( 'beltoft_services_usage_account_created', $user_id, $sub );
 	}
 
 	/**

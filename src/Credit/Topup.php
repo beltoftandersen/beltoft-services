@@ -35,6 +35,13 @@ final class Topup {
 	public const CART_KEY     = 'beltoft_services_credit_cents';
 	public const META_AMOUNT  = '_beltoft_services_credit_amount';
 
+	/** Cart item key (and order line meta): the currency the amount was validated in. */
+	public const CURRENCY_KEY  = 'beltoft_services_price_currency';
+	public const META_CURRENCY = '_beltoft_services_credit_currency';
+
+	/** @var bool One notice per request when a line is removed for its currency. */
+	private static bool $noticed = false;
+
 	/**
 	 * The receipt wording of a top-up.
 	 */
@@ -285,6 +292,13 @@ final class Topup {
 			return false;
 		}
 
+		// Credit is in one currency: a customer whose credit is in another one cannot top up in this one.
+		$own = Balance::currency( get_current_user_id() );
+
+		if ( '' !== $own && Currency::current() !== $own ) {
+			return false;
+		}
+
 		foreach ( WC()->cart->get_cart() as $key => $item ) {
 			if ( self::is_product( (int) ( $item['product_id'] ?? 0 ) ) ) {
 				WC()->cart->remove_cart_item( $key );
@@ -292,7 +306,8 @@ final class Topup {
 		}
 
 		self::$adding = true;
-		$key          = WC()->cart->add_to_cart( self::product_id(), 1, 0, array(), array( self::CART_KEY => $cents ) );
+		// The line carries the currency the amount was validated in, so a cart that is re-priced to another currency cannot charge it there.
+		$key          = WC()->cart->add_to_cart( self::product_id(), 1, 0, array(), array( self::CART_KEY => $cents, self::CURRENCY_KEY => Currency::current() ) );
 		self::$adding = false;
 
 		return false !== $key;
@@ -423,6 +438,22 @@ final class Topup {
 			}
 
 			$cents = (int) ( $item[ self::CART_KEY ] ?? 0 );
+			$tag   = (string) ( $item[ self::CURRENCY_KEY ] ?? '' );
+			$own   = Balance::currency( get_current_user_id() );
+
+			// The cents were validated in the currency on the line (and the customer's credit is in one currency): in another one the line goes, with one notice.
+			if ( ( '' !== $tag && Currency::current() !== $tag ) || ( '' !== $own && Currency::current() !== $own ) ) {
+				$cart->remove_cart_item( $key );
+
+				if ( ! self::$noticed && function_exists( 'wc_add_notice' ) ) {
+					self::$noticed = true;
+					wc_add_notice( __( 'Your top-up was removed from the cart because the currency changed. Add it again in the new currency.', 'beltoft-services' ), 'notice' );
+				}
+
+				continue;
+			}
+
+			$cart->cart_contents[ $key ][ self::CURRENCY_KEY ] = Currency::current();
 
 			if ( ! Config::enabled() || ! self::available() || $cents < self::min() * 100 || $cents > self::max() * 100 ) {
 				$cart->remove_cart_item( $key );
@@ -483,6 +514,7 @@ final class Topup {
 		$cents = (int) ( $values[ self::CART_KEY ] ?? 0 );
 		$item->set_name( self::line_name() );
 		$item->add_meta_data( self::META_AMOUNT, number_format( $cents / 100, 2, '.', '' ), true );
+		$item->add_meta_data( self::META_CURRENCY, (string) ( $values[ self::CURRENCY_KEY ] ?? Currency::current() ), true );
 		$item->add_meta_data( __( 'Note', 'beltoft-services' ), self::receipt_text(), true );
 	}
 
@@ -574,10 +606,17 @@ final class Topup {
 			$ref   = self::ref( (int) $order->get_id(), $item_id );
 			$cents = self::credit_cents( $item, $order );
 
-			if ( $cents > 0 && Balance::credit( $user_id, $cents, Balance::TOPUP, 'order_item', $ref, __( 'Top-up', 'beltoft-services' ) ) ) {
+			// The credit is in the order's currency and equals what was paid.
+			if ( $cents > 0 && Balance::credit( $user_id, $cents, Balance::TOPUP, 'order_item', $ref, __( 'Top-up', 'beltoft-services' ), (string) $order->get_currency() ) ) {
 				$order->add_order_note( sprintf( /* translators: %s: amount. */ __( 'Account credit of %s added to the balance.', 'beltoft-services' ), self::label_amount( $cents, $order->get_currency() ) ) );
 			} elseif ( $cents > 0 && ! Balance::exists( Balance::TOPUP, 'order_item', $ref ) ) {
-				$order->add_order_note( __( 'Account credit could not be added now (balance busy). It is added when the order status is saved again.', 'beltoft-services' ) );
+				$own = Balance::currency( $user_id );
+
+				if ( '' !== $own && $own !== (string) $order->get_currency() ) {
+					$order->add_order_note( sprintf( /* translators: %s: currency code. */ __( 'Account credit not added: the customer\'s credit is in %s, not in the currency of this order. The admin was told.', 'beltoft-services' ), $own ) );
+				} else {
+					$order->add_order_note( __( 'Account credit could not be added now (balance busy). It is added when the order status is saved again.', 'beltoft-services' ) );
+				}
 			}
 
 			self::reinstate( $user_id, $order, $ref );
@@ -610,7 +649,7 @@ final class Topup {
 		$k     = self::round_of( $ref );
 		$taken = Balance::find( Balance::CHARGEBACK, 'order_item', $ref . '-' . $k );
 
-		if ( $taken && Balance::credit( $user_id, abs( (int) $taken['amount_cents'] ), Balance::ADJUST, 'reinstate', $ref . '-' . $k, sprintf( /* translators: %s: order number. */ __( 'Chargeback undone, order #%s', 'beltoft-services' ), $order->get_order_number() ) ) ) {
+		if ( $taken && Balance::credit( $user_id, abs( (int) $taken['amount_cents'] ), Balance::ADJUST, 'reinstate', $ref . '-' . $k, sprintf( /* translators: %s: order number. */ __( 'Chargeback undone, order #%s', 'beltoft-services' ), $order->get_order_number() ), (string) $order->get_currency() ) ) {
 			$order->add_order_note( __( 'The order is paid again: the credit taken back for the chargeback was returned to the balance.', 'beltoft-services' ) );
 		}
 	}
@@ -679,7 +718,7 @@ final class Topup {
 			}
 
 			$cents = min( $want, max( 0, self::remaining( $ref ) ) );
-			$ok    = $cents > 0 && Balance::debit( $user_id, $cents, Balance::REFUND, 'order_item', $ref . '-' . (int) $refund_id, sprintf( /* translators: %s: order number. */ __( 'Refund, order #%s', 'beltoft-services' ), $order->get_order_number() ) );
+			$ok    = $cents > 0 && Balance::debit( $user_id, $cents, Balance::REFUND, 'order_item', $ref . '-' . (int) $refund_id, sprintf( /* translators: %s: order number. */ __( 'Refund, order #%s', 'beltoft-services' ), $order->get_order_number() ), (string) $order->get_currency() );
 
 			if ( $ok ) {
 				$order->add_order_note( sprintf( /* translators: %s: amount. */ __( 'Refund: %s taken back from the account credit.', 'beltoft-services' ), self::label_amount( $cents, $order->get_currency() ) ) );
@@ -724,7 +763,7 @@ final class Topup {
 			$ref   = self::ref( (int) $order->get_id(), $item_id );
 			$cents = max( 0, self::remaining( $ref ) );
 
-			if ( $cents > 0 && Balance::debit( $user_id, $cents, Balance::CHARGEBACK, 'order_item', $ref . '-' . self::round_of( $ref ), sprintf( /* translators: 1: order number, 2: new status. */ __( 'Chargeback, order #%1$s is now %2$s', 'beltoft-services' ), $order->get_order_number(), (string) $to ) ) ) {
+			if ( $cents > 0 && Balance::debit( $user_id, $cents, Balance::CHARGEBACK, 'order_item', $ref . '-' . self::round_of( $ref ), sprintf( /* translators: 1: order number, 2: new status. */ __( 'Chargeback, order #%1$s is now %2$s', 'beltoft-services' ), $order->get_order_number(), (string) $to ), (string) $order->get_currency() ) ) {
 				$order->add_order_note( sprintf( /* translators: %s: amount. */ __( 'The order is no longer paid: %s taken back from the account credit.', 'beltoft-services' ), self::label_amount( $cents, $order->get_currency() ) ) );
 				self::note_negative( $user_id, $order );
 			}

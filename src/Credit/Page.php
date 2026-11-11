@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Credit;
 
+use BeltoftServices\Currency;
 use BeltoftServices\Account\Billing;
 use BeltoftServices\Account\Panel;
 use BeltoftServices\Usage\Estimate;
@@ -145,16 +146,19 @@ final class Page {
 	 * @return array<string, mixed>
 	 */
 	public static function data(): array {
-		$user_id = get_current_user_id();
+		$user_id  = get_current_user_id();
+		// The credit is in one currency, the customer's own; top-ups are offered in it, and only on a page that shows it.
+		$currency = Balance::currency_or_user( $user_id );
+		$here     = Currency::current() === $currency;
 
 		return array(
 			'balance'  => Balance::get( $user_id ),
 			'history'  => Balance::history( $user_id, 20 ),
-			'amounts'  => Topup::amounts(),
-			'min'      => Topup::min(),
-			'max'      => Topup::max(),
-			'available' => Topup::available(),
-			'currency' => get_woocommerce_currency(),
+			'amounts'  => $here ? Topup::amounts( $currency ) : array(),
+			'min'      => Topup::min( $currency ),
+			'max'      => Topup::max( $currency ),
+			'available' => $here && Topup::available( $currency ),
+			'currency' => $currency,
 		);
 	}
 

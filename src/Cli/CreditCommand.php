@@ -52,7 +52,7 @@ final class CreditCommand {
 			\WP_CLI::error( (string) $result );
 		}
 
-		\WP_CLI::success( sprintf( 'Credit saved. Balance: %s.', Topup::label_amount( Balance::get( (int) $user->ID ) ) ) );
+		\WP_CLI::success( sprintf( 'Credit saved. Balance: %s.', Topup::label_amount( Balance::get( (int) $user->ID ), Balance::currency_or_user( (int) $user->ID ) ) ) );
 	}
 
 	/**
@@ -68,7 +68,7 @@ final class CreditCommand {
 	public function balance( array $args ): void {
 		$user = self::user( $args[0] );
 
-		\WP_CLI::line( 'Balance: ' . Topup::label_amount( Balance::get( (int) $user->ID ) ) );
+		\WP_CLI::line( 'Balance: ' . Topup::label_amount( Balance::get( (int) $user->ID ), Balance::currency_or_user( (int) $user->ID ) ) );
 		\WP_CLI\Utils\format_items( 'table', Balance::history( (int) $user->ID, 10 ), array( 'created', 'kind', 'amount_cents', 'balance_after_cents', 'note' ) );
 	}
 

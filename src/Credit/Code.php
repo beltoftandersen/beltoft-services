@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Credit;
 
+use BeltoftServices\Currency;
 use Automattic\WooCommerce\Utilities\DiscountsUtil;
 use BeltoftServices\Card\Card;
 use BeltoftServices\Locks;
@@ -230,7 +231,16 @@ final class Code {
 
 		$note = sprintf( /* translators: %s: the code. */ __( 'Credit code %s', 'beltoft-services' ), strtoupper( $coupon->get_code() ) );
 
-		if ( ! Balance::credit( $user_id, $cents, Balance::PROMO, 'code', $ref, $note ) ) {
+		// A code is in the shop's currency unless the coupon says otherwise (its meta); it is only credited to a balance in that currency.
+		$currency = (string) $coupon->get_meta( '_beltoft_services_credit_currency', true );
+		$currency = '' !== Currency::clean( $currency ) ? Currency::clean( $currency ) : Currency::base();
+		$own      = Balance::currency( $user_id );
+
+		if ( '' !== $own && $own !== $currency ) {
+			return self::fail( __( 'This code is in another currency than your credit.', 'beltoft-services' ) );
+		}
+
+		if ( ! Balance::credit( $user_id, $cents, Balance::PROMO, 'code', $ref, $note, $currency ) ) {
 			return self::fail( __( 'The credit could not be added. Try again.', 'beltoft-services' ) );
 		}
 
@@ -241,7 +251,7 @@ final class Code {
 
 		return array(
 			'ok'      => true,
-			'message' => sprintf( /* translators: %s: amount with currency. */ __( '%s credit added.', 'beltoft-services' ), Page::money( $cents, get_woocommerce_currency() ) ),
+			'message' => sprintf( /* translators: %s: amount with currency. */ __( '%s credit added.', 'beltoft-services' ), Page::money( $cents, $currency ) ),
 		);
 	}
 
