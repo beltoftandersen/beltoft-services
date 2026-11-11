@@ -193,8 +193,8 @@ class ServerPageTest extends MonitoringTestCase {
 		ob_start();
 		include BELTOFT_SERVICES_PATH . 'templates/account/slots.php';
 		$html = (string) ob_get_clean();
-		$this->assertSame( 5, substr_count( $html, '<i' ) );
-		$this->assertSame( 2, substr_count( $html, 'is-used' ) );
+		$this->assertStringContainsString( '<i style="width: 40%"></i>', $html, 'Two of five slots fill 40% of the bar.' );
+		$this->assertStringNotContainsString( 'is-full', $html );
 		$this->assertStringContainsString( 'aria-hidden="true"', $html );
 	}
 

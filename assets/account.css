@@ -512,10 +512,11 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .beltoft-services-glance__label { color: var(--ink-soft, #5e7080); font-size: var(--bs-fs-caption); font-weight: var(--bs-fw-medium); }
 .beltoft-services-glance__value { font-weight: var(--bs-fw-medium); }
 @media (max-width: 760px) { .beltoft-services-glance { grid-template-columns: minmax(0, 1fr); gap: 8px; } }
-.beltoft-services-slots { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 8px; }
-/* One box per slot: a used one is filled, a free one is an outline. */
-.beltoft-services-slots i { box-sizing: border-box; width: 18px; height: 18px; border: 2px solid var(--rule, #d6d2c8); background: transparent; }
-.beltoft-services-slots i.is-used { border-color: var(--green, #28513e); background: var(--green, #28513e); }
+/* Snapshot slots in use: the count, and under it a bar whose filled part is the share in use (the look of the server list's usage bars). */
+.beltoft-services-slotrow { display: grid; gap: var(--bs-space-2, 8px); margin: 8px 0 var(--bs-space-4, 16px); }
+.beltoft-services-slotrow .description { margin: 0; color: var(--navy, #0c1535); font-weight: var(--bs-fw-medium, 500); font-variant-numeric: tabular-nums; }
+.beltoft-services-usebar { display: block; position: relative; width: 100%; max-width: 320px; height: 6px; background: var(--bg-warm, #eeece6); }
+.beltoft-services-usebar i { position: absolute; inset: 0 auto 0 0; background: var(--navy, #0c1535); }
 .beltoft-services-vm__more { margin: 12px 0 0; }
 div.beltoft-services-vm__more > h4 { margin-top: 16px; }
 .beltoft-services-tab > div.beltoft-services-vm__more:first-child > h4, .beltoft-services-tab > p:first-child + div.beltoft-services-vm__more > h4 { margin-top: 0; }

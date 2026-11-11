@@ -255,7 +255,7 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 == Changelog ==
 
 = 0.9.2 =
-* Snapshots: each slot is a box (filled when used), the two buttons of a snapshot have space between them and Delete is the outlined button.
+* Snapshots: the slots in use are a bar under the count, the two buttons of a snapshot have space between them and Delete is the outlined button.
 
 = 0.9.1 =
 * Server page: the "Copy SSH command" button among the power buttons is gone; a small Copy sits beside the command on the Log in line.

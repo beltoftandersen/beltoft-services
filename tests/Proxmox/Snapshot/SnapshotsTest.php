@@ -981,9 +981,9 @@ class SnapshotsTest extends SnapshotsTestCase {
 			include BELTOFT_SERVICES_PATH . 'templates/account/slots.php';
 			return (string) ob_get_clean();
 		};
-		$this->assertSame( '', trim( $render( 0, 1 ) ), 'No lone empty box with no snapshots.' );
-		$html = $render( 1, 3 );
-		$this->assertSame( 3, substr_count( $html, '<i' ) );
-		$this->assertSame( 1, substr_count( $html, 'is-used' ) );
+		$this->assertStringContainsString( 'width: 0%', $render( 0, 1 ), 'An empty bar with no snapshots.' );
+		$this->assertSame( '', trim( $render( 0, 0 ) ), 'No bar without slots.' );
+		$this->assertStringContainsString( 'width: 33%', $render( 1, 3 ) );
+		$this->assertStringContainsString( 'beltoft-services-usebar is-full', $render( 1, 1 ) );
 	}
 }

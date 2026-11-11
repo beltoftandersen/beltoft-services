@@ -1,6 +1,6 @@
 <?php
 /**
- * The snapshot slots as squares: used ones filled, free ones empty. Decoration only; the numbers are printed beside it.
+ * The snapshot slots in use as a bar: the filled part is the share in use. Decoration only; the numbers are printed with it.
  *
  * @package BeltoftServices
  *
@@ -9,11 +9,13 @@
 
 defined( 'ABSPATH' ) || exit;
 
-$beltoft_services_cells = max( 0, min( 40, (int) $beltoft_services_strip['slots'] ) );
+$beltoft_services_slots = max( 0, (int) $beltoft_services_strip['slots'] );
 
-// With none in use the squares are only empty boxes (one lone box on a one-slot plan): the numbers say it.
-if ( (int) $beltoft_services_strip['used'] < 1 ) {
+// Nothing to measure against.
+if ( $beltoft_services_slots < 1 ) {
 	return;
 }
+
+$beltoft_services_share = (int) round( 100 * min( $beltoft_services_slots, max( 0, (int) $beltoft_services_strip['used'] ) ) / $beltoft_services_slots );
 ?>
-<span class="beltoft-services-slots" aria-hidden="true"><?php for ( $beltoft_services_i = 0; $beltoft_services_i < $beltoft_services_cells; $beltoft_services_i++ ) : ?><i<?php echo $beltoft_services_i < (int) $beltoft_services_strip['used'] ? ' class="is-used"' : ''; ?>></i><?php endfor; ?></span>
+<span class="beltoft-services-usebar<?php echo 100 === $beltoft_services_share ? ' is-full' : ''; ?>" aria-hidden="true"><i style="width: <?php echo (int) $beltoft_services_share; ?>%"></i></span>

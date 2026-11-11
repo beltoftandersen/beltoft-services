@@ -600,11 +600,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 	<?php if ( is_array( $snapshots ) ) : ?>
 		<div class="beltoft-services-vm__backups beltoft-services-vm__snapshots" data-snapshots>
 			<h4><?php esc_html_e( 'Snapshots', 'beltoft-services' ); ?></h4>
-			<?php
-			// The slots as squares, used ones filled.
-			$beltoft_services_strip = array( 'used' => (int) $snapshots['used'], 'slots' => (int) $snapshots['slots'] );
-			include BELTOFT_SERVICES_PATH . 'templates/account/slots.php';
-			?>
+			<div class="beltoft-services-slotrow">
 			<p class="description" data-snapshot-slots>
 				<?php
 				echo esc_html(
@@ -627,6 +623,12 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 				}
 				?>
 			</p>
+			<?php
+			// The share of the slots in use as a bar under the count.
+			$beltoft_services_strip = array( 'used' => (int) $snapshots['used'], 'slots' => (int) $snapshots['slots'] );
+			include BELTOFT_SERVICES_PATH . 'templates/account/slots.php';
+			?>
+			</div>
 			<?php foreach ( $snapshots['packs'] as $beltoft_services_pack_card ) : ?>
 				<?php
 				// A snapshot pack of this server: its slots, and a note when it is paused.
