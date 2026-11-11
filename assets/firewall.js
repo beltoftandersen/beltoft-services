@@ -286,6 +286,21 @@
 	function load() {
 		return request( 'GET', url ).then( function ( reply ) {
 			if ( ! reply.ok ) {
+				// A background refresh that was refused (too many requests: a second tab, a busy minute) or failed is tried again
+				// later without a word: the list on the page is still right, and a failure line here read as if the customer's
+				// own action (a shutdown, a snapshot) had failed.
+				if ( null !== data && ! applyHandle ) {
+					poll( 15000 );
+
+					return;
+				}
+
+				if ( 429 === reply.status ) {
+					poll( 15000 );
+
+					return;
+				}
+
 				say( '' );
 				B.fail( applyHandle, S.loadFailed );
 				applyHandle = null;
@@ -314,6 +329,12 @@
 				settle();
 			}
 		} ).catch( function () {
+			if ( null !== data && ! applyHandle ) {
+				poll( 15000 );
+
+				return;
+			}
+
 			say( '' );
 			B.fail( applyHandle, S.loadFailed );
 			applyHandle = null;
@@ -328,11 +349,11 @@
 		return JSON.parse( JSON.stringify( rule ) );
 	}
 
-	function poll() {
+	function poll( wait ) {
 		window.clearTimeout( timer );
 		timer = window.setTimeout( function () {
 			load();
-		}, 4000 );
+		}, wait || 4000 );
 	}
 
 	function send( on, rules, ack, confirm, button ) {

@@ -126,7 +126,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 		<dl class="beltoft-services-facts">
 			<?php if ( '' !== $ip ) : ?>
 				<div><dt><?php esc_html_e( 'IP address', 'beltoft-services' ); ?></dt><dd><code><?php echo esc_html( $ip ); ?></code></dd></div>
-				<div><dt><?php esc_html_e( 'Log in', 'beltoft-services' ); ?></dt><dd><code>ssh <?php echo esc_html( $ssh_user ); ?>@<?php echo esc_html( $ip ); ?></code> <button type="button" class="beltoft-services-copy" data-copy="<?php echo esc_attr( 'ssh ' . $ssh_user . '@' . $ip ); ?>" data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></dd></div>
+				<div><dt><?php esc_html_e( 'Log in', 'beltoft-services' ); ?></dt><dd><code>ssh <?php echo esc_html( $ssh_user ); ?>@<wbr><?php echo esc_html( $ip ); ?></code> <button type="button" class="beltoft-services-copy" data-copy="<?php echo esc_attr( 'ssh ' . $ssh_user . '@' . $ip ); ?>" data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></dd></div>
 			<?php endif; ?>
 			<div>
 				<dt><?php esc_html_e( 'Plan', 'beltoft-services' ); ?></dt>
@@ -157,7 +157,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 				<dt><?php esc_html_e( 'IP address', 'beltoft-services' ); ?></dt>
 				<dd><code><?php echo esc_html( $ip ); ?></code></dd>
 				<dt><?php esc_html_e( 'Log in', 'beltoft-services' ); ?></dt>
-				<dd><code>ssh <?php echo esc_html( $ssh_user ); ?>@<?php echo esc_html( $ip ); ?></code> <button type="button" class="beltoft-services-copy" data-copy="<?php echo esc_attr( 'ssh ' . $ssh_user . '@' . $ip ); ?>" data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></dd>
+				<dd><code>ssh <?php echo esc_html( $ssh_user ); ?>@<wbr><?php echo esc_html( $ip ); ?></code> <button type="button" class="beltoft-services-copy" data-copy="<?php echo esc_attr( 'ssh ' . $ssh_user . '@' . $ip ); ?>" data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></dd>
 			<?php endif; ?>
 			<dt><?php esc_html_e( 'Plan', 'beltoft-services' ); ?></dt>
 			<dd>
@@ -247,8 +247,8 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 							?>
 						<?php else : ?>
 							<?php
-							/* translators: %d: the plan's disk size in GB. */
-							echo esc_html( sprintf( __( 'Disk: %d GB', 'beltoft-services' ), (int) $plan['disk_gb'] ) );
+							/* translators: %d: the plan's disk size in GB (the card's label already says Disk). */
+							echo esc_html( sprintf( __( '%d GB', 'beltoft-services' ), (int) $plan['disk_gb'] ) );
 							?>
 						<?php endif; ?>
 					</p>
@@ -276,10 +276,6 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 			<?php if ( isset( $beltoft_services_tabs['snapshots'] ) ) : ?>
 				<a class="beltoft-services-glance__item" href="<?php echo esc_url( $beltoft_services_link( 'snapshots' ) ); ?>" data-tab-link="snapshots">
 					<span class="beltoft-services-glance__label"><?php esc_html_e( 'Snapshots', 'beltoft-services' ); ?></span>
-					<?php
-					$beltoft_services_strip = array( 'used' => (int) $snapshots['used'], 'slots' => (int) $snapshots['slots'] );
-					include BELTOFT_SERVICES_PATH . 'templates/account/slots.php';
-					?>
 					<span class="beltoft-services-glance__value">
 						<?php
 						echo esc_html(
@@ -292,6 +288,10 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 						);
 						?>
 					</span>
+					<?php
+					$beltoft_services_strip = array( 'used' => (int) $snapshots['used'], 'slots' => (int) $snapshots['slots'] );
+					include BELTOFT_SERVICES_PATH . 'templates/account/slots.php';
+					?>
 				</a>
 			<?php endif; ?>
 			<?php if ( isset( $beltoft_services_tabs['backups'] ) ) : ?>

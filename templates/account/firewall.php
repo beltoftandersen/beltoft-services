@@ -66,7 +66,7 @@ $beltoft_services_fw_id = (int) $r->id();
 				</p>
 				<p>
 					<label for="beltoft-fw-port-<?php echo (int) $beltoft_services_fw_id; ?>"><?php esc_html_e( 'Port or range', 'beltoft-services' ); ?></label>
-					<input type="text" id="beltoft-fw-port-<?php echo (int) $beltoft_services_fw_id; ?>" name="port" inputmode="numeric" autocomplete="off" placeholder="8080 or 8000-8100">
+					<input type="text" id="beltoft-fw-port-<?php echo (int) $beltoft_services_fw_id; ?>" name="port" inputmode="numeric" autocomplete="off" placeholder="<?php /* translators: an example port and an example port range */ esc_attr_e( '8080 or 8000-8100', 'beltoft-services' ); ?>">
 				</p>
 				<p>
 					<label for="beltoft-fw-who-<?php echo (int) $beltoft_services_fw_id; ?>"><?php esc_html_e( 'Who can connect', 'beltoft-services' ); ?></label>

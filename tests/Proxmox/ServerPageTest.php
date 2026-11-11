@@ -117,7 +117,7 @@ class ServerPageTest extends MonitoringTestCase {
 		}
 		$this->assertMatchesRegularExpression( '/data-copy="[^"]+" data-copied="[^"]+" hidden/', $html );
 		// The command is printed in the facts, so nothing is lost without script.
-		$this->assertStringContainsString( '<code>ssh root@192.0.2.10</code>', $html );
+		$this->assertStringContainsString( '<code>ssh root@<wbr>192.0.2.10</code>', $html );
 	}
 
 	public function test_the_panel_keeps_what_the_scripts_bind_to(): void {
@@ -217,7 +217,7 @@ class ServerPageTest extends MonitoringTestCase {
 		$this->assertStringNotContainsString( 'beltoft-services-tabs', $html );
 		$this->assertStringNotContainsString( 'class="beltoft-services-tab"', $html );
 		$this->assertStringContainsString( 'data-vm-metrics', $html );
-		$this->assertStringContainsString( 'Disk used', str_replace( 'Disk: 30 GB', 'Disk used', $html ) );
+		$this->assertStringContainsString( 'Disk used', preg_replace( '#\b30 GB\b#', 'Disk used', $html ) );
 	}
 
 	public function test_the_disk_is_a_bar_with_its_reading_cadence(): void {

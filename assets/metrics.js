@@ -1,6 +1,8 @@
 /* Customer VPS usage charts. Inline SVG, no library. No provider data is written into the document. */
 ( function () {
 	'use strict';
+	// Dates and times follow the page's language (da: 20:43), not the browser's own (which may print 08:43 PM).
+	var LANG = ( document.documentElement.lang || '' ).trim() || undefined;
 	var account = window.beltoftServicesAccount;
 	var labels = window.beltoftServicesMetrics && window.beltoftServicesMetrics.strings;
 	if ( ! account || ! labels || ! window.fetch || ! window.beltoftApi ) { return; }
@@ -39,8 +41,8 @@
 
 	function clock( seconds, range ) {
 		var date = new Date( seconds * 1000 );
-		if ( 'month' === range ) { return date.toLocaleDateString( [], { day: 'numeric', month: 'short' } ); }
-		return 'day' === range ? date.toLocaleString( [], { weekday: 'short', hour: '2-digit', minute: '2-digit' } ) : date.toLocaleTimeString( [], { hour: '2-digit', minute: '2-digit' } );
+		if ( 'month' === range ) { return date.toLocaleDateString( LANG, { day: 'numeric', month: 'short' } ); }
+		return 'day' === range ? date.toLocaleString( LANG, { weekday: 'short', hour: '2-digit', minute: '2-digit' } ) : date.toLocaleTimeString( LANG, { hour: '2-digit', minute: '2-digit' } );
 	}
 
 	function span( text ) {

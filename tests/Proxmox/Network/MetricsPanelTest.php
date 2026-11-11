@@ -18,7 +18,7 @@ class MetricsPanelTest extends MonitoringTestCase {
 		$this->assertStringContainsString( 'data-vm-metrics', $html );
 		$this->assertSame( 4, substr_count( $html, 'data-chart=' ) );
 		$this->assertStringContainsString( 'data-range="month"', $html );
-		$this->assertStringContainsString( 'Disk: 30 GB', $html );
+		$this->assertStringContainsString( '>30 GB<', preg_replace( '#>\s+#', '>', preg_replace( '#\s+<#', '<', $html ) ) );
 		$this->assertStringNotContainsString( 'Proxmox', $html );
 	}
 
@@ -27,7 +27,7 @@ class MetricsPanelTest extends MonitoringTestCase {
 		$r->set( array( 'disk_used' => 12 * 1073741824, 'disk_total' => 30 * 1073741824, 'disk_read_at' => time() ) );
 		$this->assertStringContainsString( 'Disk used: 12.0 of 30.0 GB', $this->output( $r ) );
 		$r->set( array( 'disk_read_at' => time() - 6 * HOUR_IN_SECONDS - 1 ) );
-		$this->assertStringContainsString( 'Disk: 30 GB', $this->output( $r ) );
+		$this->assertStringContainsString( '>30 GB<', preg_replace( '#>\s+#', '>', preg_replace( '#\s+<#', '<', $this->output( $r ) ) ) );
 		$r->set( array( 'state' => 'paused' ) );
 		$this->assertStringNotContainsString( 'data-vm-metrics', $this->output( $r ) );
 	}

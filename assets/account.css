@@ -499,6 +499,9 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .beltoft-services-facts dt { margin: 0; color: var(--ink-soft, #5e7080); font-size: var(--bs-fs-caption); font-weight: var(--bs-fw-medium); }
 .beltoft-services-facts dd { margin: var(--bs-space-1) 0 0; font-weight: var(--bs-fw-medium); overflow-wrap: anywhere; }
 .beltoft-services-facts code { padding: 4px 8px; background: var(--bg-warm, #eeece6); font: inherit; font-size: 14px; }
+/* A command breaks at its space or after the @ (a <wbr>), never in the middle of the address. */
+.beltoft-services-facts code, .beltoft-services-vm__facts code { overflow-wrap: normal; word-break: normal; }
+.beltoft-services-fw__again { margin: var(--bs-space-3, 12px) 0 0; }
 /* The small Copy beside a command (the server's Log in line). */
 .beltoft-services-copy, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-copy { display: inline; width: auto; min-height: 0; margin: 0 0 0 var(--bs-space-2, 8px); padding: 0; border: 0; background: none; color: var(--navy, #0c1535); font: inherit; font-size: 14px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .beltoft-services-copy:hover { background: none; color: var(--ink-mid, #3d4a44); }
