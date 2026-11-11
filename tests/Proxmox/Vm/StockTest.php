@@ -227,6 +227,14 @@ class StockTest extends TestCase {
 			return $query;
 		};
 		add_filter( 'query', $grab );
+		$reads = 0;
+		$watch = static function ( $pre ) use ( &$reads ) {
+			++$reads;
+
+			return $pre;
+		};
+		add_filter( 'pre_transient_' . Placement::CAPACITY_PREFIX . 'lab', $watch );
+		add_filter( 'pre_option__transient_' . Placement::CAPACITY_PREFIX . 'lab', $watch );
 
 		foreach ( $products as $product ) {
 			$fresh = wc_get_product( $product->get_id() );
@@ -238,6 +246,9 @@ class StockTest extends TestCase {
 		do_action( 'woocommerce_checkout_process' );
 
 		remove_filter( 'query', $grab );
+		remove_filter( 'pre_transient_' . Placement::CAPACITY_PREFIX . 'lab', $watch );
+		remove_filter( 'pre_option__transient_' . Placement::CAPACITY_PREFIX . 'lab', $watch );
+		$this->assertSame( 0, $reads, 'Showing stock, adding to the cart and checking out never read the capacity cache.' );
 
 		foreach ( $seen as $sql ) {
 			$this->assertStringNotContainsString( Schema::tables()['vms'], $sql, 'The display, cart and checkout path read the machine records: ' . $sql );
@@ -1238,4 +1249,52 @@ class StockTest extends TestCase {
 		Stock::migrate();
 		Stock::run_migration();
 		$this->assertSame( 'outofstock', $this->stored( $closed ), 'Once only.' );
-	}}
+	}
+	public function test_saving_out_of_stock_from_the_product_form_is_the_owners_choice_and_the_pool_does_not_reopen_it(): void {
+		$product = $this->product();
+		$this->assertTrue( IpPool::block( '192.0.2.10' ) );
+		$this->assertSame( 'yes', (string) get_post_meta( $product->get_id(), Stock::META_CLOSED, true ), 'Closed by the pool.' );
+
+		// The owner opens the product form and saves with out of stock selected, which did not change.
+		$p = wc_get_product( $product->get_id() );
+		$p->set_stock_status( 'outofstock' );
+		do_action( 'woocommerce_admin_process_product_object', $p );
+		$p->save();
+		$this->assertSame( '', (string) get_post_meta( $product->get_id(), Stock::META_CLOSED, true ), 'The marker is gone: it is the owner\'s choice now.' );
+
+		$this->assertTrue( IpPool::unblock( '192.0.2.10' ) );
+		$this->assertSame( 'outofstock', $this->stored( $product ), 'An address coming back does not reopen it.' );
+
+		// With in stock selected the marker is not touched (the product is open anyway).
+		$q = $this->product();
+		$this->assertTrue( IpPool::block( '192.0.2.10' ) );
+		$f = wc_get_product( $q->get_id() );
+		$f->set_stock_status( 'instock' );
+		do_action( 'woocommerce_admin_process_product_object', $f );
+		$this->assertSame( 'yes', (string) $f->get_meta( Stock::META_CLOSED ) );
+	}
+
+	public function test_two_migrations_at_once_do_the_work_once(): void {
+		global $wpdb;
+		$closed = $this->product( 4096 );
+		$p      = wc_get_product( $closed->get_id() );
+		$p->set_stock_status( 'outofstock' );
+		$p->save();
+		update_post_meta( $p->get_id(), Stock::META_CLOSED, 'yes' );
+		delete_option( Stock::MIGRATED );
+
+		$name  = \BeltoftServices\Locks::name( 'stock_policy', 0 );
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection is the other process.
+		$other->query( "SELECT GET_LOCK('" . $other->real_escape_string( $name ) . "', 0)" );
+
+		Stock::run_migration();
+		$this->assertSame( 'outofstock', $this->stored( $closed ), 'Another process holds the lock: nothing is done, nothing waits.' );
+		$this->assertSame( '', (string) get_option( Stock::MIGRATED, '' ) );
+
+		$other->query( "SELECT RELEASE_LOCK('" . $other->real_escape_string( $name ) . "')" );
+		$other->close();
+		Stock::run_migration();
+		$this->assertSame( 'instock', $this->stored( $closed ) );
+		$this->assertSame( '1', get_option( Stock::MIGRATED ) );
+	}
+}
