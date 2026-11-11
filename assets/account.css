@@ -398,7 +398,7 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .beltoft-services-srv__name { font-size: var(--bs-fs-body); font-weight: var(--bs-fw-strong); overflow-wrap: anywhere; }
 .beltoft-services-srv__sub { color: var(--ink-soft, #5e7080); font-size: var(--bs-fs-small); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .beltoft-services-srv__bars { display: grid; gap: 4px; font-size: var(--bs-fs-caption); color: var(--ink-soft, #5e7080); font-variant-numeric: tabular-nums; }
-.beltoft-services-bar { display: grid; grid-template-columns: 52px minmax(0, 1fr) 34px; gap: 8px; align-items: center; }
+.beltoft-services-bar { display: grid; grid-template-columns: minmax(52px, max-content) minmax(0, 1fr) 34px; gap: 8px; align-items: center; }
 .beltoft-services-bar > span:last-child { text-align: right; }
 .beltoft-services-bar__track { position: relative; height: 4px; background: var(--bg-warm, #eeece6); }
 .beltoft-services-bar__track i { position: absolute; inset: 0 auto 0 0; background: var(--ink-mid, #2d4060); }
@@ -475,6 +475,13 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .bs-pagehead { box-sizing: border-box; height: 20px; margin: 0 0 var(--bs-space-4); transition: height .15s ease, margin-bottom .15s ease; }
 /* No description and nothing happening: the line takes no room (it only holds the hidden close button). */
 .bs-pagehead.is-empty:not(.is-live) { height: 0; margin-bottom: 0; overflow: hidden; }
+/* The line never grows wider than its page (in a column that sizes to its content it pushed the page sideways on a phone),
+   and a failure is read in full: it wraps instead of ending in an ellipsis. */
+.bs-pagehead { align-self: stretch; min-width: 0; max-width: 100%; }
+.bs-inline { box-sizing: border-box; max-width: 100%; }
+.bs-pagehead:has(.bs-inline.is-fail) { height: auto; min-height: 20px; }
+.bs-inline.is-fail { height: auto; min-height: 20px; align-items: flex-start; }
+.bs-inline.is-fail .bs-inline__text { overflow: visible; text-overflow: clip; white-space: normal; }
 .bs-inline.is-done, .bs-inline.is-info { color: var(--ink-mid, #2d4060); }
 .bs-inline.is-fail { color: var(--bs-status-fail); font-weight: var(--bs-fw-medium); }
 .bs-inline__close { flex: none; width: var(--bs-btn-h); height: var(--bs-btn-h); margin: -10px -10px -10px 0; padding: 0; border: 0; background: none; box-shadow: none; color: inherit; font-size: 22px; line-height: 1; cursor: pointer; }

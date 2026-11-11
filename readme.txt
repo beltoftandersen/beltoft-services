@@ -256,6 +256,7 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 = 0.9.3 =
 * Firewall: a background refresh that is refused (too many requests) or fails is tried again later without a failure line; before, it read as if the customer's own action had failed.
+* The status line wraps a failure and never widens the page; the memory bar's label has room in the server list.
 * Server page: space above the Open console and Start again buttons, the SSH command no longer breaks inside the address, graph times follow the page language, the disk card says the size once, the port example is translatable.
 
 = 0.9.2 =
