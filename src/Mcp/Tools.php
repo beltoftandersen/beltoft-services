@@ -423,7 +423,11 @@ final class Tools {
 					return new \WP_Error( 'beltoft_services_tool', $found->get_error_message() );
 				}
 
-				return array_is_list( $found ) ? array( 'results' => $found ) : $found;
+				$found = array_is_list( $found ) ? array( 'results' => $found ) : $found;
+				// Prices are per year, excluding tax, in the currency of the token's owner.
+				$found['currency'] = \BeltoftServices\Currency::current();
+
+				return $found;
 		}
 
 		$id = (int) $args['id'];

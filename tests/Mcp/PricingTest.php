@@ -27,6 +27,7 @@ require_once __DIR__ . '/DatabaseFixture.php';
 final class PricingTest extends UsageTestCase {
 
 	use CallsTools;
+	use \BeltoftServices\Tests\Support\FakeCurrency;
 	use DatabaseFixture;
 
 	/**
@@ -62,6 +63,7 @@ final class PricingTest extends UsageTestCase {
 	}
 
 	public function tear_down(): void {
+		$this->fake_currency_down();
 		$this->mcp_tear_down();
 		Offers::reset();
 		update_option( 'woocommerce_currency', 'USD' );
@@ -218,5 +220,69 @@ final class PricingTest extends UsageTestCase {
 		$this->assertStringNotContainsString( '—', $all );
 		$this->assertStringNotContainsString( '·', $all );
 		$this->assertStringNotContainsString( 'password', $all );
+	}
+
+	private function dkk_owner(): void {
+		update_option( \BeltoftServices\Domains\Prices::OPTION, array( 'com' => array( 'create' => 8.0, 'renew' => 8.0, 'transfer' => 8.0, 'restricted' => false, 'price' => 12 ) ) );
+		$this->fake_currency_up( 'EUR' );
+		$this->fake_user_currencies( array( $this->user => 'DKK' ) );
+		$this->fake_amounts( array( 'DKK' => array( 'domain_price_overrides' => "com=119\n" ) ) );
+	}
+
+	public function test_the_whole_mcp_call_is_answered_in_the_token_owners_currency_and_the_window_closes(): void {
+		$this->dkk_owner();
+		$this->fake_runner();
+
+		$out = $this->call( 'catalog', array( 'kind' => 'domain_prices' ) );
+
+		$this->assertSame( 'DKK', $out['currency'], 'No literal EUR.' );
+		$this->assertSame( array( array( 'ending' => 'com', 'price_per_year' => 119 ) ), $out['endings'], 'The DKK line, never the euro price.' );
+		$this->assertSame( 'EUR', \BeltoftServices\Currency::current(), 'The window is closed.' );
+	}
+
+	public function test_with_no_way_to_put_the_owners_currency_in_force_the_call_is_refused(): void {
+		$this->dkk_owner();
+		$this->fake_runner( false );
+
+		$response = $this->post( array( 'jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => array( 'name' => 'catalog', 'arguments' => array( 'kind' => 'domain_prices' ) ) ), $this->read() );
+
+		$this->assertSame( 503, $response->get_status() );
+		$this->assertSame( 'currency_unavailable', $response->get_data()['error'] );
+	}
+
+	public function test_an_owner_in_the_shop_currency_is_answered_as_before_with_the_currency_code_added(): void {
+		update_option( \BeltoftServices\Domains\Prices::OPTION, array( 'com' => array( 'create' => 8.0, 'renew' => 8.0, 'transfer' => 8.0, 'restricted' => false, 'price' => 12 ) ) );
+
+		$out = $this->call( 'catalog', array( 'kind' => 'domain_prices' ) );
+
+		$this->assertSame( 'EUR', $out['currency'] );
+		$this->assertSame( array( array( 'ending' => 'com', 'price_per_year' => 12 ) ), $out['endings'] );
+	}
+
+	public function test_a_token_request_to_a_money_route_runs_in_the_owners_currency(): void {
+		$this->dkk_owner();
+		$this->fake_runner();
+		$seen = '';
+		add_filter( 'rest_request_after_callbacks', function ( $response ) use ( &$seen ) {
+			$seen = \BeltoftServices\Currency::current();
+			return $response;
+		}, 5 );
+		$prop = new \ReflectionProperty( Tokens::class, 'current' );
+		$prop->setAccessible( true );
+		$prop->setValue( null, array( 'uuid' => 'u', 'user' => $this->user, 'scope' => Tokens::READ ) );
+		wp_set_current_user( $this->user );
+
+		$gate = Tokens::gate( null, rest_get_server(), new \WP_REST_Request( 'GET', '/beltoft-services/v1/domains/check' ) );
+
+		$prop->setValue( null, null );
+		$this->assertNotNull( $gate, 'The gate answered inside the window.' );
+		$this->assertSame( 'DKK', $seen );
+		$this->assertSame( 'EUR', \BeltoftServices\Currency::current() );
+	}
+
+	public function test_a_pay_as_you_go_order_is_refused_when_the_plan_has_no_price_in_the_currency(): void {
+		$src = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'src/Mcp/Purchase.php' );
+
+		$this->assertStringContainsString( "'' === (string) \$variant->get_price()", $src, 'A missing price is not free.' );
 	}
 }

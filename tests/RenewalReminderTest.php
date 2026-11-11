@@ -191,4 +191,34 @@ class RenewalReminderTest extends TestCase {
 		$this->assertNotNull( Emails::get( 'beltoft_services_renewal_reminder' ) );
 		$this->assertSame( 0, RenewalReminder::days( $this->service_product()->get_id() ) );
 	}
+
+	public function test_the_price_is_written_in_the_subscriptions_currency_and_the_mail_is_skipped_when_it_cannot_be(): void {
+		update_option( 'woocommerce_currency', 'EUR' );
+		$sub = $this->subscription( 'year', 20 * DAY_IN_SECONDS, '30' );
+		$sub->set_currency( 'DKK' );
+		$sub->save();
+		$sub = wcs_get_subscription( $sub->get_id() );
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
+		delete_transient( 'beltoft_services_reminder_currency_dkk' );
+		$state = new class() {
+			use \BeltoftServices\Tests\Support\FakeCurrency;
+
+			public function up( bool $honour ): void {
+				$this->fake_currency_up( 'EUR' );
+				$this->fake_runner( $honour );
+			}
+
+			public function down(): void {
+				$this->fake_currency_down();
+			}
+		};
+
+		$state->up( false );
+		RenewalReminder::run( $sub->get_id() );
+		$this->assertSame( array(), $this->reminders(), 'No way to put DKK in force: no mail in the wrong currency.' );
+		$this->assertCount( 1, array_filter( $this->mails, static fn( $m ) => false !== strpos( (string) $m['subject'], 'Renewal reminder not sent in DKK' ) ), 'The admin is told once.' );
+		RenewalReminder::run( $sub->get_id() );
+		$this->assertCount( 1, array_filter( $this->mails, static fn( $m ) => false !== strpos( (string) $m['subject'], 'not sent in DKK' ) ) );
+		$state->down();
+	}
 }

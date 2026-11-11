@@ -8,6 +8,7 @@
 namespace BeltoftServices\Api;
 
 use BeltoftLicenses\Events;
+use BeltoftServices\Currency;
 use BeltoftServices\Mcp\Endpoint;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
@@ -147,6 +148,12 @@ final class Tokens {
 	 * @var array<string, mixed>|null
 	 */
 	private static $current = null;
+
+	/** Routes whose answers hold money: a token request to them runs in its owner's currency. */
+	private const MONEY_ROUTES = '#/(domains/check|[^/]+/\d+/addons|addons)$#D';
+
+	/** @var bool Inside the window of a token request (the nested dispatch skips the gate's window). */
+	private static bool $windowed = false;
 
 	/**
 	 * Hooks.
@@ -443,6 +450,24 @@ final class Tokens {
 
 		if ( RateLimit::exceeded( 'token_' . self::$current['uuid'], 'beltoft-services:token', $max, MINUTE_IN_SECONDS ) ) {
 			return self::refuse( 'beltoft_services_rate_limited', __( 'Too many requests. Please wait a minute and try again.', 'beltoft-services' ), 429 );
+		}
+
+		// A route that returns money is answered in the currency of the token's owner: the whole dispatch runs in a window for it, which
+		// closes when the dispatch ends, whichever way it ends. With no way to put that currency in force the call is refused.
+		if ( ! self::$windowed && 1 === preg_match( self::MONEY_ROUTES, $route ) ) {
+			$code = Currency::of_user( (int) self::$current['user'] );
+
+			if ( $code !== Currency::current() ) {
+				self::$windowed = true;
+
+				try {
+					list( $ok, $response ) = Currency::with( $code, static fn() => rest_get_server()->dispatch( $request ) );
+				} finally {
+					self::$windowed = false;
+				}
+
+				return $ok ? $response : self::refuse( 'beltoft_services_currency', __( 'Prices are not available for the currency of this account.', 'beltoft-services' ), 503 );
+			}
 		}
 
 		return $result;

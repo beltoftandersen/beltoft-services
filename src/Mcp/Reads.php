@@ -604,7 +604,7 @@ final class Reads {
 					}
 				}
 
-				return array( 'currency' => 'EUR', 'note' => 'Prices are per year and exclude tax. Use domain_check for one name.', 'endings' => array_slice( $out, 0, 500 ) );
+				return array( 'currency' => \BeltoftServices\Currency::current(), 'note' => 'Prices are per year and exclude tax. Use domain_check for one name.', 'endings' => array_slice( $out, 0, 500 ) );
 		}
 
 		return new \WP_Error( 'beltoft_services_tool', __( 'This is not available.', 'beltoft-services' ) );

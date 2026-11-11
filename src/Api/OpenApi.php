@@ -240,9 +240,9 @@ final class OpenApi {
 				'errors'  => array( 401, 403, 404, 429 ),
 			),
 			'GET /domains/check'                         => array(
-				'summary' => 'Whether a domain name is available, and its price.',
+				'summary' => 'Whether a domain name is available, and its price per year excluding tax, in the currency named in the answer.',
 				'scope'   => 'read',
-				'reply'   => array( 'results' => array( 'type' => 'array', 'items' => array( 'type' => 'object' ) ) ),
+				'reply'   => array( 'results' => array( 'type' => 'array', 'items' => array( 'type' => 'object' ) ), 'currency' => $text ),
 				'errors'  => array( 400, 429, 503 ),
 			),
 			'GET /openapi.json'                          => array(

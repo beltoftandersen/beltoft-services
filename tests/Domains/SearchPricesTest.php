@@ -82,7 +82,8 @@ class SearchPricesTest extends TestCase {
 		$request->set_param( 'name', $name . '.com' );
 		$browser = Search::rest_check( $request )->get_data();
 
-		$this->assertSame( array( 'results' ), array_keys( $plain ) );
+		$this->assertSame( array( 'results', 'currency' ), array_keys( $plain ), 'A token holder gets the plain answer and the currency code of its prices.' );
+		$this->assertSame( 12, $plain['results'][0]['price'] );
 		$this->assertArrayHasKey( 'price_html', $browser['results'][0] );
 		$this->assertArrayHasKey( 'tax', $browser );
 	}

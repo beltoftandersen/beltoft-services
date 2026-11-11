@@ -112,7 +112,7 @@ final class Purchase {
 		}
 
 		return array(
-			'currency' => get_woocommerce_currency(),
+			'currency' => \BeltoftServices\Currency::current(),
 			'note'     => Pricing::note() . ' Pass a plan id and a system id to order_server. An app runs on its own system, so give an app or a system, not both. Apps that have a licence cost are ordered in the dashboard.',
 			'plans'    => $out,
 		);
@@ -247,7 +247,7 @@ final class Purchase {
 		$target  = $backups ? (int) $usage['backups_variation_id'] : (int) $usage['variation_id'];
 		$variant = $target > 0 ? wc_get_product( $target ) : null;
 
-		if ( ! $variant instanceof \WC_Product || (int) $checked['variation_id'] !== $target || (float) $variant->get_price() > 0 ) {
+		if ( ! $variant instanceof \WC_Product || (int) $checked['variation_id'] !== $target || '' === (string) $variant->get_price() || (float) $variant->get_price() > 0 ) {
 			return $fail( __( 'This plan cannot be ordered pay as you go through Claude.', 'beltoft-services' ) );
 		}
 

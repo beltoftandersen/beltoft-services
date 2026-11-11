@@ -8,6 +8,8 @@
 namespace BeltoftServices;
 
 use BeltoftLicenses\Licenses;
+use BeltoftServices\Alerts;
+use BeltoftServices\Currency;
 use BeltoftServices\Emails\Emails;
 
 defined( 'ABSPATH' ) || exit;
@@ -191,6 +193,22 @@ final class RenewalReminder {
 		$next = (int) $subscription->get_time( 'next_payment' );
 		$sent = false;
 
+		// The price is written in the currency of the subscription, whatever this job runs in. With no way to put that currency in force the
+		// mail is not sent (a price in the wrong currency is worse than a late reminder) and the admin is told once per currency.
+		list( $ok, $price_html ) = Currency::with( Currency::of_order( $subscription ), static fn() => (string) $subscription->get_formatted_order_total() );
+
+		if ( ! $ok ) {
+			Alerts::notify(
+				/* translators: %s: currency code */
+				sprintf( __( 'Renewal reminder not sent in %s', 'beltoft-services' ), Currency::of_order( $subscription ) ),
+				array( sprintf( 'The renewal reminder of subscription %1$d was not sent: its price is in %2$s and that currency could not be put in force.', $subscription->get_id(), Currency::of_order( $subscription ) ) ),
+				null,
+				'beltoft_services_reminder_currency_' . strtolower( Currency::of_order( $subscription ) )
+			);
+
+			return false;
+		}
+
 		foreach ( Licenses::where( 'subscription_id', (int) $subscription->get_id() ) as $license ) {
 			$resource = Resource::for_license( (int) $license['id'] );
 
@@ -211,7 +229,7 @@ final class RenewalReminder {
 					'renewal' => array(
 						'date'       => wp_date( 'j F Y', $next ),
 						'plan'       => implode( ', ', array_filter( $names ) ),
-						'price_html' => (string) $subscription->get_formatted_order_total(),
+						'price_html' => (string) $price_html,
 						'view_url'   => (string) $subscription->get_view_order_url(),
 					),
 				)

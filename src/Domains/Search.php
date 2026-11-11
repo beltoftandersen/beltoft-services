@@ -43,6 +43,8 @@ final class Search {
 		// A token holder (REST token, OAuth, MCP) gets the plain answer; the browser of a visitor also gets the prices as the page prints them.
 		$result = self::visitor_search( (string) $request['name'], null === Tokens::current() );
 		if ( is_wp_error( $result ) ) { return $result; }
+		// A token holder's prices are excluding tax and carry their currency.
+		if ( null !== Tokens::current() ) { $result['currency'] = (string) get_woocommerce_currency(); }
 		$response = new \WP_REST_Response( $result, 200 );
 		// Only this browser may keep it, briefly: shared caches must not hold availability.
 		$response->header( 'Cache-Control', 'private, max-age=60' );

@@ -8,6 +8,7 @@
 namespace BeltoftServices\Mcp;
 
 use BeltoftServices\Api\Tokens;
+use BeltoftServices\Currency;
 use BeltoftServices\RateLimit;
 
 defined( 'ABSPATH' ) || exit;
@@ -158,7 +159,13 @@ final class Endpoint {
 			return self::http( self::error( null, -32600, 'Invalid Request: batches are not supported' ), 400 );
 		}
 
-		$reply = self::message( $body, $token );
+		// The whole message is answered in the currency of the token's owner (the tools call the REST routes inside this window). With no way
+		// to put that currency in force the call is refused: a price in the wrong currency is never given.
+		list( $ok, $reply ) = Currency::with( Currency::of_user( (int) $token['user'] ), static fn() => self::message( $body, $token ) );
+
+		if ( ! $ok ) {
+			return self::http( array( 'error' => 'currency_unavailable', 'message' => __( 'Prices are not available for the currency of this account.', 'beltoft-services' ) ), 503 );
+		}
 
 		return null === $reply ? self::http( null, 202 ) : self::http( $reply, 200 );
 	}
