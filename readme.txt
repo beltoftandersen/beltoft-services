@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.7.2
+Stable tag: 0.8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -53,6 +53,27 @@ Connection secrets are encrypted with a key from `wp-config.php`, and they are n
 6. For virtual machines, follow "How do I set up Proxmox?" in the FAQ.
 
 == Frequently Asked Questions ==
+
+= More than one currency =
+
+For a site builder. The plugin never converts a price. It reads prices from WooCommerce and amounts from its own settings, in the currency of the customer, and it asks the site (through filters) for everything that differs per currency. A plugin that gives WooCommerce a second currency connects to these hooks in a small site file.
+
+* `beltoft_services_currency_runner`: returns a callable `function ( string $code, callable $fn )` that runs `$fn` with that currency in force and puts the old one back in a `finally`. Without it only the shop's own currency can be worked in, and a call in another currency (a meter run, an API call, a reminder mail) is refused or skipped with an admin alert.
+* `beltoft_services_user_currency( $code, $user_id )`: the currency a customer is in. Run at priority 5 by your connection; the plugin adds the customer's credit currency at 10 and their usage account at 20.
+* `beltoft_services_amount_setting( $value, $key, $currency )`: the amount of a setting in a currency (`usage_minimum`, `usage_threshold`, `usage_threshold_new`, `credit_min`, `credit_max`, `domain_price_overrides`). `$value` is null for a currency other than the shop's, and null back means "no amount": no early bill, no minimum, no top-ups, the domain extension is not sold.
+* `beltoft_services_guard_rate( $rate, $code )`, or the setting Guard rates (lines such as `DKK=7.60`, a little above the real rate): how many units of the currency are worth one euro. Used only to check that an order covers what a supplier is paid in euro. No rate: the order is refused and the admin is mailed once.
+* `beltoft_services_currencies( $codes )`: the currencies of the shop, for the currency field of a credit code.
+* `beltoft_services_price_html( $html, $amount, $currency, $context, $render )`: every catalogue price printed as markup passes it; `$render( 'incl' | 'excl' | '' )` renders the same price in a tax display, so a site can show both figures.
+* `beltoft_services_app_text( $text, $app_id, $field )`: the summary and getting-started text of a one-click app, after translation.
+* `beltoft_services_checkout_field_heading( $show, $kind )`: a checkout with its own step heading leaves the fields' heading out.
+* Action `beltoft_services_usage_account_created( $user_id, $account )`: a usage account was made with no order behind it; fix the customer's currency here.
+* The cart item key `beltoft_services_price_currency` (`Currency::CART_KEY`) holds the currency a runtime price (a domain line, a top-up line) was worked out in. A site that approves runtime prices in another currency must approve a line only when this key equals the cart's currency.
+
+What the plugin never does: convert an amount for a customer, show a price in a currency other than the customer's, or put one customer's money in two currencies (a credit balance has one currency, and rows in another currency are never billed on an order of the first).
+
+What must be set for each currency: the price of every product and variation (also 0 for a pay as you go variation), the pay as you go monthly prices the rates come from, the minimum, the early billing thresholds, the top-up limits, a domain price line per extension, and a guard rate. A currency with no value for one of them simply does not get that feature.
+
+The order to switch a currency on: 1. add the prices and amounts above, 2. add the guard rate, 3. connect the hooks in the site file, 4. try an order, a pay as you go server, a top-up and a domain on a staging site in the new currency, 5. only then show the currency to visitors.
 
 = How do I set the secrets key? =
 
@@ -231,6 +252,15 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.8.0 =
+* More than one shop currency. A customer is priced, invoiced and charged in one currency, and nothing is ever converted for a customer: an amount with no value in a currency is not offered in it. See "More than one currency" in the FAQ.
+* Pay as you go usage, credit, top-ups, the minimum and the early billing threshold work per currency. Hours that could not be metered (no price in the account's currency yet) are caught up from the first unmetered hour, up to 45 days.
+* Hosting add-ons are quoted, ordered and billed in the subscription's currency. Plan, backup, disk and add-on prices shown for an existing service are read in its subscription's currency, and a switch is refused from a page in another currency.
+* Domains, certificates and licence keys can be sold in a second currency: a price per extension per currency, and a guard rate (setting `currency_guard_rates`) so an order is only placed with the supplier when what was paid covers its cost in euro. Without a guard rate such an order is refused and the admin is mailed.
+* The MCP endpoint, the API routes that return prices and the renewal reminder use the currency of the token owner or of the subscription. A call that cannot be answered in that currency is refused; amounts stay excluding tax and carry their currency code.
+* The credit box on a user profile names the currency, credit codes have a currency, and the Currencies settings section explains the fields.
+* New hooks: `beltoft_services_currency_runner`, `_user_currency`, `_amount_setting`, `_guard_rate`, `_currencies`, `_price_html`, `_app_text`, `_checkout_field_heading` and the action `beltoft_services_usage_account_created`. Pinned for a theme: `Usage\Rates::in_cart()`.
 
 = 0.7.2 =
 * Groundwork for a second shop currency, with no change on a shop with one currency: pay as you go usage is metered, invoiced and capped in the currency of the customer's usage account, account credit and top-ups have one currency per customer, and amount settings can be given per currency through filters. Nothing is ever converted: an amount with no value in a currency is not offered in it.
