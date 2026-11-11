@@ -25,9 +25,6 @@ $beltoft_services_power_text = $busy ? __( 'Busy', 'beltoft-services' ) : ( 'run
 			<?php endif; ?>
 			<?php if ( '' !== $ip || $actions ) : ?>
 				<div class="beltoft-services-page__actions">
-					<?php if ( '' !== $ip ) : ?>
-						<button type="button" class="button woocommerce-button beltoft-services-btn" data-copy="<?php echo esc_attr( 'ssh ' . $ssh_user . '@' . $ip ); ?>" data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy SSH command', 'beltoft-services' ); ?></button>
-					<?php endif; ?>
 					<?php foreach ( array( 'start', 'reboot', 'shutdown' ) as $beltoft_services_name ) : ?>
 						<?php if ( ! isset( $actions[ $beltoft_services_name ] ) ) { continue; } ?>
 						<?php $beltoft_services_label = $actions[ $beltoft_services_name ]; ?>

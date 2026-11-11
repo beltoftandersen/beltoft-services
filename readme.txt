@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.9.0
+Stable tag: 0.9.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -253,6 +253,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.9.1 =
+* Server page: the "Copy SSH command" button among the power buttons is gone; a small Copy sits beside the command on the Log in line.
 
 = 0.9.0 =
 * Free transfers (setting `domain_free_transfers`, off by default): for an extension the registrar moves without a year, a transfer costs nothing at checkout and the first yearly payment falls on the domain's own renewal date. A payment method is still required. No year is bought at the registrar before that payment. The price refresh now records whether the registrar stated a transfer price (a missing price is not free). A domain search result of a free transfer carries `free_transfer` true (no key otherwise); the price tag `{beltoft_domain_transfer:tld}` prints "Free" for such an extension. Filters `beltoft_services_domain_free_transfer` and `beltoft_services_trial_cart_item`.

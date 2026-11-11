@@ -69,6 +69,8 @@ class ServerPageTest extends MonitoringTestCase {
 		$html = $this->page( $r, (string) $r->license()['id'] );
 		$this->assertStringContainsString( 'beltoft-services-page__rename-name">web-01</span>', $html );
 		$this->assertStringContainsString( 'data-copy="ssh root@192.0.2.10"', $html );
+		$this->assertStringNotContainsString( 'Copy SSH command', $html, 'The copy sits beside the Log in line, not among the power buttons.' );
+		$this->assertStringContainsString( 'class="beltoft-services-copy" data-copy="ssh root@192.0.2.10"', $html );
 		$this->assertStringContainsString( 'data-power-action="reboot"', $html );
 		$this->assertStringContainsString( 'data-power-action="shutdown"', $html );
 		$this->assertStringNotContainsString( 'Console', $html );
