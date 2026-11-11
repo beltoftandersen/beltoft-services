@@ -494,7 +494,7 @@ final class ServerPicker {
 
 		if ( '' === $period ) {
 			/* translators: %s: price such as €4.00 */
-			return sprintf( TaxNote::pick( $tax, __( '%s excluding VAT', 'beltoft-services' ), __( '%s including VAT', 'beltoft-services' ), __( '%s', 'beltoft-services' ) ), $money );
+			return sprintf( TaxNote::pick( $tax, __( '%s excluding VAT', 'beltoft-services' ), __( '%s including VAT', 'beltoft-services' ), '%s' ), $money );
 		}
 
 		/* translators: 1: price such as €4.00, 2: period such as month */
