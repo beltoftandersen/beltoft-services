@@ -14,17 +14,6 @@
 	var status = window.beltoftStatus;
 	var strings = ( window.beltoftApiTokens && window.beltoftApiTokens.strings ) || {};
 
-	// What the last post did arrives in the page; the bar says it.
-	if ( status ) {
-		Array.prototype.forEach.call( document.querySelectorAll( '[data-bs-flash]' ), function ( node ) {
-			if ( 'fail' === node.getAttribute( 'data-bs-flash' ) ) {
-				status.fail( null, node.textContent );
-			} else {
-				status.info( node.textContent );
-			}
-		} );
-	}
-
 	// WooCommerce's own forms that post and reload (account details, address): the bar says Working and the buttons lock.
 	Array.prototype.forEach.call( document.querySelectorAll( 'form.woocommerce-EditAccountForm, .woocommerce-address-fields' ), function ( node ) {
 		var form = 'FORM' === node.tagName ? node : node.closest( 'form' );
@@ -34,7 +23,7 @@
 		}
 	} );
 
-	// Create token needs a name (a styled message under the field); Send code and Create say what they do while the page reloads.
+	// Create token needs a name (the message goes to the status bar, the field is marked); Send code and Create say what they do while the page reloads.
 	document.addEventListener( 'submit', function ( event ) {
 		var form = event.target;
 		var name;

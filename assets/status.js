@@ -4,7 +4,7 @@
  *
  *   var h = beltoftStatus.busy( 'Rebooting your server…', 'resource-id', button? );   // state line + lock, returns a handle
  *   beltoftStatus.done( h, 'Your server has restarted.' );                           // shown about 5 s, then fades
- *   beltoftStatus.fail( h, 'Failed: …', fieldElementOrSelector? );                   // stays until closed; the field gets the message too
+ *   beltoftStatus.fail( h, 'Failed: …', fieldElementOrSelector? );                   // stays until closed; the field is marked invalid and focused, the text is shown once, here
  *   beltoftStatus.info( 'Copied.' );                                                  // like done, without a handle
  *   beltoftStatus.confirm( { title, text, confirm, cancel, danger } ).then( function ( yes ) {} );
  *   beltoftStatus.locked( scope );                                                    // true while a handle of that scope is busy
@@ -390,10 +390,6 @@
 
 	function clearFields() {
 		fieldNotes.forEach( function ( note ) {
-			if ( note.node.parentNode ) {
-				note.node.parentNode.removeChild( note.node );
-			}
-
 			note.field.removeAttribute( 'aria-invalid' );
 
 			if ( note.describedby ) {
@@ -406,28 +402,26 @@
 		fieldNotes = [];
 	}
 
-	function fieldNote( field, message ) {
-		var node = make( 'p', 'bs-field-error', message );
-		var anchor = field;
-		var id = 'bs-field-error-' + ( fieldNotes.length + 1 ) + '-' + Date.now();
+	// A failed field is marked invalid and points at the state line, which holds the one copy of the message. The text is never
+	// printed next to the field: an error is shown once, at the top.
+	function fieldNote( field ) {
+		var line = inlineTarget();
 		var before = field.getAttribute( 'aria-describedby' );
 
 		clearFields();
-		node.id = id;
-		node.setAttribute( 'data-bs-field-error', '' );
+		field.setAttribute( 'aria-invalid', 'true' );
 
-		// Right under the field; a field inside a label or a row of inputs gets it after the row.
-		if ( anchor.nextSibling ) {
-			anchor.parentNode.insertBefore( node, anchor.nextSibling );
-		} else {
-			anchor.parentNode.appendChild( node );
+		if ( line ) {
+			if ( ! line.id ) {
+				line.id = 'bs-status-line';
+			}
+
+			field.setAttribute( 'aria-describedby', before ? before + ' ' + line.id : line.id );
 		}
 
-		field.setAttribute( 'aria-invalid', 'true' );
-		field.setAttribute( 'aria-describedby', before ? before + ' ' + id : id );
-		fieldNotes.push( { node: node, field: field, describedby: before } );
+		fieldNotes.push( { field: field, describedby: before } );
 
-		// The error goes when the customer changes the field.
+		// The mark goes when the customer changes the field.
 		var gone = function () {
 			field.removeEventListener( 'input', gone );
 			field.removeEventListener( 'change', gone );
@@ -494,10 +488,10 @@
 
 		finish( handle, 'fail', message );
 
-		// A failure with no field to point to must not go unseen: bring the state line into view.
+		// The message is at the top: bring the state line into view when it is not.
 		var line = inlineTarget();
 
-		if ( line && ! target && line.getBoundingClientRect ) {
+		if ( line && line.getBoundingClientRect ) {
 			var seen = line.getBoundingClientRect();
 
 			if ( seen.top < headerTop || seen.bottom > window.innerHeight ) {
@@ -506,7 +500,7 @@
 		}
 
 		if ( target ) {
-			fieldNote( target, text( 'failedPrefix', 'Failed: ' ) + message );
+			fieldNote( target );
 
 			if ( target.focus ) {
 				target.focus( { preventScroll: true } );
@@ -723,4 +717,26 @@
 		clearFields: clearFields,
 		release: release
 	};
+
+	// What the last post did arrives in the page as hidden [data-bs-flash] lines (Account\Flash, the credit page, the API tokens page):
+	// the status bar says it, once. A failure may name its field (data-bs-field): the field is marked and focused, the text is not repeated.
+	function flash() {
+		Array.prototype.forEach.call( document.querySelectorAll( '[data-bs-flash]' ), function ( node ) {
+			var kind = node.getAttribute( 'data-bs-flash' );
+
+			node.removeAttribute( 'data-bs-flash' );
+
+			if ( 'fail' === kind ) {
+				fail( null, node.textContent, node.getAttribute( 'data-bs-field' ) || undefined );
+			} else {
+				info( node.textContent );
+			}
+		} );
+	}
+
+	if ( 'loading' === document.readyState ) {
+		document.addEventListener( 'DOMContentLoaded', flash );
+	} else {
+		flash();
+	}
 }() );

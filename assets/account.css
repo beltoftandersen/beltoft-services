@@ -453,7 +453,6 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .beltoft-services-page__namerow .beltoft-services-page__renameform[hidden] { display: none; }
 .beltoft-services-page__namerow .beltoft-services-page__renameform input[name="name"] { flex: 0 1 320px; width: auto; box-sizing: border-box; min-width: 0; height: var(--bs-btn-h); margin: 0; padding: 0 var(--bs-space-3); font-size: var(--bs-fs-title); font-weight: var(--bs-fw-strong); line-height: 1; }
 .beltoft-services-page__namerow .beltoft-services-page__renameform .beltoft-services-btn { flex: none; width: auto; margin: 0; }
-.beltoft-services-page__renameform .bs-field-error { order: 9; flex: 0 0 100%; margin: 0; }
 .beltoft-services-page__meta { display: flex; flex-wrap: nowrap; align-items: center; gap: 0 var(--bs-space-4); height: 20px; margin: var(--bs-space-1) 0 0; color: var(--ink-soft, #5e7080); font-size: var(--bs-fs-small); line-height: 20px; }
 .beltoft-services-panel--page .beltoft-services-badge { display: inline-flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; color: var(--ink-mid, #2d4060); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); letter-spacing: normal; line-height: 20px; opacity: 1; flex: none; }
 .beltoft-services-panel--page .beltoft-services-badge--ready { color: var(--bs-status-ok); }
@@ -901,8 +900,7 @@ div.beltoft-services-domain ul.beltoft-services-domain__import-list > li { displ
 .woocommerce-account .beltoft-services-usage__table { margin-bottom: 4px; }
 
 /* Status bar, action lock and question (assets/status.js). One colour variable per state: change it here and it changes everywhere. */
-.woocommerce-MyAccount-content :is(input, select, textarea, button, a, summary, [aria-invalid]), .woocommerce-checkout :is(input, select, textarea, button), .bs-field-error { scroll-margin-top: var(--bs-overlay-clear, 88px); }
-.bs-field-error { margin: 8px 0 0; color: var(--bs-status-fail); font-size: 14px; font-weight: 600; }
+.woocommerce-MyAccount-content :is(input, select, textarea, button, a, summary, [aria-invalid]), .woocommerce-checkout :is(input, select, textarea, button) { scroll-margin-top: var(--bs-overlay-clear, 88px); }
 [aria-invalid="true"] { outline: 2px solid var(--bs-status-fail); outline-offset: 1px; }
 button.is-busy, input.is-busy, [data-bs-action].is-busy { cursor: progress; }
 button.is-busy::before, [data-bs-action].is-busy::before { content: ""; display: inline-block; width: 1.5em; height: 0.44em; margin-right: 0.6em; vertical-align: 0.02em; background: linear-gradient(currentColor, currentColor) 0 50% / 0.44em 0.44em no-repeat, linear-gradient(currentColor, currentColor) 50% 50% / 0.18em 0.18em no-repeat, linear-gradient(currentColor, currentColor) 100% 50% / 0.18em 0.18em no-repeat; animation: beltoft-services-dots 1.2s ease-in-out infinite; }

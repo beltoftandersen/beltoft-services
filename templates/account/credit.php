@@ -20,7 +20,7 @@ $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 ?>
 <section class="beltoft-services-credit">
 	<?php
-	// A redeemed or refused code is told in the status bar (assets/credit.js); a refused code also under its field.
+	// A redeemed or refused code is told in the status bar (assets/credit.js); a refused code also marks its field (not repeated there).
 	// A Bricks account page does not print notices for this page.
 	if ( function_exists( 'wc_get_notices' ) ) {
 		foreach ( wc_get_notices() as $beltoft_services_kind => $beltoft_services_list ) {

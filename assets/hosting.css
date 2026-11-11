@@ -7,7 +7,6 @@
 .beltoft-hosting h4 { margin: 0 0 var(--bs-space-3, 12px); color: var(--bsh-ink); font-size: var(--bs-fs-heading, 18px); font-weight: var(--bs-fw-strong, 600); line-height: var(--bs-lh-heading, 1.3); }
 .beltoft-hosting > div { margin: var(--bs-space-5, 24px) 0 0; }
 .beltoft-hosting .beltoft-hosting-summary { margin-top: var(--bs-space-5, 24px); }
-.beltoft-hosting .beltoft-hosting-message { min-height: 1.5em; margin: var(--bs-space-3, 12px) 0 0; color: var(--bsh-soft); font-size: var(--bs-fs-small, 14px); }
 
 /* Notices */
 .beltoft-hosting .beltoft-hosting-notice, .beltoft-hosting .beltoft-hosting-warning { padding: var(--bs-space-3, 12px) var(--bs-space-4, 16px); border-left: 3px solid var(--bs-status-warn, #8a5a00); background: var(--bsh-warm); overflow-wrap: anywhere; }

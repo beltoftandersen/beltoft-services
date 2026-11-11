@@ -173,6 +173,7 @@ final class Plugin {
 		Mcp\Access::register();
 		Mcp\Endpoint::register();
 		Account\ApiTokens::register();
+		Account\Flash::register();
 		// Feature hooks into the core's extension points (retention, state_changed, parking, failure mail).
 		Proxmox\Vm\CoreHooks::register();
 		Proxmox\Vm\RevealRoute::register();

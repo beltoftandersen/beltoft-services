@@ -1,5 +1,5 @@
 /**
- * My Account, Credit: what the last form did goes to the status bar (a refused code also under its field), and
+ * My Account, Credit: what the last form did goes to the status bar (assets/status.js reads the page's flash lines; a refused code also marks its field), and
  * an empty code gets a styled message instead of the browser's.
  */
 ( function () {
@@ -11,14 +11,6 @@
 	if ( ! status ) {
 		return;
 	}
-
-	Array.prototype.forEach.call( document.querySelectorAll( '.beltoft-services-credit [data-bs-flash]' ), function ( node ) {
-		if ( 'fail' === node.getAttribute( 'data-bs-flash' ) ) {
-			status.fail( null, node.textContent, node.getAttribute( 'data-bs-field' ) || undefined );
-		} else {
-			status.info( node.textContent );
-		}
-	} );
 
 	document.addEventListener( 'submit', function ( event ) {
 		var form = event.target;

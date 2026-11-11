@@ -358,7 +358,7 @@ final class HostingAccount {
 			self::print_packs( $r, $mail );
 		}
 
-		echo '<p class="beltoft-hosting-message" role="status" aria-live="polite"></p></div>';
+		echo '</div>';
 	}
 
 	/**

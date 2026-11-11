@@ -18,11 +18,16 @@
 		return;
 	}
 
+	// What happened goes to the status bar at the top of the page, like every other form of My Account; nothing is printed in the panel.
 	function say( panel, message ) {
-		var line = panel.querySelector( '.beltoft-hosting-message' );
+		if ( message && S ) {
+			S.info( message );
+		}
+	}
 
-		if ( line ) {
-			line.textContent = message;
+	function fail( message ) {
+		if ( message && S ) {
+			S.fail( null, message );
 		}
 	}
 
@@ -101,7 +106,7 @@
 		} else if ( bought.ok && bought.data && bought.data.pay_url ) {
 			window.location.href = bought.data.pay_url;
 		} else {
-			say( panel, ( bought.data && bought.data.message ) || text.failed || '' );
+			fail( ( bought.data && bought.data.message ) || text.failed || '' );
 		}
 	}
 
@@ -195,7 +200,7 @@
 					tab.close();
 				}
 
-				say( panel, ( result.data && result.data.message ) || text.failed || '' );
+				fail( ( result.data && result.data.message ) || text.failed || '' );
 				return;
 			}
 
@@ -219,7 +224,7 @@
 				tab.close();
 			}
 
-			say( panel, text.failed || '' );
+			fail( text.failed || '' );
 		} );
 	}
 }() );
