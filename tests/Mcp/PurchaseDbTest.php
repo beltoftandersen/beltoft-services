@@ -45,6 +45,8 @@ final class PurchaseDbTest extends UsageTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		// The shop currency first: the usage account is made in it, and the MCP call is answered in the account's currency.
+		update_option( 'woocommerce_currency', 'EUR' );
 		$this->seed_private_nets();
 
 		$this->user    = $this->new_user();
