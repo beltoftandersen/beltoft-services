@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-10T22:27:24+00:00\n"
+"POT-Creation-Date: 2026-11-11T04:16:11+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-services\n"
@@ -1070,7 +1070,7 @@ msgstr ""
 #. translators: %s: price
 #: src/Account/ServerPicker.php:496
 #: src/Account/ServerPicker.php:727
-#: src/Usage/Rates.php:225
+#: src/Usage/Rates.php:226
 #: templates/account/vm.php:490
 #: templates/account/vm.php:647
 #, php-format
@@ -1745,6 +1745,12 @@ msgstr ""
 msgid "Services"
 msgstr ""
 
+#. translators: %d: the committed share in percent.
+#: src/Alerts.php:562
+#, php-format
+msgid "Committed share now: at least %d%% (this mail is sent at 100%% and at each further 10%%)."
+msgstr ""
+
 #: src/Api/Reference.php:58
 msgid "API documentation page"
 msgstr ""
@@ -1839,7 +1845,7 @@ msgstr ""
 #: src/Proxmox/Network/MetricsRoute.php:50
 #: src/Proxmox/Network/MetricsRoute.php:69
 #: src/Usage/CustomerDelete.php:214
-#: src/Usage/UsageDisk.php:113
+#: src/Usage/UsageDisk.php:177
 msgid "This service is not available."
 msgstr ""
 
@@ -6703,31 +6709,48 @@ msgid "The backup could not be started. Try again."
 msgstr ""
 
 #. translators: 1: node memory in GB, 2: reserve in GB.
-#: src/Hosting/HostingCapacity.php:317
+#: src/Hosting/HostingCapacity.php:329
 #, php-format
 msgid "The budget is the memory of the node (%1$d GB) minus the reserve (%2$s GB). It is set by the node size on the Hosting nodes screen and by the setting \"Memory reserve per node, in GB\"; the setting \"Memory overcommit\" divides what each account commits."
 msgstr ""
 
 #. translators: %d: node disk in GB.
-#: src/Hosting/HostingCapacity.php:327
+#: src/Hosting/HostingCapacity.php:339
 #, php-format
 msgid "The budget is the disk of the node (%d GB), set on the Hosting nodes screen; the setting \"Disk overcommit\" divides what each account commits."
 msgstr ""
 
 #. translators: 1: node id, 2: memory or disk.
-#: src/Hosting/HostingCapacity.php:342
+#: src/Hosting/HostingCapacity.php:354
 #, php-format
 msgid "Hosting node %1$s is over its committed %2$s budget"
 msgstr ""
 
 #. translators: 1: node id, 2: memory or disk, 3: committed in GB, 4: budget in GB.
-#: src/Hosting/HostingCapacity.php:345
+#: src/Hosting/HostingCapacity.php:357
 #, php-format
 msgid "Hosting node %1$s has %2$s committed to accounts: %3$.1f GB of a budget of %4$.1f GB."
 msgstr ""
 
-#: src/Hosting/HostingCapacity.php:347
+#: src/Hosting/HostingCapacity.php:359
 msgid "Nothing is stopped: new accounts are placed on the node with the most room left. Add a node or raise the capacity."
+msgstr ""
+
+#. translators: %s: node id.
+#: src/Hosting/HostingCapacity.php:390
+#: src/Hosting/HostingCapacity.php:394
+#, php-format
+msgid "Hosting node %s"
+msgstr ""
+
+#: src/Hosting/HostingCapacity.php:407
+#: src/Proxmox/Pve/CapacityCheck.php:76
+msgid "disk"
+msgstr ""
+
+#: src/Hosting/HostingCapacity.php:407
+#: src/Proxmox/Pve/CapacityCheck.php:76
+msgid "memory"
 msgstr ""
 
 #: src/Hosting/HostingDriver.php:66
@@ -7067,7 +7090,7 @@ msgid "%s must be https, with a host and no path, user or query."
 msgstr ""
 
 #: src/Hosting/Nodes.php:237
-#: src/Proxmox/Pve/Clusters.php:358
+#: src/Proxmox/Pve/Clusters.php:359
 msgid "The token id looks like user@realm!tokenname."
 msgstr ""
 
@@ -7094,7 +7117,7 @@ msgid "%s must be a PEM certificate (starting with BEGIN CERTIFICATE)."
 msgstr ""
 
 #: src/Hosting/Nodes.php:275
-#: src/Proxmox/Pve/Clusters.php:374
+#: src/Proxmox/Pve/Clusters.php:375
 msgid "The CA file must be an absolute path to a file this site can read."
 msgstr ""
 
@@ -7113,7 +7136,7 @@ msgid "%s must be the base64 of a SHA-256 hash (44 characters)."
 msgstr ""
 
 #: src/Hosting/Nodes.php:301
-#: src/Proxmox/Pve/Clusters.php:394
+#: src/Proxmox/Pve/Clusters.php:395
 msgid "The client must be fake or live."
 msgstr ""
 
@@ -8083,13 +8106,13 @@ msgstr ""
 
 #. translators: %d: minimum length.
 #: src/Http/Connections.php:624
-#: src/Proxmox/Pve/Clusters.php:734
+#: src/Proxmox/Pve/Clusters.php:736
 #, php-format
 msgid "A new secret needs at least %d characters."
 msgstr ""
 
 #: src/Http/Connections.php:628
-#: src/Proxmox/Pve/Clusters.php:738
+#: src/Proxmox/Pve/Clusters.php:740
 #: src/Settings.php:433
 msgid "Add BELTOFT_SERVICES_KEY to wp-config.php before saving secrets."
 msgstr ""
@@ -10137,18 +10160,18 @@ msgstr ""
 msgid "Move the domain %1$s to these name servers:%2$s Our DNS records for it stop being used. If these name servers do not answer for the domain, its website and e-mail go offline until it is changed back."
 msgstr ""
 
-#: src/Mcp/ServerDisk.php:63
+#: src/Mcp/ServerDisk.php:62
 msgid "No extra disk can be ordered with this plan here right now. Order the server without it; a disk can be added in the dashboard."
 msgstr ""
 
 #. translators: %s: the extra disk sizes in GB that are offered, such as "50, 100"
-#: src/Mcp/ServerDisk.php:68
+#: src/Mcp/ServerDisk.php:67
 #, php-format
 msgid "That extra disk size is not offered with this plan. The sizes are, in GB: %s."
 msgstr ""
 
 #. translators: %d: most extra disks a server can have
-#: src/Mcp/ServerDisk.php:127
+#: src/Mcp/ServerDisk.php:126
 #, php-format
 msgid "One extra disk can be ordered with a new server, and it is billed by the hour with the server and capped. In the dashboard, the server page lists the extra disk sizes that can be added to a ready server, up to %d extra disks per server, and an extra disk can be removed there. An extra disk can be made larger there to the next size up, never smaller."
 msgstr ""
@@ -10360,7 +10383,7 @@ msgid "Connect an app"
 msgstr ""
 
 #. translators: %s: comma separated plugin names.
-#: src/Plugin.php:363
+#: src/Plugin.php:365
 #, php-format
 msgid "Beltoft Services is inactive until these are active: %s."
 msgstr ""
@@ -12044,49 +12067,71 @@ msgid "Outgoing internet traffic from this server is blocked because it showed s
 msgstr ""
 
 #. translators: 1: node name, 2: cluster id.
-#: src/Proxmox/Pve/Capacity.php:155
+#: src/Proxmox/Pve/Capacity.php:158
 #, php-format
 msgid "Node %1$s of cluster %2$s is over its committed memory budget"
 msgstr ""
 
 #. translators: 1: node name, 2: cluster id, 3: committed in GB, 4: budget in GB.
-#: src/Proxmox/Pve/Capacity.php:158
+#: src/Proxmox/Pve/Capacity.php:161
 #, php-format
 msgid "Node %1$s of cluster %2$s has %3$.1f GB of memory committed to servers of this site, a budget of %4$.1f GB."
 msgstr ""
 
 #. translators: 1: node memory in GB, 2: reserve in GB.
-#: src/Proxmox/Pve/Capacity.php:160
+#: src/Proxmox/Pve/Capacity.php:163
 #, php-format
 msgid "The budget is the memory of the node (%1$.1f GB) minus the setting \"Memory kept free on each node, in GB\" (%2$.1f GB)."
 msgstr ""
 
-#: src/Proxmox/Pve/Capacity.php:161
+#: src/Proxmox/Pve/Capacity.php:164
 msgid "Nothing is stopped: new servers are placed on the node with the most room left. Add a node or raise the capacity."
 msgstr ""
 
 #. translators: 1: node or cluster name, 2: memory or disk.
-#: src/Proxmox/Pve/CapacityCheck.php:72
+#: src/Proxmox/Pve/CapacityCheck.php:85
 #, php-format
 msgid "%1$s: real free %2$s is low"
 msgstr ""
 
 #. translators: 1: node or cluster name, 2: memory or disk, 3: percent free, 4: free in GB, 5: total in GB.
-#: src/Proxmox/Pve/CapacityCheck.php:75
+#: src/Proxmox/Pve/CapacityCheck.php:88
 #, php-format
 msgid "%1$s reports %3$.1f%% free %2$s: %4$.1f GB of %5$.1f GB."
 msgstr ""
 
 #. translators: 1: committed in GB, 2: budget in GB.
-#: src/Proxmox/Pve/CapacityCheck.php:77
+#: src/Proxmox/Pve/CapacityCheck.php:90
 #, php-format
 msgid "The plugin counts %1$.1f GB committed against a budget of %2$.1f GB."
 msgstr ""
 
 #. translators: %s: threshold in percent.
-#: src/Proxmox/Pve/CapacityCheck.php:79
+#: src/Proxmox/Pve/CapacityCheck.php:92
 #, php-format
 msgid "You are told when the real free share is under %s%%: settings \"Alert when real free memory is under\" and \"Alert when real free disk is under\". Nothing is stopped; selling and placing go on."
+msgstr ""
+
+#. translators: %s: cluster id.
+#: src/Proxmox/Pve/CapacityCheck.php:124
+#, php-format
+msgid "Cluster %s: the capacity check has no data"
+msgstr ""
+
+#. translators: %s: cluster id.
+#: src/Proxmox/Pve/CapacityCheck.php:127
+#, php-format
+msgid "The nightly capacity check had no usable node data for cluster %s on two nights in a row, so it could not compare the committed memory with what the nodes report."
+msgstr ""
+
+#: src/Proxmox/Pve/CapacityCheck.php:128
+msgid "Check that the hourly capacity job runs and that the cluster answers. Nothing is stopped; selling and placing go on."
+msgstr ""
+
+#. translators: 1: node name, 2: cluster id.
+#: src/Proxmox/Pve/CapacityCheck.php:149
+#, php-format
+msgid "Node %1$s of cluster %2$s"
 msgstr ""
 
 #: src/Proxmox/Pve/Clusters.php:119
@@ -12097,133 +12142,133 @@ msgstr ""
 msgid "Set the site tag in Settings, Proxmox first. A live cluster needs one you chose: the host name is not used for live clusters."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:334
+#: src/Proxmox/Pve/Clusters.php:335
 msgid "A cluster id is 1 to 40 characters: lowercase letters, numbers, dashes and underscores."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:344
+#: src/Proxmox/Pve/Clusters.php:345
 msgid "A cluster needs a label."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:364
+#: src/Proxmox/Pve/Clusters.php:365
 msgid "The console token id looks like user@realm!tokenname."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:367
+#: src/Proxmox/Pve/Clusters.php:368
 msgid "Use a separate token for the console."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:385
+#: src/Proxmox/Pve/Clusters.php:386
 msgid "The pin must be the base64 of a SHA-256 hash (44 characters)."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:408
+#: src/Proxmox/Pve/Clusters.php:409
 msgid "The pool API must be pools or pools_id."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:417
+#: src/Proxmox/Pve/Clusters.php:418
 msgid "Node names contain letters, numbers and dashes only."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:424
+#: src/Proxmox/Pve/Clusters.php:425
 msgid "Name at least one node."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:430
+#: src/Proxmox/Pve/Clusters.php:431
 msgid "The disk storage"
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:431
+#: src/Proxmox/Pve/Clusters.php:432
 msgid "The cloud-init storage"
 msgstr ""
 
 #. translators: %s: field name, such as "The disk storage".
-#: src/Proxmox/Pve/Clusters.php:437
+#: src/Proxmox/Pve/Clusters.php:438
 #, php-format
 msgid "%s must be a storage id (letters, numbers, dots, dashes, underscores)."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:446
+#: src/Proxmox/Pve/Clusters.php:447
 msgid "The bridge is a network device name such as vmbr1."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:453
+#: src/Proxmox/Pve/Clusters.php:454
 msgid "The private bridge is a network device name such as vmbr1."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:456
+#: src/Proxmox/Pve/Clusters.php:457
 msgid "The private bridge must differ from the public bridge."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:463
+#: src/Proxmox/Pve/Clusters.php:464
 msgid "The VLAN tag is a number from 1 to 4094, or empty."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:468
+#: src/Proxmox/Pve/Clusters.php:469
 msgid "The public VLAN is reserved for a private network."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:474
+#: src/Proxmox/Pve/Clusters.php:475
 msgid "The pool id contains letters, numbers, dots, dashes and underscores only."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:483
+#: src/Proxmox/Pve/Clusters.php:484
 msgid "The boot disk is a disk slot such as scsi0 or virtio0."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:491
+#: src/Proxmox/Pve/Clusters.php:492
 msgid "The gateway must be an IPv4 address."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:500
+#: src/Proxmox/Pve/Clusters.php:501
 msgid "Name servers are IPv4 addresses, separated by commas."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:512
+#: src/Proxmox/Pve/Clusters.php:513
 msgid "The network prefix is a number from 1 to 32."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:522
+#: src/Proxmox/Pve/Clusters.php:523
 msgid "The VMID range runs from at least 100 to at most 999999999, and the first must be lower than the last."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:536
+#: src/Proxmox/Pve/Clusters.php:537
 msgid "A template cannot sit inside the customer VMID range: it could then be changed or deleted like a customer machine."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:545
+#: src/Proxmox/Pve/Clusters.php:546
 msgid "The default template must be one of the VMIDs in the template list, or empty to use the first."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:553
+#: src/Proxmox/Pve/Clusters.php:554
 msgid "The vendor snippet is a volume such as local:snippets/vendor.yaml."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:561
+#: src/Proxmox/Pve/Clusters.php:562
 msgid "The database vendor snippet is a volume such as local:snippets/vm-vendor-cloudinit-db-v1.yaml."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:598
+#: src/Proxmox/Pve/Clusters.php:599
 msgid "The backup storage must be a storage id (letters, numbers, dots, dashes, underscores), or empty to turn backups off."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:635
+#: src/Proxmox/Pve/Clusters.php:636
 msgid "A cluster needs the API token secret."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:642
+#: src/Proxmox/Pve/Clusters.php:643
 msgid "The console token secret is the value Proxmox shows once, like 0a1b2c3d-1111-2222-3333-444455556666. Paste only that value."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:678
+#: src/Proxmox/Pve/Clusters.php:680
 msgid "Write each template as a line: VMID = label. The VMID is at least 100."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:682
+#: src/Proxmox/Pve/Clusters.php:684
 msgid "A template VMID is listed twice."
 msgstr ""
 
-#: src/Proxmox/Pve/Clusters.php:712
+#: src/Proxmox/Pve/Clusters.php:714
 msgid "The API address must be https, such as https://pve.example.invalid:8006, with no path."
 msgstr ""
 
@@ -12483,6 +12528,10 @@ msgstr ""
 
 #: src/Proxmox/Pve/ClustersScreen.php:380
 msgid "Save cluster"
+msgstr ""
+
+#: src/Proxmox/Pve/DiskCapacity.php:152
+msgid "unknown (no fresh reading)"
 msgstr ""
 
 #. translators: %s: cluster ids.
@@ -14856,7 +14905,7 @@ msgstr ""
 #. translators: 1: product name, 2: the database's address.
 #. translators: 1: "€0.0829 per hour", 2: "max €55.00 per month"
 #: src/Usage/Estimate.php:119
-#: src/Usage/Rates.php:293
+#: src/Usage/Rates.php:294
 #, php-format
 msgid "%1$s, %2$s"
 msgstr ""
@@ -14930,47 +14979,47 @@ msgid "Usage of %1$s carried to next month (under the %2$s minimum)."
 msgstr ""
 
 #. translators: %s: monthly amount such as €45
-#: src/Usage/Rates.php:120
+#: src/Usage/Rates.php:121
 #, php-format
 msgid "%s / month"
 msgstr ""
 
 #. translators: %s: monthly amount such as €5
-#: src/Usage/Rates.php:130
+#: src/Usage/Rates.php:131
 #, php-format
 msgid "+%s / month"
 msgstr ""
 
 #. translators: %s: monthly amount such as €5
-#: src/Usage/Rates.php:140
+#: src/Usage/Rates.php:141
 #, php-format
 msgid "+%s per month"
 msgstr ""
 
 #. translators: 1: hourly price such as €0.0226, 2: monthly cap such as €16.50
-#: src/Usage/Rates.php:214
+#: src/Usage/Rates.php:215
 #, php-format
 msgid "Or %1$s/hour, max %2$s/month, pay as you go"
 msgstr ""
 
-#: src/Usage/Rates.php:255
+#: src/Usage/Rates.php:256
 msgid "Billed monthly for the hours used"
 msgstr ""
 
 #. translators: %s: price per hour such as €0.0829
-#: src/Usage/Rates.php:272
+#: src/Usage/Rates.php:273
 #, php-format
 msgid "%s per hour"
 msgstr ""
 
 #. translators: %s: monthly cap such as €55.00
-#: src/Usage/Rates.php:282
+#: src/Usage/Rates.php:283
 #, php-format
 msgid "max %s per month"
 msgstr ""
 
 #. translators: %s: monthly price such as €55.00
-#: src/Usage/Rates.php:303
+#: src/Usage/Rates.php:304
 #, php-format
 msgid "%s per month, paid in advance"
 msgstr ""
@@ -15108,19 +15157,19 @@ msgstr ""
 msgid "Usage billed early: the unbilled usage reached the threshold."
 msgstr ""
 
-#: src/Usage/UsageDisk.php:122
+#: src/Usage/UsageDisk.php:186
 msgid "This disk cannot be made larger right now. Please try again when it has finished what it is doing."
 msgstr ""
 
-#: src/Usage/UsageDisk.php:130
+#: src/Usage/UsageDisk.php:194
 msgid "There is no larger size of this disk that can be made now."
 msgstr ""
 
-#: src/Usage/UsageDisk.php:142
+#: src/Usage/UsageDisk.php:206
 msgid "The disk is busy. Please try again in a moment."
 msgstr ""
 
-#: src/Usage/UsageDisk.php:146
+#: src/Usage/UsageDisk.php:210
 msgid "The disk could not be made larger now."
 msgstr ""
 
