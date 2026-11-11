@@ -110,7 +110,7 @@ final class Capacity {
 		}
 
 		if ( $ok ) {
-			self::overage_alerts( $cluster_id ); // The committed memory moved: tell the admin when a node is over its budget.
+			Alerts::quietly( static fn() => self::overage_alerts( $cluster_id ) ); // The committed memory moved: tell the admin when a node is over its budget; a failing alert never fails the placement.
 		}
 
 		return (bool) $ok;
@@ -135,6 +135,9 @@ final class Capacity {
 
 		$reserve = max( 0, (int) Settings::get( 'host_reserve_gb' ) ) * 1024;
 		$allowed = array_map( 'strval', (array) $cluster['nodes'] );
+
+		// A node taken out of the cluster list no longer keeps a remembered step.
+		Alerts::overage_prune( 'pve:' . $cluster_id . ':', array_map( static fn( $n ) => 'pve:' . $cluster_id . ':' . $n . ':memory', $allowed ) );
 
 		foreach ( $rows as $row ) {
 			$name = (string) ( $row['node'] ?? '' );

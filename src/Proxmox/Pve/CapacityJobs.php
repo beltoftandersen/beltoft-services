@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Proxmox\Pve;
 
+use BeltoftServices\Alerts;
 use BeltoftServices\Jobs;
 use BeltoftServices\Locks;
 use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
@@ -172,7 +173,7 @@ final class CapacityJobs {
 		}
 		// Committed memory moved: tell the admin where a node is over its budget (Capacity::overage_alerts()).
 		if ( $locked ) {
-			Capacity::overage_alerts( $id );
+			Alerts::quietly( static fn() => Capacity::overage_alerts( $id ) );
 		}
 	}
 }

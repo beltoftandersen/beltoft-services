@@ -463,4 +463,41 @@ class CapacityTest extends HostingCase {
 		$this->assertSame( array(), HostingCapacity::cross_check( 'n1', array( 'mem_total_mb' => 32768, 'mem_free_mb' => 1000 ) ), 'Once a day per node and kind.' );
 		$this->assertSame( array(), HostingCapacity::cross_check( 'n1', array() ), 'A member that is missing is not checked.' );
 	}
+
+	public function test_the_health_job_tells_the_admin_when_a_node_is_over_its_budget(): void {
+		$mails = array();
+		add_filter(
+			'pre_wp_mail',
+			function ( $pre, $args ) use ( &$mails ) {
+				$mails[] = $args;
+
+				return true;
+			},
+			10,
+			2
+		);
+		$this->settings( array( 'hosting_mem_overcommit' => '1', 'hosting_reserve_gb' => '20', 'hosting_alert_percent' => '100' ) ); // 12 GB budget.
+		$r = $this->resource( array( 'memory_mb' => 13000, 'db_buffer_mb' => 0, 'disk_gb' => 1 ) );
+		Records::open( $r->id(), 'n1' );
+
+		\BeltoftServices\Hosting\NodeHealth::run();
+
+		$over = array_filter( $mails, static fn( $m ) => false !== strpos( (string) $m['subject'], 'over its committed memory budget' ) );
+		$this->assertCount( 1, $over, 'The hourly health job sends the overage alert.' );
+	}
+
+	public function test_a_failing_mailer_never_fails_or_retries_a_placement(): void {
+		add_filter(
+			'pre_wp_mail',
+			static function () {
+				throw new \RuntimeException( 'mailer down' );
+			}
+		);
+		$this->settings( array( 'hosting_mem_overcommit' => '1', 'hosting_reserve_gb' => '27' ) ); // 5 GB budget.
+		$first = $this->resource( array( 'memory_mb' => 4000, 'db_buffer_mb' => 0, 'disk_gb' => 5 ) );
+		$this->provision_fully( $first );
+		$second = $this->resource( array( 'memory_mb' => 4000, 'db_buffer_mb' => 0, 'disk_gb' => 5 ) );
+		$this->provision_fully( $second ); // Over the budget: the alert throws, the placement goes on and the step is done, not retried.
+		$this->assertNotNull( \BeltoftServices\Hosting\Records::for_resource( $second->id() ), 'The account is placed.' );
+	}
 }

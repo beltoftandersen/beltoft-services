@@ -511,10 +511,17 @@ final class Alerts {
 	}
 
 	/**
+	 * How many percentage points under a mailed step the share must fall before the step is forgotten (so a node
+	 * hovering around a step does not mail at every crossing).
+	 */
+	private const OVERAGE_HYSTERESIS = 5;
+
+	/**
 	 * Tells the admin when something is committed beyond its budget: once when the share first passes 100 percent and
-	 * again at each further 10 percent step (110, 120 and so on). A step is mailed once. When the share falls back under
-	 * a step it is forgotten, so crossing it again mails again. Nothing is remembered while no mail could be sent (no
-	 * valid alert address), so the mail follows once the address is fixed.
+	 * again at each further 10 percent step (110, 120 and so on). A step is mailed once. A step is forgotten only when the
+	 * share has fallen 5 points under it (a node hovering around a step does not mail at every crossing), so crossing it
+	 * again after that mails again. Nothing is remembered while no mail could be sent (no valid alert address), so the
+	 * mail follows once the address is fixed. The remembered steps are read and written under a lock.
 	 *
 	 * @param string             $key     What is measured, for example "hosting:node-1:memory".
 	 * @param float              $ratio   Committed divided by budget.
@@ -523,37 +530,104 @@ final class Alerts {
 	 * @return bool Whether a mail was sent.
 	 */
 	public static function overage( string $key, float $ratio, string $subject, array $lines ): bool {
-		$step  = self::overage_step( $ratio );
-		$all   = (array) get_option( self::OVERAGE_OPTION, array() );
-		$known = (int) ( $all[ $key ] ?? 0 );
+		list( $locked, $sent ) = Locks::with(
+			Locks::name( 'overage_steps', 0 ),
+			5,
+			static function () use ( $key, $ratio, $subject, $lines ): bool {
+				$step    = self::overage_step( $ratio );
+				$percent = (int) floor( $ratio * 100 + 0.000001 );
+				$all     = self::overage_state();
+				$known   = (int) ( $all[ $key ] ?? 0 );
 
-		if ( $step === $known ) {
-			return false;
-		}
+				if ( $step === $known ) {
+					return false;
+				}
 
-		if ( $step < $known ) {
-			// Back under a step: forget it, no mail.
-			if ( $step > 0 ) {
+				if ( $step < $known ) {
+					// Back under a step: forgotten only five points under it, with no mail.
+					if ( $percent <= $known - self::OVERAGE_HYSTERESIS ) {
+						if ( $step > 0 ) {
+							$all[ $key ] = $step;
+						} else {
+							unset( $all[ $key ] );
+						}
+
+						update_option( self::OVERAGE_OPTION, $all, false );
+					}
+
+					return false;
+				}
+
+				/* translators: %d: the committed share in percent. */
+				$lines[] = sprintf( __( 'Committed share now: at least %d%% (this mail is sent at 100%% and at each further 10%%).', 'beltoft-services' ), $step );
+
+				if ( ! self::notify( $subject, $lines ) ) {
+					return false;
+				}
+
 				$all[ $key ] = $step;
-			} else {
-				unset( $all[ $key ] );
+				update_option( self::OVERAGE_OPTION, $all, false );
+
+				return true;
 			}
+		);
 
-			update_option( self::OVERAGE_OPTION, $all, false );
+		return $locked && $sent;
+	}
 
-			return false;
+	/**
+	 * Forgets the remembered steps under a prefix whose key is no longer measured (a node that was removed), under the
+	 * same lock as overage().
+	 *
+	 * @param string   $prefix Keys that start with this are looked at, for example "hosting:" or "pve:cluster-1:".
+	 * @param string[] $live   The keys that still exist.
+	 */
+	public static function overage_prune( string $prefix, array $live ): void {
+		Locks::with(
+			Locks::name( 'overage_steps', 0 ),
+			5,
+			static function () use ( $prefix, $live ): void {
+				$all     = self::overage_state();
+				$changed = false;
+
+				foreach ( array_keys( $all ) as $key ) {
+					if ( 0 === strpos( (string) $key, $prefix ) && ! in_array( (string) $key, $live, true ) ) {
+						unset( $all[ $key ] );
+						$changed = true;
+					}
+				}
+
+				if ( $changed ) {
+					update_option( self::OVERAGE_OPTION, $all, false );
+				}
+			}
+		);
+	}
+
+	/**
+	 * The remembered steps, read fresh (another process may have written them while this one waited for the lock).
+	 *
+	 * @return array<string, int>
+	 */
+	private static function overage_state(): array {
+		wp_cache_delete( self::OVERAGE_OPTION, 'options' );
+		wp_cache_delete( 'alloptions', 'options' );
+
+		return (array) get_option( self::OVERAGE_OPTION, array() );
+	}
+
+	/**
+	 * Runs an alert from inside a step (a placement, a provisioning step, a capacity write) so that a failing alert, a
+	 * throwing mailer for example, can never fail or retry the step: the failure is logged and the step goes on.
+	 *
+	 * @param callable $alert The alert to send.
+	 */
+	public static function quietly( callable $alert ): void {
+		try {
+			$alert();
+		} catch ( \Throwable $e ) {
+			error_log( 'Beltoft Services: an admin alert failed and was skipped: ' . $e->getMessage() ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- an alert never fails a step.
 		}
-
-		$lines[] = sprintf( 'Committed share now: at least %d%% (this mail is sent at 100%% and at each further 10%%).', $step );
-
-		if ( ! self::notify( $subject, $lines ) ) {
-			return false;
-		}
-
-		$all[ $key ] = $step;
-		update_option( self::OVERAGE_OPTION, $all, false );
-
-		return true;
 	}
 
 	/**

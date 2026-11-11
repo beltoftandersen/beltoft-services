@@ -209,4 +209,122 @@ class CapacityAlertsTest extends TestCase {
 		$this->assertSame( array(), CapacityCheck::run() );
 		$this->assertNotFalse( has_action( \BeltoftServices\Proxmox\Vm\ProxmoxJobs::CAPACITY_CHECK, array( CapacityCheck::class, 'run' ) ) );
 	}
+
+	public function test_a_node_hovering_around_a_step_does_not_mail_at_each_crossing(): void {
+		// Budget 60 GB.
+		$this->node( 61 ); // 101 percent: step 100 is mailed.
+		$this->assertSame( array( 'node-a' ), Capacity::overage_alerts( 'lab' ) );
+		$this->node( 67 ); // 111 percent: step 110 is mailed.
+		$this->assertSame( array( 'node-a' ), Capacity::overage_alerts( 'lab' ) );
+		$this->assertCount( 2, $this->over_mails() );
+
+		$this->node( 64 ); // 106 percent: under 110 but not five points under it.
+		$this->assertSame( array(), Capacity::overage_alerts( 'lab' ) );
+		$this->node( 67 ); // Back over 110: no second mail.
+		$this->assertSame( array(), Capacity::overage_alerts( 'lab' ), 'A node hovering around the step mails once.' );
+		$this->assertCount( 2, $this->over_mails() );
+
+		$this->node( 62 ); // 103 percent: five points under 110, the step is forgotten.
+		$this->assertSame( array(), Capacity::overage_alerts( 'lab' ) );
+		$this->node( 67 );
+		$this->assertSame( array( 'node-a' ), Capacity::overage_alerts( 'lab' ), 'Crossing it again after a real fall mails again.' );
+		$this->assertCount( 3, $this->over_mails() );
+
+		// The same for the 100 step: 97 percent is not five points under it, 94 is.
+		delete_option( \BeltoftServices\Alerts::OVERAGE_OPTION );
+		$this->node( 61 );
+		Capacity::overage_alerts( 'lab' ); // Step 100 mailed.
+		$this->node( 58.2 );
+		Capacity::overage_alerts( 'lab' );
+		$this->node( 61 );
+		$this->assertSame( array(), Capacity::overage_alerts( 'lab' ), 'Step 100 was still known at 97 percent.' );
+	}
+
+	public function test_a_node_that_is_offline_or_not_in_the_cluster_list_is_not_counted(): void {
+		set_transient(
+			Placement::CAPACITY_PREFIX . 'lab',
+			array(
+				array( 'node' => 'node-a', 'status' => 'offline', 'maxmem' => 64 * self::GB, 'mem' => 80 * self::GB, 'mem_used' => 62 * self::GB ),
+				array( 'node' => 'node-x', 'status' => 'online', 'maxmem' => 64 * self::GB, 'mem' => 80 * self::GB, 'mem_used' => 62 * self::GB ),
+			),
+			HOUR_IN_SECONDS
+		);
+
+		$this->assertSame( array(), Capacity::overage_alerts( 'lab' ), 'Offline and unlisted nodes are over budget on paper but are not counted.' );
+		$this->assertSame( array(), CapacityCheck::run() );
+		$this->assertCount( 0, $this->mails );
+		$this->assertSame( array(), Capacity::free_by_node( 'lab' ), 'Only online nodes of the cluster list have free memory.' );
+	}
+
+	public function test_the_check_hold_is_shorter_than_the_nightly_period(): void {
+		$this->node( 20, 62 );
+		$this->assertSame( array( 'lab:node-a:memory' ), CapacityCheck::run() );
+		$timeout = (int) get_option( '_transient_timeout_beltoft_services_capacity_check_' . md5( 'pve:lab:node-a|memory' ) );
+
+		$this->assertGreaterThan( time() + 19 * HOUR_IN_SECONDS, $timeout );
+		$this->assertLessThan( time() + 21 * HOUR_IN_SECONDS, $timeout, 'About 20 hours: a standing problem is not skipped on alternate nights.' );
+	}
+
+	public function test_two_nights_without_usable_data_for_a_cluster_are_told_once(): void {
+		delete_option( CapacityCheck::GAPS_OPTION );
+		delete_transient( Placement::CAPACITY_PREFIX . 'lab' );
+
+		CapacityCheck::run();
+		$this->assertCount( 0, $this->mails, 'One night is not told.' );
+		CapacityCheck::run();
+		$this->assertCount( 1, $this->mails, 'Two nights in a row are.' );
+		$this->assertSame( 'christian.beltoft@gmail.com', $this->mails[0]['to'] );
+		$this->assertStringContainsString( 'lab', $this->mails[0]['subject'] );
+		CapacityCheck::run();
+		CapacityCheck::run();
+		$this->assertCount( 1, $this->mails, 'Once.' );
+
+		$this->node( 20, 10 ); // Data again: the count starts over.
+		CapacityCheck::run();
+		delete_transient( Placement::CAPACITY_PREFIX . 'lab' );
+		CapacityCheck::run();
+		$this->assertCount( 1, $this->mails, 'One night again.' );
+		CapacityCheck::run();
+		$this->assertCount( 2, $this->mails, 'Two again: told again.' );
+	}
+
+	public function test_a_failing_mailer_never_fails_a_placement(): void {
+		$this->node( 58 );
+		add_filter(
+			'pre_wp_mail',
+			static function () {
+				throw new \RuntimeException( 'mailer down' );
+			}
+		);
+		$this->assertTrue( Capacity::place( 'lab', 'node-a', 4 * self::GB, static fn() => true ), 'The placement is recorded although the alert threw.' );
+	}
+
+	public function test_the_remembered_steps_of_a_removed_node_are_dropped_and_the_write_is_locked(): void {
+		global $wpdb;
+		update_option( \BeltoftServices\Alerts::OVERAGE_OPTION, array( 'pve:lab:node-gone:memory' => 110, 'pve:other:node-a:memory' => 100, 'hosting:h1:memory' => 100 ), false );
+		$this->node( 40 );
+		Capacity::overage_alerts( 'lab' );
+		$all = (array) get_option( \BeltoftServices\Alerts::OVERAGE_OPTION );
+		$this->assertArrayNotHasKey( 'pve:lab:node-gone:memory', $all );
+		$this->assertArrayHasKey( 'pve:other:node-a:memory', $all, 'Another cluster is not touched.' );
+		$this->assertArrayHasKey( 'hosting:h1:memory', $all );
+
+		// Another process holds the lock: nothing is read or written, nothing waits long.
+		$name  = \BeltoftServices\Locks::name( 'overage_steps', 0 );
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection is the other process.
+		$other->query( "SELECT GET_LOCK('" . $other->real_escape_string( $name ) . "', 0)" );
+		$this->mails = array();
+		$this->node( 61 );
+		$started = microtime( true );
+		add_filter( 'query', static function ( $q ) {
+			return $q;
+		} );
+		$sent = \BeltoftServices\Alerts::overage( 'pve:lab:node-a:memory', 1.5, 'x', array( 'y' ) );
+		$this->assertTrue( microtime( true ) - $started < 8 );
+		$this->assertFalse( $sent );
+		$this->assertCount( 0, $this->mails );
+		$other->query( "SELECT RELEASE_LOCK('" . $other->real_escape_string( $name ) . "')" );
+		$other->close();
+		$this->assertTrue( \BeltoftServices\Alerts::overage( 'pve:lab:node-a:memory', 1.5, 'x', array( 'y' ) ), 'Free again: it goes.' );
+	}
 }

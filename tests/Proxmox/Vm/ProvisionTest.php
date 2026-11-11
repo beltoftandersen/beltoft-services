@@ -996,11 +996,11 @@ class ProvisionTest extends TestCase {
 		$this->assertSame( 4 * $gb, $free['node-a'] );
 		$this->assertSame( 2 * $gb, $free['node-b'] );
 
-		// Nothing fits any more (4 and 2 GiB free, 4 needed again on the fourth): the next one is placed all the same, on the node with the most room.
+		// 4 and 2 GiB are free and 4 are needed: it fits on node-a only, and the rule (most free memory) picks it. When nothing fits any more the next one is placed all the same, on the node with the most room.
 		$resource = $this->resource();
 		IpPool::add( '192.0.2.13' );
 		$this->assert_done( $this->run_provision( $resource ) );
-		$this->assertContains( VmRecords::for_resource( $resource->id() )['node'], array( 'node-a', 'node-b' ) );
+		$this->assertSame( 'node-a', VmRecords::for_resource( $resource->id() )['node'], 'node-a has 4 GiB free, node-b 2: the most free memory takes it.' );
 	}
 
 	public function test_template_must_be_a_template_and_in_the_list(): void {

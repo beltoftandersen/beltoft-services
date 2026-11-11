@@ -297,6 +297,18 @@ final class HostingCapacity {
 	public static function overage_alerts( ?string $only = null ): array {
 		$sent = array();
 
+		if ( null === $only ) {
+			// A node that was removed no longer keeps a remembered step.
+			$live = array();
+
+			foreach ( array_keys( Nodes::all() ) as $node_id ) {
+				$live[] = 'hosting:' . $node_id . ':memory';
+				$live[] = 'hosting:' . $node_id . ':disk';
+			}
+
+			Alerts::overage_prune( 'hosting:', $live );
+		}
+
 		foreach ( array_keys( Nodes::all() ) as $id ) {
 			$id = (string) $id;
 			$u  = ( null === $only || $only === $id ) ? self::usage( $id ) : null;
@@ -339,10 +351,10 @@ final class HostingCapacity {
 					'hosting:' . $id . ':' . $kind,
 					$row[0] / $row[1],
 					/* translators: 1: node id, 2: memory or disk. */
-					sprintf( __( 'Hosting node %1$s is over its committed %2$s budget', 'beltoft-services' ), $id, $kind ),
+					sprintf( __( 'Hosting node %1$s is over its committed %2$s budget', 'beltoft-services' ), $id, self::kind_label( $kind ) ),
 					array(
 						/* translators: 1: node id, 2: memory or disk, 3: committed in GB, 4: budget in GB. */
-						sprintf( __( 'Hosting node %1$s has %2$s committed to accounts: %3$.1f GB of a budget of %4$.1f GB.', 'beltoft-services' ), $id, $kind, $row[0] / 1024, $row[1] / 1024 ),
+						sprintf( __( 'Hosting node %1$s has %2$s committed to accounts: %3$.1f GB of a budget of %4$.1f GB.', 'beltoft-services' ), $id, self::kind_label( $kind ), $row[0] / 1024, $row[1] / 1024 ),
 						$row[2],
 						__( 'Nothing is stopped: new accounts are placed on the node with the most room left. Add a node or raise the capacity.', 'beltoft-services' ),
 					)
@@ -375,14 +387,23 @@ final class HostingCapacity {
 
 		$sent = array();
 
-		if ( isset( $host['mem_total_mb'], $host['mem_free_mb'] ) && \BeltoftServices\Proxmox\Pve\CapacityCheck::report( 'hosting:' . $id, sprintf( 'Hosting node %s', $id ), 'memory', (float) $host['mem_total_mb'], (float) $host['mem_free_mb'], $u['memory_committed'], $u['memory_budget'] ) ) {
+		if ( isset( $host['mem_total_mb'], $host['mem_free_mb'] ) && \BeltoftServices\Proxmox\Pve\CapacityCheck::report( 'hosting:' . $id, sprintf( /* translators: %s: node id. */ __( 'Hosting node %s', 'beltoft-services' ), $id ), 'memory', (float) $host['mem_total_mb'], (float) $host['mem_free_mb'], $u['memory_committed'], $u['memory_budget'] ) ) {
 			$sent[] = 'memory';
 		}
 
-		if ( isset( $host['disk_total_gb'], $host['disk_free_gb'] ) && \BeltoftServices\Proxmox\Pve\CapacityCheck::report( 'hosting:' . $id, sprintf( 'Hosting node %s', $id ), 'disk', (float) $host['disk_total_gb'] * 1024, (float) $host['disk_free_gb'] * 1024, $u['disk_committed'], $u['disk_budget'] ) ) {
+		if ( isset( $host['disk_total_gb'], $host['disk_free_gb'] ) && \BeltoftServices\Proxmox\Pve\CapacityCheck::report( 'hosting:' . $id, sprintf( /* translators: %s: node id. */ __( 'Hosting node %s', 'beltoft-services' ), $id ), 'disk', (float) $host['disk_total_gb'] * 1024, (float) $host['disk_free_gb'] * 1024, $u['disk_committed'], $u['disk_budget'] ) ) {
 			$sent[] = 'disk';
 		}
 
 		return $sent;
+	}
+
+	/**
+	 * The word for memory or disk in a mail, translated.
+	 *
+	 * @param string $kind memory or disk.
+	 */
+	public static function kind_label( string $kind ): string {
+		return 'disk' === $kind ? __( 'disk', 'beltoft-services' ) : __( 'memory', 'beltoft-services' );
 	}
 }

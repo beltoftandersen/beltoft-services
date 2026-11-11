@@ -241,6 +241,31 @@ class ProxmoxJobsTest extends TestCase {
 		$this->assertCount( $calls, $this->fake->calls(), 'A page request reads the cache and calls nothing.' );
 	}
 
+	public function test_the_hourly_capacity_run_tells_the_admin_when_a_node_is_over_its_memory_budget(): void {
+		$mails = array();
+		add_filter(
+			'pre_wp_mail',
+			static function ( $pre, $args ) use ( &$mails ) {
+				$mails[] = $args;
+
+				return true;
+			},
+			10,
+			2
+		);
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
+		$this->vm( 5000, 'node-a', 'running', 65536 ); // 64 GB committed of a 60 GB budget (64 GB node, 4 GB reserve).
+
+		CapacityJobs::capacity();
+
+		$over = array_values( array_filter( $mails, static fn( $m ) => false !== strpos( (string) $m['subject'], 'over its committed memory budget' ) ) );
+		$this->assertCount( 1, $over, 'The hourly job sends the overage alert.' );
+		$this->assertSame( 'christian.beltoft@gmail.com', $over[0]['to'] );
+
+		CapacityJobs::capacity();
+		$this->assertCount( 1, array_filter( $mails, static fn( $m ) => false !== strpos( (string) $m['subject'], 'over its committed memory budget' ) ), 'Once per step.' );
+	}
+
 	public function test_capacity_is_not_cached_when_the_cluster_cannot_be_read(): void {
 		$this->fake->fail_next( 'GET', '#/nodes$#', array( 'status' => 500 ) );
 

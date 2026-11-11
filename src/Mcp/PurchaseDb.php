@@ -112,7 +112,7 @@ final class PurchaseDb {
 			return $quote;
 		}
 
-		// The choices must be ones that can be bought now: a free address, a step that fits.
+		// The choices must be ones that can be bought now: a free address (room on a node is not asked).
 		$bare = wc_get_product( (int) $plan['variation_id'] );
 		$with = $bare instanceof \WC_Product_Variation && $ip ? Backups::sibling_by( $bare, 'public_ip', true ) : $bare;
 

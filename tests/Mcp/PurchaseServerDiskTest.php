@@ -258,6 +258,7 @@ final class PurchaseServerDiskTest extends UsageTestCase {
 		$out = $this->tool( 'order_server', $this->args( array( 'extra_disk_gb' => 50 ) ), $this->oauth( $this->user, Tokens::FULL ) );
 		$this->assertFalse( $out['isError'] ?? false, wp_json_encode( $out ) );
 		$this->assertStringNotContainsString( 'does not fit', wp_json_encode( $out ) );
+		$this->assertNotEmpty( $this->orders( $this->user ), 'The order exists although no node has the room.' );
 	}
 	/**
 	 * WooCommerce's checkout defines WOOCOMMERCE_CHECKOUT for good: a process of its own keeps it from the other tests.

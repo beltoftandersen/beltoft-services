@@ -24,10 +24,9 @@ final class ServerDisk {
 	/**
 	 * The pay as you go disk sizes of a plan, by extra GB.
 	 *
-	 * @param array<string, mixed> $plan     Plan from Offers.
 	 * @return array<int, \WC_Product_Variation> Sorted by size.
 	 */
-	public static function steps( array $plan ): array {
+	public static function steps(): array {
 		$out = array();
 
 		foreach ( DiskField::sizes_for( true ) as $variation ) {
@@ -53,7 +52,7 @@ final class ServerDisk {
 	 * @return \WC_Product_Variation|string The disk variation, or the refusal.
 	 */
 	public static function pick( array $plan, int $gb ) {
-		$steps = self::steps( $plan );
+		$steps = self::steps();
 
 		if ( isset( $steps[ $gb ] ) ) {
 			return $steps[ $gb ];
@@ -102,7 +101,7 @@ final class ServerDisk {
 	public static function options( array $plan ): array {
 		$sizes = array();
 
-		foreach ( self::steps( $plan ) as $gb => $variation ) {
+		foreach ( self::steps() as $gb => $variation ) {
 			$sizes[] = array(
 				'extra_gb'     => (int) $gb,
 				'variation_id' => $variation->get_id(),

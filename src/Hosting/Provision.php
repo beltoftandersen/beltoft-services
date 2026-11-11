@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Hosting;
 
+use BeltoftServices\Alerts;
 use BeltoftServices\Crypto;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Proxmox\Pve\Ownership;
@@ -193,7 +194,7 @@ final class Provision {
 		}
 
 		// The account now counts against its node: tell the admin when the node is over its budget (once per step).
-		HostingCapacity::overage_alerts( (string) $record['node'] );
+		Alerts::quietly( static fn() => HostingCapacity::overage_alerts( (string) $record['node'] ) ); // A failing alert never fails or retries the placement.
 
 		$err = $this->connect();
 
