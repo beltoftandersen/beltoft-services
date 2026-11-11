@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.7.1
+Stable tag: 0.7.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -231,6 +231,12 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.7.2 =
+* Groundwork for a second shop currency, with no change on a shop with one currency: pay as you go usage is metered, invoiced and capped in the currency of the customer's usage account, account credit and top-ups have one currency per customer, and amount settings can be given per currency through filters. Nothing is ever converted: an amount with no value in a currency is not offered in it.
+* Every catalogue price the plugin prints follows WooCommerce's tax display and can be re-rendered in the other display through the `beltoft_services_price_html` filter. Invoices, order lines, the API and MCP stay excluding tax.
+* The domain search and the Bricks domain rows print the shop's currency format. New Bricks tags print a domain's register, renew and transfer price.
+* A checkout that shows the setup fields in a step with its own heading can leave the fields' heading out (`beltoft_services_checkout_field_heading`).
 
 = 0.7.1 =
 * The pay as you go ledger and the credit ledger get a currency column. Existing rows are set to the shop's currency in batches on the first request after the update, and a row with no currency counts as the shop's currency. Nothing else changes for customers.
