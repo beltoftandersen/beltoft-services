@@ -343,7 +343,7 @@ final class DbAccess {
 			'my_ip'     => self::my_ip(),
 			'confirm'   => self::CONFIRM_WORLD,
 			'add_url'   => '' === $address && ! $wanted ? DbIp::switch_url( $r, true ) : '',
-			'add_price' => '' === $address && ! $wanted ? DbIp::price_label( $r, true ) : '',
+			'add_price' => '' === $address && ! $wanted ? \BeltoftServices\Currency::with_resource( $r, static fn() => DbIp::price_label( $r, true ), '' ) : '',
 			'sold_out'  => '' === $address && ! $wanted && 0 === IpPool::available_for_db(),
 			'remove_url' => '' !== $address && $wanted ? DbIp::switch_url( $r, false ) : '',
 		);

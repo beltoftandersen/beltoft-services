@@ -530,4 +530,36 @@ final class KeyTest extends TestCase {
 		$this->assertMatchesRegularExpression( '#<p class="form-row form-row-wide validate-required"><label><input type="checkbox" class="input-checkbox" name="[^"]*\[confirm\]"#', $html );
 		$this->assertMatchesRegularExpression( '#<p class="form-row form-row-wide validate-required"><label for="[^"]*_ip">#', $html );
 	}
+
+	/** A licence whose paid order is in DKK. */
+	private function dkk_licence( float $total ): Resource {
+		$r     = $this->licence( array( 'total' => $total ) );
+		$order = wc_get_order( (int) $r->license()['order_id'] );
+		$order->set_currency( 'DKK' );
+		$order->save();
+
+		return Resource::find( $r->id() );
+	}
+
+	public function test_a_licence_paid_in_another_currency_is_ordered_only_when_it_covers_the_cost_at_the_guard_rate(): void {
+		add_filter( 'pre_wp_mail', '__return_true' );
+		$this->settings( array( 'licence_costs' => 'pro=30', 'currency_guard_rates' => '', 'admin_email' => 'christian.beltoft@gmail.com' ) );
+		$none = $this->dkk_licence( 300.0 );
+
+		$this->assertStringContainsString( 'not in EUR', (string) \BeltoftServices\Licences\KeyOrder::spend_problem( $none, 'pro' ), 'No guard rate: refused, never 1 to 1.' );
+		$this->assertTrue( $this->build( $none )->is_failed() );
+		$this->assertSame( array(), $this->calls( 'POST', '/licenses/plesk' ) );
+
+		$this->settings( array( 'currency_guard_rates' => 'DKK=8' ) );
+		$under = $this->dkk_licence( 200.0 );
+		$this->assertStringContainsString( 'below the Openprovider cost', (string) \BeltoftServices\Licences\KeyOrder::spend_problem( $under, 'pro' ), '200 DKK is 25 euro at the guard rate: under 30.' );
+		$this->assertTrue( $this->build( $under )->is_failed() );
+		$this->assertSame( array(), $this->calls( 'POST', '/licenses/plesk' ) );
+
+		$ok = $this->dkk_licence( 260.0 );
+		$this->assertNull( \BeltoftServices\Licences\KeyOrder::spend_problem( $ok, 'pro' ) );
+		$this->assertTrue( $this->build( $ok )->is_done() );
+		$this->assertCount( 1, $this->calls( 'POST', '/licenses/plesk' ) );
+		remove_filter( 'pre_wp_mail', '__return_true' );
+	}
 }

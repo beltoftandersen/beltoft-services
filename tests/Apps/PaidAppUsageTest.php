@@ -26,6 +26,8 @@ require_once __DIR__ . '/PaidAppCase.php';
  */
 final class PaidAppUsageTest extends PaidAppCase {
 
+	use \BeltoftServices\Tests\Support\FakeCurrency;
+
 	/** @var array<string, \WC_Product_Variation> Monthly tiers. */
 	private array $tiers = array();
 
@@ -43,6 +45,7 @@ final class PaidAppUsageTest extends PaidAppCase {
 	}
 
 	public function tear_down(): void {
+		$this->fake_currency_down();
 		WC()->cart->empty_cart();
 		parent::tear_down();
 	}
@@ -333,5 +336,38 @@ final class PaidAppUsageTest extends PaidAppCase {
 		$_POST[ \BeltoftServices\Apps\AppField::POST_VERSION ] = '29';
 		\BeltoftServices\Apps\AppField::validate_classic( array(), $errors );
 		$this->assertNotEmpty( $errors->get_error_messages(), 'Checkout does not go on without the tier line.' );
+	}
+
+	/** The cap of a pay as you go Plesk tier in the usage account's currency is compared with its euro cost at the guard rate. */
+	public function test_the_plesk_usage_cap_in_another_currency_is_compared_at_the_guard_rate_or_refused(): void {
+		update_option( 'woocommerce_currency', 'EUR' );
+		$this->settings( array( 'plesk_costs' => 'basic=5', 'domain_api_mode' => 'fake', 'currency_guard_rates' => '', 'admin_email' => 'christian.beltoft@gmail.com' ) );
+		add_filter( 'pre_wp_mail', '__return_true' );
+		$p = $this->usage_pair( 'basic', 3 );
+
+		$this->assertNull( \BeltoftServices\Apps\PleskLicence::spend_problem( $p['licence'], 'basic' ), 'The shop currency: the cap 5.50 covers the cost 5, as it always did.' );
+
+		$sub = wcs_create_subscription( array( 'customer_id' => $p['user'], 'billing_period' => 'month', 'billing_interval' => 1, 'status' => 'active' ) );
+		$sub->set_currency( 'DKK' );
+		$sub->save();
+		\BeltoftLicenses\Licenses::update( (int) $p['licence']->license()['id'], array( 'subscription_id' => $sub->get_id() ) );
+		$licence = Resource::find( $p['licence']->id() );
+		$this->fake_currency_up( 'EUR' );
+		$this->fake_runner();
+		$monthly = Rates::sibling( $this->usage['basic'], false );
+		update_post_meta( $monthly->get_id(), '_test_price_DKK', '40' );
+		$why = 'The pay as you go cap of this Plesk tier is below the Openprovider cost.';
+
+		$this->assertSame( $why, \BeltoftServices\Apps\PleskLicence::spend_problem( $licence, 'basic' ), 'No guard rate for DKK: refused, never 1 to 1.' );
+
+		$this->settings( array( 'currency_guard_rates' => 'DKK=7.60' ) );
+		$this->assertNull( \BeltoftServices\Apps\PleskLicence::spend_problem( $licence, 'basic' ), '40 x 1.1 = 44 DKK is 5.79 euro at 7.60, over the cost 5.' );
+
+		update_post_meta( $monthly->get_id(), '_test_price_DKK', '30' );
+		$this->assertSame( $why, \BeltoftServices\Apps\PleskLicence::spend_problem( $licence, 'basic' ), '33 DKK is 4.34 euro: under.' );
+
+		update_post_meta( $monthly->get_id(), '_test_price_DKK', '' );
+		$this->assertSame( $why, \BeltoftServices\Apps\PleskLicence::spend_problem( $licence, 'basic' ), 'No DKK price: no cap, refused.' );
+		remove_filter( 'pre_wp_mail', '__return_true' );
 	}
 }

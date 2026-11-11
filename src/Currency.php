@@ -61,6 +61,44 @@ final class Currency {
 	}
 
 	/**
+	 * The currency of an order or subscription: its own code, else the shop's.
+	 *
+	 * @param \WC_Abstract_Order $order Order or subscription.
+	 */
+	public static function of_order( $order ): string {
+		$code = $order instanceof \WC_Abstract_Order ? self::clean( $order->get_currency() ) : '';
+
+		return '' !== $code ? $code : self::base();
+	}
+
+	/**
+	 * The currency of the subscription behind a service, or '' when it has none (the current currency then applies).
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function of_resource( Resource $r ): string {
+		$id  = (int) ( $r->license()['subscription_id'] ?? 0 );
+		$sub = $id > 0 && function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( $id ) : false;
+
+		return $sub instanceof \WC_Subscription ? self::of_order( $sub ) : '';
+	}
+
+	/**
+	 * Runs a callback in the currency of a service's subscription (prices shown for an existing service, and compared with its own, are
+	 * in that currency, never the request's). With no such currency in force the default comes back, so nothing is shown at a figure of another.
+	 *
+	 * @param Resource $r       Resource.
+	 * @param callable $fn      Callback.
+	 * @param mixed    $default Answer when the currency cannot be put in force.
+	 * @return mixed
+	 */
+	public static function with_resource( Resource $r, callable $fn, $default = null ) {
+		list( $ok, $result ) = self::with( self::of_resource( $r ), $fn );
+
+		return $ok ? $result : $default;
+	}
+
+	/**
 	 * Runs a callback with a currency in force. Fails closed: a price is never read under a currency we did not get.
 	 *
 	 * The current currency (or an empty code) runs the callback as it is. For another one the filter

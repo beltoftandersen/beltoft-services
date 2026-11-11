@@ -30,13 +30,13 @@ final class Offers {
 	 *
 	 * @var array<int, array<string, mixed>>|null
 	 */
-	private static $memo = null;
+	private static $memo = array();
 
 	/**
 	 * Forgets the cached offers (a test, or code that changed a product in the same request).
 	 */
 	public static function reset(): void {
-		self::$memo = null;
+		self::$memo = array();
 	}
 
 	/**
@@ -92,8 +92,11 @@ final class Offers {
 	 * @return array<int, array{product_id: int, name: string, plans: array<int, array<string, mixed>>}>
 	 */
 	public static function products(): array {
-		if ( null !== self::$memo ) {
-			return self::$memo;
+		// Offers are read in a currency: the memo is kept per currency, so a window in another one never sees the page's prices.
+		$currency = \BeltoftServices\Currency::current();
+
+		if ( isset( self::$memo[ $currency ] ) ) {
+			return self::$memo[ $currency ];
 		}
 
 		$out = array();
@@ -124,7 +127,7 @@ final class Offers {
 			}
 		}
 
-		self::$memo = $out;
+		self::$memo[ $currency ] = $out;
 
 		return $out;
 	}

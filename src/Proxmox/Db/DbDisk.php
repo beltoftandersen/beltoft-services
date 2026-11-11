@@ -270,7 +270,7 @@ final class DbDisk {
 			$out['options'][] = array(
 				'extra' => $extra,
 				'total' => $out['gb'] + $more,
-				'price' => self::price_label( $current, $step ),
+				'price' => (string) \BeltoftServices\Currency::with_resource( $r, static fn() => self::price_label( $current, $step ), '' ),
 				'url'   => $url,
 			);
 		}

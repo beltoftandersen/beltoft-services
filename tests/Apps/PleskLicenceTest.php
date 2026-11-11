@@ -585,4 +585,24 @@ final class PleskLicenceTest extends PaidAppCase {
 		// Run twice: the command refuses when the product exists, so nothing doubles.
 		$this->assertSame( $id, PleskProductCommand::ensure() );
 	}
+
+	public function test_an_order_in_another_currency_is_compared_at_the_guard_rate_and_refused_without_one(): void {
+		$o = $this->plesk_order( 'pro' );
+		add_filter( 'pre_wp_mail', '__return_true' );
+		$this->settings( array( 'domain_api_mode' => 'fake', 'admin_email' => 'christian.beltoft@gmail.com', 'currency_guard_rates' => '' ) );
+		$o['order']->set_currency( 'DKK' );
+		$o['order']->save();
+		$licence = $this->fresh( $o['licence'] );
+		$paid    = (float) \BeltoftServices\Domains\SpendGuard::item_of_resource( $licence )->get_total();
+
+		$this->settings( array( 'plesk_costs' => 'pro=10' ) );
+		$this->assertStringContainsString( 'not in EUR', (string) PleskLicence::spend_problem( $licence, 'pro' ), 'No guard rate: refused.' );
+
+		$this->settings( array( 'currency_guard_rates' => 'DKK=8', 'plesk_costs' => sprintf( 'pro=%.2f', $paid / 8 - 0.5 ) ) );
+		$this->assertNull( PleskLicence::spend_problem( $licence, 'pro' ), 'Paid more than the cost at the guard rate.' );
+
+		$this->settings( array( 'plesk_costs' => sprintf( 'pro=%.2f', $paid / 8 + 0.5 ) ) );
+		$this->assertStringContainsString( 'below the Openprovider cost', (string) PleskLicence::spend_problem( $licence, 'pro' ) );
+		remove_filter( 'pre_wp_mail', '__return_true' );
+	}
 }

@@ -37,6 +37,8 @@ require_once dirname( __DIR__ ) . '/Mcp/ServerDiskFixture.php';
  */
 final class UsageDiskTest extends UsageTestCase {
 
+	use \BeltoftServices\Tests\Support\FakeCurrency;
+
 	use CallsTools;
 	use ServerDiskFixture;
 
@@ -62,6 +64,8 @@ final class UsageDiskTest extends UsageTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		// The shop currency first: the usage account is made in it.
+		update_option( 'woocommerce_currency', 'EUR' );
 
 		$this->user    = $this->new_user();
 		$this->account = $this->usage_account( $this->user );
@@ -77,6 +81,7 @@ final class UsageDiskTest extends UsageTestCase {
 	}
 
 	public function tear_down(): void {
+		$this->fake_currency_down();
 		if ( function_exists( 'WC' ) && WC()->cart ) {
 			WC()->cart->empty_cart();
 		}
@@ -580,5 +585,57 @@ final class UsageDiskTest extends UsageTestCase {
 
 		$this->assertContains( 'Extra disk for web1', $subjects );
 		$this->assertContains( 'web1', $subjects, 'The server line is its name.' );
+	}
+
+	/** Tax on at 25 percent in the standard class, the display set to the given mode. */
+	private function tax( string $display ): void {
+		update_option( 'woocommerce_calc_taxes', 'yes' );
+		update_option( 'woocommerce_prices_include_tax', 'no' );
+		update_option( 'woocommerce_tax_display_shop', $display );
+		update_option( 'woocommerce_tax_display_cart', $display );
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture.
+		$wpdb->query( "DELETE FROM {$wpdb->prefix}woocommerce_tax_rates" );
+		\WC_Tax::_insert_tax_rate( array( 'tax_rate_country' => '', 'tax_rate_state' => '', 'tax_rate' => '25.0000', 'tax_rate_name' => 'VAT', 'tax_rate_priority' => 1, 'tax_rate_compound' => 0, 'tax_rate_shipping' => 0, 'tax_rate_order' => 1, 'tax_rate_class' => '' ) );
+		\WC_Cache_Helper::invalidate_cache_group( 'taxes' );
+	}
+
+	public function test_the_grow_button_difference_follows_the_tax_display(): void {
+		$disk = $this->usage_disk( $this->server() );
+
+		$this->tax( 'excl' );
+		$this->assertSame( '+€4.40 per month', UsageDisk::price_difference( $disk ) );
+
+		$this->tax( 'incl' );
+		$this->assertSame( '+€5.50 per month', UsageDisk::price_difference( $disk ), 'The cap difference 4.40 at 25 percent.' );
+	}
+
+	public function test_the_grow_button_difference_is_in_the_usage_accounts_currency_or_not_shown(): void {
+		$server = $this->server();
+		$disk   = $this->usage_disk( $server );
+		$this->account->set_currency( 'DKK' );
+		$this->account->save();
+		$this->fake_currency_up( 'EUR' );
+		$this->fake_runner();
+		$this->tax( 'excl' );
+
+		$this->assertSame( '', UsageDisk::price_difference( $disk ), 'No DKK prices on the sizes: no figure, never the euro one.' );
+
+		// The window is opened for the subscription's currency, whatever the page is in (the sizes themselves need prices in that currency).
+		$asked = array();
+		add_filter(
+			'beltoft_services_currency_runner',
+			static function ( $runner ) use ( &$asked ) {
+				return static function ( string $code, callable $fn ) use ( &$asked ) {
+					$asked[] = $code;
+					return $fn();
+				};
+			},
+			20
+		);
+		UsageDisk::price_difference( $disk );
+
+		$this->assertContains( 'DKK', $asked );
+		$this->assertSame( 'EUR', \BeltoftServices\Currency::current() );
 	}
 }

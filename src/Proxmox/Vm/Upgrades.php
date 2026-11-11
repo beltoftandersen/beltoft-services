@@ -53,7 +53,14 @@ final class Upgrades {
 			return null;
 		}
 
-		foreach ( Offers::plans() as $offer ) {
+		// The plans are read, compared and chosen in the currency of the server's subscription; a plan with no price there is not offered.
+		$offers = \BeltoftServices\Currency::with_resource( $r, static fn() => Offers::plans(), null );
+
+		if ( null === $offers ) {
+			return null;
+		}
+
+		foreach ( $offers as $offer ) {
 			$ok = (int) $offer['product_id'] === (int) $license['product_id'] && (string) $offer['cluster'] === (string) ( $plan['cluster'] ?? '' ) && ! empty( $offer['in_stock'] );
 
 			foreach ( $keys as $name => $key ) {

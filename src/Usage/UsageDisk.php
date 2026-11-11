@@ -166,6 +166,15 @@ final class UsageDisk {
 	 * @param Resource $disk Resource.
 	 */
 	public static function price_difference( Resource $disk ): string {
+		return (string) \BeltoftServices\Currency::with_resource( $disk, static fn() => self::price_difference_now( $disk ), '' );
+	}
+
+	/**
+	 * The same in the currency now in force.
+	 *
+	 * @param Resource $disk Resource.
+	 */
+	private static function price_difference_now( Resource $disk ): string {
 		$to   = self::next( $disk );
 		$from = wc_get_product( (int) ( $disk->license()['variation_id'] ?? 0 ) );
 

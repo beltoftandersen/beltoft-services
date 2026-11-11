@@ -22,6 +22,8 @@ use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 require_once __DIR__ . '/Backup/BackupTestCase.php';
 
 class UsageAlertsUiTest extends BackupTestCase {
+
+	use \BeltoftServices\Tests\Support\FakeCurrency;
 	private const OWNER = 'christian.beltoft+usage-ui@gmail.com';
 
 	public function set_up(): void {
@@ -33,6 +35,7 @@ class UsageAlertsUiTest extends BackupTestCase {
 	}
 
 	public function tear_down(): void {
+		$this->fake_currency_down();
 		remove_all_filters( 'woocommerce_subscriptions_can_item_be_switched_by_user' );
 		wp_set_current_user( 0 );
 		Offers::reset();
@@ -150,6 +153,28 @@ class UsageAlertsUiTest extends BackupTestCase {
 	}
 
 	// -- The upgrade link ----------------------------------------------------------------------------
+
+	public function test_the_upgrade_is_chosen_in_the_subscriptions_currency_and_a_plan_with_no_price_there_is_not_offered(): void {
+		list( $v, $r ) = $this->on_variation( 'a-None' );
+		$this->assertSame( $v['b-None']->get_id(), Upgrades::target( $r, 'disk' )->get_id(), 'In the shop currency the larger plan is offered.' );
+
+		$sub = wcs_get_subscription( (int) $r->license()['subscription_id'] );
+		$sub->set_currency( 'DKK' );
+		$sub->save();
+		$this->fake_currency_up( \BeltoftServices\Currency::base() );
+		$this->fake_runner();
+		Offers::reset();
+
+		$this->assertNull( Upgrades::target( $r, 'disk' ), 'No DKK price on the plans: nothing is offered at a figure of the page currency.' );
+
+		foreach ( array( 'a-None', 'b-None', 'a-Daily', 'b-Daily' ) as $key ) {
+			update_post_meta( $v[ $key ]->get_id(), '_test_price_DKK', 'b' === $key[0] ? '150' : '100' );
+		}
+		Offers::reset();
+
+		$this->assertSame( $v['b-None']->get_id(), Upgrades::target( $r, 'disk' )->get_id(), 'Chosen in DKK.' );
+		$this->assertSame( \BeltoftServices\Currency::base(), \BeltoftServices\Currency::current() );
+	}
 
 	public function test_target_is_the_next_larger_in_stock_plan_for_what_ran_short(): void {
 		list( $v, $r ) = $this->on_variation( 'a-None' );

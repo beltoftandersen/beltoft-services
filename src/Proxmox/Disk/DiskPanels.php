@@ -20,6 +20,17 @@ defined( 'ABSPATH' ) || exit;
 
 final class DiskPanels {
 	public static function server( Resource $server ): array {
+		// The sizes and their prices are those of the server's subscription currency.
+		return \BeltoftServices\Currency::with_resource( $server, static fn() => self::server_now( $server ), array( 'items' => array(), 'add' => array(), 'mode' => (string) Settings::get( 'deletion_mode' ) ) );
+	}
+
+	/**
+	 * The disks of a server and the sizes it could add, in the currency now in force.
+	 *
+	 * @param Resource $server Server resource.
+	 * @return array<string, mixed>
+	 */
+	private static function server_now( Resource $server ): array {
 		$disks = array();
 		$volumes = array();
 		$located = VmRecords::for_resource( $server->id() );

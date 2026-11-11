@@ -386,6 +386,17 @@ final class Panels {
 	 * @return array<int, array{slots: int, url: string, price: string, days: int}>
 	 */
 	private static function snapshot_packs( Resource $r ): array {
+		// Priced and shown in the currency of the server's subscription.
+		return \BeltoftServices\Currency::with_resource( $r, static fn() => self::snapshot_packs_now( $r ), array() );
+	}
+
+	/**
+	 * The packs, in the currency now in force.
+	 *
+	 * @param Resource $r Server resource.
+	 * @return array<int, array{slots: int, url: string, price: string, days: int}>
+	 */
+	private static function snapshot_packs_now( Resource $r ): array {
 		$out = array();
 
 		foreach ( SnapshotCart::packs() as $variation ) {
