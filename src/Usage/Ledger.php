@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Usage;
 
+use BeltoftServices\Currency;
 use BeltoftServices\Proxmox\Vm\Schema;
 
 defined( 'ABSPATH' ) || exit;
@@ -44,15 +45,22 @@ final class Ledger {
 	 * @param string $unit        Unit label.
 	 * @param float  $rate        Price per unit and hour.
 	 * @param int    $hour        Start of the hour (unix time).
+	 * @param string $currency    Currency of the rate, empty for the shop's.
 	 * @return bool Whether a row was added.
 	 */
-	public static function record( int $resource_id, int $user_id, string $item, float $quantity, string $unit, float $rate, int $hour ): bool {
+	public static function record( int $resource_id, int $user_id, string $item, float $quantity, string $unit, float $rate, int $hour, string $currency = '' ): bool {
 		global $wpdb;
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
+		// The currency column exists once the schema upgrade has finished; before that rows are written the old way and read as the shop's currency.
+		$has    = Schema::has_currency();
+		$column = $has ? ', currency' : '';
+		$value  = $has ? ', %s' : '';
+		$args   = $has ? array( '' !== $currency ? $currency : Currency::base() ) : array();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- own table; the column list is fixed text.
 		$done = $wpdb->query(
 			$wpdb->prepare(
-				'INSERT IGNORE INTO %i (resource_id, user_id, item, quantity, unit, rate, hour_bucket, created) VALUES (%d, %d, %s, %s, %s, %s, %s, %s)',
+				"INSERT IGNORE INTO %i (resource_id, user_id, item, quantity, unit, rate, hour_bucket, created$column) VALUES (%d, %d, %s, %s, %s, %s, %s, %s$value)",
 				self::table(),
 				$resource_id,
 				$user_id,
@@ -61,7 +69,8 @@ final class Ledger {
 				$unit,
 				number_format( $rate, 8, '.', '' ),
 				gmdate( 'Y-m-d H:i:s', self::hour( $hour ) ),
-				gmdate( 'Y-m-d H:i:s' )
+				gmdate( 'Y-m-d H:i:s' ),
+				...$args
 			)
 		);
 

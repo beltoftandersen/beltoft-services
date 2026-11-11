@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Credit;
 
+use BeltoftServices\Currency;
 use BeltoftServices\Locks;
 use BeltoftServices\Proxmox\Vm\Schema;
 
@@ -195,9 +196,14 @@ final class Balance {
 			static function () use ( $wpdb, $user_id, $signed, $kind, $ref_type, $ref_id, $note ): bool {
 				// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
 				$before = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COALESCE( SUM( amount_cents ), 0 ) FROM %i WHERE user_id = %d', self::table(), $user_id ) );
-				$done   = $wpdb->query(
+				$has    = Schema::has_currency();
+				$column = $has ? ', currency' : '';
+				$value  = $has ? ', %s' : '';
+				$extra  = $has ? array( Currency::base() ) : array();
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- the column list is fixed text.
+				$done = $wpdb->query(
 					$wpdb->prepare(
-						'INSERT IGNORE INTO %i (user_id, kind, amount_cents, balance_after_cents, ref_type, ref_id, note, created) VALUES (%d, %s, %d, %d, %s, %s, %s, %s)',
+						"INSERT IGNORE INTO %i (user_id, kind, amount_cents, balance_after_cents, ref_type, ref_id, note, created$column) VALUES (%d, %s, %d, %d, %s, %s, %s, %s$value)",
 						self::table(),
 						$user_id,
 						$kind,
@@ -206,7 +212,8 @@ final class Balance {
 						$ref_type,
 						$ref_id,
 						substr( $note, 0, 255 ),
-						gmdate( 'Y-m-d H:i:s' )
+						gmdate( 'Y-m-d H:i:s' ),
+						...$extra
 					)
 				);
 				// phpcs:enable

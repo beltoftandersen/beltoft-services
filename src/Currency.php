@@ -105,6 +105,17 @@ final class Currency {
 	}
 
 	/**
+	 * The currency of a ledger row (usage or credit): its currency column, and an empty or missing one reads as the shop's currency.
+	 *
+	 * @param array<string, mixed> $row Row.
+	 */
+	public static function of_row( array $row ): string {
+		$code = self::clean( $row['currency'] ?? '' );
+
+		return '' !== $code ? $code : self::base();
+	}
+
+	/**
 	 * A currency code in capitals, or '' when the value is not a three letter code.
 	 *
 	 * @param mixed $code Value.

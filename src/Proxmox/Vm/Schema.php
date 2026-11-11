@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Proxmox\Vm;
 
+use BeltoftServices\Currency;
+use BeltoftServices\Locks;
 use BeltoftServices\VersionedSchema;
 
 defined( 'ABSPATH' ) || exit;
@@ -21,7 +23,7 @@ final class Schema {
 
 	use VersionedSchema;
 
-	public const DB_VERSION        = '5';
+	public const DB_VERSION        = '6';
 	public const OPTION_DB_VERSION = 'beltoft_services_db_version';
 	public const RETRY_TRANSIENT   = 'beltoft_services_proxmox_schema_retry';
 
@@ -58,6 +60,19 @@ final class Schema {
 	);
 
 	/**
+	 * Columns that the code writes and that a version may be stored only once they exist, per table.
+	 * Version 6: the currency of a ledger row. An empty value reads as the shop's currency (Currency::of_row()).
+	 */
+	private const REQUIRED_COLUMNS = array(
+		'usage'  => array( 'currency' ),
+		'credit' => array( 'currency' ),
+	);
+
+	/** Rows per backfill statement, and the seconds one request may spend on the backfill. */
+	private const BACKFILL_BATCH   = 5000;
+	private const BACKFILL_SECONDS = 15;
+
+	/**
 	 * Table names.
 	 *
 	 * @return array<string, string>
@@ -90,6 +105,100 @@ final class Schema {
 	 */
 	public static function missing_keys(): array {
 		return self::unique_keys_missing();
+	}
+
+	/**
+	 * Required columns that are missing, as "table.column" names. Empty when all are in place.
+	 *
+	 * @return string[]
+	 */
+	public static function missing_columns(): array {
+		global $wpdb;
+
+		$tables  = self::tables();
+		$missing = array();
+
+		foreach ( self::REQUIRED_COLUMNS as $table => $columns ) {
+			$suppress = $wpdb->suppress_errors( true );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- schema check on our own table.
+			$found = $wpdb->get_col( $wpdb->prepare( 'SHOW COLUMNS FROM %i', $tables[ $table ] ) );
+			$wpdb->suppress_errors( $suppress );
+
+			foreach ( $columns as $column ) {
+				if ( ! in_array( $column, is_array( $found ) ? $found : array(), true ) ) {
+					$missing[] = $table . '.' . $column;
+				}
+			}
+		}
+
+		return $missing;
+	}
+
+	/**
+	 * Whether the code may write the version 6 columns: the stored version says they exist and are filled.
+	 * A site whose upgrade has not finished (or failed) keeps writing rows the old way, which read the same.
+	 */
+	public static function has_currency(): bool {
+		return self::DB_VERSION === get_option( self::OPTION_DB_VERSION );
+	}
+
+	/**
+	 * Sets the shop's currency on the ledger rows that have none, in id windows (a primary key range each, so a large
+	 * table is never scanned twice) and under a lock that is not waited for. Idempotent: only empty values are written,
+	 * and an empty value reads as the shop's currency anyway, so stopping at any point loses nothing.
+	 *
+	 * @return bool True when every row was visited (or there is nothing to set); false when it stopped early, failed or another request holds the lock.
+	 */
+	private static function backfill_currency(): bool {
+		global $wpdb;
+
+		$base = Currency::base();
+
+		if ( '' === $base ) {
+			return true;
+		}
+
+		$tables   = self::tables();
+		$deadline = microtime( true ) + self::BACKFILL_SECONDS;
+
+		list( $locked, $done ) = Locks::with(
+			Locks::name( 'schema_backfill', 0 ),
+			0,
+			static function () use ( $wpdb, $tables, $base, $deadline ): bool {
+				foreach ( array( 'usage', 'credit' ) as $key ) {
+					$suppress = $wpdb->suppress_errors( true );
+					// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- own table.
+					$max = $wpdb->get_var( $wpdb->prepare( 'SELECT MAX(id) FROM %i', $tables[ $key ] ) );
+					$wpdb->suppress_errors( $suppress );
+
+					if ( null === $max || false === $max ) {
+						if ( $wpdb->last_error ) {
+							return false;
+						}
+						continue;
+					}
+
+					for ( $from = 0; $from <= (int) $max; $from += self::BACKFILL_BATCH ) {
+						if ( microtime( true ) > $deadline ) {
+							return false;
+						}
+
+						$suppress = $wpdb->suppress_errors( true );
+						// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- own table.
+						$result = $wpdb->query( $wpdb->prepare( "UPDATE %i SET currency = %s WHERE id >= %d AND id < %d AND currency = ''", $tables[ $key ], $base, $from, $from + self::BACKFILL_BATCH ) );
+						$wpdb->suppress_errors( $suppress );
+
+						if ( false === $result ) {
+							return false;
+						}
+					}
+				}
+
+				return true;
+			}
+		);
+
+		return $locked && true === $done;
 	}
 
 	/**
@@ -198,6 +307,7 @@ final class Schema {
 				hour_bucket datetime NOT NULL,
 				order_id bigint(20) unsigned NULL DEFAULT NULL,
 				created datetime NOT NULL,
+				currency char(3) NOT NULL DEFAULT '',
 				PRIMARY KEY  (id),
 				UNIQUE KEY resource_item_hour (resource_id,item,hour_bucket),
 				KEY user_open (user_id,order_id,hour_bucket),
@@ -217,6 +327,7 @@ final class Schema {
 				ref_id varchar(64) NOT NULL DEFAULT '',
 				note varchar(255) NOT NULL DEFAULT '',
 				created datetime NOT NULL,
+				currency char(3) NOT NULL DEFAULT '',
 				PRIMARY KEY  (id),
 				UNIQUE KEY kind_ref (kind,ref_type,ref_id),
 				KEY user_id (user_id,id)
@@ -225,7 +336,8 @@ final class Schema {
 
 		$wpdb->suppress_errors( $suppress );
 
-		if ( array() === self::missing_keys() ) {
+		// The version is stored only when the keys and the new columns are in place and the backfill finished: a failed ALTER or an unfinished backfill is tried again.
+		if ( array() === self::missing_keys() && array() === self::missing_columns() && self::backfill_currency() ) {
 			update_option( self::OPTION_DB_VERSION, self::DB_VERSION );
 			delete_transient( self::RETRY_TRANSIENT );
 		}

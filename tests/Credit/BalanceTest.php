@@ -32,10 +32,10 @@ class BalanceTest extends TestCase {
 		global $wpdb;
 
 		$this->assertSame( array(), Schema::missing_keys() );
-		$this->assertSame( '5', Schema::DB_VERSION );
+		$this->assertSame( '6', Schema::DB_VERSION );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- schema check.
 		$cols = $wpdb->get_col( $wpdb->prepare( 'SHOW COLUMNS FROM %i', Balance::table() ) );
-		$this->assertSame( array( 'id', 'user_id', 'kind', 'amount_cents', 'balance_after_cents', 'ref_type', 'ref_id', 'note', 'created' ), $cols );
+		$this->assertSame( array( 'id', 'user_id', 'kind', 'amount_cents', 'balance_after_cents', 'ref_type', 'ref_id', 'note', 'created', 'currency' ), $cols );
 	}
 
 	public function test_upgrade_runs_on_an_install_with_an_older_schema_version(): void {

@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.7.0
+Stable tag: 0.7.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -232,7 +232,8 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 == Changelog ==
 
-= Unreleased =
+= 0.7.1 =
+* The pay as you go ledger and the credit ledger get a currency column. Existing rows are set to the shop's currency in batches on the first request after the update, and a row with no currency counts as the shop's currency. Nothing else changes for customers.
 * Capacity never stops a sale, a placement or an upgrade. Hosting, servers, databases and apps are on sale whatever the room on the nodes; sold out is WooCommerce's own stock status, set by hand (a plan is also closed while no public address is free). New services go on the node with the most room, or the one least over its budget when none has room.
 * The admin is mailed when a node passes its committed budget (at 100 percent and at each further 10 percent), and each night when the real free memory or disk of a node is under a threshold (two new settings). The promised-storage setting is retired.
 
