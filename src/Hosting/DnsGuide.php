@@ -8,6 +8,7 @@
 namespace BeltoftServices\Hosting;
 
 use BeltoftServices\Domains\DnsQuery;
+use BeltoftServices\Domains\Ownership;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -96,12 +97,13 @@ final class DnsGuide {
 		foreach ( $hosts as $host ) {
 			$paired = 0 === strpos( $host, 'www.' ) && in_array( substr( $host, 4 ), $all, true );
 
-			if ( $paired || SiteDns::under_verified_domain( $resource_id, $host ) ) {
+			// A name that is proven already (below an active name, a zone of ours, another service) shows no proof record.
+			if ( $paired || SiteDns::leans( $resource_id, $host ) ) {
 				continue;
 			}
 
-			$name  = SiteDns::PROOF_LABEL . '.' . $host;
-			$out[] = array( 'key' => 'TXT|' . $host, 'type' => 'TXT', 'name' => $name, 'label' => self::label( $name, $domain ), 'value' => SiteDns::proof_token( $resource_id, $host ) );
+			$name  = Ownership::record_name( $host );
+			$out[] = array( 'key' => 'TXT|' . $host, 'type' => 'TXT', 'name' => $name, 'label' => self::label( $name, $domain ), 'value' => Ownership::token( SiteDns::owner( $resource_id ), $host ) );
 		}
 
 		return $out;
@@ -176,7 +178,10 @@ final class DnsGuide {
 				$texts = DnsQuery::texts( $rec['name'] );
 				$clean = is_wp_error( $texts ) ? array() : array_map( static fn( $t ) => trim( (string) $t, " \t\"" ), $texts );
 
-				$rows[ $rec['key'] ] = array( 'ok' => in_array( $rec['value'], $clean, true ), 'seen' => array() );
+				// The central value, or the older value of this account and name.
+				$old = SiteDns::proof_token( $r->id(), (string) substr( $rec['key'], 4 ) );
+
+				$rows[ $rec['key'] ] = array( 'ok' => in_array( $rec['value'], $clean, true ) || in_array( $old, $clean, true ), 'seen' => array() );
 				continue;
 			}
 

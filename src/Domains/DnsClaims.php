@@ -190,12 +190,42 @@ final class DnsClaims {
 	}
 
 	/**
-	 * The TXT record value the customer publishes.
+	 * The TXT record value the customer publishes: the one value of the customer and domain that every feature shows
+	 * (Ownership::token). A claim made before it was introduced still accepts its own value (legacy_value()).
 	 *
 	 * @param array<string, mixed> $claim Claim.
 	 */
 	public static function txt_value( array $claim ): string {
+		return Ownership::token( (int) $claim['user_id'], (string) $claim['domain'] );
+	}
+
+	/**
+	 * The value this claim showed before the central token: still accepted.
+	 *
+	 * @param array<string, mixed> $claim Claim.
+	 */
+	public static function legacy_value( array $claim ): string {
 		return self::TOKEN_PREFIX . $claim['token'];
+	}
+
+	/**
+	 * Domains the customer has a live, verified claim for whose proof was the record itself (a claim verified on the
+	 * strength of another feature's proof does not count, so a proof cannot be passed on in a circle). Claims verified
+	 * before that was recorded count: they were always verified by the record.
+	 *
+	 * @param int $user_id Customer.
+	 * @return string[]
+	 */
+	public static function proven_domains( int $user_id ): array {
+		$out = array();
+
+		foreach ( self::for_user( $user_id ) as $claim ) {
+			if ( self::usable( $claim, $user_id ) && 'derived' !== ( $claim['last_result']['via'] ?? '' ) ) {
+				$out[] = (string) $claim['domain'];
+			}
+		}
+
+		return $out;
 	}
 
 	/**

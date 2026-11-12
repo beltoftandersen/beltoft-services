@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Mail;
 
+use BeltoftServices\Domains\Ownership;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
@@ -171,8 +172,11 @@ final class MailView {
 		// The proof record, while the customer has not shown that the domain is theirs.
 		$proof = null;
 
-		if ( 'external' === $mode && ! in_array( 'proof', (array) $r->get( 'steps' ), true ) && '' !== (string) $r->get( MailDomain::META_TOKEN ) && in_array( $kind, array( 'building' ), true ) ) {
-			$proof = MailDomain::proof_record( $domain, (string) $r->get( MailDomain::META_TOKEN ) );
+		// Not shown when the customer has proven the domain already (a zone of ours, a record for another service).
+		$user = (int) ( $r->license()['user_id'] ?? 0 );
+
+		if ( 'external' === $mode && ! in_array( 'proof', (array) $r->get( 'steps' ), true ) && ( (int) $r->get( 'mail_proof_until' ) > 0 || '' !== MailDomain::legacy_token( $r ) ) && in_array( $kind, array( 'building' ), true ) && ! Ownership::proven( $user, $domain ) ) {
+			$proof = MailDomain::proof_record( $domain, $user );
 		}
 
 		$checked = (int) $r->get( 'mail_dns_checked' );

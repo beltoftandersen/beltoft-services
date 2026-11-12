@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Mail;
 
-use BeltoftServices\Domains\ProofResolver;
+use BeltoftServices\Domains\Ownership;
 use BeltoftServices\Resource;
 use BeltoftServices\Domains\ZoneAccess;
 use BeltoftServices\Domains\HostName;
@@ -26,6 +26,12 @@ final class MailDomain {
 
 	public const META_DOMAIN = 'mail_domain';
 	public const META_TOKEN  = 'mail_verify_token';
+
+	/** Resource meta: how the proof step passed: the TXT record, a zone of ours, or a proof made through another service. */
+	public const META_VIA   = 'mail_proof_via';
+	public const VIA_RECORD = 'record';
+	public const VIA_ZONE   = 'zone';
+	public const VIA_OTHER  = 'other';
 
 	/**
 	 * The name as it would be typed into DNS, or null when it is not a usable domain.
@@ -117,80 +123,61 @@ final class MailDomain {
 	}
 
 	/**
-	 * The token the customer publishes: stored once per resource.
+	 * The token this service showed before the central one existed (stored once per resource). Still accepted for this
+	 * service; none is made any more.
 	 *
 	 * @param Resource $r Resource.
-	 * @return string '' when it could not be stored.
+	 * @return string '' when the service never had one.
 	 */
-	public static function token( Resource $r ): string {
-		$token = (string) $r->get( self::META_TOKEN );
-
-		if ( '' !== $token ) {
-			return $token;
-		}
-
-		$token = 'beltoft-' . strtolower( wp_generate_password( 32, false ) );
-
-		return $r->set( array( self::META_TOKEN => $token ) ) ? $token : '';
+	public static function legacy_token( Resource $r ): string {
+		return (string) $r->get( self::META_TOKEN );
 	}
 
 	/**
-	 * The record the customer adds to prove the domain, as a DNS table row.
+	 * The record the customer adds to prove the domain, as a DNS table row: the one record of the customer and domain
+	 * that every service uses (Domains\Ownership).
 	 *
-	 * @param string $name  Domain.
-	 * @param string $token Token.
+	 * @param string $name    Domain.
+	 * @param int    $user_id Customer.
 	 * @return array{name:string,type:string,value:string}
 	 */
-	public static function proof_record( string $name, string $token ): array {
-		return array(
-			'name'  => ProofResolver::TXT_LABEL . '.' . $name,
-			'type'  => 'TXT',
-			'value' => $token,
-		);
+	public static function proof_record( string $name, int $user_id ): array {
+		return Ownership::record( $user_id, $name );
 	}
 
 	/**
-	 * Reads the proof from the domain's delegated name servers.
+	 * Answers the ownership filter (Domains\Ownership::FILTER): a mail service of this customer for this name or a name
+	 * above it, not ended, whose proof step passed with the TXT record itself. A service that took its proof from a zone or
+	 * from another service does not answer, and a service in the same registrable domain only answers for the names it
+	 * covers (Ownership::covers).
 	 *
-	 * @param string $name  Domain.
-	 * @param string $token Token.
-	 * @return array{status:string,reason:string} found, missing, unknown (try again) or support (cannot be proven).
+	 * @param mixed $proven  Answer so far.
+	 * @param mixed $name    The name.
+	 * @param mixed $user_id The customer.
+	 * @return mixed
 	 */
-	public static function check_proof( string $name, string $token ): array {
-		$delegation = self::proof( 'delegation', array( $name ) );
-
-		if ( 'ok' !== ( $delegation['status'] ?? '' ) ) {
-			return array(
-				'status' => (string) ( $delegation['status'] ?? 'unknown' ),
-				'reason' => (string) ( $delegation['reason'] ?? '' ),
-			);
+	public static function answer( $proven, $name, $user_id ) {
+		if ( true === $proven || ! is_string( $name ) || (int) $user_id <= 0 ) {
+			return $proven;
 		}
 
-		$txt = self::proof( 'check_txt', array( $name, $token, $delegation ) );
+		foreach ( Ownership::chain( $name ) as $candidate ) {
+			foreach ( Resource::find_by_meta( MailDriver::KIND, self::META_DOMAIN, $candidate ) as $id ) {
+				$r = Resource::find( (int) $id );
 
-		return array(
-			'status' => (string) ( $txt['status'] ?? 'unknown' ),
-			'reason' => (string) ( $txt['reason'] ?? '' ),
-		);
-	}
-
-	/**
-	 * One ProofResolver call. The test-only filter is the one the DNS claim jobs use.
-	 *
-	 * @param string            $call delegation or check_txt.
-	 * @param array<int, mixed> $args Arguments.
-	 * @return array<string, mixed>
-	 */
-	private static function proof( string $call, array $args ): array {
-		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals -- the same test-only filter as DnsClaimJobs.
-		$result = apply_filters( 'beltoft_services_dns_proof_result', null, $call, $args );
-
-		if ( is_array( $result ) ) {
-			return $result;
+				if ( $r
+					&& $r->is_live()
+					&& ! in_array( $r->get( 'state' ), array( 'deleted', 'failed' ), true )
+					&& (int) ( $r->license()['user_id'] ?? 0 ) === (int) $user_id
+					&& in_array( 'proof', (array) $r->get( 'steps' ), true )
+					&& self::VIA_RECORD === $r->get( self::META_VIA )
+					&& Ownership::covers( $candidate, $name )
+				) {
+					return true;
+				}
+			}
 		}
 
-		return 'check_txt' === $call
-			? ProofResolver::check_txt( (string) $args[0], (string) $args[1], (array) $args[2] )
-			: ProofResolver::delegation( (string) $args[0] );
+		return $proven;
 	}
 }

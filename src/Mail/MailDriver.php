@@ -8,6 +8,7 @@
 namespace BeltoftServices\Mail;
 
 use BeltoftServices\Alerts;
+use BeltoftServices\Domains\Ownership;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Drivers\NeedsBilling;
 use BeltoftServices\Drivers\StepResult;
@@ -139,7 +140,7 @@ final class MailDriver implements Driver, NeedsBilling {
 
 			$steps[] = 'proof';
 
-			if ( ! $r->set( array( 'steps' => $steps, 'mail_mode' => $proof ) ) ) {
+			if ( ! $r->set( array( 'steps' => $steps, 'mail_mode' => $proof['mode'], MailDomain::META_VIA => $proof['via'] ) ) ) {
 				return StepResult::retry( 60, 'The proof could not be saved.' );
 			}
 
@@ -236,27 +237,25 @@ final class MailDriver implements Driver, NeedsBilling {
 	}
 
 	/**
-	 * Proves the customer holds the domain.
+	 * Proves the customer holds the domain: a zone of ours, a proof the customer made for the same domain through another
+	 * service (Domains\Ownership), or the TXT record itself. After the proof the service exists on the mail server, so a
+	 * proof is needed at set-up time only.
 	 *
 	 * @param Resource $r    Resource.
 	 * @param string   $name Domain.
-	 * @return string|StepResult 'ours' or 'external' when proven, else the result to return.
+	 * @return array{mode:string,via:string}|StepResult The proof (mode ours or external; via zone, other or record), else the result to return.
 	 */
 	private function prove( Resource $r, string $name ) {
-		if ( MailDomain::on_our_servers( $name, (int) ( $r->license()['user_id'] ?? 0 ) ) ) {
-			return 'ours';
+		$user = (int) ( $r->license()['user_id'] ?? 0 );
+
+		if ( MailDomain::on_our_servers( $name, $user ) ) {
+			return array( 'mode' => 'ours', 'via' => MailDomain::VIA_ZONE );
 		}
 
-		/**
-		 * Whether another service of the same customer has already proven that the domain is theirs (for example the
-		 * hosting account whose website runs on it, when this mail domain belongs to that account). Default false.
-		 *
-		 * @param bool     $proven Default false.
-		 * @param string   $name   The domain.
-		 * @param Resource $r      The mail resource.
-		 */
-		if ( apply_filters( 'beltoft_services_mail_domain_proven', false, $name, $r ) ) {
-			return 'external';
+		// Proven already: a name in a zone of ours below the zone, a verified claim, or a hosting account whose record was
+		// found. Never a fresh lookup for another feature, and never a proof that was itself taken from a service.
+		if ( Ownership::proven( $user, $name ) ) {
+			return array( 'mode' => 'external', 'via' => MailDomain::VIA_OTHER );
 		}
 
 		// A domain registered or transferred in the same order: wait for it, then it is ours. After the deadline the
@@ -265,18 +264,12 @@ final class MailDriver implements Driver, NeedsBilling {
 			return StepResult::wait( 600, 'Waiting for the domain registration to finish.', (int) $r->get( MailField::META_WAIT_UNTIL ) );
 		}
 
-		$token = MailDomain::token( $r );
-
-		if ( '' === $token ) {
-			return StepResult::retry( 60, 'The proof token could not be saved.' );
-		}
-
 		$until = (int) $r->get( 'mail_proof_until' );
 		$until = $until > 0 ? $until : time() + MailDns::WAIT_DAYS * DAY_IN_SECONDS;
-		$check = MailDomain::check_proof( $name, $token );
+		$check = Ownership::check( $user, $name, array_filter( array( MailDomain::legacy_token( $r ) ) ) );
 
 		if ( 'found' === $check['status'] ) {
-			return 'external';
+			return array( 'mode' => 'external', 'via' => MailDomain::VIA_RECORD );
 		}
 
 		if ( 'support' === $check['status'] && 'not_delegated' !== $check['reason'] ) {

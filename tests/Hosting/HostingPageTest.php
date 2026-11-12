@@ -688,7 +688,7 @@ class HostingPageTest extends HostingCase {
 		$this->assertStringContainsString( 'data-copy="www"', $html );
 		$this->assertStringContainsString( 'data-copy="_beltoft-verify"', $html );
 		$this->assertStringContainsString( 'data-copy="198.51.100.7"', $html );
-		$this->assertStringContainsString( 'data-copy="' . \BeltoftServices\Hosting\SiteDns::proof_token( $r->id(), 'example.org' ) . '"', $html );
+		$this->assertStringContainsString( 'data-copy="' . \BeltoftServices\Domains\Ownership::token( (int) $r->license()['user_id'], 'example.org' ) . '"', $html );
 		$this->assertSame( 1, substr_count( $html, 'data-copy="_beltoft-verify' ), 'The www name needs no proof of its own.' );
 		$this->assertStringContainsString( 'data-hosting-action="dns_check" data-host="example.org"', $html );
 		$this->assertStringContainsString( 'Not checked yet', $html );

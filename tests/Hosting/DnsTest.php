@@ -258,7 +258,9 @@ class DnsTest extends HostingCase {
 		list( $r, , $node ) = $this->account();
 		$slug  = 'w' . $r->id();
 		$host  = 'www.elsewhere.example';
-		$token = SiteDns::proof_token( $r->id(), $host );
+		$user  = (int) $r->license()['user_id'];
+		$token = \BeltoftServices\Domains\Ownership::token( $user, $host );
+		$old   = SiteDns::proof_token( $r->id(), $host );
 
 		$calls = count( $this->dns->calls() );
 		$this->assertSame( array( 'kind' => 'external', 'state' => 'waiting' ), SiteDns::add_domain( $r, $slug, $host, $node ) );
@@ -270,7 +272,7 @@ class DnsTest extends HostingCase {
 		);
 		$with = SiteDns::instructions( $node, $host, $r->id() );
 		$this->assertSame( array( 'type' => 'TXT', 'name' => '_beltoft-verify.' . $host, 'value' => $token ), end( $with ) );
-		$this->assertNotSame( $token, SiteDns::proof_token( $r->id() + 1, $host ), 'The token belongs to the account.' );
+		$this->assertNotSame( $token, \BeltoftServices\Domains\Ownership::token( $user + 1, $host ), 'The token belongs to the customer.' );
 		$this->assertNotContains( $host, array_column( EdgeMap::routes( $r->id(), false ), 'host' ), 'A waiting name is not on the edge.' );
 
 		$this->lookups( array( '203.0.113.50' ), array( $token ) );
@@ -284,6 +286,18 @@ class DnsTest extends HostingCase {
 		$this->lookups( array( '198.51.100.7' ), array( '"' . $token . '"' ) );
 		$this->assertSame( 'active', SiteDns::check_external( $host, $node ) );
 		$this->assertContains( $host, array_column( EdgeMap::routes( $r->id(), false ), 'host' ) );
+
+		// The proof goes away: the name goes back to waiting, and its own stored state does not keep it alive.
+		$this->lookups( array( '198.51.100.7' ), array() );
+		$this->assertSame( 'waiting', SiteDns::check_external( $host, $node ) );
+		$this->assertArrayNotHasKey( $host, (array) Resource::find( $r->id() )->get( SiteDns::META_PROOFS ) );
+
+		// A record made before 0.15.0 (the value of this account and name) still proves it.
+		$this->lookups( array( '198.51.100.7' ), array( $old ) );
+		$this->assertSame( 'active', SiteDns::check_external( $host, $node ) );
+		$this->lookups( array( '198.51.100.7' ), array( $token ) );
+		$this->assertSame( 'active', SiteDns::check_external( $host, $node ) );
+		$this->assertArrayHasKey( $host, (array) Resource::find( $r->id() )->get( SiteDns::META_PROOFS ), 'Proven by the record itself.' );
 
 		remove_all_filters( 'beltoft_services_dns_resolve' );
 		add_filter( 'beltoft_services_dns_resolve', fn() => new \WP_Error( 'down', 'down' ) );
@@ -314,7 +328,7 @@ class DnsTest extends HostingCase {
 		$this->assertSame( 'waiting', SiteDns::check_external( $under, $node ), 'Not verified yet, so the subdomain gets no free pass.' );
 		$this->assertFalse( SiteDns::under_verified_domain( $r->id(), $under ) );
 
-		$this->lookups( array( '198.51.100.7' ), array( SiteDns::proof_token( $r->id(), $apex ) ) );
+		$this->lookups( array( '198.51.100.7' ), array( \BeltoftServices\Domains\Ownership::token( $user, $apex ) ) );
 		$this->assertSame( 'active', SiteDns::check_external( $apex, $node ) );
 		$this->lookups( array( '198.51.100.7' ), array() );
 		$this->assertTrue( SiteDns::under_verified_domain( $r->id(), $under ) );
@@ -335,6 +349,70 @@ class DnsTest extends HostingCase {
 		SiteDns::add_domain( $other, 'w' . $other->id(), 'www.outside.example', $node );
 		$this->assertSame( 'waiting', SiteDns::check_external( 'www.outside.example', $node ), 'The other account never proved outside.example.' );
 		remove_all_filters( 'beltoft_services_dns_resolve' );
+	}
+
+	/**
+	 * A mail service of a customer for a name, its proof step passed in the given way.
+	 *
+	 * @param int    $user User id.
+	 * @param string $name Domain.
+	 * @param string $via  Mail proof marker.
+	 */
+	private function mail_service( int $user, string $name, string $via ): Resource {
+		$product = $this->service_product( 'mail', array(), array( 'slug' => 'mail-' . wp_generate_password( 5, false ) ) );
+		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $user ) );
+		$mail    = Resource::create( $license, \BeltoftServices\Drivers\Registry::get( 'mail' ), array(), array( 'mail_domain' => $name, 'steps' => array( 'proof' ), 'mail_proof_via' => $via ) );
+		$this->assertInstanceOf( Resource::class, $mail );
+		$mail->set( array( 'state' => 'ready' ) );
+
+		return Resource::find( $mail->id() );
+	}
+
+	public function test_a_domain_the_customer_proved_for_mail_needs_no_second_record_for_hosting(): void {
+		list( $r, $user, $node ) = $this->account();
+		$slug = 'w' . $r->id();
+		SiteDns::add_domain( $r, $slug, 'mailfirst.example', $node );
+		SiteDns::add_domain( $r, $slug, 'www.mailfirst.example', $node );
+		$this->lookups( array( '198.51.100.7' ), array() );
+
+		$this->assertSame( 'waiting', SiteDns::check_external( 'mailfirst.example', $node ), 'No proof anywhere.' );
+		$this->assertCount( 1, array_filter( SiteDns::instructions( $node, 'mailfirst.example', $r->id() ), static fn( $i ) => 'TXT' === $i['type'] ), 'The record is asked for.' );
+
+		// Mail proved it with the record: the hosting name needs nothing more, and its name below it too.
+		$mail = $this->mail_service( $user, 'mailfirst.example', 'record' );
+		$this->assertSame( 'active', SiteDns::check_external( 'mailfirst.example', $node ) );
+		$this->assertSame( 'active', SiteDns::check_external( 'www.mailfirst.example', $node ) );
+		$this->assertCount( 0, array_filter( SiteDns::instructions( $node, 'mailfirst.example', $r->id() ), static fn( $i ) => 'TXT' === $i['type'] ), 'Proven: the guide shows no proof row.' );
+		$this->assertArrayNotHasKey( 'mailfirst.example', (array) Resource::find( $r->id() )->get( SiteDns::META_PROOFS ), 'Taken from mail, not found as a record: it does not answer for others.' );
+
+		// The mail service ends: the proof is gone and the name waits again.
+		$mail->set( array( 'state' => 'deleted' ) );
+		$this->assertSame( 'waiting', SiteDns::check_external( 'mailfirst.example', $node ) );
+	}
+
+	public function test_a_mail_proof_that_came_from_a_zone_or_another_service_does_not_prove_a_hosting_name(): void {
+		list( $r, $user, $node ) = $this->account();
+		SiteDns::add_domain( $r, 'w' . $r->id(), 'borrowed.example', $node );
+		$this->lookups( array( '198.51.100.7' ), array() );
+
+		$this->mail_service( $user, 'borrowed.example', 'other' );
+		$this->assertSame( 'waiting', SiteDns::check_external( 'borrowed.example', $node ) );
+
+		// Another customer's mail service for the same domain never counts.
+		list( , $stranger ) = $this->account();
+		$this->mail_service( $stranger, 'borrowed.example', 'record' );
+		$this->assertSame( 'waiting', SiteDns::check_external( 'borrowed.example', $node ) );
+	}
+
+	public function test_a_subdomain_proof_does_not_cover_the_domain_above_it(): void {
+		list( $r, $user, $node ) = $this->account();
+		SiteDns::add_domain( $r, 'w' . $r->id(), 'above.example', $node );
+		$this->lookups( array( '198.51.100.7' ), array() );
+
+		$this->mail_service( $user, 'sub.above.example', 'record' );
+		$this->assertSame( 'waiting', SiteDns::check_external( 'above.example', $node ) );
+		$this->assertTrue( \BeltoftServices\Domains\Ownership::proven( $user, 'x.sub.above.example' ) );
+		$this->assertFalse( \BeltoftServices\Domains\Ownership::proven( $user, 'www.above.example' ) );
 	}
 
 	public function test_the_sweep_activates_and_deactivates_external_names_and_sends_the_routes(): void {

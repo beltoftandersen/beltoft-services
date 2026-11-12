@@ -13,6 +13,7 @@ use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
 use BeltoftServices\Domains\ZoneAccess;
+use BeltoftServices\Domains\Ownership;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -51,6 +52,7 @@ final class MailField {
 	 * Hooks.
 	 */
 	public static function register(): void {
+		add_filter( Ownership::FILTER, array( MailDomain::class, 'answer' ), 10, 3 );
 		// Under the billing details: the theme's checkout shows the order notes step only for server and database carts.
 		add_action( 'woocommerce_after_checkout_billing_form', array( __CLASS__, 'render' ), 20 );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate' ), 10, 2 );

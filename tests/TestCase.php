@@ -66,6 +66,15 @@ abstract class TestCase extends \WP_UnitTestCase {
 		// A public DNS lookup (an app on the customer's own domain) answers "nothing there" and never reaches the network; a test sets its own answers.
 		add_filter( 'beltoft_services_dns_resolve', static fn( $answer ) => null === $answer ? array() : $answer );
 
+		// The ownership check asks the delegated name servers first: by default they "cannot be reached", so nothing in a test
+		// run reaches the network (the system resolver filter above answers instead). A test sets its own proof answers.
+		add_filter(
+			'beltoft_services_dns_proof_result',
+			static fn( $result, $call ) => null === $result && in_array( $call, array( 'delegation', 'check_txt' ), true ) ? array( 'status' => 'unknown', 'reason' => 'test_no_network', 'ns' => array(), 'ips' => array(), 'ds' => null, 'ours' => false, 'servers' => array() ) : $result,
+			5,
+			2
+		);
+
 		// Re-reads of a lagging Proxmox status never sleep in tests; the pauses are counted.
 		$this->pauses = array();
 		add_filter(

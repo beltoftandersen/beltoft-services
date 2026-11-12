@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Tests\Mail;
 
+use BeltoftServices\Domains\Ownership;
 use BeltoftServices\Domains\Clients as DnsClients;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Drivers\StepResult;
@@ -109,13 +110,37 @@ final class MailDriverTest extends MailTestCase {
 		$this->assertGreaterThan( time(), $res->wait_until() );
 		$this->assertSame( array(), $this->mailcow->calls(), 'No mailcow call before the proof.' );
 
+		// The one record of the customer and domain: nothing is stored per service any more.
 		$fresh = Resource::find( $r->id() );
-		$token = $fresh->get( MailDomain::META_TOKEN );
-		$this->assertStringStartsWith( 'beltoft-', $token );
-		$this->assertSame( array( 'name' => '_beltoft-verify.customer.example', 'type' => 'TXT', 'value' => $token ), MailDomain::proof_record( 'customer.example', $token ) );
+		$user  = (int) $fresh->license()['user_id'];
+		$token = Ownership::token( $user, 'customer.example' );
+		$this->assertStringStartsWith( 'beltoft-owner=', $token );
+		$this->assertSame( '', MailDomain::legacy_token( $fresh ) );
+		$this->assertSame( array( 'name' => '_beltoft-verify.customer.example', 'type' => 'TXT', 'value' => $token ), MailDomain::proof_record( 'customer.example', $user ) );
 
 		$this->driver()->provision( $fresh );
-		$this->assertSame( $token, Resource::find( $r->id() )->get( MailDomain::META_TOKEN ), 'The token stays the same.' );
+		$this->assertSame( '', MailDomain::legacy_token( Resource::find( $r->id() ) ) );
+	}
+
+	public function test_a_record_with_the_old_per_service_value_still_proves_the_domain(): void {
+		$r = $this->mail_resource( 'older.example', array( MailDomain::META_TOKEN => 'beltoft-oldvalue' ) );
+		$seen = array();
+		add_filter(
+			'beltoft_services_dns_proof_result',
+			static function ( $pre, $call, $args ) use ( &$seen ) {
+				if ( 'check_txt' === $call ) {
+					$seen = (array) $args[1];
+					return array( 'status' => 'found', 'servers' => array(), 'reason' => 'found' );
+				}
+				return $pre;
+			},
+			20,
+			3
+		);
+		$this->assertTrue( $this->driver()->provision( $r )->is_done() );
+		$this->assertContains( 'beltoft-oldvalue', $seen, 'The value shown before 0.15.0 is asked for too.' );
+		$this->assertContains( Ownership::token( (int) $r->license()['user_id'], 'older.example' ), $seen );
+		$this->assertSame( MailDomain::VIA_RECORD, Resource::find( $r->id() )->get( MailDomain::META_VIA ) );
 	}
 
 	public function test_a_domain_that_cannot_be_proven_fails_and_one_not_yet_delegated_waits(): void {

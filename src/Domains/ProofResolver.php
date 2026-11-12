@@ -101,11 +101,16 @@ final class ProofResolver {
 	}
 
 	/**
-	 * Is the TXT record at _beltoft-verify.<domain> published, with exactly $value, on every delegated server?
+	 * Is the TXT record at _beltoft-verify.<domain> published, with exactly $value (or exactly one of the values when a
+	 * list is given), on every delegated server?
 	 *
+	 * @param string       $domain     Name the record is under (the registrable domain or a name below it).
+	 * @param string|array $value      One accepted value or a list of them.
+	 * @param array        $delegation Result of delegation().
 	 * @return array{status: string, servers: array<string, string>, reason: string}
 	 */
-	public static function check_txt( string $domain, string $value, array $delegation ): array {
+	public static function check_txt( string $domain, $value, array $delegation ): array {
+		$value = array_values( array_filter( array_map( 'strval', (array) $value ), static fn( $v ) => '' !== $v ) );
 		if ( 'ok' !== ( $delegation['status'] ?? '' ) ) { return array( 'status' => (string) ( $delegation['status'] ?? 'unknown' ), 'servers' => array(), 'reason' => (string) ( $delegation['reason'] ?? 'no_delegation' ) ); }
 		$deadline = self::deadline();
 		$name     = self::TXT_LABEL . '.' . strtolower( rtrim( $domain, '.' ) );
@@ -254,14 +259,14 @@ final class ProofResolver {
 	}
 
 	/** One server's answer to the TXT question, as a per-server state. */
-	private static function txt_state( array $response, string $name, string $value ): string {
+	private static function txt_state( array $response, string $name, array $values ): string {
 		if ( ! $response['aa'] || ! in_array( $response['rcode'], array( 0, 3 ), true ) ) { return 'error'; }
 		$wrong = false;
 		foreach ( $response['answer'] as $rr ) {
 			if ( $rr['name'] !== $name ) { continue; }
 			if ( DnsWire::CNAME === $rr['type'] ) { return 'cname'; }
 			if ( DnsWire::TXT === $rr['type'] ) {
-				if ( implode( '', (array) $rr['data'] ) === $value ) { return 'found'; }
+				if ( in_array( implode( '', (array) $rr['data'] ), $values, true ) ) { return 'found'; }
 				$wrong = true;
 			}
 		}

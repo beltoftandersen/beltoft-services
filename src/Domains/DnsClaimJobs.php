@@ -178,13 +178,24 @@ final class DnsClaimJobs {
 
 		$domain     = (string) $claim['domain'];
 		$delegation = self::proof( 'delegation', array( $domain ) );
-		$result     = 'ok' === ( $delegation['status'] ?? '' ) ? self::proof( 'check_txt', array( $domain, DnsClaims::txt_value( $claim ), $delegation ) ) : $delegation;
+		$user       = (int) $claim['user_id'];
+		$via        = 'dns';
+		$result     = 'ok' === ( $delegation['status'] ?? '' ) ? Ownership::check_with_delegation( $user, $domain, $delegation, array( DnsClaims::legacy_value( $claim ) ) ) : $delegation;
+
+		// A domain the customer has proven through another service needs no record of its own. A claim does not renew
+		// itself: its own earlier verification is left out of that look, and a claim verified this way is marked so it is
+		// never passed on as a proof (Ownership::source).
+		if ( 'ok' === ( $delegation['status'] ?? '' ) && 'found' !== ( $result['status'] ?? '' ) && '' !== Ownership::source( $user, $domain, array( 'claim' ) ) ) {
+			$result = array( 'status' => 'found', 'reason' => 'found', 'servers' => array() );
+			$via    = 'derived';
+		}
 		$status     = (string) ( $result['status'] ?? 'unknown' );
 		$reason     = (string) ( $result['reason'] ?? '' );
 		$summary    = array(
 			'status'  => $status,
 			'reason'  => $reason,
 			'servers' => (array) ( $result['servers'] ?? array() ),
+			'via'     => $via,
 		);
 		$kept       = array_intersect_key( $claim['last_result'], array_flip( array( 'scan', 'zone_file' ) ) );
 		$now        = gmdate( 'Y-m-d H:i:s' );

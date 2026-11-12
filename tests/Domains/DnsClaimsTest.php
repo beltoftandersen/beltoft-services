@@ -17,7 +17,9 @@ class DnsClaimsTest extends TestCase {
 		$b = DnsClaims::create( 2, 'example.com' );
 		$this->assertSame( 1, preg_match( '/^[A-Za-z0-9_-]{43}$/', $a['token'] ) );
 		$this->assertNotSame( $a['token'], $b['token'] );
-		$this->assertSame( 'beltoft-verify=v1:' . $a['token'], DnsClaims::txt_value( $a ) );
+		$this->assertSame( 'beltoft-verify=v1:' . $a['token'], DnsClaims::legacy_value( $a ) );
+		$this->assertSame( \BeltoftServices\Domains\Ownership::token( 1, 'example.com' ), DnsClaims::txt_value( $a ) );
+		$this->assertNotSame( DnsClaims::txt_value( $a ), DnsClaims::txt_value( $b ), 'One value per customer.' );
 		$this->assertSame( '_beltoft-verify.example.com', DnsClaims::txt_name( $a ) );
 		$this->assertSame( 'pending', $a['status'] );
 		$this->assertSame( array(), $a['parent_ns'] );

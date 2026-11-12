@@ -8,6 +8,7 @@
 namespace BeltoftServices\Hosting;
 
 use BeltoftServices\Domains\DnsQuery;
+use BeltoftServices\Domains\Ownership;
 use BeltoftServices\Domains\ZoneAccess;
 use BeltoftServices\Domains\ZoneWriter;
 use BeltoftServices\Resource;
@@ -66,12 +67,14 @@ final class SiteDns {
 			}
 		}
 
-		// The proof that the customer controls the name: a TXT record with a token only this account and name can show.
-		if ( '' !== $host && $resource_id > 0 ) {
+		// The proof that the customer controls the name: the one TXT record of the customer and domain (Domains\Ownership),
+		// shown only while the name is not proven already.
+		if ( '' !== $host && $resource_id > 0 && ! self::leans( $resource_id, $host ) ) {
+			$rec   = Ownership::record( self::owner( $resource_id ), $host );
 			$out[] = array(
-				'type'  => 'TXT',
-				'name'  => self::PROOF_LABEL . '.' . $host,
-				'value' => self::proof_token( $resource_id, $host ),
+				'type'  => $rec['type'],
+				'name'  => $rec['name'],
+				'value' => $rec['value'],
 			);
 		}
 
@@ -81,8 +84,26 @@ final class SiteDns {
 	/** Label of the ownership proof record, in front of the host name. */
 	public const PROOF_LABEL = '_beltoft-verify';
 
+	/** Resource meta: the names whose proof was the TXT record itself, host => time. Only these answer for other features. */
+	public const META_PROOFS = 'host_proofs';
+
+	/** The name being checked now: its own stored state does not answer for itself. */
+	private static string $excluding = '';
+
 	/**
-	 * The ownership token of a name for an account (not stored: made again from the site's secret keys).
+	 * The customer of a hosting account.
+	 *
+	 * @param int $resource_id Hosting resource id.
+	 */
+	public static function owner( int $resource_id ): int {
+		$r = Resource::find( $resource_id );
+
+		return $r ? (int) ( $r->license()['user_id'] ?? 0 ) : 0;
+	}
+
+	/**
+	 * The older ownership token of a name for an account (not stored: made again from the site's secret keys). Still
+	 * accepted next to the central value (Domains\Ownership), so a record added before 0.15.0 keeps working.
 	 *
 	 * @param int    $resource_id Hosting resource id.
 	 * @param string $host        Host name.
@@ -355,10 +376,9 @@ final class SiteDns {
 	}
 
 	/**
-	 * Looks at an external name: it is active once the customer has proved the name is theirs (the TXT record
-	 * `_beltoft-verify.<name>` with the account's token) AND a public lookup shows our edge address, and goes back to
-	 * waiting if either stops showing. A lookup that fails changes nothing. Pointing at us alone proves nothing: anybody
-	 * can point a name they do not own.
+	 * Looks at an external name: it is active once the customer has proved the name is theirs (see proof()) AND a public
+	 * lookup shows our edge address, and goes back to waiting if either stops showing. A lookup that fails changes
+	 * nothing. Pointing at us alone proves nothing: anybody can point a name they do not own.
 	 *
 	 * @param string               $host Host name.
 	 * @param array<string, mixed> $node Node settings.
@@ -373,18 +393,142 @@ final class SiteDns {
 
 		$edge  = self::edge( $node );
 		$found = DnsQuery::addresses( $host, 'A' );
-		$texts = DnsQuery::texts( self::PROOF_LABEL . '.' . $host );
 
-		if ( is_wp_error( $found ) || is_wp_error( $texts ) ) {
+		if ( is_wp_error( $found ) ) {
 			return null;
 		}
 
-		$proved = self::under_verified_domain( (int) $row['resource_id'], $host ) || in_array( self::proof_token( (int) $row['resource_id'], $host ), array_map( static fn( $t ) => trim( (string) $t, " \t\"" ), $texts ), true );
-		$state  = $proved && '' !== $edge['A'] && in_array( $edge['A'], $found, true ) ? 'active' : 'waiting';
+		$points = '' !== $edge['A'] && in_array( $edge['A'], $found, true );
+		$proved = false;
+
+		// The proof is looked for only while the name points at us: a name that does not is waiting whatever it proves.
+		if ( $points ) {
+			$proved = self::proof( (int) $row['resource_id'], $host );
+
+			if ( null === $proved ) {
+				return null;
+			}
+		}
+
+		$state = $proved && $points ? 'active' : 'waiting';
 
 		SiteDomains::set_state( $host, $state );
 
 		return $state;
+	}
+
+	/**
+	 * Does the name have the customer's proof now? Order: a name below an active name of this account; another stored
+	 * proof of the same customer (a zone of ours, a claim, another service: Ownership::source, never this name's own earlier
+	 * state); then the record itself (Ownership::check, the system resolver as the fallback). The name is marked as proven
+	 * by the record only in the last case, so it answers for other services only while the record is there.
+	 *
+	 * @param int    $resource_id Hosting resource id.
+	 * @param string $host        Host name.
+	 * @return bool|null True, false, or null when the lookup could not tell.
+	 */
+	private static function proof( int $resource_id, string $host ): ?bool {
+		$user = self::owner( $resource_id );
+
+		if ( self::leans( $resource_id, $host ) ) {
+			self::mark( $resource_id, $host, false );
+
+			return true;
+		}
+
+		$check = Ownership::check( $user, $host, array( self::proof_token( $resource_id, $host ) ), true );
+
+		if ( 'unknown' === $check['status'] ) {
+			return null;
+		}
+
+		self::mark( $resource_id, $host, 'found' === $check['status'] );
+
+		return 'found' === $check['status'];
+	}
+
+	/**
+	 * Is the name proven without looking at DNS: below an active name of the account, or proven by something else
+	 * (a zone of ours, a claim, another service of the same customer)? The name's own stored state never counts.
+	 *
+	 * @param int    $resource_id Hosting resource id.
+	 * @param string $host        Host name.
+	 */
+	public static function leans( int $resource_id, string $host ): bool {
+		if ( self::under_verified_domain( $resource_id, $host ) ) {
+			return true;
+		}
+
+		$before          = self::$excluding;
+		self::$excluding = $host;
+
+		try {
+			return '' !== Ownership::source( self::owner( $resource_id ), $host );
+		} finally {
+			self::$excluding = $before;
+		}
+	}
+
+	/**
+	 * Notes whether the proof of a name is the record itself.
+	 *
+	 * @param int    $resource_id Hosting resource id.
+	 * @param string $host        Host name.
+	 * @param bool   $by_record   True when the record was found.
+	 */
+	private static function mark( int $resource_id, string $host, bool $by_record ): void {
+		$r = Resource::find( $resource_id );
+
+		if ( ! $r ) {
+			return;
+		}
+
+		$marks = (array) $r->get( self::META_PROOFS );
+
+		if ( $by_record === isset( $marks[ $host ] ) ) {
+			return;
+		}
+
+		if ( $by_record ) {
+			$marks[ $host ] = time();
+		} else {
+			unset( $marks[ $host ] );
+		}
+
+		$r->set( array( self::META_PROOFS => $marks ) );
+	}
+
+	/**
+	 * Answers the ownership filter (Domains\Ownership::FILTER): the customer has an active outside name of one of their
+	 * hosting accounts, at or above this name, whose proof was the TXT record. A name active only because another service or
+	 * the zone proved it does not answer (a proof is never passed on in a circle), and the name being checked does not answer
+	 * for itself.
+	 *
+	 * @param mixed $proven  Answer so far.
+	 * @param mixed $name    The name.
+	 * @param mixed $user_id The customer.
+	 * @return mixed
+	 */
+	public static function answer( $proven, $name, $user_id ) {
+		if ( true === $proven || ! is_string( $name ) || (int) $user_id <= 0 ) {
+			return $proven;
+		}
+
+		foreach ( Ownership::chain( $name ) as $candidate ) {
+			$row = $candidate === self::$excluding ? null : SiteDomains::find( $candidate );
+
+			if ( null === $row || 'external' !== $row['kind'] || 'active' !== $row['state'] ) {
+				continue;
+			}
+
+			$r = Resource::find( (int) $row['resource_id'] );
+
+			if ( $r && HostingDriver::ID === $r->get( 'driver' ) && $r->is_live() && (int) ( $r->license()['user_id'] ?? 0 ) === (int) $user_id && isset( ( (array) $r->get( self::META_PROOFS ) )[ $candidate ] ) ) {
+				return true;
+			}
+		}
+
+		return $proven;
 	}
 
 	/**

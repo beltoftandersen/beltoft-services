@@ -364,8 +364,12 @@ class LiteMailTest extends HostingCase {
 		remove_filter( 'beltoft_services_lock_timeout', '__return_zero' );
 	}
 
-	public function test_the_mail_domain_of_a_hosting_account_needs_no_second_proof(): void {
-		// The mail service's own proof record is NOT there: the hosting account proved the domain already.
+	/**
+	 * The record is not there for the mail service, but the hosting account found it for the same domain.
+	 *
+	 * @param bool $by_record The hosting name's proof was the record itself.
+	 */
+	private function mail_on_hosting_name( bool $by_record ): array {
 		remove_all_filters( 'beltoft_services_dns_proof_result' );
 		$proof = array(
 			'delegation' => array( 'status' => 'ok', 'reason' => 'delegated', 'ns' => array( 'ns1.host.example' ), 'ips' => array(), 'ds' => null, 'ours' => false ),
@@ -377,11 +381,40 @@ class LiteMailTest extends HostingCase {
 		$child  = $this->lite( $parent, 'proved.example' );
 		$this->assertInstanceOf( Resource::class, $child );
 
-		$result = Registry::get( 'mail' )->provision( Resource::find( $child->id() ) );
-		$this->assertContains( 'proof', (array) Resource::find( $child->id() )->get( 'steps' ), 'The proof step is passed: ' . $result->error() );
-		$this->assertSame( 'external', Resource::find( $child->id() )->get( 'mail_mode' ) );
+		// The account's name is an outside name that passed the record (or was proven by something else).
+		global $wpdb;
+		$wpdb->update( \BeltoftServices\Hosting\Schema::tables()['hosting_domains'], array( 'kind' => 'external' ), array( 'host' => 'proved.example' ) );
 
-		// A mail domain that is not the child of a hosting account still needs its own proof.
-		$this->assertFalse( \BeltoftServices\Hosting\LiteMail::proven( false, 'proved.example', $parent ) );
+		if ( $by_record ) {
+			$parent->set( array( \BeltoftServices\Hosting\SiteDns::META_PROOFS => array( 'proved.example' => time() ) ) );
+		}
+
+		return array( $parent, $child );
+	}
+
+	public function test_the_mail_domain_of_a_hosting_account_needs_no_second_proof(): void {
+		list( , $child ) = $this->mail_on_hosting_name( true );
+
+		$result = Registry::get( 'mail' )->provision( Resource::find( $child->id() ) );
+		$fresh  = Resource::find( $child->id() );
+		$this->assertContains( 'proof', (array) $fresh->get( 'steps' ), 'The proof step is passed: ' . $result->error() );
+		$this->assertSame( 'external', $fresh->get( 'mail_mode' ) );
+		$this->assertSame( MailDomain::VIA_OTHER, $fresh->get( MailDomain::META_VIA ), 'It is marked as taken from another service.' );
+	}
+
+	public function test_a_hosting_name_that_was_not_proven_by_the_record_proves_nothing_for_mail(): void {
+		list( , $child ) = $this->mail_on_hosting_name( false );
+
+		Registry::get( 'mail' )->provision( Resource::find( $child->id() ) );
+		$this->assertNotContains( 'proof', (array) Resource::find( $child->id() )->get( 'steps' ), 'A name active for another reason is not passed on.' );
+	}
+
+	public function test_another_customers_hosting_proof_does_not_count_for_mail(): void {
+		list( , $child ) = $this->mail_on_hosting_name( true );
+
+		$other = $this->account();
+		$this->assertFalse( \BeltoftServices\Domains\Ownership::proven( (int) $other->license()['user_id'], 'proved.example' ) );
+		$this->assertFalse( \BeltoftServices\Domains\Ownership::proven( (int) $other->license()['user_id'], 'www.proved.example' ) );
+		$this->assertTrue( \BeltoftServices\Domains\Ownership::proven( (int) Resource::find( $child->id() )->license()['user_id'], 'www.proved.example' ), 'The same customer: a name below it is covered.' );
 	}
 }

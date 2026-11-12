@@ -119,10 +119,10 @@ class ReadyTest extends HostingCase {
 			array(
 				array( 'name' => 'www.elsewhere.example', 'type' => 'A', 'value' => '198.51.100.7' ),
 				array( 'name' => 'www.elsewhere.example', 'type' => 'AAAA', 'value' => '2001:db8::7' ),
-				array( 'name' => '_beltoft-verify.www.elsewhere.example', 'type' => 'TXT', 'value' => \BeltoftServices\Hosting\SiteDns::proof_token( $r->id(), 'www.elsewhere.example' ) ),
+				array( 'name' => '_beltoft-verify.www.elsewhere.example', 'type' => 'TXT', 'value' => \BeltoftServices\Domains\Ownership::token( (int) $r->license()['user_id'], 'www.elsewhere.example' ) ),
 				array( 'name' => 'elsewhere.example', 'type' => 'A', 'value' => '198.51.100.7' ),
 				array( 'name' => 'elsewhere.example', 'type' => 'AAAA', 'value' => '2001:db8::7' ),
-				array( 'name' => '_beltoft-verify.elsewhere.example', 'type' => 'TXT', 'value' => \BeltoftServices\Hosting\SiteDns::proof_token( $r->id(), 'elsewhere.example' ) ),
+				array( 'name' => '_beltoft-verify.elsewhere.example', 'type' => 'TXT', 'value' => \BeltoftServices\Domains\Ownership::token( (int) $r->license()['user_id'], 'elsewhere.example' ) ),
 			),
 			$facts['dns_records']
 		);

@@ -112,7 +112,7 @@ class DnsClaimRoutesTest extends TestCase {
 		$this->assertSame( 'example.com', $data['domain'] );
 		$this->assertSame( 'pending', $data['status'] );
 		$this->assertSame( '_beltoft-verify.example.com', $data['txt_name'] );
-		$this->assertStringStartsWith( 'beltoft-verify=v1:', $data['txt_value'] );
+		$this->assertStringStartsWith( 'beltoft-owner=', $data['txt_value'], 'The one record of the customer and domain.' );
 		$this->assertSame( 'Add this TXT record at your current DNS provider, then check.', $data['message'] );
 		$this->assertMatchesRegularExpression( '/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/', $data['expires_at'] );
 		$this->assertNull( $data['scan'] );
@@ -141,7 +141,8 @@ class DnsClaimRoutesTest extends TestCase {
 	public function test_creating_again_rotates_the_token(): void {
 		$first  = $this->call( 'POST', '', $this->user, array( 'domain' => 'example.com' ) )->get_data();
 		$second = $this->call( 'POST', '', $this->user, array( 'domain' => 'example.com' ) )->get_data();
-		$this->assertNotSame( $first['txt_value'], $second['txt_value'] );
+		$this->assertSame( $first['txt_value'], $second['txt_value'], 'Every service shows the same value, so a new claim needs no new record.' );
+		$this->assertNotSame( DnsClaims::get( $first['id'] )['token'], DnsClaims::get( $second['id'] )['token'], 'The old per-claim value is rotated and still accepted for the open claim.' );
 		$this->assertSame( 'cancelled', DnsClaims::get( $first['id'] )['status'] );
 		$this->assertNull( $this->call( 'GET', '/' . $first['id'], $this->user )->get_data()['txt_value'] );
 	}

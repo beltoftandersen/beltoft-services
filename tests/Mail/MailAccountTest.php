@@ -220,6 +220,22 @@ final class MailAccountTest extends MailTestCase {
 		$this->assertStringNotContainsString( 'data-mail-create-submit', $html );
 	}
 
+	public function test_the_proof_row_is_hidden_once_the_customer_has_proven_the_domain_through_another_service(): void {
+		$this->proof['check_txt'] = array( 'status' => 'missing', 'servers' => array(), 'reason' => 'not_found' );
+		$r      = $this->mail_resource( 'wait.example', array(), array(), $this->user );
+		$result = \BeltoftServices\Drivers\Registry::get( 'mail' )->provision( $r );
+		$r->set( array_merge( $result->meta(), array( 'state' => 'provisioning', 'desired' => 'ready' ) ) );
+		$r = Resource::find( $r->id() );
+
+		$this->assertStringContainsString( '_beltoft-verify.wait.example', $this->page( $r, 'dns' ), 'Not proven: the record is shown.' );
+
+		// A hosting account of the same customer found the record for a name above: nothing is shown any more.
+		$user = $this->user;
+		add_filter( \BeltoftServices\Domains\Ownership::FILTER, static fn( $p, $name, $id ) => $id === $user && 'wait.example' === $name ? true : $p, 10, 3 );
+		$this->assertStringNotContainsString( '_beltoft-verify', $this->page( $r, 'dns' ) );
+		remove_all_filters( \BeltoftServices\Domains\Ownership::FILTER );
+	}
+
 	public function test_a_domain_that_is_not_ready_says_what_it_waits_for(): void {
 		$this->proof['check_txt'] = array( 'status' => 'missing', 'servers' => array(), 'reason' => 'not_found' );
 		$r = $this->mail_resource( 'wait.example', array(), array(), $this->user );
@@ -234,7 +250,7 @@ final class MailAccountTest extends MailTestCase {
 
 		$dns = $this->page( $r, 'dns' );
 		$this->assertStringContainsString( '_beltoft-verify.wait.example', $dns );
-		$this->assertStringContainsString( (string) $r->get( 'mail_verify_token' ), $dns );
+		$this->assertStringContainsString( \BeltoftServices\Domains\Ownership::token( (int) $r->license()['user_id'], 'wait.example' ), $dns );
 		$this->assertStringNotContainsString( 'Check again', $dns );
 
 		$r->set( array( 'state' => 'paused' ) );
