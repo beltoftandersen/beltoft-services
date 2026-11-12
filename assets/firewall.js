@@ -189,18 +189,6 @@
 			} );
 			act.appendChild( remove );
 
-			if ( rule.ufw ) {
-				var copy = document.createElement( 'button' );
-
-				copy.type = 'button';
-				copy.className = 'beltoft-services-fw__link';
-				copy.textContent = S.copyUfw;
-				copy.addEventListener( 'click', function () {
-					copyText( rule.ufw, copy );
-				} );
-				act.appendChild( copy );
-			}
-
 			[ what, port, who, act ].forEach( function ( cell ) {
 				cell.setAttribute( 'role', 'cell' );
 				row.appendChild( cell );
@@ -215,23 +203,6 @@
 		}
 
 		return rule.proto.toUpperCase() + ' ' + ( rule.from === rule.to ? rule.from : rule.from + '-' + rule.to );
-	}
-
-	function copyText( text, button ) {
-		var done = function () {
-			var was = button.textContent;
-
-			button.textContent = S.copied;
-			window.setTimeout( function () {
-				button.textContent = was;
-			}, 2000 );
-		};
-
-		if ( navigator.clipboard && navigator.clipboard.writeText ) {
-			navigator.clipboard.writeText( text ).then( done );
-		} else {
-			B.confirm( { title: '', text: text, confirm: S.ok, cancel: false } );
-		}
 	}
 
 	function renderSsh() {

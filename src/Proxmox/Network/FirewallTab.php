@@ -94,8 +94,6 @@ final class FirewallTab {
 			'anyone'        => __( 'Anyone', 'beltoft-services' ),
 			'forApp'        => __( 'Added for your app', 'beltoft-services' ),
 			'noRules'       => __( 'No ports are open.', 'beltoft-services' ),
-			'copyUfw'       => __( 'Copy the command for inside the server', 'beltoft-services' ),
-			'copied'        => __( 'Copied.', 'beltoft-services' ),
 			'apply'         => __( 'Apply changes', 'beltoft-services' ),
 			'applying'      => __( 'Applying. This takes up to a minute.', 'beltoft-services' ),
 			'saved'         => __( 'Saved. The change is in place.', 'beltoft-services' ),

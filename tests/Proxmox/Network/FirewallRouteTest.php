@@ -256,11 +256,11 @@ class FirewallRouteTest extends FirewallTestCase {
 		$this->assertStringContainsString( 'Outgoing mail on port 25 is blocked', $plain );
 		$this->assertStringContainsString( 'address spoofing', $plain );
 		$this->assertStringContainsString( 'in front of your server', $plain );
-		$this->assertStringNotContainsString( 'Copy button', $plain );
+		$this->assertStringNotContainsString( 'its own firewall inside', $plain );
 		$this->assertStringNotContainsString( "\u{2014}", $plain );
 
 		Resource::find( $r->id() )->set( array( 'app_id' => 'wordpress' ) );
-		$this->assertStringContainsString( 'Copy button', $this->page( Resource::find( $r->id() ), 'firewall' ) );
+		$this->assertStringContainsString( 'its own firewall inside', $this->page( Resource::find( $r->id() ), 'firewall' ) );
 	}
 
 	public function test_the_mail_line_follows_the_cluster_setting(): void {
@@ -268,22 +268,6 @@ class FirewallRouteTest extends FirewallTestCase {
 		$this->save_cluster( array( 'fw_enabled' => '1', 'block_smtp' => '' ) );
 		$this->assertStringNotContainsString( 'Outgoing mail', $this->page( Resource::find( $r->id() ), 'firewall' ) );
 	}
-
-	public function test_ufw_commands_are_given_for_app_servers_only(): void {
-		list( $r ) = $this->ready( array( 'app_id' => 'wordpress' ) );
-		$this->save_cluster( array( 'fw_enabled' => '1' ) );
-		$r = Resource::find( $r->id() );
-		FirewallRules::store( $r, true, FirewallRules::normalise( array( $this->rule( 'tcp', 8080 ), $this->rule( 'tcp', 9000, 9010, array( '203.0.113.7' ) ), $this->rule( 'icmp', 0 ) ), $r ), true, 1 );
-
-		$rules = FirewallRules::view( Resource::find( $r->id() ) )['rules'];
-		$this->assertSame( 'sudo ufw allow 8080/tcp', $rules[0]['ufw'] );
-		$this->assertSame( 'sudo ufw allow from 203.0.113.7 to any port 9000:9010 proto tcp', $rules[1]['ufw'] );
-		$this->assertSame( '', $rules[2]['ufw'] );
-
-		$r->set( array( 'app_id' => null ) );
-		$this->assertSame( '', FirewallRules::view( Resource::find( $r->id() ) )['rules'][0]['ufw'] );
-	}
-
 	public function test_the_account_buttons_do_not_draw_the_firewall_actions(): void {
 		list( $r ) = $this->on();
 		$buttons   = \BeltoftServices\Proxmox\Vm\Actions::buttons( ( new \BeltoftServices\Proxmox\Vm\ProxmoxDriver() )->customer_actions( $r ), $r, 'page' );

@@ -112,7 +112,7 @@ $beltoft_services_fw_id = (int) $r->id();
 		<div class="beltoft-services-fw__layers">
 			<h5><?php esc_html_e( 'Two firewalls', 'beltoft-services' ); ?></h5>
 			<?php if ( ! empty( $view['app'] ) ) : ?>
-				<p class="description"><?php esc_html_e( 'Your app opens its own ports inside the server. A port you add here is also needed inside the server, for example with the command that the Copy button next to the rule gives you.', 'beltoft-services' ); ?></p>
+				<p class="description"><?php esc_html_e( 'Your app runs its own firewall inside the server. A port you add here must be open there too.', 'beltoft-services' ); ?></p>
 			<?php else : ?>
 				<p class="description"><?php esc_html_e( 'This firewall sits in front of your server. If you turned on a firewall inside the server, the port must be open there too.', 'beltoft-services' ); ?></p>
 			<?php endif; ?>

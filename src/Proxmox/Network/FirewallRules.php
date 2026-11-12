@@ -467,25 +467,6 @@ final class FirewallRules {
 	}
 
 	/**
-	 * The command that opens a rule's port inside a server that has ufw (an app server), or ''.
-	 *
-	 * @param array<string, mixed> $rule Rule.
-	 */
-	private static function ufw( array $rule ): string {
-		if ( 'icmp' === $rule['proto'] ) {
-			return '';
-		}
-
-		$port = $rule['from'] === $rule['to'] ? (string) $rule['from'] : $rule['from'] . ':' . $rule['to'];
-
-		if ( ! $rule['sources'] ) {
-			return 'sudo ufw allow ' . $port . '/' . $rule['proto'];
-		}
-
-		return 'sudo ufw allow from ' . $rule['sources'][0] . ' to any port ' . $port . ' proto ' . $rule['proto'];
-	}
-
-	/**
 	 * What the tab shows, from the stored meta (no Proxmox call). Never carries fw_error.
 	 *
 	 * @param Resource $r     Resource.
@@ -508,7 +489,6 @@ final class FirewallRules {
 				'label'   => (string) $rule['label'],
 				'origin'  => (string) $rule['origin'],
 				'port'    => self::port_text( $rule ),
-				'ufw'     => $has_app ? self::ufw( $rule ) : '',
 			);
 		}
 
