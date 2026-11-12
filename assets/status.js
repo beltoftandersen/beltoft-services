@@ -13,6 +13,7 @@
  * on any other page it is the line under the title row (PageHead), and it falls back to one at the top of the content.
  * Busy, done, fail and info show there, and it goes back to what it said (the description) after a done or an info.
  * The line has a fixed height: long text is cut with an ellipsis (the title holds all of it), so nothing on the page moves.
+ * The same busy, done and fail text is also shown right under the clicked button's group (.bs-note), where the customer looks.
  *
  * Scope: the service's resource id (the container carries data-bs-scope="<id>"; a [data-resource] element is marked
  * automatically), or 'page' for the whole content area. Only the latest message is shown. No dependencies.
@@ -432,6 +433,47 @@
 		field.addEventListener( 'change', gone );
 	}
 
+	// ---- the note next to the button -----------------------------------------------------------------------------
+	// Busy, done and fail are also said right where the customer clicked: a line directly under the button's group, so it
+	// is seen on a phone too. Busy has a spinner, done a check mark and stays until the next action there, fail says why.
+
+	var NOTE_ANCHOR = '[data-bs-note-anchor], .bs-item__actions, .bs-actions, .beltoft-hosting-buttons, .beltoft-services-panel__actions, .beltoft-services-vm__actions, .beltoft-services-db__form p';
+
+	function noteFor( button ) {
+		if ( ! button || ! button.closest || button.closest( 'dialog' ) ) {
+			return null;
+		}
+
+		var anchor = button.closest( NOTE_ANCHOR ) || button;
+		var note = anchor.nextElementSibling;
+
+		if ( ! note || ! note.classList || ! note.classList.contains( 'bs-note' ) ) {
+			note = make( 'p', 'bs-note' );
+			note.appendChild( make( 'span', 'bs-note__icon' ) ).setAttribute( 'aria-hidden', 'true' );
+			note.appendChild( make( 'span', 'bs-note__text' ) );
+			anchor.insertAdjacentElement( 'afterend', note );
+		}
+
+		return note;
+	}
+
+	function noteSay( note, kind, message ) {
+		if ( ! note ) {
+			return;
+		}
+
+		note.className = 'bs-note bs-note--' + kind;
+		note.setAttribute( 'role', 'fail' === kind ? 'alert' : 'status' );
+		note.querySelector( '.bs-note__text' ).textContent = String( message || '' );
+		note.hidden = '' === String( message || '' );
+
+		var box = note.getBoundingClientRect ? note.getBoundingClientRect() : null;
+
+		if ( box && ( box.bottom > window.innerHeight || box.top < headerTop ) ) {
+			note.scrollIntoView( { block: 'nearest', behavior: reduced() ? 'auto' : 'smooth' } );
+		}
+	}
+
 	// ---- the API ----------------------------------------------------------------------------------------------
 
 	function busy( message, scope, button ) {
@@ -463,12 +505,16 @@
 		active.push( handle );
 		show( 'busy', message, handle );
 
+		handle.note = noteFor( handle.button );
+		noteSay( handle.note, 'busy', message );
+
 		return handle;
 	}
 
 	function finish( handle, kind, message ) {
 		if ( handle ) {
 			release( handle );
+			noteSay( handle.note, kind, message );
 		}
 
 		// A newer request is still working: its busy line stays, a failure is the only thing that may replace it.

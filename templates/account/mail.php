@@ -173,41 +173,50 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 				<?php elseif ( array() === (array) $view['mailboxes'] ) : ?>
 					<p><?php esc_html_e( 'You have no mailboxes yet. Make the first one below.', 'beltoft-services' ); ?></p>
 				<?php else : ?>
-					<table class="beltoft-services-vm__backup-list beltoft-services-mail__table">
-						<thead>
-							<tr><th scope="col"><?php esc_html_e( 'Address', 'beltoft-services' ); ?></th><th scope="col"><?php esc_html_e( 'Name', 'beltoft-services' ); ?></th><th scope="col"><?php esc_html_e( 'Storage', 'beltoft-services' ); ?></th><th scope="col"></th></tr>
-						</thead>
-						<tbody>
-							<?php foreach ( (array) $view['mailboxes'] as $beltoft_services_box ) : ?>
-								<?php $beltoft_services_percent = $beltoft_services_box['quota_mb'] > 0 ? (int) min( 100, floor( $beltoft_services_box['used_mb'] * 100 / $beltoft_services_box['quota_mb'] ) ) : 0; ?>
-								<tr data-mail-box="<?php echo esc_attr( $beltoft_services_box['email'] ); ?>">
-									<td><code><?php echo esc_html( \BeltoftServices\Domains\HostName::display( $beltoft_services_box['email'] ) ); ?></code><?php echo $beltoft_services_box['active'] ? '' : ' <span class="description">' . esc_html__( 'Paused', 'beltoft-services' ) . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped text. ?>
-										<?php if ( ! empty( $view['send_held'] ) ) : ?>
-											<span class="description" data-mail-hold-row><?php esc_html_e( 'Sending on hold', 'beltoft-services' ); ?></span>
-										<?php endif; ?></td>
-									<td><?php echo esc_html( $beltoft_services_box['name'] ); ?></td>
-									<td><?php echo esc_html( sprintf( /* translators: 1: storage used, 2: storage of the mailbox, 3: percent used */ __( '%1$s of %2$s (%3$d%%)', 'beltoft-services' ), $beltoft_services_size( (int) $beltoft_services_box['used_mb'] ), $beltoft_services_size( (int) $beltoft_services_box['quota_mb'] ), $beltoft_services_percent ) ); ?></td>
-									<td class="beltoft-services-mail__actions">
-										<?php if ( $beltoft_services_box['reveal'] ) : ?>
-											<button type="button" class="button woocommerce-button beltoft-services-mail__outline" data-mail-reveal="<?php echo esc_attr( $beltoft_services_box['email'] ); ?>"><?php esc_html_e( 'Show password once', 'beltoft-services' ); ?></button>
+					<ul class="bs-list beltoft-services-mail__list">
+						<?php foreach ( (array) $view['mailboxes'] as $beltoft_services_box ) : ?>
+							<?php $beltoft_services_percent = $beltoft_services_box['quota_mb'] > 0 ? (int) min( 100, floor( $beltoft_services_box['used_mb'] * 100 / $beltoft_services_box['quota_mb'] ) ) : 0; ?>
+							<li class="bs-item" data-mail-box="<?php echo esc_attr( $beltoft_services_box['email'] ); ?>">
+								<div class="bs-item__main">
+									<p class="bs-item__title"><span class="bs-item__name"><?php echo esc_html( \BeltoftServices\Domains\HostName::display( $beltoft_services_box['email'] ) ); ?></span>
+										<?php if ( ! $beltoft_services_box['active'] ) : ?>
+											<span class="bs-state bs-state--muted"><?php esc_html_e( 'Paused', 'beltoft-services' ); ?></span>
+										<?php elseif ( ! empty( $view['send_held'] ) ) : ?>
+											<span class="bs-state bs-state--warn" data-mail-hold-row><?php esc_html_e( 'Sending on hold', 'beltoft-services' ); ?></span>
+										<?php else : ?>
+											<span class="bs-state bs-state--ok"><?php esc_html_e( 'Active', 'beltoft-services' ); ?></span>
 										<?php endif; ?>
-										<button type="button" class="button woocommerce-button beltoft-services-mail__outline" data-mail-reset="<?php echo esc_attr( $beltoft_services_box['email'] ); ?>"><?php esc_html_e( 'New password', 'beltoft-services' ); ?></button>
-										<details class="beltoft-services-vm__more">
-											<summary><?php esc_html_e( 'Delete', 'beltoft-services' ); ?></summary>
-											<p class="description"><?php esc_html_e( 'Every message in the mailbox is deleted for good. This cannot be undone.', 'beltoft-services' ); ?></p>
+									</p>
+									<?php if ( '' !== (string) $beltoft_services_box['name'] ) : ?>
+										<p class="bs-item__meta"><?php echo esc_html( $beltoft_services_box['name'] ); ?></p>
+									<?php endif; ?>
+								</div>
+								<div class="bs-item__usage">
+									<span class="bs-meter<?php echo $beltoft_services_percent >= 90 ? ' bs-meter--high' : ''; ?>" aria-hidden="true"><span class="bs-meter__fill" style="width: <?php echo (int) $beltoft_services_percent; ?>%"></span></span>
+									<span class="bs-item__meta"><?php echo esc_html( sprintf( /* translators: 1: storage used, 2: storage of the mailbox, 3: percent used */ __( '%1$s of %2$s (%3$d%%)', 'beltoft-services' ), $beltoft_services_size( (int) $beltoft_services_box['used_mb'] ), $beltoft_services_size( (int) $beltoft_services_box['quota_mb'] ), $beltoft_services_percent ) ); ?></span>
+								</div>
+								<div class="bs-item__actions beltoft-services-mail__actions">
+									<?php if ( $beltoft_services_box['reveal'] ) : ?>
+										<button type="button" class="button woocommerce-button bs-btn bs-btn--secondary bs-btn--sm beltoft-services-mail__outline" data-mail-reveal="<?php echo esc_attr( $beltoft_services_box['email'] ); ?>"><?php esc_html_e( 'Show password once', 'beltoft-services' ); ?></button>
+									<?php endif; ?>
+									<button type="button" class="button woocommerce-button bs-btn bs-btn--secondary bs-btn--sm beltoft-services-mail__outline" data-mail-reset="<?php echo esc_attr( $beltoft_services_box['email'] ); ?>"><?php esc_html_e( 'New password', 'beltoft-services' ); ?></button>
+									<details class="bs-confirm beltoft-services-vm__more">
+										<summary class="bs-btn bs-btn--danger bs-btn--sm"><?php esc_html_e( 'Delete', 'beltoft-services' ); ?></summary>
+										<div class="bs-confirm__body">
+											<p class="bs-item__meta"><?php esc_html_e( 'Every message in the mailbox is deleted for good. This cannot be undone.', 'beltoft-services' ); ?></p>
 											<div class="beltoft-services-db__form">
 												<p>
 													<label for="beltoft-mail-del-<?php echo esc_attr( md5( $beltoft_services_box['email'] ) ); ?>"><?php echo esc_html( sprintf( /* translators: %s: the word to type */ __( 'Type %s to confirm', 'beltoft-services' ), (string) $view['delete_word'] ) ); ?></label>
 													<input type="text" id="beltoft-mail-del-<?php echo esc_attr( md5( $beltoft_services_box['email'] ) ); ?>" autocomplete="off" data-mail-delete-confirm>
 												</p>
-												<p><button type="button" class="button woocommerce-button beltoft-services-mail__danger" data-mail-delete="<?php echo esc_attr( $beltoft_services_box['email'] ); ?>"><?php esc_html_e( 'Delete mailbox', 'beltoft-services' ); ?></button></p>
+												<p><button type="button" class="button woocommerce-button bs-btn bs-btn--danger-solid beltoft-services-mail__danger" data-mail-delete="<?php echo esc_attr( $beltoft_services_box['email'] ); ?>"><?php esc_html_e( 'Delete mailbox', 'beltoft-services' ); ?></button></p>
 											</div>
-										</details>
-									</td>
-								</tr>
-							<?php endforeach; ?>
-						</tbody>
-					</table>
+										</div>
+									</details>
+								</div>
+							</li>
+						<?php endforeach; ?>
+					</ul>
 				<?php endif; ?>
 
 				<div class="beltoft-services-mail__secret" data-mail-secret hidden>
@@ -266,20 +275,17 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 				<?php elseif ( array() === (array) $view['aliases'] ) : ?>
 					<p><?php esc_html_e( 'You have no aliases yet.', 'beltoft-services' ); ?></p>
 				<?php else : ?>
-					<table class="beltoft-services-vm__backup-list beltoft-services-mail__table">
-						<thead>
-							<tr><th scope="col"><?php esc_html_e( 'Alias', 'beltoft-services' ); ?></th><th scope="col"><?php esc_html_e( 'Delivers to', 'beltoft-services' ); ?></th><th scope="col"></th></tr>
-						</thead>
-						<tbody>
-							<?php foreach ( (array) $view['aliases'] as $beltoft_services_alias ) : ?>
-								<tr>
-									<td><code><?php echo esc_html( \BeltoftServices\Domains\HostName::display( $beltoft_services_alias['address'] ) ); ?></code></td>
-									<td><?php echo esc_html( implode( ', ', $beltoft_services_alias['goto'] ) ); ?></td>
-									<td class="beltoft-services-mail__actions"><button type="button" class="button woocommerce-button beltoft-services-mail__outline" data-mail-alias-delete="<?php echo esc_attr( $beltoft_services_alias['address'] ); ?>"><?php esc_html_e( 'Delete', 'beltoft-services' ); ?></button></td>
-								</tr>
-							<?php endforeach; ?>
-						</tbody>
-					</table>
+					<ul class="bs-list beltoft-services-mail__list">
+						<?php foreach ( (array) $view['aliases'] as $beltoft_services_alias ) : ?>
+							<li class="bs-item">
+								<div class="bs-item__main">
+									<p class="bs-item__title"><span class="bs-item__name"><?php echo esc_html( \BeltoftServices\Domains\HostName::display( $beltoft_services_alias['address'] ) ); ?></span></p>
+									<p class="bs-item__meta"><?php /* translators: %s: the mailboxes an alias delivers to */ echo esc_html( sprintf( __( 'Delivers to %s', 'beltoft-services' ), implode( ', ', $beltoft_services_alias['goto'] ) ) ); ?></p>
+								</div>
+								<div class="bs-item__actions beltoft-services-mail__actions"><button type="button" class="button woocommerce-button bs-btn bs-btn--danger bs-btn--sm beltoft-services-mail__outline" data-mail-alias-delete="<?php echo esc_attr( $beltoft_services_alias['address'] ); ?>"><?php esc_html_e( 'Delete', 'beltoft-services' ); ?></button></div>
+							</li>
+						<?php endforeach; ?>
+					</ul>
 				<?php endif; ?>
 				<p class="description"><?php echo esc_html( sprintf( /* translators: 1: aliases in use, 2: aliases the plan allows */ _n( '%1$d of %2$d alias used.', '%1$d of %2$d aliases used.', (int) $beltoft_services_limits['aliases'], 'beltoft-services' ), (int) $view['counts']['aliases'], (int) $beltoft_services_limits['aliases'] ) ); ?></p>
 			</div>

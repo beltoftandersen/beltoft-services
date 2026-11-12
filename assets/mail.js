@@ -40,6 +40,23 @@
 			return;
 		}
 
+		// The password is shown inside the row of its mailbox (a new mailbox: where the box is); it goes back when closed.
+		var row = null;
+
+		Array.prototype.forEach.call( box.querySelectorAll( '[data-mail-box]' ), function ( item ) {
+			if ( ! row && line && -1 !== String( line ).indexOf( item.getAttribute( 'data-mail-box' ) ) ) {
+				row = item;
+			}
+		} );
+
+		if ( ! holder.beltoftHome ) {
+			holder.beltoftHome = { parent: holder.parentNode, next: holder.nextSibling };
+		}
+
+		if ( row ) {
+			row.appendChild( holder );
+		}
+
 		holder.querySelector( '[data-mail-secret-text]' ).textContent = line + ' ' + strings.once;
 		holder.querySelector( '[data-mail-secret-value]' ).textContent = password;
 		holder.hidden = false;
@@ -60,7 +77,7 @@
 			}
 
 			secret( box, line || email, result.data.password );
-			S.done( h, strings.once );
+			S.done( h, line || email );
 
 			if ( button ) {
 				button.hidden = true;
@@ -129,6 +146,12 @@
 		}
 
 		if ( target.hasAttribute( 'data-mail-secret-done' ) ) {
+			var shown = target.closest( '[data-mail-secret]' );
+
+			if ( shown && shown.beltoftHome && shown.beltoftHome.parent ) {
+				shown.beltoftHome.parent.insertBefore( shown, shown.beltoftHome.next );
+			}
+
 			fresh( box );
 
 			return;

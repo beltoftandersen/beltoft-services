@@ -412,22 +412,30 @@
 		var staging = 0 === action.indexOf( 'staging_' ) && ! opens;
 		var opening = 'tool_files' === action ? text.openingFiles : ( 'tool_database' === action ? text.openingDatabase : text.opening );
 
-		say( panel, opens ? ( opening || '' ) : ( text.working || '' ) );
+		// Working, done and failed are said under the clicked button (window.beltoftStatus note) and in the state line.
+		var handle = S ? S.busy( button.getAttribute( 'data-busy' ) || ( opens ? ( opening || '' ) : ( text.working || '' ) ), 'page', button ) : null;
+		var ok = function ( message ) {
+			// The button's own done sentence beats the generic one; the server's own message beats both.
+			if ( message === text.done && button.getAttribute( 'data-done' ) ) {
+				message = button.getAttribute( 'data-done' );
+			}
 
-		// A staging job: say it where the customer clicked, and keep the other staging buttons still while it starts.
-		var where = staging ? button.closest( 'dd' ) : null;
-		var near = null;
+			if ( handle ) {
+				S.done( handle, message );
+				handle = null;
+			} else {
+				say( panel, message );
+			}
+		};
+		var bad = function ( message ) {
+			if ( handle ) {
+				S.fail( handle, message );
+				handle = null;
+			} else {
+				fail( message );
+			}
+		};
 
-		if ( where ) {
-			Array.prototype.forEach.call( where.querySelectorAll( '[data-hosting-action^="staging_"]' ), function ( other ) {
-				other.disabled = true;
-			} );
-			near = document.createElement( 'p' );
-			near.className = 'beltoft-hosting-line';
-			near.setAttribute( 'role', 'status' );
-			near.textContent = text.working || '';
-			( button.closest( '.beltoft-hosting-buttons' ) || button ).insertAdjacentElement( 'afterend', near );
-		}
 
 		// The sign-in link is opened from the click, so a pop-up blocker allows it.
 		var tab = opens ? window.open( '', '_blank' ) : null;
@@ -449,10 +457,10 @@
 				// WordPress nests the data of an error response one level down: result.data.data.
 				var offer = result.data.data || {};
 
-				say( panel, '' );
+				ok( '' );
 				confirmed( result.data.message || '', text.buy || '', false ).then( function ( yes ) {
 					if ( ! yes ) {
-						say( panel, '' );
+						ok( '' );
 						return;
 					}
 
@@ -470,7 +478,7 @@
 
 			// The person's own country is on the list: the answer is a question, and the same request goes again with the answer.
 			if ( ! result.ok && 409 === result.status && 'country_save' === action && result.data && 'beltoft_services_hosting_country_confirm' === result.data.code ) {
-				say( panel, '' );
+				ok( '' );
 				confirmed( result.data.message || '', text.saveAnyway || '', true ).then( function ( yes ) {
 					if ( yes ) {
 						var again = request[ 2 ];
@@ -485,7 +493,7 @@
 
 			if ( result.ok && result.data && 'pending' === result.data.status ) {
 				button.disabled = false;
-				say( panel, result.data.message || '' );
+				ok( result.data.message || '' );
 				return;
 			}
 
@@ -500,8 +508,7 @@
 					tab.close();
 				}
 
-				unstage( near, where, ( result.data && result.data.message ) || text.failed || '' );
-				fail( ( result.data && result.data.message ) || text.failed || '' );
+				bad( ( result.data && result.data.message ) || text.failed || '' );
 				return;
 			}
 
@@ -512,9 +519,9 @@
 
 				// The node tells which administrator the address is for: say so.
 				if ( result.data.user ) {
-					say( panel, 'password' === action ? format( text.passwordFor, [ result.data.user ] ) : format( text.signedInAs, [ result.data.user, result.data.email || '' ] ).replace( ' ()', '' ) );
+					ok( 'password' === action ? format( text.passwordFor, [ result.data.user ] ) : format( text.signedInAs, [ result.data.user, result.data.email || '' ] ).replace( ' ()', '' ) );
 				} else {
-					say( panel, text.done || '' );
+					ok( text.done || '' );
 				}
 
 				return;
@@ -536,16 +543,13 @@
 				Array.prototype.forEach.call( scope.querySelectorAll( '[data-hosting-field]' ), function ( input ) {
 					input.value = '';
 				} );
-				say( panel, text.done || '' );
+				ok( text.done || '' );
 				return;
 			}
 
 			// A move of WordPress and the staging jobs run in the background: the answer says so, and the page shows the state.
-			say( panel, ( ( 'wp_address' === action || staging ) && result.data && result.data.message ) || text.done || '' );
+			ok( ( ( 'wp_address' === action || staging ) && result.data && result.data.message ) || text.done || '' );
 
-			if ( near ) {
-				near.textContent = ( result.data && result.data.message ) || text.done || '';
-			}
 			window.setTimeout( function () {
 				window.location.reload();
 			}, 'wp_address' === action ? 2500 : ( staging ? 1500 : 800 ) );
@@ -556,23 +560,10 @@
 				tab.close();
 			}
 
-			unstage( near, where, text.failed || '' );
-			fail( text.failed || '' );
+			bad( text.failed || '' );
 		} );
 	}
 
-	// A staging request that did not start: the line next to the button says why, and the buttons work again.
-	function unstage( near, where, message ) {
-		if ( near ) {
-			near.textContent = message;
-		}
-
-		if ( where ) {
-			Array.prototype.forEach.call( where.querySelectorAll( '[data-hosting-action^="staging_"]' ), function ( other ) {
-				other.disabled = false;
-			} );
-		}
-	}
 
 	// The caches of each website, asked from the node when the page is open (the page itself is drawn without calling the node).
 	function cacheFacts() {

@@ -33,6 +33,12 @@
 	--bs-status-ok: var(--green, #28513e);
 	--bs-status-fail: #a4372a;
 	--bs-status-warn: #8a5a00;
+	/* Corners: one for controls (buttons, fields), one for cards and panels, the same as the website. */
+	--bs-radius: 8px;
+	--bs-radius-lg: 12px;
+	--bs-surface: var(--bg-card, #fff);
+	--bs-line: var(--rule, #e3e0d8);
+	--bs-muted: var(--ink-soft, #5e7080);
 }
 
 .beltoft-services-panel {
@@ -1057,3 +1063,84 @@ body.woocommerce-account div.beltoft-services-domain .beltoft-dnse__table td.bel
 	.beltoft-dnsg__fields > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
 	.beltoft-dnsg__check > button { width: 100%; }
 }
+
+
+/* ==== Dashboard UI: one set of parts for every account page (2026-11-12) ==========================================
+   Buttons: .bs-btn + --primary | --secondary | --danger | --danger-solid, and --sm for rows. Rows of items: .bs-list > .bs-item
+   with __main (__title, __name, __meta), __usage (.bs-meter) and __actions. A state next to a name: .bs-state--ok|warn|fail|muted
+   (coloured dot and text, never a chip). Working, done and failed: .bs-note under the clicked button (status.js). */
+
+/* Every control and card in the account area uses the same two corners. */
+body.woocommerce-account .woocommerce-MyAccount-content :is(button, .button, a.button, .woocommerce-button, input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="search"], input[type="url"], input[type="tel"], select, textarea, summary.bs-btn, .bs-btn) { border-radius: var(--bs-radius); }
+
+body.woocommerce-account .woocommerce-MyAccount-content .bs-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--bs-space-2); box-sizing: border-box; min-height: var(--bs-btn-h); margin: 0; padding: 0 var(--bs-space-4); border: 1px solid var(--navy, #10221b); background: var(--navy, #10221b); color: var(--bs-surface); font-family: inherit; font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); line-height: 1.2; text-decoration: none; white-space: nowrap; cursor: pointer; box-shadow: none; transition: background-color .12s ease, border-color .12s ease, color .12s ease; }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-btn:hover { background: var(--ink-mid, #2d4060); border-color: var(--ink-mid, #2d4060); color: var(--bs-surface); }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-btn--secondary { background: var(--bs-surface); color: var(--navy, #10221b); border-color: var(--bs-input-border); }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-btn--secondary:hover { background: var(--bg-warm, #eeece6); color: var(--navy, #10221b); border-color: var(--navy, #10221b); }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-btn--danger { background: var(--bs-surface); color: var(--bs-status-fail); border-color: var(--bs-status-fail); }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-btn--danger:hover { background: #fbeeec; color: var(--bs-status-fail); border-color: var(--bs-status-fail); }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-btn--danger-solid { background: var(--bs-status-fail); color: #fff; border-color: var(--bs-status-fail); }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-btn--danger-solid:hover { background: #87291f; border-color: #87291f; color: #fff; }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-btn--sm { min-height: var(--bs-btn-h-sm); padding: 0 var(--bs-space-3); font-size: var(--bs-fs-small); }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-btn:disabled, body.woocommerce-account .woocommerce-MyAccount-content .bs-btn[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
+
+/* A button that is working: a small turning ring before its label (status.js marks it .is-busy and aria-busy). */
+body.woocommerce-account .woocommerce-MyAccount-content :is(button, .button).is-busy { position: relative; opacity: 1; cursor: progress; }
+body.woocommerce-account .woocommerce-MyAccount-content :is(button, .button).is-busy::before { content: ""; flex: none; width: 14px; height: 14px; margin-right: 2px; border: 2px solid currentcolor; border-right-color: transparent; border-radius: 50%; animation: bs-turn .7s linear infinite; }
+@keyframes bs-turn { to { transform: rotate(360deg); } }
+
+/* Working, done, failed: the line right under the clicked button's group. */
+.bs-note { display: flex; align-items: flex-start; gap: var(--bs-space-2); margin: var(--bs-space-2) 0 0; padding: var(--bs-space-2) var(--bs-space-3); border-radius: var(--bs-radius); font-size: var(--bs-fs-small); line-height: var(--bs-lh-text); color: var(--navy, #10221b); background: var(--bg-warm, #eeece6); max-width: 70ch; }
+.bs-note[hidden] { display: none; }
+.bs-note__icon { flex: none; width: 14px; height: 14px; margin-top: 3px; }
+.bs-note--busy .bs-note__icon { border: 2px solid currentcolor; border-right-color: transparent; border-radius: 50%; animation: bs-turn .7s linear infinite; box-sizing: border-box; }
+.bs-note--done, .bs-note--info { background: #e7f1ea; color: var(--bs-status-ok); }
+.bs-note--done .bs-note__icon, .bs-note--info .bs-note__icon { background: currentcolor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5 9-10'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5 9-10'/%3E%3C/svg%3E") center / contain no-repeat; }
+.bs-note--fail { background: #fbeeec; color: var(--bs-status-fail); }
+.bs-note--fail .bs-note__icon { background: currentcolor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M12 7v6M12 17h.01'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M12 7v6M12 17h.01'/%3E%3C/svg%3E") center / contain no-repeat; }
+
+/* A state next to a name: a coloured dot and plain text. */
+.bs-state { display: inline-flex; align-items: center; gap: 6px; font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); white-space: nowrap; color: var(--bs-muted); }
+.bs-state::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: currentcolor; }
+.bs-state--ok { color: var(--bs-status-ok); }
+.bs-state--warn { color: var(--bs-status-warn); }
+.bs-state--fail { color: var(--bs-status-fail); }
+
+/* Rows of items (mailboxes, aliases, and more as pages move over): name and state, details, usage, actions. */
+body.woocommerce-account .woocommerce-MyAccount-content .bs-list { list-style: none; margin: 0 0 var(--bs-space-5); padding: 0; border-radius: var(--bs-radius-lg); background: var(--bs-surface); }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-item { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(140px, .8fr) auto; align-items: center; gap: var(--bs-space-2) var(--bs-space-5); margin: 0; padding: var(--bs-space-4) var(--bs-space-5); border-top: 1px solid var(--bs-line); }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-item:first-child { border-top: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-item:not(:has(.bs-item__usage)) { grid-template-columns: minmax(0, 1fr) auto; }
+.bs-item__main { grid-column: 1; grid-row: 1; min-width: 0; }
+.bs-item__usage { grid-column: 2; grid-row: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.bs-item__actions { grid-column: -2; grid-row: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--bs-space-2); }
+/* Everything after the first line (the message, an open confirmation, a one-time password) spans the row, in page order. */
+.bs-item > :is(.bs-note, [data-mail-secret]) { grid-column: 1 / -1; grid-row: auto; }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-item__title { display: flex; flex-wrap: wrap; align-items: center; gap: 2px var(--bs-space-3); margin: 0; max-width: none; font-size: var(--bs-fs-body); color: var(--navy, #10221b); }
+.bs-item__name { font-weight: var(--bs-fw-strong); overflow-wrap: anywhere; }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-item__meta { margin: 2px 0 0; max-width: none; font-size: var(--bs-fs-small); color: var(--bs-muted); overflow-wrap: anywhere; }
+.bs-item__usage .bs-item__meta { margin: 0; }
+
+/* Usage bar. */
+.bs-meter { display: block; height: 6px; border-radius: 3px; background: var(--bg-warm, #eeece6); overflow: hidden; }
+.bs-meter__fill { display: block; height: 100%; min-width: 0; border-radius: 3px; background: var(--bs-status-ok); }
+.bs-meter--high .bs-meter__fill { background: var(--bs-status-warn); }
+
+/* Delete with a typed confirmation: the summary is the button, the form opens under the row. */
+body.woocommerce-account .woocommerce-MyAccount-content .bs-confirm, body.woocommerce-account .woocommerce-MyAccount-content .bs-confirm[open] { display: block; position: static; margin: 0; padding: 0; border: 0; background: none; }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-confirm > summary::after, body.woocommerce-account .woocommerce-MyAccount-content .bs-confirm > summary::before { content: none; display: none; }
+.bs-confirm > summary { list-style: none; }
+.bs-confirm > summary::-webkit-details-marker { display: none; }
+.bs-item:has(.bs-confirm[open]) > .bs-item__actions { grid-column: 1 / -1; grid-row: 2; justify-content: flex-start; }
+.bs-confirm[open] { flex-basis: 100%; }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-confirm__body { margin-top: var(--bs-space-2); padding: var(--bs-space-4); border-radius: var(--bs-radius); background: #fbeeec; }
+
+@media (max-width: 767px) {
+	body.woocommerce-account .woocommerce-MyAccount-content .bs-item, body.woocommerce-account .woocommerce-MyAccount-content .bs-item:not(:has(.bs-item__usage)) { grid-template-columns: minmax(0, 1fr); padding: var(--bs-space-4); }
+	.bs-item > *, .bs-item:has(.bs-confirm[open]) > .bs-item__actions { grid-column: 1; grid-row: auto; }
+	.bs-item__actions { justify-content: flex-start; }
+}
+
+/* The one-time password of a mailbox, shown in its row. */
+.bs-item > [data-mail-secret] { grid-column: 1 / -1; margin: var(--bs-space-2) 0 0; padding: var(--bs-space-4); border-radius: var(--bs-radius); background: var(--bg-warm, #eeece6); }
+.bs-item > [data-mail-secret] p { margin: 0 0 var(--bs-space-2); }
