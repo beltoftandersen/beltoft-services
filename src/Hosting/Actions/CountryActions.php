@@ -121,4 +121,51 @@ final class CountryActions {
 
 		return CountryBlock::view( (array) Sites::find( $this->r->id(), $slug ) ) + array( 'slug' => $slug );
 	}
+
+	/**
+	 * Sends the stored block of a website to the node again (after a restore, or any path that renders the website afresh
+	 * and so loses the node's copy). Nothing is changed in the shop: the stored setting is the truth. A website that never
+	 * had a block set is left alone; one whose block was turned off is sent as off, so a restored older copy does not bring
+	 * a removed block back.
+	 *
+	 * @param string $slug Site.
+	 * @return true|\WP_Error True when sent or when there is nothing stored.
+	 */
+	public function resend( string $slug ) {
+		return $this->locked( fn() => $this->resend_locked( $slug ) );
+	}
+
+	/**
+	 * resend with the site lock held.
+	 *
+	 * @param string $slug Site.
+	 * @return true|\WP_Error
+	 */
+	private function resend_locked( string $slug ) {
+		$site = Sites::find( $this->r->id(), $slug );
+
+		if ( null === $site || ! isset( $site['flags']['country_block'] ) ) {
+			return true;
+		}
+
+		$ready = $this->ready();
+
+		if ( is_wp_error( $ready ) ) {
+			return $ready;
+		}
+
+		$stored = CountryBlock::stored( $site );
+		$record = (array) Records::for_resource( $this->r->id() );
+		$done   = $this->call( 'site_country_' . $slug, 'site.country_block', array( 'vmid' => (int) $record['vmid'], 'slug' => $slug, 'countries' => $stored['countries'], 'scope' => $stored['scope'] ) );
+
+		if ( is_wp_error( $done ) ) {
+			return $done;
+		}
+
+		$block           = (array) $site['flags']['country_block'];
+		$block['active'] = array() === $stored['countries'] ? null : ! empty( $done['active'] );
+		Sites::update( $this->r->id(), $slug, array( 'flags' => array( 'country_block' => $block ) ) );
+
+		return true;
+	}
 }

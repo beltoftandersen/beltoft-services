@@ -315,6 +315,11 @@ final class HostingRestore {
 		$this->r->set( array( 'restore' => array( 'kind' => '' ), 'restore_last' => array( 'kind' => $round['kind'], 'at' => Jobs::now(), 'ok' => true ) ) );
 		$this->tell( $round, true );
 
+		// A restored container or website may have lost the node's copy of a country block: send the stored one again, in the background.
+		if ( in_array( (string) $round['kind'], array( 'account', 'files', 'undo' ), true ) ) {
+			CountryResend::queue( $this->r, 'files' === $round['kind'] ? (string) $round['slug'] : '' );
+		}
+
 		return $this->signal( StepResult::done( array(), 'Restore finished' ) );
 	}
 

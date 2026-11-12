@@ -97,6 +97,7 @@ final class Plugin {
 		Hosting\HostingUsage::register();
 		Hosting\HostingBackups::register();
 		Hosting\HostingRestore::register();
+		Hosting\CountryResend::register();
 		Hosting\NodeHealth::register();
 		Hosting\HostingRefresh::register();
 		Hosting\DomainSweep::register();
