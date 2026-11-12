@@ -426,7 +426,7 @@ final class HostingAccount {
 		echo '<span class="beltoft-hosting-php">' . esc_html( 'PHP ' . $site['php'] ) . '</span>';
 
 		if ( $ready ) {
-			echo ' <button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="php_edit">' . esc_html__( 'Change', 'beltoft-services' ) . '</button>';
+			echo ' <button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="php_edit" aria-expanded="false">' . esc_html__( 'Change', 'beltoft-services' ) . '</button>';
 			echo '<span class="beltoft-hosting-inline" data-php-form hidden><label class="screen-reader-text" for="beltoft-php-' . esc_attr( $slug ) . '">' . esc_html__( 'PHP version', 'beltoft-services' ) . '</label><select id="beltoft-php-' . esc_attr( $slug ) . '" data-hosting-field="php_version">';
 
 			foreach ( $limits['php_versions'] as $version ) {
@@ -606,7 +606,7 @@ final class HostingAccount {
 		echo '<p class="beltoft-hosting-line">' . esc_html( ! empty( $files['password_set'] ) ? __( 'A password is set. It is not shown again.', 'beltoft-services' ) : __( 'No password is set yet.', 'beltoft-services' ) ) . '</p>';
 
 		if ( $ready ) {
-			echo '<button type="button" class="beltoft-hosting-btn" data-hosting-action="files_open" data-target="password">' . esc_html__( 'Set a password', 'beltoft-services' ) . '</button>';
+			echo '<button type="button" class="beltoft-hosting-btn" data-hosting-action="files_open" data-target="password" aria-expanded="false">' . esc_html__( 'Set a password', 'beltoft-services' ) . '</button>';
 			echo '<div class="beltoft-hosting-secure" data-files-form="password" hidden>';
 			self::print_code_field();
 			echo '<label class="beltoft-hosting-field"><span>' . esc_html__( 'Your own password, 16 characters or more (optional)', 'beltoft-services' ) . '</span><input type="text" data-hosting-field="sftp_password" autocomplete="off" autocapitalize="off" spellcheck="false"></label>';
@@ -638,7 +638,7 @@ final class HostingAccount {
 		}
 
 		if ( $ready ) {
-			echo '<button type="button" class="beltoft-hosting-btn" data-hosting-action="files_open" data-target="key">' . esc_html__( 'Add an SSH key', 'beltoft-services' ) . '</button>';
+			echo '<button type="button" class="beltoft-hosting-btn" data-hosting-action="files_open" data-target="key" aria-expanded="false">' . esc_html__( 'Add an SSH key', 'beltoft-services' ) . '</button>';
 			echo '<div class="beltoft-hosting-secure" data-files-form="key" hidden>';
 			self::print_code_field();
 			echo '<label class="beltoft-hosting-field beltoft-hosting-field--wide"><span>' . esc_html__( 'Public key', 'beltoft-services' ) . '</span><textarea rows="3" data-hosting-field="ssh_key" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ssh-ed25519 AAAA..."></textarea></label>';

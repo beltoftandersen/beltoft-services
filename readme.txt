@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.12.0
+Stable tag: 0.12.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -255,6 +255,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.12.1 =
+* Hosting page: Enter in a field does what its button does, Escape closes an opened form, an opened form takes the focus, and an empty field that is needed is marked.
 
 = 0.12.0 =
 * WordPress hosting page: every website is a panel with its main address, PHP version (with a Change control), WordPress login, cache and addresses; the sections Get started, Add a website, Files (SFTP), Backups and Email are panels with headings. Buttons follow one hierarchy and fields are as wide as their content.

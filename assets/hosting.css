@@ -115,3 +115,5 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .beltof
 	.beltoft-hosting td { padding: var(--bs-space-1, 4px) 0; border: 0; }
 	.beltoft-hosting tr { padding: var(--bs-space-3, 12px) 0; border-bottom: 1px solid var(--bsh-rule); }
 }
+/* A field the action cannot do without, left empty. */
+.beltoft-hosting [data-hosting-field][aria-invalid="true"] { border-color: var(--bs-status-fail, #a4372a); box-shadow: inset 0 0 0 1px var(--bs-status-fail, #a4372a); }

@@ -146,6 +146,83 @@
 		}
 	}
 
+	function expanded( opener, open ) {
+		if ( opener ) {
+			opener.setAttribute( 'aria-expanded', open ? 'true' : 'false' );
+		}
+	}
+
+	// A form that opens takes the focus in its first field; one that closes gives it back to the button that opened it.
+	function disclosed( opener, form, open ) {
+		expanded( opener, open );
+
+		if ( open && form ) {
+			var first = form.querySelector( 'input:not([type="hidden"]), select, textarea' );
+
+			if ( first ) {
+				first.focus();
+			}
+		} else if ( ! open && opener && ! opener.hidden ) {
+			opener.focus();
+		}
+	}
+
+	// The fields an action cannot do without. The first empty one is marked and takes the focus.
+	var NEEDS = { add_domain: [ 'host' ], files_password: [ 'code' ], files_key: [ 'ssh_key', 'code' ] };
+
+	function firstEmpty( scope, action ) {
+		var names = NEEDS[ action ] || [];
+
+		for ( var i = 0; i < names.length; i++ ) {
+			var el = scope.querySelector( '[data-hosting-field="' + names[ i ] + '"]' );
+
+			if ( el && '' === String( el.value || '' ).trim() ) {
+				return el;
+			}
+		}
+
+		return null;
+	}
+
+	document.addEventListener( 'input', function ( event ) {
+		if ( event.target && event.target.hasAttribute && event.target.hasAttribute( 'data-hosting-field' ) ) {
+			event.target.removeAttribute( 'aria-invalid' );
+		}
+	} );
+
+	// Enter in a field does what the button beside it does; Escape closes an opened form.
+	document.addEventListener( 'keydown', function ( event ) {
+		var el = event.target;
+
+		if ( ! el || ! el.closest || ! el.closest( '.beltoft-hosting' ) ) {
+			return;
+		}
+
+		if ( 'Escape' === event.key ) {
+			var open = el.closest( '[data-php-form], [data-files-form]' );
+			var close = open ? open.querySelector( '[data-hosting-action="php_cancel"], [data-hosting-action="files_close"]' ) : null;
+
+			if ( close ) {
+				event.preventDefault();
+				close.click();
+			}
+
+			return;
+		}
+
+		if ( 'Enter' !== event.key || 'INPUT' !== el.tagName || /^(radio|checkbox|hidden)$/.test( el.type ) ) {
+			return;
+		}
+
+		var group = el.closest( '[data-files-form]' ) || el.closest( '[data-php-form]' ) || el.closest( '.beltoft-hosting-formrow' );
+		var go = group ? ( group.querySelector( '.beltoft-hosting-btn--primary[data-hosting-action]' ) || group.querySelector( 'button[data-hosting-action]:not([data-hosting-action="send_code"]):not([data-hosting-action="files_close"]):not([data-hosting-action="php_cancel"])' ) ) : null;
+
+		if ( go && ! go.disabled ) {
+			event.preventDefault();
+			go.click();
+		}
+	} );
+
 	// Actions that only show, hide or copy something, or ask for the emailed code. True when the click was one of them.
 	function local( panel, button, id, action ) {
 		var scope = button.closest( '[data-hosting-scope]' ) || panel;
@@ -153,22 +230,30 @@
 		switch ( action ) {
 			case 'php_edit':
 			case 'php_cancel':
+				var phpOpener = scope.querySelector( '[data-hosting-action="php_edit"]' );
+
 				setHidden( scope.querySelector( '[data-php-form]' ), 'php_cancel' === action );
-				setHidden( button, 'php_edit' === action );
-
-				if ( 'php_cancel' === action ) {
-					setHidden( scope.querySelector( '[data-hosting-action="php_edit"]' ), false );
-				}
-
+				setHidden( phpOpener, 'php_edit' === action );
+				disclosed( phpOpener, scope.querySelector( '[data-php-form]' ), 'php_edit' === action );
 				return true;
 			case 'files_open':
 				Array.prototype.forEach.call( scope.querySelectorAll( '[data-files-form]' ), function ( form ) {
-					setHidden( form, form.getAttribute( 'data-files-form' ) !== button.getAttribute( 'data-target' ) );
+					var mine = form.getAttribute( 'data-files-form' ) === button.getAttribute( 'data-target' );
+
+					setHidden( form, ! mine );
+
+					if ( ! mine ) {
+						expanded( scope.querySelector( '[data-hosting-action="files_open"][data-target="' + form.getAttribute( 'data-files-form' ) + '"]' ), false );
+					}
 				} );
 				setHidden( scope.querySelector( '[data-files-reveal]' ), true );
+				disclosed( button, scope.querySelector( '[data-files-form="' + button.getAttribute( 'data-target' ) + '"]' ), true );
 				return true;
 			case 'files_close':
-				setHidden( button.closest( '[data-files-form]' ), true );
+				var closing = button.closest( '[data-files-form]' );
+
+				setHidden( closing, true );
+				disclosed( closing ? scope.querySelector( '[data-hosting-action="files_open"][data-target="' + closing.getAttribute( 'data-files-form' ) + '"]' ) : null, closing, false );
 				return true;
 			case 'copy':
 				copy( button.getAttribute( 'data-copy' ) || '' );
@@ -226,6 +311,13 @@
 		var request = plan( panel, button, id );
 
 		if ( ! request ) {
+			var missing = firstEmpty( button.closest( '[data-hosting-scope]' ) || panel, action );
+
+			if ( missing ) {
+				missing.setAttribute( 'aria-invalid', 'true' );
+				missing.focus();
+			}
+
 			return;
 		}
 
