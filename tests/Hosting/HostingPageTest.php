@@ -745,14 +745,14 @@ class HostingPageTest extends HostingCase {
 		$r = $this->account();
 		$this->assertStringNotContainsString( 'beltoft-hosting-move', $this->page( $r ) );
 
-		$this->settings( array( 'hosting_move_url' => '/contact/?about=Website move', 'hosting_move_text' => 'We move your website here for free.' ) );
+		$this->settings( array( 'hosting_move_url' => '/contact/?about=Website move', 'hosting_move_free' => 1 ) );
 		$html = $this->page( $r );
 		$this->assertStringContainsString( 'id="beltoft-hosting-move"', $html );
-		$this->assertStringContainsString( 'We move your website here for free.', $html );
+		$this->assertStringContainsString( 'We move it here for you, free of charge.', $html );
 		$this->assertStringContainsString( 'Request a move', $html );
 		$this->assertStringContainsString( esc_url( home_url( '/contact/?about=Website move' ) ), $html );
 
-		$this->settings( array( 'hosting_move_url' => '/contact/', 'hosting_move_text' => '' ) );
+		$this->settings( array( 'hosting_move_url' => '/contact/', 'hosting_move_free' => 0 ) );
 		$this->assertStringContainsString( 'Have a website somewhere else? We can move it here for you.', $this->page( $r ) );
 	}
 }

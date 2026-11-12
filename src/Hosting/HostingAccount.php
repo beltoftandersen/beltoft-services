@@ -647,10 +647,10 @@ final class HostingAccount {
 			return;
 		}
 
-		$text = trim( (string) \BeltoftServices\Settings::get( 'hosting_move_text' ) );
+		$free = (bool) \BeltoftServices\Settings::get( 'hosting_move_free' );
 
 		self::panel_open( esc_html__( 'Move a website here', 'beltoft-services' ), 'beltoft-hosting-move', '', 'beltoft-hosting-quiet' );
-		echo '<p>' . esc_html( '' !== $text ? $text : __( 'Have a website somewhere else? We can move it here for you.', 'beltoft-services' ) ) . '</p>';
+		echo '<p>' . esc_html( $free ? __( 'Have a website somewhere else? We move it here for you, free of charge.', 'beltoft-services' ) : __( 'Have a website somewhere else? We can move it here for you.', 'beltoft-services' ) ) . '</p>';
 		echo '<p><a class="beltoft-hosting-btn" href="' . esc_url( $url ) . '">' . esc_html__( 'Request a move', 'beltoft-services' ) . '</a></p>';
 		self::panel_close();
 	}
