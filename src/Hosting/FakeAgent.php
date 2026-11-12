@@ -31,6 +31,8 @@ defined( 'ABSPATH' ) || exit;
  * - site.verify: status (200), host. A loopback request inside the container for the host name (an operation this
  *   plugin adds to the plan's list for the verify step). Fails with "unknown site" for a site that was not created.
  * - site.tool_link: url (a one-time address of the file manager or the database tool, fake) and expires_in.
+ * - site.country_block: countries (ISO codes, sorted; empty = off), scope (site or login), ok, slug, active (true with a list unless
+ *   set_geo_missing(true): the node has no country database yet, so nothing is blocked), changed. The setting is kept in state().
  * - site.wp_login_link, site.wp_password_link: url (a one-time address, fake) and, for a site installed through site.wp_install,
  *   user and email of the administrator (the preferred admin_user when it is the one installed, else the installed one). The
  *   address of the password link is a different fake address; no reset key is ever in a reply.
@@ -161,6 +163,12 @@ class FakeAgent implements Agent {
 			'slug' => array( 'ident', true ),
 			'tool' => array( 'tool', true ),
 			'host' => array( 'host', false ),
+		),
+		'site.country_block' => array(
+			'vmid'      => array( 'vmid', true ),
+			'slug'      => array( 'ident', true ),
+			'countries' => array( 'countries', true ),
+			'scope'     => array( 'country_scope', true ),
 		),
 		'site.staging_create' => array(
 			'vmid' => array( 'vmid', true ),
@@ -425,6 +433,17 @@ class FakeAgent implements Agent {
 	public function set_loaders( array $loaders ): void {
 		$this->load();
 		$this->state['loaders'] = $loaders;
+		$this->save();
+	}
+
+	/**
+	 * Lets the node lack the country database from now on: site.country_block saves the list and answers active false.
+	 *
+	 * @param bool $missing Missing.
+	 */
+	public function set_geo_missing( bool $missing ): void {
+		$this->load();
+		$this->state['geo_missing'] = $missing;
 		$this->save();
 	}
 
@@ -714,6 +733,10 @@ class FakeAgent implements Agent {
 				return is_string( $value ) && 1 === preg_match( '/^[a-z0-9_-]{1,32}$/D', $value );
 			case 'tool':
 				return in_array( $value, array( 'files', 'database' ), true );
+			case 'country_scope':
+				return in_array( $value, array( 'site', 'login' ), true );
+			case 'countries':
+				return is_array( $value ) && count( $value ) <= 250 && count( array_unique( $value ) ) === count( $value ) && array() === array_filter( $value, static fn( $v ) => ! is_string( $v ) || 1 !== preg_match( '/^[A-Z]{2}$/D', $v ) );
 			case 'host':
 				return is_string( $value ) && strlen( $value ) <= 253 && 1 === preg_match( '/^(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/D', $value );
 			case 'ip':
@@ -850,6 +873,7 @@ class FakeAgent implements Agent {
 			case 'site.wp_login_link':
 			case 'site.wp_password_link':
 			case 'site.tool_link':
+			case 'site.country_block':
 			case 'site.php':
 			case 'site.domains':
 			case 'site.cache_purge':
@@ -921,6 +945,21 @@ class FakeAgent implements Agent {
 					return array(
 						'url'        => $this->state['tool_url'] ?? 'https://' . ( $args['host'] ?? $site['wp_address'] ?? $site['host'] ) . '/.hosting/' . $args['tool'] . '/?t=fake-tool-token',
 						'expires_in' => 60,
+					);
+				}
+
+				if ( 'site.country_block' === $op ) {
+					$countries = array_values( $args['countries'] );
+					sort( $countries );
+					$this->state['sites'][ $vmid ][ $args['slug'] ]['country_block'] = array() === $countries ? null : array( 'countries' => $countries, 'scope' => $args['scope'] );
+
+					return array(
+						'ok'        => true,
+						'slug'      => $args['slug'],
+						'countries' => $countries,
+						'scope'     => $args['scope'],
+						'active'    => array() !== $countries && empty( $this->state['geo_missing'] ),
+						'changed'   => true,
 					);
 				}
 

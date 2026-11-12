@@ -85,6 +85,7 @@ final class SiteActions {
 				'wp'        => SiteWordPress::view( $site, $rows, $preview ),
 				'admin_user'  => (string) ( $site['flags']['admin_user'] ?? '' ),
 				'admin_email' => (string) ( $site['flags']['admin_email'] ?? '' ),
+				'country'     => \BeltoftServices\Hosting\CountryBlock::view( $site ),
 			);
 		}
 

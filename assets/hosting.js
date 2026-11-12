@@ -82,6 +82,19 @@
 				return [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/files-link', {} ];
 			case 'tool_database':
 				return [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/database-link', {} ];
+			case 'country_save':
+			case 'country_off':
+				var countryScope = scope.querySelector( '[data-country-form]' ) || scope;
+				var picked = [];
+				var kind = countryScope.querySelector( 'input[type="radio"]:checked' );
+
+				if ( 'country_save' === button.getAttribute( 'data-hosting-action' ) ) {
+					Array.prototype.forEach.call( countryScope.querySelectorAll( 'input[data-country]:checked' ), function ( box ) {
+						picked.push( box.value );
+					} );
+				}
+
+				return [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/country-block', { countries: picked, scope: kind ? kind.value : 'site' } ];
 			case 'php_save':
 				return [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/php', { php: field( scope, 'php_version' ) } ];
 			case 'set_main':
@@ -196,6 +209,16 @@
 		if ( event.target && event.target.hasAttribute && event.target.hasAttribute( 'data-hosting-field' ) ) {
 			event.target.removeAttribute( 'aria-invalid' );
 		}
+
+		// The country list narrows to what was typed.
+		if ( event.target && event.target.hasAttribute && event.target.hasAttribute( 'data-country-filter' ) ) {
+			var typed = String( event.target.value || '' ).trim().toLowerCase();
+			var form = event.target.closest( '[data-country-form]' );
+
+			Array.prototype.forEach.call( form ? form.querySelectorAll( '[data-country-name]' ) : [], function ( row ) {
+				row.hidden = '' !== typed && -1 === ( row.getAttribute( 'data-country-name' ) || '' ).indexOf( typed );
+			} );
+		}
 	} );
 
 	// Enter in a field does what the button beside it does; Escape closes an opened form.
@@ -207,8 +230,8 @@
 		}
 
 		if ( 'Escape' === event.key ) {
-			var open = el.closest( '[data-php-form], [data-files-form]' );
-			var close = open ? open.querySelector( '[data-hosting-action="php_cancel"], [data-hosting-action="files_close"]' ) : null;
+			var open = el.closest( '[data-php-form], [data-files-form], [data-country-form]' );
+			var close = open ? open.querySelector( '[data-hosting-action="php_cancel"], [data-hosting-action="files_close"], [data-hosting-action="country_cancel"]' ) : null;
 
 			if ( close ) {
 				event.preventDefault();
@@ -218,12 +241,12 @@
 			return;
 		}
 
-		if ( 'Enter' !== event.key || 'INPUT' !== el.tagName || /^(radio|checkbox|hidden)$/.test( el.type ) ) {
+		if ( 'Enter' !== event.key || 'INPUT' !== el.tagName || /^(radio|checkbox|hidden)$/.test( el.type ) || el.hasAttribute( 'data-hosting-nosubmit' ) ) {
 			return;
 		}
 
 		var group = el.closest( '[data-files-form]' ) || el.closest( '[data-php-form]' ) || el.closest( '.beltoft-hosting-formrow' );
-		var go = group ? ( group.querySelector( '.beltoft-hosting-btn--primary[data-hosting-action]' ) || group.querySelector( 'button[data-hosting-action]:not([data-hosting-action="send_code"]):not([data-hosting-action="files_close"]):not([data-hosting-action="php_cancel"])' ) ) : null;
+		var go = group ? ( group.querySelector( '.beltoft-hosting-btn--primary[data-hosting-action]' ) || group.querySelector( 'button[data-hosting-action]:not([data-hosting-action="send_code"]):not([data-hosting-action="files_close"]):not([data-hosting-action="php_cancel"]):not([data-hosting-action="country_cancel"])' ) ) : null;
 
 		if ( go && ! go.disabled ) {
 			event.preventDefault();
@@ -243,6 +266,24 @@
 				setHidden( scope.querySelector( '[data-php-form]' ), 'php_cancel' === action );
 				setHidden( phpOpener, 'php_edit' === action );
 				disclosed( phpOpener, scope.querySelector( '[data-php-form]' ), 'php_edit' === action );
+				return true;
+			case 'country_edit':
+			case 'country_cancel':
+				var countryOpener = scope.querySelector( '[data-hosting-action="country_edit"]' );
+				var countryForm = scope.querySelector( '[data-country-form]' );
+
+				setHidden( countryForm, 'country_cancel' === action );
+				setHidden( countryOpener, 'country_edit' === action );
+				disclosed( countryOpener, countryForm, 'country_edit' === action );
+				return true;
+			case 'country_list':
+				var wanted = ( button.getAttribute( 'data-codes' ) || '' ).split( ' ' );
+
+				Array.prototype.forEach.call( scope.querySelectorAll( 'input[data-country]' ), function ( box ) {
+					if ( wanted.indexOf( box.value ) >= 0 ) {
+						box.checked = true;
+					}
+				} );
 				return true;
 			case 'files_open':
 				Array.prototype.forEach.call( scope.querySelectorAll( '[data-files-form]' ), function ( form ) {
@@ -384,6 +425,21 @@
 							button.click();
 						} );
 					} );
+				} );
+
+				return;
+			}
+
+			// The person's own country is on the list: the answer is a question, and the same request goes again with the answer.
+			if ( ! result.ok && 409 === result.status && 'country_save' === action && result.data && 'beltoft_services_hosting_country_confirm' === result.data.code ) {
+				say( panel, '' );
+				confirmed( result.data.message || '', text.saveAnyway || '', true ).then( function ( yes ) {
+					if ( yes ) {
+						var again = request[ 2 ];
+
+						again.confirm = true;
+						run( panel, button, id, action, [ request[ 0 ], request[ 1 ], again ] );
+					}
 				} );
 
 				return;

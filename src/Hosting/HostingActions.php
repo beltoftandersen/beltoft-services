@@ -9,6 +9,7 @@ namespace BeltoftServices\Hosting;
 
 use BeltoftServices\Hosting\Actions\AddonActions;
 use BeltoftServices\Hosting\Actions\CareActions;
+use BeltoftServices\Hosting\Actions\CountryActions;
 use BeltoftServices\Hosting\Actions\FilesActions;
 use BeltoftServices\Hosting\Actions\PhpActions;
 use BeltoftServices\Hosting\Actions\ToolActions;
@@ -56,6 +57,13 @@ final class HostingActions {
 	private $addons;
 
 	/**
+	 * The country block of a website.
+	 *
+	 * @var CountryActions
+	 */
+	private $country;
+
+	/**
 	 * Backups, restore, undo, checklist.
 	 *
 	 * @var CareActions
@@ -78,6 +86,7 @@ final class HostingActions {
 		$this->php    = new PhpActions( $r );
 		$this->tools  = new ToolActions( $r );
 		$this->addons = new AddonActions( $r );
+		$this->country = new CountryActions( $r );
 		$this->care   = new CareActions( $r );
 	}
 
@@ -278,6 +287,30 @@ final class HostingActions {
 	 */
 	public function database_link( string $slug ) {
 		return $this->tools->database_link( $slug );
+	}
+
+	/**
+	 * The country block of a website: the countries, where it applies, the ready lists.
+	 *
+	 * @param string $slug Site.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function country_block( string $slug ) {
+		return $this->country->country_block( $slug );
+	}
+
+	/**
+	 * Sets the country block of a website (an empty list turns it off). Asks for a confirmation when the country of the
+	 * person asking is on the list.
+	 *
+	 * @param string   $slug      Site.
+	 * @param string[] $countries Country codes.
+	 * @param string   $scope     site or login.
+	 * @param bool     $confirmed The person confirmed that their own country is on the list.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function set_country_block( string $slug, array $countries, string $scope, bool $confirmed = false ) {
+		return $this->country->set_country_block( $slug, $countries, $scope, $confirmed );
 	}
 
 	/**

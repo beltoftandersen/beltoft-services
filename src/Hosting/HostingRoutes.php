@@ -26,6 +26,8 @@ defined( 'ABSPATH' ) || exit;
  * - POST   hosting/sites/<slug>/workers    workers
  * - POST   hosting/sites/<slug>/cache      clears the page cache
  * - GET    hosting/sites/<slug>/cache      what the node reports about the page cache and the object cache
+ * - GET    hosting/sites/<slug>/country-block  the country block of the website, the ready lists, the visitor's own country when known
+ * - POST   hosting/sites/<slug>/country-block  countries (codes; empty turns it off), scope (site or login), confirm (true when the person's own country is on the list)
  * - POST   hosting/sites/<slug>/login      a one-time WordPress sign-in address
  * - POST   hosting/sites/<slug>/password   a one-time address to WordPress's own "choose a new password" screen
  * - POST   hosting/sites/<slug>/files-link     a one-time address that opens the file manager of the website
@@ -109,6 +111,19 @@ final class HostingRoutes {
 		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/cache', array(
 			array( 'methods' => $post, 'callback' => array( __CLASS__, 'purge_cache' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ),
 			array( 'methods' => \WP_REST_Server::READABLE, 'callback' => array( __CLASS__, 'cache_status' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ),
+		) );
+		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/country-block', array(
+			array( 'methods' => \WP_REST_Server::READABLE, 'callback' => array( __CLASS__, 'country_block' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ),
+			array(
+				'methods'             => $post,
+				'callback'            => array( __CLASS__, 'set_country_block' ),
+				'permission_callback' => 'is_user_logged_in',
+				'args'                => $id + $site + array(
+					'countries' => array( 'type' => 'array', 'required' => true, 'items' => array( 'type' => 'string' ), 'description' => 'ISO 3166-1 alpha-2 country codes whose visitors are refused. An empty list turns the block off.' ),
+					'scope'     => array( 'type' => 'string', 'default' => 'site', 'enum' => array( 'site', 'login' ), 'description' => 'site: the whole website. login: only the WordPress login, xmlrpc.php, the admin area (not admin-ajax.php and admin-post.php), the one-time login address and the file manager and database tool.' ),
+					'confirm'   => array( 'type' => 'boolean', 'default' => false, 'description' => 'True when the person saw that their own country is on the list (error country_confirm) and wants it anyway.' ),
+				),
+			),
 		) );
 		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/login', array( 'methods' => $post, 'callback' => array( __CLASS__, 'login_link' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ) );
 		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/files-link', array( 'methods' => $post, 'callback' => array( __CLASS__, 'files_link' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ) );
@@ -278,6 +293,7 @@ final class HostingRoutes {
 			'busy_round'   => 409,
 			'confirm'      => 402,
 			'step_up'      => 403,
+			'country_confirm' => 409,
 			'addon_required' => 402,
 			'failed'       => 502,
 			'rate_limited' => 429,
@@ -369,6 +385,19 @@ final class HostingRoutes {
 		$r = self::guard( $request, true, Routes::STATUS_RATE_LIMIT );
 
 		return $r instanceof Resource ? self::reply( ( new HostingActions( $r ) )->cache_status( (string) $request['slug'] ) ) : $r;
+	}
+
+	public static function country_block( \WP_REST_Request $request ): \WP_REST_Response {
+		$r = self::guard( $request, false, Routes::STATUS_RATE_LIMIT );
+
+		return $r instanceof Resource ? self::reply( ( new HostingActions( $r ) )->country_block( (string) $request['slug'] ) ) : $r;
+	}
+
+	public static function set_country_block( \WP_REST_Request $request ): \WP_REST_Response {
+		return self::change(
+			$request,
+			static fn( HostingActions $a ) => $a->set_country_block( (string) $request['slug'], (array) $request['countries'], (string) ( $request['scope'] ?: 'site' ), true === $request['confirm'] )
+		);
 	}
 
 	public static function purge_cache( \WP_REST_Request $request ): \WP_REST_Response {

@@ -27,6 +27,7 @@ class AgentContractTest extends TestCase {
 		'site.wp_install'   => array( 'woocommerce' ),
 		'site.wp_address'   => array(),
 		'site.tool_link'    => array(),
+		'site.country_block' => array(),
 		'site.php'          => array( 'memory_mb', 'upload_mb' ),
 		'backup.prepare'    => array( 'label' ),
 		'db.readonly'       => array(),

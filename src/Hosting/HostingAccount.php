@@ -108,6 +108,7 @@ final class HostingAccount {
 					'cachePageMissing' => __( 'Page cache: off, its WordPress plugin is not installed.', 'beltoft-services' ),
 					'cacheObjectOn' => __( 'Object cache: on.', 'beltoft-services' ),
 					'cacheObjectOff' => __( 'Object cache: off.', 'beltoft-services' ),
+					'saveAnyway' => __( 'Save anyway', 'beltoft-services' ),
 				),
 			)
 		);
@@ -503,6 +504,8 @@ final class HostingAccount {
 
 		echo '<p class="beltoft-hosting-help">' . esc_html__( 'Opens phpMyAdmin for the database of this website in a new tab. You do not need a password. The tab ends after 30 minutes without use.', 'beltoft-services' ) . '</p></dd></div>';
 
+		self::print_protection( $slug, (array) $site['country'], $ready );
+
 		echo '</dl>';
 
 		if ( $ready && $many ) {
@@ -510,6 +513,82 @@ final class HostingAccount {
 		}
 
 		self::panel_close();
+	}
+
+	/**
+	 * The country block of a website: what it does now, and the form to change it (hidden until Change is pressed).
+	 *
+	 * @param string               $slug  Site.
+	 * @param array<string, mixed> $block CountryBlock::view().
+	 * @param bool                 $ready Whether the account takes changes.
+	 */
+	private static function print_protection( string $slug, array $block, bool $ready ): void {
+		$names   = \BeltoftServices\Hosting\CountryBlock::names();
+		$lists   = \BeltoftServices\Hosting\CountryBlock::lists();
+		$enabled = ! empty( $block['enabled'] );
+		$chosen  = array_map( static fn( $c ) => (string) $c['code'], (array) $block['countries'] );
+		$scope   = (string) $block['scope'];
+		$id      = 'beltoft-country-' . $slug;
+
+		echo '<div><dt>' . esc_html__( 'Protection', 'beltoft-services' ) . '</dt><dd>';
+
+		if ( ! $enabled ) {
+			echo '<p class="beltoft-hosting-line" data-country-state>' . esc_html__( 'Country block: off. Visitors from every country can reach this website.', 'beltoft-services' ) . '</p>';
+		} else {
+			$list = implode( ', ', array_map( static fn( $c ) => (string) $c['name'], (array) $block['countries'] ) );
+			/* translators: 1: where the block applies, 2: the blocked countries. */
+			echo '<p class="beltoft-hosting-line" data-country-state>' . esc_html( sprintf( __( 'Country block: on for %1$s. Blocked: %2$s.', 'beltoft-services' ), 'login' === $scope ? __( 'the login and the admin area', 'beltoft-services' ) : __( 'the whole website', 'beltoft-services' ), $list ) ) . '</p>';
+
+			if ( false === $block['active'] ) {
+				echo '<p class="beltoft-hosting-warning">' . esc_html__( 'The list is saved, but the country database is not in place on your server yet, so nothing is blocked until it is.', 'beltoft-services' ) . '</p>';
+			}
+		}
+
+		if ( $ready ) {
+			echo '<div class="beltoft-hosting-buttons"><button type="button" class="beltoft-hosting-btn" data-hosting-action="country_edit" aria-expanded="false" aria-controls="' . esc_attr( $id ) . '">' . esc_html( $enabled ? __( 'Change', 'beltoft-services' ) : __( 'Block countries', 'beltoft-services' ) ) . '</button></div>';
+			echo '<div class="beltoft-hosting-secure" id="' . esc_attr( $id ) . '" data-country-form hidden>';
+			echo '<fieldset class="beltoft-hosting-fieldset"><legend>' . esc_html__( 'Countries to block', 'beltoft-services' ) . '</legend>';
+
+			if ( array() !== $lists ) {
+				echo '<div class="beltoft-hosting-buttons">';
+
+				foreach ( $lists as $list_id => $list ) {
+					/* translators: %s: the name of a ready list of countries. */
+					echo '<button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="country_list" data-codes="' . esc_attr( implode( ' ', $list['countries'] ) ) . '">' . esc_html( sprintf( __( 'Select: %s', 'beltoft-services' ), $list['label'] ) ) . '</button>';
+				}
+
+				echo '</div>';
+
+				foreach ( $lists as $list ) {
+					/* translators: 1: the name of a ready list, 2: its countries. */
+					echo '<p class="beltoft-hosting-help">' . esc_html( sprintf( __( '%1$s: %2$s.', 'beltoft-services' ), $list['label'], implode( ', ', array_map( static fn( $c ) => $names[ $c ] ?? $c, $list['countries'] ) ) ) ) . '</p>';
+				}
+			}
+
+			echo '<label class="beltoft-hosting-field"><span>' . esc_html__( 'Find a country', 'beltoft-services' ) . '</span><input type="search" data-country-filter data-hosting-nosubmit autocomplete="off" spellcheck="false"></label>';
+			echo '<div class="beltoft-hosting-countries" role="group" aria-label="' . esc_attr__( 'Countries', 'beltoft-services' ) . '">';
+
+			foreach ( $names as $code => $name ) {
+				echo '<label class="beltoft-hosting-check" data-country-name="' . esc_attr( function_exists( 'mb_strtolower' ) ? mb_strtolower( $name ) : strtolower( $name ) ) . '"><input type="checkbox" data-country value="' . esc_attr( $code ) . '"' . checked( in_array( $code, $chosen, true ), true, false ) . '> <span>' . esc_html( $name ) . '</span></label>';
+			}
+
+			echo '</div></fieldset>';
+			echo '<fieldset class="beltoft-hosting-fieldset"><legend>' . esc_html__( 'Where it applies', 'beltoft-services' ) . '</legend>';
+			echo '<label class="beltoft-hosting-radio"><input type="radio" name="' . esc_attr( $id ) . '-scope" value="site"' . checked( 'login' !== $scope, true, false ) . '> <span>' . esc_html__( 'Whole website', 'beltoft-services' ) . '</span></label> ';
+			echo '<label class="beltoft-hosting-radio"><input type="radio" name="' . esc_attr( $id ) . '-scope" value="login"' . checked( 'login', $scope, false ) . '> <span>' . esc_html__( 'Login and admin only', 'beltoft-services' ) . '</span></label>';
+			echo '<p class="beltoft-hosting-help">' . esc_html__( 'Login and admin only covers wp-login.php, xmlrpc.php and the WordPress admin area (not admin-ajax.php and admin-post.php), and the file manager and database tool. The rest of the website stays open.', 'beltoft-services' ) . '</p></fieldset>';
+			echo '<p class="beltoft-hosting-help">' . esc_html__( 'If your own country is blocked, you cannot reach the website or the buttons on this page that open it.', 'beltoft-services' ) . '</p>';
+			echo '<div class="beltoft-hosting-buttons"><button type="button" class="beltoft-hosting-btn" data-hosting-action="country_save" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Save', 'beltoft-services' ) . '</button><button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="country_cancel">' . esc_html__( 'Cancel', 'beltoft-services' ) . '</button>';
+
+			if ( $enabled ) {
+				echo '<button type="button" class="beltoft-hosting-linkbtn beltoft-hosting-linkbtn--danger" data-hosting-action="country_off" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Turn off', 'beltoft-services' ) . '</button>';
+			}
+
+			echo '</div></div>';
+		}
+
+		echo '<p class="beltoft-hosting-help">' . esc_html__( 'The country is looked up from the visitor\'s address. This is not exact, and a VPN gets around it.', 'beltoft-services' ) . '</p>';
+		echo '<p class="beltoft-hosting-help">' . esc_html( \BeltoftServices\Hosting\CountryBlock::ATTRIBUTION ) . '</p></dd></div>';
 	}
 
 	/**

@@ -77,6 +77,14 @@
 .beltoft-hosting .beltoft-hosting-field--wide textarea { width: 100%; max-width: 520px; }
 .beltoft-hosting .beltoft-hosting-secure { display: grid; gap: var(--bs-space-3, 12px); margin-top: var(--bs-space-3, 12px); }
 .beltoft-hosting .beltoft-hosting-secure[hidden], .beltoft-hosting [data-files-reveal][hidden], .beltoft-hosting [data-php-form][hidden] { display: none; }
+/* Country block: a filter field and a scrolling list of countries in columns */
+.beltoft-hosting input[type="search"] { box-sizing: border-box; width: auto; min-width: 160px; max-width: 360px; height: var(--bs-input-h, 44px); margin: 0; padding: 0 var(--bs-space-3, 12px); border: 1px solid var(--bs-input-border, #7d8b99); border-radius: 0; background: #fff; box-shadow: none; color: var(--bsh-ink); font: inherit; font-size: var(--bs-fs-body, 15px); }
+.beltoft-hosting .beltoft-hosting-fieldset { display: grid; gap: var(--bs-space-2, 8px); min-width: 0; margin: 0; padding: 0; border: 0; }
+.beltoft-hosting .beltoft-hosting-fieldset legend { padding: 0; margin-bottom: var(--bs-space-2, 8px); color: var(--bsh-soft); font-size: var(--bs-fs-small, 14px); font-weight: var(--bs-fw-medium, 500); }
+.beltoft-hosting .beltoft-hosting-countries { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--bs-space-1, 4px) var(--bs-space-3, 12px); max-height: 260px; overflow-y: auto; padding: var(--bs-space-2, 8px) var(--bs-space-3, 12px); border: 1px solid var(--bs-input-border, #7d8b99); }
+.beltoft-hosting .beltoft-hosting-check { display: flex; align-items: center; gap: var(--bs-space-2, 8px); margin: 0; cursor: pointer; }
+.beltoft-hosting .beltoft-hosting-check input { margin: 0; }
+.beltoft-hosting .beltoft-hosting-check[hidden] { display: none; }
 .beltoft-hosting .beltoft-hosting-reveal { margin-top: var(--bs-space-3, 12px); }
 .beltoft-hosting .beltoft-hosting-inline { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--bs-space-3, 12px); vertical-align: middle; }
 .beltoft-hosting .beltoft-hosting-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bs-space-2, 8px) var(--bs-space-4, 16px); }
@@ -106,7 +114,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .beltof
 	.beltoft-hosting .beltoft-hosting-formrow, .beltoft-hosting .beltoft-hosting-buttons, .beltoft-hosting .beltoft-hosting-inline { flex-direction: column; align-items: stretch; }
 	.beltoft-hosting .beltoft-hosting-buttons { align-items: flex-start; }
 	.beltoft-hosting .beltoft-hosting-buttons .beltoft-hosting-btn, .beltoft-hosting .beltoft-hosting-formrow .beltoft-hosting-btn, .beltoft-hosting .beltoft-hosting-inline .beltoft-hosting-btn, .beltoft-hosting .beltoft-hosting-facts dd > .beltoft-hosting-btn { width: 100%; }
-	.beltoft-hosting input[type="text"], .beltoft-hosting select, .beltoft-hosting textarea, .beltoft-hosting .beltoft-hosting-field { width: 100%; max-width: 100%; }
+	.beltoft-hosting input[type="text"], .beltoft-hosting input[type="search"], .beltoft-hosting select, .beltoft-hosting textarea, .beltoft-hosting .beltoft-hosting-field { width: 100%; max-width: 100%; }
 	.beltoft-hosting .beltoft-hosting-main { align-items: flex-start; flex-direction: column; }
 	/* A row of the backup table is a block on a phone: the label over each value. */
 	.beltoft-hosting table, .beltoft-hosting tbody, .beltoft-hosting tr, .beltoft-hosting td { display: block; width: auto; }
