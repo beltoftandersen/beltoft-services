@@ -272,7 +272,7 @@ class ServiceAreasTest extends TestCase {
 		$row  = $this->apps_area()->row( $this->views( $app )[0], $app );
 
 		$this->assertSame( 'Odoo app', $row['name'] );
-		$this->assertSame( 'Ready', $row['state'] );
+		$this->assertSame( 'Active', $row['state'] );
 		$this->assertSame( '1 of 3', $row['details'] );
 		$this->assertSame( 'Open app', $row['action']['label'] );
 		$this->assertStringContainsString( 'data-beltoft-services-open', $html );

@@ -112,6 +112,11 @@ final class Panel {
 			return $app;
 		}
 
+		// A connected app (the HTTP driver) that is set up is in use from then on: "Active", as a domain is, not "Ready".
+		if ( $r && 'http' === $r->get( 'driver' ) && 'ready' === self::group( $state, $r ) ) {
+			return __( 'Active', 'beltoft-services' );
+		}
+
 		$labels = array(
 			'getting-ready' => __( 'Getting ready', 'beltoft-services' ),
 			'ready'         => __( 'Ready', 'beltoft-services' ),
