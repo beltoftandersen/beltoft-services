@@ -236,12 +236,12 @@ final class HostingAccount {
 		echo '<div class="beltoft-hosting" data-hosting-resource="' . esc_attr( (string) $r->id() ) . '">';
 
 		self::print_notices( $r );
+		self::print_overview( $r, $limits );
+		self::print_websites( $r, $limits, $sites, $ready );
 
 		if ( self::checklist_visible( $r ) ) {
 			self::print_checklist( $r, $ready, $sites );
 		}
-
-		self::print_websites( $r, $limits, $sites, $ready );
 
 		if ( $ready && ( 0 === $limits['sites'] || $limits['sites_used'] < $limits['sites'] ) ) {
 			self::print_add_site( $limits );
@@ -253,6 +253,43 @@ final class HostingAccount {
 		self::print_email( $r, $ready );
 
 		echo '</div>';
+	}
+
+	/**
+	 * The account at a glance, at the top: websites, PHP workers and storage, and links to the account-wide sections
+	 * further down (files, backups, email).
+	 *
+	 * @param Resource             $r      Hosting resource.
+	 * @param array<string, mixed> $limits Ceilings.
+	 */
+	private static function print_overview( Resource $r, array $limits ): void {
+		$storage = HostingUsage::storage_percent( $r );
+
+		echo '<section class="bsh-overview" aria-label="' . esc_attr__( 'Overview', 'beltoft-services' ) . '"><dl class="bsh-overview__facts">';
+		echo '<div><dt>' . esc_html__( 'Websites', 'beltoft-services' ) . '</dt><dd>' . esc_html(
+			0 === (int) $limits['sites']
+				? (string) (int) $limits['sites_used']
+				/* translators: 1: websites used, 2: websites allowed. */
+				: sprintf( __( '%1$d of %2$d', 'beltoft-services' ), (int) $limits['sites_used'], (int) $limits['sites'] )
+		) . '</dd></div>';
+		/* translators: 1: PHP workers in use, 2: PHP workers allowed. */
+		echo '<div><dt>' . esc_html__( 'PHP workers', 'beltoft-services' ) . '</dt><dd>' . esc_html( sprintf( __( '%1$d of %2$d', 'beltoft-services' ), (int) $limits['workers_used'], (int) $limits['php_workers'] ) ) . '</dd></div>';
+
+		if ( null !== $storage ) {
+			$percent = (int) round( max( 0.0, min( 100.0, (float) $storage ) ) );
+			/* translators: %d: percent of the plan's storage in use. */
+			echo '<div><dt>' . esc_html__( 'Storage', 'beltoft-services' ) . '</dt><dd><span class="bs-meter' . ( $percent >= 90 ? ' bs-meter--high' : '' ) . '" aria-hidden="true"><span class="bs-meter__fill" style="width: ' . (int) $percent . '%"></span></span><span class="bsh-overview__small">' . esc_html( sprintf( __( '%d%% used', 'beltoft-services' ), $percent ) ) . '</span></dd></div>';
+		}
+
+		echo '</dl><nav class="bsh-jump" aria-label="' . esc_attr__( 'On this page', 'beltoft-services' ) . '">';
+		echo '<a href="#beltoft-hosting-sites">' . esc_html__( 'Websites', 'beltoft-services' ) . '</a>';
+		echo '<a href="#beltoft-hosting-files">' . esc_html__( 'Files (SFTP)', 'beltoft-services' ) . '</a>';
+		if ( HostingBackups::enabled( $r ) ) {
+			echo '<a href="#beltoft-hosting-backups">' . esc_html__( 'Backups', 'beltoft-services' ) . '</a>';
+		}
+
+		echo '<a href="#beltoft-hosting-email">' . esc_html__( 'Email', 'beltoft-services' ) . '</a>';
+		echo '</nav></section>';
 	}
 
 	/**
@@ -273,6 +310,27 @@ final class HostingAccount {
 	 */
 	private static function panel_close(): void {
 		echo '</section>';
+	}
+
+	/**
+	 * Opens one section of a website: a row that shows its name and its current value, and opens to the rest. Only one
+	 * thing per row is shown until the customer opens it; the help sits inside.
+	 *
+	 * @param string $label Section name.
+	 * @param string $value The current value, plain text, or ''.
+	 * @param bool   $open  Open from the start (something needs the customer's attention).
+	 * @param string $key   Short key for the row (data attribute and id part).
+	 * @param string $slug  Site.
+	 */
+	private static function sec_open( string $label, string $value, bool $open, string $key, string $slug ): void {
+		echo '<details class="bsh-sec" data-sec="' . esc_attr( $key ) . '" id="' . esc_attr( 'beltoft-site-' . $slug . '-' . $key ) . '"' . ( $open ? ' open' : '' ) . '><summary class="bsh-sec__row"><span class="bsh-sec__label">' . esc_html( $label ) . '</span><span class="bsh-sec__value">' . esc_html( $value ) . '</span></summary><div class="bsh-sec__body">';
+	}
+
+	/**
+	 * Closes a section.
+	 */
+	private static function sec_close(): void {
+		echo '</div></details>';
 	}
 
 	/**
@@ -334,24 +392,8 @@ final class HostingAccount {
 	 * @param bool                             $ready  Whether the account takes changes.
 	 */
 	private static function print_websites( Resource $r, array $limits, array $sites, bool $ready ): void {
-		echo '<div class="beltoft-hosting-section"><h3 class="beltoft-hosting-section__title">' . esc_html__( 'Websites', 'beltoft-services' ) . '</h3><p class="beltoft-hosting-section__note">';
-		echo esc_html(
-			0 === $limits['sites']
-				? sprintf(
-					/* translators: 1: websites in the account, 2: PHP workers allowed. */
-					_n( '%1$d website. Unlimited websites and subdomains. Up to %2$d PHP workers for all websites together.', '%1$d websites. Unlimited websites and subdomains. Up to %2$d PHP workers for all websites together.', $limits['sites_used'], 'beltoft-services' ),
-					$limits['sites_used'],
-					$limits['php_workers']
-				)
-				: sprintf(
-					/* translators: 1: websites used, 2: websites allowed, 3: PHP workers allowed. */
-					__( '%1$d of %2$d websites. Up to %3$d PHP workers for all websites together.', 'beltoft-services' ),
-					$limits['sites_used'],
-					$limits['sites'],
-					$limits['php_workers']
-				)
-		);
-		echo '</p></div>';
+		// The counts are in the overview at the top; the heading only marks where the websites start.
+		echo '<div class="beltoft-hosting-section" id="beltoft-hosting-sites"><h3 class="beltoft-hosting-section__title">' . esc_html__( 'Websites', 'beltoft-services' ) . '</h3></div>';
 
 		$ending = Addons::ending_domains( $r );
 		$node   = (array) ( Nodes::get( (string) ( Records::for_resource( $r->id() )['node'] ?? '' ) ) ?? array() );
@@ -382,10 +424,33 @@ final class HostingAccount {
 			. '<span class="beltoft-hosting-status' . ( $ready ? ' is-ok' : '' ) . '">' . esc_html( $ready ? __( 'Online', 'beltoft-services' ) : __( 'Not ready', 'beltoft-services' ) ) . '</span>';
 
 		self::panel_open( esc_html( self::site_name( $site ) ), 'beltoft-site-' . $slug, $head, 'beltoft-hosting-site', ' data-hosting-scope data-slug="' . esc_attr( $slug ) . '"' );
-		echo '<dl class="beltoft-hosting-facts">';
+
+		// The things done most, as one row of buttons under the name; everything else in sections that open one at a time.
+		if ( $ready ) {
+			echo '<div class="bsh-quick">';
+			echo '<button type="button" class="beltoft-hosting-btn beltoft-hosting-btn--primary" data-hosting-action="login" data-slug="' . esc_attr( $slug ) . '" data-busy="' . esc_attr__( 'Opening WordPress in a new tab...', 'beltoft-services' ) . '" data-done="' . esc_attr__( 'WordPress opened in a new tab.', 'beltoft-services' ) . '">' . esc_html__( 'Log in to WordPress', 'beltoft-services' ) . '</button>';
+			echo '<button type="button" class="beltoft-hosting-btn" data-hosting-action="tool_files" data-slug="' . esc_attr( $slug ) . '" data-done="' . esc_attr__( 'The file manager opened in a new tab.', 'beltoft-services' ) . '">' . esc_html__( 'Open file manager', 'beltoft-services' ) . '</button>';
+			echo '<button type="button" class="beltoft-hosting-btn" data-hosting-action="tool_database" data-slug="' . esc_attr( $slug ) . '" data-done="' . esc_attr__( 'The database tool opened in a new tab.', 'beltoft-services' ) . '">' . esc_html__( 'Open database', 'beltoft-services' ) . '</button>';
+			echo '<button type="button" class="beltoft-hosting-btn" data-hosting-action="cache" data-slug="' . esc_attr( $slug ) . '" data-busy="' . esc_attr__( 'Clearing the cache...', 'beltoft-services' ) . '" data-done="' . esc_attr__( 'The cache of this website was cleared.', 'beltoft-services' ) . '">' . esc_html__( 'Clear cache', 'beltoft-services' ) . '</button>';
+			echo '</div>';
+		}
+
+		echo '<div class="bsh-secs">';
 
 		// Address.
-		echo '<div><dt>' . esc_html__( 'Address', 'beltoft-services' ) . '</dt><dd>';
+		$names   = array_filter( $site['domains'], static fn( $d ) => 'preview' !== $d['kind'] );
+		$waiting = array() !== array_filter( $names, static fn( $d ) => 'active' !== $d['state'] );
+
+		self::sec_open(
+			__( 'Domains', 'beltoft-services' ),
+			array() === $names
+				? __( 'Temporary address only', 'beltoft-services' )
+				/* translators: %d: number of names connected to the website. */
+				: sprintf( _n( '%d name connected', '%d names connected', count( $names ), 'beltoft-services' ), count( $names ) ) . ( $waiting ? ', ' . __( 'waiting for DNS', 'beltoft-services' ) : '' ),
+			$waiting,
+			'domains',
+			$slug
+		);
 		echo '<ul class="beltoft-hosting-names">';
 
 		foreach ( $site['domains'] as $d ) {
@@ -438,10 +503,10 @@ final class HostingAccount {
 			echo '<p class="beltoft-hosting-help">' . esc_html__( 'A domain is connected with and without www. A subdomain is connected only as typed.', 'beltoft-services' ) . '</p>';
 		}
 
-		echo '</dd></div>';
+		self::sec_close();
 
 		// PHP.
-		echo '<div><dt>' . esc_html__( 'PHP', 'beltoft-services' ) . '</dt><dd>';
+		self::sec_open( __( 'PHP', 'beltoft-services' ), 'PHP ' . $site['php'], false, 'php', $slug );
 		echo '<span class="beltoft-hosting-php">' . esc_html( 'PHP ' . $site['php'] ) . '</span>';
 
 		if ( $ready ) {
@@ -461,54 +526,42 @@ final class HostingAccount {
 			}
 		}
 
-		echo '</dd></div>';
+		self::sec_close();
 
 		// WordPress login.
-		echo '<div><dt>' . esc_html__( 'WordPress login', 'beltoft-services' ) . '</dt><dd>';
+		self::sec_open( __( 'WordPress login', 'beltoft-services' ), (string) $site['admin_user'], false, 'login', $slug );
 		echo '<p class="beltoft-hosting-line" data-login-facts>' . esc_html( self::login_facts( (string) $site['admin_user'], (string) $site['admin_email'] ) ) . '</p>';
 
 		if ( $ready ) {
-			echo '<div class="beltoft-hosting-buttons"><button type="button" class="beltoft-hosting-btn beltoft-hosting-btn--primary" data-hosting-action="login" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Log in to WordPress', 'beltoft-services' ) . '</button><button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="password" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Set a WordPress password', 'beltoft-services' ) . '</button></div>';
+			echo '<div class="beltoft-hosting-buttons"><button type="button" class="beltoft-hosting-btn" data-hosting-action="password" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Set a WordPress password', 'beltoft-services' ) . '</button></div>';
 		}
 
 		echo '<p class="beltoft-hosting-help">' . esc_html( sprintf( /* translators: %s: the website's WordPress sign-in address. */ __( 'You have no WordPress password until you set one. With a password you can log in at %s without this page.', 'beltoft-services' ), 'https://' . $wp['address'] . '/wp-login.php' ) ) . '</p>';
-		echo '</dd></div>';
+		self::sec_close();
 
 		// Cache.
-		echo '<div><dt>' . esc_html__( 'Cache', 'beltoft-services' ) . '</dt><dd>';
+		self::sec_open( __( 'Cache', 'beltoft-services' ), '', false, 'cache', $slug );
 
 		if ( $ready ) {
 			echo '<p class="beltoft-hosting-line" data-cache-facts data-slug="' . esc_attr( $slug ) . '" hidden></p>';
-			echo '<button type="button" class="beltoft-hosting-btn" data-hosting-action="cache" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Clear cache', 'beltoft-services' ) . '</button>';
 		}
 
 		echo '<p class="beltoft-hosting-help">' . esc_html__( 'Clears the page cache and the object cache of this website.', 'beltoft-services' ) . '</p>';
-		echo '<p class="beltoft-hosting-help">' . esc_html__( 'The page cache is switched on and off in the WordPress dashboard, under Settings. Switch it off there, or deactivate or delete its plugin, to use another caching plugin.', 'beltoft-services' ) . '</p></dd></div>';
+		echo '<p class="beltoft-hosting-help">' . esc_html__( 'The page cache is switched on and off in the WordPress dashboard, under Settings. Switch it off there, or deactivate or delete its plugin, to use another caching plugin.', 'beltoft-services' ) . '</p>';
+		self::sec_close();
 
-		// Files.
-		echo '<div><dt>' . esc_html__( 'Files', 'beltoft-services' ) . '</dt><dd>';
+		// Files and database: the buttons are in the row above; the section says how they work and where SFTP is.
+		self::sec_open( __( 'Files and database', 'beltoft-services' ), '', false, 'tools', $slug );
+		echo '<p class="beltoft-hosting-help">' . esc_html__( 'Opens in a new tab and shows the files of this website. The tab ends after 30 minutes without use.', 'beltoft-services' ) . '</p>';
+		echo '<p class="beltoft-hosting-help">' . esc_html__( 'Opens phpMyAdmin for the database of this website in a new tab. You do not need a password. The tab ends after 30 minutes without use.', 'beltoft-services' ) . '</p>';
+		echo '<p class="beltoft-hosting-help">' . esc_html__( 'Upload and download files with SFTP.', 'beltoft-services' ) . ' <a class="beltoft-hosting-link" href="#beltoft-hosting-files">' . esc_html__( 'Files (SFTP)', 'beltoft-services' ) . '</a></p>';
+		self::sec_close();
 
-		if ( $ready ) {
-			echo '<div class="beltoft-hosting-buttons"><button type="button" class="beltoft-hosting-btn" data-hosting-action="tool_files" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Open file manager', 'beltoft-services' ) . '</button></div>';
-			echo '<p class="beltoft-hosting-help">' . esc_html__( 'Opens in a new tab and shows the files of this website. The tab ends after 30 minutes without use.', 'beltoft-services' ) . '</p>';
-		}
-
-		echo '<p class="beltoft-hosting-help">' . esc_html__( 'Upload and download files with SFTP.', 'beltoft-services' ) . ' <a class="beltoft-hosting-link" href="#beltoft-hosting-files">' . esc_html__( 'Files (SFTP)', 'beltoft-services' ) . '</a></p></dd></div>';
-
-		// Database.
-		echo '<div><dt>' . esc_html__( 'Database', 'beltoft-services' ) . '</dt><dd>';
-
-		if ( $ready ) {
-			echo '<div class="beltoft-hosting-buttons"><button type="button" class="beltoft-hosting-btn" data-hosting-action="tool_database" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Open database', 'beltoft-services' ) . '</button></div>';
-		}
-
-		echo '<p class="beltoft-hosting-help">' . esc_html__( 'Opens phpMyAdmin for the database of this website in a new tab. You do not need a password. The tab ends after 30 minutes without use.', 'beltoft-services' ) . '</p></dd></div>';
-
-		self::print_scan( (array) $site['scan'] );
+		self::print_scan( (array) $site['scan'], $slug );
 		self::print_staging( $slug, (array) $site['staging'], $ready, $limits );
 		self::print_protection( $slug, (array) $site['country'], $ready );
 
-		echo '</dl>';
+		echo '</div>';
 
 		if ( $ready && $many ) {
 			echo '<footer class="beltoft-hosting-panel__foot"><button type="button" class="beltoft-hosting-linkbtn beltoft-hosting-linkbtn--danger" data-hosting-action="remove_site" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Remove website', 'beltoft-services' ) . '</button></footer>';
@@ -520,23 +573,25 @@ final class HostingAccount {
 	/**
 	 * The result of the last nightly malware scan of a website. Nothing is drawn for a website that was never scanned.
 	 *
-	 * @param array<string, mixed> $v MalwareScan::view().
+	 * @param array<string, mixed> $v    MalwareScan::view().
+	 * @param string               $slug Site.
 	 */
-	private static function print_scan( array $v ): void {
+	private static function print_scan( array $v, string $slug = 'site' ): void {
 		$words = MalwareScan::words( $v );
 
 		if ( '' === $words ) {
 			return;
 		}
 
-		echo '<div><dt>' . esc_html__( 'Malware scan', 'beltoft-services' ) . '</dt><dd>';
+		self::sec_open( __( 'Malware scan', 'beltoft-services' ), 'found' === $v['state'] ? __( 'Malware found', 'beltoft-services' ) : __( 'Nothing found', 'beltoft-services' ), 'found' === $v['state'], 'scan', $slug );
 		echo '<p class="' . ( 'found' === $v['state'] ? 'beltoft-hosting-warning' : 'beltoft-hosting-line' ) . '" data-scan-state role="status">' . esc_html( $words ) . '</p>';
 
 		if ( 'found' === $v['state'] ) {
 			echo '<p class="beltoft-hosting-help">' . esc_html__( 'Your website is still online and nothing was changed. Restore a backup from before this date, or remove the files with the file manager. Contact support if you need help.', 'beltoft-services' ) . '</p>';
 		}
 
-		echo '<p class="beltoft-hosting-help">' . esc_html__( 'Your website is scanned every night for known malware. The scan only reads your files. It does not change or remove anything.', 'beltoft-services' ) . '</p></dd></div>';
+		echo '<p class="beltoft-hosting-help">' . esc_html__( 'Your website is scanned every night for known malware. The scan only reads your files. It does not change or remove anything.', 'beltoft-services' ) . '</p>';
+		self::sec_close();
 	}
 
 	/**
@@ -566,7 +621,7 @@ final class HostingAccount {
 			'delete'  => __( 'The staging copy could not be deleted. Try again.', 'beltoft-services' ),
 		);
 
-		echo '<div><dt>' . esc_html__( 'Staging', 'beltoft-services' ) . '</dt><dd>';
+		self::sec_open( __( 'Staging', 'beltoft-services' ), ! empty( $v['busy'] ) ? __( 'Working...', 'beltoft-services' ) : ( ! empty( $v['exists'] ) ? __( 'Copy ready', 'beltoft-services' ) : __( 'No staging copy', 'beltoft-services' ) ), ! empty( $v['busy'] ) || '' !== (string) ( $v['note'] ?? '' ), 'staging', $slug );
 
 		if ( $v['busy'] ) {
 			echo '<p class="beltoft-hosting-line" data-staging-busy data-slug="' . esc_attr( $slug ) . '" role="status">' . esc_html( $busy[ $v['state'] ] ?? '' ) . '</p>';
@@ -639,7 +694,8 @@ final class HostingAccount {
 			}
 		}
 
-		echo '<p class="beltoft-hosting-help">' . esc_html__( 'A staging copy is a copy of this website on an address of its own, to try changes in before they go live. It sends no email, is not shown to search engines and does not count as a website.', 'beltoft-services' ) . '</p></dd></div>';
+		echo '<p class="beltoft-hosting-help">' . esc_html__( 'A staging copy is a copy of this website on an address of its own, to try changes in before they go live. It sends no email, is not shown to search engines and does not count as a website.', 'beltoft-services' ) . '</p>';
+		self::sec_close();
 	}
 
 	/**
@@ -657,7 +713,7 @@ final class HostingAccount {
 		$scope   = (string) $block['scope'];
 		$id      = 'beltoft-country-' . $slug;
 
-		echo '<div><dt>' . esc_html__( 'Protection', 'beltoft-services' ) . '</dt><dd>';
+		self::sec_open( __( 'Country block', 'beltoft-services' ), $enabled ? __( 'On', 'beltoft-services' ) : __( 'Off', 'beltoft-services' ), false, 'country', $slug );
 
 		if ( ! $enabled ) {
 			echo '<p class="beltoft-hosting-line" data-country-state>' . esc_html__( 'Country block: off. Visitors from every country can reach this website.', 'beltoft-services' ) . '</p>';
@@ -715,7 +771,8 @@ final class HostingAccount {
 		}
 
 		echo '<p class="beltoft-hosting-help">' . esc_html__( 'The country is looked up from the visitor\'s address. This is not exact, and a VPN gets around it.', 'beltoft-services' ) . '</p>';
-		echo '<p class="beltoft-hosting-help">' . esc_html( \BeltoftServices\Hosting\CountryBlock::ATTRIBUTION ) . '</p></dd></div>';
+		echo '<p class="beltoft-hosting-help">' . esc_html( \BeltoftServices\Hosting\CountryBlock::ATTRIBUTION ) . '</p>';
+		self::sec_close();
 	}
 
 	/**

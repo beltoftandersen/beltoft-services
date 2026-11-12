@@ -332,7 +332,7 @@ class AccountTest extends HostingCase {
 		HostingAccount::render( Resource::find( $r->id() ) );
 		$html = (string) ob_get_clean();
 		wp_set_current_user( 0 );
-		$this->assertStringContainsString( '7 websites. Unlimited websites and subdomains.', $html );
+		$this->assertStringContainsString( '<dt>Websites</dt><dd>7</dd>', $html );
 		$this->assertStringContainsString( 'data-hosting-action="add_site"', $html );
 	}
 
@@ -453,7 +453,7 @@ class AccountTest extends HostingCase {
 		HostingAccount::render( Resource::find( $r->id() ) );
 		$html = (string) ob_get_clean();
 
-		$this->assertStringContainsString( '2 of 3 websites', $html );
+		$this->assertStringContainsString( '<dt>Websites</dt><dd>2 of 3</dd>', $html );
 		$this->assertStringContainsString( 'blog.preview.example.test', $html );
 		$this->assertMatchesRegularExpression( '/www\.outside\.example<\/span> <span class="beltoft-hosting-note">waiting for DNS/', $html );
 		$this->assertStringContainsString( '>Blog</h3>', $html );

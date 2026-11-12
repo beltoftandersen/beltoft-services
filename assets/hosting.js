@@ -624,4 +624,29 @@
 	}
 
 	stagingWatch();
+
+	// A link or a hash that points into a closed section (for example "Connect a domain" from Get started) opens it first.
+	function openTo( hash ) {
+		var target = hash && hash.length > 1 ? document.getElementById( decodeURIComponent( hash.slice( 1 ) ) ) : null;
+		var node = target;
+
+		while ( node ) {
+			if ( 'DETAILS' === node.tagName ) {
+				node.open = true;
+			}
+
+			node = node.parentElement;
+		}
+
+		return target;
+	}
+
+	window.addEventListener( 'hashchange', function () {
+		var target = openTo( window.location.hash );
+
+		if ( target ) {
+			target.scrollIntoView( { block: 'start' } );
+		}
+	} );
+	openTo( window.location.hash );
 }() );
