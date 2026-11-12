@@ -9,6 +9,7 @@ namespace BeltoftServices\Hosting;
 
 use BeltoftServices\Hosting\Actions\AddonActions;
 use BeltoftServices\Hosting\Actions\CareActions;
+use BeltoftServices\Hosting\Actions\FilesActions;
 use BeltoftServices\Hosting\Actions\PhpActions;
 use BeltoftServices\Hosting\Actions\SiteActions;
 use BeltoftServices\Resource;
@@ -54,9 +55,17 @@ final class HostingActions {
 	private $care;
 
 	/**
+	 * File access: SFTP details and password, SSH keys.
+	 *
+	 * @var FilesActions
+	 */
+	private $files;
+
+	/**
 	 * @param Resource $r Hosting resource.
 	 */
 	public function __construct( Resource $r ) {
+		$this->files  = new FilesActions( $r );
 		$this->sites  = new SiteActions( $r );
 		$this->php    = new PhpActions( $r );
 		$this->addons = new AddonActions( $r );
@@ -128,6 +137,16 @@ final class HostingActions {
 	}
 
 	/**
+	 * Chooses which name of a with-and-without-www pair is the main address; the other one redirects to it (301).
+	 *
+	 * @param string $host The name that becomes the main address.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function set_main_address( string $host ) {
+		return $this->sites->set_main_address( $host );
+	}
+
+	/**
 	 * Sends the account's current routes to the edge (a name became active or stopped being).
 	 *
 	 * @return true|\WP_Error
@@ -189,6 +208,55 @@ final class HostingActions {
 	 */
 	public function login_link( string $slug ) {
 		return $this->php->login_link( $slug );
+	}
+
+	/**
+	 * A one-time address that opens WordPress's own "choose a new password" screen for the website's administrator.
+	 *
+	 * @param string $slug Site.
+	 * @return array<string, mixed>|\WP_Error url, and user and email of the administrator when the node says.
+	 */
+	public function password_link( string $slug ) {
+		return $this->php->password_link( $slug );
+	}
+
+	/**
+	 * What the page shows about file access: where to connect, the keys and whether a password was ever set.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function files(): array {
+		return $this->files->files();
+	}
+
+	/**
+	 * Sets the SFTP password: the one given (16 characters or more), or a generated one. Returned once.
+	 *
+	 * @param string $chosen The customer's own password, or '' for a generated one.
+	 * @return array<string, mixed>|\WP_Error password, host, port, user.
+	 */
+	public function set_sftp_password( string $chosen = '' ) {
+		return $this->files->set_sftp_password( $chosen );
+	}
+
+	/**
+	 * Adds a public SSH key.
+	 *
+	 * @param string $key A public key line.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function add_ssh_key( string $key ) {
+		return $this->files->add_ssh_key( $key );
+	}
+
+	/**
+	 * Removes a public SSH key by its fingerprint.
+	 *
+	 * @param string $fingerprint SHA256:... as shown.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function remove_ssh_key( string $fingerprint ) {
+		return $this->files->remove_ssh_key( $fingerprint );
 	}
 
 	/**

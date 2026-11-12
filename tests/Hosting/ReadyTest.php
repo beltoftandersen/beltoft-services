@@ -100,7 +100,10 @@ class ReadyTest extends HostingCase {
 			$this->assertStringContainsString( 'https://' . $slug . '.preview.example.test/', $body, $type );
 			$this->assertStringContainsString( 'https://' . $slug . '.preview.example.test/wp-admin/', $body, $type );
 			$this->assertStringContainsString( 'Host 198.51.100.7, port 22001, user web', $body, $type );
-			$this->assertStringContainsString( 'shown once in My Account', $body, $type );
+			$flat = (string) preg_replace( '/\s+/', ' ', $body );
+			$this->assertStringContainsString( 'signs you in as owner without a password', $flat, $type );
+			$this->assertStringContainsString( 'A password is never sent by email', $flat, $type );
+			$this->assertStringNotContainsString( 'shown once in My Account', $body, $type );
 			$this->assertStringNotContainsString( "\u{2014}", $body, $type );
 			$this->assertStringNotContainsString( "\u{00B7}", $body, $type );
 			$this->assertStringNotContainsString( \BeltoftServices\Crypto::decrypt( (string) $r->get( 'db_secret' ) ), $body, $type );
@@ -117,6 +120,9 @@ class ReadyTest extends HostingCase {
 				array( 'name' => 'www.elsewhere.example', 'type' => 'A', 'value' => '198.51.100.7' ),
 				array( 'name' => 'www.elsewhere.example', 'type' => 'AAAA', 'value' => '2001:db8::7' ),
 				array( 'name' => '_beltoft-verify.www.elsewhere.example', 'type' => 'TXT', 'value' => \BeltoftServices\Hosting\SiteDns::proof_token( $r->id(), 'www.elsewhere.example' ) ),
+				array( 'name' => 'elsewhere.example', 'type' => 'A', 'value' => '198.51.100.7' ),
+				array( 'name' => 'elsewhere.example', 'type' => 'AAAA', 'value' => '2001:db8::7' ),
+				array( 'name' => '_beltoft-verify.elsewhere.example', 'type' => 'TXT', 'value' => \BeltoftServices\Hosting\SiteDns::proof_token( $r->id(), 'elsewhere.example' ) ),
 			),
 			$facts['dns_records']
 		);
@@ -175,7 +181,7 @@ class ReadyTest extends HostingCase {
 	public function test_the_checklist_reads_domain_and_email_and_takes_two_ticks(): void {
 		$r = $this->account();
 
-		$this->assertSame( array( 'domain' => false, 'email' => false, 'build' => false, 'backups' => false ), HostingAccount::checklist( $r ) );
+		$this->assertSame( array( 'domain' => false, 'email' => false, 'build' => false, 'backups' => false, 'password' => false ), HostingAccount::checklist( $r ) );
 		$this->assertTrue( HostingAccount::checklist_visible( $r ) );
 
 		$a = new HostingActions( $r );
@@ -184,13 +190,14 @@ class ReadyTest extends HostingCase {
 		$a->enable_mail( 'www.elsewhere.example' );
 		$this->assertSame( array( 'done' => 'build' ), $a->checklist( 'build' ) );
 		$a->checklist( 'build' );
-		$this->assertSame( array( 'domain' => true, 'email' => true, 'build' => true, 'backups' => false ), HostingAccount::checklist( Resource::find( $r->id() ) ) );
+		$this->assertSame( array( 'domain' => true, 'email' => true, 'build' => true, 'backups' => false, 'password' => false ), HostingAccount::checklist( Resource::find( $r->id() ) ) );
 		$this->assertSame( array( 'build' ), Resource::find( $r->id() )->get( 'checklist' ), 'A tick is kept once.' );
 
-		$this->assertSame( 'invalid', $a->checklist( 'domain' )->get_error_code(), 'Only the two manual items.' );
+		$this->assertSame( 'invalid', $a->checklist( 'domain' )->get_error_code(), 'Only the manual items.' );
 
 		$a->checklist( 'backups' );
-		$this->assertFalse( HostingAccount::checklist_visible( Resource::find( $r->id() ) ), 'Hidden when everything is done.' );
+		$this->assertFalse( HostingAccount::checklist_visible( Resource::find( $r->id() ) ), 'Hidden when everything required is done: the WordPress password item is optional.' );
+		$this->assertSame( array( 'done' => 'password' ), $a->checklist( 'password' ) );
 	}
 
 	public function test_the_checklist_can_be_dismissed_and_is_shown_in_the_panel_until_then(): void {
@@ -199,7 +206,7 @@ class ReadyTest extends HostingCase {
 		ob_start();
 		HostingAccount::render( $r );
 		$html = (string) ob_get_clean();
-		$this->assertStringContainsString( 'Getting started', $html );
+		$this->assertStringContainsString( 'Get started', $html );
 		$this->assertStringContainsString( 'To do:</span><span class="beltoft-hosting-check-label">Connect your domain', $html );
 		$this->assertStringContainsString( 'data-hosting-action="check_item" data-item="build"', $html );
 		$this->assertStringContainsString( 'data-hosting-resource="' . $r->id() . '"', $html );
@@ -208,7 +215,7 @@ class ReadyTest extends HostingCase {
 
 		ob_start();
 		HostingAccount::render( Resource::find( $r->id() ) );
-		$this->assertStringNotContainsString( 'Getting started', (string) ob_get_clean() );
+		$this->assertStringNotContainsString( 'Get started', (string) ob_get_clean() );
 	}
 
 	public function test_the_checklist_route_belongs_to_the_owner(): void {
@@ -232,11 +239,13 @@ class ReadyTest extends HostingCase {
 	public function test_the_panel_has_action_buttons_only_while_ready_and_the_script_is_enqueued(): void {
 		$r = $this->account();
 		$this->connect_domain( $r, 'ready.example' );
+		( new HostingActions( $r ) )->add_site( 'second', 'Second' ); // The last website cannot be removed, so only a second one has the button.
+		$r = Resource::find( $r->id() );
 
 		ob_start();
 		HostingAccount::render( $r );
 		$html = (string) ob_get_clean();
-		foreach ( array( 'login', 'cache', 'remove_site', 'add_site', 'add_domain', 'enable_mail' ) as $action ) {
+		foreach ( array( 'login', 'password', 'cache', 'remove_site', 'php_save', 'files_password', 'files_key', 'add_site', 'add_domain', 'enable_mail' ) as $action ) {
 			$this->assertStringContainsString( 'data-hosting-action="' . $action . '"', $html, $action );
 		}
 
@@ -244,7 +253,7 @@ class ReadyTest extends HostingCase {
 		ob_start();
 		HostingAccount::render( Resource::find( $r->id() ) );
 		$paused = (string) ob_get_clean();
-		$this->assertStringNotContainsString( 'data-hosting-action', $paused );
+		$this->assertStringNotContainsString( 'data-hosting-action', str_replace( 'data-hosting-action="copy"', '', $paused ), 'Nothing that changes anything is offered while paused (copying a value is not a change).' );
 
 		$this->assertTrue( wp_script_is( HostingAccount::HANDLE, 'enqueued' ), 'Printing a hosting panel enqueues the script.' );
 		$this->assertContains( \BeltoftServices\Account\Panel::HANDLE, wp_scripts()->registered[ HostingAccount::HANDLE ]->deps );

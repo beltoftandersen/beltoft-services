@@ -143,6 +143,23 @@ final class SiteDomains {
 	}
 
 	/**
+	 * Sets which name of a with-and-without-www pair is the main address (SiteAddresses::APEX, WWW, or '' for none).
+	 *
+	 * @param string $host Host name of the pair's base row (without www).
+	 * @param string $mode apex, www or ''.
+	 */
+	public static function set_www_mode( string $host, string $mode ): bool {
+		global $wpdb;
+
+		if ( ! in_array( $mode, array( '', SiteAddresses::APEX, SiteAddresses::WWW ), true ) ) {
+			return false;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- our own table.
+		return false !== $wpdb->update( Schema::tables()['hosting_domains'], array( 'www_mode' => $mode ), array( 'host' => $host ), array( '%s' ), array( '%s' ) );
+	}
+
+	/**
 	 * Removes one name.
 	 *
 	 * @param string $host Host name.
@@ -179,6 +196,7 @@ final class SiteDomains {
 			'site_id'     => (int) $row['site_id'],
 			'host'        => (string) $row['host'],
 			'kind'        => (string) $row['kind'],
+			'www_mode'    => (string) ( $row['www_mode'] ?? '' ),
 			'state'       => (string) $row['state'],
 			'cert_state'  => (string) $row['cert_state'],
 			'checked'     => null === $row['checked'] ? null : (string) $row['checked'],

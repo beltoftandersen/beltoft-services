@@ -26,8 +26,13 @@ defined( 'ABSPATH' ) || exit;
  * - POST   hosting/sites/<slug>/workers    workers
  * - POST   hosting/sites/<slug>/cache      clears the page cache
  * - POST   hosting/sites/<slug>/login      a one-time WordPress sign-in address
+ * - POST   hosting/sites/<slug>/password   a one-time address to WordPress's own "choose a new password" screen
  * - POST   hosting/sites/<slug>/domains    host
  * - DELETE hosting/domains/<host>
+ * - POST   hosting/domains/<host>/main     the main address of a with-and-without-www pair (the other one redirects)
+ * - POST   hosting/files/password         code (emailed), password (optional): the SFTP password, shown once
+ * - POST   hosting/files/keys              code (emailed), key: adds a public SSH key
+ * - DELETE hosting/files/keys              fingerprint: removes one
  * - POST   hosting/mail                    domain (optional, must be the account's own domain): sets up Email lite
  * - GET    hosting/usage                   stats, database size, storage share
  * - GET    hosting/backups                 the backups, the safety point
@@ -44,6 +49,12 @@ final class HostingRoutes {
 
 	/** Sign-in links per resource and hour. */
 	public const LOGIN_LIMIT = 20;
+
+	/** File access changes (password, keys) per resource and hour. */
+	public const FILES_LIMIT = 10;
+
+	/** The purpose of the emailed code before a password or a key is set for file access. */
+	public const STEP_PURPOSE = 'hosting_files';
 
 	public static function register(): void {
 		add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
@@ -93,6 +104,7 @@ final class HostingRoutes {
 		) );
 		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/cache', array( 'methods' => $post, 'callback' => array( __CLASS__, 'purge_cache' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ) );
 		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/login', array( 'methods' => $post, 'callback' => array( __CLASS__, 'login_link' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ) );
+		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/password', array( 'methods' => $post, 'callback' => array( __CLASS__, 'password_link' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ) );
 		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/domains', array(
 			'methods'             => $post,
 			'callback'            => array( __CLASS__, 'add_domain' ),
@@ -104,6 +116,38 @@ final class HostingRoutes {
 			'callback'            => array( __CLASS__, 'remove_domain' ),
 			'permission_callback' => 'is_user_logged_in',
 			'args'                => $id + array( 'host' => array( 'type' => 'string', 'required' => true ) ),
+		) );
+		register_rest_route( $ns, $base . '/domains/(?P<host>[^/]+)/main', array(
+			'methods'             => $post,
+			'callback'            => array( __CLASS__, 'set_main_address' ),
+			'permission_callback' => 'is_user_logged_in',
+			'args'                => $id + array( 'host' => array( 'type' => 'string', 'required' => true, 'description' => 'The name that becomes the main address: example.com or www.example.com.' ) ),
+		) );
+		register_rest_route( $ns, $base . '/files/password', array(
+			'methods'             => $post,
+			'callback'            => array( __CLASS__, 'sftp_password' ),
+			'permission_callback' => 'is_user_logged_in',
+			'args'                => $id + array(
+				'code'     => array( 'type' => 'string', 'required' => true, 'description' => 'The code emailed to the account owner (POST step-up/send with purpose hosting_files).' ),
+				'password' => array( 'type' => 'string', 'default' => '', 'description' => 'Your own password, 16 characters or more. Empty: one is generated. It is returned once and never stored.' ),
+			),
+		) );
+		register_rest_route( $ns, $base . '/files/keys', array(
+			array(
+				'methods'             => $post,
+				'callback'            => array( __CLASS__, 'add_ssh_key' ),
+				'permission_callback' => 'is_user_logged_in',
+				'args'                => $id + array(
+					'code' => array( 'type' => 'string', 'required' => true, 'description' => 'The code emailed to the account owner (POST step-up/send with purpose hosting_files).' ),
+					'key'  => array( 'type' => 'string', 'required' => true, 'description' => 'A public SSH key line.' ),
+				),
+			),
+			array(
+				'methods'             => \WP_REST_Server::DELETABLE,
+				'callback'            => array( __CLASS__, 'remove_ssh_key' ),
+				'permission_callback' => 'is_user_logged_in',
+				'args'                => $id + array( 'fingerprint' => array( 'type' => 'string', 'required' => true, 'description' => 'The key\'s SHA256 fingerprint as listed.' ) ),
+			),
 		) );
 		register_rest_route( $ns, $base . '/usage', array( 'methods' => \WP_REST_Server::READABLE, 'callback' => array( __CLASS__, 'usage' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id ) );
 		register_rest_route( $ns, $base . '/backups', array(
@@ -212,6 +256,7 @@ final class HostingRoutes {
 			'not_found'    => 404,
 			'busy_round'   => 409,
 			'confirm'      => 402,
+			'step_up'      => 403,
 			'addon_required' => 402,
 			'failed'       => 502,
 			'rate_limited' => 429,
@@ -366,6 +411,51 @@ final class HostingRoutes {
 
 	public static function mail_for_sites( \WP_REST_Request $request ): \WP_REST_Response {
 		return self::change( $request, static fn( HostingActions $a ) => $a->use_email_for_sites() );
+	}
+
+	public static function set_main_address( \WP_REST_Request $request ): \WP_REST_Response {
+		return self::change( $request, static fn( HostingActions $a ) => $a->set_main_address( rawurldecode( (string) $request['host'] ) ) );
+	}
+
+	/**
+	 * A change of file access: its own hourly group, and the emailed code first (a password or a key stays valid, unlike a
+	 * sign-in link). The code is checked after the guard, so a wrong code is also counted by the rate limit.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @param callable         $do      fn( HostingActions ): array|\WP_Error.
+	 */
+	private static function files_change( \WP_REST_Request $request, callable $do ): \WP_REST_Response {
+		$r = self::guard( $request, true, Routes::RATE_LIMIT, 'files', self::FILES_LIMIT );
+
+		if ( ! $r instanceof Resource ) {
+			return $r;
+		}
+
+		if ( ! \BeltoftServices\StepUp::verify( get_current_user_id(), (string) $request['code'], self::STEP_PURPOSE ) ) {
+			return self::error( 'step_up', __( 'That code is not right or has expired. Send a new code.', 'beltoft-services' ) );
+		}
+
+		return self::reply( $do( new HostingActions( $r ) ) );
+	}
+
+	public static function sftp_password( \WP_REST_Request $request ): \WP_REST_Response {
+		return self::files_change( $request, static fn( HostingActions $a ) => $a->set_sftp_password( (string) $request['password'] ) );
+	}
+
+	public static function add_ssh_key( \WP_REST_Request $request ): \WP_REST_Response {
+		return self::files_change( $request, static fn( HostingActions $a ) => $a->add_ssh_key( (string) $request['key'] ) );
+	}
+
+	public static function remove_ssh_key( \WP_REST_Request $request ): \WP_REST_Response {
+		$r = self::guard( $request, true, Routes::RATE_LIMIT, 'files', self::FILES_LIMIT );
+
+		return $r instanceof Resource ? self::reply( ( new HostingActions( $r ) )->remove_ssh_key( (string) $request['fingerprint'] ) ) : $r;
+	}
+
+	public static function password_link( \WP_REST_Request $request ): \WP_REST_Response {
+		$r = self::guard( $request, true, Routes::RATE_LIMIT, 'password', self::LOGIN_LIMIT );
+
+		return $r instanceof Resource ? self::reply( ( new HostingActions( $r ) )->password_link( (string) $request['slug'] ) ) : $r;
 	}
 
 	public static function login_link( \WP_REST_Request $request ): \WP_REST_Response {

@@ -455,8 +455,8 @@ class AccountTest extends HostingCase {
 
 		$this->assertStringContainsString( '2 of 3 websites', $html );
 		$this->assertStringContainsString( 'blog.preview.example.test', $html );
-		$this->assertStringContainsString( 'www.outside.example (waiting for DNS)', $html );
-		$this->assertStringContainsString( '>Blog</td>', $html );
+		$this->assertMatchesRegularExpression( '/www\.outside\.example<\/span> <span class="beltoft-hosting-note">waiting for DNS/', $html );
+		$this->assertStringContainsString( '>Blog</h3>', $html );
 		$this->assertStringNotContainsString( '<b>', $html );
 		$this->assertStringContainsString( 'Connect your own domain to a website to set up Email lite', $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
@@ -538,6 +538,7 @@ class AccountTest extends HostingCase {
 			\BeltoftServices\Hosting\Actions\PhpActions::class,
 			\BeltoftServices\Hosting\Actions\AddonActions::class,
 			\BeltoftServices\Hosting\Actions\CareActions::class,
+			\BeltoftServices\Hosting\Actions\FilesActions::class,
 		);
 		$facade = new \ReflectionClass( HostingActions::class );
 
@@ -555,7 +556,7 @@ class AccountTest extends HostingCase {
 			}
 
 			// Only limits() is shared (it sits in the Base trait every group uses); the facade asks SiteActions.
-			$this->assertCount( 'limits' === $method->getName() ? 4 : 1, $found, $method->getName() );
+			$this->assertCount( 'limits' === $method->getName() ? 5 : 1, $found, $method->getName() );
 
 			$this->assertSame( $this->signature( $method ), $this->signature( $found[0] ), $method->getName() );
 		}

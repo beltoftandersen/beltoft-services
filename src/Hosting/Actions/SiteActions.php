@@ -14,6 +14,7 @@ use BeltoftServices\Hosting\EdgeMap;
 use BeltoftServices\Hosting\Plan;
 use BeltoftServices\Hosting\Provision;
 use BeltoftServices\Hosting\Records;
+use BeltoftServices\Hosting\SiteAddresses;
 use BeltoftServices\Hosting\SiteDns;
 use BeltoftServices\Hosting\SiteDomains;
 use BeltoftServices\Hosting\SiteNames;
@@ -43,9 +44,11 @@ final class SiteActions {
 			}
 
 			$names = array();
+			$rows  = array();
 
 			foreach ( $domains as $d ) {
 				if ( $d['site_id'] === $site['id'] ) {
+					$rows[]  = $d;
 					$names[] = array(
 						'host'  => $d['host'],
 						'kind'  => $d['kind'],
@@ -53,6 +56,19 @@ final class SiteActions {
 					);
 				}
 			}
+
+			$pairs = array();
+
+			foreach ( SiteAddresses::pairs( $rows ) as $base => $pair ) {
+				$pairs[] = array(
+					'base'  => $base,
+					'www'   => 'www.' . $base,
+					'main'  => SiteAddresses::main_of_pair( $base, $pair[0] ),
+					'ready' => 'active' === $pair[0]['state'] && 'active' === $pair[1]['state'],
+				);
+			}
+
+			$preview = EdgeMap::preview_host( (string) $site['slug'] );
 
 			$out[] = array(
 				'slug'      => $site['slug'],
@@ -62,6 +78,11 @@ final class SiteActions {
 				'memory_mb' => (int) ( $site['flags']['memory_mb'] ?? $this->plan['php_memory_mb'] ),
 				'upload_mb' => (int) ( $site['flags']['upload_mb'] ?? $this->plan['upload_mb'] ),
 				'domains'   => $names,
+				'pairs'     => $pairs,
+				'preview'   => $preview,
+				'main'      => SiteAddresses::main_address( $rows, $preview ),
+				'admin_user'  => (string) ( $site['flags']['admin_user'] ?? '' ),
+				'admin_email' => (string) ( $site['flags']['admin_email'] ?? '' ),
 			);
 		}
 
@@ -222,6 +243,9 @@ final class SiteActions {
 
 				return $done;
 			}
+
+			// Who the install made the administrator, so the page can say which user the sign-in link uses.
+			Sites::update( $this->r->id(), $slug, array( 'flags' => array( 'admin_user' => Config::admin_user(), 'admin_email' => sanitize_email( (string) ( $license['email'] ?? '' ) ) ) ) );
 		}
 
 		Sites::update( $this->r->id(), $slug, array( 'flags' => array( 'pending' => false ) ) );
@@ -370,6 +394,10 @@ final class SiteActions {
 			return new \WP_Error( 'addon_required', Addons::confirm_text( Addons::KIND_DOMAIN, $quote ), array( 'kind' => Addons::KIND_DOMAIN, 'target' => $needs, 'amount_cents' => (int) round( $quote['now'] * 100 ), 'host' => strtolower( rtrim( trim( $host ), '.' ) ), 'slug' => $slug ) );
 		}
 
+		// A registrable domain is connected with and without www; a subdomain only as typed.
+		$typed = strtolower( rtrim( trim( $host ), '.' ) );
+		$names = SiteAddresses::names_for( $typed );
+		$host  = $names[0];
 		$added = SiteDns::add_domain( $this->r, $slug, $host, $this->node );
 
 		if ( is_wp_error( $added ) ) {
@@ -380,19 +408,57 @@ final class SiteActions {
 			return $this->error( 'invalid', $this->customer_text( $added ) );
 		}
 
+		$notice = '';
+		$also   = '';
+
+		if ( isset( $names[1] ) ) {
+			$site  = Sites::find( $this->r->id(), $slug );
+			$other = SiteDomains::find( $names[1] );
+
+			if ( null !== $other && ( $other['resource_id'] !== $this->r->id() || $other['site_id'] !== (int) ( $site['id'] ?? 0 ) ) ) {
+				/* translators: %s: domain name. */
+				$notice = sprintf( __( '%s is already used by another website and was left as it is.', 'beltoft-services' ), \BeltoftServices\Domains\HostName::display( $names[1] ) );
+			} else {
+				$second = SiteDns::add_domain( $this->r, $slug, $names[1], $this->node );
+
+				if ( is_array( $second ) ) {
+					$also = $names[1];
+				} else {
+					/* translators: %s: domain name. */
+					$notice = sprintf( __( '%s could not be connected yet. Add it again in a moment.', 'beltoft-services' ), \BeltoftServices\Domains\HostName::display( $names[1] ) );
+				}
+			}
+
+			// The main address starts as the form the customer typed; a choice made earlier is kept.
+			$base = 0 === strpos( $typed, 'www.' ) ? substr( $typed, 4 ) : $typed;
+			$row  = SiteDomains::find( $base );
+
+			if ( '' !== $also && null !== $row && '' === $row['www_mode'] ) {
+				SiteDomains::set_www_mode( $base, $typed === $base ? SiteAddresses::APEX : SiteAddresses::WWW );
+			}
+		}
+
 		// The customer wants a domain back that was to leave at the renewal (the name stayed, so a new name of it needs no
 		// add-on): its line bills again.
 		if ( SiteDomains::valid_host( strtolower( rtrim( trim( $host ), '.' ) ) ) ) {
 			Addons::keep( $this->r, Addons::KIND_DOMAIN, Addons::registrable( $host ) );
 		}
 
-		$edge = $this->edge();
+		$edge = $this->names_and_edge();
 
 		if ( is_wp_error( $edge ) ) {
 			return $edge;
 		}
 
-		return array_merge( $added, array( 'point_at' => 'external' === $added['kind'] ? SiteDns::instructions( $this->node, strtolower( rtrim( trim( $host ), '.' ) ), $this->r->id() ) : array() ) );
+		return array_merge(
+			$added,
+			array(
+				'host'     => $host,
+				'also'     => $also,
+				'notice'   => $notice,
+				'point_at' => 'external' === $added['kind'] ? SiteDns::instructions( $this->node, $host, $this->r->id() ) : array(),
+			)
+		);
 	}
 
 	/**
@@ -449,7 +515,12 @@ final class SiteActions {
 			return $this->error( 'busy', __( 'The DNS could not be changed right now. Try again in a moment.', 'beltoft-services' ) );
 		}
 
-		$edge = $this->edge();
+		// A pair that loses a name has no main address to choose any more.
+		if ( 0 === strpos( $row['host'], 'www.' ) ) {
+			SiteDomains::set_www_mode( substr( $row['host'], 4 ), '' );
+		}
+
+		$edge = $this->names_and_edge();
 
 		return is_wp_error( $edge ) ? $edge : array( 'removed' => $row['host'] );
 	}
@@ -462,6 +533,151 @@ final class SiteActions {
 	public function sync_edge() {
 		$ready = $this->ready();
 
-		return is_wp_error( $ready ) ? $ready : $this->edge();
+		return is_wp_error( $ready ) ? $ready : $this->names_and_edge();
+	}
+
+	/**
+	 * Chooses which name of a with-and-without-www pair is the main address; the other one redirects to it (301). Only the
+	 * redirect changes: the WordPress address of the website is not touched and nothing in its database is rewritten.
+	 *
+	 * @param string $host The name that becomes the main address (example.com or www.example.com).
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function set_main_address( string $host ) {
+		return $this->locked( fn() => $this->set_main_address_locked( $host ) );
+	}
+
+	/**
+	 * set_main_address with the site lock held.
+	 *
+	 * @return mixed
+	 */
+	private function set_main_address_locked( string $host ) {
+		$ready = $this->ready();
+
+		if ( is_wp_error( $ready ) ) {
+			return $ready;
+		}
+
+		$host = strtolower( rtrim( trim( $host ), '.' ) );
+		$base = 0 === strpos( $host, 'www.' ) ? substr( $host, 4 ) : $host;
+		$apex = SiteDomains::find( $base );
+		$www  = SiteDomains::find( 'www.' . $base );
+
+		if ( null === $apex || null === $www || $apex['resource_id'] !== $this->r->id() || $www['resource_id'] !== $this->r->id() || 'preview' === $apex['kind'] ) {
+			return $this->error( 'not_found', __( 'That address is not on your account with and without www.', 'beltoft-services' ) );
+		}
+
+		if ( $apex['site_id'] !== $www['site_id'] ) {
+			return $this->error( 'invalid', __( 'The two addresses belong to different websites.', 'beltoft-services' ) );
+		}
+
+		$site = null;
+
+		foreach ( Sites::for_resource( $this->r->id() ) as $candidate ) {
+			if ( $candidate['id'] === $apex['site_id'] ) {
+				$site = $candidate;
+			}
+		}
+
+		if ( null === $site ) {
+			return $this->error( 'not_found', __( 'That website does not exist.', 'beltoft-services' ) );
+		}
+
+		$mode = $host === $base ? SiteAddresses::APEX : SiteAddresses::WWW;
+
+		SiteDomains::set_www_mode( $base, $mode );
+		$pushed = $this->push_site_names( $site );
+
+		if ( true !== $pushed ) {
+			SiteDomains::set_www_mode( $base, $apex['www_mode'] );
+
+			return is_wp_error( $pushed ) ? $pushed : $this->error( 'failed', __( 'Redirecting from one address to the other is not available on your server yet. Contact support.', 'beltoft-services' ) );
+		}
+
+		return array(
+			'main'     => $host,
+			'redirect' => 'active' === $apex['state'] && 'active' === $www['state'],
+		);
+	}
+
+	/**
+	 * The names of every site of the account go to the node (what its web server answers to, and the redirects), and then
+	 * the routes go to the edge. The names come first: the edge starts to send a name when its server is ready for it.
+	 *
+	 * @return true|\WP_Error
+	 */
+	private function names_and_edge() {
+		foreach ( Sites::for_resource( $this->r->id() ) as $site ) {
+			if ( ! empty( $site['flags']['pending'] ) ) {
+				continue;
+			}
+
+			$pushed = $this->push_site_names( $site );
+
+			if ( is_wp_error( $pushed ) ) {
+				return $pushed;
+			}
+		}
+
+		return $this->edge();
+	}
+
+	/**
+	 * Sends the names of one site (the active names of the customer, and the redirects between a pair's names) to the
+	 * node when they differ from what was sent last. A node whose agent does not know redirects still gets the names.
+	 *
+	 * @param array<string, mixed> $site Site row.
+	 * @return true|string|\WP_Error True when done or nothing to do, 'unsupported' when the names went without the redirects.
+	 */
+	private function push_site_names( array $site ) {
+		$all   = array_values( array_filter( SiteDomains::for_resource( $this->r->id() ), static fn( $d ) => $d['site_id'] === $site['id'] && 'preview' !== $d['kind'] ) );
+		$names = array();
+
+		foreach ( $all as $d ) {
+			if ( 'active' === $d['state'] ) {
+				$names[] = $d['host'];
+			}
+		}
+
+		$redirects = SiteAddresses::redirects( $all );
+		$sig       = md5( (string) wp_json_encode( array( $names, $redirects ) ) );
+		$last      = (string) ( $site['flags']['names_sig'] ?? '' );
+
+		if ( $last === $sig || ( '' === $last && array() === $names ) ) {
+			return true;
+		}
+
+		$record = (array) Records::for_resource( $this->r->id() );
+		$args   = array(
+			'vmid'    => (int) $record['vmid'],
+			'slug'    => (string) $site['slug'],
+			'domains' => $names,
+		);
+
+		if ( array() !== $redirects ) {
+			$args['redirects'] = $redirects;
+		}
+
+		$done = $this->call( 'site_names_' . $site['slug'], 'site.domains', $args );
+
+		if ( is_wp_error( $done ) && array() !== $redirects ) {
+			unset( $args['redirects'] );
+			$plain = $this->call( 'site_names_plain_' . $site['slug'], 'site.domains', $args );
+
+			if ( ! is_wp_error( $plain ) ) {
+				Sites::update( $this->r->id(), (string) $site['slug'], array( 'flags' => array( 'names_sig' => '' ) ) );
+
+				return 'unsupported';
+			}
+		}
+
+		if ( is_wp_error( $done ) ) {
+			return $done;
+		}
+
+		Sites::update( $this->r->id(), (string) $site['slug'], array( 'flags' => array( 'names_sig' => $sig ) ) );
+
+		return true;
 	}
 }

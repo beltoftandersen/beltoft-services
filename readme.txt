@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.11.2
+Stable tag: 0.12.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -255,6 +255,15 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.12.0 =
+* WordPress hosting page: every website is a panel with its main address, PHP version (with a Change control), WordPress login, cache and addresses; the sections Get started, Add a website, Files (SFTP), Backups and Email are panels with headings. Buttons follow one hierarchy and fields are as wide as their content.
+* A domain is connected with and without www. A control chooses the main address; the other one redirects to it (301). The redirect needs the node agent of this release and starts when both names point at the hosting. The WordPress address of the website is not changed.
+* The WordPress login says which administrator it signs in as. "Set a WordPress password" opens WordPress's own screen for choosing a password, through a one-time address. Neither address is stored or logged. The hosting ready email and the order page say the same.
+* Files (SFTP): host, port and user name with Copy, a password (generated or your own, shown once, emailed code first) and public SSH keys (emailed code first to add one).
+* The names of a website are now sent to its container (before, only the edge knew a connected domain).
+* New DNS records of a website are written with a TTL of one hour instead of five minutes.
+* REST: POST hosting/sites/<slug>/password, POST hosting/domains/<host>/main, POST hosting/files/password, POST and DELETE hosting/files/keys.
 
 = 0.11.2 =
 * API tokens: the access dropdown keeps the arrow a theme draws.

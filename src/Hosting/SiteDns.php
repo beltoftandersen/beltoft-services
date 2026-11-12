@@ -31,9 +31,9 @@ defined( 'ABSPATH' ) || exit;
 final class SiteDns {
 
 	/**
-	 * TTL of the records written, in seconds.
+	 * TTL of the records written, in seconds (one hour: the address of a website rarely changes, and resolvers keep it).
 	 */
-	public const TTL = 300;
+	public const TTL = 3600;
 
 	/**
 	 * The edge addresses of a node: A, and AAAA when the node has one.

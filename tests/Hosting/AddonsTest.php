@@ -302,6 +302,9 @@ class AddonsTest extends HostingCase {
 		// Removing: the last name of the paid domain stays until the renewal, the line ends, no new charge.
 		$a->remove_domain( 'shop.other.example' );
 		$this->assertNull( SiteDomains::find( 'shop.other.example' ), 'A name of a domain that keeps another name goes at once.' );
+		$this->assertNotNull( SiteDomains::find( 'other.example' ), 'A registrable domain is connected with and without www.' );
+		$a->remove_domain( 'other.example' );
+		$this->assertNull( SiteDomains::find( 'other.example' ), 'The name without www goes at once while the one with www stays.' );
 		$gone = $a->remove_domain( 'www.other.example' );
 		$this->assertTrue( $gone['at_renewal'] );
 		$this->assertNotNull( SiteDomains::find( 'www.other.example' ) );
@@ -611,11 +614,12 @@ class AddonsTest extends HostingCase {
 		$s = 'w' . $r->id();
 		$a->buy_addon( 'domain', 'www.other.example', 100 );
 		$this->assertIsArray( $a->add_domain( $s, 'www.other.example' ) );
+		$a->remove_domain( 'other.example' );
 		$this->assertTrue( $a->remove_domain( 'www.other.example' )['at_renewal'] );
 
 		ob_start();
 		HostingAccount::render( Resource::find( $r->id() ) );
-		$this->assertMatchesRegularExpression( '/www\.other\.example[^,<]*\(ends at the next renewal\)/', (string) ob_get_clean() );
+		$this->assertMatchesRegularExpression( '/www\.other\.example<\/span> <span class="beltoft-hosting-note">[^<]*ends at the next renewal/', (string) ob_get_clean() );
 
 		// Added again before the renewal: the line bills again and the domain stays.
 		$this->assertIsArray( $a->add_domain( $s, 'shop.other.example' ) );

@@ -24,7 +24,10 @@ defined( 'ABSPATH' ) || exit;
  * - site.wp_install: installed (true), slug.
  * - site.verify: status (200), host. A loopback request inside the container for the host name (an operation this
  *   plugin adds to the plan's list for the verify step). Fails with "unknown site" for a site that was not created.
- * - site.wp_login_link: url (a one-time address, fake).
+ * - site.wp_login_link, site.wp_password_link: url (a one-time address, fake) and, for a site installed through site.wp_install,
+ *   user and email of the administrator (the preferred admin_user when it is the one installed, else the installed one). The
+ *   address of the password link is a different fake address; no reset key is ever in a reply.
+ * - site.domains: ok (true), slug. The names and the optional redirects (a list of from and to names) are kept in state().
  * - db.create: user, databases. The password is accepted, kept out of every reply and of the call log.
  * - ct.refresh: updated (names of the replaced files, none when current), version (12 hex characters). Fails "container not
  *   running" for an unknown container or one set with set_not_running().
@@ -57,7 +60,7 @@ class FakeAgent implements Agent {
 
 	/**
 	 * The operations (plan 4.6, v1) and their arguments: name => [type, required]. Types: vmid, ident, host,
-	 * ip, int, string, bool, secret, list (strings), names (database names), routes.
+	 * ip, int, string, bool, secret, list (strings), names (database names), routes, redirects (from and to names).
 	 */
 	public const OPERATIONS = array(
 		'ct.prepare'        => array(
@@ -92,9 +95,10 @@ class FakeAgent implements Agent {
 			'upload_mb' => array( 'int', false ),
 		),
 		'site.domains'      => array(
-			'vmid'    => array( 'vmid', true ),
-			'slug'    => array( 'ident', true ),
-			'domains' => array( 'list', true ),
+			'vmid'      => array( 'vmid', true ),
+			'slug'      => array( 'ident', true ),
+			'domains'   => array( 'list', true ),
+			'redirects' => array( 'redirects', false ),
 		),
 		'site.cache_purge'  => array(
 			'vmid' => array( 'vmid', true ),
@@ -115,8 +119,14 @@ class FakeAgent implements Agent {
 			'host' => array( 'host', true ),
 		),
 		'site.wp_login_link' => array(
-			'vmid' => array( 'vmid', true ),
-			'slug' => array( 'ident', true ),
+			'vmid'       => array( 'vmid', true ),
+			'slug'       => array( 'ident', true ),
+			'admin_user' => array( 'ident', false ),
+		),
+		'site.wp_password_link' => array(
+			'vmid'       => array( 'vmid', true ),
+			'slug'       => array( 'ident', true ),
+			'admin_user' => array( 'ident', false ),
 		),
 		'site.staging_create' => array(
 			'vmid' => array( 'vmid', true ),
@@ -582,6 +592,17 @@ class FakeAgent implements Agent {
 			}
 		}
 
+		// The agent's own cross-check: only between the site's own names.
+		if ( 'site.domains' === $op && isset( $out['redirects'] ) ) {
+			$names = (array) $out['domains'];
+
+			foreach ( $out['redirects'] as $redirect ) {
+				if ( ! in_array( $redirect['from'], $names, true ) || ! in_array( $redirect['to'], $names, true ) ) {
+					return $this->error( 400, 'invalid', 'The redirects must be between names of the site.' );
+				}
+			}
+		}
+
 		return $out;
 	}
 
@@ -609,6 +630,24 @@ class FakeAgent implements Agent {
 				return is_string( $value ) && '' !== $value && strlen( $value ) <= 200;
 			case 'secret':
 				return is_string( $value ) && strlen( $value ) >= 16 && strlen( $value ) <= 200;
+			case 'redirects':
+				if ( ! is_array( $value ) || array() === $value || count( $value ) > 50 ) {
+					return false;
+				}
+
+				$from = array();
+				$to   = array();
+
+				foreach ( $value as $item ) {
+					if ( ! is_array( $item ) || ! isset( $item['from'], $item['to'] ) || 2 !== count( $item ) || ! self::valid( 'host', $item['from'] ) || ! self::valid( 'host', $item['to'] ) || $item['from'] === $item['to'] ) {
+						return false;
+					}
+
+					$from[] = $item['from'];
+					$to[]   = $item['to'];
+				}
+
+				return count( array_unique( $from ) ) === count( $from ) && array() === array_intersect( $from, $to );
 			case 'list':
 				return is_array( $value ) && count( $value ) <= 100 && array() === array_filter( $value, static fn( $v ) => ! is_string( $v ) || '' === $v || strlen( $v ) > 2000 );
 			case 'names':
@@ -717,6 +756,7 @@ class FakeAgent implements Agent {
 			case 'site.wp_install':
 			case 'site.verify':
 			case 'site.wp_login_link':
+			case 'site.wp_password_link':
 			case 'site.php':
 			case 'site.domains':
 			case 'site.cache_purge':
@@ -731,6 +771,11 @@ class FakeAgent implements Agent {
 				}
 
 				if ( 'site.wp_install' === $op ) {
+					$this->state['sites'][ $vmid ][ $args['slug'] ]['admin'] = array(
+						'user'  => $args['admin_user'],
+						'email' => $args['admin_email'],
+					);
+
 					return array(
 						'installed' => true,
 						'slug'      => $args['slug'],
@@ -744,8 +789,22 @@ class FakeAgent implements Agent {
 					);
 				}
 
-				if ( 'site.wp_login_link' === $op ) {
-					return array( 'url' => 'https://' . $this->state['sites'][ $vmid ][ $args['slug'] ]['host'] . '/?fake-login=1' );
+				if ( 'site.wp_login_link' === $op || 'site.wp_password_link' === $op ) {
+					$site = $this->state['sites'][ $vmid ][ $args['slug'] ];
+					$out  = array( 'url' => 'https://' . $site['host'] . ( 'site.wp_login_link' === $op ? '/?fake-login=1' : '/?fake-password=1' ) );
+
+					// What the template plugin reports: the administrator it used (the installed one; a site that was not installed here has none to name).
+					if ( ! empty( $site['admin'] ) ) {
+						$out['user']  = $site['admin']['user'];
+						$out['email'] = $site['admin']['email'];
+					}
+
+					return $out;
+				}
+
+				if ( 'site.domains' === $op ) {
+					$this->state['sites'][ $vmid ][ $args['slug'] ]['domains']   = $args['domains'];
+					$this->state['sites'][ $vmid ][ $args['slug'] ]['redirects'] = $args['redirects'] ?? array();
 				}
 
 				if ( 'site.php' === $op ) {

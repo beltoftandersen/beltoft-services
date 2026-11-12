@@ -68,6 +68,12 @@ final class HostingSettings {
 			'admin_url' => (string) $facts['admin_url'],
 		);
 
+		// The end state says how to log in: one click, no password, and a password can be set.
+		$row['message'] = '' !== (string) $facts['admin_user']
+			/* translators: %s: WordPress user name. */
+			? sprintf( __( 'Log in to WordPress from your hosting in My Account with one click. It signs you in as %s without a password. You can also set a WordPress password there.', 'beltoft-services' ), (string) $facts['admin_user'] )
+			: __( 'Log in to WordPress from your hosting in My Account with one click. No password is needed. You can also set a WordPress password there.', 'beltoft-services' );
+
 		return $row;
 	}
 

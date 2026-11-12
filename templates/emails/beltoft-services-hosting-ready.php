@@ -9,7 +9,7 @@
  * @var string              $email_heading      Heading.
  * @var string              $customer_name      Customer's first name, or ''.
  * @var string              $account_url        The service in My Account.
- * @var array<string,mixed> $hosting            site_name, site_url, admin_url, sftp_host, sftp_port, sftp_user, ssh, domains, dns_records, has_email.
+ * @var array<string,mixed> $hosting            site_name, site_url, admin_url, admin_user, admin_email, sftp_host, sftp_port, sftp_user, ssh, domains, dns_records, has_email.
  * @var string              $additional_content Additional content from the email's settings.
  * @var \WC_Email           $email              The email.
  */
@@ -50,7 +50,18 @@ if ( '' !== $customer_name ) {
 	<?php endif; ?>
 </table>
 <?php endif; ?>
-<p><?php esc_html_e( 'Your WordPress admin password is shown once in My Account. For your safety it is never sent by email.', 'beltoft-services' ); ?></p>
+<p>
+<?php
+if ( ! empty( $beltoft_services_h['admin_user'] ) ) {
+	/* translators: %s: WordPress user name. */
+	printf( esc_html__( 'In My Account, "Log in to WordPress" signs you in as %s without a password.', 'beltoft-services' ), esc_html( $beltoft_services_h['admin_user'] ) );
+} else {
+	esc_html_e( 'In My Account, "Log in to WordPress" signs you in without a password.', 'beltoft-services' );
+}
+echo ' ';
+esc_html_e( 'You can also set a WordPress password there. A password is never sent by email.', 'beltoft-services' );
+?>
+</p>
 <?php if ( ! empty( $beltoft_services_h['dns_records'] ) ) : ?>
 <h2><?php esc_html_e( 'Connect your domain', 'beltoft-services' ); ?></h2>
 <p><?php esc_html_e( 'Add these DNS records where the DNS of your domain is hosted. Your website moves to your domain once they are in place, and we check for them regularly.', 'beltoft-services' ); ?></p>

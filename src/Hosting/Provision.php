@@ -615,6 +615,9 @@ final class Provision {
 			if ( $installed instanceof StepResult ) {
 				return $installed;
 			}
+
+			// Who the install made the administrator, so My Account can say which user the sign-in link uses.
+			Sites::update( $this->r->id(), $spec['slug'], array( 'flags' => array( 'admin_user' => $spec['admin_user'], 'admin_email' => 'unknown@invalid' === $spec['admin_email'] ? '' : $spec['admin_email'] ) ) );
 		}
 
 		return array();

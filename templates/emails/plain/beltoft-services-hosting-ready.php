@@ -9,7 +9,7 @@
  * @var string              $email_heading      Heading.
  * @var string              $customer_name      Customer's first name, or ''.
  * @var string              $account_url        The service in My Account.
- * @var array<string,mixed> $hosting            site_name, site_url, admin_url, sftp_host, sftp_port, sftp_user, ssh, domains, dns_records, has_email.
+ * @var array<string,mixed> $hosting            site_name, site_url, admin_url, admin_user, admin_email, sftp_host, sftp_port, sftp_user, ssh, domains, dns_records, has_email.
  * @var string              $additional_content Additional content from the email's settings.
  * @var \WC_Email           $email              The email.
  */
@@ -46,7 +46,14 @@ if ( ! empty( $beltoft_services_h['site_url'] ) ) {
 	echo "\n";
 }
 
-echo __( 'Your WordPress admin password is shown once in My Account. For your safety it is never sent by email.', 'beltoft-services' ) . "\n\n";
+if ( ! empty( $beltoft_services_h['admin_user'] ) ) {
+	/* translators: %s: WordPress user name. */
+	echo wp_strip_all_tags( sprintf( __( 'In My Account, "Log in to WordPress" signs you in as %s without a password.', 'beltoft-services' ), $beltoft_services_h['admin_user'] ) ) . ' ';
+} else {
+	echo __( 'In My Account, "Log in to WordPress" signs you in without a password.', 'beltoft-services' ) . ' ';
+}
+
+echo __( 'You can also set a WordPress password there. A password is never sent by email.', 'beltoft-services' ) . "\n\n";
 
 if ( ! empty( $beltoft_services_h['dns_records'] ) ) {
 	echo __( 'Connect your domain', 'beltoft-services' ) . "\n\n";

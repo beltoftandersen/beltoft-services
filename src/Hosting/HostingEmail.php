@@ -14,7 +14,8 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Display values for one hosting account: its first site and address, the WordPress admin address, the SFTP
  * details, and the DNS records an external domain still needs. Never a password and never a secret: the
- * WordPress admin password is shown once in My Account, and the SFTP password is set there.
+ * WordPress admin password is random and never shown: the customer logs in with one click in My Account or sets one there,
+ * and the SFTP password is set there.
  */
 final class HostingEmail {
 
@@ -53,6 +54,8 @@ final class HostingEmail {
 			'site_name'    => null === $first ? '' : ( '' !== $first['label'] ? (string) $first['label'] : (string) $first['slug'] ),
 			'site_url'     => '' === $host ? '' : 'https://' . $host . '/',
 			'admin_url'    => '' === $host ? '' : 'https://' . $host . '/wp-admin/',
+			'admin_user'   => null === $first ? '' : (string) ( $first['flags']['admin_user'] ?? '' ),
+			'admin_email'  => null === $first ? '' : (string) ( $first['flags']['admin_email'] ?? '' ),
 			'sftp_host'    => (string) ( $node['edge_ip'] ?? '' ),
 			'sftp_port'    => (int) ( $record['ssh_port'] ?? 0 ),
 			'sftp_user'    => 'web',

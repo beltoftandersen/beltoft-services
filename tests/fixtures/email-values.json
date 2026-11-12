@@ -314,6 +314,8 @@
             "site_name": "",
             "site_url": "",
             "admin_url": "",
+            "admin_user": "",
+            "admin_email": "",
             "sftp_host": "",
             "sftp_port": 0,
             "sftp_user": "web",

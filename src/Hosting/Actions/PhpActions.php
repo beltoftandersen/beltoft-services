@@ -200,17 +200,80 @@ final class PhpActions {
 	 * A one-time sign-in address for the site's WordPress.
 	 *
 	 * @param string $slug Site.
-	 * @return array<string, mixed>|\WP_Error url.
+	 * @return array<string, mixed>|\WP_Error url, and user and email of the administrator it signs in as when the node says.
 	 */
 	public function login_link( string $slug ) {
-		$out = $this->site_job( $slug, 'site.wp_login_link', 'login', null );
+		return $this->one_time_link( $slug, 'site.wp_login_link', 'login', __( 'The sign-in link could not be made.', 'beltoft-services' ) );
+	}
+
+	/**
+	 * A one-time address that opens WordPress's own "choose a new password" screen for the website's administrator.
+	 * The reset key is made by the website when the address is opened; it does not pass through this site.
+	 *
+	 * @param string $slug Site.
+	 * @return array<string, mixed>|\WP_Error url, and user and email of the administrator when the node says.
+	 */
+	public function password_link( string $slug ) {
+		return $this->one_time_link( $slug, 'site.wp_password_link', 'password', __( 'Setting a WordPress password from here is not available on your server yet. Use "Lost your password?" on the WordPress sign-in page.', 'beltoft-services' ) );
+	}
+
+	/**
+	 * One of the two one-time addresses. The administrator the install made is asked for by name; a node whose agent does
+	 * not know the argument is asked again without it. The address is returned to the customer's browser and never stored
+	 * or logged here.
+	 *
+	 * @param string $slug    Site.
+	 * @param string $op      Agent operation.
+	 * @param string $name    Job name.
+	 * @param string $failure What the customer reads when the node cannot do it.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private function one_time_link( string $slug, string $op, string $name, string $failure ) {
+		$ready = $this->ready();
+
+		if ( is_wp_error( $ready ) ) {
+			return $ready;
+		}
+
+		$site = Sites::find( $this->r->id(), $slug );
+
+		if ( null === $site ) {
+			return $this->error( 'not_found', __( 'That website does not exist.', 'beltoft-services' ) );
+		}
+
+		$record = (array) Records::for_resource( $this->r->id() );
+		$args   = array( 'vmid' => (int) $record['vmid'], 'slug' => $slug );
+		$user   = (string) ( $site['flags']['admin_user'] ?? '' );
+
+		if ( '' !== $user ) {
+			$args['admin_user'] = $user;
+		}
+
+		$out = $this->call( 'site_' . $name . '_' . $slug, $op, $args );
+
+		if ( is_wp_error( $out ) && isset( $args['admin_user'] ) ) {
+			unset( $args['admin_user'] );
+			$out = $this->call( 'site_' . $name . '_plain_' . $slug, $op, $args );
+		}
 
 		if ( is_wp_error( $out ) ) {
-			return $out;
+			return 'password' === $name ? $this->error( 'failed', $failure ) : $out;
 		}
 
 		$url = (string) ( $out['url'] ?? '' );
 
-		return 0 === strpos( $url, 'https://' ) ? array( 'url' => $url ) : $this->error( 'failed', __( 'The sign-in link could not be made.', 'beltoft-services' ) );
+		if ( 0 !== strpos( $url, 'https://' ) ) {
+			return $this->error( 'failed', $failure );
+		}
+
+		$result = array( 'url' => $url );
+
+		foreach ( array( 'user', 'email' ) as $key ) {
+			if ( isset( $out[ $key ] ) && is_string( $out[ $key ] ) && '' !== $out[ $key ] ) {
+				$result[ $key ] = sanitize_text_field( $out[ $key ] );
+			}
+		}
+
+		return $result;
 	}
 }

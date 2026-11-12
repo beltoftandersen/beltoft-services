@@ -37,7 +37,7 @@ class FakeAgentTest extends TestCase {
 	public function test_the_operation_list_is_the_plans_list_plus_site_verify(): void {
 		$expected = array(
 			'ct.prepare', 'ct.stats', 'ct.release', 'ct.refresh',
-			'site.create', 'site.delete', 'site.php', 'site.domains', 'site.cache_purge', 'site.wp_install', 'site.verify', 'site.wp_login_link', 'site.staging_create', 'site.staging_push', 'site.cron', 'site.workers',
+			'site.create', 'site.delete', 'site.php', 'site.domains', 'site.cache_purge', 'site.wp_install', 'site.verify', 'site.wp_login_link', 'site.wp_password_link', 'site.staging_create', 'site.staging_push', 'site.cron', 'site.workers',
 			'db.create', 'db.drop', 'db.password', 'db.dump', 'db.size', 'db.readonly',
 			'ssh.keys', 'ssh.password',
 			'edge.apply', 'edge.cert_push', 'edge.storage_backup',
@@ -122,7 +122,14 @@ class FakeAgentTest extends TestCase {
 		$a->submit( 'db.create', array( 'account' => 'c1', 'vmid' => 1000, 'ip' => '10.200.0.10', 'databases' => array( 'c1_shop' ), 'password' => self::PASSWORD ), 'j3c' );
 
 		$this->assertSame( array( 'installed' => true, 'slug' => 'shop' ), $a->submit( 'site.wp_install', array( 'vmid' => 1000, 'slug' => 'shop', 'title' => 'Shop', 'admin_user' => 'owner', 'admin_email' => 'christian.beltoft@gmail.com' ), 'j4' )['result'] );
-		$this->assertSame( array( 'url' => 'https://shop.example.test/?fake-login=1' ), $a->submit( 'site.wp_login_link', array( 'vmid' => 1000, 'slug' => 'shop' ), 'j5' )['result'] );
+		$this->assertSame( array( 'url' => 'https://shop.example.test/?fake-login=1', 'user' => 'owner', 'email' => 'christian.beltoft@gmail.com' ), $a->submit( 'site.wp_login_link', array( 'vmid' => 1000, 'slug' => 'shop', 'admin_user' => 'owner' ), 'j5' )['result'] );
+		$this->assertSame( array( 'url' => 'https://shop.example.test/?fake-password=1', 'user' => 'owner', 'email' => 'christian.beltoft@gmail.com' ), $a->submit( 'site.wp_password_link', array( 'vmid' => 1000, 'slug' => 'shop' ), 'j5b' )['result'] );
+		$redirects = array( array( 'from' => 'www.shop.test', 'to' => 'shop.test' ) );
+		$this->assertSame( array( 'ok' => true, 'slug' => 'shop' ), $a->submit( 'site.domains', array( 'vmid' => 1000, 'slug' => 'shop', 'domains' => array( 'shop.test', 'www.shop.test' ), 'redirects' => $redirects ), 'j5c' )['result'] );
+		$this->assertSame( $redirects, $a->state()['sites'][1000]['shop']['redirects'] );
+		foreach ( array( array( array( 'from' => 'a.test', 'to' => 'a.test' ) ), array( array( 'from' => 'www.shop.test', 'to' => 'elsewhere.test' ) ), array( array( 'from' => 'a' ) ), array(), 'shop.test' ) as $i => $bad ) {
+			$this->assertSame( 'invalid', $a->submit( 'site.domains', array( 'vmid' => 1000, 'slug' => 'shop', 'domains' => array( 'shop.test', 'www.shop.test' ), 'redirects' => $bad ), 'j5d' . $i )->get_error_code() );
+		}
 
 		$db = $a->submit( 'db.create', array( 'account' => 'c1', 'vmid' => 1000, 'ip' => '10.200.0.10', 'databases' => array( 'c1_shop' ), 'password' => self::PASSWORD ), 'j6' );
 		$this->assertSame( array( 'user' => 'c1', 'databases' => array( 'c1_shop' ) ), $db['result'] );

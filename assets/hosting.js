@@ -31,10 +31,23 @@
 		}
 	}
 
-	function field( panel, name ) {
-		var el = panel.querySelector( '[data-hosting-field="' + name + '"]' );
+	// A field of the block (website panel, form) the button is in.
+	function field( scope, name ) {
+		var el = scope.querySelector( '[data-hosting-field="' + name + '"]' );
 
 		return el ? String( el.value || '' ).trim() : '';
+	}
+
+	function format( template, values ) {
+		var i = 0;
+
+		return String( template || '' ).replace( /%(?:(\d)\$)?s/g, function ( all, n ) {
+			var value = values[ n ? parseInt( n, 10 ) - 1 : i ];
+
+			i += n ? 0 : 1;
+
+			return undefined === value ? '' : value;
+		} );
 	}
 
 	function call( method, path, body ) {
@@ -58,10 +71,27 @@
 	function plan( panel, button, id ) {
 		var base = id + '/hosting';
 		var slug = button.getAttribute( 'data-slug' ) || '';
+		var scope = button.closest( '[data-hosting-scope]' ) || panel;
 
 		switch ( button.getAttribute( 'data-hosting-action' ) ) {
 			case 'login':
 				return [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/login', {} ];
+			case 'password':
+				return [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/password', {} ];
+			case 'php_save':
+				return [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/php', { php: field( scope, 'php_version' ) } ];
+			case 'set_main':
+				var chosen = scope.querySelector( 'input[type="radio"]:checked' );
+
+				return chosen ? [ 'POST', base + '/domains/' + encodeURIComponent( chosen.value ) + '/main', {} ] : null;
+			case 'remove_domain':
+				return ask( text.confirmRemoveDomain || '', button, [ 'DELETE', base + '/domains/' + encodeURIComponent( button.getAttribute( 'data-host' ) || '' ), undefined ], true );
+			case 'files_password':
+				return '' === field( scope, 'code' ) ? null : [ 'POST', base + '/files/password', { code: field( scope, 'code' ), password: field( scope, 'sftp_password' ) } ];
+			case 'files_key':
+				return '' === field( scope, 'code' ) || '' === field( scope, 'ssh_key' ) ? null : [ 'POST', base + '/files/keys', { code: field( scope, 'code' ), key: field( scope, 'ssh_key' ) } ];
+			case 'remove_key':
+				return ask( text.confirmRemoveKey || '', button, [ 'DELETE', base + '/files/keys?fingerprint=' + encodeURIComponent( button.getAttribute( 'data-fingerprint' ) || '' ), undefined ], true );
 			case 'php_rollback':
 				return [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/php/rollback', {} ];
 			case 'cache':
@@ -71,21 +101,21 @@
 
 				return null === typed ? null : [ 'DELETE', base + '/sites/' + encodeURIComponent( slug ) + '?confirm=' + encodeURIComponent( typed ), undefined ];
 			case 'add_site':
-				return [ 'POST', base + '/sites', { slug: '', php: field( panel, 'php' ) } ];
+				return [ 'POST', base + '/sites', { slug: '', label: field( scope, 'label' ), php: field( scope, 'php' ) } ];
 			case 'add_domain':
-				return '' === field( panel, 'host' ) ? null : [ 'POST', base + '/sites/' + encodeURIComponent( field( panel, 'domain_slug' ) ) + '/domains', { host: field( panel, 'host' ) } ];
+				return '' === field( scope, 'host' ) ? null : [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/domains', { host: field( scope, 'host' ) } ];
 			case 'add_pack':
 				return ask( button.getAttribute( 'data-confirm' ) || '', button, [ 'POST', base + '/addons', { kind: 'mail_pack', target: button.getAttribute( 'data-mailbox' ) || '', confirm: parseInt( button.getAttribute( 'data-cents' ) || '0', 10 ) } ], false );
 			case 'remove_pack':
 				return ask( text.confirmPack || '', button, [ 'DELETE', base + '/addons?target=' + encodeURIComponent( button.getAttribute( 'data-mailbox' ) || '' ), undefined ], true );
 			case 'enable_mail':
-				return [ 'POST', base + '/mail', { domain: field( panel, 'mail_domain' ) } ];
+				return [ 'POST', base + '/mail', { domain: field( scope, 'mail_domain' ) } ];
 			case 'backup_now':
 				return [ 'POST', base + '/backups', {} ];
 			case 'restore':
 				var scope = button.getAttribute( 'data-scope' ) || '';
 
-				return ask( text.confirmRestore || '', button, [ 'POST', base + '/backups/restore', { scope: scope, volid: button.getAttribute( 'data-volid' ) || '', slug: field( panel, 'restore_slug' ) } ], false );
+				return ask( text.confirmRestore || '', button, [ 'POST', base + '/backups/restore', { scope: scope, volid: button.getAttribute( 'data-volid' ) || '', slug: field( scope, 'restore_slug' ) } ], false );
 			case 'undo':
 				return ask( text.confirmUndo || '', button, [ 'POST', base + '/backups/undo', {} ], false );
 			case 'check_item':
@@ -110,6 +140,74 @@
 		}
 	}
 
+	function setHidden( el, hidden ) {
+		if ( el ) {
+			el.hidden = hidden;
+		}
+	}
+
+	// Actions that only show, hide or copy something, or ask for the emailed code. True when the click was one of them.
+	function local( panel, button, id, action ) {
+		var scope = button.closest( '[data-hosting-scope]' ) || panel;
+
+		switch ( action ) {
+			case 'php_edit':
+			case 'php_cancel':
+				setHidden( scope.querySelector( '[data-php-form]' ), 'php_cancel' === action );
+				setHidden( button, 'php_edit' === action );
+
+				if ( 'php_cancel' === action ) {
+					setHidden( scope.querySelector( '[data-hosting-action="php_edit"]' ), false );
+				}
+
+				return true;
+			case 'files_open':
+				Array.prototype.forEach.call( scope.querySelectorAll( '[data-files-form]' ), function ( form ) {
+					setHidden( form, form.getAttribute( 'data-files-form' ) !== button.getAttribute( 'data-target' ) );
+				} );
+				setHidden( scope.querySelector( '[data-files-reveal]' ), true );
+				return true;
+			case 'files_close':
+				setHidden( button.closest( '[data-files-form]' ), true );
+				return true;
+			case 'copy':
+				copy( button.getAttribute( 'data-copy' ) || '' );
+				return true;
+			case 'copy_secret':
+				copy( ( scope.querySelector( '[data-files-secret]' ) || {} ).textContent || '' );
+				return true;
+			case 'send_code':
+				button.disabled = true;
+				window.beltoftApi.call( account.root + 'step-up/send', { method: 'POST', body: { purpose: 'hosting_files' }, holder: account } ).then( function ( result ) {
+					button.disabled = false;
+
+					if ( result.ok ) {
+						say( panel, text.codeSent || '' );
+					} else {
+						fail( ( result.data && result.data.message ) || text.failed || '' );
+					}
+				}, function () {
+					button.disabled = false;
+					fail( text.failed || '' );
+				} );
+				return true;
+		}
+
+		return false;
+	}
+
+	function copy( value ) {
+		if ( ! value ) {
+			return;
+		}
+
+		if ( navigator.clipboard && navigator.clipboard.writeText ) {
+			navigator.clipboard.writeText( value ).then( function () {
+				say( null, text.copied || '' );
+			}, function () {} );
+		}
+	}
+
 	document.addEventListener( 'click', function ( event ) {
 		var button = event.target && event.target.closest ? event.target.closest( '[data-hosting-action]' ) : null;
 		var panel = button ? button.closest( '.beltoft-hosting' ) : null;
@@ -119,8 +217,13 @@
 		}
 
 		var id = panel.getAttribute( 'data-hosting-resource' );
-		var request = plan( panel, button, id );
 		var action = button.getAttribute( 'data-hosting-action' );
+
+		if ( local( panel, button, id, action ) ) {
+			return;
+		}
+
+		var request = plan( panel, button, id );
 
 		if ( ! request ) {
 			return;
@@ -142,10 +245,12 @@
 
 	function run( panel, button, id, action, request ) {
 		button.disabled = true;
-		say( panel, 'login' === action ? ( text.opening || '' ) : ( text.working || '' ) );
+		var opens = 'login' === action || 'password' === action;
+
+		say( panel, opens ? ( text.opening || '' ) : ( text.working || '' ) );
 
 		// The sign-in link is opened from the click, so a pop-up blocker allows it.
-		var tab = 'login' === action ? window.open( '', '_blank' ) : null;
+		var tab = opens ? window.open( '', '_blank' ) : null;
 
 		// The tab opens on the customer's own website: it must not be able to reach back to this page.
 		if ( tab ) {
@@ -204,11 +309,37 @@
 				return;
 			}
 
-			if ( 'login' === action && result.data && result.data.url ) {
+			if ( opens && result.data && result.data.url ) {
 				if ( tab ) {
 					tab.location = result.data.url;
 				}
 
+				// The node tells which administrator the address is for: say so.
+				if ( result.data.user ) {
+					say( panel, 'password' === action ? format( text.passwordFor, [ result.data.user ] ) : format( text.signedInAs, [ result.data.user, result.data.email || '' ] ).replace( ' ()', '' ) );
+				} else {
+					say( panel, text.done || '' );
+				}
+
+				return;
+			}
+
+			// A password is shown once, in place, and the page is not reloaded.
+			if ( 'files_password' === action && result.data && result.data.password ) {
+				var form = button.closest( '[data-files-form]' );
+				var scope = button.closest( '[data-hosting-scope]' ) || panel;
+				var reveal = scope.querySelector( '[data-files-reveal]' );
+				var secret = scope.querySelector( '[data-files-secret]' );
+
+				if ( secret ) {
+					secret.textContent = result.data.password;
+				}
+
+				setHidden( reveal, false );
+				setHidden( form, true );
+				Array.prototype.forEach.call( scope.querySelectorAll( '[data-hosting-field]' ), function ( input ) {
+					input.value = '';
+				} );
 				say( panel, text.done || '' );
 				return;
 			}
