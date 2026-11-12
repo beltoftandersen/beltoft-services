@@ -996,3 +996,10 @@ body.woocommerce-account div.beltoft-services-domain .beltoft-dnse__table td.bel
 }
 .beltoft-services-progress__note { margin: 0.75em 0 0; }
 .beltoft-services-progress__note[hidden], .beltoft-services-progress__note [hidden] { display: none; }
+
+/* Sweep 2026-11-12: headings keep room above the block under them (the site h2/h3/h4 rule pulls them tight) */
+.woocommerce-MyAccount-content div.beltoft-services-vm__more > h4 { margin-bottom: var(--bs-space-3); }
+.woocommerce-MyAccount-content section.beltoft-services-api > h3:not(:first-child) { margin-top: var(--bs-space-4); }
+.woocommerce-MyAccount-content .beltoft-services-api__claude > h4:not(:first-child) { margin-top: var(--bs-space-4); }
+.woocommerce-MyAccount-content .beltoft-services-credit .beltoft-services-ov__head :is(h2, h3) { margin: 0; }
+.woocommerce-MyAccount-content section.beltoft-services-api > .beltoft-services-api__claude { margin-top: var(--bs-space-4); }
