@@ -27,6 +27,9 @@ class CheckoutCardGateway extends UsageCardGateway {
 	/** @var bool Refuse the next charges with an error. */
 	public bool $refuse = false;
 
+	/** @var bool Answer as the Stripe gateway does when the bank asks for a next action: success, the order unpaid, a #response redirect the browser finishes. */
+	public bool $next_action = false;
+
 	/**
 	 * Charges the order total, as the Stripe gateway does: the order, not the cart.
 	 *
@@ -41,6 +44,10 @@ class CheckoutCardGateway extends UsageCardGateway {
 			wc_add_notice( 'The card was declined.', 'error' );
 
 			return array( 'result' => 'failure', 'redirect' => '' );
+		}
+
+		if ( $this->next_action ) {
+			return array( 'result' => 'success', 'redirect' => '#response=' . rawurlencode( base64_encode( wp_json_encode( array( 'order_id' => $order_id, 'status' => 'requires_action' ) ) ) ) );
 		}
 
 		$order->payment_complete();
@@ -69,12 +76,13 @@ abstract class CheckoutCreditCase extends CreditTestCase {
 		WC()->session->set( 'order_awaiting_payment', null );
 		WC()->customer->set_billing_country( 'DK' );
 		CheckoutCredit::register();
-		add_filter( 'woocommerce_cart_needs_payment', array( CheckoutCredit::class, 'cart_needs_payment' ), 40, 2 );
+		CheckoutCredit::reset();
 	}
 
 	public function tear_down(): void {
 		WC()->cart->empty_cart();
 		WC()->session->set( 'order_awaiting_payment', null );
+		CheckoutCredit::reset();
 		remove_all_actions( 'woocommerce_cart_calculate_fees' );
 		parent::tear_down();
 	}
@@ -119,6 +127,41 @@ abstract class CheckoutCreditCase extends CreditTestCase {
 		return $fresh;
 	}
 
+	/**
+	 * A customer. A card always needs to be there to use credit, so every customer here has a saved card, unless a test removes it.
+	 */
+	protected function new_user(): int {
+		$user = parent::new_user();
+		$this->saved_card( $user );
+
+		return $user;
+	}
+
+	/**
+	 * Saves a card (the default payment method of the gateway that charges subscriptions) for a customer.
+	 */
+	protected function saved_card( int $user, int $years = 2 ): void {
+		$token = new \WC_Payment_Token_CC();
+		$token->set_token( 'tok_' . wp_generate_password( 10, false ) );
+		$token->set_gateway_id( 'fakecard' );
+		$token->set_card_type( 'visa' );
+		$token->set_last4( '4242' );
+		$token->set_expiry_month( '12' );
+		$token->set_expiry_year( (string) ( (int) gmdate( 'Y' ) + $years ) );
+		$token->set_user_id( $user );
+		$token->set_default( true );
+		$token->save();
+	}
+
+	/**
+	 * Removes the customer's saved cards.
+	 */
+	protected function remove_cards( int $user ): void {
+		foreach ( \WC_Payment_Tokens::get_customer_tokens( $user ) as $token ) {
+			$token->delete();
+		}
+	}
+
 	protected function paid( int $user, int $cents ): void {
 		if ( $cents < 1 ) {
 			return;
@@ -142,6 +185,7 @@ abstract class CheckoutCreditCase extends CreditTestCase {
 	 */
 	protected function cart( int $user, array $products ): void {
 		wp_set_current_user( $user );
+		CheckoutCredit::reset();
 		WC()->cart->empty_cart();
 
 		foreach ( $products as $product ) {

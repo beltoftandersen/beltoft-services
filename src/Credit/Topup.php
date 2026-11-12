@@ -119,7 +119,7 @@ final class Topup {
 					'type'    => 'checkbox',
 					'default' => 0,
 					'label'   => __( 'Account credit pays orders at checkout', 'beltoft-services' ),
-					'desc'    => __( 'Credit also pays the first order of a signed-in customer, before the card is charged: the checkout shows the credit and the amount left to pay. Credit a customer paid for can pay any order. Promotional credit pays only products that have the box "Promotional credit can pay orders and renewals" ticked. An order whose rest for the card would be under the usage minimum is paid by the card in full. Top-ups and plan switches are never paid from credit. Needs account credit.', 'beltoft-services' ),
+					'desc'    => __( 'Credit also pays the first order of a signed-in customer, before the card is charged: the checkout shows the credit and the amount left to pay. Credit a customer paid for can pay any order. Promotional credit pays only products that have the box "Promotional credit can pay orders and renewals" ticked. An order whose rest for the card would be under the usage minimum is paid by the card in full. A card always needs to be there: the checkout still asks for a payment method, and an order with nothing that saves a card (no subscription, no pay as you go) uses credit only when the customer already has a saved card. Top-ups and plan switches are never paid from credit. Needs account credit.', 'beltoft-services' ),
 				),
 				'credit_min' => array(
 					'tab'     => 'general',

@@ -257,7 +257,7 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 == Changelog ==
 
 = 0.11.0 =
-* Account credit can pay the first order at checkout (setting "Account credit pays orders at checkout", off by default). The checkout shows the credit used and the amount left for the card before the customer pays; the card form and the wallet sheets show the same amount. Credit a customer paid for pays any order; promotional credit pays only products with the box "Promotional credit can pay orders and renewals" (the old label "Promotional credit can pay renewals"). Top-ups and plan switches are never paid from credit. Credit is given back when the payment fails or the order is cancelled, and a new attempt takes it again.
+* Account credit can pay the first order at checkout (setting "Account credit pays orders at checkout", off by default). The checkout shows the credit used and the amount left for the card before the customer pays; the card form and the wallet sheets show the same amount. Credit a customer paid for pays any order; promotional credit pays only products with the box "Promotional credit can pay orders and renewals" (the old label "Promotional credit can pay renewals"). A card always needs to be there: the checkout still asks for a payment method, and an order with nothing that saves a card uses credit only when the customer already has a saved card. Top-ups and plan switches are never paid from credit. Credit is given back when the payment fails or the order is cancelled, and a new attempt takes it again.
 
 = 0.10.8 =
 * Firewall: the note about a firewall inside the server says when it matters.

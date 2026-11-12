@@ -27,7 +27,7 @@ class CheckoutCreditTest extends CheckoutCreditCase {
 		$this->assertSame( 200, has_action( 'woocommerce_checkout_order_processed', array( CheckoutCredit::class, 'apply' ) ), 'After WooCommerce Subscriptions (100), before the needs-payment decision.' );
 		$this->assertSame( 5, has_filter( 'woocommerce_create_order', array( CheckoutCredit::class, 'release_awaiting' ) ) );
 		$this->assertSame( 20, has_action( 'woocommerce_order_status_failed', array( CheckoutCredit::class, 'after_failed' ) ), 'After Invoice::failed.' );
-		$this->assertSame( 40, has_filter( 'woocommerce_cart_needs_payment', array( CheckoutCredit::class, 'cart_needs_payment' ) ) );
+		$this->assertFalse( has_filter( 'woocommerce_cart_needs_payment', array( CheckoutCredit::class, 'cart_needs_payment' ) ), 'A card always needs to be there: the cart still needs payment.' );
 		$this->assertSame( 20, has_filter( 'wc_stripe_cart_data', array( CheckoutCredit::class, 'stripe_cart_data' ) ) );
 		$this->assertNotFalse( has_action( 'woocommerce_review_order_before_order_total', array( CheckoutCredit::class, 'review_row' ) ) );
 		$this->assertNotFalse( has_filter( 'woocommerce_cart_totals_order_total_html', array( CheckoutCredit::class, 'total_html' ) ) );
@@ -411,7 +411,7 @@ class CheckoutCreditTest extends CheckoutCreditCase {
 		$this->assertLedgerBalanced( $user );
 	}
 
-	public function test_a_second_submit_of_an_unpaid_order_releases_its_credit_and_takes_it_for_the_new_order(): void {
+	public function test_the_same_cart_resumes_the_unpaid_order_and_keeps_its_credit(): void {
 		$user = $this->new_user();
 		$this->paid( $user, 600 );
 		$this->cart( $user, array( $this->product( false ) ) );
@@ -421,26 +421,72 @@ class CheckoutCreditTest extends CheckoutCreditCase {
 		$this->assertSame( 0, Balance::get( $user ) );
 		$this->assertEqualsWithDelta( 4.0, (float) $first->get_total(), 0.001 );
 
-		// The forecast counts what the unpaid order holds: it will be given back before the new order is made.
+		// The forecast is what the order that will be resumed holds, though the balance is 0.
 		$p = CheckoutCredit::preview();
 		$this->assertSame( 600, $p['credit'] );
+		$this->assertSame( 400, $p['due'] );
 
 		$second = $this->place();
 
-		$first = wc_get_order( $first->get_id() );
-		$this->assertSame( 600, Invoice::used( $second ) );
+		$this->assertSame( $first->get_id(), $second->get_id(), 'WooCommerce resumed the order.' );
+		$this->assertCount( 1, $this->credit_fees( $second ), 'One fee: put back after WooCommerce rebuilt the items.' );
 		$this->assertSame( $p['due'], Balance::cents( $second->get_total() ) );
+		$this->assertSame( 600, Invoice::used( $second ) );
+		$this->assertSame( array( Balance::INVOICE => 600 ), $this->rows_of( $second ), 'One debit.' );
+		$this->assertFalse( Balance::exists( Balance::ADJUST, Invoice::REF_RETURN, (string) $second->get_id() ), 'Nothing was given back.' );
+		$this->assertSame( '', (string) $second->get_meta( CheckoutCredit::META_RELEASED ) );
 		$this->assertSame( 0, Balance::get( $user ) );
-		$this->assertSame( array(), $this->credit_fees( $first ) );
-		$this->assertEqualsWithDelta( 10.0, (float) $first->get_total(), 0.001, 'The abandoned order is whole again.' );
-		$this->assertSame( 0, Invoice::used( $first ) );
-		$this->assertLedgerBalanced( $user );
 
-		// And a third time: still only 600 in the ledger for the customer.
-		WC()->session->set( 'order_awaiting_payment', $second->get_id() );
-		$third = $this->place();
-		$this->assertSame( 600, Invoice::used( $third ) );
-		$this->assertSame( 0, Balance::get( $user ) );
+		// And a third and fourth time: the same.
+		for ( $i = 0; $i < 2; $i++ ) {
+			WC()->session->set( 'order_awaiting_payment', $second->get_id() );
+			$again = $this->place();
+			$this->assertSame( $first->get_id(), $again->get_id() );
+			$this->assertCount( 1, $this->credit_fees( $again ) );
+			$this->assertSame( 400, Balance::cents( $again->get_total() ) );
+		}
+
+		$this->assertLedgerBalanced( $user );
+	}
+
+	public function test_a_resumed_order_is_restored_even_with_the_setting_turned_off_meanwhile(): void {
+		$user = $this->new_user();
+		$this->paid( $user, 600 );
+		$this->cart( $user, array( $this->product( false ) ) );
+		$first = $this->place();
+		WC()->session->set( 'order_awaiting_payment', $first->get_id() );
+		$this->settings( array( 'credit_checkout' => 0 ) );
+
+		$second = $this->place();
+
+		$this->assertSame( $first->get_id(), $second->get_id() );
+		$this->assertCount( 1, $this->credit_fees( $second ), 'The debit stays, so the fee does too.' );
+		$this->assertSame( 400, Balance::cents( $second->get_total() ) );
+	}
+
+	public function test_a_resumed_order_that_cannot_carry_its_credit_gives_it_back_and_is_paid_in_full(): void {
+		$user = $this->new_user();
+		$this->paid( $user, 600 );
+		$this->cart( $user, array( $this->product( false ) ) );
+		$order = $this->place();
+
+		// As WooCommerce leaves a resumed order whose rebuilt total is lower than the credit: no fee, a total of 5.00.
+		foreach ( $order->get_items( 'fee' ) as $id => $fee ) {
+			$order->remove_item( $id );
+		}
+
+		$order->set_total( '5.00' );
+		$order->save();
+
+		CheckoutCredit::apply( $order->get_id(), array(), wc_get_order( $order->get_id() ) );
+
+		$order = wc_get_order( $order->get_id() );
+		$this->assertSame( 600, Balance::get( $user ), 'Given back.' );
+		$this->assertSame( array(), $this->credit_fees( $order ) );
+		$this->assertEqualsWithDelta( 5.0, (float) $order->get_total(), 0.001 );
+		$this->assertSame( '', (string) $order->get_meta( CheckoutCredit::META ) );
+		$this->assertSame( '', (string) $order->get_meta( CheckoutCredit::META_RELEASED ), 'It is the order being paid now: not released.' );
+		$this->assertTrue( $order->needs_payment() );
 		$this->assertLedgerBalanced( $user );
 	}
 
@@ -519,25 +565,78 @@ class CheckoutCreditTest extends CheckoutCreditCase {
 		$this->assertSame( $same, CheckoutCredit::stripe_cart_data( $same, WC()->cart ) );
 	}
 
-	public function test_the_payment_method_is_dropped_only_when_credit_covers_everything_and_nothing_needs_a_card(): void {
+	public function test_the_cart_always_asks_for_a_payment_method(): void {
 		$user = $this->new_user();
 		$this->paid( $user, 5000 );
 		$this->cart( $user, array( $this->product( false ) ) );
-		$this->assertFalse( WC()->cart->needs_payment(), 'A plain product paid in full by credit needs no card.' );
-
-		$part = $this->new_user();
-		$this->paid( $part, 400 );
-		$this->cart( $part, array( $this->product( false ) ) );
-		$this->assertTrue( WC()->cart->needs_payment() );
-
-		$none = $this->new_user();
-		$this->cart( $none, array( $this->product( false ) ) );
-		$this->assertTrue( WC()->cart->needs_payment() );
+		$this->assertTrue( WC()->cart->needs_payment(), 'Even when credit covers the whole cart.' );
 
 		$sub = $this->new_user();
 		$this->paid( $sub, 5000 );
 		$this->cart( $sub, array( $this->as_subscription( $this->product( false ) ) ) );
-		$this->assertTrue( WC()->cart->needs_payment(), 'A subscription still gets a payment method for its renewals.' );
+		$this->assertTrue( WC()->cart->needs_payment() );
+	}
+
+	// A card always needs to be there to use credit.
+
+	public function test_no_saved_card_and_a_plain_product_means_no_credit(): void {
+		$user = $this->new_user();
+		$this->remove_cards( $user );
+		$this->paid( $user, 5000 );
+		$this->cart( $user, array( $this->product( false ) ) );
+
+		$this->assertNull( CheckoutCredit::preview(), 'No row, no reduced total.' );
+
+		$order = $this->place();
+
+		$this->assertSame( array(), $this->credit_fees( $order ) );
+		$this->assertSame( array(), $this->rows_of( $order ) );
+		$this->assertSame( 5000, Balance::get( $user ) );
+		$this->assertEqualsWithDelta( 10.0, (float) $order->get_total(), 0.001, 'The card pays in full.' );
+	}
+
+	public function test_an_expired_saved_card_does_not_count(): void {
+		$user = $this->new_user();
+		$this->remove_cards( $user );
+		$this->saved_card( $user, -2 );
+		$this->paid( $user, 5000 );
+		$this->cart( $user, array( $this->product( false ) ) );
+
+		$this->assertNull( CheckoutCredit::preview() );
+		$this->assertSame( array(), $this->credit_fees( $this->place() ) );
+	}
+
+	public function test_a_saved_card_and_a_plain_product_uses_credit_in_full_and_in_part_as_the_forecast_says(): void {
+		$full = $this->new_user();
+		$this->paid( $full, 5000 );
+		$this->cart( $full, array( $this->product( false ) ) );
+		$p = CheckoutCredit::preview();
+		$this->assertSame( 1000, $p['credit'] );
+		$order = $this->place();
+		$this->assertSame( $p['credit'], Invoice::used( $order ) );
+		$this->assertSame( $p['due'], Balance::cents( $order->get_total() ) );
+
+		$part = $this->new_user();
+		$this->paid( $part, 400 );
+		$this->cart( $part, array( $this->product( false ) ) );
+		$p = CheckoutCredit::preview();
+		$this->assertSame( 400, $p['credit'] );
+		$order = $this->place();
+		$this->assertSame( $p['credit'], Invoice::used( $order ) );
+		$this->assertSame( $p['due'], Balance::cents( $order->get_total() ) );
+	}
+
+	public function test_a_subscription_cart_uses_credit_without_a_saved_card_because_the_card_is_saved_at_checkout(): void {
+		$user = $this->new_user();
+		$this->remove_cards( $user );
+		$this->paid( $user, 5000 );
+		$this->cart( $user, array( $this->as_subscription( $this->product( false ) ) ) );
+
+		$p = CheckoutCredit::preview();
+		$this->assertSame( 1000, $p['credit'] );
+		$order = $this->place();
+		$this->assertSame( $p['credit'], Invoice::used( $order ) );
+		$this->assertSame( 0, Balance::cents( $order->get_total() ) );
 	}
 
 	/**

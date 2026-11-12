@@ -101,7 +101,7 @@ class CheckoutCreditFlowTest extends CheckoutCreditCase {
 	 * @runInSeparateProcess
 	 * @preserveGlobalState disabled
 	 */
-	public function test_credit_covering_the_order_asks_for_no_payment(): void {
+	public function test_credit_covering_a_plain_order_with_a_saved_card_charges_nothing(): void {
 		$user = $this->new_user();
 		$this->paid( $user, 5000 );
 		$product = $this->product( false );
@@ -110,14 +110,14 @@ class CheckoutCreditFlowTest extends CheckoutCreditCase {
 			$user,
 			function () use ( $product ) {
 				$this->fill( array( $product ) );
-				$this->assertFalse( WC()->cart->needs_payment(), 'The checkout asks for no payment method.' );
+				$this->assertTrue( WC()->cart->needs_payment(), 'The checkout still asks for a payment method.' );
 
-				return $this->submit( array( 'payment_method' => '' ) );
+				return $this->submit();
 			}
 		);
 
 		$this->assertSame( 'success', $end['result'], implode( ' ', $end['messages'] ) );
-		$this->assertSame( array(), $this->card->charges, 'No gateway is asked.' );
+		$this->assertSame( array(), $this->card->charges, 'An order of 0 that needs no card is completed by WooCommerce: the gateway is not asked and nothing is charged.' );
 
 		$order = wc_get_order( $end['order_id'] );
 		$this->assertEqualsWithDelta( 0.0, (float) $order->get_total(), 0.001 );
@@ -132,6 +132,7 @@ class CheckoutCreditFlowTest extends CheckoutCreditCase {
 	 */
 	public function test_credit_covering_a_subscription_still_saves_a_payment_method(): void {
 		$user = $this->new_user();
+		$this->remove_cards( $user );
 		$this->paid( $user, 5000 );
 		$product = $this->as_subscription( $this->product( false ) );
 
@@ -189,7 +190,7 @@ class CheckoutCreditFlowTest extends CheckoutCreditCase {
 	 * @runInSeparateProcess
 	 * @preserveGlobalState disabled
 	 */
-	public function test_a_declined_card_then_a_new_try_takes_the_credit_once(): void {
+	public function test_a_declined_card_then_a_new_try_of_the_same_cart_keeps_one_debit_and_asks_the_same_amount(): void {
 		$user = $this->new_user();
 		$this->paid( $user, 400 );
 		$product = $this->product( false );
@@ -208,9 +209,10 @@ class CheckoutCreditFlowTest extends CheckoutCreditCase {
 				$this->assertSame( 0, Balance::get( $user ), 'The credit is held by the unpaid order.' );
 				$this->assertSame( '6.00', $this->card->charges[0][0] );
 
-				// The forecast on the page still shows the whole credit: it will be given back and taken again.
+				// The forecast on the page is what that order holds.
 				$preview = CheckoutCredit::preview();
 				$this->assertSame( 400, $preview['credit'] );
+				$this->assertSame( 600, $preview['due'] );
 
 				// The customer tries again with a card that works.
 				$this->card->refuse = false;
@@ -220,16 +222,64 @@ class CheckoutCreditFlowTest extends CheckoutCreditCase {
 			}
 		);
 
-		$this->assertNotSame( $ids[0], $ids[1], 'The first order is not resumed.' );
-		$this->assertSame( '6.00', $this->card->charges[1][0], 'The second charge is the same amount, with the credit taken again.' );
+		$this->assertSame( $ids[0], $ids[1], 'The order is resumed, not replaced.' );
+		$this->assertSame( array( '6.00', '6.00' ), array_column( $this->card->charges, 0 ), 'The gateway is asked the same amount twice.' );
 
-		$first  = wc_get_order( $ids[0] );
-		$second = wc_get_order( $ids[1] );
-		$this->assertSame( array(), $this->credit_fees( $first ) );
-		$this->assertTrue( Balance::exists( Balance::ADJUST, Invoice::REF_RETURN, (string) $first->get_id() ), 'Given back once.' );
-		$this->assertSame( 400, Invoice::used( $second ) );
-		$this->assertTrue( $second->is_paid() );
-		$this->assertSame( 0, Balance::get( $user ), 'The credit is spent once, on the order that was paid.' );
+		$order = wc_get_order( $ids[1] );
+		$this->assertCount( 1, $this->credit_fees( $order ) );
+		$this->assertSame( array( Balance::INVOICE => 400 ), $this->rows_of( $order ), 'One debit.' );
+		$this->assertSame( 600, Balance::cents( $order->get_total() ) );
+		$this->assertTrue( $order->is_paid() );
+		$this->assertSame( 0, Balance::get( $user ) );
+		$this->assertFalse( Balance::exists( Balance::ADJUST, Invoice::REF_RETURN, (string) $order->get_id() ) );
+		$this->assertLedgerBalanced( $user );
+	}
+
+	/**
+	 * The Stripe gateway answers success with a #response redirect and an unpaid order when the bank asks for a next action; the
+	 * browser finishes it with the intent's client secret and on the return URL, not by submitting the form again. A customer who submits
+	 * the form once more meanwhile resumes the same order, and the payment that completes later is the order that kept its credit.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_a_next_action_is_finished_on_the_order_that_kept_its_credit(): void {
+		$user = $this->new_user();
+		$this->paid( $user, 400 );
+		$product = $this->product( false );
+		$ids     = array();
+
+		$this->in_checkout(
+			$user,
+			function () use ( $product, &$ids ) {
+				$this->fill( array( $product ) );
+				$this->card->next_action = true;
+
+				$one   = $this->submit();
+				$ids[] = $one['order_id'];
+				$this->assertSame( 'success', $one['result'], implode( ' ', $one['messages'] ) );
+				$this->assertSame( 'pending', wc_get_order( $one['order_id'] )->get_status(), 'Waiting for the browser to finish the payment.' );
+
+				// A second submit while the bank's window is open.
+				$two   = $this->submit();
+				$ids[] = $two['order_id'];
+			}
+		);
+
+		$this->assertSame( $ids[0], $ids[1], 'The same order: it is not released in the middle of its own payment.' );
+		$order = wc_get_order( $ids[0] );
+		$this->assertSame( array( '6.00', '6.00' ), array_column( $this->card->charges, 0 ) );
+		$this->assertSame( 400, Invoice::used( $order ) );
+
+		// The browser finishes: the return URL's handler completes the order named in the intent.
+		$order->payment_complete( 'pi_test' );
+
+		$order = wc_get_order( $ids[0] );
+		$this->assertTrue( $order->is_paid() );
+		$this->assertSame( 400, Invoice::used( $order ) );
+		$this->assertSame( array( Balance::INVOICE => 400 ), $this->rows_of( $order ) );
+		$this->assertSame( 0, Balance::get( $user ) );
+		$this->assertSame( '', (string) $order->get_meta( CheckoutCredit::META_GUARDED ), 'Not held: it kept its credit.' );
 		$this->assertLedgerBalanced( $user );
 	}
 
@@ -269,5 +319,34 @@ class CheckoutCreditFlowTest extends CheckoutCreditCase {
 		$this->assertSame( 400, Invoice::used( wc_get_order( $ids[1] ) ) );
 		$this->assertSame( 0, Balance::get( $user ) );
 		$this->assertLedgerBalanced( $user );
+	}
+
+	/**
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_a_failed_first_order_is_released_and_cannot_be_paid(): void {
+		$user = $this->new_user();
+		$this->paid( $user, 400 );
+		$product = $this->product( false );
+		$ids     = array();
+
+		$this->in_checkout(
+			$user,
+			function () use ( $product, &$ids ) {
+				$this->fill( array( $product ) );
+				$this->card->refuse = true;
+				$one                = $this->submit();
+				$ids[]              = $one['order_id'];
+				wc_get_order( $one['order_id'] )->update_status( 'failed', 'Charge failed.' );
+			}
+		);
+
+		$order = wc_get_order( $ids[0] );
+		$this->assertSame( 400, Balance::get( $user ), 'The credit went back.' );
+		$this->assertNotSame( '', (string) $order->get_meta( CheckoutCredit::META_RELEASED ) );
+		$this->assertSame( '400', (string) $order->get_meta( CheckoutCredit::META_RELEASED_CENTS ) );
+		$this->assertFalse( $order->needs_payment(), 'The Pay link and the order-pay page refuse it.' );
+		$this->assertSame( array(), apply_filters( 'woocommerce_valid_order_statuses_for_payment', array( 'pending', 'failed' ), $order ) );
 	}
 }

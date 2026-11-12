@@ -221,6 +221,22 @@ final class Invoice {
 			return 0;
 		}
 
+		self::add_fee( $order, $used );
+		$order->update_meta_data( self::META_USED, (string) $used );
+		$order->add_order_note( sprintf( /* translators: %s: amount. */ __( 'Paid from account credit: %s.', 'beltoft-services' ), Topup::label_amount( $used, $order->get_currency() ) ) );
+
+		return $used;
+	}
+
+	/**
+	 * The fee line "Paid from account credit" and the lowered total. calculate_totals() is not used: it treats a negative fee as a
+	 * discount, takes VAT off with it and refuses a fee larger than the net total, so credit could never pay the VAT part. The lines and
+	 * tax lines stay as they are. The one place that writes the fee line.
+	 *
+	 * @param \WC_Order $order Order.
+	 * @param int       $used  Cents.
+	 */
+	private static function add_fee( \WC_Order $order, int $used ): void {
 		$fee = new \WC_Order_Item_Fee();
 		$fee->set_name( __( 'Paid from account credit', 'beltoft-services' ) );
 		$fee->set_tax_status( 'none' );
@@ -228,13 +244,54 @@ final class Invoice {
 		$fee->set_total( number_format( -$used / 100, 2, '.', '' ) );
 		$fee->add_meta_data( self::META_FEE, 'yes', true );
 		$order->add_item( $fee );
-		$order->update_meta_data( self::META_USED, (string) $used );
-		// calculate_totals() is not used: it treats a negative fee as a discount, takes VAT off with it and refuses a
-		// fee larger than the net total, so credit could never pay the VAT part. The lines and tax lines stay as they are.
 		$order->set_total( number_format( ( Balance::cents( $order->get_total() ) - $used ) / 100, 2, '.', '' ) );
-		$order->add_order_note( sprintf( /* translators: %s: amount. */ __( 'Paid from account credit: %s.', 'beltoft-services' ), Topup::label_amount( $used, $order->get_currency() ) ) );
+	}
 
-		return $used;
+	/**
+	 * Cents the ledger holds as debited for an order and not given back: the paid and the promotional row.
+	 *
+	 * @param \WC_Order $order Order.
+	 * @return array{promo: int, paid: int}
+	 */
+	public static function debited( \WC_Order $order ): array {
+		$id    = (string) $order->get_id();
+		$paid  = Balance::find( Balance::INVOICE, self::REF_TYPE, $id );
+		$promo = Balance::find( Balance::PROMO_USE, self::REF_TYPE, $id );
+
+		return array(
+			'promo' => $promo && ! Balance::exists( Balance::PROMO_BACK, self::REF_RETURN, $id ) ? abs( (int) $promo['amount_cents'] ) : 0,
+			'paid'  => $paid && ! Balance::exists( Balance::ADJUST, self::REF_RETURN, $id ) ? abs( (int) $paid['amount_cents'] ) : 0,
+		);
+	}
+
+	/**
+	 * Puts the fee line and the lowered total back on an order whose items were rebuilt (WooCommerce resumes an unpaid checkout order of the
+	 * same cart and rebuilds its lines) while the ledger still holds its debit. No ledger movement: the fee is what the ledger says.
+	 *
+	 * @param \WC_Order $order Order. Not saved.
+	 * @return bool True when the order carries its credit again (or already did). False when it cannot: nothing debited, the debit does
+	 *              not match what the order says it used, it was given back, or the rebuilt total is lower than the credit. The caller
+	 *              then gives the credit back.
+	 */
+	public static function restore( \WC_Order $order ): bool {
+		$used  = self::used( $order );
+		$debit = self::debited( $order );
+
+		if ( $used < 1 || $debit['promo'] + $debit['paid'] !== $used ) {
+			return false;
+		}
+
+		if ( self::fee_of( $order ) ) {
+			return true;
+		}
+
+		if ( Balance::cents( $order->get_total() ) < $used ) {
+			return false;
+		}
+
+		self::add_fee( $order, $used );
+
+		return true;
 	}
 
 	/**
