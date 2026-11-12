@@ -161,11 +161,10 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 				<p><button type="button" class="button woocommerce-button" data-mail-proof-check><?php esc_html_e( 'Check now', 'beltoft-services' ); ?></button></p>
 			<?php endif; ?>
 		<?php else : ?>
-			<?php if ( 'ok' !== $view['dns']['status'] && array() !== $view['dns']['rows'] ) : ?>
-				<p class="beltoft-services-panel__notice" role="status"><?php esc_html_e( 'Mail does not arrive on this domain until its DNS records are in place. You can make mailboxes now.', 'beltoft-services' ); ?> <a href="<?php echo esc_url( $nav ? $link( 'dns' ) : '#beltoft-mail-dns' ); ?>"><?php esc_html_e( 'Open the DNS records guide', 'beltoft-services' ); ?></a></p>
-			<?php endif; ?>
 			<?php if ( ! empty( $view['send_held'] ) ) : ?>
-				<p class="beltoft-services-panel__notice" role="status" data-mail-hold><?php echo esc_html( (string) $view['hold_text'] ); ?> <a href="<?php echo esc_url( $nav ? $link( 'dns' ) : '#beltoft-mail-dns' ); ?>"><?php esc_html_e( 'Open the DNS records guide', 'beltoft-services' ); ?></a></p>
+				<p class="beltoft-services-panel__notice" role="status" data-mail-hold><?php esc_html_e( 'Mail does not arrive on this domain until the MX record is in place, and your mailboxes cannot send until the SPF and DKIM records are found. You can make mailboxes now.', 'beltoft-services' ); ?> <a href="<?php echo esc_url( $nav ? $link( 'dns' ) : '#beltoft-mail-dns' ); ?>"><?php esc_html_e( 'Open the DNS records guide', 'beltoft-services' ); ?></a></p>
+			<?php elseif ( 'ok' !== $view['dns']['status'] && array() !== $view['dns']['rows'] ) : ?>
+				<p class="beltoft-services-panel__notice" role="status"><?php esc_html_e( 'Mail does not arrive on this domain until its DNS records are in place. You can make mailboxes now.', 'beltoft-services' ); ?> <a href="<?php echo esc_url( $nav ? $link( 'dns' ) : '#beltoft-mail-dns' ); ?>"><?php esc_html_e( 'Open the DNS records guide', 'beltoft-services' ); ?></a></p>
 			<?php endif; ?>
 			<div class="beltoft-services-vm__more">
 				<h4><?php esc_html_e( 'Mailboxes', 'beltoft-services' ); ?></h4>
@@ -184,7 +183,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 								<tr data-mail-box="<?php echo esc_attr( $beltoft_services_box['email'] ); ?>">
 									<td><code><?php echo esc_html( \BeltoftServices\Domains\HostName::display( $beltoft_services_box['email'] ) ); ?></code><?php echo $beltoft_services_box['active'] ? '' : ' <span class="description">' . esc_html__( 'Paused', 'beltoft-services' ) . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped text. ?>
 										<?php if ( ! empty( $view['send_held'] ) ) : ?>
-											<span class="description" data-mail-hold-row><?php echo esc_html( (string) $view['hold_text'] ); ?> <a href="<?php echo esc_url( $nav ? $link( 'dns' ) : '#beltoft-mail-dns' ); ?>"><?php esc_html_e( 'Open the DNS records guide', 'beltoft-services' ); ?></a></span>
+											<span class="description" data-mail-hold-row><?php esc_html_e( 'Sending on hold', 'beltoft-services' ); ?></span>
 										<?php endif; ?></td>
 									<td><?php echo esc_html( $beltoft_services_box['name'] ); ?></td>
 									<td><?php echo esc_html( sprintf( /* translators: 1: storage used, 2: storage of the mailbox, 3: percent used */ __( '%1$s of %2$s (%3$d%%)', 'beltoft-services' ), $beltoft_services_size( (int) $beltoft_services_box['used_mb'] ), $beltoft_services_size( (int) $beltoft_services_box['quota_mb'] ), $beltoft_services_percent ) ); ?></td>
@@ -232,9 +231,6 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 					</p>
 				<?php else : ?>
 					<p class="description"><?php echo esc_html( sprintf( /* translators: %s: size of a mailbox, such as 5 GB */ __( 'Each mailbox has %s of storage. You get a password to show once.', 'beltoft-services' ), $beltoft_services_size( (int) $beltoft_services_limits['quota_mb'] ) ) ); ?></p>
-					<?php if ( ! empty( $view['send_held'] ) ) : ?>
-						<p class="description" data-mail-hold-form><?php echo esc_html( (string) $view['hold_text'] ); ?> <a href="<?php echo esc_url( $nav ? $link( 'dns' ) : '#beltoft-mail-dns' ); ?>"><?php esc_html_e( 'Open the DNS records guide', 'beltoft-services' ); ?></a></p>
-					<?php endif; ?>
 					<div class="beltoft-services-db__form" data-mail-create>
 						<p>
 							<label for="beltoft-mail-local"><?php esc_html_e( 'Name before the @', 'beltoft-services' ); ?></label>

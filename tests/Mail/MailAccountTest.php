@@ -339,7 +339,7 @@ final class MailAccountTest extends MailTestCase {
 		$this->assertStringContainsString( 'dkim._domainkey.elsewhere.example', $html );
 		$this->assertStringContainsString( 'Not checked yet', $html );
 		$this->assertStringContainsString( 'data-mail-dns-check', $html );
-		$this->assertStringContainsString( 'Mail does not arrive on this domain until its DNS records are in place', $this->page( $r ), 'The first tab says it too, with a link to the guide.' );
+		$this->assertStringContainsString( 'Mail does not arrive on this domain until', $this->page( $r ), 'The first tab says it too, with a link to the guide.' );
 		$this->assertStringContainsString( 'Open the DNS records guide', $this->page( $r ) );
 
 		$ours = $this->our_zone( $this->user, 'ours.example' );
@@ -360,8 +360,10 @@ final class MailAccountTest extends MailTestCase {
 		$html = $this->page( Resource::find( $r->id() ) );
 		$this->assertStringContainsString( 'data-mail-hold>', $html );
 		$this->assertStringContainsString( 'data-mail-hold-row', $html );
-		$this->assertStringContainsString( 'data-mail-hold-form', $html );
-		$this->assertSame( 3, substr_count( $html, $line ) );
+		$this->assertStringNotContainsString( 'data-mail-hold-form', $html );
+		$this->assertSame( 1, substr_count( $html, 'Open the DNS records guide' ), 'one link to the guide' );
+		$this->assertSame( 0, substr_count( $html, $line ), 'the long line is said once, in the combined notice' );
+		$this->assertStringContainsString( 'your mailboxes cannot send until the SPF and DKIM records are found', $html );
 
 		$fresh = Resource::find( $r->id() );
 		$rows  = (array) $fresh->get( 'mail_records' );
@@ -370,7 +372,7 @@ final class MailAccountTest extends MailTestCase {
 		}
 		$fresh->set( array( 'mail_records' => $rows, 'mail_dns' => 'ok' ) );
 
-		$this->assertStringNotContainsString( 'Sending is held', $this->page( Resource::find( $r->id() ) ) );
+		$this->assertStringNotContainsString( 'Sending on hold', $this->page( Resource::find( $r->id() ) ) );
 	}
 
 	public function test_a_conflict_shows_its_reason(): void {
