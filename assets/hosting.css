@@ -145,3 +145,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .beltof
 .beltoft-hosting .beltoft-hosting-dns__table th:first-child, .beltoft-hosting .beltoft-hosting-dns__table td:first-child { width: 56px; white-space: nowrap; }
 .beltoft-hosting .beltoft-hosting-dns__table th:last-child, .beltoft-hosting .beltoft-hosting-dns__table td:last-child { width: 30%; padding-right: 0; }
 .beltoft-hosting .beltoft-hosting-dns + .beltoft-hosting-formrow, .beltoft-hosting .beltoft-hosting-dns + .beltoft-hosting-main { margin-top: var(--bs-space-4, 16px); }
+@media (max-width: 767px) {
+	.beltoft-hosting .beltoft-hosting-dns__table td:first-child, .beltoft-hosting .beltoft-hosting-dns__table td:last-child { width: auto; white-space: normal; }
+	.beltoft-hosting .beltoft-hosting-dns__state { white-space: normal; }
+}
