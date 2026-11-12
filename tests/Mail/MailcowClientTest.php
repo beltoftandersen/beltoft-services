@@ -90,7 +90,8 @@ final class MailcowClientTest extends TestCase {
 					return $this->json( array() );
 				}
 				if ( str_contains( $url, 'get/mailbox/all/' ) ) {
-					return $this->json( array( array( 'username' => 'x@a.example', 'quota' => 1048576, 'quota_used' => 10 ) ) );
+					// A mailcow that ignores the domain part answers with every mailbox it has.
+					return $this->json( array( array( 'username' => 'x@a.example', 'domain' => 'a.example', 'quota' => 1048576, 'quota_used' => 10 ), array( 'username' => 'boss@other.example', 'domain' => 'other.example', 'quota' => 1 ), array( 'username' => 'y@nota.example', 'quota' => 1 ), array( 'username' => 'z@a.example', 'domain' => 'other.example', 'quota' => 1 ) ) );
 				}
 				return $this->json( array( 'domain' => 'a.example' ) );
 			}
@@ -100,7 +101,9 @@ final class MailcowClientTest extends TestCase {
 		$this->assertNull( $c->get_domain( 'gone.example' ) );
 		$this->assertSame( 'a.example', $c->get_domain( 'a.example' )['domain'] );
 		$this->assertNull( $c->get_dkim( 'a.example' ) );
-		$this->assertSame( 'x@a.example', $c->list_mailboxes( 'a.example' )[0]['username'] );
+		$this->assertSame( array( 'x@a.example' ), array_column( $c->list_mailboxes( 'a.example' ), 'username' ), 'Only the mailboxes of the asked domain, whatever the server answers.' );
+		$this->assertSame( array(), $c->list_mailboxes( 'unknown.example' ) );
+		$this->assertSame( array(), $c->list_mailboxes( '' ), 'No domain is never every mailbox.' );
 		$this->assertSame( array( 6 ), array_column( $c->list_aliases( 'a.example' ), 'id' ) );
 		$this->assertStringContainsString( 'get/mailbox/all/a.example', $this->http_calls()[3]['url'] );
 		$this->assertSame( 'GET', $this->http_calls()[0]['args']['method'] );

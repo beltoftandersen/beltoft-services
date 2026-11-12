@@ -88,9 +88,38 @@ final class LiveMailcowClient implements MailcowClient {
 	}
 
 	public function list_mailboxes( string $domain ) {
+		$domain = strtolower( trim( $domain ) );
+
+		// No domain is never "every mailbox on the server".
+		if ( '' === $domain ) {
+			return array();
+		}
+
 		$rows = $this->request( 'GET', 'get/mailbox/all/' . rawurlencode( $domain ) );
 
-		return is_wp_error( $rows ) ? $rows : array_values( array_filter( $rows, 'is_array' ) );
+		if ( is_wp_error( $rows ) ) {
+			return $rows;
+		}
+
+		// The server's own filter is not trusted: a mailcow that does not know the domain part of this address answers
+		// with every mailbox it has. Only the rows of this domain are kept, judged by the row itself.
+		$out = array();
+
+		foreach ( $rows as $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+
+			$user = strtolower( (string) ( $row['username'] ?? '' ) );
+			$at   = strrpos( $user, '@' );
+			$of   = isset( $row['domain'] ) ? strtolower( (string) $row['domain'] ) : $domain;
+
+			if ( $of === $domain && false !== $at && substr( $user, $at + 1 ) === $domain ) {
+				$out[] = $row;
+			}
+		}
+
+		return $out;
 	}
 
 	public function delete_mailbox( string $email ) {
