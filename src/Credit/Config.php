@@ -30,4 +30,11 @@ final class Config {
 	public static function renewals(): bool {
 		return self::enabled() && (bool) Settings::get( 'credit_renewals' );
 	}
+
+	/**
+	 * Is credit also applied to the first order of a signed-in customer at checkout? Needs account credit to be on.
+	 */
+	public static function checkout(): bool {
+		return self::enabled() && (bool) Settings::get( 'credit_checkout' );
+	}
 }

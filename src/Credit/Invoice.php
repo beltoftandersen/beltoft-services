@@ -104,6 +104,36 @@ final class Invoice {
 	}
 
 	/**
+	 * What credit pays of an amount due: the one rule, used by apply() on the order and by CheckoutCredit for the figure the checkout
+	 * shows beforehand, so the two cannot disagree. Promotional credit first (within its cap), then paid credit for the rest; nothing
+	 * when the rest for the card would be above 0 and under $min_rest.
+	 *
+	 * @param int      $due        Cents due (the order total).
+	 * @param int      $balance    Cents of credit in the order's currency.
+	 * @param int      $promo_left Cents of the balance that are promotional.
+	 * @param int|null $promo_cap  Most cents of promotional credit that may be used (null: no limit).
+	 * @param int      $min_rest   Cents. With a rest for the card above 0 and under this, nothing is used (0: no such rule).
+	 * @return array{promo: int, paid: int, cents: int} All 0 when no credit is used.
+	 */
+	public static function split( int $due, int $balance, int $promo_left, ?int $promo_cap, int $min_rest = 0 ): array {
+		$none = array( 'promo' => 0, 'paid' => 0, 'cents' => 0 );
+
+		if ( min( $balance, $due ) < 1 ) {
+			return $none;
+		}
+
+		$promo = min( $promo_left, null === $promo_cap ? $due : max( 0, $promo_cap ), $due );
+		$paid  = min( max( 0, $balance - $promo_left ), $due - $promo );
+		$cents = $promo + $paid;
+
+		if ( $cents < 1 || ( $min_rest > 0 && $due - $cents > 0 && $due - $cents < $min_rest ) ) {
+			return $none;
+		}
+
+		return array( 'promo' => $promo, 'paid' => $paid, 'cents' => $cents );
+	}
+
+	/**
 	 * Applies credit to an invoice whose lines, taxes and totals are final. Does not save the order.
 	 *
 	 * Promotional credit is spent first, then paid credit. A debit is up to two ledger rows with the order as reference: the promotional
@@ -146,12 +176,12 @@ final class Invoice {
 				}
 
 				// Promotional credit first (within its cap), then paid credit for the rest.
-				$promo_left = Balance::promo_left( $user_id );
-				$promo      = min( $promo_left, null === $promo_cap ? $due : max( 0, $promo_cap ), $due );
-				$paid       = min( max( 0, $balance - $promo_left ), $due - $promo );
-				$cents      = $promo + $paid;
+				$parts = self::split( $due, $balance, Balance::promo_left( $user_id ), $promo_cap, $min_rest );
+				$promo = $parts['promo'];
+				$paid  = $parts['paid'];
+				$cents = $parts['cents'];
 
-				if ( $cents < 1 || ( $min_rest > 0 && $due - $cents > 0 && $due - $cents < $min_rest ) ) {
+				if ( $cents < 1 ) {
 					return 0;
 				}
 

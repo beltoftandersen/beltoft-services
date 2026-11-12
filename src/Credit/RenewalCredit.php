@@ -22,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
  * What may be used:
  * - Paid credit (top-ups) pays any renewal.
  * - Promotional credit (ledger kind promo) pays only the part of the order that belongs to lines of products with the box
- *   "Promotional credit can pay renewals" (meta META_PROMO, read through the parent product of a variation), including their VAT.
+ *   "Promotional credit can pay orders and renewals" (meta META_PROMO, read through the parent product of a variation), including their VAT.
  *   Promotional credit is spent first, then paid credit, so an order with marked and other lines takes promo up to the marked lines
  *   and paid credit for the rest. The filter `beltoft_services_promo_credit_line` can change the answer for one line.
  * - A fixed subscription cannot be carried to next month: when credit would cover only part of the order and the rest for the card
@@ -152,8 +152,8 @@ final class RenewalCredit {
 		woocommerce_wp_checkbox(
 			array(
 				'id'          => self::META_PROMO,
-				'label'       => __( 'Promotional credit can pay renewals', 'beltoft-services' ),
-				'description' => __( 'Let promotional credit (credit codes and grants) pay the renewals of this product. Credit a customer paid for can pay any renewal. Needs the setting that lets credit pay renewals.', 'beltoft-services' ),
+				'label'       => __( 'Promotional credit can pay orders and renewals', 'beltoft-services' ),
+				'description' => __( 'Let promotional credit (credit codes and grants) pay the first order and the renewals of this product. Credit a customer paid for can pay any order. Needs the setting that lets credit pay renewals or orders at checkout.', 'beltoft-services' ),
 				'value'       => $product && 'yes' === $product->get_meta( self::META_PROMO ) ? 'yes' : 'no',
 			)
 		);

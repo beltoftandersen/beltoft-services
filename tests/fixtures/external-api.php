@@ -13,6 +13,7 @@ return array(
 	'Account\\Servers' => array( 'requested()', 'slug()' ),
 	'Account\\ServiceArea' => array( 'tab_nav()', 'url_for_license()' ),
 	'BillingRequirements' => array( 'cart_needs_billing()' ),
+	'Credit\\CheckoutCredit' => array( 'preview()' ),
 	'Credit\\Topup' => array( 'max()', 'min()' ),
 	'Domains\\Prices' => array( 'price()' ),
 	'Hosting\\SiteField' => array( 'is_hosting_product()' ),

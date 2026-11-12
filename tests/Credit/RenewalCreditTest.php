@@ -439,7 +439,7 @@ class RenewalCreditTest extends CreditTestCase {
 
 		ob_start();
 		RenewalCredit::product_field( $product );
-		$this->assertStringContainsString( 'Promotional credit can pay renewals', (string) ob_get_clean() );
+		$this->assertStringContainsString( 'Promotional credit can pay orders and renewals', (string) ob_get_clean() );
 	}
 
 	// Split and attribution.

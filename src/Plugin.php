@@ -254,6 +254,7 @@ final class Plugin {
 		Credit\Page::register();
 		Credit\Invoice::register();
 		Credit\RenewalCredit::register();
+		Credit\CheckoutCredit::register();
 		Credit\Grant::register();
 		Credit\Code::register();
 
