@@ -504,9 +504,14 @@ final class HostingAccount {
 	 * @param bool                 $ready Whether the account takes changes.
 	 */
 	private static function print_pair( string $slug, array $pair, bool $ready ): void {
+		// Until both names point here there is nothing to choose: the DNS guide under the names says what to do first.
+		if ( ! $pair['ready'] ) {
+			return;
+		}
+
 		$name = 'beltoft-main-' . $slug . '-' . preg_replace( '/[^a-z0-9]/', '-', (string) $pair['base'] );
 
-		echo '<fieldset class="beltoft-hosting-main" data-hosting-scope><legend>' . esc_html__( 'Main address', 'beltoft-services' ) . '</legend>';
+		echo '<div class="beltoft-hosting-main" role="radiogroup" aria-labelledby="' . esc_attr( $name ) . '-label" data-hosting-scope><span class="beltoft-hosting-main__label" id="' . esc_attr( $name ) . '-label">' . esc_html__( 'Main address', 'beltoft-services' ) . '</span>';
 
 		foreach ( array( (string) $pair['base'], (string) $pair['www'] ) as $host ) {
 			echo '<label class="beltoft-hosting-radio"><input type="radio" name="' . esc_attr( $name ) . '" value="' . esc_attr( $host ) . '"' . checked( $host, (string) $pair['main'], false ) . ( $ready ? '' : ' disabled' ) . '> <span>' . esc_html( \BeltoftServices\Domains\HostName::display( $host ) ) . '</span></label>';
@@ -518,13 +523,11 @@ final class HostingAccount {
 
 		echo '<p class="beltoft-hosting-help">' . esc_html__( 'The other address redirects to the main address. This does not change the address set in WordPress.', 'beltoft-services' ) . '</p>';
 
-		if ( ! $pair['ready'] ) {
-			echo '<p class="beltoft-hosting-help">' . esc_html__( 'The redirect starts when both addresses point here.', 'beltoft-services' ) . '</p>';
-		} elseif ( '' === (string) $pair['main'] ) {
+		if ( '' === (string) $pair['main'] ) {
 			echo '<p class="beltoft-hosting-help">' . esc_html__( 'Both addresses show the website. Choose a main address to redirect the other one.', 'beltoft-services' ) . '</p>';
 		}
 
-		echo '</fieldset>';
+		echo '</div>';
 	}
 
 	/**

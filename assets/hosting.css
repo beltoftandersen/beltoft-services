@@ -45,7 +45,7 @@
 
 /* The main address of a pair */
 .beltoft-hosting .beltoft-hosting-main { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bs-space-2, 8px) var(--bs-space-4, 16px); min-width: 0; margin: 0 0 var(--bs-space-3, 12px); padding: 0; border: 0; }
-.beltoft-hosting .beltoft-hosting-main legend { float: left; width: auto; margin: 0; padding: 0; color: var(--bsh-soft); font-size: var(--bs-fs-small, 14px); font-weight: var(--bs-fw-medium, 500); }
+.beltoft-hosting .beltoft-hosting-main__label { color: var(--bsh-soft); font-size: var(--bs-fs-small, 14px); font-weight: var(--bs-fw-medium, 500); }
 .beltoft-hosting .beltoft-hosting-main > .beltoft-hosting-help { flex: 1 1 100%; margin: 0; }
 .beltoft-hosting .beltoft-hosting-radio { display: inline-flex; align-items: center; gap: var(--bs-space-2, 8px); margin: 0; cursor: pointer; }
 .beltoft-hosting .beltoft-hosting-radio input { margin: 0; }
@@ -108,7 +108,6 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .beltof
 	.beltoft-hosting .beltoft-hosting-buttons .beltoft-hosting-btn, .beltoft-hosting .beltoft-hosting-formrow .beltoft-hosting-btn, .beltoft-hosting .beltoft-hosting-inline .beltoft-hosting-btn, .beltoft-hosting .beltoft-hosting-facts dd > .beltoft-hosting-btn { width: 100%; }
 	.beltoft-hosting input[type="text"], .beltoft-hosting select, .beltoft-hosting textarea, .beltoft-hosting .beltoft-hosting-field { width: 100%; max-width: 100%; }
 	.beltoft-hosting .beltoft-hosting-main { align-items: flex-start; flex-direction: column; }
-	.beltoft-hosting .beltoft-hosting-main legend { float: none; }
 	/* A row of the backup table is a block on a phone: the label over each value. */
 	.beltoft-hosting table, .beltoft-hosting tbody, .beltoft-hosting tr, .beltoft-hosting td { display: block; width: auto; }
 	.beltoft-hosting thead { display: none; }
@@ -143,3 +142,6 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .beltof
 }
 .beltoft-hosting .beltoft-hosting-steps { margin: var(--bs-space-2, 8px) 0 0; padding-left: 20px; }
 .beltoft-hosting .beltoft-hosting-steps li { margin: 0 0 4px; }
+.beltoft-hosting .beltoft-hosting-dns__table th:first-child, .beltoft-hosting .beltoft-hosting-dns__table td:first-child { width: 56px; white-space: nowrap; }
+.beltoft-hosting .beltoft-hosting-dns__table th:last-child, .beltoft-hosting .beltoft-hosting-dns__table td:last-child { width: 30%; padding-right: 0; }
+.beltoft-hosting .beltoft-hosting-dns + .beltoft-hosting-formrow, .beltoft-hosting .beltoft-hosting-dns + .beltoft-hosting-main { margin-top: var(--bs-space-4, 16px); }

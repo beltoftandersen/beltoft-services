@@ -378,6 +378,10 @@ final class DnsGuide {
 			echo esc_html__( 'We also check by ourselves every 15 minutes. A change of DNS can take up to an hour to show.', 'beltoft-services' ) . '</span></div>';
 
 			echo '<p class="beltoft-hosting-help">' . esc_html( sprintf( /* translators: 1: "@", 2: domain name. */ __( 'About the name %1$s: it means the domain itself. Some providers want %1$s, some want the field left empty, and some want %2$s written out.', 'beltoft-services' ), '@', $shown ) ) . '</p>';
+			if ( in_array( $domain, $all, true ) && in_array( 'www.' . $domain, $all, true ) ) {
+				echo '<p class="beltoft-hosting-help">' . esc_html__( 'The redirect starts when both addresses point here.', 'beltoft-services' ) . ' ' . esc_html__( 'Then you choose which one is the main address.', 'beltoft-services' ) . '</p>';
+			}
+
 			echo '<p class="beltoft-hosting-help">' . esc_html__( 'If the name already has an A record that points somewhere else, change that record instead of adding a second one.', 'beltoft-services' ) . '</p>';
 			echo '</section>';
 		}
