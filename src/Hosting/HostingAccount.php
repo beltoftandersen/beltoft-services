@@ -786,9 +786,10 @@ final class HostingAccount {
 			if ( '' !== $dns_url && 'external' === (string) $mail->get( 'mail_mode' ) && ( \BeltoftServices\Mail\MailDns::waiting( $mail ) || \BeltoftServices\Mail\MailField::waiting_for_proof( $mail ) ) ) {
 				echo '</p><p class="beltoft-hosting-help">' . esc_html(
 					sprintf(
-						/* translators: %s: the mail domain. */
 						\BeltoftServices\Mail\MailField::waiting_for_proof( $mail )
+							/* translators: %s: the mail domain. */
 							? __( 'We are waiting for the proof that %s is yours. Add the record in the DNS records guide.', 'beltoft-services' )
+							/* translators: %s: the mail domain. */
 							: __( 'Mailboxes can be made now, but mail does not arrive until the DNS records for %s are added.', 'beltoft-services' ),
 						$mail_domain
 					)
