@@ -883,6 +883,11 @@ div.beltoft-services-domain ul.beltoft-services-domain__import-list > li { displ
 .beltoft-services-credit .beltoft-services-credit__note { margin: 0; color: var(--ink-soft, #5e7080); font-size: 14px; font-weight: 400; }
 .beltoft-services-credit__amounts .beltoft-services-credit__custom { margin-top: 8px; }
 .beltoft-services-credit__amounts .beltoft-services-credit__note { margin-top: 12px; }
+/* The balance rows and the notes under them: a note is small and soft, lined up with the row's text, with room before the
+   next row; rows that follow each other are one box with a hairline between them. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit > .beltoft-services-credit__note { max-width: 68ch; margin: var(--bs-space-2, 8px) 0 0; padding: 0 16px; color: var(--ink-soft, #5e7080); font-size: 14px; line-height: 1.5; }
+.beltoft-services-credit > .beltoft-services-credit__note + .beltoft-services-credit__balance { margin-top: var(--bs-space-4, 16px); }
+.beltoft-services-credit > .beltoft-services-credit__balance + .beltoft-services-credit__balance { border-top: 1px solid var(--rule, #e6e2d8); }
 .beltoft-services-credit__submit { justify-self: start; }
 .beltoft-services-credit__code { display: grid; gap: 8px; margin: 24px 0 0; }
 .beltoft-services-credit__coderow { display: flex; align-items: stretch; gap: 8px; max-width: 480px; }
