@@ -414,6 +414,21 @@
 
 		say( panel, opens ? ( opening || '' ) : ( text.working || '' ) );
 
+		// A staging job: say it where the customer clicked, and keep the other staging buttons still while it starts.
+		var where = staging ? button.closest( 'dd' ) : null;
+		var near = null;
+
+		if ( where ) {
+			Array.prototype.forEach.call( where.querySelectorAll( '[data-hosting-action^="staging_"]' ), function ( other ) {
+				other.disabled = true;
+			} );
+			near = document.createElement( 'p' );
+			near.className = 'beltoft-hosting-line';
+			near.setAttribute( 'role', 'status' );
+			near.textContent = text.working || '';
+			( button.closest( '.beltoft-hosting-buttons' ) || button ).insertAdjacentElement( 'afterend', near );
+		}
+
 		// The sign-in link is opened from the click, so a pop-up blocker allows it.
 		var tab = opens ? window.open( '', '_blank' ) : null;
 
@@ -485,6 +500,7 @@
 					tab.close();
 				}
 
+				unstage( near, where, ( result.data && result.data.message ) || text.failed || '' );
 				fail( ( result.data && result.data.message ) || text.failed || '' );
 				return;
 			}
@@ -526,6 +542,10 @@
 
 			// A move of WordPress and the staging jobs run in the background: the answer says so, and the page shows the state.
 			say( panel, ( ( 'wp_address' === action || staging ) && result.data && result.data.message ) || text.done || '' );
+
+			if ( near ) {
+				near.textContent = ( result.data && result.data.message ) || text.done || '';
+			}
 			window.setTimeout( function () {
 				window.location.reload();
 			}, 'wp_address' === action ? 2500 : ( staging ? 1500 : 800 ) );
@@ -536,8 +556,22 @@
 				tab.close();
 			}
 
+			unstage( near, where, text.failed || '' );
 			fail( text.failed || '' );
 		} );
+	}
+
+	// A staging request that did not start: the line next to the button says why, and the buttons work again.
+	function unstage( near, where, message ) {
+		if ( near ) {
+			near.textContent = message;
+		}
+
+		if ( where ) {
+			Array.prototype.forEach.call( where.querySelectorAll( '[data-hosting-action^="staging_"]' ), function ( other ) {
+				other.disabled = false;
+			} );
+		}
 	}
 
 	// The caches of each website, asked from the node when the page is open (the page itself is drawn without calling the node).

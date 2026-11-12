@@ -563,7 +563,7 @@ final class HostingAccount {
 			if ( $v['exists'] ) {
 				echo '<p class="beltoft-hosting-line" data-staging-state>';
 				/* translators: %s: the address of the staging copy. */
-				echo wp_kses( sprintf( esc_html__( 'Staging copy: %s.', 'beltoft-services' ), '<a class="beltoft-hosting-link" href="' . esc_url( 'https://' . $v['host'] . '/' ) . '" target="_blank" rel="noopener">' . esc_html( \BeltoftServices\Domains\HostName::display( (string) $v['host'] ) ) . '</a>' ), array( 'a' => array( 'class' => true, 'href' => true, 'target' => true, 'rel' => true ) ) );
+				echo wp_kses( sprintf( esc_html__( 'The staging copy is ready at %s.', 'beltoft-services' ), '<a class="beltoft-hosting-link" href="' . esc_url( 'https://' . $v['host'] . '/' ) . '" target="_blank" rel="noopener">' . esc_html( \BeltoftServices\Domains\HostName::display( (string) $v['host'] ) ) . '</a>' ), array( 'a' => array( 'class' => true, 'href' => true, 'target' => true, 'rel' => true ) ) );
 
 				if ( $v['at'] > 0 ) {
 					/* translators: %s: date and time. */
@@ -587,6 +587,7 @@ final class HostingAccount {
 					echo '<button type="button" class="beltoft-hosting-btn" data-hosting-action="staging_refresh" data-slug="' . esc_attr( $slug ) . '" data-confirm="' . esc_attr__( 'Refresh the staging copy from the live website? Changes made only in the staging copy are lost.', 'beltoft-services' ) . '">' . esc_html__( 'Refresh from live', 'beltoft-services' ) . '</button>';
 					echo '<button type="button" class="beltoft-hosting-linkbtn beltoft-hosting-linkbtn--danger" data-hosting-action="staging_delete" data-slug="' . esc_attr( $slug ) . '" data-confirm="' . esc_attr__( 'Delete the staging copy? Its files and its database are deleted. The live website is not changed.', 'beltoft-services' ) . '">' . esc_html__( 'Delete staging copy', 'beltoft-services' ) . '</button>';
 					echo '</div>';
+					echo '<p class="beltoft-hosting-help">' . esc_html__( 'Open staging signs you in to the WordPress of the staging copy. The address above shows the copy as visitors would see it.', 'beltoft-services' ) . '</p>';
 					echo '<div class="beltoft-hosting-secure" id="' . esc_attr( $id ) . '" data-staging-form hidden>';
 					echo '<fieldset class="beltoft-hosting-fieldset"><legend>' . esc_html__( 'What to push', 'beltoft-services' ) . '</legend>';
 					echo '<label class="beltoft-hosting-radio"><input type="radio" name="' . esc_attr( $id ) . '-what" value="full" data-confirm="' . esc_attr( $both ) . '" checked> <span>' . esc_html__( 'Files and database', 'beltoft-services' ) . '</span></label> ';
