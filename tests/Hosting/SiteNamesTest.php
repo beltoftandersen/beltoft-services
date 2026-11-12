@@ -87,6 +87,12 @@ class SiteNamesTest extends HostingCase {
 		$this->assertTrue( Sites::held_by_other( $one, 'someone-else' ) );
 	}
 
+	public function test_a_long_base_is_cut_at_a_whole_word_when_that_leaves_enough(): void {
+		$this->assertSame( 'toemrerfirmaet', SiteNames::clean( 'Tømrerfirmaet Østergaard & Sønner i Aarhus' ) );
+		$this->assertSame( 'mit-firma-aps', SiteNames::clean( 'Mit Firma ApS' ), 'A short name is not cut.' );
+		$this->assertSame( 'ab-cdefghijklmnopqrs', SiteNames::clean( 'ab cdefghijklmnopqrstuvwxyz' ), 'A first word too short to stand alone: the plain cut.' );
+	}
+
 	public function test_a_taken_draw_is_drawn_again_and_after_20_it_widens_to_three_characters(): void {
 		$calls = array();
 		add_filter(

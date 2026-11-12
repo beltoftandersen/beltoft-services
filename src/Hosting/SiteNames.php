@@ -71,7 +71,19 @@ final class SiteNames {
 		$text = strtolower( remove_accents( $text ) );
 		$text = trim( (string) preg_replace( '/[^a-z0-9]+/', '-', $text ), '-' );
 
-		return rtrim( substr( $text, 0, self::BASE_MAX ), '-' );
+		if ( strlen( $text ) > self::BASE_MAX ) {
+			$cut  = substr( $text, 0, self::BASE_MAX );
+			$dash = strrpos( $cut, '-' );
+
+			// A whole word reads better than half a word: back to the last dash, when that leaves enough of the name.
+			if ( '-' !== $text[ self::BASE_MAX ] && false !== $dash && $dash >= 8 ) {
+				$cut = substr( $cut, 0, $dash );
+			}
+
+			$text = $cut;
+		}
+
+		return rtrim( $text, '-' );
 	}
 
 	/**
