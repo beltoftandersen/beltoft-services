@@ -22,8 +22,9 @@ defined( 'ABSPATH' ) || exit;
  * our name servers is never held (the records are placed by us). The meta mail_hold records what was done to the
  * mailboxes: 'held' (every mailbox of the domain had sending switched off), 'lifted' (switched on again) or ''.
  * It is applied to every new mailbox, to every mailbox that exists at the next DNS check, and lifted by the DNS check
- * (and "Check now") as soon as both records are found. It is applied again only by a later DNS check (a customer who
- * restarts the look after it timed out); nothing watches the records after they were found.
+ * (and "Check now") as soon as both records are found. It is applied again by a later DNS check (a customer who
+ * restarts the look after it timed out) and by the daily look MailDns::recheck() at a domain whose records were found
+ * once: when a needed record is gone it sets the domain back to waiting and calls sync().
  */
 final class MailHold {
 
@@ -40,11 +41,7 @@ final class MailHold {
 	 * @param Resource $r Resource.
 	 */
 	public static function held( Resource $r ): bool {
-		$domain = MailGuard::domain( $r );
-		$mode   = (string) $r->get( 'mail_mode' );
-		$mode   = '' !== $mode ? $mode : ( MailDomain::on_our_servers( $domain, (int) ( $r->license()['user_id'] ?? 0 ) ) ? 'ours' : 'external' );
-
-		if ( 'external' !== $mode ) {
+		if ( 'external' !== self::mode( $r ) ) {
 			return false;
 		}
 
@@ -57,6 +54,22 @@ final class MailHold {
 		}
 
 		return array() !== array_diff( array( 'spf', 'dkim' ), $ok );
+	}
+
+	/**
+	 * Where the domain's DNS is: ours (our name servers) or external. The stored mode wins; an older resource without one
+	 * is worked out from the customer's zones.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function mode( Resource $r ): string {
+		$mode = (string) $r->get( 'mail_mode' );
+
+		if ( '' !== $mode ) {
+			return $mode;
+		}
+
+		return MailDomain::on_our_servers( MailGuard::domain( $r ), (int) ( $r->license()['user_id'] ?? 0 ) ) ? 'ours' : 'external';
 	}
 
 	/**

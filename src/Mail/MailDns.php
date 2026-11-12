@@ -49,12 +49,18 @@ final class MailDns {
 	/** Seconds a record may be cached. */
 	public const TTL = 3600;
 
+	/** The daily sweep that queues a look at each domain whose records were found, and the look. */
+	public const RECHECK_ALL  = 'beltoft_services_mail_dns_recheck_all';
+	public const RECHECK      = 'beltoft_services_mail_dns_recheck';
+	public const RECHECK_CRON = '40 3 * * *';
+
 	/** The DKIM selector mailcow is asked for. */
 	public const SELECTOR = 'dkim';
 
 	public static function register(): void {
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
 		add_action( Jobs::SWEEP, array( __CLASS__, 'sweep' ) );
+		self::register_recheck();
 	}
 
 	// -- The records ---------------------------------------------------------------------------
@@ -595,29 +601,10 @@ final class MailDns {
 				continue;
 			}
 
-			$fqdn  = '@' === $row['name'] ? $domain : $row['name'] . '.' . $domain;
-			$found = self::lookup( $fqdn, (string) $row['type'] );
+			$read = self::read_row( $row, $domain );
 
-			if ( is_wp_error( $found ) ) {
-				continue;
-			}
-
-			if ( self::row_holds( $row, $found ) ) {
-				$rows[ $i ]['status'] = 'ok';
-				$rows[ $i ]['reason'] = '';
-				unset( $rows[ $i ]['seen'], $rows[ $i ]['merged'] );
-			} else {
-				if ( 'conflict' !== $row['status'] ) {
-					$rows[ $i ]['status'] = 'missing';
-				}
-
-				// What is there now, for the guide: another MX, another SPF (and the SPF with our include added), another key.
-				$seen = array_values( array_filter( array_map( static fn( $v ) => substr( trim( (string) $v ), 0, 400 ), 'spf' === $row['key'] ? array_filter( $found, static fn( $v ) => 0 === stripos( (string) $v, 'v=spf1' ) ) : $found ), static fn( $v ) => '' !== $v ) );
-				$rows[ $i ]['seen'] = array_slice( $seen, 0, 3 );
-
-				if ( 'spf' === $row['key'] && array() !== $seen ) {
-					$rows[ $i ]['merged'] = self::merge_spf( $seen[0] );
-				}
+			if ( null !== $read ) {
+				$rows[ $i ] = $read;
 			}
 		}
 
@@ -636,6 +623,161 @@ final class MailDns {
 		}
 
 		self::schedule( $id, 60 );
+	}
+
+	/**
+	 * Reads public DNS for one record of a domain hosted elsewhere and returns the row with its status: ok when it holds,
+	 * missing (or conflict, kept) with what is there now when it does not.
+	 *
+	 * @param array<string, mixed> $row    Stored row.
+	 * @param string               $domain Domain.
+	 * @return array<string, mixed>|null The row, or null when the lookup failed (nothing is learned).
+	 */
+	private static function read_row( array $row, string $domain ): ?array {
+		$fqdn  = '@' === $row['name'] ? $domain : $row['name'] . '.' . $domain;
+		$found = self::lookup( $fqdn, (string) $row['type'] );
+
+		if ( is_wp_error( $found ) ) {
+			return null;
+		}
+
+		if ( self::row_holds( $row, $found ) ) {
+			$row['status'] = 'ok';
+			$row['reason'] = '';
+			unset( $row['seen'], $row['merged'] );
+
+			return $row;
+		}
+
+		if ( 'conflict' !== $row['status'] ) {
+			$row['status'] = 'missing';
+		}
+
+		// What is there now, for the guide: another MX, another SPF (and the SPF with our include added), another key.
+		$seen = array_values( array_filter( array_map( static fn( $v ) => substr( trim( (string) $v ), 0, 400 ), 'spf' === $row['key'] ? array_filter( $found, static fn( $v ) => 0 === stripos( (string) $v, 'v=spf1' ) ) : $found ), static fn( $v ) => '' !== $v ) );
+		$row['seen'] = array_slice( $seen, 0, 3 );
+
+		if ( 'spf' === $row['key'] && array() !== $seen ) {
+			$row['merged'] = self::merge_spf( $seen[0] );
+		}
+
+		return $row;
+	}
+
+	// -- The daily look after the records were found ---------------------------------------------
+
+	/**
+	 * Hooks the daily look: a sweep that queues one look per domain, and the look.
+	 */
+	public static function register_recheck(): void {
+		add_action( self::RECHECK_ALL, array( __CLASS__, 'recheck_all' ) );
+		add_action( self::RECHECK, array( __CLASS__, 'recheck' ) );
+		Jobs::recurring( array( __CLASS__, 'schedule_recheck' ) );
+	}
+
+	/**
+	 * Schedules the daily sweep once.
+	 */
+	public static function schedule_recheck(): void {
+		Jobs::ensure_cron( self::RECHECK_ALL, self::RECHECK_CRON, array(), HOUR_IN_SECONDS );
+	}
+
+	/**
+	 * The daily sweep: one look per domain hosted elsewhere whose records were found, spread over the next hours so the
+	 * lookups of many domains never come at once. Domains still waiting are not in it (the ten minute look has them), and a
+	 * domain on our name servers is never looked at this way (recheck() leaves it).
+	 */
+	public static function recheck_all(): void {
+		$step = 0;
+
+		foreach ( Resource::find_by_meta( MailDriver::KIND, 'mail_dns', 'ok' ) as $id ) {
+			Jobs::schedule_once( time() + min( $step * 4, 20 * HOUR_IN_SECONDS ), self::RECHECK, array( (int) $id ) );
+			++$step;
+		}
+	}
+
+	/**
+	 * The look at one domain after its records were found: all six records are read once and stored, so the
+	 * recommended ones show their real state. A needed record (MX, SPF or DKIM) that is no longer found is confirmed with a
+	 * second read straight away; if it is still gone the domain goes back to waiting (the ten minute look and "Check now" of
+	 * the Email page work as before), sending is held again when SPF or DKIM is the one that went, and the customer gets the
+	 * email about missing records once. When the records come back the ten minute look lifts the hold as it always did.
+	 *
+	 * A lookup that fails changes nothing. At most one look a day for a domain (mail_dns_rechecked).
+	 *
+	 * @param int $id Resource id.
+	 */
+	public static function recheck( int $id ): void {
+		$r = Resource::find( $id );
+
+		if ( ! $r || ! $r->is_live() || 'ok' !== (string) $r->get( 'mail_dns' ) || 'ready' !== (string) $r->get( 'state' ) || 'external' !== MailHold::mode( $r ) ) {
+			return;
+		}
+
+		$now = time();
+
+		if ( $now - (int) $r->get( 'mail_dns_rechecked' ) < 20 * HOUR_IN_SECONDS ) {
+			return;
+		}
+
+		$domain = (string) $r->get( MailDomain::META_DOMAIN );
+		$rows   = (array) $r->get( 'mail_records' );
+
+		if ( '' === $domain || array() === $rows ) {
+			return;
+		}
+
+		foreach ( $rows as $i => $row ) {
+			if ( ! is_array( $row ) || ! isset( $row['name'], $row['type'], $row['value'], $row['key'] ) ) {
+				continue;
+			}
+
+			$read = self::read_row( $row, $domain );
+
+			// Not found: look once more before saying so, so a flaky answer never holds a customer's sending.
+			if ( null !== $read && 'ok' !== $read['status'] && 'ok' === ( $row['status'] ?? '' ) ) {
+				$read = self::read_row( $row, $domain );
+
+				if ( null !== $read && 'ok' !== $read['status'] ) {
+					$rows[ $i ] = $read;
+				}
+
+				continue;
+			}
+
+			if ( null !== $read ) {
+				$rows[ $i ] = $read;
+			}
+		}
+
+		$lost = ! self::complete( $rows );
+		$meta = array( 'mail_records' => $rows, 'mail_dns_rechecked' => $now );
+
+		if ( $lost ) {
+			// Waiting again, as if just set up; the reminder mail is the one sent below, so the ten minute look sends none.
+			$meta += array( 'mail_dns' => 'waiting', 'mail_dns_since' => $now, 'mail_dns_checked' => $now, 'mail_dns_reminded' => $now );
+		}
+
+		$stored = $r->locked(
+			static function () use ( $id, $meta ): bool {
+				$fresh = Resource::find( $id );
+
+				return $fresh && 'ok' === (string) $fresh->get( 'mail_dns' ) && $fresh->set( $meta );
+			}
+		);
+
+		if ( true !== $stored ) {
+			return;
+		}
+
+		$fresh = Resource::find( $id ) ?? $r;
+
+		MailHold::sync( $fresh );
+
+		if ( $lost ) {
+			self::schedule( $id, self::INTERVAL );
+			\BeltoftServices\Emails\Emails::send( 'beltoft_services_mail_dns_reminder', $fresh );
+		}
 	}
 
 	/**
