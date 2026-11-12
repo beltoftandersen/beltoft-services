@@ -49,6 +49,7 @@ final class ValueDefaults {
 			'mail_domain'           => '',
 			'mail_external'         => false,
 			'mail_records'          => array(),
+			'mail_records_needed'   => array(),
 			'mail_host'             => '',
 			'mail_imap'             => 0,
 			'mail_smtp'             => 0,

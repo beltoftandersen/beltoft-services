@@ -127,15 +127,16 @@ final class MailDns {
 	 * The records still to add, as the customer would type them: full name, type, value, priority. Nothing secret is
 	 * in them (the DKIM value is the public key).
 	 *
-	 * @param Resource $r Resource.
+	 * @param Resource $r           Resource.
+	 * @param bool     $needed_only Leave out the recommended records.
 	 * @return array<int, array<string, mixed>>
 	 */
-	public static function missing_rows( Resource $r ): array {
+	public static function missing_rows( Resource $r, bool $needed_only = false ): array {
 		$domain = (string) $r->get( MailDomain::META_DOMAIN );
 		$out    = array();
 
 		foreach ( (array) $r->get( 'mail_records' ) as $row ) {
-			if ( ! is_array( $row ) || 'ok' === ( $row['status'] ?? '' ) || ! isset( $row['name'], $row['type'], $row['value'] ) ) {
+			if ( ! is_array( $row ) || 'ok' === ( $row['status'] ?? '' ) || ! isset( $row['name'], $row['type'], $row['value'] ) || ( $needed_only && ! self::required( (string) ( $row['key'] ?? '' ) ) ) ) {
 				continue;
 			}
 
@@ -152,28 +153,34 @@ final class MailDns {
 	}
 
 	/**
-	 * Is every record in place?
+	 * Are the needed records in place? MX, SPF and DKIM must each be there and ok; the recommended records (DMARC,
+	 * autoconfig, autodiscover) never decide.
 	 *
 	 * @param array<int, array<string, mixed>> $rows Rows with status.
 	 */
 	public static function complete( array $rows ): bool {
+		$ok = array();
+
 		foreach ( $rows as $row ) {
-			if ( 'ok' !== ( $row['status'] ?? '' ) ) {
-				return false;
+			if ( 'ok' === ( $row['status'] ?? '' ) ) {
+				$ok[] = (string) ( $row['key'] ?? '' );
 			}
 		}
 
-		return array() !== $rows;
+		return array() === array_diff( self::NEEDED, $ok );
 	}
 
+	/** The records a domain needs: without MX nothing arrives, without SPF and DKIM sending is held. */
+	public const NEEDED = array( 'mx', 'spf', 'dkim' );
+
 	/**
-	 * Does the record count as needed? The driver counts every record: `mail_dns` is ok only when all of them are
-	 * (complete()), the daily look and the reminder email go on until they are, and the customer is shown them as needed.
+	 * Does the record count as needed? `mail_dns` is ok when the needed ones are found (complete()); the daily look and
+	 * the reminder email go on until then. The others are recommended: still looked for, stored and shown, never blocking.
 	 *
 	 * @param string $key Record key (mx, spf, dkim, dmarc, autoconfig, autodiscover).
 	 */
 	public static function required( string $key ): bool {
-		return in_array( $key, array( 'mx', 'spf', 'dkim', 'dmarc', 'autoconfig', 'autodiscover' ), true );
+		return in_array( $key, self::NEEDED, true );
 	}
 
 	/**
@@ -184,11 +191,11 @@ final class MailDns {
 	public static function purpose( string $key ): string {
 		switch ( $key ) {
 			case 'mx':
-				return __( 'Sends email for your domain to our mail server.', 'beltoft-services' );
+				return __( 'Sends email for your domain to our mail server. Receiving waits for this record.', 'beltoft-services' );
 			case 'spf':
-				return __( 'Says our mail server may send email for your domain.', 'beltoft-services' );
+				return __( 'Says our mail server may send email for your domain. Sending waits for this record.', 'beltoft-services' );
 			case 'dkim':
-				return __( 'Signs your outgoing email, so other servers know it is yours.', 'beltoft-services' );
+				return __( 'Signs your outgoing email, so other servers know it is yours. Sending waits for this record.', 'beltoft-services' );
 			case 'dmarc':
 				return __( 'Tells other servers what to do with email that fails the checks.', 'beltoft-services' );
 			case 'autoconfig':
@@ -622,6 +629,8 @@ final class MailDns {
 		}
 
 		if ( self::store( $id, $meta, $done ? null : self::INTERVAL ) ) {
+			// Sending is held or lifted from the records just stored (the system mailbox of Email lite included).
+			MailHold::sync( Resource::find( $id ) ?? $r );
 			self::remind( $id );
 			return;
 		}
@@ -644,7 +653,7 @@ final class MailDns {
 
 		$since = (int) $r->get( 'mail_dns_since' );
 
-		if ( $since <= 0 || time() < $since + self::REMIND_AFTER || array() === self::missing_rows( $r ) ) {
+		if ( $since <= 0 || time() < $since + self::REMIND_AFTER || array() === self::missing_rows( $r, true ) ) {
 			return;
 		}
 

@@ -274,6 +274,7 @@ class FakeMailcowClient implements MailcowClient {
 			'messages'   => 0,
 			'password'   => 'set',
 			'rl'         => false,
+			'smtp'       => true,
 		);
 		$this->save();
 
@@ -366,6 +367,23 @@ class FakeMailcowClient implements MailcowClient {
 		$this->save();
 
 		return $this->ok( 'rl_saved', $email );
+	}
+
+	public function set_smtp_access( string $email, bool $allow ) {
+		$email = strtolower( $email );
+
+		if ( $err = $this->enter( 'set_smtp_access', $email, $allow ) ) {
+			return $err;
+		}
+
+		if ( ! isset( $this->mailboxes[ $email ] ) ) {
+			return $this->error( 'access_denied', $email );
+		}
+
+		$this->mailboxes[ $email ]['smtp'] = $allow;
+		$this->save();
+
+		return $this->ok( 'mailbox_modified', $email );
 	}
 
 	public function set_domain_rate_limit( string $domain, int $value, string $frame ) {

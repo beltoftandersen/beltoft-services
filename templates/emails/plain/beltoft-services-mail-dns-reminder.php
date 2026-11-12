@@ -11,7 +11,7 @@
  * @var string                           $account_url        The Email area.
  * @var string                           $mail_domain        The email domain.
  * @var bool                             $mail_external      The domain is hosted elsewhere.
- * @var array<int, array<string, mixed>> $mail_records       Records: name, type, value, priority, status.
+ * @var array<int, array<string, mixed>> $mail_records_needed Needed records still missing: name, type, value, priority, status.
  * @var string                           $mail_guide_url     The setup guide, or ''.
  * @var string                           $additional_content Additional content from the email's settings.
  * @var \WC_Email                        $email              The email.
@@ -34,9 +34,9 @@ if ( '' !== $customer_name ) {
 }
 
 /* translators: %s: domain name. */
-echo wp_strip_all_tags( sprintf( __( 'Email for %s will not work until these DNS records are added where the domain is hosted.', 'beltoft-services' ), $mail_domain ) ) . "\n\n";
+echo wp_strip_all_tags( sprintf( __( 'Email for %s will not work fully until these DNS records are added where the domain is hosted. Mail arrives once the MX record is in place. Your mailboxes cannot send until the SPF and DKIM records are found.', 'beltoft-services' ), $mail_domain ) ) . "\n\n";
 
-foreach ( $mail_records as $beltoft_services_row ) {
+foreach ( $mail_records_needed as $beltoft_services_row ) {
 	echo wp_strip_all_tags( $beltoft_services_row['type'] . ' ' . $beltoft_services_row['name'] . ' ' . ( ! empty( $beltoft_services_row['priority'] ) ? $beltoft_services_row['priority'] . ' ' : '' ) . $beltoft_services_row['value'] ) . "\n";
 }
 echo "\n";

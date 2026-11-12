@@ -87,6 +87,7 @@ final class Plugin {
 		Mail\MailSetup::register();
 		Bricks\DocsElements::register();
 		Mail\MailDns::register();
+		Mail\MailHold::register();
 		Mail\EmailValues::register();
 		Hosting\EmailValues::register();
 		Ssl\EmailValues::register();

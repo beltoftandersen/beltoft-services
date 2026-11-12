@@ -11,7 +11,7 @@
  * @var string                           $account_url        The Email area.
  * @var string                           $mail_domain        The email domain.
  * @var bool                             $mail_external      The domain is hosted elsewhere.
- * @var array<int, array<string, mixed>> $mail_records       Records: name, type, value, priority, status.
+ * @var array<int, array<string, mixed>> $mail_records_needed Needed records still missing: name, type, value, priority, status.
  * @var string                           $mail_guide_url     The setup guide, or ''.
  * @var string                           $additional_content Additional content from the email's settings.
  * @var \WC_Email                        $email              The email.
@@ -32,14 +32,14 @@ if ( '' !== $customer_name ) {
 }
 ?>
 </p>
-<p><?php echo esc_html( sprintf( /* translators: %s: domain name. */ __( 'Email for %s will not work until these DNS records are added where the domain is hosted.', 'beltoft-services' ), $mail_domain ) ); ?></p>
+<p><?php echo esc_html( sprintf( /* translators: %s: domain name. */ __( 'Email for %s will not work fully until these DNS records are added where the domain is hosted. Mail arrives once the MX record is in place. Your mailboxes cannot send until the SPF and DKIM records are found.', 'beltoft-services' ), $mail_domain ) ); ?></p>
 <table cellspacing="0" cellpadding="6" style="width:100%;margin-bottom:16px" border="1">
 	<tr>
 		<th scope="col" style="text-align:left"><?php esc_html_e( 'Type', 'beltoft-services' ); ?></th>
 		<th scope="col" style="text-align:left"><?php esc_html_e( 'Name', 'beltoft-services' ); ?></th>
 		<th scope="col" style="text-align:left"><?php esc_html_e( 'Value', 'beltoft-services' ); ?></th>
 	</tr>
-	<?php foreach ( $mail_records as $beltoft_services_row ) : ?>
+	<?php foreach ( $mail_records_needed as $beltoft_services_row ) : ?>
 	<tr>
 		<td><?php echo esc_html( (string) $beltoft_services_row['type'] ); ?></td>
 		<td style="word-break:break-all"><?php echo esc_html( (string) $beltoft_services_row['name'] ); ?></td>

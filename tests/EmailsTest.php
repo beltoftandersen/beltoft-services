@@ -732,6 +732,7 @@ final class EmailsTest extends TestCase {
 			'mail_host',
 			'mail_imap',
 			'mail_records',
+			'mail_records_needed',
 			'mail_smtp',
 			'monitor_cpu_hours',
 			'monitor_cpu_percent',

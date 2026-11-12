@@ -80,6 +80,22 @@ final class MailcowClientTest extends TestCase {
 		);
 	}
 
+	public function test_holding_and_allowing_sending_changes_one_attribute_of_one_mailbox(): void {
+		// The documented answer of edit/mailbox: log, msg and type.
+		$this->respond_with( fn() => $this->json( array( array( 'type' => 'success', 'log' => array( 'mailbox', 'edit', 'mailbox' ), 'msg' => array( 'mailbox_modified', 'x@a.example' ) ) ) ) );
+		$c = $this->live();
+
+		$this->assertIsArray( $c->set_smtp_access( 'x@a.example', false ) );
+		$c->set_smtp_access( 'x@a.example', true );
+
+		$calls = $this->http_calls();
+		$this->assertSame( 'https://mail.example.net/api/v1/edit/mailbox', $calls[0]['url'] );
+		$this->assertSame( array( 'items' => array( 'x@a.example' ), 'attr' => array( 'smtp_access' => '0' ) ), json_decode( $calls[0]['args']['body'], true ) );
+		$this->assertSame( array( 'items' => array( 'x@a.example' ), 'attr' => array( 'smtp_access' => '1' ) ), json_decode( $calls[1]['args']['body'], true ) );
+		$this->assertStringNotContainsString( 'protocol_access', $calls[0]['args']['body'], 'The other protocols are not named, so they stay as they are.' );
+		$this->assertCount( 2, $calls );
+	}
+
 	public function test_reads(): void {
 		$this->respond_with(
 			function ( $url ) {

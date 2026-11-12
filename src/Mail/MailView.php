@@ -50,6 +50,8 @@ final class MailView {
 			'aliases'   => null,
 			'errors'    => array(),
 			'dns'       => self::dns( $r, $kind ),
+			'send_held' => $ready && MailHold::held( $r ),
+			'hold_text' => $ready ? MailHold::notice( $r ) : '',
 			'connect'   => self::connect( MailGuard::domain( $r ) ),
 			'send'      => array(
 				'mailbox_day'   => MailSettings::override( $r, 'day', (int) Settings::get( 'mail_rl_day' ) ),
@@ -288,7 +290,7 @@ final class MailView {
 			'id'        => 'mail',
 			'domain'    => $domain,
 			'title'     => sprintf( /* translators: %s: domain name. */ __( 'Make email work on %s', 'beltoft-services' ), $shown ),
-			'why'       => sprintf( /* translators: %s: domain name. */ __( 'These records send email for %s to our mail server and let it send email as you. Mail does not arrive until the needed records are in place.', 'beltoft-services' ), $shown ),
+			'why'       => sprintf( /* translators: %s: domain name. */ __( 'These records send email for %s to our mail server and let it send email as you. The needed records decide what works: receiving waits for MX, sending waits for SPF and DKIM. The recommended records are not required.', 'beltoft-services' ), $shown ),
 			'records'   => $records,
 			'notes'     => $notes,
 			'done_text' => sprintf( /* translators: %s: domain name. */ __( 'Email DNS for %s is set up. All needed records were found.', 'beltoft-services' ), $shown ),

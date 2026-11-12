@@ -14,6 +14,7 @@ use BeltoftServices\Mail\MailClients;
 use BeltoftServices\Mail\MailDomain;
 use BeltoftServices\Mail\MailDriver;
 use BeltoftServices\Mail\MailGuard;
+use BeltoftServices\Mail\MailHold;
 use BeltoftServices\Mail\MailMeta;
 use BeltoftServices\Mail\MailSettings;
 use BeltoftServices\Resource;
@@ -157,6 +158,13 @@ final class SiteMail {
 			if ( is_wp_error( $limited ) ) {
 				return StepResult::retry( 300, 'mail: ' . $this->scrub( $limited->get_error_message(), 160 ) );
 			}
+		}
+
+		// The system mailbox follows the rule of its domain: no sending while SPF and DKIM are not found there.
+		$held = MailHold::on_new_mailbox( Resource::find( $child->id() ) ?? $child, $client, $address );
+
+		if ( is_wp_error( $held ) ) {
+			return StepResult::retry( 300, 'mail: ' . $this->scrub( $held->get_error_message(), 160 ) );
 		}
 
 		return $this->smtp( 'smtp_system', MailSettings::host(), $address, $password, 'system' );

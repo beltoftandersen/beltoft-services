@@ -154,6 +154,16 @@ final class Mailboxes {
 					}
 				}
 
+				// A domain whose SPF and DKIM are not found yet may receive, not send: the new mailbox is held like the others.
+				$held = MailHold::on_new_mailbox( $r, $client, $email );
+
+				if ( is_wp_error( $held ) ) {
+					$client->delete_mailbox( $email );
+					MailAccess::abort( $r, $email );
+					$outcome = MailGuard::failed( $held, __( 'create the mailbox', 'beltoft-services' ) );
+					return false;
+				}
+
 				MailAccess::finish( $r, $email );
 				$seen    = MailPlan::mailboxes_of( $r );
 				$count   = is_wp_error( $seen ) ? (int) $r->get( 'mail_boxes' ) + 1 : $seen;

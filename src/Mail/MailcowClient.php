@@ -154,4 +154,15 @@ interface MailcowClient {
 	 * @return array<int, mixed>|\WP_Error
 	 */
 	public function set_domain_rate_limit( string $domain, int $value, string $frame );
+
+	/**
+	 * POST edit/mailbox with only smtp_access: lets one mailbox log in to send (SMTP submission) or stops it. Receiving,
+	 * IMAP, POP3 and every other attribute of the mailbox stay as they are (mailcow keeps an attribute that the request
+	 * does not name).
+	 *
+	 * @param string $email Mailbox address.
+	 * @param bool   $allow True to allow sending, false to hold it.
+	 * @return array<int, mixed>|\WP_Error
+	 */
+	public function set_smtp_access( string $email, bool $allow );
 }

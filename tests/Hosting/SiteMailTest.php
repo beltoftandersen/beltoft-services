@@ -129,6 +129,31 @@ class SiteMailTest extends HostingCase {
 		$this->assertSame( array( 'mode' => 'system', 'address' => 'wordpress@shop.example' ), $fresh->get( 'mail_sender' ) );
 	}
 
+	public function test_the_system_mailbox_cannot_send_while_spf_and_dkim_are_not_found_and_other_domains_are_left_alone(): void {
+		$this->mailcow->add_domain( array( 'domain' => 'other.example' ) );
+		$this->mailcow->add_mailbox( array( 'local_part' => 'bob', 'domain' => 'other.example', 'quota' => '10' ) );
+		list( $r, $child ) = $this->account_with_mail();
+
+		( new SiteMail( $r ) )->enable_system_mailbox();
+
+		$this->assertTrue( \BeltoftServices\Mail\MailHold::held( Resource::find( $child->id() ) ) );
+		$this->assertFalse( $this->mailcow->mailbox( 'wordpress@shop.example' )['smtp'] );
+		$this->assertSame( '1', $this->mailcow->mailbox( 'wordpress@shop.example' )['active'] );
+		$this->assertTrue( $this->mailcow->mailbox( 'bob@other.example' )['smtp'] );
+
+		// The DNS check lifts it for the system mailbox too.
+		$fresh = Resource::find( $child->id() );
+		$rows  = (array) $fresh->get( 'mail_records' );
+		foreach ( $rows as $i => $row ) {
+			if ( in_array( $row['key'], array( 'spf', 'dkim' ), true ) ) {
+				$rows[ $i ]['status'] = 'ok';
+			}
+		}
+		$fresh->set( array( 'mail_records' => $rows ) );
+		\BeltoftServices\Mail\MailHold::sync( Resource::find( $child->id() ) );
+		$this->assertTrue( $this->mailcow->mailbox( 'wordpress@shop.example' )['smtp'] );
+	}
+
 	public function test_running_it_again_keeps_one_mailbox_and_the_same_password(): void {
 		list( $r ) = $this->account_with_mail();
 		( new SiteMail( $r ) )->enable_system_mailbox();
@@ -205,7 +230,10 @@ class SiteMailTest extends HostingCase {
 		$address = 'wp-c' . $r->id() . '@shop.example';
 		$this->assertSame( array( 'mode' => 'system', 'address' => $address ), $done['mail_sender'] );
 		$this->assertNotNull( $this->mailcow->mailbox( $address ) );
-		$this->assertSame( $before, $this->mailcow->mailbox( 'wordpress@shop.example' ), 'Their mailbox was not edited.' );
+		// Their mailbox is not edited; only its sending is held with the others of the domain until SPF and DKIM are found.
+		$after = $this->mailcow->mailbox( 'wordpress@shop.example' );
+		$this->assertFalse( $after['smtp'] );
+		$this->assertSame( $before, array_merge( $after, array( 'smtp' => true ) ), 'Their mailbox was not edited.' );
 		$this->assertSame( 'wp-c' . $r->id(), Resource::find( $r->id() )->get( 'smtp_local' ), 'Chosen once and kept.' );
 		$this->assertSame( $address, MailGuard::system_address( Resource::find( SiteMail::child_of( $r )->id() ) ) );
 	}

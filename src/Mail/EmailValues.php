@@ -52,6 +52,7 @@ final class EmailValues {
 		$values['mail_domain']    = $mail ? HostName::display( (string) $mail->get( 'mail_domain' ) ) : '';
 		$values['mail_external']  = $mail && 'external' === (string) $mail->get( 'mail_mode' );
 		$values['mail_records']   = $mail ? MailDns::missing_rows( $mail ) : array();
+		$values['mail_records_needed'] = $mail ? MailDns::missing_rows( $mail, true ) : array();
 		$values['mail_host']      = $mail ? MailSettings::host() : '';
 		$values['mail_imap']      = MailView::IMAP_PORT;
 		$values['mail_smtp']      = MailView::SMTP_SSL;

@@ -352,15 +352,36 @@ final class MailAccountTest extends MailTestCase {
 		$this->assertNotNull( $ours );
 	}
 
+	public function test_the_page_says_sending_is_held_on_the_overview_each_mailbox_and_the_form_until_it_is_lifted(): void {
+		$r = $this->ready_mail( 'held.example', array(), $this->user );
+		\BeltoftServices\Mail\Mailboxes::create( $r, 'anna' );
+		$line = 'Sending is held until the SPF and DKIM records are found. Receiving works once the MX record points here.';
+
+		$html = $this->page( Resource::find( $r->id() ) );
+		$this->assertStringContainsString( 'data-mail-hold>', $html );
+		$this->assertStringContainsString( 'data-mail-hold-row', $html );
+		$this->assertStringContainsString( 'data-mail-hold-form', $html );
+		$this->assertSame( 3, substr_count( $html, $line ) );
+
+		$fresh = Resource::find( $r->id() );
+		$rows  = (array) $fresh->get( 'mail_records' );
+		foreach ( $rows as $i => $row ) {
+			$rows[ $i ]['status'] = 'ok';
+		}
+		$fresh->set( array( 'mail_records' => $rows, 'mail_dns' => 'ok' ) );
+
+		$this->assertStringNotContainsString( 'Sending is held', $this->page( Resource::find( $r->id() ) ) );
+	}
+
 	public function test_a_conflict_shows_its_reason(): void {
-		$this->our_zone( $this->user, 'conflict.example', array( array( 'name' => 'autoconfig', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.1' ) ) );
+		$this->our_zone( $this->user, 'conflict.example', array( array( 'name' => '@', 'type' => 'MX', 'ttl' => 300, 'value' => 'other.example', 'priority' => 20 ) ) );
 		$r = $this->ready_mail( 'conflict.example', array(), $this->user );
 
 		$html = $this->page( $r, 'dns' );
 
 		$this->assertStringContainsString( 'on our name servers, so we add these records for you', $html );
 		$this->assertStringContainsString( 'Another value is there now', $html );
-		$this->assertStringContainsString( 'The name already has a DNS record.', $html );
+		$this->assertStringContainsString( 'The domain already has other MX records.', $html );
 		$this->assertStringContainsString( 'data-mail-dns-check', $html );
 	}
 
