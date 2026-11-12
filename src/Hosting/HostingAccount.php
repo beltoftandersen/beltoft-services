@@ -834,7 +834,10 @@ final class HostingAccount {
 		if ( $ready && ! $busy ) {
 			echo '<div class="beltoft-hosting-formrow">';
 
-			if ( array() !== $sites ) {
+			if ( 1 === count( $sites ) ) {
+				// One website: nothing to choose, the restore buttons use it.
+				echo '<input type="hidden" data-hosting-field="restore_slug" value="' . esc_attr( (string) reset( $sites )['slug'] ) . '">';
+			} elseif ( array() !== $sites ) {
 				echo '<label class="beltoft-hosting-field"><span>' . esc_html__( 'Website to restore', 'beltoft-services' ) . '</span><select data-hosting-field="restore_slug">';
 
 				foreach ( $sites as $site ) {
