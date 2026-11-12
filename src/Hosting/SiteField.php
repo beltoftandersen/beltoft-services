@@ -282,10 +282,9 @@ final class SiteField {
 	private static function read_post( string $key ): array {
 		$out = LineField::read_post( self::POST_KEY, $key, array( 'slug', 'slug_domain', 'label', 'mode', 'host', 'host_ours', 'host_new', 'zone', 'install', 'language', 'email' ) );
 
-		// Each mode has its own inputs; only the chosen mode's inputs count.
-		if ( '' !== $out['mode'] && self::MODE_PREVIEW !== $out['mode'] ) {
-			$out['slug'] = $out['slug_domain'];
-		}
+		// Each mode has its own inputs; only the chosen mode's inputs count. The temporary address has no name input: its name
+		// is made from the customer's details, so a name posted with it (a changed request) is not taken.
+		$out['slug'] = '' !== $out['mode'] && self::MODE_PREVIEW !== $out['mode'] ? $out['slug_domain'] : '';
 
 		if ( self::MODE_NEW === $out['mode'] ) {
 			$out['host'] = $out['host_new'];

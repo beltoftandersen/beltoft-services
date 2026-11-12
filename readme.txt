@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.10.1
+Stable tag: 0.10.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -255,6 +255,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.10.2 =
+* Hosting order form: a website name posted together with the temporary address is ignored (the name is generated); the form stopped offering the field in 0.10.1 but the server still took it.
 
 = 0.10.1 =
 * The temporary address of a new hosting website is made for the customer, from the website title, the company, the name or the email name, with two random characters (for example `myfirm-k7`), instead of being typed at the checkout. The same goes for a website added in My Account without a name. A name that is given (REST) is checked as before. New filter `beltoft_services_hosting_generated_name`.

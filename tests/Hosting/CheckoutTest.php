@@ -524,7 +524,9 @@ class CheckoutTest extends HostingCase {
 		$this->post( $key, array( 'mode' => 'preview', 'slug' => 'plain', 'slug_domain' => 'ignored' ) );
 		$item = new \WC_Order_Item_Product();
 		SiteField::save_on_item( $item, $key );
-		$this->assertSame( 'plain', $item->get_meta( SiteField::ITEM_META )['slug'] );
+		$made = (string) $item->get_meta( SiteField::ITEM_META )['slug'];
+		$this->assertNotSame( 'plain', $made, 'The temporary address takes no posted name.' );
+		$this->assertMatchesRegularExpression( '/^[a-z0-9-]+-[a-z0-9]{2,3}$/', $made, 'It is the generated name.' );
 	}
 
 	public function test_an_account_with_the_old_empty_install_still_works(): void {
@@ -745,5 +747,21 @@ class CheckoutTest extends HostingCase {
 		$this->assertStringContainsString( 'Connect it below or contact support.', $hint );
 		$this->assertStringNotContainsString( 'addon_required', $hint );
 		$this->assertStringNotContainsString( "\u{2014}", $hint );
+	}
+
+	public function test_a_name_posted_with_the_temporary_address_is_not_taken(): void {
+		$read = new \ReflectionMethod( SiteField::class, 'read_post' );
+		$read->setAccessible( true );
+
+		$_POST[ SiteField::POST_KEY ] = array( 'k1' => array( 'mode' => 'preview', 'slug' => 'chosen-name', 'slug_domain' => 'other' ) );
+		$this->assertSame( '', $read->invoke( null, 'k1' )['slug'], 'The form has no name field in this mode.' );
+
+		$_POST[ SiteField::POST_KEY ] = array( 'k1' => array( 'slug' => 'chosen-name' ) );
+		$this->assertSame( '', $read->invoke( null, 'k1' )['slug'], 'No mode posted is the temporary address.' );
+
+		$_POST[ SiteField::POST_KEY ] = array( 'k1' => array( 'mode' => 'own', 'host' => 'www.example.com', 'slug' => 'ignored', 'slug_domain' => 'typed-name' ) );
+		$this->assertSame( 'typed-name', $read->invoke( null, 'k1' )['slug'], 'A domain mode keeps its More options name.' );
+
+		unset( $_POST[ SiteField::POST_KEY ] );
 	}
 }
