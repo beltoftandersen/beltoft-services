@@ -63,7 +63,7 @@ class PluginTest extends TestCase {
 			'MySQL 8'                     => array( '8.0.36-0ubuntu0.22.04.1', true ),
 			'MariaDB 10.0.1 with prefix'  => array( '5.5.5-10.0.1-MariaDB', false ),
 			'MariaDB 10.0.2 with prefix'  => array( '5.5.5-10.0.2-MariaDB-log', true ),
-			'MariaDB 10.11 without'       => array( '10.11.14-MariaDB-0ubuntu0.24.04.1', true ),
+			'MariaDB 10.11 without'       => array( '10.11.24-MariaDB-0ubuntu0.24.04.1', true ),
 			'MariaDB 5.5'                 => array( '5.5.68-MariaDB', false ),
 			'MariaDB 11'                  => array( '11.4.2-MariaDB', true ),
 			'unknown server info'         => array( '', true ),
@@ -110,7 +110,7 @@ class PluginTest extends TestCase {
 		$data = get_file_data( BELTOFT_SERVICES_FILE, array( 'Version' => 'Version' ) );
 
 		$this->assertSame( BELTOFT_SERVICES_VERSION, $data['Version'] );
-		$this->assertSame( '0.11.1', BELTOFT_SERVICES_VERSION );
+		$this->assertSame( '0.11.2', BELTOFT_SERVICES_VERSION );
 	}
 
 	public function test_no_code_needs_a_newer_php_than_the_header_says(): void {

@@ -796,7 +796,8 @@ div.beltoft-services-domain ul.beltoft-services-domain__import-list > li { displ
 .woocommerce-MyAccount-content .beltoft-services-api .form-row { position: relative; width: 100%; max-width: 520px; margin: 0; padding: 0; }
 .woocommerce-MyAccount-content .beltoft-services-api .form-row label { display: block; margin: 0 0 var(--bs-space-1); padding: 0; color: var(--navy, #0c1535); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); line-height: var(--bs-lh-text); }
 .woocommerce-MyAccount-content .beltoft-services-api .form-row .woocommerce-input-wrapper { display: block; }
-.woocommerce-MyAccount-content .beltoft-services-api .form-row input, .woocommerce-MyAccount-content .beltoft-services-api .form-row select { box-sizing: border-box; display: block; width: 100%; height: var(--bs-input-h); margin: 0; padding: 0 var(--bs-space-3); border: 1px solid var(--bs-input-border); background: var(--bg-card, #fff); box-shadow: none; color: var(--navy, #0c1535); font: inherit; font-size: var(--bs-fs-body); line-height: var(--bs-lh-text); }
+.woocommerce-MyAccount-content .beltoft-services-api .form-row input, .woocommerce-MyAccount-content .beltoft-services-api .form-row select { box-sizing: border-box; display: block; width: 100%; height: var(--bs-input-h); margin: 0; padding: 0 var(--bs-space-3); border: 1px solid var(--bs-input-border); background-color: var(--bg-card, #fff); box-shadow: none; color: var(--navy, #0c1535); font: inherit; font-size: var(--bs-fs-body); line-height: var(--bs-lh-text); }
+.woocommerce-MyAccount-content .beltoft-services-api .form-row select { padding-right: 40px; }
 .beltoft-services-api__hint { display: block; margin: 8px 0 0; color: var(--ink-soft, #5e7080); font-size: 14px; }
 .beltoft-services-api__buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .beltoft-services-api__send { order: -1; }
