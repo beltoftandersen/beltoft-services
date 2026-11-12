@@ -77,6 +77,13 @@ final class CheckoutCredit {
 	private static array $memo = array();
 
 	/**
+	 * Per request: the order this checkout made is paid from credit and its cart saves a card, so the gateway must still be asked.
+	 *
+	 * @var bool
+	 */
+	private static bool $ask_gateway = false;
+
+	/**
 	 * Hooks.
 	 */
 	public static function register(): void {
@@ -93,6 +100,8 @@ final class CheckoutCredit {
 		foreach ( array( 'pending', 'failed', 'on-hold', 'cancelled' ) as $status ) {
 			add_action( 'woocommerce_payment_complete_order_status_' . $status, array( __CLASS__, 'hold_late_payment' ), 10, 1 );
 		}
+		// After WooCommerce Subscriptions (10), the trial rule (20) and the usage rule (30).
+		add_filter( 'woocommerce_cart_needs_payment', array( __CLASS__, 'gateway_saves_card' ), 40 );
 		add_action( 'woocommerce_review_order_before_order_total', array( __CLASS__, 'review_row' ) );
 		add_filter( 'woocommerce_cart_totals_order_total_html', array( __CLASS__, 'total_html' ), 10 );
 		// What the Stripe gateway tells the browser about the cart: the amount of the card form and of the wallet sheets.
@@ -327,7 +336,31 @@ final class CheckoutCredit {
 	 * Forgets the forecasts of this request (a credit change, a test).
 	 */
 	public static function reset(): void {
-		self::$memo = array();
+		self::$memo        = array();
+		self::$ask_gateway = false;
+	}
+
+	/**
+	 * The order of this request carries credit: when its cart saves a card (a subscription, pay as you go), the gateway is asked also
+	 * with a total of 0, so the card is saved for the renewals. WooCommerce decides "needs payment" from the order total right after
+	 * the order is made, and a store can let a subscription of 0 through without a payment method; a card always needs to be there.
+	 *
+	 * @param \WC_Order $order Order that carries credit.
+	 */
+	private static function note_card( \WC_Order $order ): void {
+		$cart = function_exists( 'WC' ) ? WC()->cart : null;
+
+		self::$ask_gateway = Invoice::used( $order ) > 0 && $cart instanceof \WC_Cart && ! $cart->is_empty() && self::cart_saves_card( $cart );
+	}
+
+	/**
+	 * See note_card().
+	 *
+	 * @param mixed $needs Whether a payment is needed.
+	 * @return mixed
+	 */
+	public static function gateway_saves_card( $needs ) {
+		return self::$ask_gateway ? true : $needs;
 	}
 
 	/**
@@ -445,6 +478,7 @@ final class CheckoutCredit {
 		if ( Invoice::apply( $order, $user_id, $min, RenewalCredit::promo_cap( $order ) ) > 0 ) {
 			$order->update_meta_data( self::META, 'yes' );
 			$order->save();
+			self::note_card( $order );
 		}
 	}
 
@@ -460,6 +494,7 @@ final class CheckoutCredit {
 
 		if ( Invoice::restore( $order ) ) {
 			$order->save();
+			self::note_card( $order );
 
 			return;
 		}

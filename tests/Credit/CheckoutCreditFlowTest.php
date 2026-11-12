@@ -167,6 +167,45 @@ class CheckoutCreditFlowTest extends CheckoutCreditCase {
 	 * @runInSeparateProcess
 	 * @preserveGlobalState disabled
 	 */
+	public function test_credit_covering_a_subscription_saves_the_card_also_where_the_store_lets_a_zero_checkout_through(): void {
+		// WooCommerce Subscriptions setting: a subscription checkout of 0 needs no payment method. Credit still asks the gateway.
+		update_option( \WC_Subscriptions_Admin::$option_prefix . '_zero_initial_payment_requires_payment', 'yes' );
+		$user = $this->new_user();
+		$this->remove_cards( $user );
+		$this->paid( $user, 5000 );
+		$product = $this->as_subscription( $this->product( false ) );
+
+		$end = $this->in_checkout(
+			$user,
+			function () use ( $product ) {
+				$this->fill( array( $product ) );
+				$this->assertTrue( WC()->cart->needs_payment(), 'The customer still chooses a payment method.' );
+
+				return $this->submit();
+			}
+		);
+
+		$this->assertSame( 'success', $end['result'], implode( ' ', $end['messages'] ) );
+		$this->assertCount( 1, $this->card->charges, 'The gateway is asked, with an order of 0 (it saves the card).' );
+		$this->assertSame( '0.00', $this->card->charges[0][0] );
+
+		$order = wc_get_order( $end['order_id'] );
+		$this->assertSame( 1000, Invoice::used( $order ) );
+		$this->assertTrue( $order->is_paid() );
+
+		$subs = wcs_get_subscriptions_for_order( $order );
+		$this->assertCount( 1, $subs );
+		$sub = array_values( $subs )[0];
+		$this->assertSame( 'active', $sub->get_status() );
+		$this->assertSame( 'fakecard', $sub->get_payment_method(), 'The payment method is on the subscription.' );
+		$this->assertGreaterThan( time(), $sub->get_time( 'next_payment' ), 'The next payment is dated.' );
+		$this->assertEqualsWithDelta( 10.0, (float) $sub->get_total(), 0.001, 'The subscription renews at its full price.' );
+	}
+
+	/**
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
 	public function test_promotional_credit_on_an_unmarked_product_leaves_the_card_to_pay_in_full(): void {
 		$user = $this->new_user();
 		$this->promo( $user, 5000 );
