@@ -246,6 +246,17 @@ class ProofResolverTest extends TestCase {
 		$this->assertSame( array( self::N1 . "|$name|16", self::N2 . "|$name|16" ), $this->asked );
 	}
 
+	/** The ownership check passes several accepted values through DnsClaimJobs::proof(): any one of them is the proof. */
+	public function test_a_list_of_values_through_the_proof_call_finds_any_of_them(): void {
+		$name = '_beltoft-verify.example.com';
+		$this->net[ self::N1 . "|$name|16" ] = $this->txt( $name, array( 'older-token' ) );
+		$this->net[ self::N2 . "|$name|16" ] = $this->txt( $name, array( 'older-token' ) );
+		remove_all_filters( 'beltoft_services_dns_proof_result' ); // The test base answers every proof call without DNS; this one goes through.
+		$result = \BeltoftServices\Domains\DnsClaimJobs::proof( 'check_txt', array( 'example.com', array( 'central-token', 'older-token' ), $this->delegation_for( array( 'ns1.x.net' => array( self::N1 ), 'ns2.x.net' => array( self::N2 ) ) ) ) );
+		$this->assertSame( 'found', $result['status'] );
+		$this->assertSame( array( 'ns1.x.net' => 'found', 'ns2.x.net' => 'found' ), $result['servers'] );
+	}
+
 	public function test_txt_found_on_one_and_missing_on_another_is_missing(): void {
 		$name = '_beltoft-verify.example.com';
 		$this->net[ self::N1 . "|$name|16" ] = $this->txt( $name, array( 'proof-1' ) );

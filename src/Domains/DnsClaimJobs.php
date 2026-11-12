@@ -321,7 +321,8 @@ final class DnsClaimJobs {
 		}
 
 		if ( 'check_txt' === $call ) {
-			return ProofResolver::check_txt( (string) $args[0], (string) $args[1], (array) $args[2] );
+			// The value may be a list (the central token and older ones): never cast it to a string.
+			return ProofResolver::check_txt( (string) $args[0], is_array( $args[1] ) ? $args[1] : (string) $args[1], (array) $args[2] );
 		}
 
 		if ( 'scan' === $call ) {

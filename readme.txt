@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.17.0
+Stable tag: 0.17.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -255,6 +255,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.17.1 =
+* Fix: the domain ownership check passed its list of accepted proof values on as the word "Array", so a hosting domain proven by its TXT record was set back to waiting at its next check (0.15.0 to 0.17.0).
 
 = 0.17.0 =
 * Hosting: a file manager and a database tool for every website, opened from the hosting page with one click ("Open file manager", "Open database") in a new tab on the website's own address. No password is typed or shown. The link works once for 60 seconds, the tab ends after 30 minutes without use (8 hours at most), and the tools are not reachable without it. New routes `hosting/sites/<slug>/files-link` and `hosting/sites/<slug>/database-link` (dashboard only, not for API tokens or the MCP server); needs the node agent with the operation `site.tool_link`.
