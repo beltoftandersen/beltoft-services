@@ -89,6 +89,8 @@ final class HostingAccount {
 					'confirm'   => __( 'Type the website name to remove it. Its files and database are deleted.', 'beltoft-services' ),
 					'buy'       => __( 'Buy and add', 'beltoft-services' ),
 					'opening'   => __( 'Opening WordPress...', 'beltoft-services' ),
+					'openingFiles' => __( 'Opening the file manager...', 'beltoft-services' ),
+					'openingDatabase' => __( 'Opening the database tool...', 'beltoft-services' ),
 					/* translators: 1: WordPress user name, 2: email address. */
 					'signedInAs' => __( 'Signed in as %1$s (%2$s).', 'beltoft-services' ),
 					/* translators: %s: WordPress user name. */
@@ -483,7 +485,23 @@ final class HostingAccount {
 		echo '<p class="beltoft-hosting-help">' . esc_html__( 'The page cache is switched on and off in the WordPress dashboard, under Settings. Switch it off there, or deactivate or delete its plugin, to use another caching plugin.', 'beltoft-services' ) . '</p></dd></div>';
 
 		// Files.
-		echo '<div><dt>' . esc_html__( 'Files', 'beltoft-services' ) . '</dt><dd>' . esc_html__( 'Upload and download files with SFTP.', 'beltoft-services' ) . ' <a class="beltoft-hosting-link" href="#beltoft-hosting-files">' . esc_html__( 'Files (SFTP)', 'beltoft-services' ) . '</a></dd></div>';
+		echo '<div><dt>' . esc_html__( 'Files', 'beltoft-services' ) . '</dt><dd>';
+
+		if ( $ready ) {
+			echo '<div class="beltoft-hosting-buttons"><button type="button" class="beltoft-hosting-btn" data-hosting-action="tool_files" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Open file manager', 'beltoft-services' ) . '</button></div>';
+			echo '<p class="beltoft-hosting-help">' . esc_html__( 'Opens in a new tab and shows the files of this website. The tab ends after 30 minutes without use.', 'beltoft-services' ) . '</p>';
+		}
+
+		echo '<p class="beltoft-hosting-help">' . esc_html__( 'Upload and download files with SFTP.', 'beltoft-services' ) . ' <a class="beltoft-hosting-link" href="#beltoft-hosting-files">' . esc_html__( 'Files (SFTP)', 'beltoft-services' ) . '</a></p></dd></div>';
+
+		// Database.
+		echo '<div><dt>' . esc_html__( 'Database', 'beltoft-services' ) . '</dt><dd>';
+
+		if ( $ready ) {
+			echo '<div class="beltoft-hosting-buttons"><button type="button" class="beltoft-hosting-btn" data-hosting-action="tool_database" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Open database', 'beltoft-services' ) . '</button></div>';
+		}
+
+		echo '<p class="beltoft-hosting-help">' . esc_html__( 'Opens phpMyAdmin for the database of this website in a new tab. You do not need a password. The tab ends after 30 minutes without use.', 'beltoft-services' ) . '</p></dd></div>';
 
 		echo '</dl>';
 

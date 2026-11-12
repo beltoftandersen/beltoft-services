@@ -536,6 +536,7 @@ class AccountTest extends HostingCase {
 		$groups = array(
 			\BeltoftServices\Hosting\Actions\SiteActions::class,
 			\BeltoftServices\Hosting\Actions\PhpActions::class,
+			\BeltoftServices\Hosting\Actions\ToolActions::class,
 			\BeltoftServices\Hosting\Actions\AddonActions::class,
 			\BeltoftServices\Hosting\Actions\CareActions::class,
 			\BeltoftServices\Hosting\Actions\FilesActions::class,
@@ -556,7 +557,7 @@ class AccountTest extends HostingCase {
 			}
 
 			// Only limits() is shared (it sits in the Base trait every group uses); the facade asks SiteActions.
-			$this->assertCount( 'limits' === $method->getName() ? 5 : 1, $found, $method->getName() );
+			$this->assertCount( 'limits' === $method->getName() ? 6 : 1, $found, $method->getName() );
 
 			$this->assertSame( $this->signature( $method ), $this->signature( $found[0] ), $method->getName() );
 		}

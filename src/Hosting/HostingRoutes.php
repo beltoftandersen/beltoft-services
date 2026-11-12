@@ -28,6 +28,8 @@ defined( 'ABSPATH' ) || exit;
  * - GET    hosting/sites/<slug>/cache      what the node reports about the page cache and the object cache
  * - POST   hosting/sites/<slug>/login      a one-time WordPress sign-in address
  * - POST   hosting/sites/<slug>/password   a one-time address to WordPress's own "choose a new password" screen
+ * - POST   hosting/sites/<slug>/files-link     a one-time address that opens the file manager of the website
+ * - POST   hosting/sites/<slug>/database-link  a one-time address that opens the database tool of the website
  * - POST   hosting/sites/<slug>/wordpress-address  host (empty: the main address): moves WordPress itself to that address (background)
  * - POST   hosting/sites/<slug>/domains    host
  * - DELETE hosting/domains/<host>
@@ -109,6 +111,8 @@ final class HostingRoutes {
 			array( 'methods' => \WP_REST_Server::READABLE, 'callback' => array( __CLASS__, 'cache_status' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ),
 		) );
 		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/login', array( 'methods' => $post, 'callback' => array( __CLASS__, 'login_link' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ) );
+		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/files-link', array( 'methods' => $post, 'callback' => array( __CLASS__, 'files_link' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ) );
+		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/database-link', array( 'methods' => $post, 'callback' => array( __CLASS__, 'database_link' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ) );
 		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/password', array( 'methods' => $post, 'callback' => array( __CLASS__, 'password_link' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ) );
 		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/wordpress-address', array(
 			'methods'             => $post,
@@ -519,6 +523,18 @@ final class HostingRoutes {
 		$r = self::guard( $request, true, Routes::RATE_LIMIT, 'password', self::LOGIN_LIMIT );
 
 		return $r instanceof Resource ? self::reply( ( new HostingActions( $r ) )->password_link( (string) $request['slug'] ) ) : $r;
+	}
+
+	public static function files_link( \WP_REST_Request $request ): \WP_REST_Response {
+		$r = self::guard( $request, true, Routes::RATE_LIMIT, 'tools', self::LOGIN_LIMIT );
+
+		return $r instanceof Resource ? self::reply( ( new HostingActions( $r ) )->files_link( (string) $request['slug'] ) ) : $r;
+	}
+
+	public static function database_link( \WP_REST_Request $request ): \WP_REST_Response {
+		$r = self::guard( $request, true, Routes::RATE_LIMIT, 'tools', self::LOGIN_LIMIT );
+
+		return $r instanceof Resource ? self::reply( ( new HostingActions( $r ) )->database_link( (string) $request['slug'] ) ) : $r;
 	}
 
 	public static function login_link( \WP_REST_Request $request ): \WP_REST_Response {

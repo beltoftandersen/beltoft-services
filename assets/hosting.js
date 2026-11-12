@@ -78,6 +78,10 @@
 				return [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/login', {} ];
 			case 'password':
 				return [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/password', {} ];
+			case 'tool_files':
+				return [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/files-link', {} ];
+			case 'tool_database':
+				return [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/database-link', {} ];
 			case 'php_save':
 				return [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/php', { php: field( scope, 'php_version' ) } ];
 			case 'set_main':
@@ -341,9 +345,10 @@
 
 	function run( panel, button, id, action, request ) {
 		button.disabled = true;
-		var opens = 'login' === action || 'password' === action;
+		var opens = 'login' === action || 'password' === action || 'tool_files' === action || 'tool_database' === action;
+		var opening = 'tool_files' === action ? text.openingFiles : ( 'tool_database' === action ? text.openingDatabase : text.opening );
 
-		say( panel, opens ? ( text.opening || '' ) : ( text.working || '' ) );
+		say( panel, opens ? ( opening || '' ) : ( text.working || '' ) );
 
 		// The sign-in link is opened from the click, so a pop-up blocker allows it.
 		var tab = opens ? window.open( '', '_blank' ) : null;

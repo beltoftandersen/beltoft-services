@@ -30,6 +30,7 @@ defined( 'ABSPATH' ) || exit;
  *   the page cache plugin active, lifetime (seconds). Read only. Fails with "unknown site".
  * - site.verify: status (200), host. A loopback request inside the container for the host name (an operation this
  *   plugin adds to the plan's list for the verify step). Fails with "unknown site" for a site that was not created.
+ * - site.tool_link: url (a one-time address of the file manager or the database tool, fake) and expires_in.
  * - site.wp_login_link, site.wp_password_link: url (a one-time address, fake) and, for a site installed through site.wp_install,
  *   user and email of the administrator (the preferred admin_user when it is the one installed, else the installed one). The
  *   address of the password link is a different fake address; no reset key is ever in a reply.
@@ -154,6 +155,12 @@ class FakeAgent implements Agent {
 			'vmid'       => array( 'vmid', true ),
 			'slug'       => array( 'ident', true ),
 			'admin_user' => array( 'ident', false ),
+		),
+		'site.tool_link' => array(
+			'vmid' => array( 'vmid', true ),
+			'slug' => array( 'ident', true ),
+			'tool' => array( 'tool', true ),
+			'host' => array( 'host', false ),
 		),
 		'site.staging_create' => array(
 			'vmid' => array( 'vmid', true ),
@@ -436,6 +443,23 @@ class FakeAgent implements Agent {
 	}
 
 	/**
+	 * The address every site.tool_link answers with from now on (to test what the plugin refuses), or '' for the normal one.
+	 *
+	 * @param string $url Address.
+	 */
+	public function script_tool_url( string $url ): void {
+		$this->load();
+
+		if ( '' === $url ) {
+			unset( $this->state['tool_url'] );
+		} else {
+			$this->state['tool_url'] = $url;
+		}
+
+		$this->save();
+	}
+
+	/**
 	 * The result the next site.wp_address answers with (merged over changed false), nothing else is done. Consumed once.
 	 *
 	 * @param array<string, mixed> $result For example array( 'failed' => true, 'restored' => true ).
@@ -688,6 +712,8 @@ class FakeAgent implements Agent {
 				return is_bool( $value );
 			case 'ident':
 				return is_string( $value ) && 1 === preg_match( '/^[a-z0-9_-]{1,32}$/D', $value );
+			case 'tool':
+				return in_array( $value, array( 'files', 'database' ), true );
 			case 'host':
 				return is_string( $value ) && strlen( $value ) <= 253 && 1 === preg_match( '/^(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/D', $value );
 			case 'ip':
@@ -823,6 +849,7 @@ class FakeAgent implements Agent {
 			case 'site.verify':
 			case 'site.wp_login_link':
 			case 'site.wp_password_link':
+			case 'site.tool_link':
 			case 'site.php':
 			case 'site.domains':
 			case 'site.cache_purge':
@@ -885,6 +912,15 @@ class FakeAgent implements Agent {
 					return array(
 						'status' => 200,
 						'host'   => $args['host'],
+					);
+				}
+
+				if ( 'site.tool_link' === $op ) {
+					$site = $this->state['sites'][ $vmid ][ $args['slug'] ];
+
+					return array(
+						'url'        => $this->state['tool_url'] ?? 'https://' . ( $args['host'] ?? $site['wp_address'] ?? $site['host'] ) . '/.hosting/' . $args['tool'] . '/?t=fake-tool-token',
+						'expires_in' => 60,
 					);
 				}
 

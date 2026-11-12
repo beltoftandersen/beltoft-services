@@ -11,6 +11,7 @@ use BeltoftServices\Hosting\Actions\AddonActions;
 use BeltoftServices\Hosting\Actions\CareActions;
 use BeltoftServices\Hosting\Actions\FilesActions;
 use BeltoftServices\Hosting\Actions\PhpActions;
+use BeltoftServices\Hosting\Actions\ToolActions;
 use BeltoftServices\Hosting\Actions\SiteActions;
 use BeltoftServices\Resource;
 
@@ -19,7 +20,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * The customer operations behind the account page and the REST routes: sites, domains, PHP version and limits,
  * cache purge, the WordPress login link, Email lite, backups. The work lives in four groups under Hosting\Actions
- * (SiteActions, PhpActions, AddonActions, CareActions); this class builds them from the same Resource and forwards
+ * (SiteActions, PhpActions, ToolActions, AddonActions, CareActions); this class builds them from the same Resource and forwards
  * each call by name, so the routes, the account page, the add-ons, the CLI and the MCP tools keep one entry point.
  * Results are arrays; a refusal is a WP_Error with a short code (invalid, limit, exists, not_found, busy, failed,
  * not_ready) and words for the customer. Nothing an agent says is passed on.
@@ -39,6 +40,13 @@ final class HostingActions {
 	 * @var PhpActions
 	 */
 	private $php;
+
+	/**
+	 * The one-time links to the file manager and the database tool.
+	 *
+	 * @var ToolActions
+	 */
+	private $tools;
 
 	/**
 	 * Add-ons and Email lite.
@@ -68,6 +76,7 @@ final class HostingActions {
 		$this->files  = new FilesActions( $r );
 		$this->sites  = new SiteActions( $r );
 		$this->php    = new PhpActions( $r );
+		$this->tools  = new ToolActions( $r );
 		$this->addons = new AddonActions( $r );
 		$this->care   = new CareActions( $r );
 	}
@@ -249,6 +258,26 @@ final class HostingActions {
 	 */
 	public function password_link( string $slug ) {
 		return $this->php->password_link( $slug );
+	}
+
+	/**
+	 * A one-time address that opens the file manager of the website, on its own address.
+	 *
+	 * @param string $slug Site.
+	 * @return array<string, mixed>|\WP_Error url.
+	 */
+	public function files_link( string $slug ) {
+		return $this->tools->files_link( $slug );
+	}
+
+	/**
+	 * A one-time address that opens the database tool of the website, on its own address.
+	 *
+	 * @param string $slug Site.
+	 * @return array<string, mixed>|\WP_Error url.
+	 */
+	public function database_link( string $slug ) {
+		return $this->tools->database_link( $slug );
 	}
 
 	/**
