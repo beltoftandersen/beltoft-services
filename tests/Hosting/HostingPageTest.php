@@ -740,4 +740,19 @@ class HostingPageTest extends HostingCase {
 		( new HostingActions( $r ) )->add_domain( 'w' . $r->id(), 'example.org' );
 		$this->assertStringContainsString( 'example.org is connected and waits for its DNS', $this->page( $r ) );
 	}
+
+	public function test_the_move_panel_shows_only_when_the_shop_has_a_request_page(): void {
+		$r = $this->account();
+		$this->assertStringNotContainsString( 'beltoft-hosting-move', $this->page( $r ) );
+
+		$this->settings( array( 'hosting_move_url' => '/contact/?about=Website move', 'hosting_move_text' => 'We move your website here for free.' ) );
+		$html = $this->page( $r );
+		$this->assertStringContainsString( 'id="beltoft-hosting-move"', $html );
+		$this->assertStringContainsString( 'We move your website here for free.', $html );
+		$this->assertStringContainsString( 'Request a move', $html );
+		$this->assertStringContainsString( esc_url( home_url( '/contact/?about=Website move' ) ), $html );
+
+		$this->settings( array( 'hosting_move_url' => '/contact/', 'hosting_move_text' => '' ) );
+		$this->assertStringContainsString( 'Have a website somewhere else? We can move it here for you.', $this->page( $r ) );
+	}
 }

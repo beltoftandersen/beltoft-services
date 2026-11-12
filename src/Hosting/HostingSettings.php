@@ -166,6 +166,22 @@ final class HostingSettings {
 				'desc'    => __( 'Where the Order hosting button in the account goes, for example /wordpress-hosting/#plans. Empty uses the first hosting product page.', 'beltoft-services' ),
 			)
 		);
+		$fields['hosting_move_url'] = array_merge(
+			$base,
+			array(
+				'default' => '',
+				'label'   => __( 'Website move request page', 'beltoft-services' ),
+				'desc'    => __( 'A page where a customer asks to have an existing website moved to their hosting, for example /contact/?about=Website move. When set, the hosting account page shows a "Move a website here" panel with a button to it. Empty: no panel.', 'beltoft-services' ),
+			)
+		);
+		$fields['hosting_move_text'] = array_merge(
+			$base,
+			array(
+				'default' => '',
+				'label'   => __( 'Website move text', 'beltoft-services' ),
+				'desc'    => __( 'The sentence in that panel, for example that the move is free. Empty: "Have a website somewhere else? We can move it here for you."', 'beltoft-services' ),
+			)
+		);
 		foreach ( $list as $key => $row ) {
 			$fields[ $key ] = $base + array(
 				'default' => Config::DEFAULTS[ $row[0] ],

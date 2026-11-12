@@ -578,6 +578,22 @@
         "label": "Hosting order page",
         "desc": "Where the Order hosting button in the account goes, for example /wordpress-hosting/#plans. Empty uses the first hosting product page."
     },
+    "hosting_move_url": {
+        "tab": "hosting",
+        "section": "hosting",
+        "type": "text",
+        "default": "",
+        "label": "Website move request page",
+        "desc": "A page where a customer asks to have an existing website moved to their hosting, for example /contact/?about=Website move. When set, the hosting account page shows a \"Move a website here\" panel with a button to it. Empty: no panel."
+    },
+    "hosting_move_text": {
+        "tab": "hosting",
+        "section": "hosting",
+        "type": "text",
+        "default": "",
+        "label": "Website move text",
+        "desc": "The sentence in that panel, for example that the move is free. Empty: \"Have a website somewhere else? We can move it here for you.\""
+    },
     "hosting_preview_zone": {
         "tab": "hosting",
         "section": "hosting",

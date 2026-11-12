@@ -244,6 +244,7 @@ final class HostingAccount {
 			self::print_add_site( $limits );
 		}
 
+		self::print_move();
 		self::print_files( $r, $actions->files(), $ready );
 		self::print_backups( $r, $sites, $ready );
 		self::print_email( $r, $ready );
@@ -626,6 +627,32 @@ final class HostingAccount {
 		}
 
 		echo '</div>';
+	}
+
+	/**
+	 * The "Move a website here" panel: shown when the shop has a page for the request (setting "Website move request page").
+	 */
+	private static function print_move(): void {
+		$url = trim( (string) \BeltoftServices\Settings::get( 'hosting_move_url' ) );
+		$url = '' === $url || 0 === strpos( $url, '//' ) ? '' : esc_url_raw( 0 === strpos( $url, '/' ) ? home_url( $url ) : $url );
+
+		/**
+		 * The address of the "Request a move" button on the hosting account page. Return '' for no panel.
+		 *
+		 * @param string $url The setting, as a full address, or ''.
+		 */
+		$url = (string) apply_filters( 'beltoft_services_hosting_move_url', $url );
+
+		if ( '' === $url ) {
+			return;
+		}
+
+		$text = trim( (string) \BeltoftServices\Settings::get( 'hosting_move_text' ) );
+
+		self::panel_open( esc_html__( 'Move a website here', 'beltoft-services' ), 'beltoft-hosting-move', '', 'beltoft-hosting-quiet' );
+		echo '<p>' . esc_html( '' !== $text ? $text : __( 'Have a website somewhere else? We can move it here for you.', 'beltoft-services' ) ) . '</p>';
+		echo '<p><a class="beltoft-hosting-btn" href="' . esc_url( $url ) . '">' . esc_html__( 'Request a move', 'beltoft-services' ) . '</a></p>';
+		self::panel_close();
 	}
 
 	/**
