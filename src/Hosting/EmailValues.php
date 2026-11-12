@@ -60,6 +60,7 @@ final class EmailValues {
 			'until' => isset( $data['until'] ) ? sanitize_text_field( (string) $data['until'] ) : '',
 			'site'  => isset( $data['site'] ) ? HostName::display( sanitize_text_field( (string) $data['site'] ) ) : '',
 		) : array( 'kind' => 'account', 'ok' => true, 'until' => '', 'site' => '' );
+		$values['hosting_malware'] = MalwareScan::email_values( $data );
 
 		return $values;
 	}

@@ -51,6 +51,11 @@ defined( 'ABSPATH' ) || exit;
  *   for example failed and restored. Fails "this website has no staging copy".
  * - site.staging_undo: puts the last push back: undone (true), files (true), database (the push replaced it), status (200). Fails "there is nothing to undo".
  * - site.staging_delete: removes the copy (deleted true, slug, copy, '' when there was none). Deleting the website removes its copy too.
+ * - site.scan_results: the last malware scan of one site (slug) or of every site of the container: `sites` (slug => state never, clean or found,
+ *   scanned_at, attempted_at, files, hit_count, hits (path, signature, seen_at, size, mtime), engine, error). Read only. Fails "unknown site"
+ *   for a slug that was not created. Hits are what plant_malware() put in a site when it was scanned last.
+ * - site.scan_now: scans one site now (the node does it with the planted files): the same view of that site in `sites`. A file that was found by
+ *   an earlier scan keeps its seen_at, a removed file is gone, a planted file gets the time of the scan. Fails "unknown site".
  * - db.create: user, databases. The password is accepted, kept out of every reply and of the call log.
  * - ct.refresh: updated (names of the replaced files, none when current), version (12 hex characters). Fails "container not
  *   running" for an unknown container or one set with set_not_running().
@@ -172,6 +177,14 @@ class FakeAgent implements Agent {
 			'slug' => array( 'ident', true ),
 			'tool' => array( 'tool', true ),
 			'host' => array( 'host', false ),
+		),
+		'site.scan_results' => array(
+			'vmid' => array( 'vmid', true ),
+			'slug' => array( 'ident', false ),
+		),
+		'site.scan_now'     => array(
+			'vmid' => array( 'vmid', true ),
+			'slug' => array( 'ident', true ),
 		),
 		'site.country_block' => array(
 			'vmid'      => array( 'vmid', true ),
@@ -527,6 +540,53 @@ class FakeAgent implements Agent {
 	}
 
 	/**
+	 * Puts a file that matches a malware signature into a site, as a customer's site could get one. A scan (site.scan_now) finds it.
+	 *
+	 * @param int    $vmid      Container.
+	 * @param string $slug      Site (a staging copy counts as a site of its own).
+	 * @param string $path      Path inside the site folder.
+	 * @param string $signature Signature name.
+	 */
+	public function plant_malware( int $vmid, string $slug, string $path, string $signature = '{HEX}test.test.eicar' ): void {
+		$this->load();
+		$this->state['sites'][ $vmid ][ $slug ]['planted'][ $path ] = $signature;
+		$this->save();
+	}
+
+	/**
+	 * Removes a planted file ('' removes them all); the next scan no longer finds it.
+	 *
+	 * @param int    $vmid Container.
+	 * @param string $slug Site.
+	 * @param string $path Path, or ''.
+	 */
+	public function remove_malware( int $vmid, string $slug, string $path = '' ): void {
+		$this->load();
+
+		if ( '' === $path ) {
+			$this->state['sites'][ $vmid ][ $slug ]['planted'] = array();
+		} else {
+			unset( $this->state['sites'][ $vmid ][ $slug ]['planted'][ $path ] );
+		}
+
+		$this->save();
+	}
+
+	/**
+	 * Sets the time the next scan gives a file as seen_at (a changed file that still matches is new again).
+	 *
+	 * @param int    $vmid    Container.
+	 * @param string $slug    Site.
+	 * @param string $path    Path.
+	 * @param int    $seen_at Time.
+	 */
+	public function set_malware_seen( int $vmid, string $slug, string $path, int $seen_at ): void {
+		$this->load();
+		$this->state['sites'][ $vmid ][ $slug ]['scan']['seen'][ $path ] = $seen_at;
+		$this->save();
+	}
+
+	/**
 	 * Makes operations unknown to the agent, as an older agent has them: the answer is 400 unknown_op.
 	 *
 	 * @param string[] $ops Operations.
@@ -832,6 +892,10 @@ class FakeAgent implements Agent {
 		$vmid = (int) ( $args['vmid'] ?? 0 );
 
 		switch ( $op ) {
+			case 'site.scan_results':
+			case 'site.scan_now':
+				return $this->scan_op( $op, $vmid, $args );
+
 			case 'ct.prepare':
 				$this->state['cts'][ $vmid ] = array(
 					'prepared'  => true,
@@ -1242,6 +1306,64 @@ class FakeAgent implements Agent {
 		unset( $this->state['sites'][ $vmid ][ $copy ] ); // site.staging_delete.
 
 		return array( 'deleted' => true, 'slug' => $slug, 'copy' => $copy );
+	}
+
+	/**
+	 * site.scan_results and site.scan_now.
+	 *
+	 * @param string               $op   Operation.
+	 * @param int                  $vmid Container.
+	 * @param array<string, mixed> $args Arguments.
+	 * @return array<string, mixed>|string
+	 */
+	private function scan_op( string $op, int $vmid, array $args ) {
+		$sites = (array) ( $this->state['sites'][ $vmid ] ?? array() );
+
+		if ( isset( $args['slug'] ) && ! isset( $sites[ $args['slug'] ] ) ) {
+			return 'unknown site';
+		}
+
+		$slugs = isset( $args['slug'] ) ? array( (string) $args['slug'] ) : array_map( 'strval', array_keys( $sites ) );
+
+		if ( 'site.scan_now' === $op ) {
+			$site   = $this->state['sites'][ $vmid ][ $args['slug'] ];
+			$seen   = (array) ( $site['scan']['seen'] ?? array() );
+			$found  = array();
+
+			foreach ( (array) ( $site['planted'] ?? array() ) as $path => $signature ) {
+				$found[ $path ] = array( 'signature' => $signature, 'seen_at' => (int) ( $seen[ $path ] ?? time() ) );
+			}
+
+			$this->state['sites'][ $vmid ][ $args['slug'] ]['scan'] = array(
+				'at'   => time(),
+				'seen' => array_map( static fn( $f ) => $f['seen_at'], $found ),
+				'hits' => $found,
+			);
+		}
+
+		$out = array();
+
+		foreach ( $slugs as $slug ) {
+			$scan  = (array) ( $this->state['sites'][ $vmid ][ $slug ]['scan'] ?? array() );
+			$hits  = array();
+
+			foreach ( (array) ( $scan['hits'] ?? array() ) as $path => $f ) {
+				$hits[] = array( 'path' => (string) $path, 'signature' => $f['signature'], 'seen_at' => $f['seen_at'], 'size' => 78, 'mtime' => $f['seen_at'] );
+			}
+
+			$out[ $slug ] = array(
+				'state'        => empty( $scan['at'] ) ? 'never' : ( array() === $hits ? 'clean' : 'found' ),
+				'scanned_at'   => (int) ( $scan['at'] ?? 0 ),
+				'attempted_at' => (int) ( $scan['at'] ?? 0 ),
+				'files'        => empty( $scan['at'] ) ? 0 : 120,
+				'hit_count'    => count( $hits ),
+				'hits'         => $hits,
+				'engine'       => empty( $scan['at'] ) ? array() : array( 'name' => 'maldet', 'version' => '2.0.1', 'signatures' => '2026052490478' ),
+				'error'        => '',
+			);
+		}
+
+		return array( 'vmid' => $vmid, 'sites' => $out );
 	}
 
 	/**

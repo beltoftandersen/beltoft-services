@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.20.3
+Stable tag: 0.21.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -259,6 +259,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.21.0 =
+* Hosting: a nightly malware scan. The node agent scans the files of every website, a staging copy included, with Linux Malware Detect (read only: nothing is moved, cleaned or removed, and nothing leaves the node). A daily job (07:15) reads the last result for each hosting account (`site.scan_results`). A file found since the customer was last told is told once: one email to the customer ("Hosting malware found", with the websites, the files and what to do) and one mail to the alert address. A file the node saw before and that did not change is not told again, a file that changed and still matches is. The website stays online. The hosting page shows a Malware scan row under the website ("Malware found on <date>: N files. <list>" until a scan finds nothing, or "Scanned on <date>. Nothing found."). New WP-CLI command `wp beltoft-services hosting scan <resource> [--now]` (`--now` asks the node to scan the account's websites first, operation `site.scan_now`). Needs the node agent with the operations `site.scan_results` and `site.scan_now` and its scan switched on; an older agent is left alone.
 
 = 0.20.3 =
 * Staging copy: the page says right under the button that the copy is being made, and once ready says where it is and what Open staging does.

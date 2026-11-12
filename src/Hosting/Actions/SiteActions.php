@@ -88,6 +88,7 @@ final class SiteActions {
 				'admin_email' => (string) ( $site['flags']['admin_email'] ?? '' ),
 				'country'     => \BeltoftServices\Hosting\CountryBlock::view( $site ),
 				'staging'     => SiteStaging::view( $site ),
+				'scan'        => \BeltoftServices\Hosting\MalwareScan::view( $site ),
 			);
 		}
 

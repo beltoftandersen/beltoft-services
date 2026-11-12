@@ -504,6 +504,7 @@ final class HostingAccount {
 
 		echo '<p class="beltoft-hosting-help">' . esc_html__( 'Opens phpMyAdmin for the database of this website in a new tab. You do not need a password. The tab ends after 30 minutes without use.', 'beltoft-services' ) . '</p></dd></div>';
 
+		self::print_scan( (array) $site['scan'] );
 		self::print_staging( $slug, (array) $site['staging'], $ready, $limits );
 		self::print_protection( $slug, (array) $site['country'], $ready );
 
@@ -514,6 +515,28 @@ final class HostingAccount {
 		}
 
 		self::panel_close();
+	}
+
+	/**
+	 * The result of the last nightly malware scan of a website. Nothing is drawn for a website that was never scanned.
+	 *
+	 * @param array<string, mixed> $v MalwareScan::view().
+	 */
+	private static function print_scan( array $v ): void {
+		$words = MalwareScan::words( $v );
+
+		if ( '' === $words ) {
+			return;
+		}
+
+		echo '<div><dt>' . esc_html__( 'Malware scan', 'beltoft-services' ) . '</dt><dd>';
+		echo '<p class="' . ( 'found' === $v['state'] ? 'beltoft-hosting-warning' : 'beltoft-hosting-line' ) . '" data-scan-state role="status">' . esc_html( $words ) . '</p>';
+
+		if ( 'found' === $v['state'] ) {
+			echo '<p class="beltoft-hosting-help">' . esc_html__( 'Your website is still online and nothing was changed. Restore a backup from before this date, or remove the files with the file manager. Contact support if you need help.', 'beltoft-services' ) . '</p>';
+		}
+
+		echo '<p class="beltoft-hosting-help">' . esc_html__( 'Your website is scanned every night for known malware. The scan only reads your files. It does not change or remove anything.', 'beltoft-services' ) . '</p></dd></div>';
 	}
 
 	/**

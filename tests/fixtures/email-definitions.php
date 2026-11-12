@@ -199,6 +199,15 @@ return array (
     'html' => 'emails/beltoft-services-hosting-restore-done.php',
     'plain' => 'emails/plain/beltoft-services-hosting-restore-done.php',
   ),
+  'beltoft_services_hosting_malware_found' =>
+  array (
+    'title' => 'Hosting malware found',
+    'description' => 'Sent when the nightly scan of a hosting account finds files that match known malware. It names the websites and the files and says what to do. Nothing is removed or changed, and the websites stay online.',
+    'subject' => 'Malware found on your hosting {product_name}',
+    'heading' => 'Malware found on your website',
+    'html' => 'emails/beltoft-services-hosting-malware-found.php',
+    'plain' => 'emails/plain/beltoft-services-hosting-malware-found.php',
+  ),
   'beltoft_services_renewal_reminder' => 
   array (
     'title' => 'Renewal reminder',

@@ -70,6 +70,7 @@ final class ValueDefaults {
 			'hosting'               => array( 'site_name' => '', 'site_url' => '', 'admin_url' => '', 'admin_user' => '', 'admin_email' => '', 'sftp_host' => '', 'sftp_port' => 0, 'sftp_user' => 'web', 'ssh' => false, 'domains' => array(), 'dns_records' => array(), 'has_email' => false ),
 			'hosting_notice'        => array( 'kind' => 'storage_warning', 'percent' => 0, 'used' => 0, 'limit' => 0, 'days' => 0, 'php' => '', 'php_default' => '', 'php_end' => '', 'site' => '' ),
 			'hosting_restore'       => array( 'kind' => 'account', 'ok' => true, 'until' => '', 'site' => '' ),
+			'hosting_malware'       => array( 'before' => '', 'sites' => array() ),
 			'ssl'                   => array( 'name' => '', 'smime' => false, 'reason' => 'dns', 'rows' => array(), 'approver' => '', 'valid_to' => '', 'by_customer' => false, 'pull_url' => '', 'key_waiting' => false ),
 		);
 	}

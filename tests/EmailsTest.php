@@ -723,6 +723,7 @@ final class EmailsTest extends TestCase {
 			'extra_disks',
 			'held',
 			'hosting',
+			'hosting_malware',
 			'hosting_notice',
 			'hosting_restore',
 			'limit',

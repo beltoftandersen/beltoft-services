@@ -358,6 +358,33 @@ final class Alerts {
 	}
 
 	/**
+	 * Alerts the admin that the nightly scan of a hosting account found malware (the customer is told by email, the website stays
+	 * online). Once per newest find: the dedupe key holds the date of the oldest new file.
+	 *
+	 * @param Resource           $r     Hosting resource.
+	 * @param array<int, string> $sites One line per website.
+	 * @param int                $first When the oldest new file was first found.
+	 * @return bool Whether a mail was sent.
+	 */
+	public static function malware_found( Resource $r, array $sites, int $first ): bool {
+		$license = $r->license();
+
+		return self::notify(
+			sprintf( 'Malware found in hosting resource %d', $r->id() ),
+			array_merge(
+				array(
+					sprintf( 'Hosting resource: %d', $r->id() ),
+					sprintf( 'Customer: %d', (int) ( $license['user_id'] ?? 0 ) ),
+				),
+				$sites,
+				array( 'The customer was told by email. The website stays online and nothing was changed or removed on the node. The files are listed on the hosting page of the account.' )
+			),
+			$r,
+			'beltoft_services_malware_' . $r->id() . '_' . $first
+		);
+	}
+
+	/**
 	 * Alerts the admin that a deletion warning could not be sent: the service is not deleted until
 	 * the customer has been warned. The caller sends this once.
 	 *

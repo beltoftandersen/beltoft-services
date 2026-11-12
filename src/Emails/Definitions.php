@@ -189,6 +189,12 @@ final class Definitions {
 				'subject'     => __( 'Your hosting restore has finished', 'beltoft-services' ),
 				'heading'     => __( 'Your restore has finished', 'beltoft-services' ),
 			),
+			'beltoft_services_hosting_malware_found' => array(
+				'title'       => __( 'Hosting malware found', 'beltoft-services' ),
+				'description' => __( 'Sent when the nightly scan of a hosting account finds files that match known malware. It names the websites and the files and says what to do. Nothing is removed or changed, and the websites stay online.', 'beltoft-services' ),
+				'subject'     => __( 'Malware found on your hosting {product_name}', 'beltoft-services' ),
+				'heading'     => __( 'Malware found on your website', 'beltoft-services' ),
+			),
 			'beltoft_services_renewal_reminder' => array(
 				'title'       => __( 'Renewal reminder', 'beltoft-services' ),
 				'description' => __( 'Sent a product-set number of days before a long renewal (for example 30 days before a yearly hosting renewal): the plan, the date, the full price and how to cancel.', 'beltoft-services' ),

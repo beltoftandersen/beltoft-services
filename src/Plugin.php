@@ -103,6 +103,7 @@ final class Plugin {
 		Hosting\DomainSweep::register();
 		Hosting\SiteWordPress::register();
 		Hosting\SiteStaging::register();
+		Hosting\MalwareScan::register();
 		Hosting\RestoreTest::register();
 		Mail\MailField::register();
 		Mail\MailSwitch::register();

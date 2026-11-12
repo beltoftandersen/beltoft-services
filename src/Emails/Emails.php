@@ -65,6 +65,7 @@ final class Emails {
 		'BeltoftServices_HostingReady' => HostingReady::class,
 		'BeltoftServices_HostingNotice' => HostingNotice::class,
 		'BeltoftServices_HostingRestoreDone' => HostingRestoreDone::class,
+		'BeltoftServices_HostingMalwareFound' => HostingMalwareFound::class,
 		'BeltoftServices_RenewalReminder' => RenewalReminder::class,
 		'BeltoftServices_StepUpCode' => StepUpCode::class,
 		'BeltoftServices_SslIssued' => SslIssued::class,

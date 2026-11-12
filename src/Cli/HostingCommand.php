@@ -101,6 +101,51 @@ class HostingCommand {
 	}
 
 	/**
+	 * The malware scan of one hosting account.
+	 *
+	 * ## OPTIONS
+	 * <action> : scan.
+	 * <resource> : The hosting resource id.
+	 * [--now] : Ask the node to scan the websites now (about 20 seconds a website, only one scan runs on a node at a time) before the result is read.
+	 *
+	 * ## EXAMPLES
+	 *     wp beltoft-services hosting scan 12
+	 *     wp beltoft-services hosting scan 12 --now
+	 *
+	 * Reads the node's last scan of each website of the account and applies it the way the daily job does: the websites' flags are
+	 * updated and, for files found since the customer was last told, the customer gets the email and the admin one mail. Prints one
+	 * line per website. Nothing is moved, cleaned or removed on the node.
+	 *
+	 * @param array<int, string>   $args       Positional arguments.
+	 * @param array<string, mixed> $assoc_args Flags.
+	 */
+	public function scan( array $args, array $assoc_args ): void {
+		$r = \BeltoftServices\Resource::find( (int) ( $args[0] ?? 0 ) );
+
+		if ( ! $r || \BeltoftServices\Hosting\HostingDriver::ID !== (string) $r->get( 'driver' ) ) {
+			\WP_CLI::error( 'Use: scan <resource> [--now] (the resource id of a hosting account).' );
+		}
+
+		$job = new \BeltoftServices\Hosting\MalwareScan( $r );
+		$out = $job->check( ! empty( $assoc_args['now'] ) );
+
+		for ( $i = 0; $out instanceof \BeltoftServices\Drivers\StepResult && $out->is_poll() && $i < 120; $i++ ) {
+			sleep( 2 );
+			$out = $job->check( ! empty( $assoc_args['now'] ) );
+		}
+
+		if ( $out instanceof \BeltoftServices\Drivers\StepResult ) {
+			\WP_CLI::error( 'The node did not answer: ' . $out->error() );
+		}
+
+		foreach ( $out['lines'] as $line ) {
+			\WP_CLI::log( $line );
+		}
+
+		\WP_CLI::success( sprintf( '%d website(s) read, %d with files found, %d new file(s)%s.', $out['sites'], $out['found'], $out['new'], $out['told'] ? ', the customer and the admin were told' : '' ) );
+	}
+
+	/**
 	 * Prints one line per node.
 	 */
 	private function list_nodes(): void {

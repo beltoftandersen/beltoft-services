@@ -26,6 +26,10 @@
         "extra_disks": [],
         "held": false,
         "hosting": [],
+        "hosting_malware": {
+            "before": "",
+            "sites": []
+        },
         "hosting_notice": {
             "kind": "storage_warning",
             "percent": 0,
@@ -122,6 +126,10 @@
         "extra_disks": [],
         "held": false,
         "hosting": [],
+        "hosting_malware": {
+            "before": "",
+            "sites": []
+        },
         "hosting_notice": {
             "kind": "storage_warning",
             "percent": 0,
@@ -218,6 +226,10 @@
         "extra_disks": [],
         "held": false,
         "hosting": [],
+        "hosting_malware": {
+            "before": "",
+            "sites": []
+        },
         "hosting_notice": {
             "kind": "storage_warning",
             "percent": 0,
@@ -327,6 +339,10 @@
             "dns_records": [],
             "has_email": false
         },
+        "hosting_malware": {
+            "before": "",
+            "sites": []
+        },
         "hosting_notice": {
             "kind": "storage_warning",
             "percent": 0,
@@ -423,6 +439,10 @@
         "extra_disks": [],
         "held": false,
         "hosting": [],
+        "hosting_malware": {
+            "before": "",
+            "sites": []
+        },
         "hosting_notice": {
             "kind": "storage_warning",
             "percent": 0,
