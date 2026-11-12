@@ -15,6 +15,9 @@
 defined( 'ABSPATH' ) || exit;
 
 $beltoft_services_kind = (string) $result['kind'];
+$beltoft_services_level = (string) ( $result['level'] ?? '' );
+$beltoft_services_level = in_array( $beltoft_services_level, array( 'actions', 'full' ), true ) ? $beltoft_services_level : 'read';
+$beltoft_services_step  = is_array( $result['step_up'] ?? null ) ? $result['step_up'] : array( 'kind' => 'emailed', 'label' => __( 'Code from the email', 'beltoft-services' ), 'autocomplete' => 'one-time-code', 'email' => '' );
 ?>
 <main class="beltoft-services-oauth">
 	<div class="beltoft-services-oauth__panel">
@@ -53,10 +56,19 @@ $beltoft_services_kind = (string) $result['kind'];
 				<input type="hidden" name="<?php echo esc_attr( $beltoft_services_key ); ?>" value="<?php echo esc_attr( $beltoft_services_value ); ?>">
 			<?php endforeach; ?>
 			<input type="hidden" name="_wpnonce" value="<?php echo esc_attr( $nonce ); ?>">
+			<?php /* Enter in the code field must allow, not send a code: this is the first submit button of the form. */ ?>
+			<button type="submit" name="decision" value="approve" hidden tabindex="-1" aria-hidden="true"></button>
 			<fieldset class="beltoft-services-oauth__choices">
 				<legend><?php esc_html_e( 'What the app may do', 'beltoft-services' ); ?></legend>
 				<?php if ( ! empty( $result['notice'] ) && 'full_tick' === $result['notice'] ) : ?>
 					<p class="beltoft-services-oauth__note"><?php esc_html_e( 'To give Full access, tick the box under it. Nothing was connected.', 'beltoft-services' ); ?></p>
+				<?php elseif ( ! empty( $result['notice'] ) && 'full_code' === $result['notice'] ) : ?>
+					<p class="beltoft-services-oauth__note"><?php esc_html_e( 'That code is not right or has expired. Send a new code.', 'beltoft-services' ); ?></p>
+				<?php elseif ( ! empty( $result['notice'] ) && 'code_sent' === $result['notice'] ) : ?>
+					<?php /* translators: %s: the account email with part of the name hidden. */ ?>
+					<p class="beltoft-services-oauth__note"><?php echo esc_html( sprintf( __( 'We sent a code to %s. It works once for 10 minutes.', 'beltoft-services' ), (string) ( $beltoft_services_step['email'] ?? '' ) ) ); ?></p>
+				<?php elseif ( ! empty( $result['notice'] ) && 'code_error' === $result['notice'] ) : ?>
+					<p class="beltoft-services-oauth__note"><?php echo esc_html( (string) ( $result['notice_text'] ?? '' ) ); ?></p>
 				<?php endif; ?>
 				<?php
 				$beltoft_services_asks = (string) ( $result['asks'] ?? ( ! empty( $result['asks_actions'] ) ? 'actions' : 'read' ) );
@@ -67,30 +79,39 @@ $beltoft_services_kind = (string) $result['kind'];
 					<p class="beltoft-services-oauth__note"><?php esc_html_e( 'This app asks for Full access. Choose that only if you want it.', 'beltoft-services' ); ?></p>
 				<?php endif; ?>
 				<label class="beltoft-services-oauth__choice">
-					<input type="radio" name="level" value="read" checked>
+					<input type="radio" name="level" value="read"<?php checked( $beltoft_services_level, 'read' ); ?>>
 					<span>
 						<strong><?php esc_html_e( 'Read only', 'beltoft-services' ); ?></strong>
 						<?php esc_html_e( 'Read your servers, databases, domains and DNS records, their state, usage, backups and snapshots, firewall and access lists, your orders, subscriptions, saved cards (brand and last digits only), account details, license keys and next payment. It cannot change anything.', 'beltoft-services' ); ?>
 					</span>
 				</label>
 				<label class="beltoft-services-oauth__choice">
-					<input type="radio" name="level" value="actions">
+					<input type="radio" name="level" value="actions"<?php checked( $beltoft_services_level, 'actions' ); ?>>
 					<span>
 						<strong><?php esc_html_e( 'Read and actions', 'beltoft-services' ); ?></strong>
 						<?php esc_html_e( 'Also everyday changes: restart, start and stop a server, rename it, take a snapshot, change its firewall and database access list, set or remove DNS records, change name servers, turn auto-renew on or off, and ask for a new database password. Restoring, rolling back, reinstalling, deleting, cancelling, buying and showing passwords need Full access.', 'beltoft-services' ); ?>
 					</span>
 				</label>
 				<label class="beltoft-services-oauth__choice">
-					<input type="radio" name="level" value="full">
+					<input type="radio" name="level" value="full"<?php checked( $beltoft_services_level, 'full' ); ?>>
 					<span>
 						<strong><?php esc_html_e( 'Full access', 'beltoft-services' ); ?></strong>
 						<?php esc_html_e( 'Everything above, plus abilities that need your yes in the chat each time, after the app has shown you what it is about to do: restore a server or database from a backup, roll a server back to a snapshot, delete a snapshot, reinstall a server, replace its SSH key or reset its password, restart its firewall from the defaults, cancel a subscription, remove an add-on, make another saved card your default, turn a firewall off, open a database to everyone, move a domain to other name servers, change what a Valkey database does when its memory is full, and show you a server, database or app password once (it is then in your conversation with the app, and we send you an e-mail about it). Buying and renewing services are not part of this yet. Domain transfers, the transfer code of a domain and the console are never possible through an app: they stay in your dashboard.', 'beltoft-services' ); ?>
 					</span>
 				</label>
 				<label class="beltoft-services-oauth__choice beltoft-services-oauth__understand">
-					<input type="checkbox" name="understand_full" value="1">
+					<input type="checkbox" name="understand_full" value="1"<?php checked( ! empty( $result['understood'] ) ); ?>>
 					<span><?php esc_html_e( 'For Full access: I understand that the app can delete data and show passwords once I agree in the chat.', 'beltoft-services' ); ?></span>
 				</label>
+				<p class="beltoft-services-oauth__stepup">
+					<label for="beltoft-oauth-code"><?php echo esc_html( (string) $beltoft_services_step['label'] ); ?> <?php esc_html_e( '(only for Full access)', 'beltoft-services' ); ?></label>
+					<input type="text" id="beltoft-oauth-code" name="step_code" maxlength="12" inputmode="numeric" autocomplete="<?php echo esc_attr( (string) ( $beltoft_services_step['autocomplete'] ?? 'one-time-code' ) ); ?>" spellcheck="false">
+					<?php if ( 'emailed' === ( $beltoft_services_step['kind'] ?? '' ) ) : ?>
+						<?php /* translators: %s: the account email with part of the name hidden. */ ?>
+						<span class="beltoft-services-oauth__hint"><?php echo esc_html( sprintf( __( 'For Full access we email a code to %s.', 'beltoft-services' ), (string) ( $beltoft_services_step['email'] ?? '' ) ) ); ?></span>
+						<button type="submit" name="decision" value="send_code" class="button beltoft-services-oauth__send" formnovalidate><?php echo esc_html( 'code_sent' === ( $result['notice'] ?? '' ) ? __( 'Send a new code', 'beltoft-services' ) : __( 'Send code', 'beltoft-services' ) ); ?></button>
+					<?php endif; ?>
+				</p>
 			</fieldset>
 			<p class="beltoft-services-oauth__secret"><?php esc_html_e( 'Your account password is never shared. Only with Full access can the app show you a server, database or app password, once, after your yes in the chat.', 'beltoft-services' ); ?></p>
 			<p class="beltoft-services-oauth__buttons">

@@ -13,6 +13,7 @@ use BeltoftServices\Oauth\Clients;
 use BeltoftServices\Oauth\Grants;
 use BeltoftServices\Oauth\Schema;
 use BeltoftServices\Oauth\Server;
+use BeltoftServices\StepUp;
 
 /**
  * OAuth tests.
@@ -21,8 +22,26 @@ final class OauthTest extends TestCase {
 
 	private const REDIRECT = 'https://claude.ai/api/mcp/auth_callback';
 
+	/**
+	 * Captured mails (the step-up code); nothing leaves the test.
+	 *
+	 * @var array<int, array<string, mixed>>
+	 */
+	private array $mails = array();
+
 	public function set_up(): void {
 		parent::set_up();
+		$this->mails = array();
+		add_filter(
+			'pre_wp_mail',
+			function ( $pre, $atts ) {
+				$this->mails[] = $atts;
+
+				return true;
+			},
+			10,
+			2
+		);
 
 		global $wp_rest_server;
 		$wp_rest_server = new \WP_REST_Server();
@@ -39,6 +58,38 @@ final class OauthTest extends TestCase {
 		Tokens::reset( false );
 
 		parent::tear_down();
+	}
+
+	/**
+	 * A customer with an address of the owner (the mail is captured anyway).
+	 */
+	private function customer(): int {
+		return self::factory()->user->create( array( 'user_email' => 'christian.beltoft+oa' . wp_generate_password( 8, false ) . '@gmail.com' ) );
+	}
+
+	/**
+	 * Sends a code for a purpose and returns it from the captured mail.
+	 */
+	private function code_for( int $user, string $purpose = Server::STEP_PURPOSE ): string {
+		$this->assertTrue( StepUp::send( $user, $purpose ) );
+		$this->assertSame( 1, preg_match( '/\b(\d{6})\b/', wp_strip_all_tags( (string) end( $this->mails )['message'] ), $m ) );
+
+		return $m[1];
+	}
+
+	/**
+	 * The consent form posted for Full access.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function approve_full( string $client, int $user, string $challenge, ?string $code, array $extra = array() ): array {
+		return $this->approve( $client, $user, $challenge, false, $extra + array( 'level' => 'full', 'understand_full' => '1' ) + ( null === $code ? array() : array( 'step_code' => $code ) ) );
+	}
+
+	private function grant_rows(): int {
+		global $wpdb;
+
+		return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', Schema::tables()['grants'] ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 	}
 
 	/**
@@ -584,7 +635,7 @@ final class OauthTest extends TestCase {
 	}
 
 	public function test_full_access_is_a_third_level_that_needs_its_own_tick(): void {
-		$user   = self::factory()->user->create();
+		$user   = $this->customer();
 		$client = $this->client();
 		list( $verifier, $challenge ) = $this->pkce();
 
@@ -599,13 +650,174 @@ final class OauthTest extends TestCase {
 		$this->assertSame( 'full_tick', $again['notice'] );
 
 		// With the tick the grant is full, through the code, the access token and the refresh.
-		$q      = $this->query( $this->approve( $client, $user, $challenge, false, array( 'level' => 'full', 'understand_full' => '1' ) ) );
+		$q      = $this->query( $this->approve_full( $client, $user, $challenge, $this->code_for( $user ) ) );
 		$tokens = Grants::exchange_code( $q['code'], $client, self::REDIRECT, $verifier );
 		$this->assertSame( Tokens::FULL, $tokens['scope'] );
 		$this->assertSame( Tokens::FULL, Grants::authenticate( $tokens['access_token'] )['scope'] );
 		$again = Grants::refresh( $tokens['refresh_token'], $client );
 		$this->assertSame( Tokens::FULL, Grants::authenticate( $again['access_token'] )['scope'] );
 		$this->assertSame( Tokens::FULL, Grants::connections( $user )[0]['scope'] );
+	}
+
+	public function test_full_access_needs_the_emailed_code_and_read_does_not(): void {
+		$user   = $this->customer();
+		$client = $this->client();
+		list( $verifier, $challenge ) = $this->pkce();
+
+		// Read and actions: no code, as before.
+		$this->assertArrayHasKey( 'code', $this->query( $this->approve( $client, $user, $challenge ) ) );
+		$this->assertArrayHasKey( 'code', $this->query( $this->approve( $client, $user, $challenge, false, array( 'level' => 'read', 'step_code' => '123456' ) ) ) );
+		$this->assertArrayHasKey( 'code', $this->query( $this->approve( $client, $user, $challenge, true ) ) );
+
+		$before = $this->grant_rows();
+
+		// Full without a code, with an empty one, with a wrong one.
+		foreach ( array( null, '', '000000' ) as $code ) {
+			$result = $this->approve_full( $client, $user, $challenge, $code );
+			$this->assertSame( 'page', $result['type'] );
+			$this->assertSame( 'full_code', $result['notice'] );
+		}
+
+		$this->assertSame( $before, $this->grant_rows(), 'No authorization code was stored.' );
+
+		// Right code: the authorization code is issued and the token is full.
+		$q      = $this->query( $this->approve_full( $client, $user, $challenge, $this->code_for( $user ) ) );
+		$tokens = Grants::exchange_code( $q['code'], $client, self::REDIRECT, $verifier );
+		$this->assertSame( Tokens::FULL, $tokens['scope'] );
+	}
+
+	public function test_a_code_for_another_purpose_or_another_user_does_not_give_full_access(): void {
+		$user   = $this->customer();
+		$other  = $this->customer();
+		$client = $this->client();
+		list( , $challenge ) = $this->pkce();
+		$before = $this->grant_rows();
+
+		$token_code = $this->code_for( $user, \BeltoftServices\Account\ApiTokens::PURPOSE );
+		$this->assertSame( 'page', $this->approve_full( $client, $user, $challenge, $token_code )['type'] );
+
+		$others = $this->code_for( $other );
+		$this->assertSame( 'page', $this->approve_full( $client, $user, $challenge, $others )['type'] );
+		$this->assertSame( $before, $this->grant_rows() );
+
+		// The code for the other purpose was not used up by the try here.
+		$this->assertTrue( StepUp::verify( $user, $token_code, \BeltoftServices\Account\ApiTokens::PURPOSE ) );
+		// And the code of this purpose does not work for a Full access token.
+		$mine = $this->code_for( $user );
+		$this->assertFalse( StepUp::verify( $user, $mine, \BeltoftServices\Account\ApiTokens::PURPOSE ) );
+	}
+
+	public function test_an_expired_or_used_code_does_not_give_full_access(): void {
+		$user   = $this->customer();
+		$client = $this->client();
+		list( , $challenge ) = $this->pkce();
+
+		$code            = $this->code_for( $user );
+		$meta            = get_user_meta( $user, 'beltoft_services_stepup_' . Server::STEP_PURPOSE, true );
+		$meta['expires'] = time() - 5;
+		update_user_meta( $user, 'beltoft_services_stepup_' . Server::STEP_PURPOSE, $meta );
+		$this->assertSame( 'page', $this->approve_full( $client, $user, $challenge, $code )['type'] );
+
+		// A used code: the same POST again is refused.
+		$code = $this->code_for( $user );
+		$this->assertArrayHasKey( 'code', $this->query( $this->approve_full( $client, $user, $challenge, $code ) ) );
+		$count = $this->grant_rows();
+		$this->assertSame( 'page', $this->approve_full( $client, $user, $challenge, $code )['type'] );
+		$this->assertSame( $count, $this->grant_rows() );
+	}
+
+	public function test_a_missing_tick_does_not_use_up_the_code(): void {
+		$user   = $this->customer();
+		$client = $this->client();
+		list( , $challenge ) = $this->pkce();
+		$code = $this->code_for( $user );
+
+		$this->assertSame( 'full_tick', $this->approve( $client, $user, $challenge, false, array( 'level' => 'full', 'step_code' => $code ) )['notice'] );
+		$this->assertArrayHasKey( 'code', $this->query( $this->approve_full( $client, $user, $challenge, $code ) ) );
+	}
+
+	public function test_the_tries_and_the_send_rate_limit_apply(): void {
+		$user   = $this->customer();
+		$client = $this->client();
+		list( , $challenge ) = $this->pkce();
+		$code = $this->code_for( $user );
+
+		for ( $i = 0; $i < StepUp::MAX_TRIES; $i++ ) {
+			$this->assertSame( 'page', $this->approve_full( $client, $user, $challenge, '000000' === $code ? '111111' : '000000' )['type'] );
+		}
+
+		// The right code no longer works after the wrong tries.
+		$this->assertSame( 'page', $this->approve_full( $client, $user, $challenge, $code )['type'] );
+
+		// Send code: the page comes back with a notice (one code was sent above, so two more fit in the window).
+		$sent = array();
+
+		for ( $i = 0; $i < 3; $i++ ) {
+			$sent[] = $this->approve( $client, $user, $challenge, false, array( 'decision' => 'send_code', 'level' => 'full', 'understand_full' => '1' ) );
+		}
+
+		$this->assertSame( 'code_sent', $sent[0]['notice'] );
+		$this->assertSame( 'full', $sent[0]['level'], 'The choice is kept.' );
+		$this->assertTrue( $sent[0]['understood'] );
+		$this->assertSame( 'code_error', $sent[2]['notice'] );
+		$this->assertStringContainsString( 'Too many codes were sent', $sent[2]['notice_text'] );
+	}
+
+	public function test_a_refresh_of_an_existing_full_grant_needs_no_new_code(): void {
+		$user   = $this->customer();
+		$client = $this->client();
+		list( $verifier, $challenge ) = $this->pkce();
+		$q      = $this->query( $this->approve_full( $client, $user, $challenge, $this->code_for( $user ) ) );
+		$tokens = Grants::exchange_code( $q['code'], $client, self::REDIRECT, $verifier );
+		$again  = Grants::refresh( $tokens['refresh_token'], $client );
+
+		$this->assertSame( Tokens::FULL, Grants::authenticate( $again['access_token'] )['scope'] );
+		$this->assertCount( 1, $this->mails, 'Only the code of the first authorization was sent.' );
+	}
+
+	public function test_a_crafted_upgrade_from_read_is_refused_without_a_code(): void {
+		$user   = $this->customer();
+		$client = $this->client();
+		list( , $challenge ) = $this->pkce();
+
+		// The page was shown for a read request, the POST says full.
+		$this->assertSame( 'consent', Server::authorize( array( 'client_id' => $client, 'redirect_uri' => self::REDIRECT, 'response_type' => 'code', 'code_challenge' => $challenge, 'code_challenge_method' => 'S256', 'scope' => 'read' ), $user, false )['kind'] );
+		$this->assertSame( 'full_code', $this->approve( $client, $user, $challenge, false, array( 'level' => 'full', 'understand_full' => '1', 'allow_actions' => '1' ) )['notice'] );
+	}
+
+	public function test_the_consent_page_has_the_code_field_and_send_button(): void {
+		$user   = $this->customer();
+		$client = Clients::find( $this->client() );
+		$render = function ( array $result ): string {
+			ob_start();
+			( static function ( array $result ): void {
+				$fields = array( 'client_id' => 'x' );
+				$nonce  = 'n';
+				$action = home_url( '/beltoft-oauth/authorize' );
+				include BELTOFT_SERVICES_PATH . 'templates/account/oauth-consent.php';
+			} )( $result );
+
+			return (string) ob_get_clean();
+		};
+
+		$page = Server::authorize( array( 'client_id' => $client['client_id'], 'redirect_uri' => self::REDIRECT, 'response_type' => 'code', 'code_challenge' => $this->pkce()[1], 'code_challenge_method' => 'S256' ), $user, false );
+		$html = $render( $page );
+		$this->assertStringContainsString( 'name="step_code"', $html );
+		$this->assertStringContainsString( 'value="send_code"', $html );
+		$this->assertStringContainsString( '(only for Full access)', $html );
+		$this->assertStringContainsString( 'For Full access we email a code to c***@gmail.com.', $html );
+		$this->assertStringNotContainsString( '—', $html );
+		$this->assertStringNotContainsString( '·', $html );
+		$this->assertMatchesRegularExpression( '/name="level" value="read" checked/', $html );
+
+		$html = $render( $page + array( 'notice' => 'full_code' ) );
+		$this->assertStringContainsString( 'That code is not right or has expired. Send a new code.', $html );
+
+		$kept = $render( array( 'level' => 'full', 'understood' => true, 'notice' => 'code_sent' ) + $page );
+		$this->assertMatchesRegularExpression( '/name="level" value="full" checked/', $kept );
+		$this->assertStringContainsString( 'It works once for 10 minutes.', $kept );
+		$this->assertStringContainsString( 'Send a new code', $kept );
+		$this->assertStringNotContainsString( 'step_code" value', $kept, 'A typed code is never printed back.' );
 	}
 
 	public function test_the_levels_are_ordered_and_unknown_values_are_read(): void {

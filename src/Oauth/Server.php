@@ -11,6 +11,7 @@ use BeltoftServices\Api\Tokens;
 use BeltoftServices\Mcp\Access;
 use BeltoftServices\Mcp\Endpoint;
 use BeltoftServices\RateLimit;
+use BeltoftServices\StepUp;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -45,6 +46,12 @@ final class Server {
 	public const MAX_PARAM = 512;
 
 	/**
+	 * Purpose of the emailed code that Full access needs on the consent page. Its own purpose, so a code sent for a
+	 * Full access API token cannot be used here and the other way round.
+	 */
+	public const STEP_PURPOSE = 'oauth_full';
+
+	/**
 	 * Hooks.
 	 */
 	public static function register(): void {
@@ -58,6 +65,28 @@ final class Server {
 		add_action( 'wp_set_password', array( Grants::class, 'password_changed' ), 10, 2 );
 		add_action( 'profile_update', array( Grants::class, 'profile_updated' ), 10, 2 );
 		add_action( 'delete_user', array( Grants::class, 'revoke_user' ) );
+		add_filter( 'beltoft_services_stepup_purposes', array( __CLASS__, 'stepup_purposes' ) );
+		add_filter( 'beltoft_services_stepup_text', array( __CLASS__, 'stepup_text' ), 10, 2 );
+	}
+
+	/**
+	 * Registers the purpose of the code step before Full access is given to an app.
+	 *
+	 * @param array<int, string> $purposes Purposes so far.
+	 * @return array<int, string>
+	 */
+	public static function stepup_purposes( $purposes ): array {
+		return array_merge( (array) $purposes, array( self::STEP_PURPOSE ) );
+	}
+
+	/**
+	 * What the code email says this purpose is for.
+	 *
+	 * @param string $text    Text so far.
+	 * @param string $purpose The purpose.
+	 */
+	public static function stepup_text( $text, $purpose ): string {
+		return self::STEP_PURPOSE === $purpose ? __( 'giving an app Full access to your account', 'beltoft-services' ) : (string) $text;
 	}
 
 	/**
@@ -346,7 +375,7 @@ final class Server {
 		// phpcs:enable WordPress.Security.NonceVerification
 		$params = array();
 
-		foreach ( array( 'client_id', 'redirect_uri', 'response_type', 'code_challenge', 'code_challenge_method', 'state', 'scope', 'resource', 'decision', 'allow_actions', 'level', 'understand_full', '_wpnonce' ) as $key ) {
+		foreach ( array( 'client_id', 'redirect_uri', 'response_type', 'code_challenge', 'code_challenge_method', 'state', 'scope', 'resource', 'decision', 'allow_actions', 'level', 'understand_full', 'step_code', '_wpnonce' ) as $key ) {
 			if ( isset( $source[ $key ] ) && is_scalar( $source[ $key ] ) ) {
 				// Not run through a text sanitizer: state and the redirect address must come back exactly as sent.
 				// They are capped, refused when they hold control characters, and escaped where they are printed.
@@ -456,24 +485,23 @@ final class Server {
 			return $fail( 'user_off', 403 );
 		}
 
+		$consent = static fn( array $extra = array() ): array => self::consent( $client, $redirect, $params, $user_id, $extra );
+
 		if ( ! $post ) {
-			return array(
-				'type'    => 'page',
-				'status'  => 200,
-				'kind'    => 'consent',
-				'client'  => $client,
-				'host'    => (string) wp_parse_url( $redirect, PHP_URL_HOST ),
-				// The choice is never set from the request: the customer chooses. This only says what the app asked for.
-				'asks'         => self::asked( (string) ( $params['scope'] ?? '' ) ),
-				'asks_actions' => Tokens::rank( self::asked( (string) ( $params['scope'] ?? '' ) ) ) >= Tokens::rank( Tokens::ACTIONS ),
-				// Verified: the redirect is on the owner's list and the app calls itself exactly Claude.
-				'verified' => 'Claude' === $client['name'] && in_array( $redirect, Access::redirect_allowlist(), true ),
-				'account'  => self::account( $user_id ),
-			);
+			return $consent();
 		}
 
 		if ( ! wp_verify_nonce( (string) ( $params['_wpnonce'] ?? '' ), self::NONCE ) ) {
 			return $fail( 'expired' );
+		}
+
+		// The Send code button: a code goes to the account address and the page is shown again with the choices kept.
+		if ( 'send_code' === ( $params['decision'] ?? '' ) ) {
+			$sent = StepUp::send( $user_id, self::STEP_PURPOSE );
+
+			return is_wp_error( $sent )
+				? $consent( array( 'notice' => 'code_error', 'notice_text' => $sent->get_error_message() ) )
+				: $consent( array( 'notice' => 'code_sent' ) );
 		}
 
 		if ( 'approve' !== ( $params['decision'] ?? '' ) ) {
@@ -483,20 +511,17 @@ final class Server {
 		// The page posts level. A page that was open before the update posts allow_actions=1, which is actions.
 		$scope = Tokens::level( (string) ( $params['level'] ?? ( ! empty( $params['allow_actions'] ) ? Tokens::ACTIONS : '' ) ) );
 
-		// Full needs its own tick, checked here and not only in the page: without it the page is shown again.
-		if ( Tokens::FULL === $scope && empty( $params['understand_full'] ) ) {
-			return array(
-				'type'         => 'page',
-				'status'       => 200,
-				'kind'         => 'consent',
-				'client'       => $client,
-				'host'         => (string) wp_parse_url( $redirect, PHP_URL_HOST ),
-				'asks'         => self::asked( (string) ( $params['scope'] ?? '' ) ),
-				'asks_actions' => true,
-				'notice'       => 'full_tick',
-				'verified'     => 'Claude' === $client['name'] && in_array( $redirect, Access::redirect_allowlist(), true ),
-				'account'      => self::account( $user_id ),
-			);
+		if ( Tokens::FULL === $scope ) {
+			// Full needs its own tick, checked here and not only in the page: without it the page is shown again.
+			if ( empty( $params['understand_full'] ) ) {
+				return $consent( array( 'notice' => 'full_tick' ) );
+			}
+
+			// And the same emailed code as a Full access API token. Checked here, so a posted form that skips the field
+			// gets no authorization code. A right code is used up by verify(); a wrong one counts as a try.
+			if ( ! StepUp::verify( $user_id, (string) ( $params['step_code'] ?? '' ), self::STEP_PURPOSE ) ) {
+				return $consent( array( 'notice' => 'full_code' ) );
+			}
 		}
 
 		$code  = Grants::issue_code( $client['client_id'], $user_id, Tokens::pack( $scope, true ), $redirect, (string) $params['code_challenge'] );
@@ -507,6 +532,38 @@ final class Server {
 		}
 
 		return array( 'type' => 'redirect', 'url' => add_query_arg( rawurlencode_deep( $args ), $redirect ) );
+	}
+
+	/**
+	 * The consent page result.
+	 *
+	 * @param array<string, mixed>  $client   Client.
+	 * @param string                $redirect Registered redirect address.
+	 * @param array<string, string> $params   Request parameters.
+	 * @param int                   $user_id  Customer.
+	 * @param array<string, mixed>  $extra    Notice and the like.
+	 * @return array<string, mixed>
+	 */
+	private static function consent( array $client, string $redirect, array $params, int $user_id, array $extra = array() ): array {
+		$asks = self::asked( (string) ( $params['scope'] ?? '' ) );
+
+		return $extra + array(
+			'type'         => 'page',
+			'status'       => 200,
+			'kind'         => 'consent',
+			'client'       => $client,
+			'host'         => (string) wp_parse_url( $redirect, PHP_URL_HOST ),
+			// The choice is never set from the request: the customer chooses. This only says what the app asked for.
+			'asks'         => $asks,
+			'asks_actions' => Tokens::rank( $asks ) >= Tokens::rank( Tokens::ACTIONS ),
+			// What the customer had chosen when the page came back (a code was sent or refused). Never from the first request.
+			'level'        => empty( $params['decision'] ) ? '' : Tokens::level( (string) ( $params['level'] ?? '' ) ),
+			'understood'   => ! empty( $params['understand_full'] ),
+			// Verified: the redirect is on the owner's list and the app calls itself exactly Claude.
+			'verified'     => 'Claude' === $client['name'] && in_array( $redirect, Access::redirect_allowlist(), true ),
+			'account'      => self::account( $user_id ),
+			'step_up'      => StepUp::ask( $user_id, self::STEP_PURPOSE ),
+		);
 	}
 
 	/**

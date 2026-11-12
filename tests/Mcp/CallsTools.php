@@ -93,6 +93,39 @@ trait CallsTools {
 		$verifier = rtrim( strtr( base64_encode( random_bytes( 32 ) ), '+/', '-_' ), '=' );
 		$challenge = rtrim( strtr( base64_encode( hash( 'sha256', $verifier, true ) ), '+/', '-_' ), '=' );
 		wp_set_current_user( $user );
+		$step = array();
+
+		if ( Tokens::FULL === $scope ) {
+			// Full access needs the emailed code, as for a Full access token.
+			$mail = '';
+			$grab = static function ( $pre, $atts ) use ( &$mail ) {
+				$mail = (string) $atts['message'];
+
+				return true;
+			};
+			// The code mail is not one of the mails a test looks at: the test's own mail capture is set aside for the send.
+			global $wp_filter;
+			$saved = isset( $wp_filter['pre_wp_mail'] ) ? clone $wp_filter['pre_wp_mail'] : null;
+			remove_all_filters( 'pre_wp_mail' );
+			add_filter( 'pre_wp_mail', $grab, 10, 2 );
+			$sent = \BeltoftServices\StepUp::send( $user, Server::STEP_PURPOSE );
+			remove_all_filters( 'pre_wp_mail' );
+
+			if ( null !== $saved ) {
+				$wp_filter['pre_wp_mail'] = $saved;
+			}
+
+			preg_match( '/\b(\d{6})\b/', wp_strip_all_tags( $mail ), $m );
+			$step = array( 'step_code' => $m[1] ?? '' );
+
+			if ( is_wp_error( $sent ) ) {
+				// A customer without an address (a test of that case) cannot be sent a code: the check is answered by the site filter.
+				$pass = static fn( $ok, $id, $secret ) => 'no-address' === $secret ? true : $ok;
+				add_filter( 'beltoft_services_step_up_verify', $pass, 10, 3 );
+				$step = array( 'step_code' => 'no-address' );
+			}
+		}
+
 		$result = Server::authorize(
 			array(
 				'client_id'             => $done['client_id'],
@@ -102,10 +135,14 @@ trait CallsTools {
 				'code_challenge_method' => 'S256',
 				'decision'              => 'approve',
 				'_wpnonce'              => wp_create_nonce( Server::NONCE ),
-			) + ( Tokens::READ === $scope ? array() : array( 'level' => $scope, 'understand_full' => '1' ) ),
+			) + ( Tokens::READ === $scope ? array() : array( 'level' => $scope, 'understand_full' => '1' ) ) + $step,
 			$user,
 			true
 		);
+		if ( isset( $pass ) ) {
+			remove_filter( 'beltoft_services_step_up_verify', $pass, 10 );
+		}
+
 		parse_str( (string) wp_parse_url( $result['url'], PHP_URL_QUERY ), $q );
 		$tokens = Grants::exchange_code( $q['code'], $done['client_id'], 'https://claude.ai/api/mcp/auth_callback', $verifier );
 		$this->assertIsArray( $tokens );

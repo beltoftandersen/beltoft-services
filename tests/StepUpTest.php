@@ -205,8 +205,8 @@ final class StepUpTest extends TestCase {
 		$this->assertSame( '', get_user_meta( $user, 'beltoft_services_stepup_api_token', true ) );
 	}
 
-	public function test_purposes_are_the_two_registered_ones_and_a_third_can_be_added(): void {
-		$this->assertEqualsCanonicalizing( array( 'api_token', 'transfer_code' ), StepUp::purposes() );
+	public function test_purposes_are_the_three_registered_ones_and_a_third_can_be_added(): void {
+		$this->assertEqualsCanonicalizing( array( 'api_token', 'transfer_code', 'oauth_full' ), StepUp::purposes() );
 		$this->assertSame( 'api_token', ApiTokens::PURPOSE );
 		$this->assertSame( 'transfer_code', AuthCodeRoute::PURPOSE );
 
@@ -218,7 +218,7 @@ final class StepUpTest extends TestCase {
 		$text = static fn( $t, $p ) => 'third' === $p ? 'doing the third thing' : $t;
 		add_filter( 'beltoft_services_stepup_text', $text, 10, 2 );
 
-		$this->assertCount( 3, StepUp::purposes(), 'No duplicates.' );
+		$this->assertCount( 4, StepUp::purposes(), 'No duplicates.' );
 		$this->assertTrue( StepUp::send( $user, 'third' ) );
 		$this->assertStringContainsString( 'doing the third thing', wp_strip_all_tags( (string) end( $this->mails )['message'] ) );
 		$this->assertTrue( StepUp::verify( $user, $this->code(), 'third' ) );
