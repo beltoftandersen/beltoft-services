@@ -1147,3 +1147,6 @@ body.woocommerce-account .woocommerce-MyAccount-content .bs-confirm__body { marg
 
 /* Every state dot is round, like .bs-state (licences cards, service heads, panel badges). */
 .beltoft-licenses__status::before, .beltoft-services-badge::before, .beltoft-services-state::before, .beltoft-hosting-status::before { border-radius: 50%; }
+
+/* The white boxes of every page take the card corner (overview, lists of servers and other services, facts, credit). */
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-ov__attention, .beltoft-services-ov__feed, .beltoft-services-ov__money, .beltoft-services-ov__rows, .beltoft-services-servers, .beltoft-services-credit__balance, .beltoft-services-credit__grid, .beltoft-services-facts) { border-radius: var(--bs-radius-lg); overflow: hidden; }
