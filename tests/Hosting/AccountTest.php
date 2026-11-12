@@ -575,4 +575,17 @@ class AccountTest extends HostingCase {
 
 		return implode( ',', $out ) . '=>' . $m->getReturnType();
 	}
+
+	public function test_the_rest_route_makes_a_name_when_none_is_given_and_keeps_a_given_one(): void {
+		$r    = $this->account();
+		$user = $this->user( $r );
+		$base = $r->id() . '/hosting/sites';
+
+		$made = $this->call( 'POST', $base, $user, array( 'slug' => '', 'install' => false ) );
+		$this->assertSame( 201, $made->get_status(), (string) wp_json_encode( $made->get_data() ) );
+		$this->assertMatchesRegularExpression( '/^[a-z0-9-]+-[a-hj-km-np-z2-9]{2}$/D', $made->get_data()['slug'] );
+
+		$this->assertSame( 201, $this->call( 'POST', $base, $user, array( 'slug' => 'named', 'install' => false ) )->get_status() );
+		$this->assertSame( 409, $this->call( 'POST', $base, $user, array( 'slug' => 'named' ) )->get_status() );
+	}
 }

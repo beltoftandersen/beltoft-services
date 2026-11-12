@@ -128,7 +128,9 @@ class CheckoutTest extends HostingCase {
 		$this->assertStringNotContainsString( 'A domain in my account', $html, 'A visitor has no domains on our name servers.' );
 		$this->assertStringContainsString( '<option value="wordpress" selected', $html );
 		$this->assertMatchesRegularExpression( '#<p class="form-row form-row-wide validate-required"><label for="[^"]*_host">Domain name#', $html, 'The checkout step stops on an empty domain name, as it does on an empty website name.' );
-		$this->assertMatchesRegularExpression( '#<p class="form-row form-row-wide validate-required"><label for="[^"]*_slug">#', $html );
+		$this->assertStringNotContainsString( '[slug]"', $html, 'The temporary name is made, not typed.' );
+		$this->assertStringNotContainsString( 'data-site-address', $html );
+		$this->assertStringContainsString( 'Your website gets a temporary address made from your name.', $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
 		$this->assertStringNotContainsString( "\u{00B7}", $html );
 
@@ -172,7 +174,6 @@ class CheckoutTest extends HostingCase {
 
 		$bad = array(
 			'slug'        => array( array( 'slug' => 'Bad Slug' ), 'site_slug' ),
-			'no slug'     => array( array(), 'site_slug' ),
 			'mode'        => array( array( 'slug' => 'a', 'mode' => 'weird' ), 'site_mode' ),
 			'own empty'   => array( array( 'slug' => 'a', 'mode' => 'own', 'host' => '' ), 'site_host' ),
 			'own bad'     => array( array( 'slug' => 'a', 'mode' => 'own', 'host' => 'not a host' ), 'site_host' ),
@@ -232,6 +233,9 @@ class CheckoutTest extends HostingCase {
 		$key = $this->in_cart( $this->product() );
 
 		$this->post( $key, array( 'slug' => '', 'mode' => 'preview' ) );
+		$this->assertSame( array(), $this->errors(), 'No name is asked for: it is made.' );
+
+		$this->post( $key, array( 'mode' => 'own', 'host' => '' ) );
 		$this->assertCount( 1, $this->errors() );
 
 		$this->post( $key, array( 'slug' => 'good-name', 'mode' => 'preview' ) );
@@ -480,10 +484,10 @@ class CheckoutTest extends HostingCase {
 		$long = SiteField::resolve( array( 'mode' => 'own', 'host' => 'a-very-long-subdomain-name.another-long-label.example.com' ), 0 );
 		$this->assertTrue( Sites::valid_slug( $long['slug'] ) );
 
-		// A name typed under "more options" is used as typed; a preview order still needs its name.
+		// A name typed under "more options" is used as typed.
 		$typed = SiteField::resolve( array( 'mode' => 'own', 'host' => 'typed.example.net', 'slug' => 'my-pick' ), 0 );
 		$this->assertSame( 'my-pick', $typed['slug'] );
-		$this->assertSame( 'site_slug', SiteField::resolve( array( 'mode' => 'preview' ), 0 )->get_error_code() );
+		$this->assertMatchesRegularExpression( '/^site-[a-z2-9]{2}$/D', SiteField::resolve( array( 'mode' => 'preview' ), 0 )['slug'], 'A preview order with no name gets a made one.' );
 	}
 
 	public function test_a_guest_hold_moves_to_the_customer_the_checkout_makes_and_to_nobody_else(): void {

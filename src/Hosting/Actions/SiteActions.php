@@ -16,6 +16,7 @@ use BeltoftServices\Hosting\Provision;
 use BeltoftServices\Hosting\Records;
 use BeltoftServices\Hosting\SiteDns;
 use BeltoftServices\Hosting\SiteDomains;
+use BeltoftServices\Hosting\SiteNames;
 use BeltoftServices\Hosting\Sites;
 
 defined( 'ABSPATH' ) || exit;
@@ -97,6 +98,17 @@ final class SiteActions {
 		}
 
 		$slug = strtolower( trim( $slug ) );
+
+		if ( '' === $slug ) {
+			// No name given: the customer's own details make one. A name that is given is checked as it always was.
+			$license = $this->r->license();
+			$slug    = SiteNames::generate( SiteNames::source_for_user( (int) ( $license['user_id'] ?? 0 ), (string) ( $license['email'] ?? '' ) ) + array( 'title' => $label ), 'r' . $this->r->id(), '', false );
+
+			if ( '' === $slug ) {
+				return $this->error( 'failed', __( 'Websites cannot be added right now.', 'beltoft-services' ) );
+			}
+		}
+
 		$php  = '' === $php ? Config::get( 'php_default' ) : $php;
 
 		if ( ! Sites::valid_slug( $slug ) ) {

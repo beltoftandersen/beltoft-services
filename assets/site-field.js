@@ -1,4 +1,4 @@
-/* Checkout: shows the inputs of the chosen website address option and keeps the temporary address line current.
+/* Checkout: shows the inputs of the chosen website address option.
  * Without this script every option stays visible and the server uses only the chosen option's inputs. */
 ( function () {
 	'use strict';
@@ -22,25 +22,9 @@
 		}
 	}
 
-	function address( root ) {
-		var out = root.querySelector( '[data-site-address-name]' );
-		var input = root.querySelector( 'input[name$="[slug]"]' );
-
-		if ( out && input ) {
-			var name = input.value.toLowerCase().replace( /[^a-z0-9-]/g, '' );
-			out.textContent = name || 'myshop';
-		}
-	}
-
 	document.addEventListener( 'change', function ( event ) {
 		if ( event.target.matches && event.target.matches( '.beltoft-services-site-field input[type="radio"]' ) ) {
 			show( line( event.target ) );
-		}
-	} );
-
-	document.addEventListener( 'input', function ( event ) {
-		if ( event.target.matches && event.target.matches( '.beltoft-services-site-field input[name$="[slug]"]' ) ) {
-			address( line( event.target ) );
 		}
 	} );
 }() );

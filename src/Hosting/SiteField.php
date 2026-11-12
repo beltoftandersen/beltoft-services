@@ -152,6 +152,15 @@ final class SiteField {
 			$slug = self::free_slug( $domain, $owner );
 		}
 
+		if ( '' === $slug && self::MODE_PREVIEW === $mode ) {
+			// The temporary address is made from the customer's details, held now as a typed name was.
+			$slug = SiteNames::generate( self::name_source( $input, $user_id ), $owner, (string) ( $input['line'] ?? '' ) );
+
+			if ( '' === $slug ) {
+				return new \WP_Error( 'site_taken', __( 'That website name is taken. Choose another.', 'beltoft-services' ) );
+			}
+		}
+
 		if ( Sites::reserved( $slug ) ) {
 			return new \WP_Error( 'site_slug', __( 'That website name is reserved. Choose another.', 'beltoft-services' ) );
 		}
@@ -196,6 +205,28 @@ final class SiteField {
 	}
 
 	/**
+	 * What a generated temporary name is made from: the website title, then the billing details of the order.
+	 *
+	 * @param array<string, string> $input   The choice (see resolve()).
+	 * @param int                   $user_id Customer, 0 for a guest.
+	 * @return array<string, string>
+	 */
+	private static function name_source( array $input, int $user_id ): array {
+		$given = array(
+			'company'    => (string) ( $input['company'] ?? '' ),
+			'first_name' => (string) ( $input['first_name'] ?? '' ),
+			'last_name'  => (string) ( $input['last_name'] ?? '' ),
+			'email'      => (string) ( $input['billing_email'] ?? '' ),
+		);
+
+		// A choice made outside the checkout form carries no billing details: the customer's account says them.
+		$source          = array_merge( SiteNames::source_for_user( $user_id ), array_filter( $given ) );
+		$source['title'] = (string) ( $input['label'] ?? '' );
+
+		return $source;
+	}
+
+	/**
 	 * Who a held name belongs to: the customer, or the cart's session for a guest.
 	 *
 	 * @param int $user_id Customer id, 0 for a guest.
@@ -232,7 +263,14 @@ final class SiteField {
 			return array();
 		}
 
-		return self::read_post( $key );
+		$out         = self::read_post( $key );
+		$out['line'] = $key;
+
+		foreach ( SiteNames::source_from_post( get_current_user_id() ) as $field => $value ) {
+			$out[ 'email' === $field ? 'billing_email' : $field ] = $value;
+		}
+
+		return $out;
 	}
 
 	/**
@@ -393,8 +431,6 @@ final class SiteField {
 		$have = array() !== $zones;
 		$pick = in_array( $post['install'], self::OFFERED, true ) ? $post['install'] : $install;
 		$lang = Languages::offered( $post['language'] ) ? $post['language'] : Languages::preselected();
-		$zone = Config::preview_zone();
-
 		$new = MailField::cart_domains();
 
 		if ( ! in_array( $mode, array( self::MODE_PREVIEW, self::MODE_OURS, self::MODE_OWN, self::MODE_NEW ), true ) || ( self::MODE_OURS === $mode && ! $have ) || ( self::MODE_NEW === $mode && array() === $new ) ) {
@@ -411,13 +447,7 @@ final class SiteField {
 		echo '<fieldset class="beltoft-services-site-field__group"><legend>' . esc_html__( 'Website address', 'beltoft-services' ) . '</legend>';
 		self::radio( $name, $id, self::MODE_PREVIEW, $mode, __( 'Temporary address, connect a domain later', 'beltoft-services' ) );
 		echo '<div class="beltoft-services-site-field__panel" data-site-panel="' . esc_attr( self::MODE_PREVIEW ) . '"' . ( self::MODE_PREVIEW === $mode ? '' : ' hidden' ) . '>';
-		self::text_row( $name . '[slug]', $id . '_slug', __( 'Website name', 'beltoft-services' ), $post['slug'], true, '' !== $zone ? __( 'Lowercase letters, numbers and dashes. You connect your own domain later.', 'beltoft-services' ) : __( 'Lowercase letters, numbers and dashes.', 'beltoft-services' ), 'text', 32 );
-
-		if ( '' !== $zone ) {
-			/* translators: %s: address such as myshop.example.net, with the name part marked. */
-			echo '<p class="beltoft-services-site-field__note" data-site-address data-zone="' . esc_attr( $zone ) . '">' . wp_kses( sprintf( __( 'Your website opens at %s', 'beltoft-services' ), '<strong><span data-site-address-name>' . esc_html( '' !== $post['slug'] ? $post['slug'] : 'myshop' ) . '</span>.' . esc_html( $zone ) . '</strong>' ), array( 'strong' => array(), 'span' => array( 'data-site-address-name' => true ) ) ) . '</p>';
-		}
-
+		echo '<p class="beltoft-services-site-field__note">' . esc_html__( 'Your website gets a temporary address made from your name.', 'beltoft-services' ) . '</p>';
 		echo '</div>';
 		if ( $have ) {
 			self::radio( $name, $id, self::MODE_OURS, $mode, __( 'A domain in my account', 'beltoft-services' ) );

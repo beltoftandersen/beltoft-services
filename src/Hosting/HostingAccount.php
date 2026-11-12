@@ -515,7 +515,7 @@ final class HostingAccount {
 		echo '<div class="beltoft-hosting-add">';
 
 		if ( 0 === $limits['sites'] || $limits['sites_used'] < $limits['sites'] ) {
-			echo '<div class="beltoft-hosting-row"><label class="beltoft-hosting-field"><span>' . esc_html__( 'Website name', 'beltoft-services' ) . '</span><input type="text" data-hosting-field="slug" maxlength="32"></label>';
+			echo '<div class="beltoft-hosting-row">';
 			echo '<label class="beltoft-hosting-field"><span>' . esc_html__( 'PHP version', 'beltoft-services' ) . '</span><select data-hosting-field="php">';
 
 			foreach ( $limits['php_versions'] as $version ) {

@@ -71,7 +71,7 @@
 
 				return null === typed ? null : [ 'DELETE', base + '/sites/' + encodeURIComponent( slug ) + '?confirm=' + encodeURIComponent( typed ), undefined ];
 			case 'add_site':
-				return '' === field( panel, 'slug' ) ? null : [ 'POST', base + '/sites', { slug: field( panel, 'slug' ), php: field( panel, 'php' ) } ];
+				return [ 'POST', base + '/sites', { slug: '', php: field( panel, 'php' ) } ];
 			case 'add_domain':
 				return '' === field( panel, 'host' ) ? null : [ 'POST', base + '/sites/' + encodeURIComponent( field( panel, 'domain_slug' ) ) + '/domains', { host: field( panel, 'host' ) } ];
 			case 'add_pack':
