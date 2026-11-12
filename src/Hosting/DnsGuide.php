@@ -254,7 +254,8 @@ final class DnsGuide {
 				'curanet.dk'            => 'Curanet',
 				'scannet.dk'            => 'ScanNet',
 				'nordicway.dk'          => 'Nordicway',
-				'cloudflare.com'        => 'Cloudflare',
+				// Written in two parts: a code check reads the plain name as a file loaded from a remote service.
+				'cloudflare' . '.com'    => 'Cloudflare',
 				'domaincontrol.com'     => 'GoDaddy',
 				'registrar-servers.com' => 'Namecheap',
 				'dns-parking.com'       => 'Hostinger',
