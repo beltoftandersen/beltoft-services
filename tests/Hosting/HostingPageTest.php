@@ -636,7 +636,7 @@ class HostingPageTest extends HostingCase {
 
 		$wpdb->update( \BeltoftServices\Hosting\Schema::tables()['hosting_domains'], array( 'kind' => 'external' ), array( 'host' => 'ownmail.example' ) );
 		$html = $this->page( $r );
-		$this->assertStringContainsString( 'After you press the button, you get a list of DNS records to add where the DNS of ownmail.example is managed: MX, SPF, DKIM, DMARC and two for mail programs. Mail does not arrive until they are in place.', $html );
+		$this->assertStringContainsString( 'After you press the button, you get a list of DNS records to add where the DNS of ownmail.example is managed. Three are needed: MX for receiving, SPF and DKIM for sending. Three more are recommended.', $html );
 		$this->assertStringContainsString( 'data-hosting-action="enable_mail"', $html );
 	}
 

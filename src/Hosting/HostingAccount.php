@@ -793,7 +793,7 @@ final class HostingAccount {
 							: __( 'Mailboxes can be made now, but mail does not arrive until the DNS records for %s are added.', 'beltoft-services' ),
 						$mail_domain
 					)
-				) . ' <a class="beltoft-hosting-link" href="' . esc_url( $dns_url ) . '">' . esc_html__( 'Open the DNS records guide', 'beltoft-services' ) . '</a>';
+				) . ( \BeltoftServices\Mail\MailHold::held( $mail ) ? ' ' . esc_html__( 'Until the SPF and DKIM records are found, your mailboxes and your websites cannot send mail.', 'beltoft-services' ) : '' ) . ' <a class="beltoft-hosting-link" href="' . esc_url( $dns_url ) . '">' . esc_html__( 'Open the DNS records guide', 'beltoft-services' ) . '</a>';
 			}
 
 			if ( '' !== $url ) {
@@ -840,7 +840,7 @@ final class HostingAccount {
 				echo '</p><p class="beltoft-hosting-help">' . esc_html(
 					sprintf(
 						/* translators: %s: the account's own domain. */
-						__( 'After you press the button, you get a list of DNS records to add where the DNS of %s is managed: MX, SPF, DKIM, DMARC and two for mail programs. Mail does not arrive until they are in place.', 'beltoft-services' ),
+						__( 'After you press the button, you get a list of DNS records to add where the DNS of %s is managed. Three are needed: MX for receiving, SPF and DKIM for sending. Three more are recommended.', 'beltoft-services' ),
 						\BeltoftServices\Domains\HostName::display( (string) LiteMail::ready_domain( $r ) )
 					)
 				);
