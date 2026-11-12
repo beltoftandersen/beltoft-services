@@ -90,6 +90,7 @@ final class HostingAccount {
 					'opening'   => __( 'Opening WordPress...', 'beltoft-services' ),
 					/* translators: 1: WordPress user name, 2: email address. */
 					'signedInAs' => __( 'Signed in as %1$s (%2$s).', 'beltoft-services' ),
+					/* translators: %s: WordPress user name. */
 					'passwordFor' => __( 'Choose a password for %s.', 'beltoft-services' ),
 					'confirmRemoveDomain' => __( 'Remove this address from the website?', 'beltoft-services' ),
 					'confirmRemoveKey' => __( 'Remove this SSH key?', 'beltoft-services' ),
