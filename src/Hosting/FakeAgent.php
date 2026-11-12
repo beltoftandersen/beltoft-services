@@ -22,6 +22,12 @@ defined( 'ABSPATH' ) || exit;
  * - site.delete, site.php, site.domains, site.cache_purge, site.cron, site.workers: ok (true), slug. Fail with
  *   "unknown site" for a site that was not created, except site.delete (deleting a missing site is fine).
  * - site.wp_install: installed (true), slug.
+ * - site.cache_setup: page_plugin (installed, updated, present, removed_by_customer or not_shipped), object_cache (enabled,
+ *   installed, present, removed_by_customer, no_valkey, needs_selective_flush or failed), nginx (rendered), slug; or
+ *   skipped ("no WordPress"). Idempotent. The optional object_cache argument asks for the object cache to be switched on.
+ *   Fails with "unknown site" for a site that was not created.
+ * - site.cache_status: page_cache (on, off, inactive, missing or unknown), object_cache (on, off or unknown) and, with
+ *   the page cache plugin active, lifetime (seconds). Read only. Fails with "unknown site".
  * - site.verify: status (200), host. A loopback request inside the container for the host name (an operation this
  *   plugin adds to the plan's list for the verify step). Fails with "unknown site" for a site that was not created.
  * - site.wp_login_link, site.wp_password_link: url (a one-time address, fake) and, for a site installed through site.wp_install,
@@ -101,6 +107,15 @@ class FakeAgent implements Agent {
 			'redirects' => array( 'redirects', false ),
 		),
 		'site.cache_purge'  => array(
+			'vmid' => array( 'vmid', true ),
+			'slug' => array( 'ident', true ),
+		),
+		'site.cache_setup'  => array(
+			'vmid'         => array( 'vmid', true ),
+			'slug'         => array( 'ident', true ),
+			'object_cache' => array( 'bool', false ),
+		),
+		'site.cache_status' => array(
 			'vmid' => array( 'vmid', true ),
 			'slug' => array( 'ident', true ),
 		),
@@ -760,10 +775,38 @@ class FakeAgent implements Agent {
 			case 'site.php':
 			case 'site.domains':
 			case 'site.cache_purge':
+			case 'site.cache_setup':
+			case 'site.cache_status':
 			case 'site.cron':
 			case 'site.workers':
 				if ( ! isset( $this->state['sites'][ $vmid ][ $args['slug'] ] ) ) {
 					return 'unknown site';
+				}
+
+				if ( 'site.cache_setup' === $op ) {
+					$cache = array(
+						'page_plugin'  => ! empty( $this->state['sites'][ $vmid ][ $args['slug'] ]['cache']['page'] ) ? 'present' : 'installed',
+						'object_cache' => ! empty( $args['object_cache'] ) ? 'enabled' : 'installed',
+						'nginx'        => 'rendered',
+						'slug'         => $args['slug'],
+					);
+
+					$this->state['sites'][ $vmid ][ $args['slug'] ]['cache'] = array(
+						'page'   => true,
+						'object' => ! empty( $args['object_cache'] ) || ! empty( $this->state['sites'][ $vmid ][ $args['slug'] ]['cache']['object'] ),
+					);
+
+					return $cache;
+				}
+
+				if ( 'site.cache_status' === $op ) {
+					$cache = (array) ( $this->state['sites'][ $vmid ][ $args['slug'] ]['cache'] ?? array() );
+
+					return array(
+						'page_cache'   => ! empty( $cache['page'] ) ? 'on' : 'missing',
+						'object_cache' => ! empty( $cache['object'] ) ? 'on' : 'off',
+						'lifetime'     => 600,
+					);
 				}
 
 				if ( 'site.wp_install' === $op && ! $this->has_database( $vmid, (string) $args['slug'] ) ) {
@@ -774,6 +817,10 @@ class FakeAgent implements Agent {
 					$this->state['sites'][ $vmid ][ $args['slug'] ]['admin'] = array(
 						'user'  => $args['admin_user'],
 						'email' => $args['admin_email'],
+					);
+					$this->state['sites'][ $vmid ][ $args['slug'] ]['cache'] = array(
+						'page'   => true,
+						'object' => false,
 					);
 
 					return array(

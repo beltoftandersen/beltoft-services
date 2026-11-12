@@ -25,6 +25,7 @@ defined( 'ABSPATH' ) || exit;
  * - POST   hosting/sites/<slug>/php/rollback  back to the version before an automatic switch (7 days)
  * - POST   hosting/sites/<slug>/workers    workers
  * - POST   hosting/sites/<slug>/cache      clears the page cache
+ * - GET    hosting/sites/<slug>/cache      what the node reports about the page cache and the object cache
  * - POST   hosting/sites/<slug>/login      a one-time WordPress sign-in address
  * - POST   hosting/sites/<slug>/password   a one-time address to WordPress's own "choose a new password" screen
  * - POST   hosting/sites/<slug>/domains    host
@@ -102,7 +103,10 @@ final class HostingRoutes {
 			'permission_callback' => 'is_user_logged_in',
 			'args'                => $id + $site + array( 'workers' => array( 'type' => 'integer', 'minimum' => 1, 'required' => true ) ),
 		) );
-		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/cache', array( 'methods' => $post, 'callback' => array( __CLASS__, 'purge_cache' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ) );
+		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/cache', array(
+			array( 'methods' => $post, 'callback' => array( __CLASS__, 'purge_cache' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ),
+			array( 'methods' => \WP_REST_Server::READABLE, 'callback' => array( __CLASS__, 'cache_status' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ),
+		) );
 		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/login', array( 'methods' => $post, 'callback' => array( __CLASS__, 'login_link' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ) );
 		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/password', array( 'methods' => $post, 'callback' => array( __CLASS__, 'password_link' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ) );
 		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/domains', array(
@@ -343,6 +347,17 @@ final class HostingRoutes {
 
 	public static function set_workers( \WP_REST_Request $request ): \WP_REST_Response {
 		return self::change( $request, static fn( HostingActions $a ) => $a->set_workers( (string) $request['slug'], (int) $request['workers'] ) );
+	}
+
+	/**
+	 * The caches of a site as the node reports them (read only).
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 */
+	public static function cache_status( \WP_REST_Request $request ): \WP_REST_Response {
+		$r = self::guard( $request, true, Routes::STATUS_RATE_LIMIT );
+
+		return $r instanceof Resource ? self::reply( ( new HostingActions( $r ) )->cache_status( (string) $request['slug'] ) ) : $r;
 	}
 
 	public static function purge_cache( \WP_REST_Request $request ): \WP_REST_Response {

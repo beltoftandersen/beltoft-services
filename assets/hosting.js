@@ -452,4 +452,35 @@
 			fail( text.failed || '' );
 		} );
 	}
+
+	// The caches of each website, asked from the node when the page is open (the page itself is drawn without calling the node).
+	function cacheFacts() {
+		Array.prototype.forEach.call( document.querySelectorAll( '[data-cache-facts]' ), function ( box ) {
+			var panel = box.closest( '[data-hosting-resource]' );
+			var slug = box.getAttribute( 'data-slug' ) || '';
+
+			if ( ! panel || ! slug ) {
+				return;
+			}
+
+			call( 'GET', panel.getAttribute( 'data-hosting-resource' ) + '/hosting/sites/' + encodeURIComponent( slug ) + '/cache' ).then( function ( result ) {
+				if ( ! result.ok || ! result.data ) {
+					return;
+				}
+
+				var pages = { on: text.cachePageOn, off: text.cachePageOff, inactive: text.cachePageInactive, missing: text.cachePageMissing };
+				var objects = { on: text.cacheObjectOn, off: text.cacheObjectOff };
+				var parts = [ pages[ result.data.page_cache ], objects[ result.data.object_cache ] ].filter( Boolean );
+
+				if ( parts.length ) {
+					box.textContent = parts.join( ' ' );
+					box.hidden = false;
+				}
+			}, function () {
+				// The facts are an extra: without them the line stays hidden.
+			} );
+		} );
+	}
+
+	cacheFacts();
 }() );

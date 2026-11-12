@@ -2,7 +2,7 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Beltoft Services for WooCommerce 0.12.4\n"
+"Project-Id-Version: Beltoft Services for WooCommerce 0.13.0\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/beltoft-services\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -20227,4 +20227,36 @@ msgstr ""
 
 #: assets/domain.js:309
 msgid "Error"
+msgstr ""
+
+#: src/Hosting/HostingAccount.php:102
+msgid "Page cache: on."
+msgstr ""
+
+#: src/Hosting/HostingAccount.php:103
+msgid "Page cache: off in WordPress."
+msgstr ""
+
+#: src/Hosting/HostingAccount.php:104
+msgid "Page cache: off, its WordPress plugin is deactivated."
+msgstr ""
+
+#: src/Hosting/HostingAccount.php:105
+msgid "Page cache: off, its WordPress plugin is not installed."
+msgstr ""
+
+#: src/Hosting/HostingAccount.php:106
+msgid "Object cache: on."
+msgstr ""
+
+#: src/Hosting/HostingAccount.php:107
+msgid "Object cache: off."
+msgstr ""
+
+#: src/Hosting/HostingAccount.php:472
+msgid "Clears the page cache and the object cache of this website."
+msgstr ""
+
+#: src/Hosting/HostingAccount.php:473
+msgid "The page cache is switched on and off in the WordPress dashboard, under Settings. Switch it off there, or deactivate or delete its plugin, to use another caching plugin."
 msgstr ""

@@ -55,6 +55,52 @@ class HostingCommand {
 	}
 
 	/**
+	 * Cache set-up of the hosted websites.
+	 *
+	 * ## OPTIONS
+	 * <action> : setup.
+	 * [--dry-run] : List the websites without asking the nodes to change anything.
+	 * [--account=<id>] : One hosting account only (the resource id).
+	 *
+	 * ## EXAMPLES
+	 *     wp beltoft-services hosting cache setup --dry-run
+	 *     wp beltoft-services hosting cache setup --account=12
+	 *
+	 * Installs the page cache plugin on every website that has WordPress, renders its web server rule again, and on a plan with
+	 * an object cache that is preselected for a shop, switches the object cache on. A website whose customer removed a plugin
+	 * keeps it removed. Safe to repeat.
+	 *
+	 * @param array<int, string>   $args       Positional arguments.
+	 * @param array<string, mixed> $assoc_args Flags.
+	 */
+	public function cache( array $args, array $assoc_args ): void {
+		if ( 'setup' !== (string) ( $args[0] ?? '' ) ) {
+			\WP_CLI::error( 'Use: cache setup [--dry-run] [--account=<id>]' );
+		}
+
+		$dry  = ! empty( $assoc_args['dry-run'] );
+		$rows = \BeltoftServices\Hosting\CacheSetup::run( $dry, (int) ( $assoc_args['account'] ?? 0 ) );
+
+		if ( array() === $rows ) {
+			\WP_CLI::log( 'No websites.' );
+			return;
+		}
+
+		$failed = 0;
+
+		foreach ( $rows as $row ) {
+			\WP_CLI::log( sprintf( 'account %d  %s  %s', $row['resource'], $row['slug'], $row['result'] ) );
+			$failed += 0 === strpos( $row['result'], 'not done' ) ? 1 : 0;
+		}
+
+		if ( $failed > 0 ) {
+			\WP_CLI::warning( sprintf( '%d website(s) were not set up. The set-up is safe to repeat.', $failed ) );
+		}
+
+		\WP_CLI::success( ( $dry ? 'Dry run: ' : '' ) . count( $rows ) . ' website(s).' );
+	}
+
+	/**
 	 * Prints one line per node.
 	 */
 	private function list_nodes(): void {

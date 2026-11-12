@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.12.4
+Stable tag: 0.13.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -255,6 +255,12 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.13.0 =
+* Hosting: the page cache is controlled from WordPress. A website is cached by its server only when its WordPress marks a page as cacheable, so with the page cache plugin deactivated, deleted or switched off nothing is cached. The My Account page shows, per website, whether the page cache and the object cache are on, and where to switch the page cache off.
+* New node agent operations are used when the agent has them: site.cache_status (read only, shown on the page; REST GET hosting/sites/<slug>/cache) and site.cache_setup. A node whose agent does not have them keeps working: the Clear cache button is unchanged and the cache line stays hidden.
+* A new website on a plan that preselects a shop and has an object cache gets the object cache switched on, as a best-effort step that never stops the website.
+* WP-CLI: `wp beltoft-services hosting cache setup [--dry-run] [--account=<id>]` sets up the caches of every website of every account (safe to repeat; a plugin the customer removed stays removed).
 
 = 0.12.4 =
 * Email lite: the mail domain of a hosting account needs no second ownership record when the account's website already runs on the domain (filter `beltoft_services_mail_domain_proven`).

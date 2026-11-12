@@ -201,6 +201,26 @@ final class HostingActions {
 	}
 
 	/**
+	 * Puts the caches of a site in place on the node (staff, command line).
+	 *
+	 * @param string $slug Site.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function cache_setup( string $slug ) {
+		return $this->php->cache_setup( $slug );
+	}
+
+	/**
+	 * What the node says about the caches of a site.
+	 *
+	 * @param string $slug Site.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function cache_status( string $slug ) {
+		return $this->php->cache_status( $slug );
+	}
+
+	/**
 	 * A one-time sign-in address for the site's WordPress.
 	 *
 	 * @param string $slug Site.

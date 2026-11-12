@@ -197,6 +197,67 @@ final class PhpActions {
 	}
 
 	/**
+	 * Puts the caches of a website in place on the node (staff action, from the command line): the page cache plugin, the
+	 * nginx rule, and on a plan with an object cache that is preselected for a shop, the object cache. Safe to repeat; a
+	 * website whose customer removed a plugin keeps it removed. The agent's answer is returned as it is.
+	 *
+	 * @param string $slug Site.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function cache_setup( string $slug ) {
+		$ready = $this->ready();
+
+		if ( is_wp_error( $ready ) ) {
+			return $ready;
+		}
+
+		if ( null === Sites::find( $this->r->id(), $slug ) ) {
+			return $this->error( 'not_found', __( 'That website does not exist.', 'beltoft-services' ) );
+		}
+
+		$record = (array) Records::for_resource( $this->r->id() );
+
+		return $this->call(
+			'site_cache_setup_' . $slug,
+			'site.cache_setup',
+			array(
+				'vmid'         => (int) $record['vmid'],
+				'slug'         => $slug,
+				'object_cache' => ! empty( $this->plan['woocommerce_default'] ) && (int) $this->plan['valkey_mb'] > 0,
+			)
+		);
+	}
+
+	/**
+	 * What the node says about the website's caches: the page cache (on, off, inactive, missing or unknown) and the object cache
+	 * (on, off or unknown), and the page cache lifetime in seconds when it has one. Read only. A node whose agent does not know the
+	 * operation answers with a refusal, and the page then shows nothing about the caches.
+	 *
+	 * @param string $slug Site.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function cache_status( string $slug ) {
+		$out = $this->site_job( $slug, 'site.cache_status', 'cache_status', null );
+
+		if ( is_wp_error( $out ) ) {
+			return $out;
+		}
+
+		$page   = (string) ( $out['page_cache'] ?? '' );
+		$object = (string) ( $out['object_cache'] ?? '' );
+		$clean  = array(
+			'page_cache'   => in_array( $page, array( 'on', 'off', 'inactive', 'missing' ), true ) ? $page : 'unknown',
+			'object_cache' => in_array( $object, array( 'on', 'off' ), true ) ? $object : 'unknown',
+		);
+
+		if ( isset( $out['lifetime'] ) && is_int( $out['lifetime'] ) && $out['lifetime'] > 0 ) {
+			$clean['lifetime'] = $out['lifetime'];
+		}
+
+		return $clean;
+	}
+
+	/**
 	 * A one-time sign-in address for the site's WordPress.
 	 *
 	 * @param string $slug Site.

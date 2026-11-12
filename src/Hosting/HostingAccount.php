@@ -100,6 +100,12 @@ final class HostingAccount {
 					'confirmRestore' => __( 'Restore from this backup? A safety copy of your hosting is made first, so you can undo it for 24 hours.', 'beltoft-services' ),
 					'confirmPack' => __( 'Remove one extra storage pack from this mailbox? It ends at your next renewal, the storage stays until then, and nothing is refunded.', 'beltoft-services' ),
 					'confirmUndo' => __( 'Go back to the safety copy? Changes made since the restore are lost.', 'beltoft-services' ),
+					'cachePageOn' => __( 'Page cache: on.', 'beltoft-services' ),
+					'cachePageOff' => __( 'Page cache: off in WordPress.', 'beltoft-services' ),
+					'cachePageInactive' => __( 'Page cache: off, its WordPress plugin is deactivated.', 'beltoft-services' ),
+					'cachePageMissing' => __( 'Page cache: off, its WordPress plugin is not installed.', 'beltoft-services' ),
+					'cacheObjectOn' => __( 'Object cache: on.', 'beltoft-services' ),
+					'cacheObjectOff' => __( 'Object cache: off.', 'beltoft-services' ),
 				),
 			)
 		);
@@ -460,10 +466,12 @@ final class HostingAccount {
 		echo '<div><dt>' . esc_html__( 'Cache', 'beltoft-services' ) . '</dt><dd>';
 
 		if ( $ready ) {
+			echo '<p class="beltoft-hosting-line" data-cache-facts data-slug="' . esc_attr( $slug ) . '" hidden></p>';
 			echo '<button type="button" class="beltoft-hosting-btn" data-hosting-action="cache" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Clear cache', 'beltoft-services' ) . '</button>';
 		}
 
-		echo '<p class="beltoft-hosting-help">' . esc_html__( 'Clears the page cache and the object cache of this website.', 'beltoft-services' ) . '</p></dd></div>';
+		echo '<p class="beltoft-hosting-help">' . esc_html__( 'Clears the page cache and the object cache of this website.', 'beltoft-services' ) . '</p>';
+		echo '<p class="beltoft-hosting-help">' . esc_html__( 'The page cache is switched on and off in the WordPress dashboard, under Settings. Switch it off there, or deactivate or delete its plugin, to use another caching plugin.', 'beltoft-services' ) . '</p></dd></div>';
 
 		// Files.
 		echo '<div><dt>' . esc_html__( 'Files', 'beltoft-services' ) . '</dt><dd>' . esc_html__( 'Upload and download files with SFTP.', 'beltoft-services' ) . ' <a class="beltoft-hosting-link" href="#beltoft-hosting-files">' . esc_html__( 'Files (SFTP)', 'beltoft-services' ) . '</a></dd></div>';

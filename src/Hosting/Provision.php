@@ -616,6 +616,17 @@ final class Provision {
 				return $installed;
 			}
 
+			// A node whose agent has the cache set-up already put the page cache in place with the install. Shop plans with an
+			// object cache also get it switched on. Best effort: a node whose agent does not know the operation, or a failed
+			// job, does not stop the website (the cache-setup command repairs it later). Only a job still running is waited for.
+			if ( ! empty( $this->plan['woocommerce_default'] ) && (int) $this->plan['valkey_mb'] > 0 ) {
+				$cache = $this->agent_call( 'site_cache', 'site.cache_setup', array( 'vmid' => $vmid, 'slug' => $spec['slug'], 'object_cache' => true ) );
+
+				if ( $cache instanceof StepResult && $cache->is_poll() ) {
+					return $cache;
+				}
+			}
+
 			// Who the install made the administrator, so My Account can say which user the sign-in link uses.
 			Sites::update( $this->r->id(), $spec['slug'], array( 'flags' => array( 'admin_user' => $spec['admin_user'], 'admin_email' => 'unknown@invalid' === $spec['admin_email'] ? '' : $spec['admin_email'] ) ) );
 		}
