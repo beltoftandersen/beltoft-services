@@ -19,9 +19,9 @@ final class DnsDriver implements Driver, StopsOnDelete, ProvisionSteps {
 	 */
 	public function step_labels(): array {
 		return array(
-			'claim'        => __( 'Reserve the domain', 'beltoft-services' ),
-			'zone'         => __( 'Create the DNS zone', 'beltoft-services' ),
-			'delegation'   => __( 'Check the name servers', 'beltoft-services' ),
+			'claim'        => __( 'Reserving the domain', 'beltoft-services' ),
+			'zone'         => __( 'Creating the DNS zone', 'beltoft-services' ),
+			'delegation'   => __( 'Checking the name servers', 'beltoft-services' ),
 		);
 	}
 	public function label(): string { return __( 'DNS hosting', 'beltoft-services' ); }

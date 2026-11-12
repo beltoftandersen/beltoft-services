@@ -97,25 +97,25 @@ final class ServerProgress {
 	private static function steps( string $kind ): array {
 		if ( 'rollback' === $kind ) {
 			return array(
-				'rollback' => __( 'Go back to the snapshot', 'beltoft-services' ),
-				'plan'     => __( 'Apply your plan', 'beltoft-services' ),
-				'start'    => __( 'Start the server', 'beltoft-services' ),
+				'rollback' => __( 'Going back to the snapshot', 'beltoft-services' ),
+				'plan'     => __( 'Applying your plan', 'beltoft-services' ),
+				'start'    => __( 'Starting the server', 'beltoft-services' ),
 			);
 		}
 
 		if ( 'restore' === $kind ) {
 			return array(
-				'restore' => __( 'Restore the backup', 'beltoft-services' ),
-				'plan'    => __( 'Apply your plan', 'beltoft-services' ),
-				'start'   => __( 'Start the server', 'beltoft-services' ),
+				'restore' => __( 'Restoring the backup', 'beltoft-services' ),
+				'plan'    => __( 'Applying your plan', 'beltoft-services' ),
+				'start'   => __( 'Starting the server', 'beltoft-services' ),
 			);
 		}
 
 		return array(
-			'wipe'      => __( 'Erase the old system', 'beltoft-services' ),
-			'clone'     => __( 'Install the system', 'beltoft-services' ),
-			'configure' => __( 'Apply your settings', 'beltoft-services' ),
-			'start'     => __( 'Start the server', 'beltoft-services' ),
+			'wipe'      => __( 'Erasing the old system', 'beltoft-services' ),
+			'clone'     => __( 'Installing the system', 'beltoft-services' ),
+			'configure' => __( 'Applying your settings', 'beltoft-services' ),
+			'start'     => __( 'Starting the server', 'beltoft-services' ),
 			'ready'     => __( 'Final checks', 'beltoft-services' ),
 		);
 	}

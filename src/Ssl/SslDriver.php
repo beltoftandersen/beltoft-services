@@ -32,13 +32,13 @@ final class SslDriver implements Driver, InternalActions, NeedsBilling, Provisio
 	 */
 	public function step_labels(): array {
 		return array(
-			'csr'          => __( 'Make the certificate request', 'beltoft-services' ),
-			'contact'      => __( 'Save the owner details', 'beltoft-services' ),
-			'order'        => __( 'Place the order', 'beltoft-services' ),
-			'request'      => __( 'Send the request to the certificate authority', 'beltoft-services' ),
-			'validate'     => __( 'Validate the domain', 'beltoft-services' ),
-			'active'       => __( 'Wait for the certificate authority', 'beltoft-services' ),
-			'deliver'      => __( 'Collect the certificate', 'beltoft-services' ),
+			'csr'          => __( 'Making the certificate request', 'beltoft-services' ),
+			'contact'      => __( 'Saving the owner details', 'beltoft-services' ),
+			'order'        => __( 'Placing the order', 'beltoft-services' ),
+			'request'      => __( 'Sending the request to the certificate authority', 'beltoft-services' ),
+			'validate'     => __( 'Validating the domain', 'beltoft-services' ),
+			'active'       => __( 'Waiting for the certificate authority', 'beltoft-services' ),
+			'deliver'      => __( 'Collecting the certificate', 'beltoft-services' ),
 			'dates'        => __( 'Final checks', 'beltoft-services' ),
 		);
 	}

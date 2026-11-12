@@ -57,10 +57,10 @@ final class DiskDriver implements Driver, ProvisionSteps {
 	 */
 	public function step_labels(): array {
 		return array(
-			'server'       => __( 'Find the server', 'beltoft-services' ),
-			'slot'         => __( 'Choose a slot', 'beltoft-services' ),
-			'allocate'     => __( 'Create the disk', 'beltoft-services' ),
-			'attach'       => __( 'Attach it to the server', 'beltoft-services' ),
+			'server'       => __( 'Finding the server', 'beltoft-services' ),
+			'slot'         => __( 'Choosing a slot', 'beltoft-services' ),
+			'allocate'     => __( 'Creating the disk', 'beltoft-services' ),
+			'attach'       => __( 'Attaching it to the server', 'beltoft-services' ),
 			'verify'       => __( 'Final checks', 'beltoft-services' ),
 		);
 	}

@@ -50,11 +50,11 @@ class ProxmoxDriver implements Driver, StopsOnDelete, NeedsBilling, InternalActi
 	 */
 	public function step_labels(): array {
 		return array(
-			'ip'           => __( 'Reserve an IP address', 'beltoft-services' ),
-			'vmid'         => __( 'Prepare the server', 'beltoft-services' ),
-			'clone'        => __( 'Create the server', 'beltoft-services' ),
-			'configure'    => __( 'Apply your settings', 'beltoft-services' ),
-			'start'        => __( 'Start the server', 'beltoft-services' ),
+			'ip'           => __( 'Reserving an IP address', 'beltoft-services' ),
+			'vmid'         => __( 'Preparing the server', 'beltoft-services' ),
+			'clone'        => __( 'Creating the server', 'beltoft-services' ),
+			'configure'    => __( 'Applying your settings', 'beltoft-services' ),
+			'start'        => __( 'Starting the server', 'beltoft-services' ),
 			'ready'        => __( 'Final checks', 'beltoft-services' ),
 		);
 	}

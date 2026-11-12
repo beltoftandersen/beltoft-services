@@ -63,19 +63,19 @@ class HostingDriver implements Driver, StopsOnDelete, NeedsBilling, ProvisionSte
 	 */
 	public function step_labels(): array {
 		return array(
-			'place'        => __( 'Reserve resources', 'beltoft-services' ),
-			'ip'           => __( 'Reserve an address', 'beltoft-services' ),
-			'vmid'         => __( 'Prepare your container', 'beltoft-services' ),
-			'clone'        => __( 'Create your container', 'beltoft-services' ),
-			'configure'    => __( 'Apply your plan', 'beltoft-services' ),
-			'start'        => __( 'Start your container', 'beltoft-services' ),
-			'prepare'      => __( 'Prepare the system', 'beltoft-services' ),
-			'db'           => __( 'Create the database', 'beltoft-services' ),
-			'site'         => __( 'Install WordPress', 'beltoft-services' ),
-			'edge'         => __( 'Connect the web server', 'beltoft-services' ),
-			'dns'          => __( 'Publish the address', 'beltoft-services' ),
-			'verify'       => __( 'Check your website', 'beltoft-services' ),
-			'mail'         => __( 'Set up website mail', 'beltoft-services' ),
+			'place'        => __( 'Reserving resources', 'beltoft-services' ),
+			'ip'           => __( 'Reserving an address', 'beltoft-services' ),
+			'vmid'         => __( 'Preparing your container', 'beltoft-services' ),
+			'clone'        => __( 'Creating your container', 'beltoft-services' ),
+			'configure'    => __( 'Applying your plan', 'beltoft-services' ),
+			'start'        => __( 'Starting your container', 'beltoft-services' ),
+			'prepare'      => __( 'Preparing the system', 'beltoft-services' ),
+			'db'           => __( 'Creating the database', 'beltoft-services' ),
+			'site'         => __( 'Installing WordPress', 'beltoft-services' ),
+			'edge'         => __( 'Connecting the web server', 'beltoft-services' ),
+			'dns'          => __( 'Publishing the address', 'beltoft-services' ),
+			'verify'       => __( 'Checking your website', 'beltoft-services' ),
+			'mail'         => __( 'Setting up website mail', 'beltoft-services' ),
 			'ready'        => __( 'Final checks', 'beltoft-services' ),
 		);
 	}

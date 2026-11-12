@@ -147,10 +147,10 @@ class ReadyTest extends HostingCase {
 		$labels   = array_column( $progress['steps'], 'label', 'key' );
 
 		$this->assertSame( 'build', $progress['kind'] );
-		$this->assertSame( 'Reserve resources', $labels['place'] );
-		$this->assertSame( 'Create your container', $labels['clone'] );
-		$this->assertSame( 'Install WordPress', $labels['site'] );
-		$this->assertSame( 'Publish the address', $labels['dns'] );
+		$this->assertSame( 'Reserving resources', $labels['place'] );
+		$this->assertSame( 'Creating your container', $labels['clone'] );
+		$this->assertSame( 'Installing WordPress', $labels['site'] );
+		$this->assertSame( 'Publishing the address', $labels['dns'] );
 		$this->assertSame( 'Final checks', $labels['ready'] );
 		$this->assertSame( 14, count( $labels ) );
 		$this->assertSame( 'prepare', $progress['current'], 'The agent job still runs.' );

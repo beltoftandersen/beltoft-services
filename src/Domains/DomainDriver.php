@@ -23,11 +23,11 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 	 */
 	public function step_labels(): array {
 		return array(
-			'contact'      => __( 'Save the owner details', 'beltoft-services' ),
-			'zone_prepared' => __( 'Prepare the DNS', 'beltoft-services' ),
-			'order'        => __( 'Send the order to the registry', 'beltoft-services' ),
-			'active'       => __( 'Wait for the registry', 'beltoft-services' ),
-			'zone'         => __( 'Set up the DNS', 'beltoft-services' ),
+			'contact'      => __( 'Saving the owner details', 'beltoft-services' ),
+			'zone_prepared' => __( 'Preparing the DNS', 'beltoft-services' ),
+			'order'        => __( 'Sending the order to the registry', 'beltoft-services' ),
+			'active'       => __( 'Waiting for the registry', 'beltoft-services' ),
+			'zone'         => __( 'Setting up the DNS', 'beltoft-services' ),
 			'dates'        => __( 'Final checks', 'beltoft-services' ),
 		);
 	}

@@ -247,7 +247,7 @@ final class ProgressTest extends TestCase {
 		}
 
 		$labels = array_column( $p['steps'], 'label' );
-		$this->assertSame( array( 'Go back to the snapshot', 'Apply your plan', 'Start the server' ), $labels );
+		$this->assertSame( array( 'Going back to the snapshot', 'Applying your plan', 'Starting the server' ), $labels );
 	}
 
 	public function test_the_plan_change_after_a_rollback_keeps_the_rollback_steps(): void {

@@ -7,31 +7,31 @@
         "steps": [
             {
                 "key": "ip",
-                "label": "Reserve an IP address",
+                "label": "Reserving an IP address",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "vmid",
-                "label": "Prepare the server",
+                "label": "Preparing the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "clone",
-                "label": "Create the server",
+                "label": "Creating the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "configure",
-                "label": "Apply your settings",
+                "label": "Applying your settings",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "start",
-                "label": "Start the server",
+                "label": "Starting the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -59,31 +59,31 @@
         "steps": [
             {
                 "key": "ip",
-                "label": "Reserve an IP address",
+                "label": "Reserving an IP address",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "vmid",
-                "label": "Prepare the server",
+                "label": "Preparing the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "clone",
-                "label": "Create the server",
+                "label": "Creating the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "configure",
-                "label": "Apply your settings",
+                "label": "Applying your settings",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "start",
-                "label": "Start the server",
+                "label": "Starting the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -111,31 +111,31 @@
         "steps": [
             {
                 "key": "ip",
-                "label": "Reserve an IP address",
+                "label": "Reserving an IP address",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "vmid",
-                "label": "Prepare the server",
+                "label": "Preparing the server",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "clone",
-                "label": "Create the server",
+                "label": "Creating the server",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "configure",
-                "label": "Apply your settings",
+                "label": "Applying your settings",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "start",
-                "label": "Start the server",
+                "label": "Starting the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -163,31 +163,31 @@
         "steps": [
             {
                 "key": "ip",
-                "label": "Reserve an IP address",
+                "label": "Reserving an IP address",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "vmid",
-                "label": "Prepare the server",
+                "label": "Preparing the server",
                 "status": "failed",
                 "status_label": "Failed"
             },
             {
                 "key": "clone",
-                "label": "Create the server",
+                "label": "Creating the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "configure",
-                "label": "Apply your settings",
+                "label": "Applying your settings",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "start",
-                "label": "Start the server",
+                "label": "Starting the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -230,25 +230,25 @@
         "steps": [
             {
                 "key": "wipe",
-                "label": "Erase the old system",
+                "label": "Erasing the old system",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "clone",
-                "label": "Install the system",
+                "label": "Installing the system",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "configure",
-                "label": "Apply your settings",
+                "label": "Applying your settings",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "start",
-                "label": "Start the server",
+                "label": "Starting the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -276,25 +276,25 @@
         "steps": [
             {
                 "key": "wipe",
-                "label": "Erase the old system",
+                "label": "Erasing the old system",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "clone",
-                "label": "Install the system",
+                "label": "Installing the system",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "configure",
-                "label": "Apply your settings",
+                "label": "Applying your settings",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "start",
-                "label": "Start the server",
+                "label": "Starting the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -322,19 +322,19 @@
         "steps": [
             {
                 "key": "restore",
-                "label": "Restore the backup",
+                "label": "Restoring the backup",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "plan",
-                "label": "Apply your plan",
+                "label": "Applying your plan",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "start",
-                "label": "Start the server",
+                "label": "Starting the server",
                 "status": "todo",
                 "status_label": "Waiting"
             }
@@ -356,19 +356,19 @@
         "steps": [
             {
                 "key": "restore",
-                "label": "Restore the backup",
+                "label": "Restoring the backup",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "plan",
-                "label": "Apply your plan",
+                "label": "Applying your plan",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "start",
-                "label": "Start the server",
+                "label": "Starting the server",
                 "status": "todo",
                 "status_label": "Waiting"
             }
@@ -390,19 +390,19 @@
         "steps": [
             {
                 "key": "rollback",
-                "label": "Go back to the snapshot",
+                "label": "Going back to the snapshot",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "plan",
-                "label": "Apply your plan",
+                "label": "Applying your plan",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "start",
-                "label": "Start the server",
+                "label": "Starting the server",
                 "status": "todo",
                 "status_label": "Waiting"
             }
@@ -424,19 +424,19 @@
         "steps": [
             {
                 "key": "rollback",
-                "label": "Go back to the snapshot",
+                "label": "Going back to the snapshot",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "plan",
-                "label": "Apply your plan",
+                "label": "Applying your plan",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "start",
-                "label": "Start the server",
+                "label": "Starting the server",
                 "status": "todo",
                 "status_label": "Waiting"
             }
@@ -548,19 +548,19 @@
         "steps": [
             {
                 "key": "restore",
-                "label": "Restore the backup",
+                "label": "Restoring the backup",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "plan",
-                "label": "Apply your plan",
+                "label": "Applying your plan",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "start",
-                "label": "Start the server",
+                "label": "Starting the server",
                 "status": "todo",
                 "status_label": "Waiting"
             }
@@ -582,19 +582,19 @@
         "steps": [
             {
                 "key": "rollback",
-                "label": "Go back to the snapshot",
+                "label": "Going back to the snapshot",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "plan",
-                "label": "Apply your plan",
+                "label": "Applying your plan",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "start",
-                "label": "Start the server",
+                "label": "Starting the server",
                 "status": "todo",
                 "status_label": "Waiting"
             }
@@ -631,25 +631,25 @@
         "steps": [
             {
                 "key": "wipe",
-                "label": "Erase the old system",
+                "label": "Erasing the old system",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "clone",
-                "label": "Install the system",
+                "label": "Installing the system",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "configure",
-                "label": "Apply your settings",
+                "label": "Applying your settings",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "start",
-                "label": "Start the server",
+                "label": "Starting the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -692,31 +692,31 @@
         "steps": [
             {
                 "key": "ip",
-                "label": "Reserve an IP address",
+                "label": "Reserving an IP address",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "vmid",
-                "label": "Prepare the server",
+                "label": "Preparing the server",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "clone",
-                "label": "Create the server",
+                "label": "Creating the server",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "configure",
-                "label": "Apply your settings",
+                "label": "Applying your settings",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "start",
-                "label": "Start the server",
+                "label": "Starting the server",
                 "status": "done",
                 "status_label": "Done"
             },
@@ -798,31 +798,31 @@
         "steps": [
             {
                 "key": "ip",
-                "label": "Reserve an IP address",
+                "label": "Reserving an IP address",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "vmid",
-                "label": "Prepare the server",
+                "label": "Preparing the server",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "clone",
-                "label": "Create the server",
+                "label": "Creating the server",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "configure",
-                "label": "Apply your settings",
+                "label": "Applying your settings",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "start",
-                "label": "Start the server",
+                "label": "Starting the server",
                 "status": "done",
                 "status_label": "Done"
             },
@@ -949,31 +949,31 @@
         "steps": [
             {
                 "key": "ip",
-                "label": "Reserve an IP address",
+                "label": "Reserving an IP address",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "vmid",
-                "label": "Prepare the server",
+                "label": "Preparing the server",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "clone",
-                "label": "Create the server",
+                "label": "Creating the server",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "configure",
-                "label": "Apply your settings",
+                "label": "Applying your settings",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "start",
-                "label": "Start the server",
+                "label": "Starting the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -1055,25 +1055,25 @@
         "steps": [
             {
                 "key": "wipe",
-                "label": "Erase the old system",
+                "label": "Erasing the old system",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "clone",
-                "label": "Install the system",
+                "label": "Installing the system",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "configure",
-                "label": "Apply your settings",
+                "label": "Applying your settings",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "start",
-                "label": "Start the server",
+                "label": "Starting the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -1155,31 +1155,31 @@
         "steps": [
             {
                 "key": "ip",
-                "label": "Reserve an IP address",
+                "label": "Reserving an IP address",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "vmid",
-                "label": "Prepare the server",
+                "label": "Preparing the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "clone",
-                "label": "Create the server",
+                "label": "Creating the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "configure",
-                "label": "Apply your settings",
+                "label": "Applying your settings",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "start",
-                "label": "Start the server",
+                "label": "Starting the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -1261,37 +1261,37 @@
         "steps": [
             {
                 "key": "ip",
-                "label": "Reserve a public IP address",
+                "label": "Reserving a public IP address",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "net",
-                "label": "Reserve a private address",
+                "label": "Reserving a private address",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "vmid",
-                "label": "Prepare the server",
+                "label": "Preparing the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "clone",
-                "label": "Create the server",
+                "label": "Creating the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "configure",
-                "label": "Apply your settings",
+                "label": "Applying your settings",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "start",
-                "label": "Start the server",
+                "label": "Starting the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -1303,13 +1303,13 @@
             },
             {
                 "key": "db_init",
-                "label": "Set up the database",
+                "label": "Setting up the database",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "db_ready",
-                "label": "Check the database",
+                "label": "Checking the database",
                 "status": "todo",
                 "status_label": "Waiting"
             }
@@ -1331,37 +1331,37 @@
         "steps": [
             {
                 "key": "ip",
-                "label": "Reserve a public IP address",
+                "label": "Reserving a public IP address",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "net",
-                "label": "Reserve a private address",
+                "label": "Reserving a private address",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "vmid",
-                "label": "Prepare the server",
+                "label": "Preparing the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "clone",
-                "label": "Create the server",
+                "label": "Creating the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "configure",
-                "label": "Apply your settings",
+                "label": "Applying your settings",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "start",
-                "label": "Start the server",
+                "label": "Starting the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -1373,13 +1373,13 @@
             },
             {
                 "key": "db_init",
-                "label": "Set up the database",
+                "label": "Setting up the database",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "db_ready",
-                "label": "Check the database",
+                "label": "Checking the database",
                 "status": "todo",
                 "status_label": "Waiting"
             }
@@ -1401,37 +1401,37 @@
         "steps": [
             {
                 "key": "ip",
-                "label": "Reserve a public IP address",
+                "label": "Reserving a public IP address",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "net",
-                "label": "Reserve a private address",
+                "label": "Reserving a private address",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "vmid",
-                "label": "Prepare the server",
+                "label": "Preparing the server",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "clone",
-                "label": "Create the server",
+                "label": "Creating the server",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "configure",
-                "label": "Apply your settings",
+                "label": "Applying your settings",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "start",
-                "label": "Start the server",
+                "label": "Starting the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -1443,13 +1443,13 @@
             },
             {
                 "key": "db_init",
-                "label": "Set up the database",
+                "label": "Setting up the database",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "db_ready",
-                "label": "Check the database",
+                "label": "Checking the database",
                 "status": "todo",
                 "status_label": "Waiting"
             }
@@ -1471,37 +1471,37 @@
         "steps": [
             {
                 "key": "ip",
-                "label": "Reserve a public IP address",
+                "label": "Reserving a public IP address",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "net",
-                "label": "Reserve a private address",
+                "label": "Reserving a private address",
                 "status": "failed",
                 "status_label": "Failed"
             },
             {
                 "key": "vmid",
-                "label": "Prepare the server",
+                "label": "Preparing the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "clone",
-                "label": "Create the server",
+                "label": "Creating the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "configure",
-                "label": "Apply your settings",
+                "label": "Applying your settings",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "start",
-                "label": "Start the server",
+                "label": "Starting the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -1513,13 +1513,13 @@
             },
             {
                 "key": "db_init",
-                "label": "Set up the database",
+                "label": "Setting up the database",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "db_ready",
-                "label": "Check the database",
+                "label": "Checking the database",
                 "status": "todo",
                 "status_label": "Waiting"
             }
@@ -1886,37 +1886,37 @@
         "steps": [
             {
                 "key": "ip",
-                "label": "Reserve a public IP address",
+                "label": "Reserving a public IP address",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "net",
-                "label": "Reserve a private address",
+                "label": "Reserving a private address",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "vmid",
-                "label": "Prepare the server",
+                "label": "Preparing the server",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "clone",
-                "label": "Create the server",
+                "label": "Creating the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "configure",
-                "label": "Apply your settings",
+                "label": "Applying your settings",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "start",
-                "label": "Start the server",
+                "label": "Starting the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -1928,13 +1928,13 @@
             },
             {
                 "key": "db_init",
-                "label": "Set up the database",
+                "label": "Setting up the database",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "db_ready",
-                "label": "Check the database",
+                "label": "Checking the database",
                 "status": "todo",
                 "status_label": "Waiting"
             }
@@ -1971,37 +1971,37 @@
         "steps": [
             {
                 "key": "ip",
-                "label": "Reserve a public IP address",
+                "label": "Reserving a public IP address",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "net",
-                "label": "Reserve a private address",
+                "label": "Reserving a private address",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "vmid",
-                "label": "Prepare the server",
+                "label": "Preparing the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "clone",
-                "label": "Create the server",
+                "label": "Creating the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "configure",
-                "label": "Apply your settings",
+                "label": "Applying your settings",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "start",
-                "label": "Start the server",
+                "label": "Starting the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -2013,13 +2013,13 @@
             },
             {
                 "key": "db_init",
-                "label": "Set up the database",
+                "label": "Setting up the database",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "db_ready",
-                "label": "Check the database",
+                "label": "Checking the database",
                 "status": "todo",
                 "status_label": "Waiting"
             }
@@ -2041,79 +2041,79 @@
         "steps": [
             {
                 "key": "place",
-                "label": "Reserve resources",
+                "label": "Reserving resources",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "ip",
-                "label": "Reserve an address",
+                "label": "Reserving an address",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "vmid",
-                "label": "Prepare your container",
+                "label": "Preparing your container",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "clone",
-                "label": "Create your container",
+                "label": "Creating your container",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "configure",
-                "label": "Apply your plan",
+                "label": "Applying your plan",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "start",
-                "label": "Start your container",
+                "label": "Starting your container",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "prepare",
-                "label": "Prepare the system",
+                "label": "Preparing the system",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "db",
-                "label": "Create the database",
+                "label": "Creating the database",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "site",
-                "label": "Install WordPress",
+                "label": "Installing WordPress",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "edge",
-                "label": "Connect the web server",
+                "label": "Connecting the web server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "dns",
-                "label": "Publish the address",
+                "label": "Publishing the address",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "verify",
-                "label": "Check your website",
+                "label": "Checking your website",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "mail",
-                "label": "Set up website mail",
+                "label": "Setting up website mail",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -2141,79 +2141,79 @@
         "steps": [
             {
                 "key": "place",
-                "label": "Reserve resources",
+                "label": "Reserving resources",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "ip",
-                "label": "Reserve an address",
+                "label": "Reserving an address",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "vmid",
-                "label": "Prepare your container",
+                "label": "Preparing your container",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "clone",
-                "label": "Create your container",
+                "label": "Creating your container",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "configure",
-                "label": "Apply your plan",
+                "label": "Applying your plan",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "start",
-                "label": "Start your container",
+                "label": "Starting your container",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "prepare",
-                "label": "Prepare the system",
+                "label": "Preparing the system",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "db",
-                "label": "Create the database",
+                "label": "Creating the database",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "site",
-                "label": "Install WordPress",
+                "label": "Installing WordPress",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "edge",
-                "label": "Connect the web server",
+                "label": "Connecting the web server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "dns",
-                "label": "Publish the address",
+                "label": "Publishing the address",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "verify",
-                "label": "Check your website",
+                "label": "Checking your website",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "mail",
-                "label": "Set up website mail",
+                "label": "Setting up website mail",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -2241,79 +2241,79 @@
         "steps": [
             {
                 "key": "place",
-                "label": "Reserve resources",
+                "label": "Reserving resources",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "ip",
-                "label": "Reserve an address",
+                "label": "Reserving an address",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "vmid",
-                "label": "Prepare your container",
+                "label": "Preparing your container",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "clone",
-                "label": "Create your container",
+                "label": "Creating your container",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "configure",
-                "label": "Apply your plan",
+                "label": "Applying your plan",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "start",
-                "label": "Start your container",
+                "label": "Starting your container",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "prepare",
-                "label": "Prepare the system",
+                "label": "Preparing the system",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "db",
-                "label": "Create the database",
+                "label": "Creating the database",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "site",
-                "label": "Install WordPress",
+                "label": "Installing WordPress",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "edge",
-                "label": "Connect the web server",
+                "label": "Connecting the web server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "dns",
-                "label": "Publish the address",
+                "label": "Publishing the address",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "verify",
-                "label": "Check your website",
+                "label": "Checking your website",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "mail",
-                "label": "Set up website mail",
+                "label": "Setting up website mail",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -2341,79 +2341,79 @@
         "steps": [
             {
                 "key": "place",
-                "label": "Reserve resources",
+                "label": "Reserving resources",
                 "status": "failed",
                 "status_label": "Failed"
             },
             {
                 "key": "ip",
-                "label": "Reserve an address",
+                "label": "Reserving an address",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "vmid",
-                "label": "Prepare your container",
+                "label": "Preparing your container",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "clone",
-                "label": "Create your container",
+                "label": "Creating your container",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "configure",
-                "label": "Apply your plan",
+                "label": "Applying your plan",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "start",
-                "label": "Start your container",
+                "label": "Starting your container",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "prepare",
-                "label": "Prepare the system",
+                "label": "Preparing the system",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "db",
-                "label": "Create the database",
+                "label": "Creating the database",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "site",
-                "label": "Install WordPress",
+                "label": "Installing WordPress",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "edge",
-                "label": "Connect the web server",
+                "label": "Connecting the web server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "dns",
-                "label": "Publish the address",
+                "label": "Publishing the address",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "verify",
-                "label": "Check your website",
+                "label": "Checking your website",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "mail",
-                "label": "Set up website mail",
+                "label": "Setting up website mail",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -2786,79 +2786,79 @@
         "steps": [
             {
                 "key": "place",
-                "label": "Reserve resources",
+                "label": "Reserving resources",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "ip",
-                "label": "Reserve an address",
+                "label": "Reserving an address",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "vmid",
-                "label": "Prepare your container",
+                "label": "Preparing your container",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "clone",
-                "label": "Create your container",
+                "label": "Creating your container",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "configure",
-                "label": "Apply your plan",
+                "label": "Applying your plan",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "start",
-                "label": "Start your container",
+                "label": "Starting your container",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "prepare",
-                "label": "Prepare the system",
+                "label": "Preparing the system",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "db",
-                "label": "Create the database",
+                "label": "Creating the database",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "site",
-                "label": "Install WordPress",
+                "label": "Installing WordPress",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "edge",
-                "label": "Connect the web server",
+                "label": "Connecting the web server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "dns",
-                "label": "Publish the address",
+                "label": "Publishing the address",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "verify",
-                "label": "Check your website",
+                "label": "Checking your website",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "mail",
-                "label": "Set up website mail",
+                "label": "Setting up website mail",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -2901,79 +2901,79 @@
         "steps": [
             {
                 "key": "place",
-                "label": "Reserve resources",
+                "label": "Reserving resources",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "ip",
-                "label": "Reserve an address",
+                "label": "Reserving an address",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "vmid",
-                "label": "Prepare your container",
+                "label": "Preparing your container",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "clone",
-                "label": "Create your container",
+                "label": "Creating your container",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "configure",
-                "label": "Apply your plan",
+                "label": "Applying your plan",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "start",
-                "label": "Start your container",
+                "label": "Starting your container",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "prepare",
-                "label": "Prepare the system",
+                "label": "Preparing the system",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "db",
-                "label": "Create the database",
+                "label": "Creating the database",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "site",
-                "label": "Install WordPress",
+                "label": "Installing WordPress",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "edge",
-                "label": "Connect the web server",
+                "label": "Connecting the web server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "dns",
-                "label": "Publish the address",
+                "label": "Publishing the address",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "verify",
-                "label": "Check your website",
+                "label": "Checking your website",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "mail",
-                "label": "Set up website mail",
+                "label": "Setting up website mail",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -3001,25 +3001,25 @@
         "steps": [
             {
                 "key": "server",
-                "label": "Find the server",
+                "label": "Finding the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "slot",
-                "label": "Choose a slot",
+                "label": "Choosing a slot",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "allocate",
-                "label": "Create the disk",
+                "label": "Creating the disk",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "attach",
-                "label": "Attach it to the server",
+                "label": "Attaching it to the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -3047,25 +3047,25 @@
         "steps": [
             {
                 "key": "server",
-                "label": "Find the server",
+                "label": "Finding the server",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "slot",
-                "label": "Choose a slot",
+                "label": "Choosing a slot",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "allocate",
-                "label": "Create the disk",
+                "label": "Creating the disk",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "attach",
-                "label": "Attach it to the server",
+                "label": "Attaching it to the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -3093,25 +3093,25 @@
         "steps": [
             {
                 "key": "server",
-                "label": "Find the server",
+                "label": "Finding the server",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "slot",
-                "label": "Choose a slot",
+                "label": "Choosing a slot",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "allocate",
-                "label": "Create the disk",
+                "label": "Creating the disk",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "attach",
-                "label": "Attach it to the server",
+                "label": "Attaching it to the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -3139,25 +3139,25 @@
         "steps": [
             {
                 "key": "server",
-                "label": "Find the server",
+                "label": "Finding the server",
                 "status": "failed",
                 "status_label": "Failed"
             },
             {
                 "key": "slot",
-                "label": "Choose a slot",
+                "label": "Choosing a slot",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "allocate",
-                "label": "Create the disk",
+                "label": "Creating the disk",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "attach",
-                "label": "Attach it to the server",
+                "label": "Attaching it to the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -3530,25 +3530,25 @@
         "steps": [
             {
                 "key": "server",
-                "label": "Find the server",
+                "label": "Finding the server",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "slot",
-                "label": "Choose a slot",
+                "label": "Choosing a slot",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "allocate",
-                "label": "Create the disk",
+                "label": "Creating the disk",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "attach",
-                "label": "Attach it to the server",
+                "label": "Attaching it to the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -3591,25 +3591,25 @@
         "steps": [
             {
                 "key": "server",
-                "label": "Find the server",
+                "label": "Finding the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "slot",
-                "label": "Choose a slot",
+                "label": "Choosing a slot",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "allocate",
-                "label": "Create the disk",
+                "label": "Creating the disk",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "attach",
-                "label": "Attach it to the server",
+                "label": "Attaching it to the server",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -3637,31 +3637,31 @@
         "steps": [
             {
                 "key": "contact",
-                "label": "Save the owner details",
+                "label": "Saving the owner details",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "zone_prepared",
-                "label": "Prepare the DNS",
+                "label": "Preparing the DNS",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "order",
-                "label": "Send the order to the registry",
+                "label": "Sending the order to the registry",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "active",
-                "label": "Wait for the registry",
+                "label": "Waiting for the registry",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "zone",
-                "label": "Set up the DNS",
+                "label": "Setting up the DNS",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -3689,31 +3689,31 @@
         "steps": [
             {
                 "key": "contact",
-                "label": "Save the owner details",
+                "label": "Saving the owner details",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "zone_prepared",
-                "label": "Prepare the DNS",
+                "label": "Preparing the DNS",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "order",
-                "label": "Send the order to the registry",
+                "label": "Sending the order to the registry",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "active",
-                "label": "Wait for the registry",
+                "label": "Waiting for the registry",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "zone",
-                "label": "Set up the DNS",
+                "label": "Setting up the DNS",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -3741,31 +3741,31 @@
         "steps": [
             {
                 "key": "contact",
-                "label": "Save the owner details",
+                "label": "Saving the owner details",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "zone_prepared",
-                "label": "Prepare the DNS",
+                "label": "Preparing the DNS",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "order",
-                "label": "Send the order to the registry",
+                "label": "Sending the order to the registry",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "active",
-                "label": "Wait for the registry",
+                "label": "Waiting for the registry",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "zone",
-                "label": "Set up the DNS",
+                "label": "Setting up the DNS",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -3793,31 +3793,31 @@
         "steps": [
             {
                 "key": "contact",
-                "label": "Save the owner details",
+                "label": "Saving the owner details",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "zone_prepared",
-                "label": "Prepare the DNS",
+                "label": "Preparing the DNS",
                 "status": "failed",
                 "status_label": "Failed"
             },
             {
                 "key": "order",
-                "label": "Send the order to the registry",
+                "label": "Sending the order to the registry",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "active",
-                "label": "Wait for the registry",
+                "label": "Waiting for the registry",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "zone",
-                "label": "Set up the DNS",
+                "label": "Setting up the DNS",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -4190,31 +4190,31 @@
         "steps": [
             {
                 "key": "contact",
-                "label": "Save the owner details",
+                "label": "Saving the owner details",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "zone_prepared",
-                "label": "Prepare the DNS",
+                "label": "Preparing the DNS",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "order",
-                "label": "Send the order to the registry",
+                "label": "Sending the order to the registry",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "active",
-                "label": "Wait for the registry",
+                "label": "Waiting for the registry",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "zone",
-                "label": "Set up the DNS",
+                "label": "Setting up the DNS",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -4257,31 +4257,31 @@
         "steps": [
             {
                 "key": "contact",
-                "label": "Save the owner details",
+                "label": "Saving the owner details",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "zone_prepared",
-                "label": "Prepare the DNS",
+                "label": "Preparing the DNS",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "order",
-                "label": "Send the order to the registry",
+                "label": "Sending the order to the registry",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "active",
-                "label": "Wait for the registry",
+                "label": "Waiting for the registry",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "zone",
-                "label": "Set up the DNS",
+                "label": "Setting up the DNS",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -4309,43 +4309,43 @@
         "steps": [
             {
                 "key": "csr",
-                "label": "Make the certificate request",
+                "label": "Making the certificate request",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "contact",
-                "label": "Save the owner details",
+                "label": "Saving the owner details",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "order",
-                "label": "Place the order",
+                "label": "Placing the order",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "request",
-                "label": "Send the request to the certificate authority",
+                "label": "Sending the request to the certificate authority",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "validate",
-                "label": "Validate the domain",
+                "label": "Validating the domain",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "active",
-                "label": "Wait for the certificate authority",
+                "label": "Waiting for the certificate authority",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "deliver",
-                "label": "Collect the certificate",
+                "label": "Collecting the certificate",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -4373,43 +4373,43 @@
         "steps": [
             {
                 "key": "csr",
-                "label": "Make the certificate request",
+                "label": "Making the certificate request",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "contact",
-                "label": "Save the owner details",
+                "label": "Saving the owner details",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "order",
-                "label": "Place the order",
+                "label": "Placing the order",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "request",
-                "label": "Send the request to the certificate authority",
+                "label": "Sending the request to the certificate authority",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "validate",
-                "label": "Validate the domain",
+                "label": "Validating the domain",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "active",
-                "label": "Wait for the certificate authority",
+                "label": "Waiting for the certificate authority",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "deliver",
-                "label": "Collect the certificate",
+                "label": "Collecting the certificate",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -4437,43 +4437,43 @@
         "steps": [
             {
                 "key": "csr",
-                "label": "Make the certificate request",
+                "label": "Making the certificate request",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "contact",
-                "label": "Save the owner details",
+                "label": "Saving the owner details",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "order",
-                "label": "Place the order",
+                "label": "Placing the order",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "request",
-                "label": "Send the request to the certificate authority",
+                "label": "Sending the request to the certificate authority",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "validate",
-                "label": "Validate the domain",
+                "label": "Validating the domain",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "active",
-                "label": "Wait for the certificate authority",
+                "label": "Waiting for the certificate authority",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "deliver",
-                "label": "Collect the certificate",
+                "label": "Collecting the certificate",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -4501,43 +4501,43 @@
         "steps": [
             {
                 "key": "csr",
-                "label": "Make the certificate request",
+                "label": "Making the certificate request",
                 "status": "failed",
                 "status_label": "Failed"
             },
             {
                 "key": "contact",
-                "label": "Save the owner details",
+                "label": "Saving the owner details",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "order",
-                "label": "Place the order",
+                "label": "Placing the order",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "request",
-                "label": "Send the request to the certificate authority",
+                "label": "Sending the request to the certificate authority",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "validate",
-                "label": "Validate the domain",
+                "label": "Validating the domain",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "active",
-                "label": "Wait for the certificate authority",
+                "label": "Waiting for the certificate authority",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "deliver",
-                "label": "Collect the certificate",
+                "label": "Collecting the certificate",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -4910,43 +4910,43 @@
         "steps": [
             {
                 "key": "csr",
-                "label": "Make the certificate request",
+                "label": "Making the certificate request",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "contact",
-                "label": "Save the owner details",
+                "label": "Saving the owner details",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "order",
-                "label": "Place the order",
+                "label": "Placing the order",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "request",
-                "label": "Send the request to the certificate authority",
+                "label": "Sending the request to the certificate authority",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "validate",
-                "label": "Validate the domain",
+                "label": "Validating the domain",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "active",
-                "label": "Wait for the certificate authority",
+                "label": "Waiting for the certificate authority",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "deliver",
-                "label": "Collect the certificate",
+                "label": "Collecting the certificate",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -4989,43 +4989,43 @@
         "steps": [
             {
                 "key": "csr",
-                "label": "Make the certificate request",
+                "label": "Making the certificate request",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "contact",
-                "label": "Save the owner details",
+                "label": "Saving the owner details",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "order",
-                "label": "Place the order",
+                "label": "Placing the order",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "request",
-                "label": "Send the request to the certificate authority",
+                "label": "Sending the request to the certificate authority",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "validate",
-                "label": "Validate the domain",
+                "label": "Validating the domain",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "active",
-                "label": "Wait for the certificate authority",
+                "label": "Waiting for the certificate authority",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "deliver",
-                "label": "Collect the certificate",
+                "label": "Collecting the certificate",
                 "status": "todo",
                 "status_label": "Waiting"
             },
@@ -5053,19 +5053,19 @@
         "steps": [
             {
                 "key": "claim",
-                "label": "Reserve the domain",
+                "label": "Reserving the domain",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "zone",
-                "label": "Create the DNS zone",
+                "label": "Creating the DNS zone",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "delegation",
-                "label": "Check the name servers",
+                "label": "Checking the name servers",
                 "status": "todo",
                 "status_label": "Waiting"
             }
@@ -5087,19 +5087,19 @@
         "steps": [
             {
                 "key": "claim",
-                "label": "Reserve the domain",
+                "label": "Reserving the domain",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "zone",
-                "label": "Create the DNS zone",
+                "label": "Creating the DNS zone",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "delegation",
-                "label": "Check the name servers",
+                "label": "Checking the name servers",
                 "status": "todo",
                 "status_label": "Waiting"
             }
@@ -5121,19 +5121,19 @@
         "steps": [
             {
                 "key": "claim",
-                "label": "Reserve the domain",
+                "label": "Reserving the domain",
                 "status": "done",
                 "status_label": "Done"
             },
             {
                 "key": "zone",
-                "label": "Create the DNS zone",
+                "label": "Creating the DNS zone",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "delegation",
-                "label": "Check the name servers",
+                "label": "Checking the name servers",
                 "status": "todo",
                 "status_label": "Waiting"
             }
@@ -5155,19 +5155,19 @@
         "steps": [
             {
                 "key": "claim",
-                "label": "Reserve the domain",
+                "label": "Reserving the domain",
                 "status": "failed",
                 "status_label": "Failed"
             },
             {
                 "key": "zone",
-                "label": "Create the DNS zone",
+                "label": "Creating the DNS zone",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "delegation",
-                "label": "Check the name servers",
+                "label": "Checking the name servers",
                 "status": "todo",
                 "status_label": "Waiting"
             }
@@ -5534,19 +5534,19 @@
         "steps": [
             {
                 "key": "claim",
-                "label": "Reserve the domain",
+                "label": "Reserving the domain",
                 "status": "current",
                 "status_label": "In progress"
             },
             {
                 "key": "zone",
-                "label": "Create the DNS zone",
+                "label": "Creating the DNS zone",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "delegation",
-                "label": "Check the name servers",
+                "label": "Checking the name servers",
                 "status": "todo",
                 "status_label": "Waiting"
             }
@@ -5583,19 +5583,19 @@
         "steps": [
             {
                 "key": "claim",
-                "label": "Reserve the domain",
+                "label": "Reserving the domain",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "zone",
-                "label": "Create the DNS zone",
+                "label": "Creating the DNS zone",
                 "status": "todo",
                 "status_label": "Waiting"
             },
             {
                 "key": "delegation",
-                "label": "Check the name servers",
+                "label": "Checking the name servers",
                 "status": "todo",
                 "status_label": "Waiting"
             }
