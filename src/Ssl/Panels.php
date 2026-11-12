@@ -231,9 +231,53 @@ final class Panels {
 			return;
 		}
 
-		$kind = array() !== array_filter( $rows, static fn( $row ) => 'file' === ( $row['type'] ?? '' ) ) && array() === array_filter( $rows, static fn( $row ) => 'file' !== ( $row['type'] ?? '' ) ) ? 'file' : $kind;
+		// Records to add at the DNS provider go to the shared guide; a file for the website keeps its table.
+		$files = array_values( array_filter( $rows, static fn( $row ) => 'file' === ( $row['type'] ?? '' ) ) );
+		$rows  = array_values( array_filter( $rows, static fn( $row ) => 'file' !== ( $row['type'] ?? '' ) ) );
 
-		echo '<p>' . esc_html( 'file' === $kind ? __( 'Put a file with this content on your website, at this address:', 'beltoft-services' ) : __( 'Add this CNAME record where your DNS is hosted:', 'beltoft-services' ) ) . '</p>';
+		if ( array() !== $rows ) {
+			// A CNAME record at the customer's DNS provider: the shared guide (the certificate authority looks for it, not we).
+			$groups = array();
+
+			foreach ( $rows as $row ) {
+				$base              = ltrim( (string) ( $row['domain'] ?? SslNames::entries( $r )[0]['name'] ), '*.' );
+				$groups[ $base ][] = $row;
+			}
+
+			foreach ( $groups as $base => $list ) {
+				$records = array();
+
+				foreach ( $list as $row ) {
+					$records[] = array(
+						'type'     => 'CNAME',
+						'name'     => (string) ( $row['name'] ?? '' ),
+						'value'    => (string) ( $row['value'] ?? '' ),
+						'required' => true,
+						'purpose'  => __( 'Lets the certificate authority see that you control the name.', 'beltoft-services' ),
+						'status'   => 'none',
+					);
+				}
+
+				\BeltoftServices\Domains\DnsRecordsGuide::render(
+					array(
+						'id'      => 'ssl-' . $base,
+						'domain'  => (string) $base,
+						'title'   => sprintf( /* translators: %s: domain name. */ __( 'Validate %s for the certificate', 'beltoft-services' ), \BeltoftServices\Domains\HostName::display( (string) $base ) ),
+						'why'     => __( 'The certificate authority issues the certificate after it finds this record. Nothing is issued until then.', 'beltoft-services' ),
+						'records' => $records,
+						'notes'   => array( __( 'Leave the record in place after the certificate is issued. It lets later reissues validate without you.', 'beltoft-services' ) ),
+					)
+				);
+			}
+		}
+
+		if ( array() === $files ) {
+			return;
+		}
+
+		$rows = $files;
+
+		echo '<p>' . esc_html__( 'Put a file with this content on your website, at this address:', 'beltoft-services' ) . '</p>';
 		echo '<table class="beltoft-services-ssl__rows"><tbody>';
 
 		foreach ( $rows as $row ) {
@@ -241,8 +285,8 @@ final class Panels {
 				echo '<tr><th colspan="2" scope="colgroup">' . esc_html( (string) $row['domain'] ) . '</th></tr>';
 			}
 
-			echo '<tr><th scope="row">' . esc_html( 'file' === (string) ( $row['type'] ?? '' ) ? __( 'Address', 'beltoft-services' ) : __( 'Name', 'beltoft-services' ) ) . '</th><td><code>' . esc_html( (string) ( $row['name'] ?? '' ) ) . '</code></td></tr>';
-			echo '<tr><th scope="row">' . esc_html( 'file' === (string) ( $row['type'] ?? '' ) ? __( 'Content', 'beltoft-services' ) : __( 'Points to', 'beltoft-services' ) ) . '</th><td><code style="white-space:pre-wrap;word-break:break-all">' . esc_html( (string) ( $row['value'] ?? '' ) ) . '</code></td></tr>';
+			echo '<tr><th scope="row">' . esc_html__( 'Address', 'beltoft-services' ) . '</th><td><code>' . esc_html( (string) ( $row['name'] ?? '' ) ) . '</code></td></tr>';
+			echo '<tr><th scope="row">' . esc_html__( 'Content', 'beltoft-services' ) . '</th><td><code style="white-space:pre-wrap;word-break:break-all">' . esc_html( (string) ( $row['value'] ?? '' ) ) . '</code></td></tr>';
 		}
 
 		echo '</tbody></table>';

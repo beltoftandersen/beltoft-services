@@ -236,6 +236,51 @@ final class MailAccountTest extends MailTestCase {
 		remove_all_filters( \BeltoftServices\Domains\Ownership::FILTER );
 	}
 
+	public function test_the_guide_shows_an_existing_spf_to_merge_another_providers_mx_and_collapses_when_done(): void {
+		$r = $this->ready_mail( 'elsewhere.example', array(), $this->user );
+		$this->dns['MX elsewhere.example']  = array( '10 mx.other-provider.example.' );
+		$this->dns['TXT elsewhere.example'] = array( 'v=spf1 include:_spf.google.com ~all' );
+		$r->set( array( 'mail_dns_checked' => time() - 2 * \BeltoftServices\Mail\MailDns::INTERVAL ) );
+		\BeltoftServices\Mail\MailDns::run( $r->id() );
+
+		$html = $this->page( Resource::find( $r->id() ), 'dns' );
+
+		$this->assertStringContainsString( 'This domain has MX records for another mail provider. Remove them', $html );
+		$this->assertStringContainsString( 'Another value is there now: 10 mx.other-provider.example.', $html );
+		$this->assertStringContainsString( 'a domain may have only one', $html );
+		$this->assertStringContainsString( 'data-dns-copy="v=spf1 include:_spf.google.com include:_spf.mail.example.net ~all"', $html, 'The merged SPF value, ready to copy.' );
+		$this->assertStringContainsString( 'Last checked', $html );
+
+		// Everything in place: one line.
+		$this->dns['MX elsewhere.example']                  = array( '10 mail.example.net.' );
+		$this->dns['TXT elsewhere.example']                 = array( 'v=spf1 include:_spf.mail.example.net ~all' );
+		$this->dns['TXT dkim._domainkey.elsewhere.example'] = array( (string) Resource::find( $r->id() )->get( 'mail_dkim' ) );
+		$this->dns['TXT _dmarc.elsewhere.example']          = array( 'v=DMARC1; p=none' );
+		$this->dns['CNAME autoconfig.elsewhere.example']    = array( 'mail.example.net.' );
+		$this->dns['CNAME autodiscover.elsewhere.example']  = array( 'mail.example.net.' );
+		Resource::find( $r->id() )->set( array( 'mail_dns_checked' => time() - 2 * \BeltoftServices\Mail\MailDns::INTERVAL ) );
+		\BeltoftServices\Mail\MailDns::run( $r->id() );
+
+		$html = $this->page( Resource::find( $r->id() ), 'dns' );
+		$this->assertStringContainsString( 'Email DNS for elsewhere.example is set up. All needed records were found.', $html );
+		$this->assertStringNotContainsString( 'data-mail-dns-check', $html );
+		$this->assertStringNotContainsString( 'Mail does not arrive on this domain', $this->page( Resource::find( $r->id() ) ), 'Nothing to warn about any more.' );
+	}
+
+	public function test_the_proof_step_uses_the_same_guide_and_the_central_record(): void {
+		$this->proof['check_txt'] = array( 'status' => 'missing', 'servers' => array(), 'reason' => 'not_found' );
+		$r      = $this->mail_resource( 'proofguide.example', array(), array(), $this->user );
+		$result = \BeltoftServices\Drivers\Registry::get( 'mail' )->provision( $r );
+		$r->set( array_merge( $result->meta(), array( 'state' => 'provisioning', 'desired' => 'ready' ) ) );
+
+		$html = $this->page( Resource::find( $r->id() ), 'dns' );
+		$this->assertStringContainsString( 'Show that proofguide.example is yours', $html );
+		$this->assertStringContainsString( 'One record proves it for all your services here, so you add it once.', $html );
+		$this->assertStringContainsString( 'data-dns-copy="' . \BeltoftServices\Domains\Ownership::token( $this->user, 'proofguide.example' ) . '"', $html );
+		$this->assertStringContainsString( 'data-mail-proof-check', $html );
+		$this->assertStringContainsString( 'every 10 minutes for 14 days', $html );
+	}
+
 	public function test_a_domain_that_is_not_ready_says_what_it_waits_for(): void {
 		$this->proof['check_txt'] = array( 'status' => 'missing', 'servers' => array(), 'reason' => 'not_found' );
 		$r = $this->mail_resource( 'wait.example', array(), array(), $this->user );
@@ -285,23 +330,25 @@ final class MailAccountTest extends MailTestCase {
 		$r = $this->ready_mail( 'elsewhere.example', array(), $this->user );
 		$html = $this->page( $r, 'dns' );
 
-		$this->assertStringContainsString( 'managed somewhere else', $html );
-		$this->assertStringContainsString( 'every ten minutes for 14 days', $html );
+		$this->assertStringContainsString( 'Make email work on elsewhere.example', $html );
+		$this->assertStringContainsString( 'Log in where the DNS of elsewhere.example is managed', $html );
+		$this->assertStringContainsString( 'every 10 minutes for 14 days', $html );
+		$this->assertStringContainsString( 'data-dns-copy="v=spf1 include:_spf.mail.example.net ~all"', $html, 'The whole value is on the Copy button.' );
 		$this->assertStringContainsString( 'mail.example.net', $html );
 		$this->assertStringContainsString( 'v=spf1 include:_spf.mail.example.net ~all', $html );
 		$this->assertStringContainsString( 'dkim._domainkey.elsewhere.example', $html );
-		$this->assertStringContainsString( 'Missing', $html );
+		$this->assertStringContainsString( 'Not checked yet', $html );
 		$this->assertStringContainsString( 'data-mail-dns-check', $html );
-		$this->assertStringContainsString( 'DNS records are not in place yet', $this->page( $r ), 'The first tab says it too.' );
+		$this->assertStringContainsString( 'Mail does not arrive on this domain until its DNS records are in place', $this->page( $r ), 'The first tab says it too, with a link to the guide.' );
+		$this->assertStringContainsString( 'Open the DNS records guide', $this->page( $r ) );
 
 		$ours = $this->our_zone( $this->user, 'ours.example' );
 		$mine = $this->ready_mail( 'ours.example', array(), $this->user );
 		$html = $this->page( $mine, 'dns' );
 
-		$this->assertStringContainsString( 'on our name servers, so we add these records for you', $html );
-		$this->assertStringContainsString( 'OK', $html );
+		$this->assertStringContainsString( 'Email DNS for ours.example is set up. All needed records were found.', $html, 'Everything found: the guide is one line.' );
 		$this->assertStringNotContainsString( 'data-mail-dns-check', $html, 'All in place: nothing to check.' );
-		$this->assertStringContainsString( 'All records are in place.', $html );
+		$this->assertStringNotContainsString( 'beltoft-dnsg__records', $html );
 		$this->assertNotNull( $ours );
 	}
 
@@ -311,7 +358,8 @@ final class MailAccountTest extends MailTestCase {
 
 		$html = $this->page( $r, 'dns' );
 
-		$this->assertStringContainsString( 'Conflict', $html );
+		$this->assertStringContainsString( 'on our name servers, so we add these records for you', $html );
+		$this->assertStringContainsString( 'Another value is there now', $html );
 		$this->assertStringContainsString( 'The name already has a DNS record.', $html );
 		$this->assertStringContainsString( 'data-mail-dns-check', $html );
 	}

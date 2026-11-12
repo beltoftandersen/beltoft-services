@@ -780,6 +780,21 @@ final class HostingAccount {
 			$area = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Email::class );
 			$url  = $area->url( $mail->license() );
 
+			// Mail is ready to use (mailboxes can be made), but it does not arrive until the DNS records are in place.
+			$dns_url = $area->url( $mail->license(), 'dns' );
+
+			if ( '' !== $dns_url && 'external' === (string) $mail->get( 'mail_mode' ) && ( \BeltoftServices\Mail\MailDns::waiting( $mail ) || \BeltoftServices\Mail\MailField::waiting_for_proof( $mail ) ) ) {
+				echo '</p><p class="beltoft-hosting-help">' . esc_html(
+					sprintf(
+						/* translators: %s: the mail domain. */
+						\BeltoftServices\Mail\MailField::waiting_for_proof( $mail )
+							? __( 'We are waiting for the proof that %s is yours. Add the record in the DNS records guide.', 'beltoft-services' )
+							: __( 'Mailboxes can be made now, but mail does not arrive until the DNS records for %s are added.', 'beltoft-services' ),
+						$mail_domain
+					)
+				) . ' <a class="beltoft-hosting-link" href="' . esc_url( $dns_url ) . '">' . esc_html__( 'Open the DNS records guide', 'beltoft-services' ) . '</a>';
+			}
+
 			if ( '' !== $url ) {
 				echo '</p><p><a class="beltoft-hosting-link" href="' . esc_url( $url ) . '">' . esc_html__( 'Manage mailboxes', 'beltoft-services' ) . '</a>';
 			}
@@ -817,6 +832,18 @@ final class HostingAccount {
 					\BeltoftServices\Domains\HostName::display( (string) LiteMail::ready_domain( $r ) )
 				)
 			);
+
+			$own_row = SiteDomains::find( (string) LiteMail::ready_domain( $r ) );
+
+			if ( null !== $own_row && 'external' === $own_row['kind'] ) {
+				echo '</p><p class="beltoft-hosting-help">' . esc_html(
+					sprintf(
+						/* translators: %s: the account's own domain. */
+						__( 'After you press the button, you get a list of DNS records to add where the DNS of %s is managed: MX, SPF, DKIM, DMARC and two for mail programs. Mail does not arrive until they are in place.', 'beltoft-services' ),
+						\BeltoftServices\Domains\HostName::display( (string) LiteMail::ready_domain( $r ) )
+					)
+				);
+			}
 
 			if ( $ready ) {
 				echo '</p><p><button type="button" class="beltoft-hosting-btn beltoft-hosting-btn--primary" data-hosting-action="enable_mail">' . esc_html__( 'Set up email', 'beltoft-services' ) . '</button>';

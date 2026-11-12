@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Mail;
 
+use BeltoftServices\Domains\DnsRecordsGuide;
+use BeltoftServices\Domains\HostName;
 use BeltoftServices\Domains\Ownership;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
@@ -160,6 +162,9 @@ final class MailView {
 			}
 
 			$rows[] = array(
+				'key'      => (string) ( $row['key'] ?? '' ),
+				'seen'     => array_map( 'strval', array_slice( (array) ( $row['seen'] ?? array() ), 0, 3 ) ),
+				'merged'   => (string) ( $row['merged'] ?? '' ),
 				'name'     => '@' === ( $row['name'] ?? '' ) ? $domain : (string) ( $row['name'] ?? '' ) . '.' . $domain,
 				'type'     => (string) ( $row['type'] ?? '' ),
 				'priority' => isset( $row['priority'] ) ? (int) $row['priority'] : null,
@@ -181,16 +186,126 @@ final class MailView {
 
 		$checked = (int) $r->get( 'mail_dns_checked' );
 		$status  = (string) $r->get( 'mail_dns' );
+		$state   = in_array( $status, array( 'ok', 'timeout' ), true ) ? $status : ( array() === $rows ? '' : 'waiting' );
+		$can     = 'ready' === $kind && array() !== $rows && 'ok' !== $status;
 
 		return array(
-			'mode'      => $mode,
-			'status'    => in_array( $status, array( 'ok', 'timeout' ), true ) ? $status : ( array() === $rows ? '' : 'waiting' ),
-			'rows'      => $rows,
-			'proof'     => $proof,
-			'can_check' => 'ready' === $kind && array() !== $rows && 'ok' !== $status,
-			'checked'   => $checked > 0 ? wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $checked ) : '',
+			'mode'       => $mode,
+			'status'     => $state,
+			'rows'       => $rows,
+			'proof'      => $proof,
+			'can_check'  => $can,
+			'checked'    => $checked > 0 ? wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $checked ) : '',
+			'checked_at' => $checked,
+			'days'       => MailDns::WAIT_DAYS,
+			'guide'      => self::guide( $domain, $mode, $rows, $proof, $state, $can, $checked ),
+		);
+	}
+
+	/**
+	 * The DNS guide of the domain as the shared renderer takes it (Domains\DnsRecordsGuide), or null when there is nothing
+	 * to show yet: the proof record first, then the records of the domain.
+	 *
+	 * @param string                               $domain  Domain.
+	 * @param string                               $mode    ours or external.
+	 * @param array<int, array<string, mixed>>     $rows    Rows of dns().
+	 * @param array{name:string,type:string,value:string}|null $proof The proof record while it is asked for.
+	 * @param string                               $state   ok, timeout, waiting or ''.
+	 * @param bool                                 $can     The customer can start a check.
+	 * @param int                                  $checked Time of the last check, 0 for never.
+	 * @return array<string, mixed>|null
+	 */
+	private static function guide( string $domain, string $mode, array $rows, ?array $proof, string $state, bool $can, int $checked ): ?array {
+		$shown = HostName::display( $domain );
+
+		if ( null !== $proof ) {
+			return array(
+				'id'       => 'proof',
+				'domain'   => $domain,
+				'title'    => sprintf( /* translators: %s: domain name. */ __( 'Show that %s is yours', 'beltoft-services' ), $shown ),
+				'why'      => __( 'We set up email for the domain after we find this record. Nothing else works until then.', 'beltoft-services' ),
+				'records'  => array(
+					array(
+						'key'      => 'proof',
+						'type'     => $proof['type'],
+						'name'     => $proof['name'],
+						'value'    => $proof['value'],
+						'required' => true,
+						'purpose'  => DnsRecordsGuide::proof_purpose(),
+						'status'   => 'unchecked',
+					),
+				),
+				'check'    => array( 'attrs' => array( 'data-mail-proof-check' => '' ) ),
+				'interval' => MailDns::INTERVAL,
+				'days'     => MailDns::WAIT_DAYS,
+			);
+		}
+
+		if ( array() === $rows ) {
+			return null;
+		}
+
+		$records = array();
+
+		foreach ( $rows as $row ) {
+			$key    = (string) $row['key'];
+			$note   = '';
+			$status = 'missing' === $row['status'] && 0 === $checked && 'external' === $mode ? 'unchecked' : $row['status'];
+
+			if ( 'mx' === $key && array() !== $row['seen'] && 'ok' !== $row['status'] ) {
+				$note  = __( 'This domain has MX records for another mail provider. Remove them, or mail keeps going there.', 'beltoft-services' );
+			}
+
+			if ( 'spf' === $key && array() !== $row['seen'] && 'ok' !== $row['status'] ) {
+				$note = '' !== $row['merged']
+					? __( 'Your domain already has an SPF record, and a domain may have only one. Change the existing record to the value below instead of adding a second one.', 'beltoft-services' )
+					: sprintf( /* translators: %s: the SPF include to add. */ __( 'Your domain already has an SPF record, and a domain may have only one. Add include:%s to it instead of adding a second one.', 'beltoft-services' ), MailSettings::spf_include() );
+			}
+
+			$records[] = array(
+				'key'      => $key,
+				'type'     => $row['type'],
+				'name'     => $row['name'],
+				'value'    => $row['value'],
+				'priority' => $row['priority'],
+				'required' => MailDns::required( $key ),
+				'purpose'  => MailDns::purpose( $key ),
+				'status'   => $status,
+				'seen'     => $row['seen'],
+				'reason'   => $row['reason'],
+				'merged'   => $row['merged'],
+				'note'     => $note,
+			);
+		}
+
+		$notes = array();
+
+		if ( 'timeout' === $state ) {
+			$notes[] = __( 'We stopped looking for the records. Add them, then check again.', 'beltoft-services' );
+		}
+
+		$model = array(
+			'id'        => 'mail',
+			'domain'    => $domain,
+			'title'     => sprintf( /* translators: %s: domain name. */ __( 'Make email work on %s', 'beltoft-services' ), $shown ),
+			'why'       => sprintf( /* translators: %s: domain name. */ __( 'These records send email for %s to our mail server and let it send email as you. Mail does not arrive until the needed records are in place.', 'beltoft-services' ), $shown ),
+			'records'   => $records,
+			'notes'     => $notes,
+			'done_text' => sprintf( /* translators: %s: domain name. */ __( 'Email DNS for %s is set up. All needed records were found.', 'beltoft-services' ), $shown ),
+			'check'     => $can ? array( 'attrs' => array( 'data-mail-dns-check' => '' ) ) : null,
+			'checked'   => $checked,
+			'interval'  => 'external' === $mode && 'timeout' !== $state && 'ok' !== $state ? MailDns::INTERVAL : 0,
 			'days'      => MailDns::WAIT_DAYS,
 		);
+
+		if ( 'ours' === $mode ) {
+			$model['steps'] = array(
+				__( 'The DNS of this domain is on our name servers, so we add these records for you.', 'beltoft-services' ),
+				__( 'A record marked Another value is there now was not added, because something else is already there. Change or remove that record, then press Check now.', 'beltoft-services' ),
+			);
+		}
+
+		return $model;
 	}
 
 	/**

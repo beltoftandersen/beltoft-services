@@ -166,6 +166,65 @@ final class MailDns {
 		return array() !== $rows;
 	}
 
+	/**
+	 * Does the record count as needed? The driver counts every record: `mail_dns` is ok only when all of them are
+	 * (complete()), the daily look and the reminder email go on until they are, and the customer is shown them as needed.
+	 *
+	 * @param string $key Record key (mx, spf, dkim, dmarc, autoconfig, autodiscover).
+	 */
+	public static function required( string $key ): bool {
+		return in_array( $key, array( 'mx', 'spf', 'dkim', 'dmarc', 'autoconfig', 'autodiscover' ), true );
+	}
+
+	/**
+	 * A few words on what a record does, for the guide.
+	 *
+	 * @param string $key Record key.
+	 */
+	public static function purpose( string $key ): string {
+		switch ( $key ) {
+			case 'mx':
+				return __( 'Sends email for your domain to our mail server.', 'beltoft-services' );
+			case 'spf':
+				return __( 'Says our mail server may send email for your domain.', 'beltoft-services' );
+			case 'dkim':
+				return __( 'Signs your outgoing email, so other servers know it is yours.', 'beltoft-services' );
+			case 'dmarc':
+				return __( 'Tells other servers what to do with email that fails the checks.', 'beltoft-services' );
+			case 'autoconfig':
+				return __( 'Lets mail programs find your settings by themselves.', 'beltoft-services' );
+			case 'autodiscover':
+				return __( 'The same for Outlook.', 'beltoft-services' );
+		}
+
+		return '';
+	}
+
+	/**
+	 * An existing SPF record with our include added: a domain may have only one SPF record, so the customer changes theirs.
+	 *
+	 * @param string $existing The SPF record the domain has.
+	 * @return string The merged record, or '' when it cannot be worked out (not an SPF record, or it uses redirect=).
+	 */
+	public static function merge_spf( string $existing ): string {
+		$existing = trim( $existing );
+		$include  = 'include:' . MailSettings::spf_include();
+
+		if ( 0 !== stripos( $existing, 'v=spf1' ) || false !== stripos( $existing, 'redirect=' ) ) {
+			return '';
+		}
+
+		if ( false !== stripos( $existing, $include ) ) {
+			return $existing;
+		}
+
+		if ( 1 === preg_match( '/^(.*?)\s+([~\-+?]?all)$/iD', $existing, $m ) ) {
+			return $m[1] . ' ' . $include . ' ' . $m[2];
+		}
+
+		return $existing . ' ' . $include;
+	}
+
 	// -- Writing into a zone of ours -------------------------------------------------------------
 
 	/**
@@ -539,8 +598,19 @@ final class MailDns {
 			if ( self::row_holds( $row, $found ) ) {
 				$rows[ $i ]['status'] = 'ok';
 				$rows[ $i ]['reason'] = '';
-			} elseif ( 'conflict' !== $row['status'] ) {
-				$rows[ $i ]['status'] = 'missing';
+				unset( $rows[ $i ]['seen'], $rows[ $i ]['merged'] );
+			} else {
+				if ( 'conflict' !== $row['status'] ) {
+					$rows[ $i ]['status'] = 'missing';
+				}
+
+				// What is there now, for the guide: another MX, another SPF (and the SPF with our include added), another key.
+				$seen = array_values( array_filter( array_map( static fn( $v ) => substr( trim( (string) $v ), 0, 400 ), 'spf' === $row['key'] ? array_filter( $found, static fn( $v ) => 0 === stripos( (string) $v, 'v=spf1' ) ) : $found ), static fn( $v ) => '' !== $v ) );
+				$rows[ $i ]['seen'] = array_slice( $seen, 0, 3 );
+
+				if ( 'spf' === $row['key'] && array() !== $seen ) {
+					$rows[ $i ]['merged'] = self::merge_spf( $seen[0] );
+				}
 			}
 		}
 

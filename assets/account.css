@@ -1017,3 +1017,41 @@ body.woocommerce-account div.beltoft-services-domain .beltoft-dnse__table td.bel
 @media (max-width: 767px) {
 	body.woocommerce-account :is(.woocommerce-MyAccount-content, .bs-dialog) :is(input, select, textarea):not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="submit"], [type="button"], [type="hidden"], [type="color"]) { font-size: max(16px, var(--bs-fs-body)); }
 }
+
+/* The DNS records guide (Domains\DnsRecordsGuide): heading, steps, records grouped Needed and Recommended, the check.
+   Each record is a block with labelled lines, so it reads the same on a phone and nothing scrolls sideways. */
+.beltoft-dnsg { box-sizing: border-box; margin: var(--bs-space-4, 16px) 0 0; padding: var(--bs-space-4, 16px); border: 1px solid var(--line, #d7ddd4); background: var(--bg-soft, #faf9f6); font-size: var(--bs-fs-small, 14px); }
+.beltoft-dnsg *, .beltoft-dnsg *::before, .beltoft-dnsg *::after { box-sizing: border-box; }
+.beltoft-dnsg__title { margin: 0 0 var(--bs-space-2, 8px); font-size: var(--bs-fs-body, 15px); font-weight: var(--bs-fw-strong, 600); }
+.beltoft-dnsg__why, .beltoft-dnsg__done { margin: 0 0 var(--bs-space-3, 12px); }
+.beltoft-dnsg__done { color: var(--green, #28513e); font-weight: var(--bs-fw-medium, 500); }
+.beltoft-dnsg__steps { margin: 0 0 var(--bs-space-3, 12px); padding-left: 20px; }
+.beltoft-dnsg__steps li { margin: 0 0 4px; }
+.beltoft-dnsg__group { margin: var(--bs-space-3, 12px) 0 var(--bs-space-2, 8px); color: var(--bsh-soft, var(--ink-soft, #5e7080)); font-size: var(--bs-fs-caption, 13px); font-weight: var(--bs-fw-medium, 500); letter-spacing: .02em; text-transform: uppercase; }
+.beltoft-dnsg__records { margin: 0; padding: 0; list-style: none; }
+.beltoft-dnsg__rec { margin: 0 0 var(--bs-space-2, 8px); padding: var(--bs-space-3, 12px); border: 1px solid var(--line-soft, #e4e8e1); background: var(--bg, #fff); }
+.beltoft-dnsg__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px var(--bs-space-3, 12px); margin: 0 0 var(--bs-space-2, 8px); }
+.beltoft-dnsg__type { min-width: 44px; font-weight: var(--bs-fw-strong, 600); }
+.beltoft-dnsg__purpose { flex: 1 1 200px; color: var(--bsh-soft, var(--ink-soft, #5e7080)); }
+.beltoft-dnsg__state { font-weight: var(--bs-fw-medium, 500); }
+.beltoft-dnsg__state.is-ok { color: var(--green, #28513e); }
+.beltoft-dnsg__state.is-missing, .beltoft-dnsg__state.is-unchecked { color: var(--bs-status-warn, #8a5a00); }
+.beltoft-dnsg__state.is-wrong { color: var(--bs-status-fail, #a4372a); }
+.beltoft-dnsg__fields { margin: 0; }
+.beltoft-dnsg__fields > div { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 4px var(--bs-space-3, 12px); margin: 0 0 6px; }
+.beltoft-dnsg__fields dt { margin: 0; color: var(--bsh-soft, var(--ink-soft, #5e7080)); font-size: var(--bs-fs-caption, 13px); }
+.beltoft-dnsg__fields dd { min-width: 0; margin: 0; }
+.beltoft-dnsg code { display: inline-block; max-width: 100%; padding: 2px 6px; background: var(--bg-band, #eeede6); font-family: inherit; font-size: inherit; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
+.beltoft-dnsg code.beltoft-dnsg__value { display: block; max-height: 9em; overflow: auto; margin: 0 0 4px; }
+.beltoft-dnsg__full { display: block; margin: 4px 0 0; color: var(--bsh-soft, var(--ink-soft, #5e7080)); font-size: var(--bs-fs-caption, 13px); overflow-wrap: anywhere; }
+.beltoft-dnsg .beltoft-dnsg__copy, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dnsg .beltoft-dnsg__copy { display: inline; width: auto; min-height: 0; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; color: var(--navy, var(--bsh-ink, #0c1535)); font: inherit; font-size: var(--bs-fs-small, 14px); font-weight: var(--bs-fw-medium, 500); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.beltoft-dnsg__note { margin: 4px 0 0; color: var(--bsh-soft, var(--ink-soft, #5e7080)); }
+.beltoft-dnsg__notes { margin: var(--bs-space-3, 12px) 0 0; padding-left: 20px; color: var(--bsh-soft, var(--ink-soft, #5e7080)); }
+.beltoft-dnsg__notes li { margin: 0 0 4px; }
+.beltoft-dnsg__check { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bs-space-2, 8px) var(--bs-space-4, 16px); margin: var(--bs-space-3, 12px) 0 0; }
+.beltoft-dnsg__when { color: var(--bsh-soft, var(--ink-soft, #5e7080)); }
+@media (max-width: 767px) {
+	.beltoft-dnsg { padding: var(--bs-space-3, 12px); }
+	.beltoft-dnsg__fields > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+	.beltoft-dnsg__check > button { width: 100%; }
+}

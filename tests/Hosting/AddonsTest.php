@@ -157,6 +157,8 @@ class AddonsTest extends HostingCase {
 		$this->assertStringContainsString( 'Extra mailbox storage', $html );
 		$this->assertStringContainsString( 'Create a mailbox first', $html );
 		$this->assertStringContainsString( 'Manage mailboxes', $html );
+		$this->assertStringContainsString( 'Mailboxes can be made now, but mail does not arrive until the DNS records for mail.customer.example are added.', $html, 'Mail waits for DNS records: the panel says so.' );
+		$this->assertStringContainsString( 'Open the DNS records guide', $html );
 		$this->assertStringNotContainsString( 'data-hosting-action="add_pack"', $html );
 
 		Mailboxes::create( Resource::find( $child->id() ), 'info', 'Info', 0 );

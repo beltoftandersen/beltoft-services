@@ -627,6 +627,19 @@ class HostingPageTest extends HostingCase {
 		$this->assertStringContainsString( 'data-hosting-action="dismiss_checklist"', $html );
 	}
 
+	public function test_set_up_email_says_it_leads_to_dns_records_for_a_domain_at_another_provider(): void {
+		global $wpdb;
+		$r = $this->account();
+		$this->connect_domain( $r, 'ownmail.example' );
+		$html = $this->page( $r );
+		$this->assertStringNotContainsString( 'After you press the button', $html, 'A domain in our own zone gets no such warning.' );
+
+		$wpdb->update( \BeltoftServices\Hosting\Schema::tables()['hosting_domains'], array( 'kind' => 'external' ), array( 'host' => 'ownmail.example' ) );
+		$html = $this->page( $r );
+		$this->assertStringContainsString( 'After you press the button, you get a list of DNS records to add where the DNS of ownmail.example is managed: MX, SPF, DKIM, DMARC and two for mail programs. Mail does not arrive until they are in place.', $html );
+		$this->assertStringContainsString( 'data-hosting-action="enable_mail"', $html );
+	}
+
 	public function test_the_add_a_website_panel_only_shows_while_the_plan_has_room(): void {
 		$r = $this->account( array( 'sites' => 1 ) );
 
@@ -681,15 +694,15 @@ class HostingPageTest extends HostingCase {
 		( new HostingActions( $r ) )->add_domain( 'w' . $r->id(), 'example.org' );
 		$html = $this->page( $r );
 
-		$this->assertSame( 1, substr_count( $html, 'class="beltoft-hosting-dns"' ), 'One guide for the name with and without www.' );
+		$this->assertSame( 1, substr_count( $html, 'data-dnsg="' ), 'One guide for the name with and without www.' );
 		$this->assertStringContainsString( 'Point example.org to this website', $html );
 		$this->assertStringNotContainsString( 'To use ', $html );
-		$this->assertStringContainsString( 'data-copy="@"', $html );
-		$this->assertStringContainsString( 'data-copy="www"', $html );
-		$this->assertStringContainsString( 'data-copy="_beltoft-verify"', $html );
-		$this->assertStringContainsString( 'data-copy="198.51.100.7"', $html );
-		$this->assertStringContainsString( 'data-copy="' . \BeltoftServices\Domains\Ownership::token( (int) $r->license()['user_id'], 'example.org' ) . '"', $html );
-		$this->assertSame( 1, substr_count( $html, 'data-copy="_beltoft-verify' ), 'The www name needs no proof of its own.' );
+		$this->assertStringContainsString( 'data-dns-copy="@"', $html );
+		$this->assertStringContainsString( 'data-dns-copy="www"', $html );
+		$this->assertStringContainsString( 'data-dns-copy="_beltoft-verify"', $html );
+		$this->assertStringContainsString( 'data-dns-copy="198.51.100.7"', $html );
+		$this->assertStringContainsString( 'data-dns-copy="' . \BeltoftServices\Domains\Ownership::token( (int) $r->license()['user_id'], 'example.org' ) . '"', $html );
+		$this->assertSame( 1, substr_count( $html, 'data-dns-copy="_beltoft-verify' ), 'The www name needs no proof of its own.' );
 		$this->assertStringContainsString( 'data-hosting-action="dns_check" data-host="example.org"', $html );
 		$this->assertStringContainsString( 'Not checked yet', $html );
 
@@ -723,7 +736,7 @@ class HostingPageTest extends HostingCase {
 		$res = $this->call( 'POST', $r->id() . '/hosting/domains/www.example.org/check', $user );
 		$this->assertSame( array( 'example.org', 'www.example.org' ), $res->get_data()['live'] );
 		$this->assertSame( 'active', SiteDomains::find( 'www.example.org' )['state'] );
-		$this->assertStringNotContainsString( 'class="beltoft-hosting-dns"', $this->page( $r ) );
+		$this->assertStringNotContainsString( 'data-dnsg="', $this->page( $r ) );
 
 		// Somebody else's account, and a name that is not on the account.
 		$this->assertNotSame( 200, $this->call( 'POST', $r->id() . '/hosting/domains/example.org/check', self::factory()->user->create() )->get_status() );

@@ -8,6 +8,8 @@
 namespace BeltoftServices\Hosting;
 
 use BeltoftServices\Domains\DnsQuery;
+use BeltoftServices\Domains\DnsRecordsGuide;
+use BeltoftServices\Domains\HostName;
 use BeltoftServices\Domains\Ownership;
 use BeltoftServices\Resource;
 
@@ -65,11 +67,7 @@ final class DnsGuide {
 	 * @param string $domain The domain.
 	 */
 	public static function label( string $name, string $domain ): string {
-		if ( $name === $domain ) {
-			return '@';
-		}
-
-		return str_ends_with( $name, '.' . $domain ) ? substr( $name, 0, -1 - strlen( $domain ) ) : $name;
+		return DnsRecordsGuide::label( $name, $domain );
 	}
 
 	/**
@@ -322,75 +320,81 @@ final class DnsGuide {
 				continue;
 			}
 
-			$status = self::status( $r->id(), $domain );
-			$shown  = \BeltoftServices\Domains\HostName::display( $domain );
-
-			echo '<section class="beltoft-hosting-dns" data-hosting-scope aria-label="' . esc_attr( sprintf( /* translators: %s: domain name. */ __( 'DNS for %s', 'beltoft-services' ), $shown ) ) . '">';
-			echo '<h5 class="beltoft-hosting-dns__title">' . esc_html( sprintf( /* translators: %s: domain name. */ __( 'Point %s to this website', 'beltoft-services' ), $shown ) ) . '</h5>';
-			echo '<ol class="beltoft-hosting-dns__steps">';
-			echo '<li>' . esc_html( sprintf( /* translators: %s: domain name. */ __( 'Log in where the DNS of %s is managed. That is usually where you bought the domain.', 'beltoft-services' ), $shown ) );
-
-			if ( '' !== (string) ( $status['provider'] ?? '' ) ) {
-				echo ' ' . esc_html( sprintf( /* translators: %s: name of a DNS provider. */ __( 'For this domain it looks like %s.', 'beltoft-services' ), (string) $status['provider'] ) );
-			}
-
-			echo '</li>';
-			echo '<li>' . esc_html__( 'Add every record in the table. Copy the name and the value as they are.', 'beltoft-services' ) . '</li>';
-			echo '<li>' . esc_html__( 'Come back here and press Check now.', 'beltoft-services' ) . '</li>';
-			echo '</ol>';
-
-			echo '<table class="beltoft-hosting-dns__table"><thead><tr><th scope="col">' . esc_html__( 'Type', 'beltoft-services' ) . '</th><th scope="col">' . esc_html__( 'Name', 'beltoft-services' ) . '</th><th scope="col">' . esc_html__( 'Value', 'beltoft-services' ) . '</th><th scope="col">' . esc_html__( 'Status', 'beltoft-services' ) . '</th></tr></thead><tbody>';
-
-			foreach ( $records as $rec ) {
-				$found = isset( $status['rows'][ $rec['key'] ] ) ? (array) $status['rows'][ $rec['key'] ] : null;
-
-				if ( null === $found ) {
-					$state = '<span class="beltoft-hosting-dns__state">' . esc_html__( 'Not checked yet', 'beltoft-services' ) . '</span>';
-				} elseif ( ! empty( $found['ok'] ) ) {
-					$state = '<span class="beltoft-hosting-dns__state is-ok">' . esc_html__( 'Found', 'beltoft-services' ) . '</span>';
-				} elseif ( ! empty( $found['seen'] ) ) {
-					$state = '<span class="beltoft-hosting-dns__state is-wrong">' . esc_html( sprintf( /* translators: %s: one or more IP addresses. */ __( 'Points to %s now', 'beltoft-services' ), implode( ', ', array_map( 'strval', (array) $found['seen'] ) ) ) ) . '</span>';
-				} else {
-					$state = '<span class="beltoft-hosting-dns__state is-missing">' . esc_html__( 'Not found yet', 'beltoft-services' ) . '</span>';
-				}
-
-				printf(
-					'<tr><td data-label="%1$s">%2$s</td><td data-label="%3$s"><code>%4$s</code> <button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="copy" data-copy="%4$s">%5$s</button></td><td data-label="%6$s"><code>%7$s</code> <button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="copy" data-copy="%7$s">%5$s</button></td><td data-label="%8$s">%9$s</td></tr>',
-					esc_attr__( 'Type', 'beltoft-services' ),
-					esc_html( $rec['type'] ),
-					esc_attr__( 'Name', 'beltoft-services' ),
-					esc_attr( $rec['label'] ),
-					esc_html__( 'Copy', 'beltoft-services' ),
-					esc_attr__( 'Value', 'beltoft-services' ),
-					esc_attr( $rec['value'] ),
-					esc_attr__( 'Status', 'beltoft-services' ),
-					$state // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built from escaped parts above.
-				);
-			}
-
-			echo '</tbody></table>';
-
-			echo '<div class="beltoft-hosting-dns__check">';
-
-			if ( $ready ) {
-				echo '<button type="button" class="beltoft-hosting-btn" data-hosting-action="dns_check" data-host="' . esc_attr( $hosts[0] ) . '">' . esc_html__( 'Check now', 'beltoft-services' ) . '</button>';
-			}
-
-			echo '<span class="beltoft-hosting-dns__when">';
-
-			if ( ! empty( $status['time'] ) ) {
-				echo esc_html( sprintf( /* translators: %s: date and time. */ __( 'Last checked %s.', 'beltoft-services' ), wp_date( 'j F Y, H:i', (int) $status['time'] ) ) ) . ' ';
-			}
-
-			echo esc_html__( 'We also check by ourselves every 15 minutes. A change of DNS can take up to an hour to show.', 'beltoft-services' ) . '</span></div>';
-
-			echo '<p class="beltoft-hosting-help">' . esc_html( sprintf( /* translators: 1: "@", 2: domain name. */ __( 'About the name %1$s: it means the domain itself. Some providers want %1$s, some want the field left empty, and some want %2$s written out.', 'beltoft-services' ), '@', $shown ) ) . '</p>';
-			if ( in_array( $domain, $all, true ) && in_array( 'www.' . $domain, $all, true ) ) {
-				echo '<p class="beltoft-hosting-help">' . esc_html__( 'The redirect starts when both addresses point here.', 'beltoft-services' ) . ' ' . esc_html__( 'Then you choose which one is the main address.', 'beltoft-services' ) . '</p>';
-			}
-
-			echo '<p class="beltoft-hosting-help">' . esc_html__( 'If the name already has an A record that points somewhere else, change that record instead of adding a second one.', 'beltoft-services' ) . '</p>';
-			echo '</section>';
+			DnsRecordsGuide::render( self::model( $r, $domain, $hosts, $all, $records, $ready ) );
 		}
+	}
+
+	/**
+	 * The guide of a domain as the shared renderer takes it: what is hosting's own is which records, what they are for and
+	 * the notes; the drawing is Domains\DnsRecordsGuide.
+	 *
+	 * @param Resource                          $r       Hosting resource.
+	 * @param string                            $domain  The domain.
+	 * @param string[]                          $hosts   Waiting names.
+	 * @param string[]                          $all     Every name of the account.
+	 * @param array<int, array<string, string>> $records records().
+	 * @param bool                              $ready   Whether the account takes actions now.
+	 * @return array<string, mixed>
+	 */
+	public static function model( Resource $r, string $domain, array $hosts, array $all, array $records, bool $ready ): array {
+		$status = self::status( $r->id(), $domain );
+		$shown  = HostName::display( $domain );
+		$out    = array();
+		$why    = array(
+			'A'    => __( 'Sends visitors of this name to your website.', 'beltoft-services' ),
+			'AAAA' => __( 'The same, for visitors who use IPv6.', 'beltoft-services' ),
+			'TXT'  => DnsRecordsGuide::proof_purpose(),
+		);
+
+		foreach ( $records as $rec ) {
+			$found = isset( $status['rows'][ $rec['key'] ] ) ? (array) $status['rows'][ $rec['key'] ] : null;
+			$seen  = null === $found ? array() : array_map( 'strval', (array) ( $found['seen'] ?? array() ) );
+
+			$out[] = array(
+				'key'        => $rec['key'],
+				'type'       => $rec['type'],
+				'name'       => $rec['name'],
+				'label'      => $rec['label'],
+				'value'      => $rec['value'],
+				'required'   => true,
+				'purpose'    => $why[ $rec['type'] ] ?? '',
+				'status'     => null === $found ? 'unchecked' : ( ! empty( $found['ok'] ) ? 'ok' : ( array() !== $seen ? 'wrong' : 'missing' ) ),
+				'seen'       => $seen,
+				'wrong_text' => /* translators: %s: one or more IP addresses. */ __( 'Points to %s now', 'beltoft-services' ),
+			);
+		}
+
+		$notes = array();
+
+		if ( in_array( $domain, $all, true ) && in_array( 'www.' . $domain, $all, true ) ) {
+			$notes[] = __( 'The redirect starts when both addresses point here.', 'beltoft-services' ) . ' ' . __( 'Then you choose which one is the main address.', 'beltoft-services' );
+		}
+
+		$notes[] = __( 'A change of DNS can take up to an hour to show.', 'beltoft-services' );
+		$notes[] = __( 'If the name already has an A record that points somewhere else, change that record instead of adding a second one.', 'beltoft-services' );
+
+		return array(
+			'id'        => $domain,
+			'domain'    => $domain,
+			'class'     => 'beltoft-hosting-dns',
+			'attrs'     => array( 'data-hosting-scope' => '' ),
+			'title'     => sprintf( /* translators: %s: domain name. */ __( 'Point %s to this website', 'beltoft-services' ), $shown ),
+			'why'       => sprintf( /* translators: %s: domain name. */ __( 'These records send visitors of %s to your website. The website does not open on this name until they are in place.', 'beltoft-services' ), $shown ),
+			'provider'  => (string) ( $status['provider'] ?? '' ),
+			'records'   => $out,
+			'notes'     => $notes,
+			'done_text' => sprintf( /* translators: %s: domain name. */ __( '%s points to this website. All needed records were found.', 'beltoft-services' ), $shown ),
+			'check'     => $ready ? array(
+				'label' => __( 'Check now', 'beltoft-services' ),
+				'class' => 'beltoft-hosting-btn',
+				'attrs' => array(
+					'data-hosting-action' => 'dns_check',
+					'data-host'           => $hosts[0],
+				),
+			) : null,
+			'checked'   => (int) ( $status['time'] ?? 0 ),
+			'interval'  => 15 * MINUTE_IN_SECONDS,
+			'days'      => 0,
+		);
 	}
 }

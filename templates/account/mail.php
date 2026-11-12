@@ -162,7 +162,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 			<?php endif; ?>
 		<?php else : ?>
 			<?php if ( 'ok' !== $view['dns']['status'] && array() !== $view['dns']['rows'] ) : ?>
-				<p class="beltoft-services-panel__notice" role="status"><?php esc_html_e( 'Some DNS records are not in place yet, so mail may not arrive. See the DNS tab.', 'beltoft-services' ); ?></p>
+				<p class="beltoft-services-panel__notice" role="status"><?php esc_html_e( 'Mail does not arrive on this domain until its DNS records are in place. You can make mailboxes now.', 'beltoft-services' ); ?> <a href="<?php echo esc_url( $nav ? $link( 'dns' ) : '#beltoft-mail-dns' ); ?>"><?php esc_html_e( 'Open the DNS records guide', 'beltoft-services' ); ?></a></p>
 			<?php endif; ?>
 			<div class="beltoft-services-vm__more">
 				<h4><?php esc_html_e( 'Mailboxes', 'beltoft-services' ); ?></h4>
@@ -303,65 +303,12 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 
 	<?php if ( $beltoft_services_all || 'dns' === $active ) : ?>
 		<?php $beltoft_services_dns = $view['dns']; ?>
-		<div class="beltoft-services-vm__more" data-mail-dns>
+		<div class="beltoft-services-vm__more" id="beltoft-mail-dns" data-mail-dns>
 			<h4><?php esc_html_e( 'DNS records', 'beltoft-services' ); ?></h4>
-			<?php if ( null !== $beltoft_services_dns['proof'] ) : ?>
-				<p><?php esc_html_e( 'First, show that the domain is yours. Add this TXT record where the DNS of the domain is managed. Nothing else is set up until we find it.', 'beltoft-services' ); ?></p>
-				<table class="beltoft-services-vm__backup-list beltoft-services-mail__table">
-					<thead>
-						<tr><th scope="col"><?php esc_html_e( 'Name', 'beltoft-services' ); ?></th><th scope="col"><?php esc_html_e( 'Type', 'beltoft-services' ); ?></th><th scope="col"><?php esc_html_e( 'Value', 'beltoft-services' ); ?></th></tr>
-					</thead>
-					<tbody>
-						<tr><td><code><?php echo esc_html( $beltoft_services_dns['proof']['name'] ); ?></code></td><td><?php echo esc_html( $beltoft_services_dns['proof']['type'] ); ?></td><td class="beltoft-services-mail__value"><code><?php echo esc_html( $beltoft_services_dns['proof']['value'] ); ?></code></td></tr>
-					</tbody>
-				</table>
-				<p><button type="button" class="button woocommerce-button" data-mail-proof-check><?php esc_html_e( 'Check now', 'beltoft-services' ); ?></button></p>
-			<?php elseif ( array() === $beltoft_services_dns['rows'] ) : ?>
+			<?php if ( null === $beltoft_services_dns['guide'] ) : ?>
 				<p><?php esc_html_e( 'The records appear here when your email domain is ready.', 'beltoft-services' ); ?></p>
 			<?php else : ?>
-				<?php if ( 'ours' === $beltoft_services_dns['mode'] ) : ?>
-					<p><?php esc_html_e( 'The DNS of this domain is on our name servers, so we add these records for you. A record marked Conflict was not added because something else is already there. Change or remove that record, then check again.', 'beltoft-services' ); ?></p>
-				<?php else : ?>
-					<p><?php echo esc_html( sprintf( /* translators: %d: days */ _n( 'The DNS of this domain is managed somewhere else. Add these records there. We look for them every ten minutes for %d day.', 'The DNS of this domain is managed somewhere else. Add these records there. We look for them every ten minutes for %d days.', (int) $beltoft_services_dns['days'], 'beltoft-services' ), (int) $beltoft_services_dns['days'] ) ); ?></p>
-				<?php endif; ?>
-				<?php if ( 'timeout' === $beltoft_services_dns['status'] ) : ?>
-					<p class="beltoft-services-panel__notice" role="status"><?php esc_html_e( 'We stopped looking for the records. Add them, then check again.', 'beltoft-services' ); ?></p>
-				<?php elseif ( 'ok' === $beltoft_services_dns['status'] ) : ?>
-					<p><?php esc_html_e( 'All records are in place.', 'beltoft-services' ); ?></p>
-				<?php endif; ?>
-				<table class="beltoft-services-vm__backup-list beltoft-services-mail__table">
-					<thead>
-						<tr><th scope="col"><?php esc_html_e( 'Name', 'beltoft-services' ); ?></th><th scope="col"><?php esc_html_e( 'Type', 'beltoft-services' ); ?></th><th scope="col"><?php esc_html_e( 'Value', 'beltoft-services' ); ?></th><th scope="col"><?php esc_html_e( 'Status', 'beltoft-services' ); ?></th></tr>
-					</thead>
-					<tbody>
-						<?php foreach ( $beltoft_services_dns['rows'] as $beltoft_services_rec ) : ?>
-							<tr>
-								<td><code><?php echo esc_html( $beltoft_services_rec['name'] ); ?></code></td>
-								<td><?php echo esc_html( $beltoft_services_rec['type'] ); ?></td>
-								<td class="beltoft-services-mail__value"><code><?php echo esc_html( ( null !== $beltoft_services_rec['priority'] ? $beltoft_services_rec['priority'] . ' ' : '' ) . $beltoft_services_rec['value'] ); ?></code></td>
-								<td>
-									<?php
-									$beltoft_services_words = array(
-										'ok'       => __( 'OK', 'beltoft-services' ),
-										'missing'  => __( 'Missing', 'beltoft-services' ),
-										'conflict' => __( 'Conflict', 'beltoft-services' ),
-									);
-									echo esc_html( $beltoft_services_words[ $beltoft_services_rec['status'] ] );
-									if ( '' !== $beltoft_services_rec['reason'] ) {
-										echo '<br><span class="description">' . esc_html( $beltoft_services_rec['reason'] ) . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped text.
-									}
-									?>
-								</td>
-							</tr>
-						<?php endforeach; ?>
-					</tbody>
-				</table>
-				<?php if ( '' !== $beltoft_services_dns['checked'] ) : ?>
-					<p class="description"><?php echo esc_html( sprintf( /* translators: %s: date and time */ __( 'Last checked: %s', 'beltoft-services' ), $beltoft_services_dns['checked'] ) ); ?></p>
-				<?php endif; ?>
-				<?php if ( $beltoft_services_dns['can_check'] ) : ?>
-					<p><button type="button" class="button woocommerce-button" data-mail-dns-check><?php esc_html_e( 'Check again', 'beltoft-services' ); ?></button></p>
-				<?php endif; ?>
+				<?php \BeltoftServices\Domains\DnsRecordsGuide::render( $beltoft_services_dns['guide'] ); ?>
 			<?php endif; ?>
 		</div>
 	<?php endif; ?>
