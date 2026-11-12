@@ -379,7 +379,7 @@ final class IntroCoupon {
 		}
 
 		/* translators: %s: product name. */
-		$message = sprintf( __( 'The introductory price for %s is for your first order, so the regular price applies.', 'beltoft-services' ), (string) get_the_title( Product::parent_id( $product_id ) ) );
+		$message = sprintf( __( 'The introductory price for %s is only for the first time you order it. You have had it before, so the regular price applies.', 'beltoft-services' ), (string) get_the_title( Product::parent_id( $product_id ) ) );
 
 		if ( ! wc_has_notice( $message, 'notice' ) ) {
 			wc_add_notice( $message, 'notice' );

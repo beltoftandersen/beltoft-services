@@ -140,7 +140,7 @@ class IntroCouponTest extends TestCase {
 		$this->assertFalse( WC()->cart->has_discount( 'intro-half' ), 'Held by the user.' );
 		$notices = wc_get_notices( 'notice' );
 		$this->assertCount( 1, $notices, 'The customer is told why the regular price applies.' );
-		$this->assertStringContainsString( 'is for your first order, so the regular price applies', (string) ( $notices[0]['notice'] ?? '' ) );
+		$this->assertStringContainsString( 'You have had it before, so the regular price applies', (string) ( $notices[0]['notice'] ?? '' ) );
 		$this->assertSame( array(), wc_get_notices( 'error' ) );
 		$this->add( $product );
 		$this->assertCount( 1, wc_get_notices( 'notice' ), 'Told once, not on every add.' );
