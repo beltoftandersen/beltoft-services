@@ -247,6 +247,18 @@ final class MailDriver implements Driver, NeedsBilling {
 			return 'ours';
 		}
 
+		/**
+		 * Whether another service of the same customer has already proven that the domain is theirs (for example the
+		 * hosting account whose website runs on it, when this mail domain belongs to that account). Default false.
+		 *
+		 * @param bool     $proven Default false.
+		 * @param string   $name   The domain.
+		 * @param Resource $r      The mail resource.
+		 */
+		if ( apply_filters( 'beltoft_services_mail_domain_proven', false, $name, $r ) ) {
+			return 'external';
+		}
+
 		// A domain registered or transferred in the same order: wait for it, then it is ours. After the deadline the
 		// usual TXT proof applies.
 		if ( (int) $r->get( MailField::META_WAIT_UNTIL ) > time() ) {

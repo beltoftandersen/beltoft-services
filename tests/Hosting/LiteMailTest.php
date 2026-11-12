@@ -363,4 +363,25 @@ class LiteMailTest extends HostingCase {
 		remove_all_actions( 'beltoft_licenses_license_created' );
 		remove_filter( 'beltoft_services_lock_timeout', '__return_zero' );
 	}
+
+	public function test_the_mail_domain_of_a_hosting_account_needs_no_second_proof(): void {
+		// The mail service's own proof record is NOT there: the hosting account proved the domain already.
+		remove_all_filters( 'beltoft_services_dns_proof_result' );
+		$proof = array(
+			'delegation' => array( 'status' => 'ok', 'reason' => 'delegated', 'ns' => array( 'ns1.host.example' ), 'ips' => array(), 'ds' => null, 'ours' => false ),
+			'check_txt'  => array( 'status' => 'missing', 'servers' => array(), 'reason' => 'missing' ),
+		);
+		add_filter( 'beltoft_services_dns_proof_result', fn( $pre, $call ) => $proof[ $call ] ?? $pre, 10, 2 );
+
+		$parent = $this->account();
+		$child  = $this->lite( $parent, 'proved.example' );
+		$this->assertInstanceOf( Resource::class, $child );
+
+		$result = Registry::get( 'mail' )->provision( Resource::find( $child->id() ) );
+		$this->assertContains( 'proof', (array) Resource::find( $child->id() )->get( 'steps' ), 'The proof step is passed: ' . $result->error() );
+		$this->assertSame( 'external', Resource::find( $child->id() )->get( 'mail_mode' ) );
+
+		// A mail domain that is not the child of a hosting account still needs its own proof.
+		$this->assertFalse( \BeltoftServices\Hosting\LiteMail::proven( false, 'proved.example', $parent ) );
+	}
 }

@@ -25,6 +25,7 @@ final class HostingAccount {
 	 * Gives the mail area the "Included with" label of an Email lite resource that is a child of a hosting account.
 	 */
 	public static function register(): void {
+		add_filter( 'beltoft_services_mail_domain_proven', array( LiteMail::class, 'proven' ), 10, 3 );
 		add_filter( 'beltoft_services_mail_included_label', array( self::class, 'included_label' ), 10, 2 );
 		add_filter( 'beltoft_services_stepup_purposes', array( self::class, 'stepup_purposes' ) );
 		add_filter( 'beltoft_services_stepup_text', array( self::class, 'stepup_text' ), 10, 2 );

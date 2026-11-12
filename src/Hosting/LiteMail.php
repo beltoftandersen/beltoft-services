@@ -121,4 +121,29 @@ final class LiteMail {
 			__( 'The Email lite service could not be linked to the account.', 'beltoft-services' )
 		);
 	}
+
+	/**
+	 * The mail domain of a hosting account needs no proof of its own: the account's website already runs on the name,
+	 * and for an outside name that took the proof record (SiteDns::check_external).
+	 *
+	 * @param mixed    $proven Whether it is proven already.
+	 * @param mixed    $name   The domain.
+	 * @param Resource $child  The mail resource.
+	 * @return mixed
+	 */
+	public static function proven( $proven, $name, $child ) {
+		if ( $proven || ! $child instanceof Resource || ! is_string( $name ) ) {
+			return $proven;
+		}
+
+		$parent = Children::parent_of( $child );
+
+		if ( ! $parent || HostingDriver::ID !== $parent->get( 'driver' ) ) {
+			return $proven;
+		}
+
+		$row = SiteDomains::find( strtolower( $name ) );
+
+		return null !== $row && (int) $row['resource_id'] === $parent->id() && 'preview' !== $row['kind'] && 'active' === $row['state'] ? true : $proven;
+	}
 }
