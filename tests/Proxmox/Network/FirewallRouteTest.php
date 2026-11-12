@@ -255,12 +255,12 @@ class FirewallRouteTest extends FirewallTestCase {
 
 		$this->assertStringContainsString( 'Outgoing mail on port 25 is blocked', $plain );
 		$this->assertStringContainsString( 'address spoofing', $plain );
-		$this->assertStringContainsString( 'in front of your server', $plain );
-		$this->assertStringNotContainsString( 'its own firewall inside', $plain );
+		$this->assertStringContainsString( 'Check whether a firewall is turned on inside the server', $plain );
+		$this->assertStringNotContainsString( 'sudo ufw allow', $plain );
 		$this->assertStringNotContainsString( "\u{2014}", $plain );
 
 		Resource::find( $r->id() )->set( array( 'app_id' => 'wordpress' ) );
-		$this->assertStringContainsString( 'its own firewall inside', $this->page( Resource::find( $r->id() ), 'firewall' ) );
+		$this->assertStringContainsString( 'sudo ufw allow', $this->page( Resource::find( $r->id() ), 'firewall' ) );
 	}
 
 	public function test_the_mail_line_follows_the_cluster_setting(): void {

@@ -110,11 +110,11 @@ $beltoft_services_fw_id = (int) $r->id();
 		</div>
 
 		<div class="beltoft-services-fw__layers">
-			<h5><?php esc_html_e( 'Two firewalls', 'beltoft-services' ); ?></h5>
+			<h5><?php esc_html_e( 'If a port you opened does not answer', 'beltoft-services' ); ?></h5>
 			<?php if ( ! empty( $view['app'] ) ) : ?>
-				<p class="description"><?php esc_html_e( 'Your app runs its own firewall inside the server. A port you add here must be open there too.', 'beltoft-services' ); ?></p>
+				<p class="description"><?php esc_html_e( 'A server with a one-click app also has a firewall inside it (ufw). Open the port there as well, for example: sudo ufw allow 8080/tcp', 'beltoft-services' ); ?></p>
 			<?php else : ?>
-				<p class="description"><?php esc_html_e( 'This firewall sits in front of your server. If you turned on a firewall inside the server, the port must be open there too.', 'beltoft-services' ); ?></p>
+				<p class="description"><?php esc_html_e( 'Check whether a firewall is turned on inside the server. The port must be open there as well.', 'beltoft-services' ); ?></p>
 			<?php endif; ?>
 		</div>
 
