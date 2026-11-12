@@ -18,6 +18,7 @@ use BeltoftServices\Hosting\SiteAddresses;
 use BeltoftServices\Hosting\SiteDns;
 use BeltoftServices\Hosting\SiteDomains;
 use BeltoftServices\Hosting\SiteNames;
+use BeltoftServices\Hosting\SiteWordPress;
 use BeltoftServices\Hosting\Sites;
 
 defined( 'ABSPATH' ) || exit;
@@ -81,6 +82,7 @@ final class SiteActions {
 				'pairs'     => $pairs,
 				'preview'   => $preview,
 				'main'      => SiteAddresses::main_address( $rows, $preview ),
+				'wp'        => SiteWordPress::view( $site, $rows, $preview ),
 				'admin_user'  => (string) ( $site['flags']['admin_user'] ?? '' ),
 				'admin_email' => (string) ( $site['flags']['admin_email'] ?? '' ),
 			);
@@ -450,6 +452,9 @@ final class SiteActions {
 			return $edge;
 		}
 
+		// A first own domain that is live moves WordPress to it (queued, done in the background).
+		SiteWordPress::consider( $this->r, $slug );
+
 		return array_merge(
 			$added,
 			array(
@@ -509,6 +514,17 @@ final class SiteActions {
 			}
 		}
 
+		// WordPress itself is on this name: it is not left on a name that is gone.
+		foreach ( Sites::for_resource( $this->r->id() ) as $own ) {
+			if ( $own['id'] === $row['site_id'] && (string) ( $own['flags']['wp_address'] ?? '' ) === $row['host'] ) {
+				if ( ! $final ) {
+					return $this->error( 'invalid', __( 'WordPress uses this address. Make another address the WordPress address first, then remove this one.', 'beltoft-services' ) );
+				}
+
+				$this->wordpress_leaves( $own, $row['host'] );
+			}
+		}
+
 		$gone = SiteDns::remove_domain( $this->r, $row['host'], $this->node );
 
 		if ( is_wp_error( $gone ) ) {
@@ -526,6 +542,86 @@ final class SiteActions {
 	}
 
 	/**
+	 * Moves WordPress itself to one of the website's addresses, in the background: its database is copied first, every address
+	 * in it is replaced, and when anything fails the copy is put back. The temporary address and the website's working names
+	 * can be chosen. Also the way back to the address WordPress had before.
+	 *
+	 * @param string $slug Site.
+	 * @param string $host The address; empty for the main address.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function wordpress_address( string $slug, string $host = '' ) {
+		return $this->locked( fn() => $this->wordpress_address_locked( $slug, $host ) );
+	}
+
+	/**
+	 * wordpress_address with the site lock held.
+	 *
+	 * @return mixed
+	 */
+	private function wordpress_address_locked( string $slug, string $host ) {
+		$ready = $this->ready();
+
+		if ( is_wp_error( $ready ) ) {
+			return $ready;
+		}
+
+		$site = Sites::find( $this->r->id(), $slug );
+
+		if ( null === $site || ! empty( $site['flags']['pending'] ) ) {
+			return $this->error( 'not_found', __( 'That website does not exist.', 'beltoft-services' ) );
+		}
+
+		$preview = EdgeMap::preview_host( $slug );
+		$rows    = array_values( array_filter( SiteDomains::for_resource( $this->r->id() ), static fn( $d ) => $d['site_id'] === $site['id'] ) );
+		$host    = strtolower( rtrim( trim( $host ), '.' ) );
+		$host    = '' === $host ? SiteAddresses::main_address( $rows, $preview ) : $host;
+
+		if ( ! SiteWordPress::is_name( $rows, $preview, $host ) ) {
+			return $this->error( 'invalid', __( 'That address is not one of this website\'s working addresses.', 'beltoft-services' ) );
+		}
+
+		$view = SiteWordPress::view( $site, $rows, $preview );
+
+		if ( '' !== $view['moving'] ) {
+			return $this->error( 'busy', __( 'WordPress is being moved. Wait until that is done.', 'beltoft-services' ) );
+		}
+
+		if ( $view['address'] === $host && '' === $view['note'] ) {
+			return $this->error( 'invalid', __( 'WordPress already uses this address.', 'beltoft-services' ) );
+		}
+
+		// An address of her own that the customer set in WordPress is only replaced when it is the one the last look found.
+		SiteWordPress::queue_manual( $this->r, $slug, $host, 'foreign' === $view['note'] ? $view['seen'] : '' );
+
+		return array(
+			'moving'  => $host,
+			/* translators: %s: address. */
+			'message' => sprintf( __( 'WordPress is being moved to %s. This can take a few minutes.', 'beltoft-services' ), \BeltoftServices\Domains\HostName::display( $host ) ),
+		);
+	}
+
+	/**
+	 * WordPress is on a name that is being removed because its paid add-on ended: it moves back to the temporary address first,
+	 * while the node still knows the name. When that does not work the operator is told; the name goes all the same.
+	 *
+	 * @param array<string, mixed> $site Site row.
+	 * @param string               $host The name that goes.
+	 */
+	private function wordpress_leaves( array $site, string $host ): void {
+		$record = (array) Records::for_resource( $this->r->id() );
+		$done   = $this->call( 'wp_back_' . $site['slug'], 'site.wp_address', array( 'vmid' => (int) $record['vmid'], 'slug' => (string) $site['slug'], 'to' => EdgeMap::preview_host( (string) $site['slug'] ) ) );
+
+		if ( ! is_wp_error( $done ) && ( ! empty( $done['changed'] ) || ! empty( $done['unchanged'] ) ) ) {
+			Sites::update( $this->r->id(), (string) $site['slug'], array( 'flags' => array( 'wp_address' => '', 'wp_prev' => $host, 'wp_at' => \BeltoftServices\Jobs::now(), 'wp_note' => '' ) ) );
+
+			return;
+		}
+
+		\BeltoftServices\Alerts::notify( 'A website is left on a removed domain', array( 'Hosting resource ' . $this->r->id() . ', website ' . $site['slug'] . ': WordPress was on ' . $host . ' and could not be moved back to the temporary address before the name was removed.' ), $this->r, 'hosting-wp-leaves-' . $this->r->id() );
+	}
+
+	/**
 	 * Sends the account's current routes to the edge (a name became active or stopped being).
 	 *
 	 * @return true|\WP_Error
@@ -537,8 +633,9 @@ final class SiteActions {
 	}
 
 	/**
-	 * Chooses which name of a with-and-without-www pair is the main address; the other one redirects to it (301). Only the
-	 * redirect changes: the WordPress address of the website is not touched and nothing in its database is rewritten.
+	 * Chooses which name of a with-and-without-www pair is the main address; the other one redirects to it (301). The
+	 * redirect changes at once. When WordPress is on the other name of the pair it moves to the chosen one in the background
+	 * (SiteWordPress), and the redirect is sent when that is done; otherwise the WordPress address is left alone.
 	 *
 	 * @param string $host The name that becomes the main address (example.com or www.example.com).
 	 * @return array<string, mixed>|\WP_Error
@@ -587,6 +684,18 @@ final class SiteActions {
 		$mode = $host === $base ? SiteAddresses::APEX : SiteAddresses::WWW;
 
 		SiteDomains::set_www_mode( $base, $mode );
+
+		// WordPress is on the other name of this pair: it moves to the chosen one first, and the job sends the redirect when it
+		// is done. A redirect sent before would meet WordPress sending the visitor back (www and without are WordPress's own concern).
+		$wp_now = SiteWordPress::address( $site, EdgeMap::preview_host( (string) $site['slug'] ) );
+
+		if ( in_array( $wp_now, array( $base, 'www.' . $base ), true ) && 'active' === $apex['state'] && 'active' === $www['state'] && SiteWordPress::consider( $this->r, (string) $site['slug'], true ) ) {
+			return array(
+				'main'     => $host,
+				'redirect' => true,
+			);
+		}
+
 		$pushed = $this->push_site_names( $site );
 
 		if ( true !== $pushed ) {
@@ -594,6 +703,8 @@ final class SiteActions {
 
 			return is_wp_error( $pushed ) ? $pushed : $this->error( 'failed', __( 'Redirecting from one address to the other is not available on your server yet. Contact support.', 'beltoft-services' ) );
 		}
+
+		SiteWordPress::consider( $this->r, (string) $site['slug'], true ); // WordPress still on the temporary address: queued when the names allow it.
 
 		return array(
 			'main'     => $host,
@@ -641,6 +752,21 @@ final class SiteActions {
 		}
 
 		$redirects = SiteAddresses::redirects( $all );
+		$preview   = EdgeMap::preview_host( (string) $site['slug'] );
+		$to_main   = SiteWordPress::preview_redirect( $site, $all, $preview );
+
+		if ( null !== $to_main ) {
+			$redirects[] = $to_main; // The temporary address sends visitors to the main address once WordPress is on it.
+		}
+
+		// The name WordPress itself is on stays a name of the website, also when it does not point here for now: the node
+		// accepts the move back to the temporary address only from a name it knows.
+		$wp = (string) ( $site['flags']['wp_address'] ?? '' );
+
+		if ( '' !== $wp && ! in_array( $wp, $names, true ) && array() !== array_filter( $all, static fn( $d ) => $d['host'] === $wp ) ) {
+			$names[] = $wp;
+		}
+
 		$sig       = md5( (string) wp_json_encode( array( $names, $redirects ) ) );
 		$last      = (string) ( $site['flags']['names_sig'] ?? '' );
 

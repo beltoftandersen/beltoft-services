@@ -33,7 +33,12 @@ defined( 'ABSPATH' ) || exit;
  * - site.wp_login_link, site.wp_password_link: url (a one-time address, fake) and, for a site installed through site.wp_install,
  *   user and email of the administrator (the preferred admin_user when it is the one installed, else the installed one). The
  *   address of the password link is a different fake address; no reset key is ever in a reply.
- * - site.domains: ok (true), slug. The names and the optional redirects (a list of from and to names) are kept in state().
+ * - site.domains: ok (true), slug. The names and the optional redirects (a list of from and to names) are kept in state(). A redirect
+ *   is between names of the site, its temporary (preview) name included.
+ * - site.wp_address: moves WordPress to a name of the site (`to`; the optional `from` names an address of the customer's own that may be replaced). changed (true), from, to, replaced (12), dump ("wpaddr"),
+ *   keep_days (7); `foreign` (true, nothing changed) when WordPress is on an address that is none of the site's names (seed it with
+ *   set_wp_address()); `unchanged` (true) when it is on the name already; `dry_run` (true) with the count and no change. The next
+ *   result can be scripted with script_wp_address() (for example failed and restored). The one-time login links follow it.
  * - db.create: user, databases. The password is accepted, kept out of every reply and of the call log.
  * - ct.refresh: updated (names of the replaced files, none when current), version (12 hex characters). Fails "container not
  *   running" for an unknown container or one set with set_not_running().
@@ -118,6 +123,13 @@ class FakeAgent implements Agent {
 		'site.cache_status' => array(
 			'vmid' => array( 'vmid', true ),
 			'slug' => array( 'ident', true ),
+		),
+		'site.wp_address'   => array(
+			'vmid'    => array( 'vmid', true ),
+			'slug'    => array( 'ident', true ),
+			'to'      => array( 'host', true ),
+			'from'    => array( 'host', false ),
+			'dry_run' => array( 'bool', false ),
 		),
 		'site.wp_install'   => array(
 			'vmid'        => array( 'vmid', true ),
@@ -302,6 +314,8 @@ class FakeAgent implements Agent {
 			'restores' => array(),
 			'readonly' => array(),
 			'loaders'  => array(),
+			'unsupported' => array(),
+			'wp_scripts'  => array(),
 		);
 	}
 
@@ -408,6 +422,42 @@ class FakeAgent implements Agent {
 	}
 
 	/**
+	 * Where WordPress of a site is now (what `home` holds), as site.wp_address finds it. A site starts on its temporary name.
+	 * Set it to a name that is none of the site's to see the `foreign` answer.
+	 *
+	 * @param int    $vmid Container id.
+	 * @param string $slug Site.
+	 * @param string $host Host name.
+	 */
+	public function set_wp_address( int $vmid, string $slug, string $host ): void {
+		$this->load();
+		$this->state['sites'][ $vmid ][ $slug ]['wp_address'] = $host;
+		$this->save();
+	}
+
+	/**
+	 * The result the next site.wp_address answers with (merged over changed false), nothing else is done. Consumed once.
+	 *
+	 * @param array<string, mixed> $result For example array( 'failed' => true, 'restored' => true ).
+	 */
+	public function script_wp_address( array $result ): void {
+		$this->load();
+		$this->state['wp_scripts'][] = $result;
+		$this->save();
+	}
+
+	/**
+	 * Makes operations unknown to the agent, as an older agent has them: the answer is 400 unknown_op.
+	 *
+	 * @param string[] $ops Operations.
+	 */
+	public function set_unsupported( array $ops ): void {
+		$this->load();
+		$this->state['unsupported'] = $ops;
+		$this->save();
+	}
+
+	/**
 	 * Every submit made so far, with secrets masked.
 	 *
 	 * @return array<int, array{op: string, job_id: string, args: array<string, mixed>}>
@@ -464,7 +514,7 @@ class FakeAgent implements Agent {
 			return $this->view( $job_id );
 		}
 
-		if ( ! isset( self::OPERATIONS[ $op ] ) ) {
+		if ( ! isset( self::OPERATIONS[ $op ] ) || in_array( $op, (array) $this->state['unsupported'], true ) ) {
 			return $this->error( 400, 'unknown_op', 'The operation is not in the list.' );
 		}
 
@@ -609,10 +659,11 @@ class FakeAgent implements Agent {
 
 		// The agent's own cross-check: only between the site's own names.
 		if ( 'site.domains' === $op && isset( $out['redirects'] ) ) {
-			$names = (array) $out['domains'];
+			$names   = (array) $out['domains'];
+			$sources = array_merge( $names, array( (string) ( $this->state['sites'][ (int) ( $out['vmid'] ?? 0 ) ][ (string) ( $out['slug'] ?? '' ) ]['host'] ?? '' ) ) );
 
 			foreach ( $out['redirects'] as $redirect ) {
-				if ( ! in_array( $redirect['from'], $names, true ) || ! in_array( $redirect['to'], $names, true ) ) {
+				if ( ! in_array( $redirect['from'], $sources, true ) || ! in_array( $redirect['to'], $names, true ) ) {
 					return $this->error( 400, 'invalid', 'The redirects must be between names of the site.' );
 				}
 			}
@@ -779,6 +830,7 @@ class FakeAgent implements Agent {
 			case 'site.cache_status':
 			case 'site.cron':
 			case 'site.workers':
+			case 'site.wp_address':
 				if ( ! isset( $this->state['sites'][ $vmid ][ $args['slug'] ] ) ) {
 					return 'unknown site';
 				}
@@ -838,7 +890,7 @@ class FakeAgent implements Agent {
 
 				if ( 'site.wp_login_link' === $op || 'site.wp_password_link' === $op ) {
 					$site = $this->state['sites'][ $vmid ][ $args['slug'] ];
-					$out  = array( 'url' => 'https://' . $site['host'] . ( 'site.wp_login_link' === $op ? '/?fake-login=1' : '/?fake-password=1' ) );
+					$out  = array( 'url' => 'https://' . ( $site['wp_address'] ?? $site['host'] ) . ( 'site.wp_login_link' === $op ? '/?fake-login=1' : '/?fake-password=1' ) );
 
 					// What the template plugin reports: the administrator it used (the installed one; a site that was not installed here has none to name).
 					if ( ! empty( $site['admin'] ) ) {
@@ -847,6 +899,10 @@ class FakeAgent implements Agent {
 					}
 
 					return $out;
+				}
+
+				if ( 'site.wp_address' === $op ) {
+					return $this->wp_address( $vmid, (string) $args['slug'], (string) $args['to'], ! empty( $args['dry_run'] ), (string) ( $args['from'] ?? '' ) );
 				}
 
 				if ( 'site.domains' === $op ) {
@@ -979,6 +1035,47 @@ class FakeAgent implements Agent {
 		}
 
 		return array( 'ok' => true );
+	}
+
+	/**
+	 * site.wp_address.
+	 *
+	 * @param int    $vmid   Container id.
+	 * @param string $slug   Site.
+	 * @param string $to     The name WordPress moves to.
+	 * @param bool   $dry    Count only.
+	 * @param string $args_from The customer's own address that may be replaced ('' for none).
+	 * @return array<string, mixed>|string
+	 */
+	private function wp_address( int $vmid, string $slug, string $to, bool $dry, string $args_from = '' ) {
+		$site  = $this->state['sites'][ $vmid ][ $slug ];
+		$names = array_merge( array( (string) $site['host'] ), (array) ( $site['domains'] ?? array() ) );
+		$from  = (string) ( $site['wp_address'] ?? $site['host'] );
+
+		if ( ! in_array( $to, $names, true ) ) {
+			return 'the address is not one of the names of the site';
+		}
+
+		if ( array() !== $this->state['wp_scripts'] ) {
+			return array_merge( array( 'changed' => false, 'from' => $from, 'to' => $to ), (array) array_shift( $this->state['wp_scripts'] ) );
+		}
+
+		if ( ! in_array( $from, $names, true ) && ( $args_from ?? '' ) !== $from ) {
+			return array( 'changed' => false, 'foreign' => true, 'from' => $from, 'to' => $to );
+		}
+
+		if ( $from === $to ) {
+			return array( 'changed' => false, 'unchanged' => true, 'from' => $from, 'to' => $to );
+		}
+
+		if ( $dry ) {
+			return array( 'changed' => false, 'dry_run' => true, 'from' => $from, 'to' => $to, 'replaced' => 12 );
+		}
+
+		$this->state['sites'][ $vmid ][ $slug ]['wp_address'] = $to;
+		$this->state['dumps'][ $vmid ][]                      = 'wpaddr';
+
+		return array( 'changed' => true, 'from' => $from, 'to' => $to, 'replaced' => 12, 'dump' => 'wpaddr', 'keep_days' => 7 );
 	}
 
 	/**

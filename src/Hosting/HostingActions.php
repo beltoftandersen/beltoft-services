@@ -147,6 +147,17 @@ final class HostingActions {
 	}
 
 	/**
+	 * Moves WordPress itself to one of the website's addresses (background job; see SiteWordPress).
+	 *
+	 * @param string $slug Site.
+	 * @param string $host The address, or '' for the main address.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function wordpress_address( string $slug, string $host = '' ) {
+		return $this->sites->wordpress_address( $slug, $host );
+	}
+
+	/**
 	 * Sends the account's current routes to the edge (a name became active or stopped being).
 	 *
 	 * @return true|\WP_Error

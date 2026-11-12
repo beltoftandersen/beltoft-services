@@ -372,6 +372,8 @@ final class HostingAccount {
 		$slug    = (string) $site['slug'];
 		$main    = (string) $site['main'];
 		$preview = (string) $site['preview'];
+		$wp      = (array) $site['wp'];
+		$own     = array() !== array_filter( $site['domains'], static fn( $d ) => 'preview' !== $d['kind'] );
 		$head    = '<a class="beltoft-hosting-link beltoft-hosting-panel__main" href="' . esc_url( 'https://' . $main . '/' ) . '" target="_blank" rel="noopener">' . esc_html( \BeltoftServices\Domains\HostName::display( $main ) ) . '</a>'
 			. '<span class="beltoft-hosting-status' . ( $ready ? ' is-ok' : '' ) . '">' . esc_html( $ready ? __( 'Online', 'beltoft-services' ) : __( 'Not ready', 'beltoft-services' ) ) . '</span>';
 
@@ -390,6 +392,10 @@ final class HostingAccount {
 				$notes[] = __( 'Temporary address', 'beltoft-services' );
 			} elseif ( $is_main ) {
 				$notes[] = __( 'Main address', 'beltoft-services' );
+			}
+
+			if ( $own && $d['host'] === $wp['address'] ) {
+				$notes[] = __( 'WordPress address', 'beltoft-services' );
 			}
 
 			if ( 'active' !== $d['state'] ) {
@@ -415,8 +421,10 @@ final class HostingAccount {
 
 		echo '</ul>';
 
+		self::print_wordpress( $slug, $site, $ready );
+
 		foreach ( $site['pairs'] as $pair ) {
-			self::print_pair( $slug, $pair, $ready );
+			self::print_pair( $slug, $pair, $ready, (string) $wp['address'] );
 		}
 
 		DnsGuide::render( $r, $site, $node, $ready );
@@ -459,7 +467,7 @@ final class HostingAccount {
 			echo '<div class="beltoft-hosting-buttons"><button type="button" class="beltoft-hosting-btn beltoft-hosting-btn--primary" data-hosting-action="login" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Log in to WordPress', 'beltoft-services' ) . '</button><button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="password" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Set a WordPress password', 'beltoft-services' ) . '</button></div>';
 		}
 
-		echo '<p class="beltoft-hosting-help">' . esc_html( sprintf( /* translators: %s: the website's WordPress sign-in address. */ __( 'You have no WordPress password until you set one. With a password you can log in at %s without this page.', 'beltoft-services' ), 'https://' . $preview . '/wp-login.php' ) ) . '</p>';
+		echo '<p class="beltoft-hosting-help">' . esc_html( sprintf( /* translators: %s: the website's WordPress sign-in address. */ __( 'You have no WordPress password until you set one. With a password you can log in at %s without this page.', 'beltoft-services' ), 'https://' . $wp['address'] . '/wp-login.php' ) ) . '</p>';
 		echo '</dd></div>';
 
 		// Cache.
@@ -483,6 +491,83 @@ final class HostingAccount {
 		}
 
 		self::panel_close();
+	}
+
+	/**
+	 * What the page says about the address WordPress itself uses, and the one button that goes with it. Nothing is printed
+	 * for a website without a domain of its own (WordPress is on the temporary address, as it has to be).
+	 *
+	 * @param string               $slug  Site.
+	 * @param array<string, mixed> $site  Site from HostingActions::sites().
+	 * @param bool                 $ready Whether the account takes changes.
+	 */
+	private static function print_wordpress( string $slug, array $site, bool $ready ): void {
+		$wp      = (array) $site['wp'];
+		$main    = (string) $site['main'];
+		$preview = (string) $site['preview'];
+		$show    = static fn( string $host ): string => \BeltoftServices\Domains\HostName::display( $host );
+		$own     = array_values( array_filter( $site['domains'], static fn( $d ) => 'preview' !== $d['kind'] ) );
+		$button  = null;
+		$line    = '';
+
+		if ( array() === $own && '' === $wp['moving'] && '' === $wp['note'] ) {
+			return;
+		}
+
+		if ( '' !== $wp['moving'] ) {
+			/* translators: %s: address. */
+			$line = sprintf( __( 'WordPress is being moved to %s. This can take a few minutes.', 'beltoft-services' ), $show( (string) $wp['moving'] ) );
+		} elseif ( 'unsupported' === $wp['note'] ) {
+			$line = __( 'Your hosting cannot move WordPress to another address yet. Contact support.', 'beltoft-services' );
+		} elseif ( 'foreign' === $wp['note'] ) {
+			$line = '' === $wp['seen']
+				? __( 'WordPress is set to an address you chose yourself. It was left as it is.', 'beltoft-services' )
+				/* translators: %s: address. */
+				: sprintf( __( 'WordPress is set to %s, an address you chose yourself. It was left as it is.', 'beltoft-services' ), $show( (string) $wp['seen'] ) );
+
+			if ( '' !== $wp['seen'] ) {
+				/* translators: 1: the address WordPress has now, 2: the main address. */
+				$button = array( $main, sprintf( __( 'Replace %1$s with %2$s in this website? A copy of the database is made first, and put back if the change fails.', 'beltoft-services' ), $show( (string) $wp['seen'] ), $show( $main ) ) );
+			}
+		} elseif ( 'failed' === $wp['note'] ) {
+			$line = __( 'Moving WordPress did not work. Your website was not changed.', 'beltoft-services' );
+		} elseif ( $wp['address'] !== $main ) {
+			$working = array() !== array_filter( $own, static fn( $d ) => $d['host'] === $wp['address'] && 'active' !== $d['state'] );
+
+			if ( $working ) {
+				/* translators: %s: address. */
+				$line = sprintf( __( 'WordPress uses %s, which does not point to your hosting now.', 'beltoft-services' ), $show( (string) $wp['address'] ) );
+			} else {
+				/* translators: %s: address. */
+				$line = sprintf( __( 'WordPress uses %s.', 'beltoft-services' ), $show( (string) $wp['address'] ) );
+			}
+		} elseif ( $main !== $preview && '' !== $wp['prev'] ) {
+			/* translators: %s: address. */
+			$line = sprintf( __( 'WordPress now uses %s.', 'beltoft-services' ), $show( (string) $wp['address'] ) );
+		}
+
+		if ( null === $button && $wp['address'] !== $main && in_array( $wp['note'], array( '', 'failed' ), true ) && '' === $wp['moving'] ) {
+			/* translators: %s: address. */
+			$button = array( $main, sprintf( __( 'Move WordPress to %s? A copy of the database is made first, and put back if the change fails.', 'beltoft-services' ), $show( $main ) ) );
+		}
+
+		if ( '' === $line && null === $button ) {
+			return;
+		}
+
+		echo '<p class="beltoft-hosting-line" data-wp-address>' . esc_html( $line );
+
+		if ( $ready && null !== $button ) {
+			/* translators: %s: address. */
+			echo ' <button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="wp_address" data-slug="' . esc_attr( $slug ) . '" data-host="' . esc_attr( $button[0] ) . '" data-confirm="' . esc_attr( $button[1] ) . '">' . esc_html( sprintf( __( 'Make %s the WordPress address', 'beltoft-services' ), $show( $button[0] ) ) ) . '</button>';
+		}
+
+		if ( $ready && null === $button && '' === $wp['moving'] && '' !== $wp['prev'] && $wp['prev'] !== $wp['address'] ) {
+			/* translators: %s: address. */
+			echo ' <button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="wp_address" data-slug="' . esc_attr( $slug ) . '" data-host="' . esc_attr( (string) $wp['prev'] ) . '" data-confirm="' . esc_attr( sprintf( __( 'Move WordPress back to %s? A copy of the database is made first, and put back if the change fails.', 'beltoft-services' ), $show( (string) $wp['prev'] ) ) ) . '">' . esc_html( sprintf( __( 'Go back to %s', 'beltoft-services' ), $show( (string) $wp['prev'] ) ) ) . '</button>';
+		}
+
+		echo '</p>';
 	}
 
 	/**
@@ -511,8 +596,9 @@ final class HostingAccount {
 	 * @param string               $slug  Site.
 	 * @param array<string, mixed> $pair  base, www, main, ready.
 	 * @param bool                 $ready Whether the account takes changes.
+	 * @param string               $wp_address The address WordPress uses.
 	 */
-	private static function print_pair( string $slug, array $pair, bool $ready ): void {
+	private static function print_pair( string $slug, array $pair, bool $ready, string $wp_address = '' ): void {
 		// Until both names point here there is nothing to choose: the DNS guide under the names says what to do first.
 		if ( ! $pair['ready'] ) {
 			return;
@@ -530,7 +616,10 @@ final class HostingAccount {
 			echo '<button type="button" class="beltoft-hosting-btn" data-hosting-action="set_main">' . esc_html__( 'Save', 'beltoft-services' ) . '</button>';
 		}
 
-		echo '<p class="beltoft-hosting-help">' . esc_html__( 'The other address redirects to the main address. This does not change the address set in WordPress.', 'beltoft-services' ) . '</p>';
+		// WordPress follows the choice when it is on a name of this pair; otherwise the choice leaves its address alone.
+		$follows = in_array( $wp_address, array( (string) $pair['base'], (string) $pair['www'] ), true );
+
+		echo '<p class="beltoft-hosting-help">' . esc_html( $follows ? __( 'The other address redirects to the main address. WordPress moves to the main address too.', 'beltoft-services' ) : __( 'The other address redirects to the main address. This does not change the address set in WordPress.', 'beltoft-services' ) ) . '</p>';
 
 		if ( '' === (string) $pair['main'] ) {
 			echo '<p class="beltoft-hosting-help">' . esc_html__( 'Both addresses show the website. Choose a main address to redirect the other one.', 'beltoft-services' ) . '</p>';

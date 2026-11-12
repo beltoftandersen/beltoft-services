@@ -99,6 +99,7 @@ final class Plugin {
 		Hosting\NodeHealth::register();
 		Hosting\HostingRefresh::register();
 		Hosting\DomainSweep::register();
+		Hosting\SiteWordPress::register();
 		Hosting\RestoreTest::register();
 		Mail\MailField::register();
 		Mail\MailSwitch::register();

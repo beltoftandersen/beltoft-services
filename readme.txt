@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.13.0
+Stable tag: 0.14.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -255,6 +255,11 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.14.0 =
+* Hosting: WordPress itself moves to the customer's own domain when it goes live. The agent copies the website's database first, replaces the temporary address in every table (links, serialized data and JSON, GUIDs left alone), sets the WordPress and site address, clears the caches, and puts the copy back when anything fails. The copy is kept for 7 days. It moves by itself when the first domain of a website is live (both names of a pair, and the DNS shows our address) and WordPress is still on the temporary address, and when the other name of a pair is chosen as the main address. A website whose WordPress address the customer set to something else is left alone.
+* The temporary address redirects to the main address once WordPress is on it, and stops when the domain stops pointing at the hosting. The sign-in and password links follow the WordPress address. A domain WordPress is on cannot be removed by the customer until another address is the WordPress address.
+* The website panel says which address WordPress uses and has the buttons "Make ... the WordPress address" and "Go back to ..." (for 7 days). Needs the node agent of this release; an older agent is left alone and nothing is shown.
 
 = 0.13.0 =
 * Hosting: the page cache is controlled from WordPress. A website is cached by its server only when its WordPress marks a page as cacheable, so with the page cache plugin deactivated, deleted or switched off nothing is cached. The My Account page shows, per website, whether the page cache and the object cache are on, and where to switch the page cache off.

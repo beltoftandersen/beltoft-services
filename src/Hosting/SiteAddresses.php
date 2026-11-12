@@ -15,7 +15,7 @@ defined( 'ABSPATH' ) || exit;
  * main address is the one stored in the `www_mode` column of the row of `host`: `apex` (host is main, www redirects),
  * `www` (www.host is main, host redirects) or '' (nothing redirects, both show the site). A redirect is only sent to the
  * node while both names of the pair are active, so a name that does not point here yet never loses a working name.
- * Nothing here changes the WordPress address of the website.
+ * Nothing here changes the WordPress address of the website: that is SiteWordPress, which asks these helpers which name is the main one.
  */
 final class SiteAddresses {
 
@@ -106,6 +106,34 @@ final class SiteAddresses {
 		}
 
 		return $out;
+	}
+
+	/**
+	 * The name without a leading www.
+	 *
+	 * @param string $host Host name.
+	 */
+	public static function base_of( string $host ): string {
+		return 0 === strpos( $host, 'www.' ) ? substr( $host, 4 ) : $host;
+	}
+
+	/**
+	 * Is the main address settled: a name that is no part of a with-and-without-www pair, or a name of a pair whose two names
+	 * are both active and one of them is chosen? WordPress is only moved to a settled main address, so it never lands on a
+	 * name of a pair while the other one is not working.
+	 *
+	 * @param array<int, array<string, mixed>> $rows The site's name rows.
+	 * @param string                           $main The main address.
+	 */
+	public static function settled( array $rows, string $main ): bool {
+		$pairs = self::pairs( $rows );
+		$base  = self::base_of( $main );
+
+		if ( ! isset( $pairs[ $base ] ) ) {
+			return true;
+		}
+
+		return 'active' === $pairs[ $base ][0]['state'] && 'active' === $pairs[ $base ][1]['state'] && '' !== self::main_of_pair( $base, $pairs[ $base ][0] );
 	}
 
 	/**

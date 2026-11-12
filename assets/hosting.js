@@ -84,6 +84,8 @@
 				var chosen = scope.querySelector( 'input[type="radio"]:checked' );
 
 				return chosen ? [ 'POST', base + '/domains/' + encodeURIComponent( chosen.value ) + '/main', {} ] : null;
+			case 'wp_address':
+				return ask( button.getAttribute( 'data-confirm' ) || '', button, [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/wordpress-address', { host: button.getAttribute( 'data-host' ) || '' } ], false );
 			case 'remove_domain':
 				return ask( text.confirmRemoveDomain || '', button, [ 'DELETE', base + '/domains/' + encodeURIComponent( button.getAttribute( 'data-host' ) || '' ), undefined ], true );
 			case 'files_password':
@@ -438,10 +440,11 @@
 				return;
 			}
 
-			say( panel, text.done || '' );
+			// A move of WordPress runs in the background: the answer says so.
+			say( panel, ( 'wp_address' === action && result.data && result.data.message ) || text.done || '' );
 			window.setTimeout( function () {
 				window.location.reload();
-			}, 800 );
+			}, 'wp_address' === action ? 2500 : 800 );
 		}, function () {
 			button.disabled = false;
 

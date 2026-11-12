@@ -95,6 +95,7 @@ final class DomainSweep {
 
 			if ( $r && 'ready' === $r->get( 'state' ) && 'ready' === $r->get( 'desired' ) ) {
 				( new HostingActions( $r ) )->sync_edge();
+				SiteWordPress::consider_all( $r );
 			}
 		}
 

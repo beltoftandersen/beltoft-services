@@ -28,6 +28,7 @@ defined( 'ABSPATH' ) || exit;
  * - GET    hosting/sites/<slug>/cache      what the node reports about the page cache and the object cache
  * - POST   hosting/sites/<slug>/login      a one-time WordPress sign-in address
  * - POST   hosting/sites/<slug>/password   a one-time address to WordPress's own "choose a new password" screen
+ * - POST   hosting/sites/<slug>/wordpress-address  host (empty: the main address): moves WordPress itself to that address (background)
  * - POST   hosting/sites/<slug>/domains    host
  * - DELETE hosting/domains/<host>
  * - POST   hosting/domains/<host>/main     the main address of a with-and-without-www pair (the other one redirects)
@@ -109,6 +110,12 @@ final class HostingRoutes {
 		) );
 		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/login', array( 'methods' => $post, 'callback' => array( __CLASS__, 'login_link' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ) );
 		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/password', array( 'methods' => $post, 'callback' => array( __CLASS__, 'password_link' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ) );
+		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/wordpress-address', array(
+			'methods'             => $post,
+			'callback'            => array( __CLASS__, 'wordpress_address' ),
+			'permission_callback' => 'is_user_logged_in',
+			'args'                => $id + $site + array( 'host' => array( 'type' => 'string', 'default' => '', 'description' => 'The address WordPress should use: the temporary address or a working address of the website. Empty: the main address.' ) ),
+		) );
 		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/domains', array(
 			'methods'             => $post,
 			'callback'            => array( __CLASS__, 'add_domain' ),
@@ -379,6 +386,17 @@ final class HostingRoutes {
 		}
 
 		return self::reply( $out );
+	}
+
+	/**
+	 * Moves WordPress to an address of the website, in the background. Its own hourly group: every move copies the database.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 */
+	public static function wordpress_address( \WP_REST_Request $request ): \WP_REST_Response {
+		$r = self::guard( $request, true, Routes::RATE_LIMIT, 'address', SiteWordPress::LIMIT );
+
+		return $r instanceof Resource ? self::reply( ( new HostingActions( $r ) )->wordpress_address( (string) $request['slug'], (string) $request['host'] ), 202 ) : $r;
 	}
 
 	public static function remove_domain( \WP_REST_Request $request ): \WP_REST_Response {

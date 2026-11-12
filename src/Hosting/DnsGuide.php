@@ -210,6 +210,7 @@ final class DnsGuide {
 
 		if ( $changed && 'ready' === $r->get( 'state' ) && 'ready' === $r->get( 'desired' ) ) {
 			( new HostingActions( $r ) )->sync_edge();
+			SiteWordPress::consider_all( $r );
 		}
 
 		return array( 'checked' => true, 'live' => $live, 'waiting' => $waiting );
