@@ -309,6 +309,71 @@ class DnsTest extends HostingCase {
 		$this->assertNull( SiteDns::check_external( 'unknown.example', $node ) );
 	}
 
+	public function test_a_live_external_name_that_goes_back_to_waiting_mails_the_admin_once_a_day(): void {
+		list( $r, , $node ) = $this->account();
+		$slug  = 'w' . $r->id();
+		$host  = 'offline' . $r->id() . '.elsewhere.example';
+		$user  = (int) $r->license()['user_id'];
+		$token = \BeltoftServices\Domains\Ownership::token( $user, $host );
+		$mails = array();
+
+		delete_transient( 'beltoft_services_domain_off_' . md5( $host ) );
+		add_filter(
+			'pre_wp_mail',
+			static function ( $pre, $atts ) use ( &$mails ) {
+				$mails[] = $atts;
+
+				return true;
+			},
+			10,
+			2
+		);
+
+		SiteDns::add_domain( $r, $slug, $host, $node );
+		$this->lookups( array( '198.51.100.7' ), array( $token ) );
+		$this->assertSame( 'active', SiteDns::check_external( $host, $node ) );
+		$this->assertCount( 0, $mails, 'Going live is not an alert.' );
+
+		// The proof disappears.
+		$this->lookups( array( '198.51.100.7' ), array() );
+		$this->assertSame( 'waiting', SiteDns::check_external( $host, $node ) );
+		$this->assertCount( 1, $mails );
+		$this->assertStringContainsString( 'Hosting name went back to waiting: ' . $host, $mails[0]['subject'] );
+		$this->assertStringContainsString( 'Host: ' . $host, $mails[0]['message'] );
+		$this->assertStringContainsString( 'Hosting resource: ' . $r->id(), $mails[0]['message'] );
+		$this->assertStringContainsString( 'Customer: ' . $user, $mails[0]['message'] );
+		$this->assertStringContainsString( 'ownership proof', $mails[0]['message'] );
+		$this->assertStringContainsString( 'missing', $mails[0]['message'] );
+		$this->assertStringNotContainsString( $token, $mails[0]['message'], 'No token in the mail.' );
+
+		// Waiting again later (and a name that was already waiting) sends nothing more; the name is held back for a day.
+		$this->assertSame( 'waiting', SiteDns::check_external( $host, $node ) );
+		$this->lookups( array( '198.51.100.7' ), array( $token ) );
+		$this->assertSame( 'active', SiteDns::check_external( $host, $node ) );
+		$this->lookups( array( '203.0.113.9' ), array() );
+		$this->assertSame( 'waiting', SiteDns::check_external( $host, $node ) );
+		$this->assertCount( 1, $mails, 'At most one mail a day for the name.' );
+
+		// The next day, the address part: it names that.
+		delete_transient( 'beltoft_services_domain_off_' . md5( $host ) );
+		$this->lookups( array( '198.51.100.7' ), array( $token ) );
+		SiteDns::check_external( $host, $node );
+		$this->lookups( array( '203.0.113.9' ), array() );
+		SiteDns::check_external( $host, $node );
+		$this->assertCount( 2, $mails );
+		$this->assertStringContainsString( 'no longer points at our address', $mails[1]['message'] );
+		$this->assertStringContainsString( '203.0.113.9', $mails[1]['message'] );
+
+		// A failed lookup changes nothing and sends nothing.
+		remove_all_filters( 'beltoft_services_dns_resolve' );
+		add_filter( 'beltoft_services_dns_resolve', fn() => new \WP_Error( 'down', 'down' ) );
+		$this->assertNull( SiteDns::check_external( $host, $node ) );
+		$this->assertCount( 2, $mails );
+
+		remove_all_filters( 'pre_wp_mail' );
+		remove_all_filters( 'beltoft_services_dns_resolve' );
+	}
+
 	public function test_subdomains_of_a_held_or_verified_domain_are_unlimited_and_need_no_proof_of_their_own(): void {
 		list( $r, $user, $node ) = $this->account();
 		$slug = 'w' . $r->id();

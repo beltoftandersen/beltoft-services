@@ -325,6 +325,39 @@ final class Alerts {
 	}
 
 	/**
+	 * Alerts the admin that a live outside name of a hosting account went back to waiting, so its website is no longer
+	 * served on that name. At most one mail a day for the name. Holds no token or secret: only the part that failed and
+	 * what the ownership look answered.
+	 *
+	 * @param Resource           $r      Hosting resource.
+	 * @param string             $host   Host name.
+	 * @param string             $part   address (the name no longer points at our address) or ownership (the proof is not found).
+	 * @param string             $status Ownership status (found, missing, unknown, support), or empty.
+	 * @param string             $reason Ownership reason, or empty.
+	 * @param array<int, string> $seen   Addresses the lookup showed for the name.
+	 * @return bool Whether a mail was sent.
+	 */
+	public static function domain_offline( Resource $r, string $host, string $part, string $status, string $reason, array $seen = array() ): bool {
+		$license = $r->license();
+		$what    = 'address' === $part ? 'The name no longer points at our address.' : 'The ownership proof (TXT record) is not found.';
+
+		return self::notify(
+			sprintf( 'Hosting name went back to waiting: %s', $host ),
+			array(
+				sprintf( 'Host: %s', $host ),
+				sprintf( 'Hosting resource: %d', $r->id() ),
+				sprintf( 'Customer: %d', (int) ( $license['user_id'] ?? 0 ) ),
+				sprintf( 'Failed: %s', $what ),
+				sprintf( 'Ownership check: %s', '' === $status ? 'not looked at (the name does not point at us)' : $status . ( '' === $reason ? '' : ' (' . $reason . ')' ) ),
+				sprintf( 'Addresses seen: %s', array() === $seen ? 'none' : implode( ', ', array_slice( $seen, 0, 10 ) ) ),
+				'The name was live and is no longer served on it. The sweep looks again every 15 minutes and puts it back when both parts are found.',
+			),
+			$r,
+			'beltoft_services_domain_off_' . md5( strtolower( $host ) )
+		);
+	}
+
+	/**
 	 * Alerts the admin that a deletion warning could not be sent: the service is not deleted until
 	 * the customer has been warned. The caller sends this once.
 	 *

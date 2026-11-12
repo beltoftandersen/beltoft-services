@@ -11,6 +11,7 @@ use BeltoftServices\Domains\DnsQuery;
 use BeltoftServices\Domains\Ownership;
 use BeltoftServices\Domains\ZoneAccess;
 use BeltoftServices\Domains\ZoneWriter;
+use BeltoftServices\Alerts;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
@@ -89,6 +90,13 @@ final class SiteDns {
 
 	/** The name being checked now: its own stored state does not answer for itself. */
 	private static string $excluding = '';
+
+	/**
+	 * What the last ownership look found (status and reason), for the admin mail when a name goes offline.
+	 *
+	 * @var array{status: string, reason: string}
+	 */
+	private static array $last_check = array( 'status' => '', 'reason' => '' );
 
 	/**
 	 * The customer of a hosting account.
@@ -391,6 +399,8 @@ final class SiteDns {
 			return null;
 		}
 
+		self::$last_check = array( 'status' => '', 'reason' => '' );
+
 		$edge  = self::edge( $node );
 		$found = DnsQuery::addresses( $host, 'A' );
 
@@ -414,7 +424,37 @@ final class SiteDns {
 
 		SiteDomains::set_state( $host, $state );
 
+		// A live name that went back to waiting is the admin's to know: the site is offline on that name until it is fixed.
+		if ( 'active' === $row['state'] && 'waiting' === $state ) {
+			self::tell_offline( (int) $row['resource_id'], $host, $points, $found );
+		}
+
 		return $state;
+	}
+
+	/**
+	 * Mails the admin that a live outside name went back to waiting (at most once a day for the name, see Alerts).
+	 * Never fails the check.
+	 *
+	 * @param int      $resource_id Hosting resource id.
+	 * @param string   $host        Host name.
+	 * @param bool     $points      Whether the name still points at our edge address.
+	 * @param string[] $found       The addresses the lookup showed.
+	 */
+	private static function tell_offline( int $resource_id, string $host, bool $points, array $found ): void {
+		$r = Resource::find( $resource_id );
+
+		if ( ! $r ) {
+			return;
+		}
+
+		$check = self::$last_check;
+
+		Alerts::quietly(
+			static function () use ( $r, $host, $points, $found, $check ): void {
+				Alerts::domain_offline( $r, $host, $points ? 'ownership' : 'address', (string) ( $check['status'] ?? '' ), (string) ( $check['reason'] ?? '' ), $found );
+			}
+		);
 	}
 
 	/**
@@ -430,13 +470,18 @@ final class SiteDns {
 	private static function proof( int $resource_id, string $host ): ?bool {
 		$user = self::owner( $resource_id );
 
+		self::$last_check = array( 'status' => '', 'reason' => '' );
+
 		if ( self::leans( $resource_id, $host ) ) {
 			self::mark( $resource_id, $host, false );
+			self::$last_check = array( 'status' => 'found', 'reason' => 'other_proof' );
 
 			return true;
 		}
 
 		$check = Ownership::check( $user, $host, array( self::proof_token( $resource_id, $host ) ), true );
+
+		self::$last_check = array( 'status' => (string) $check['status'], 'reason' => (string) $check['reason'] );
 
 		if ( 'unknown' === $check['status'] ) {
 			return null;
