@@ -92,6 +92,8 @@
 				return '' === field( scope, 'code' ) || '' === field( scope, 'ssh_key' ) ? null : [ 'POST', base + '/files/keys', { code: field( scope, 'code' ), key: field( scope, 'ssh_key' ) } ];
 			case 'remove_key':
 				return ask( text.confirmRemoveKey || '', button, [ 'DELETE', base + '/files/keys?fingerprint=' + encodeURIComponent( button.getAttribute( 'data-fingerprint' ) || '' ), undefined ], true );
+			case 'dns_check':
+				return [ 'POST', base + '/domains/' + encodeURIComponent( button.getAttribute( 'data-host' ) || '' ) + '/check', {} ];
 			case 'php_rollback':
 				return [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/php/rollback', {} ];
 			case 'cache':

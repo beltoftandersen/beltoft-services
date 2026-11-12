@@ -313,7 +313,7 @@ class SiteMailTest extends HostingCase {
 		\BeltoftServices\Hosting\HostingAccount::render( $r );
 		$html = (string) ob_get_clean();
 		wp_set_current_user( 0 );
-		$this->assertStringContainsString( 'Connect your own domain to a website to set up Email lite', $html );
+		$this->assertStringContainsString( 'Email lite gives you mailboxes on your own domain', $html );
 		$this->assertStringNotContainsString( 'data-hosting-action="enable_mail"', $html );
 
 		// Deleting the account has no mail step to run.

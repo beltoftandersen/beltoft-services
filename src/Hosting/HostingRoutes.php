@@ -117,6 +117,12 @@ final class HostingRoutes {
 			'permission_callback' => 'is_user_logged_in',
 			'args'                => $id + array( 'host' => array( 'type' => 'string', 'required' => true ) ),
 		) );
+		register_rest_route( $ns, $base . '/domains/(?P<host>[^/]+)/check', array(
+			'methods'             => $post,
+			'callback'            => array( __CLASS__, 'check_dns' ),
+			'permission_callback' => 'is_user_logged_in',
+			'args'                => $id + array( 'host' => array( 'type' => 'string', 'required' => true, 'description' => 'One of the names of a domain the customer points here: its DNS is looked up now.' ) ),
+		) );
 		register_rest_route( $ns, $base . '/domains/(?P<host>[^/]+)/main', array(
 			'methods'             => $post,
 			'callback'            => array( __CLASS__, 'set_main_address' ),
@@ -344,7 +350,20 @@ final class HostingRoutes {
 	}
 
 	public static function add_domain( \WP_REST_Request $request ): \WP_REST_Response {
-		return self::change( $request, static fn( HostingActions $a ) => $a->add_domain( (string) $request['slug'], (string) $request['host'] ) );
+		$r = self::guard( $request, true, Routes::RATE_LIMIT, 'change' );
+
+		if ( ! $r instanceof Resource ) {
+			return $r;
+		}
+
+		$out = ( new HostingActions( $r ) )->add_domain( (string) $request['slug'], (string) $request['host'] );
+
+		// A first look at the DNS right away, so the guide shows what is there and where the DNS is managed.
+		if ( is_array( $out ) && 'external' === ( $out['kind'] ?? '' ) && 'active' !== ( $out['state'] ?? '' ) && ! empty( $out['host'] ) ) {
+			DnsGuide::check( $r, (string) $out['host'] );
+		}
+
+		return self::reply( $out );
 	}
 
 	public static function remove_domain( \WP_REST_Request $request ): \WP_REST_Response {
@@ -411,6 +430,17 @@ final class HostingRoutes {
 
 	public static function mail_for_sites( \WP_REST_Request $request ): \WP_REST_Response {
 		return self::change( $request, static fn( HostingActions $a ) => $a->use_email_for_sites() );
+	}
+
+	/**
+	 * Looks the DNS of a domain up now, on the customer's request. Its own hourly group: every check asks the resolver.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 */
+	public static function check_dns( \WP_REST_Request $request ): \WP_REST_Response {
+		$r = self::guard( $request, true, Routes::RATE_LIMIT, 'dnscheck', DnsGuide::LIMIT );
+
+		return $r instanceof Resource ? self::reply( DnsGuide::check( $r, rawurldecode( (string) $request['host'] ) ) ) : $r;
 	}
 
 	public static function set_main_address( \WP_REST_Request $request ): \WP_REST_Response {

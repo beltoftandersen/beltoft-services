@@ -412,7 +412,7 @@ final class HostingAccount {
 			self::print_pair( $slug, $pair, $ready );
 		}
 
-		self::print_dns_help( $r, $site, $node );
+		DnsGuide::render( $r, $site, $node, $ready );
 
 		if ( $ready ) {
 			echo '<div class="beltoft-hosting-formrow" data-hosting-scope id="beltoft-site-' . esc_attr( $slug ) . '-connect"><label class="beltoft-hosting-field"><span>' . esc_html__( 'Connect a domain', 'beltoft-services' ) . '</span><input type="text" data-hosting-field="host" placeholder="example.com" autocomplete="off" autocapitalize="off" spellcheck="false"></label><button type="button" class="beltoft-hosting-btn" data-hosting-action="add_domain" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Connect', 'beltoft-services' ) . '</button></div>';
@@ -525,37 +525,6 @@ final class HostingAccount {
 		}
 
 		echo '</fieldset>';
-	}
-
-	/**
-	 * A name the customer points at us themselves: the records to add, including the proof that the name is theirs. The
-	 * www name of a pair needs no proof of its own while its other name is on the account.
-	 *
-	 * @param Resource             $r    Hosting resource.
-	 * @param array<string, mixed> $site Site.
-	 * @param array<string, mixed> $node Node settings.
-	 */
-	private static function print_dns_help( Resource $r, array $site, array $node ): void {
-		$mine  = array_column( $site['domains'], 'host' );
-
-		foreach ( SiteDomains::for_resource( $r->id() ) as $d ) {
-			if ( 'external' !== $d['kind'] || 'active' === $d['state'] || ! in_array( $d['host'], $mine, true ) ) {
-				continue;
-			}
-
-			$paired = 0 === strpos( $d['host'], 'www.' ) && in_array( substr( $d['host'], 4 ), $mine, true );
-			$rows   = array();
-
-			foreach ( SiteDns::instructions( $node, $d['host'], $r->id() ) as $row ) {
-				if ( $paired && 'TXT' === $row['type'] ) {
-					continue;
-				}
-
-				$rows[] = $row['type'] . ' ' . ( $row['name'] ?? $d['host'] ) . ' = ' . $row['value'];
-			}
-
-			echo '<p class="beltoft-hosting-notice">' . esc_html( sprintf( /* translators: 1: domain name, 2: DNS records. */ __( 'To use %1$s, add these DNS records at your DNS provider: %2$s. The website goes live when both are found.', 'beltoft-services' ), \BeltoftServices\Domains\HostName::display( $d['host'] ), implode( '; ', $rows ) ) ) . '</p>';
-		}
 	}
 
 	/**
@@ -687,7 +656,31 @@ final class HostingAccount {
 				echo '</p><p><a class="beltoft-hosting-link" href="' . esc_url( $url ) . '">' . esc_html__( 'Manage mailboxes', 'beltoft-services' ) . '</a>';
 			}
 		} elseif ( null === LiteMail::ready_domain( $r ) ) {
-			echo esc_html__( 'Connect your own domain to a website to set up Email lite. It is included with your plan and uses that domain.', 'beltoft-services' );
+			$sites   = Sites::for_resource( $r->id() );
+			$first   = $sites ? (string) ( reset( $sites )['slug'] ?? '' ) : '';
+			$waiting = '';
+
+			foreach ( SiteDomains::for_resource( $r->id() ) as $d ) {
+				if ( 'preview' !== $d['kind'] && 'active' !== $d['state'] && '' === $waiting ) {
+					$waiting = \BeltoftServices\Domains\HostName::display( Addons::registrable( (string) $d['host'] ) ?: (string) $d['host'] );
+				}
+			}
+
+			echo esc_html__( 'Email lite gives you mailboxes on your own domain, for example info@example.com. It is included with your plan.', 'beltoft-services' ) . '</p>';
+			echo '<ol class="beltoft-hosting-steps"><li>';
+
+			if ( '' !== $waiting ) {
+				echo esc_html( sprintf( /* translators: %s: domain name. */ __( '%s is connected and waits for its DNS. Follow the DNS steps under the website.', 'beltoft-services' ), $waiting ) );
+			} else {
+				echo esc_html__( 'Connect your own domain to a website.', 'beltoft-services' );
+
+				if ( '' !== $first && $ready ) {
+					echo ' <a class="beltoft-hosting-link" href="#beltoft-site-' . esc_attr( $first ) . '-connect">' . esc_html__( 'Connect a domain', 'beltoft-services' ) . '</a>';
+				}
+			}
+
+			echo '</li><li>' . esc_html__( 'When the domain is live, the button "Set up email" shows here. Press it.', 'beltoft-services' ) . '</li>';
+			echo '<li>' . esc_html__( 'Create your mailboxes under Email in your account.', 'beltoft-services' ) . '</li></ol><p>';
 		} else {
 			echo esc_html(
 				sprintf(

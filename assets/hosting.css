@@ -117,3 +117,29 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .beltof
 }
 /* A field the action cannot do without, left empty. */
 .beltoft-hosting [data-hosting-field][aria-invalid="true"] { border-color: var(--bs-status-fail, #a4372a); box-shadow: inset 0 0 0 1px var(--bs-status-fail, #a4372a); }
+/* The DNS guide of a domain the customer points here: steps, a table of records to copy, and the check. */
+.beltoft-hosting .beltoft-hosting-dns { margin: var(--bs-space-4, 16px) 0 0; padding: var(--bs-space-4, 16px); border: 1px solid var(--line, #d7ddd4); background: var(--bg-soft, #faf9f6); }
+.beltoft-hosting .beltoft-hosting-dns__title { margin: 0 0 var(--bs-space-2, 8px); font-size: var(--bs-fs-body, 15px); font-weight: var(--bs-fw-strong, 600); }
+.beltoft-hosting .beltoft-hosting-dns__steps { margin: 0 0 var(--bs-space-3, 12px); padding-left: 20px; font-size: var(--bs-fs-small, 14px); }
+.beltoft-hosting .beltoft-hosting-dns__steps li { margin: 0 0 4px; }
+.beltoft-hosting .beltoft-hosting-dns__table { width: 100%; margin: 0; border-collapse: collapse; font-size: var(--bs-fs-small, 14px); }
+.beltoft-hosting .beltoft-hosting-dns__table th { padding: 6px 12px 6px 0; border-bottom: 1px solid var(--line, #d7ddd4); color: var(--bsh-soft); font-size: var(--bs-fs-caption, 13px); font-weight: var(--bs-fw-medium, 500); text-align: left; }
+.beltoft-hosting .beltoft-hosting-dns__table td { padding: 10px 12px 10px 0; border-bottom: 1px solid var(--line-soft, #e4e8e1); vertical-align: top; }
+.beltoft-hosting .beltoft-hosting-dns__table code { display: inline-block; max-width: 100%; padding: 2px 6px; background: var(--bg-band, #eeede6); font-family: inherit; font-size: inherit; overflow-wrap: anywhere; }
+.beltoft-hosting .beltoft-hosting-dns__state { font-weight: var(--bs-fw-medium, 500); white-space: nowrap; }
+.beltoft-hosting .beltoft-hosting-dns__state.is-ok { color: var(--green, #28513e); }
+.beltoft-hosting .beltoft-hosting-dns__state.is-missing { color: var(--bs-status-warn, #8a5a00); }
+.beltoft-hosting .beltoft-hosting-dns__state.is-wrong { color: var(--bs-status-fail, #a4372a); white-space: normal; }
+.beltoft-hosting .beltoft-hosting-dns__check { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bs-space-2, 8px) var(--bs-space-4, 16px); margin: var(--bs-space-3, 12px) 0 0; }
+.beltoft-hosting .beltoft-hosting-dns__when { color: var(--bsh-soft); font-size: var(--bs-fs-small, 14px); }
+/* The main address choice: one line, a small Save. */
+.beltoft-hosting .beltoft-hosting-main { margin-top: var(--bs-space-3, 12px); }
+.beltoft-hosting .beltoft-hosting-main .beltoft-hosting-btn { width: auto; flex: 0 0 auto; }
+@media (max-width: 767px) {
+	.beltoft-hosting .beltoft-hosting-dns__table td { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; padding: 4px 0; border: 0; }
+	.beltoft-hosting .beltoft-hosting-dns__table td::before { content: attr(data-label); flex: 0 0 64px; color: var(--bsh-soft); font-size: var(--bs-fs-caption, 13px); }
+	.beltoft-hosting .beltoft-hosting-dns__table tr { padding: 8px 0; border-bottom: 1px solid var(--line-soft, #e4e8e1); }
+	.beltoft-hosting .beltoft-hosting-dns__check .beltoft-hosting-btn { width: 100%; }
+}
+.beltoft-hosting .beltoft-hosting-steps { margin: var(--bs-space-2, 8px) 0 0; padding-left: 20px; }
+.beltoft-hosting .beltoft-hosting-steps li { margin: 0 0 4px; }

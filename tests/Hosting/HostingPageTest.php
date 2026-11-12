@@ -673,4 +673,71 @@ class HostingPageTest extends HostingCase {
 		$this->assertStringContainsString( 'You can also set a WordPress password there', $row['message'] );
 		$this->assertSame( 'owner', \BeltoftServices\Hosting\HostingEmail::values( $r )['admin_user'] );
 	}
+
+	// -- The DNS guide ------------------------------------------------------------------------------------------
+
+	public function test_the_dns_guide_is_one_table_for_both_names_with_copy_buttons_and_a_check(): void {
+		$r = $this->account();
+		( new HostingActions( $r ) )->add_domain( 'w' . $r->id(), 'example.org' );
+		$html = $this->page( $r );
+
+		$this->assertSame( 1, substr_count( $html, 'class="beltoft-hosting-dns"' ), 'One guide for the name with and without www.' );
+		$this->assertStringContainsString( 'Point example.org to this website', $html );
+		$this->assertStringNotContainsString( 'To use ', $html );
+		$this->assertStringContainsString( 'data-copy="@"', $html );
+		$this->assertStringContainsString( 'data-copy="www"', $html );
+		$this->assertStringContainsString( 'data-copy="_beltoft-verify"', $html );
+		$this->assertStringContainsString( 'data-copy="198.51.100.7"', $html );
+		$this->assertStringContainsString( 'data-copy="' . \BeltoftServices\Hosting\SiteDns::proof_token( $r->id(), 'example.org' ) . '"', $html );
+		$this->assertSame( 1, substr_count( $html, 'data-copy="_beltoft-verify' ), 'The www name needs no proof of its own.' );
+		$this->assertStringContainsString( 'data-hosting-action="dns_check" data-host="example.org"', $html );
+		$this->assertStringContainsString( 'Not checked yet', $html );
+
+		$this->assertSame( '@', \BeltoftServices\Hosting\DnsGuide::label( 'example.org', 'example.org' ) );
+		$this->assertSame( 'shop', \BeltoftServices\Hosting\DnsGuide::label( 'shop.example.org', 'example.org' ) );
+		$this->assertSame( '_beltoft-verify.shop', \BeltoftServices\Hosting\DnsGuide::label( '_beltoft-verify.shop.example.org', 'example.org' ) );
+	}
+
+	public function test_check_now_looks_the_records_up_says_what_it_found_and_puts_the_names_live(): void {
+		$r    = $this->account();
+		$user = (int) $r->license()['user_id'];
+		( new HostingActions( $r ) )->add_domain( 'w' . $r->id(), 'example.org' );
+		$token = \BeltoftServices\Hosting\SiteDns::proof_token( $r->id(), 'example.org' );
+		add_filter( 'beltoft_services_hosting_dns_nameservers', static fn() => array( 'ns01.one.com', 'ns02.one.com' ) );
+
+		// The address points somewhere else and there is no proof yet.
+		remove_all_filters( 'beltoft_services_dns_resolve' );
+		add_filter( 'beltoft_services_dns_resolve', static fn( $pre, $name, $type ) => 'A' === $type ? array( '203.0.113.9' ) : array(), 10, 3 );
+		$res = $this->call( 'POST', $r->id() . '/hosting/domains/example.org/check', $user );
+		$this->assertSame( 200, $res->get_status() );
+		$this->assertSame( array( 'example.org', 'www.example.org' ), $res->get_data()['waiting'] );
+		$html = $this->page( $r );
+		$this->assertStringContainsString( 'Points to 203.0.113.9 now', $html );
+		$this->assertStringContainsString( 'Not found yet', $html );
+		$this->assertStringContainsString( 'it looks like one.com', $html );
+		$this->assertStringContainsString( 'Last checked', $html );
+
+		// Everything is in place: both names go live and the guide is gone.
+		remove_all_filters( 'beltoft_services_dns_resolve' );
+		add_filter( 'beltoft_services_dns_resolve', static fn( $pre, $name, $type ) => 'TXT' === $type ? array( $token ) : ( 'A' === $type ? array( '198.51.100.7' ) : array( '2001:db8::7' ) ), 10, 3 );
+		$res = $this->call( 'POST', $r->id() . '/hosting/domains/www.example.org/check', $user );
+		$this->assertSame( array( 'example.org', 'www.example.org' ), $res->get_data()['live'] );
+		$this->assertSame( 'active', SiteDomains::find( 'www.example.org' )['state'] );
+		$this->assertStringNotContainsString( 'class="beltoft-hosting-dns"', $this->page( $r ) );
+
+		// Somebody else's account, and a name that is not on the account.
+		$this->assertNotSame( 200, $this->call( 'POST', $r->id() . '/hosting/domains/example.org/check', self::factory()->user->create() )->get_status() );
+		$this->assertNotSame( 200, $this->call( 'POST', $r->id() . '/hosting/domains/other.example/check', $user )->get_status() );
+	}
+
+	public function test_the_mail_panel_says_the_steps_before_a_domain_is_connected(): void {
+		$r    = $this->account();
+		$html = $this->page( $r );
+
+		$this->assertStringContainsString( 'Email lite gives you mailboxes on your own domain', $html );
+		$this->assertStringContainsString( 'href="#beltoft-site-w' . $r->id() . '-connect"', $html );
+
+		( new HostingActions( $r ) )->add_domain( 'w' . $r->id(), 'example.org' );
+		$this->assertStringContainsString( 'example.org is connected and waits for its DNS', $this->page( $r ) );
+	}
 }
