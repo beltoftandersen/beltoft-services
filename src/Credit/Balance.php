@@ -37,6 +37,15 @@ final class Balance {
 	public const CHARGEBACK = 'chargeback';
 	public const ADJUST     = 'adjust';
 
+	/** The promotional part of a debit on an order (the paid part is kind invoice, same reference). */
+	public const PROMO_USE = 'promo_use';
+
+	/** The promotional part of what an order gives back (the paid part is kind adjust, same reference). */
+	public const PROMO_BACK = 'promo_back';
+
+	/** Option: the highest ledger id when credit was first split into promotional and paid parts. */
+	public const OPTION_SPLIT_FROM = 'beltoft_services_credit_split_from';
+
 	/**
 	 * Table name.
 	 */
@@ -203,6 +212,75 @@ final class Balance {
 		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT currency FROM %i WHERE user_id = %d ORDER BY id DESC LIMIT 1', self::table(), $user_id ), ARRAY_A );
 
 		return is_array( $row ) ? Currency::of_row( $row ) : null;
+	}
+
+	/**
+	 * The highest ledger id that existed before credit was split into promotional and paid parts. Invoice debits up to this id took
+	 * promotional credit first (the rule for what was spent before the split); later ones state their parts as separate rows. Stored once,
+	 * with add_option() (atomic: the first request wins and every later one reads the same value), and always before the first
+	 * split row is written (Invoice::apply and promo_left both ask for it). 0 on a shop with no ledger rows yet.
+	 */
+	public static function split_from(): int {
+		$value = get_option( self::OPTION_SPLIT_FROM );
+
+		if ( false !== $value && '' !== $value ) {
+			return (int) $value;
+		}
+
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
+		$max = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COALESCE( MAX( id ), 0 ) FROM %i', self::table() ) );
+		add_option( self::OPTION_SPLIT_FROM, (string) $max, '', false );
+
+		return (int) get_option( self::OPTION_SPLIT_FROM, $max );
+	}
+
+	/**
+	 * How much of the balance is promotional credit (kind promo: credit codes and admin grants). The rest is paid credit. Read only:
+	 * the stored balance is never touched, and the result is between 0 and the balance.
+	 *
+	 * The customer's ledger is walked in order:
+	 * - promo adds, promo_use takes away, promo_back adds back.
+	 * - An invoice debit up to split_from() took promotional credit first, then paid. A later one is paid only (its promotional part is its
+	 *   promo_use row). What an order gives back (kind adjust, reference order_return) goes back to promotional credit up to what that
+	 *   order's invoice debit took from it, the rest is paid.
+	 * - Any other debit (refund, chargeback, a correction) takes paid credit first, then promotional. Any other credit is paid.
+	 *
+	 * @param int $user_id Customer.
+	 */
+	public static function promo_left( int $user_id ): int {
+		global $wpdb;
+
+		$from = self::split_from();
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
+		$rows  = $wpdb->get_results( $wpdb->prepare( 'SELECT id, kind, amount_cents, ref_type, ref_id FROM %i WHERE user_id = %d ORDER BY id ASC', self::table(), $user_id ), ARRAY_A );
+		$promo = 0;
+		$total = 0;
+		$took  = array();
+
+		foreach ( is_array( $rows ) ? $rows : array() as $row ) {
+			$amount = (int) $row['amount_cents'];
+			$kind   = (string) $row['kind'];
+
+			if ( self::PROMO === $kind || self::PROMO_BACK === $kind ) {
+				$promo += $amount;
+			} elseif ( self::PROMO_USE === $kind ) {
+				$promo = max( 0, $promo + $amount );
+			} elseif ( self::INVOICE === $kind && $amount < 0 ) {
+				$part = (int) $row['id'] <= $from ? min( $promo, -$amount ) : 0;
+				$promo -= $part;
+				$took[ (string) $row['ref_id'] ] = $part;
+			} elseif ( self::ADJUST === $kind && Invoice::REF_RETURN === $row['ref_type'] && $amount > 0 ) {
+				$promo += min( $amount, $took[ (string) $row['ref_id'] ] ?? 0 );
+			} elseif ( $amount < 0 ) {
+				$promo = max( 0, $promo - max( 0, -$amount - max( 0, $total - $promo ) ) );
+			}
+
+			$total += $amount;
+		}
+
+		return max( 0, min( $promo, $total ) );
 	}
 
 	/**

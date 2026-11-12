@@ -23,4 +23,11 @@ final class Config {
 	public static function enabled(): bool {
 		return (bool) Settings::get( 'credit_enabled' );
 	}
+
+	/**
+	 * Is credit also applied to the renewal orders of other subscriptions? Needs account credit to be on.
+	 */
+	public static function renewals(): bool {
+		return self::enabled() && (bool) Settings::get( 'credit_renewals' );
+	}
 }

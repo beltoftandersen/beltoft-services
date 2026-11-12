@@ -155,7 +155,8 @@ final class Page {
 
 		return array(
 			'balance'  => Balance::get( $user_id ),
-			'history'  => Balance::history( $user_id, 20 ),
+			'promo'    => Balance::promo_left( $user_id ),
+			'history'  => self::merged( Balance::history( $user_id, 40 ), 20 ),
 			'amounts'  => $here ? Topup::amounts( $currency ) : array(),
 			'min'      => Topup::min( $currency ),
 			'max'      => Topup::max( $currency ),
@@ -217,6 +218,49 @@ final class Page {
 	}
 
 	/**
+	 * The history with the two rows of one order (the promotional and the paid part) as one line: the sum, the newest balance.
+	 *
+	 * @param array<int, array<string, mixed>> $rows  Ledger rows, newest first.
+	 * @param int                              $limit Lines.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function merged( array $rows, int $limit ): array {
+		$out  = array();
+		$at   = array();
+		$pair = array(
+			Balance::INVOICE    => 'use',
+			Balance::PROMO_USE  => 'use',
+			Balance::ADJUST     => 'back',
+			Balance::PROMO_BACK => 'back',
+		);
+
+		foreach ( $rows as $row ) {
+			$part = $pair[ $row['kind'] ] ?? '';
+			$key  = '' !== $part && in_array( $row['ref_type'], array( Invoice::REF_TYPE, Invoice::REF_RETURN ), true ) ? $part . '|' . $row['ref_type'] . '|' . $row['ref_id'] : '';
+
+			if ( '' !== $key && isset( $at[ $key ] ) ) {
+				$out[ $at[ $key ] ]['amount_cents'] = (string) ( (int) $out[ $at[ $key ] ]['amount_cents'] + (int) $row['amount_cents'] );
+
+				continue;
+			}
+
+			if ( '' !== $key ) {
+				$at[ $key ] = count( $out );
+			}
+
+			if ( Balance::PROMO_USE === $row['kind'] ) {
+				$row['kind'] = Balance::INVOICE;
+			} elseif ( Balance::PROMO_BACK === $row['kind'] ) {
+				$row['kind'] = Balance::ADJUST;
+			}
+
+			$out[] = $row;
+		}
+
+		return array_slice( $out, 0, $limit );
+	}
+
+	/**
 	 * The words for one history row: "Credit added: Welcome credit", "Credit correction: ...", else the note or the kind.
 	 *
 	 * @param array<string, mixed> $row Ledger row.
@@ -248,6 +292,8 @@ final class Page {
 			Balance::REFUND     => __( 'Refund', 'beltoft-services' ),
 			Balance::CHARGEBACK => __( 'Chargeback', 'beltoft-services' ),
 			Balance::ADJUST     => __( 'Adjustment', 'beltoft-services' ),
+			Balance::PROMO_USE  => __( 'Used on invoice', 'beltoft-services' ),
+			Balance::PROMO_BACK => __( 'Adjustment', 'beltoft-services' ),
 		);
 
 		return $labels[ $kind ] ?? $kind;

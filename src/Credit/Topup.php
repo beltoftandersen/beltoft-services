@@ -105,6 +105,14 @@ final class Topup {
 					'label'   => __( 'Account credit for pay as you go', 'beltoft-services' ),
 					'desc'    => __( 'Customers prepay a balance, without VAT. It is applied first to their Pay as you go usage invoices, which carry the VAT. Off, nothing about credit shows.', 'beltoft-services' ),
 				),
+				'credit_renewals' => array(
+					'tab'     => 'general',
+					'section' => 'credit',
+					'type'    => 'checkbox',
+					'default' => 0,
+					'label'   => __( 'Account credit pays renewals', 'beltoft-services' ),
+					'desc'    => __( 'Credit also pays the renewal orders of subscriptions, before the card is charged. Credit a customer paid for can pay any renewal. Promotional credit (credit codes and grants) pays pay as you go usage and the renewals of products that have the box "Promotional credit can pay renewals" ticked. A renewal whose rest for the card would be under the usage minimum is paid by the card in full. Needs account credit.', 'beltoft-services' ),
+				),
 				'credit_min' => array(
 					'tab'     => 'general',
 					'section' => 'credit',

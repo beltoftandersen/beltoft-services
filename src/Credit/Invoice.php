@@ -39,6 +39,7 @@ final class Invoice {
 		add_action( 'woocommerce_order_status_cancelled', array( __CLASS__, 'give_back' ) );
 		add_action( 'woocommerce_order_status_refunded', array( __CLASS__, 'give_back' ) );
 		add_action( 'woocommerce_order_status_failed', array( __CLASS__, 'failed' ) );
+		add_action( 'woocommerce_before_delete_order', array( __CLASS__, 'deleted' ) );
 		add_action( 'woocommerce_order_before_calculate_totals', array( __CLASS__, 'before_recalculate' ), 10, 2 );
 		add_action( 'woocommerce_order_after_calculate_totals', array( __CLASS__, 'after_recalculate' ), 10, 2 );
 	}
@@ -92,13 +93,32 @@ final class Invoice {
 	}
 
 	/**
+	 * Has credit been applied to this order (a debit row of either part)?
+	 *
+	 * @param \WC_Order $order Order.
+	 */
+	public static function applied( \WC_Order $order ): bool {
+		$id = (string) $order->get_id();
+
+		return Balance::exists( Balance::INVOICE, self::REF_TYPE, $id ) || Balance::exists( Balance::PROMO_USE, self::REF_TYPE, $id );
+	}
+
+	/**
 	 * Applies credit to an invoice whose lines, taxes and totals are final. Does not save the order.
 	 *
-	 * @param \WC_Order $order   The invoice.
-	 * @param int       $user_id The customer.
+	 * Promotional credit is spent first, then paid credit. A debit is up to two ledger rows with the order as reference: the promotional
+	 * part as kind promo_use and the paid part as kind invoice (the only row, as before, when no promotional credit is used). A usage
+	 * invoice takes both without limit. A renewal order (RenewalCredit) limits the promotional part with $promo_cap and asks for the
+	 * minimum rule: nothing is used when what is left for the card would be above 0 and under $min_rest cents. The limits and the balance
+	 * are read, and the rows written, under one balance lock.
+	 *
+	 * @param \WC_Order $order     The invoice.
+	 * @param int       $user_id   The customer.
+	 * @param int       $min_rest  Cents. With a rest for the card above 0 and under this, nothing is used (0: no such rule).
+	 * @param int|null  $promo_cap Most cents of promotional credit that may be used (null: no limit).
 	 * @return int Cents applied (0: none).
 	 */
-	public static function apply( \WC_Order $order, int $user_id ): int {
+	public static function apply( \WC_Order $order, int $user_id, int $min_rest = 0, ?int $promo_cap = null ): int {
 		if ( ! Config::enabled() || $user_id < 1 || (int) $order->get_id() < 1 || '' !== (string) $order->get_meta( self::META_USED ) ) {
 			return 0;
 		}
@@ -107,34 +127,52 @@ final class Invoice {
 
 		$wrong = '';
 
+		// Fixed before the first split row is written (see Balance::split_from()).
+		Balance::split_from();
+
 		list( $locked, $used ) = Balance::locked(
 			$user_id,
-			static function () use ( $order, $user_id, $currency, &$wrong ): int {
+			static function () use ( $order, $user_id, $currency, $min_rest, $promo_cap, &$wrong ): int {
 				$due     = Balance::cents( $order->get_total() );
 				// Only credit in the order's own currency is applied: a balance in another currency is never used on this invoice.
 				$balance = Balance::get_in( $user_id, $currency );
-				$cents   = min( $balance, $due );
 
 				if ( $balance < 1 && Balance::currency( $user_id ) !== '' && Balance::currency( $user_id ) !== $currency && Balance::get( $user_id ) > 0 ) {
 					$wrong = sprintf( 'Customer %1$d has credit in %2$s and invoice #%3$s is in %4$s. The credit was not applied.', $user_id, Balance::currency( $user_id ), $order->get_order_number(), $currency );
 				}
 
-				if ( $cents < 1 || Balance::exists( Balance::INVOICE, self::REF_TYPE, (string) $order->get_id() ) ) {
+				if ( min( $balance, $due ) < 1 || self::applied( $order ) ) {
 					return 0;
 				}
 
-				$debited = Balance::debit(
-					$user_id,
-					$cents,
-					Balance::INVOICE,
-					self::REF_TYPE,
-					(string) $order->get_id(),
-					/* translators: %s: order number. */
-					sprintf( __( 'Used on invoice #%s', 'beltoft-services' ), $order->get_order_number() ),
-					$currency
-				);
+				// Promotional credit first (within its cap), then paid credit for the rest.
+				$promo_left = Balance::promo_left( $user_id );
+				$promo      = min( $promo_left, null === $promo_cap ? $due : max( 0, $promo_cap ), $due );
+				$paid       = min( max( 0, $balance - $promo_left ), $due - $promo );
+				$cents      = $promo + $paid;
 
-				return $debited ? $cents : 0;
+				if ( $cents < 1 || ( $min_rest > 0 && $due - $cents > 0 && $due - $cents < $min_rest ) ) {
+					return 0;
+				}
+
+				$id = (string) $order->get_id();
+				/* translators: %s: order number. */
+				$note = sprintf( __( 'Used on invoice #%s', 'beltoft-services' ), $order->get_order_number() );
+
+				if ( $promo > 0 && ! Balance::debit( $user_id, $promo, Balance::PROMO_USE, self::REF_TYPE, $id, $note, $currency ) ) {
+					return 0;
+				}
+
+				if ( $paid > 0 && ! Balance::debit( $user_id, $paid, Balance::INVOICE, self::REF_TYPE, $id, $note, $currency ) ) {
+					// Never leave half a debit: the promotional part goes back, and nothing is applied.
+					if ( $promo > 0 ) {
+						Balance::credit( $user_id, $promo, Balance::PROMO_BACK, self::REF_RETURN, $id, $note, $currency );
+					}
+
+					return 0;
+				}
+
+				return $cents;
 			}
 		);
 
@@ -225,15 +263,53 @@ final class Invoice {
 			return 0;
 		}
 
-		$was = Balance::find( Balance::INVOICE, self::REF_TYPE, (string) $order->get_id() );
+		$id       = (string) $order->get_id();
+		$user_id  = (int) $order->get_customer_id();
+		$currency = (string) $order->get_currency();
+		/* translators: %s: order number. */
+		$note     = sprintf( __( 'Returned from invoice #%s', 'beltoft-services' ), $order->get_order_number() );
 
-		if ( ! $was || ! Balance::credit( (int) $order->get_customer_id(), abs( (int) $was['amount_cents'] ), Balance::ADJUST, self::REF_RETURN, (string) $order->get_id(), /* translators: %s: order number. */ sprintf( __( 'Returned from invoice #%s', 'beltoft-services' ), $order->get_order_number() ), (string) $order->get_currency() ) ) {
-			return 0;
+		// Each part goes back to where it came from, once (the unique key of each returning row).
+		list( , $back ) = Balance::locked(
+			$user_id,
+			static function () use ( $user_id, $id, $currency, $note ): int {
+				$sum   = 0;
+				$paid  = Balance::find( Balance::INVOICE, self::REF_TYPE, $id );
+				$promo = Balance::find( Balance::PROMO_USE, self::REF_TYPE, $id );
+
+				if ( $paid && Balance::credit( $user_id, abs( (int) $paid['amount_cents'] ), Balance::ADJUST, self::REF_RETURN, $id, $note, $currency ) ) {
+					$sum += abs( (int) $paid['amount_cents'] );
+				}
+
+				if ( $promo && Balance::credit( $user_id, abs( (int) $promo['amount_cents'] ), Balance::PROMO_BACK, self::REF_RETURN, $id, $note, $currency ) ) {
+					$sum += abs( (int) $promo['amount_cents'] );
+				}
+
+				return $sum;
+			}
+		);
+
+		$back = is_int( $back ) ? $back : 0;
+
+		if ( $back > 0 ) {
+			$order->add_order_note( sprintf( /* translators: %s: amount. */ __( 'Account credit returned: %s.', 'beltoft-services' ), Topup::label_amount( $back, $order->get_currency() ) ) );
 		}
 
-		$order->add_order_note( sprintf( /* translators: %s: amount. */ __( 'Account credit returned: %s.', 'beltoft-services' ), Topup::label_amount( abs( (int) $was['amount_cents'] ), $order->get_currency() ) ) );
+		return $back;
+	}
 
-		return abs( (int) $was['amount_cents'] );
+	/**
+	 * An order that is deleted while it is unpaid gives its credit back (an early renewal that failed is deleted by WooCommerce
+	 * Subscriptions). A paid order keeps what it used.
+	 *
+	 * @param mixed $order_id Order id.
+	 */
+	public static function deleted( $order_id ): void {
+		$order = wc_get_order( (int) $order_id );
+
+		if ( $order instanceof \WC_Order && self::used( $order ) > 0 && $order->has_status( array( 'pending', 'failed', 'on-hold' ) ) ) {
+			self::give_back( $order_id );
+		}
 	}
 
 	/**

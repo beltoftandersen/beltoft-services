@@ -48,6 +48,9 @@ $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 		<span class="beltoft-services-credit__amount"><?php echo esc_html( Page::money( $credit['balance'], $credit['currency'] ) ); ?></span>
 	</div>
 
+	<?php if ( ! empty( $credit['promo'] ) ) : ?>
+		<p class="beltoft-services-credit__note"><?php echo esc_html( sprintf( /* translators: %s: amount with currency. */ __( 'Of this, %s is promotional credit. It pays for pay as you go usage and for the services marked for it.', 'beltoft-services' ), Page::money( (int) $credit['promo'], $credit['currency'] ) ) ); ?></p>
+	<?php endif; ?>
 	<?php if ( $beltoft_services_reserve ) : ?>
 		<div class="beltoft-services-credit__balance">
 			<span class="beltoft-services-credit__label"><?php esc_html_e( 'Used so far this month (estimate)', 'beltoft-services' ); ?></span>

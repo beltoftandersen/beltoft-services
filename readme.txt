@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.9.5
+Stable tag: 0.10.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -62,6 +62,8 @@ For a site builder. The plugin never converts a price. It reads prices from WooC
 * `beltoft_services_user_currency( $code, $user_id )`: the currency a customer is in. Run at priority 5 by your connection; the plugin adds the customer's credit currency at 10 and their usage account at 20.
 * `beltoft_services_amount_setting( $value, $key, $currency )`: the amount of a setting in a currency (`usage_minimum`, `usage_threshold`, `usage_threshold_new`, `credit_min`, `credit_max`, `domain_price_overrides`). `$value` is null for a currency other than the shop's, and null back means "no amount": no early bill, no minimum, no top-ups, the domain extension is not sold.
 * `beltoft_services_guard_rate( $rate, $code )`, or the setting Guard rates (lines such as `DKK=7.60`, a little above the real rate): how many units of the currency are worth one euro. Used only to check that an order covers what a supplier is paid in euro. No rate: the order is refused and the admin is mailed once.
+* `beltoft_services_credit_applies_to_order( $applies, $order, $user_id )`: whether account credit may pay this renewal order (default true while "Account credit pays renewals" is on).
+* `beltoft_services_promo_credit_line( $allowed, $item, $order )`: whether promotional credit may pay this product line of a renewal order (default: the product's box "Promotional credit can pay renewals").
 * `beltoft_services_currencies( $codes )`: the currencies of the shop, for the currency field of a credit code.
 * `beltoft_services_price_html( $html, $amount, $currency, $context, $render )`: every catalogue price printed as markup passes it; `$render( 'incl' | 'excl' | '' )` renders the same price in a tax display, so a site can show both figures.
 * `beltoft_services_app_text( $text, $app_id, $field )`: the summary and getting-started text of a one-click app, after translation.
@@ -253,6 +255,10 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.10.0 =
+* Account credit can pay the renewal orders of subscriptions (setting "Account credit pays renewals", off by default). Credit a customer paid for pays any renewal, before the card is charged and only for the part the card would otherwise pay; promotional credit (credit codes and grants) pays pay as you go usage and the renewals of products with the box "Promotional credit can pay renewals". A renewal whose rest for the card would be under the usage minimum is paid by the card in full. The credit page says how much of the balance is promotional.
+* New filters `beltoft_services_credit_applies_to_order` and `beltoft_services_promo_credit_line`.
 
 = 0.9.5 =
 * Account pages: headings keep room above the block under them (server Access, Reinstall and Delete sections, API tokens and MCP, Credit).

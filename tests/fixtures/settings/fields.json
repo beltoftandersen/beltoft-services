@@ -165,6 +165,14 @@
         "label": "Account credit for pay as you go",
         "desc": "Customers prepay a balance, without VAT. It is applied first to their Pay as you go usage invoices, which carry the VAT. Off, nothing about credit shows."
     },
+    "credit_renewals": {
+        "tab": "general",
+        "section": "credit",
+        "type": "checkbox",
+        "default": 0,
+        "label": "Account credit pays renewals",
+        "desc": "Credit also pays the renewal orders of subscriptions, before the card is charged. Credit a customer paid for can pay any renewal. Promotional credit (credit codes and grants) pays pay as you go usage and the renewals of products that have the box \"Promotional credit can pay renewals\" ticked. A renewal whose rest for the card would be under the usage minimum is paid by the card in full. Needs account credit."
+    },
     "credit_min": {
         "tab": "general",
         "section": "credit",
