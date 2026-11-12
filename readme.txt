@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.18.0
+Stable tag: 0.19.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -259,6 +259,11 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.19.0 =
+* Hosting: when a live outside name of a hosting account goes back to waiting (it no longer points at our address, or the ownership proof is not found), the admin gets one mail a day for that name with the host, the hosting resource, the customer, the part that failed and the ownership check's answer. No token or secret is in it.
+* Hosting: after an account restore, its undo, or a restore of one website's files, the stored country block of each website is sent to the node again (`site.country_block`) by a background job (`beltoft_services_hosting_country_resend`). The restore is never held by it; a failure is tried again after 5 minutes, 30 minutes, 2 hours and 6 hours, then the admin is told. A website whose block was turned off is sent as off.
+* Email DNS: a daily look (`beltoft_services_mail_dns_recheck_all`, one look per domain hosted elsewhere whose records were found, spread over the hours after 03:40) reads all six records once. When MX, SPF or DKIM is no longer found (confirmed by a second read), the domain goes back to waiting, sending is held again when SPF or DKIM is missing, and the customer gets the existing missing-records email once. When the records return, the ten minute look lifts the hold as before. A failed lookup changes nothing; a domain on our name servers is never looked at this way.
 
 = 0.18.0 =
 * Hosting: a country block for each website, in a new Protection row of the hosting page. Off by default. The customer picks countries (names from WooCommerce's list, two ready lists: sanctioned countries and high-risk for logins, with a filter) and where it applies: the whole website, or the login and admin only (wp-login.php, xmlrpc.php, the admin area except admin-ajax.php and admin-post.php, the one-time login address, the file manager and the database tool). A blocked visitor gets a plain 403 from nginx in the website's container, before the page cache is read or written. The page warns and asks for a confirmation when the customer's own country is on the list (the country comes from the filter `beltoft_services_visitor_country`, the server variable BELTOFT_VISITOR_COUNTRY or WooCommerce's own geolocation database; nothing is sent to an outside service). New route `hosting/sites/<slug>/country-block` (GET and POST) and the filter `beltoft_services_hosting_country_lists`. Needs the node agent with the operation `site.country_block` and the country database on the node.
