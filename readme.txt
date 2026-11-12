@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.15.0
+Stable tag: 0.16.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -255,6 +255,10 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.16.0 =
+* Email DNS: MX, SPF and DKIM are needed; DMARC, autoconfig and autodiscover are recommended. The email domain's DNS counts as set up when the needed three are found. The recommended records are still checked and shown, never block, and are not named in the reminder email.
+* Outgoing mail of an email domain whose DNS is elsewhere is held until SPF and DKIM are found: mailboxes can still be made and can receive. The hold is the mail server's per-mailbox `smtp_access` attribute (new client call `set_smtp_access`), set on every mailbox of that domain only, lifted by the DNS check or Check now. A domain on our name servers is never held. The Email lite website mailbox follows the same rule. The email overview, each mailbox row and the new mailbox form say so.
 
 = 0.15.0 =
 * Domain ownership: one check and one proof record for hosting, email and DNS hosting. A customer adds one TXT record at `_beltoft-verify.<domain>` and it proves the domain for all their services here. The value is made from the customer and the domain (`beltoft-owner=...`); older values still work. A proof counts only for the same customer, for the domain and the names below it. Removes the 0.12.4 filter `beltoft_services_mail_domain_proven`; new filter `beltoft_services_domain_proven`.
