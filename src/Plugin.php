@@ -102,6 +102,7 @@ final class Plugin {
 		Hosting\HostingRefresh::register();
 		Hosting\DomainSweep::register();
 		Hosting\SiteWordPress::register();
+		Hosting\SiteStaging::register();
 		Hosting\RestoreTest::register();
 		Mail\MailField::register();
 		Mail\MailSwitch::register();

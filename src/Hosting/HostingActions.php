@@ -14,6 +14,7 @@ use BeltoftServices\Hosting\Actions\FilesActions;
 use BeltoftServices\Hosting\Actions\PhpActions;
 use BeltoftServices\Hosting\Actions\ToolActions;
 use BeltoftServices\Hosting\Actions\SiteActions;
+use BeltoftServices\Hosting\Actions\StagingActions;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -64,11 +65,89 @@ final class HostingActions {
 	private $country;
 
 	/**
+	 * The staging copy of a website.
+	 *
+	 * @var StagingActions
+	 */
+	private $staging;
+
+	/**
 	 * Backups, restore, undo, checklist.
 	 *
 	 * @var CareActions
 	 */
 	private $care;
+
+	/**
+	 * Where the staging copy of a website is now.
+	 *
+	 * @param string $slug Website.
+	 * @return array<string, mixed>|\WP_Error state, busy, note, failed, host.
+	 */
+	public function staging( string $slug ) {
+		return $this->staging->staging( $slug );
+	}
+
+	/**
+	 * Makes the staging copy of a website (in the background).
+	 *
+	 * @param string $slug Website.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function create_staging( string $slug ) {
+		return $this->staging->create_staging( $slug );
+	}
+
+	/**
+	 * Makes the staging copy again from the website (in the background).
+	 *
+	 * @param string $slug Website.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function refresh_staging( string $slug ) {
+		return $this->staging->refresh_staging( $slug );
+	}
+
+	/**
+	 * Pushes the staging copy to the website (in the background), after a safety point.
+	 *
+	 * @param string $slug       Website.
+	 * @param bool   $files_only Files only.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function push_staging( string $slug, bool $files_only = false ) {
+		return $this->staging->push_staging( $slug, $files_only );
+	}
+
+	/**
+	 * Puts the website back as it was before the last push (in the background).
+	 *
+	 * @param string $slug Website.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function undo_staging( string $slug ) {
+		return $this->staging->undo_staging( $slug );
+	}
+
+	/**
+	 * Deletes the staging copy of a website (in the background).
+	 *
+	 * @param string $slug Website.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function delete_staging( string $slug ) {
+		return $this->staging->delete_staging( $slug );
+	}
+
+	/**
+	 * A one-time WordPress sign-in address of the staging copy.
+	 *
+	 * @param string $slug Website.
+	 * @return array<string, mixed>|\WP_Error url.
+	 */
+	public function staging_login( string $slug ) {
+		return $this->staging->staging_login( $slug );
+	}
 
 	/**
 	 * File access: SFTP details and password, SSH keys.
@@ -87,6 +166,7 @@ final class HostingActions {
 		$this->tools  = new ToolActions( $r );
 		$this->addons = new AddonActions( $r );
 		$this->country = new CountryActions( $r );
+		$this->staging = new StagingActions( $r );
 		$this->care   = new CareActions( $r );
 	}
 

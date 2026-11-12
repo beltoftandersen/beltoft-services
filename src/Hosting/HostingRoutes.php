@@ -28,6 +28,13 @@ defined( 'ABSPATH' ) || exit;
  * - GET    hosting/sites/<slug>/cache      what the node reports about the page cache and the object cache
  * - GET    hosting/sites/<slug>/country-block  the country block of the website, the ready lists, the visitor's own country when known
  * - POST   hosting/sites/<slug>/country-block  countries (codes; empty turns it off), scope (site or login), confirm (true when the person's own country is on the list)
+ * - GET    hosting/sites/<slug>/staging         where the staging copy is now (state, busy)
+ * - POST   hosting/sites/<slug>/staging         makes the staging copy (background)
+ * - DELETE hosting/sites/<slug>/staging         deletes the staging copy (background)
+ * - POST   hosting/sites/<slug>/staging/refresh makes the copy again from the website (background)
+ * - POST   hosting/sites/<slug>/staging/push    files_only (true: the database and the media library stay): the copy goes live, after a safety point (background)
+ * - POST   hosting/sites/<slug>/staging/undo    puts the website back as it was before the last push, for 7 days (background)
+ * - POST   hosting/sites/<slug>/staging/login   a one-time WordPress sign-in address of the staging copy
  * - POST   hosting/sites/<slug>/login      a one-time WordPress sign-in address
  * - POST   hosting/sites/<slug>/password   a one-time address to WordPress's own "choose a new password" screen
  * - POST   hosting/sites/<slug>/files-link     a one-time address that opens the file manager of the website
@@ -125,6 +132,20 @@ final class HostingRoutes {
 				),
 			),
 		) );
+		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/staging', array(
+			array( 'methods' => \WP_REST_Server::READABLE, 'callback' => array( __CLASS__, 'staging_state' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ),
+			array( 'methods' => $post, 'callback' => array( __CLASS__, 'create_staging' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ),
+			array( 'methods' => \WP_REST_Server::DELETABLE, 'callback' => array( __CLASS__, 'delete_staging' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ),
+		) );
+		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/staging/refresh', array( 'methods' => $post, 'callback' => array( __CLASS__, 'refresh_staging' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ) );
+		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/staging/push', array(
+			'methods'             => $post,
+			'callback'            => array( __CLASS__, 'push_staging' ),
+			'permission_callback' => 'is_user_logged_in',
+			'args'                => $id + $site + array( 'files_only' => array( 'type' => 'boolean', 'default' => false, 'description' => 'True: only the files are pushed. The database and the media library of the live website stay as they are.' ) ),
+		) );
+		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/staging/undo', array( 'methods' => $post, 'callback' => array( __CLASS__, 'undo_staging' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ) );
+		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/staging/login', array( 'methods' => $post, 'callback' => array( __CLASS__, 'staging_login' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ) );
 		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/login', array( 'methods' => $post, 'callback' => array( __CLASS__, 'login_link' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ) );
 		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/files-link', array( 'methods' => $post, 'callback' => array( __CLASS__, 'files_link' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ) );
 		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/database-link', array( 'methods' => $post, 'callback' => array( __CLASS__, 'database_link' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ) );
@@ -430,6 +451,55 @@ final class HostingRoutes {
 		$r = self::guard( $request, true, Routes::RATE_LIMIT, 'address', SiteWordPress::LIMIT );
 
 		return $r instanceof Resource ? self::reply( ( new HostingActions( $r ) )->wordpress_address( (string) $request['slug'], (string) $request['host'] ), 202 ) : $r;
+	}
+
+	/**
+	 * Where the staging copy is now: the page asks while a job runs.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 */
+	public static function staging_state( \WP_REST_Request $request ): \WP_REST_Response {
+		$r = self::guard( $request, false, Routes::STATUS_RATE_LIMIT );
+
+		return $r instanceof Resource ? self::reply( ( new HostingActions( $r ) )->staging( (string) $request['slug'] ) ) : $r;
+	}
+
+	/**
+	 * One of the staging changes. Their own hourly group: each one copies a website.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @param callable         $do      fn( HostingActions ): array|\WP_Error.
+	 */
+	private static function staging_change( \WP_REST_Request $request, callable $do ): \WP_REST_Response {
+		$r = self::guard( $request, true, Routes::RATE_LIMIT, 'staging', SiteStaging::LIMIT );
+
+		return $r instanceof Resource ? self::reply( $do( new HostingActions( $r ) ), 202 ) : $r;
+	}
+
+	public static function create_staging( \WP_REST_Request $request ): \WP_REST_Response {
+		return self::staging_change( $request, static fn( HostingActions $a ) => $a->create_staging( (string) $request['slug'] ) );
+	}
+
+	public static function delete_staging( \WP_REST_Request $request ): \WP_REST_Response {
+		return self::staging_change( $request, static fn( HostingActions $a ) => $a->delete_staging( (string) $request['slug'] ) );
+	}
+
+	public static function refresh_staging( \WP_REST_Request $request ): \WP_REST_Response {
+		return self::staging_change( $request, static fn( HostingActions $a ) => $a->refresh_staging( (string) $request['slug'] ) );
+	}
+
+	public static function push_staging( \WP_REST_Request $request ): \WP_REST_Response {
+		return self::staging_change( $request, static fn( HostingActions $a ) => $a->push_staging( (string) $request['slug'], true === $request['files_only'] ) );
+	}
+
+	public static function undo_staging( \WP_REST_Request $request ): \WP_REST_Response {
+		return self::staging_change( $request, static fn( HostingActions $a ) => $a->undo_staging( (string) $request['slug'] ) );
+	}
+
+	public static function staging_login( \WP_REST_Request $request ): \WP_REST_Response {
+		$r = self::guard( $request, true, Routes::RATE_LIMIT, 'login', self::LOGIN_LIMIT );
+
+		return $r instanceof Resource ? self::reply( ( new HostingActions( $r ) )->staging_login( (string) $request['slug'] ) ) : $r;
 	}
 
 	public static function remove_domain( \WP_REST_Request $request ): \WP_REST_Response {

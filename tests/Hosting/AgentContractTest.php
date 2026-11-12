@@ -34,6 +34,19 @@ class AgentContractTest extends TestCase {
 		'ct.release'        => array(),
 		'ct.refresh'        => array(),
 		'backup.restore_test' => array(),
+		'site.staging_create' => array( 'copy', 'host' ),
+		'site.staging_push'   => array( 'files_only' ),
+		'site.staging_refresh' => array(),
+		'site.staging_undo'   => array(),
+		'site.staging_delete' => array(),
+	);
+
+	/**
+	 * Arguments the agent branch `staging-copies` adds to an operation as required ones (the contract file next to this
+	 * repository is the main branch's until that branch is merged). Remove an entry when the contract file has it.
+	 */
+	private const REQUIRED_ADDITIONS = array(
+		'site.staging_create' => array( 'copy', 'host' ),
 	);
 
 	/**
@@ -100,6 +113,12 @@ class AgentContractTest extends TestCase {
 			$this->assertArrayHasKey( $op, FakeAgent::OPERATIONS );
 
 			foreach ( $names as $name ) {
+				if ( in_array( $name, self::REQUIRED_ADDITIONS[ $op ] ?? array(), true ) ) {
+					$this->assertTrue( (bool) FakeAgent::OPERATIONS[ $op ][ $name ][1], $op . ' ' . $name . ' is required by the agent branch that adds it.' );
+
+					continue;
+				}
+
 				$this->assertFalse( (bool) FakeAgent::OPERATIONS[ $op ][ $name ][1], $op . ' ' . $name . ' is optional, so an older agent contract still works.' );
 			}
 		}

@@ -10,7 +10,7 @@ namespace BeltoftServices\Hosting;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Builds the list of routes the edge needs for one account: every host name of its sites and the container's
+ * Builds the list of routes the edge needs for one account: every host name of its sites (and of their staging copies) and the container's
  * private address behind it. In this version a site has its preview name only (`<slug>.<preview zone>`); the
  * domain records of the plan (own and external domains) extend this later. A suspended account keeps its routes
  * with the flag set, so the edge shows its suspended page instead of the site.
@@ -72,6 +72,7 @@ final class EdgeMap {
 			}
 		}
 
-		return $routes;
+		// The staging copies of the websites, each on its own temporary address.
+		return array_merge( $routes, SiteStaging::routes( $resource_id, (string) $record['ip'], $suspended ) );
 	}
 }

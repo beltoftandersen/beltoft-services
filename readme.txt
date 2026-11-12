@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.19.0
+Stable tag: 0.20.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -259,6 +259,10 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.20.0 =
+* Hosting: a staging copy for each website, in a new Staging row of the hosting page. "Create staging copy" copies the files and the database of the website to a temporary address of its own (the website's name and `-stg`, in the preview zone) and moves WordPress in the copy to that address. The copy sends no email, is not shown to search engines (nginx header and WordPress setting), runs no scheduled tasks and has no page cache. It does not count as a website. The plan field Staging sets one copy for the account (`one`) or one for each website (`per_site`); no copy is made when more than half of the plan's storage is used. Buttons: "Open staging" (a one-time WordPress sign-in link for the copy), "Push to live", "Refresh from live" and "Delete staging copy". A push is "Files and database" (with a warning that orders, customers and comments made on the live website since the copy was made are replaced) or "Files only" (the database and the media library of the live website stay). Before every push the node makes a safety point of the live website (its files as hard links, and a dump of its database for a push with the database), WordPress goes back to the live address after the push, and "Undo last push" is offered for 7 days. A push that fails is put back by the node. Every step runs in the background and the page shows where it is. New routes under `hosting/sites/<slug>/staging` (GET, POST, DELETE, `refresh`, `push`, `undo`, `login`); needs the node agent with the operations `site.staging_create`, `site.staging_refresh`, `site.staging_push`, `site.staging_undo` and `site.staging_delete`.
+* The temporary address of a staging copy is held for it, so no website can take it.
 
 = 0.19.0 =
 * Hosting: when a live outside name of a hosting account goes back to waiting (it no longer points at our address, or the ownership proof is not found), the admin gets one mail a day for that name with the host, the hosting resource, the customer, the part that failed and the ownership check's answer. No token or secret is in it.

@@ -18,6 +18,7 @@ use BeltoftServices\Hosting\SiteAddresses;
 use BeltoftServices\Hosting\SiteDns;
 use BeltoftServices\Hosting\SiteDomains;
 use BeltoftServices\Hosting\SiteNames;
+use BeltoftServices\Hosting\SiteStaging;
 use BeltoftServices\Hosting\SiteWordPress;
 use BeltoftServices\Hosting\Sites;
 
@@ -86,6 +87,7 @@ final class SiteActions {
 				'admin_user'  => (string) ( $site['flags']['admin_user'] ?? '' ),
 				'admin_email' => (string) ( $site['flags']['admin_email'] ?? '' ),
 				'country'     => \BeltoftServices\Hosting\CountryBlock::view( $site ),
+				'staging'     => SiteStaging::view( $site ),
 			);
 		}
 
@@ -149,6 +151,11 @@ final class SiteActions {
 
 		// A name this account was adding and could not finish (and could not clean up) is picked up again, not refused.
 		if ( null !== $found && ! $resuming ) {
+			return $this->error( 'exists', __( 'That site name is taken. Choose another.', 'beltoft-services' ) );
+		}
+
+		// The temporary address of a staging copy is taken too, though it is no website.
+		if ( ! $resuming && Sites::taken( $slug ) ) {
 			return $this->error( 'exists', __( 'That site name is taken. Choose another.', 'beltoft-services' ) );
 		}
 
@@ -324,6 +331,10 @@ final class SiteActions {
 			return $this->error( 'limit', __( 'The last website of an account cannot be removed.', 'beltoft-services' ) );
 		}
 
+		if ( SiteStaging::view( $site )['busy'] ) {
+			return $this->error( 'busy', __( 'The staging copy of this website is being changed. Try again when that is done.', 'beltoft-services' ) );
+		}
+
 		$record = (array) Records::for_resource( $this->r->id() );
 
 		$done = $this->call( 'site_del_' . $slug, 'site.delete', array( 'vmid' => (int) $record['vmid'], 'slug' => $slug ) );
@@ -353,6 +364,13 @@ final class SiteActions {
 					return $this->error( 'busy', __( 'The names of the website could not be removed yet. Try again in a moment.', 'beltoft-services' ) );
 				}
 			}
+		}
+
+		// The node removed the website's staging copy with it; the copy's temporary address goes too.
+		$released = SiteStaging::release( $this->r, $site, $this->node );
+
+		if ( is_wp_error( $released ) ) {
+			return $this->error( 'busy', __( 'The names of the website could not be removed yet. Try again in a moment.', 'beltoft-services' ) );
 		}
 
 		Sites::remove( $this->r->id(), $slug );

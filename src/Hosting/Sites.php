@@ -98,7 +98,14 @@ final class Sites {
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- read fresh.
-		return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE slug = %s', Schema::tables()['hosting_sites'], $slug ) ) > 0;
+		if ( (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE slug = %s', Schema::tables()['hosting_sites'], $slug ) ) > 0 ) {
+			return true;
+		}
+
+		// The temporary address of a staging copy is in use too (it belongs to no website).
+		$host = EdgeMap::preview_host( $slug );
+
+		return '' !== $host && null !== SiteDomains::find( $host );
 	}
 
 	/** How long a name chosen at checkout is held for the customer who chose it. */

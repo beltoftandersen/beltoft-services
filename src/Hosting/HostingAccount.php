@@ -504,6 +504,7 @@ final class HostingAccount {
 
 		echo '<p class="beltoft-hosting-help">' . esc_html__( 'Opens phpMyAdmin for the database of this website in a new tab. You do not need a password. The tab ends after 30 minutes without use.', 'beltoft-services' ) . '</p></dd></div>';
 
+		self::print_staging( $slug, (array) $site['staging'], $ready, $limits );
 		self::print_protection( $slug, (array) $site['country'], $ready );
 
 		echo '</dl>';
@@ -513,6 +514,108 @@ final class HostingAccount {
 		}
 
 		self::panel_close();
+	}
+
+	/**
+	 * The staging copy of a website: what it is, its state while a job runs (the page asks the node's state every few seconds
+	 * and reloads when the job is done), and the buttons that go with the state.
+	 *
+	 * @param string               $slug   Site.
+	 * @param array<string, mixed> $v      SiteStaging::view().
+	 * @param bool                 $ready  Whether the account takes changes.
+	 * @param array<string, mixed> $limits Ceilings.
+	 */
+	private static function print_staging( string $slug, array $v, bool $ready, array $limits ): void {
+		$when = static fn( int $time ): string => wp_date( 'j F Y, H:i', $time );
+		$id   = 'beltoft-staging-' . $slug;
+		$busy = array(
+			'creating'   => __( 'The staging copy is being made. This can take a few minutes.', 'beltoft-services' ),
+			'refreshing' => __( 'The staging copy is being refreshed from the live website. This can take a few minutes.', 'beltoft-services' ),
+			'pushing'    => __( 'The staging copy is being pushed to the live website. The live website may show a maintenance message for a short time.', 'beltoft-services' ),
+			'undoing'    => __( 'The last push is being undone. The live website may show a maintenance message for a short time.', 'beltoft-services' ),
+			'deleting'   => __( 'The staging copy is being deleted.', 'beltoft-services' ),
+		);
+		$fail = array(
+			'create'  => __( 'The staging copy could not be made. Your website was not changed.', 'beltoft-services' ),
+			'refresh' => __( 'The staging copy could not be refreshed. Your website was not changed. Refresh it again, or delete it.', 'beltoft-services' ),
+			'push'    => __( 'The push did not work. Your live website was put back as it was.', 'beltoft-services' ),
+			'undo'    => __( 'The undo did not work. Try again, or contact support.', 'beltoft-services' ),
+			'delete'  => __( 'The staging copy could not be deleted. Try again.', 'beltoft-services' ),
+		);
+
+		echo '<div><dt>' . esc_html__( 'Staging', 'beltoft-services' ) . '</dt><dd>';
+
+		if ( $v['busy'] ) {
+			echo '<p class="beltoft-hosting-line" data-staging-busy data-slug="' . esc_attr( $slug ) . '" role="status">' . esc_html( $busy[ $v['state'] ] ?? '' ) . '</p>';
+		} else {
+			if ( '' !== $v['note'] ) {
+				if ( 'unsupported' === $v['note'] ) {
+					$words = __( 'Your hosting cannot do this yet. Contact support.', 'beltoft-services' );
+				} elseif ( 'unsafe' === $v['note'] ) {
+					$words = __( 'The push did not work and the live website could not be put back automatically. Support has been told.', 'beltoft-services' );
+				} else {
+					$words = (string) ( $fail[ $v['failed'] ] ?? __( 'That did not work. Try again, or contact support.', 'beltoft-services' ) );
+				}
+
+				echo '<p class="beltoft-hosting-warning" data-staging-note>' . esc_html( $words ) . '</p>';
+			}
+
+			if ( $v['exists'] ) {
+				echo '<p class="beltoft-hosting-line" data-staging-state>';
+				/* translators: %s: the address of the staging copy. */
+				echo wp_kses( sprintf( esc_html__( 'Staging copy: %s.', 'beltoft-services' ), '<a class="beltoft-hosting-link" href="' . esc_url( 'https://' . $v['host'] . '/' ) . '" target="_blank" rel="noopener">' . esc_html( \BeltoftServices\Domains\HostName::display( (string) $v['host'] ) ) . '</a>' ), array( 'a' => array( 'class' => true, 'href' => true, 'target' => true, 'rel' => true ) ) );
+
+				if ( $v['at'] > 0 ) {
+					/* translators: %s: date and time. */
+					echo ' ' . esc_html( sprintf( __( 'Made on %s.', 'beltoft-services' ), $when( (int) $v['at'] ) ) );
+				}
+
+				if ( $v['refreshed'] > 0 ) {
+					/* translators: %s: date and time. */
+					echo ' ' . esc_html( sprintf( __( 'Refreshed from the live website on %s.', 'beltoft-services' ), $when( (int) $v['refreshed'] ) ) );
+				}
+
+				echo '</p>';
+
+				if ( $ready ) {
+					$files = __( 'Push the staging copy to the live website? Its files replace the files of the live website. The database and the media library of the live website stay as they are. A safety point of the live website is made first, and you can undo the push for 7 days.', 'beltoft-services' );
+					$both  = __( 'Push the staging copy to the live website? Its files and its database replace those of the live website. Orders, customers, comments and other changes made on the live website since the copy was made are lost. A safety point of the live website is made first, and you can undo the push for 7 days.', 'beltoft-services' );
+
+					echo '<div class="beltoft-hosting-buttons">';
+					echo '<button type="button" class="beltoft-hosting-btn beltoft-hosting-btn--primary" data-hosting-action="staging_open" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Open staging', 'beltoft-services' ) . '</button>';
+					echo '<button type="button" class="beltoft-hosting-btn" data-hosting-action="staging_edit" aria-expanded="false" aria-controls="' . esc_attr( $id ) . '">' . esc_html__( 'Push to live', 'beltoft-services' ) . '</button>';
+					echo '<button type="button" class="beltoft-hosting-btn" data-hosting-action="staging_refresh" data-slug="' . esc_attr( $slug ) . '" data-confirm="' . esc_attr__( 'Refresh the staging copy from the live website? Changes made only in the staging copy are lost.', 'beltoft-services' ) . '">' . esc_html__( 'Refresh from live', 'beltoft-services' ) . '</button>';
+					echo '<button type="button" class="beltoft-hosting-linkbtn beltoft-hosting-linkbtn--danger" data-hosting-action="staging_delete" data-slug="' . esc_attr( $slug ) . '" data-confirm="' . esc_attr__( 'Delete the staging copy? Its files and its database are deleted. The live website is not changed.', 'beltoft-services' ) . '">' . esc_html__( 'Delete staging copy', 'beltoft-services' ) . '</button>';
+					echo '</div>';
+					echo '<div class="beltoft-hosting-secure" id="' . esc_attr( $id ) . '" data-staging-form hidden>';
+					echo '<fieldset class="beltoft-hosting-fieldset"><legend>' . esc_html__( 'What to push', 'beltoft-services' ) . '</legend>';
+					echo '<label class="beltoft-hosting-radio"><input type="radio" name="' . esc_attr( $id ) . '-what" value="full" data-confirm="' . esc_attr( $both ) . '" checked> <span>' . esc_html__( 'Files and database', 'beltoft-services' ) . '</span></label> ';
+					echo '<label class="beltoft-hosting-radio"><input type="radio" name="' . esc_attr( $id ) . '-what" value="files" data-confirm="' . esc_attr( $files ) . '"> <span>' . esc_html__( 'Files only', 'beltoft-services' ) . '</span></label>';
+					echo '<p class="beltoft-hosting-warning">' . esc_html__( 'Files and database: orders, customers, comments and other changes made on the live website since the staging copy was made are replaced.', 'beltoft-services' ) . '</p>';
+					echo '<p class="beltoft-hosting-help">' . esc_html__( 'Files only: themes, plugins and other files are pushed. The database and the media library of the live website stay as they are.', 'beltoft-services' ) . '</p></fieldset>';
+					echo '<div class="beltoft-hosting-buttons"><button type="button" class="beltoft-hosting-btn" data-hosting-action="staging_push" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Push to live', 'beltoft-services' ) . '</button><button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="staging_cancel">' . esc_html__( 'Cancel', 'beltoft-services' ) . '</button></div></div>';
+				}
+			} elseif ( $ready ) {
+				if ( 'one' === (string) ( $limits['staging'] ?? 'one' ) && (int) ( $limits['staging_used'] ?? 0 ) > 0 ) {
+					echo '<p class="beltoft-hosting-line">' . esc_html__( 'Your plan includes one staging copy, and another website has it.', 'beltoft-services' ) . '</p>';
+				} else {
+					echo '<div class="beltoft-hosting-buttons"><button type="button" class="beltoft-hosting-btn" data-hosting-action="staging_create" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Create staging copy', 'beltoft-services' ) . '</button></div>';
+				}
+			}
+
+			if ( $ready && null !== $v['undo'] ) {
+				$full = 'full' === $v['undo']['scope'];
+				$ask  = $full
+					? __( 'Undo the last push? The live website goes back to how it was before the push, its files and its database. Orders, comments and other changes made on the live website since the push are lost.', 'beltoft-services' )
+					: __( 'Undo the last push? The files of the live website go back to how they were before the push. The database is not changed.', 'beltoft-services' );
+
+				echo '<p class="beltoft-hosting-line"><button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="staging_undo" data-slug="' . esc_attr( $slug ) . '" data-confirm="' . esc_attr( $ask ) . '">' . esc_html__( 'Undo last push', 'beltoft-services' ) . '</button> ';
+				/* translators: %s: date and time. */
+				echo esc_html( sprintf( __( 'You can undo the last push until %s.', 'beltoft-services' ), $when( (int) $v['undo']['at'] + SiteStaging::KEEP ) ) ) . '</p>';
+			}
+		}
+
+		echo '<p class="beltoft-hosting-help">' . esc_html__( 'A staging copy is a copy of this website on an address of its own, to try changes in before they go live. It sends no email, is not shown to search engines and does not count as a website.', 'beltoft-services' ) . '</p></dd></div>';
 	}
 
 	/**

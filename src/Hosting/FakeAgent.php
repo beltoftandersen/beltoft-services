@@ -42,6 +42,15 @@ defined( 'ABSPATH' ) || exit;
  *   keep_days (7); `foreign` (true, nothing changed) when WordPress is on an address that is none of the site's names (seed it with
  *   set_wp_address()); `unchanged` (true) when it is on the name already; `dry_run` (true) with the count and no change. The next
  *   result can be scripted with script_wp_address() (for example failed and restored). The one-time login links follow it.
+ * - site.staging_create (slug, copy, host): makes the staging copy `copy` of the website, reachable on `host`; the copy is a site of its own in
+ *   state() (staging_of = slug, wp_address = host). Replies slug, copy, host, database, replaced (11), leftover (0), status (200), created.
+ *   Fails "this website has a staging copy already" for a second copy, "a staging copy cannot have a copy" for a copy.
+ * - site.staging_refresh: the copy again from the website: the same reply with refreshed (true). Fails "this website has no staging copy".
+ * - site.staging_push (files_only): the copy goes live: pushed (true), files (true), database (not files_only), leftover (0), undo_days (7),
+ *   status (200); the website keeps a way back in state() (scope full or files). Scripted failure with script_staging( 'site.staging_push', ... ),
+ *   for example failed and restored. Fails "this website has no staging copy".
+ * - site.staging_undo: puts the last push back: undone (true), files (true), database (the push replaced it), status (200). Fails "there is nothing to undo".
+ * - site.staging_delete: removes the copy (deleted true, slug, copy, '' when there was none). Deleting the website removes its copy too.
  * - db.create: user, databases. The password is accepted, kept out of every reply and of the call log.
  * - ct.refresh: updated (names of the replaced files, none when current), version (12 hex characters). Fails "container not
  *   running" for an unknown container or one set with set_not_running().
@@ -173,8 +182,23 @@ class FakeAgent implements Agent {
 		'site.staging_create' => array(
 			'vmid' => array( 'vmid', true ),
 			'slug' => array( 'ident', true ),
+			'copy' => array( 'ident', true ),
+			'host' => array( 'host', true ),
 		),
 		'site.staging_push' => array(
+			'vmid'       => array( 'vmid', true ),
+			'slug'       => array( 'ident', true ),
+			'files_only' => array( 'bool', false ),
+		),
+		'site.staging_refresh' => array(
+			'vmid' => array( 'vmid', true ),
+			'slug' => array( 'ident', true ),
+		),
+		'site.staging_undo' => array(
+			'vmid' => array( 'vmid', true ),
+			'slug' => array( 'ident', true ),
+		),
+		'site.staging_delete' => array(
 			'vmid' => array( 'vmid', true ),
 			'slug' => array( 'ident', true ),
 		),
@@ -486,6 +510,19 @@ class FakeAgent implements Agent {
 	public function script_wp_address( array $result ): void {
 		$this->load();
 		$this->state['wp_scripts'][] = $result;
+		$this->save();
+	}
+
+	/**
+	 * The result the next call of a site.staging_* operation answers with, nothing else is done. Consumed once. A failed push the
+	 * agent put back: array( 'pushed' => false, 'failed' => true, 'restored' => true ).
+	 *
+	 * @param string               $op     Operation.
+	 * @param array<string, mixed> $result Result.
+	 */
+	public function script_staging( string $op, array $result ): void {
+		$this->load();
+		$this->state['staging_scripts'][ $op ][] = $result;
 		$this->save();
 	}
 
@@ -861,6 +898,12 @@ class FakeAgent implements Agent {
 				);
 
 			case 'site.delete':
+				foreach ( (array) ( $this->state['sites'][ $vmid ] ?? array() ) as $name => $other ) {
+					if ( ( $other['staging_of'] ?? '' ) === $args['slug'] ) {
+						unset( $this->state['sites'][ $vmid ][ $name ] );
+					}
+				}
+
 				unset( $this->state['sites'][ $vmid ][ $args['slug'] ] );
 
 				return array(
@@ -882,8 +925,17 @@ class FakeAgent implements Agent {
 			case 'site.cron':
 			case 'site.workers':
 			case 'site.wp_address':
+			case 'site.staging_create':
+			case 'site.staging_refresh':
+			case 'site.staging_push':
+			case 'site.staging_undo':
+			case 'site.staging_delete':
 				if ( ! isset( $this->state['sites'][ $vmid ][ $args['slug'] ] ) ) {
 					return 'unknown site';
+				}
+
+				if ( 0 === strpos( $op, 'site.staging_' ) ) {
+					return $this->staging( $op, $vmid, $args );
 				}
 
 				if ( 'site.cache_setup' === $op ) {
@@ -1110,6 +1162,86 @@ class FakeAgent implements Agent {
 		}
 
 		return array( 'ok' => true );
+	}
+
+	/**
+	 * The site.staging_* operations.
+	 *
+	 * @param string               $op   Operation.
+	 * @param int                  $vmid Container id.
+	 * @param array<string, mixed> $args Arguments.
+	 * @return array<string, mixed>|string
+	 */
+	private function staging( string $op, int $vmid, array $args ) {
+		$slug = (string) $args['slug'];
+		$site = $this->state['sites'][ $vmid ][ $slug ];
+		$copy = '';
+
+		foreach ( (array) $this->state['sites'][ $vmid ] as $name => $other ) {
+			if ( ( $other['staging_of'] ?? '' ) === $slug ) {
+				$copy = (string) $name;
+			}
+		}
+
+		if ( isset( $this->state['staging_scripts'][ $op ] ) && array() !== $this->state['staging_scripts'][ $op ] ) {
+			return (array) array_shift( $this->state['staging_scripts'][ $op ] );
+		}
+
+		switch ( $op ) {
+			case 'site.staging_create':
+				if ( ! empty( $site['staging_of'] ) ) {
+					return 'a staging copy cannot have a copy';
+				}
+
+				if ( '' !== $copy && ( $copy !== $args['copy'] || $this->state['sites'][ $vmid ][ $copy ]['host'] !== $args['host'] ) ) {
+					return 'this website has a staging copy already';
+				}
+
+				if ( isset( $this->state['sites'][ $vmid ][ $args['copy'] ] ) && '' === $copy ) {
+					return 'that name is in use by another website';
+				}
+
+				$this->state['sites'][ $vmid ][ $args['copy'] ] = array(
+					'php'        => $site['php'],
+					'workers'    => min( 2, (int) $site['workers'] ),
+					'host'       => $args['host'],
+					'wp_address' => $args['host'],
+					'staging_of' => $slug,
+				);
+
+				return array( 'slug' => $slug, 'copy' => $args['copy'], 'host' => $args['host'], 'database' => 'db_' . str_replace( '-', '_', (string) $args['copy'] ), 'replaced' => 11, 'leftover' => 0, 'status' => 200, 'created' => true );
+
+			case 'site.staging_refresh':
+				if ( '' === $copy ) {
+					return 'this website has no staging copy';
+				}
+
+				return array( 'slug' => $slug, 'copy' => $copy, 'host' => $this->state['sites'][ $vmid ][ $copy ]['host'], 'replaced' => 11, 'leftover' => 0, 'status' => 200, 'refreshed' => true );
+
+			case 'site.staging_push':
+				if ( '' === $copy ) {
+					return 'this website has no staging copy';
+				}
+
+				$files_only = ! empty( $args['files_only'] );
+				$this->state['sites'][ $vmid ][ $slug ]['undo'] = array( 'scope' => $files_only ? 'files' : 'full', 'at' => time() );
+
+				return array( 'pushed' => true, 'files' => true, 'database' => ! $files_only, 'leftover' => 0, 'undo_days' => 7, 'status' => 200 );
+
+			case 'site.staging_undo':
+				if ( empty( $site['undo'] ) ) {
+					return 'there is nothing to undo';
+				}
+
+				$scope = (string) $site['undo']['scope'];
+				unset( $this->state['sites'][ $vmid ][ $slug ]['undo'] );
+
+				return array( 'undone' => true, 'files' => true, 'database' => 'full' === $scope, 'status' => 200 );
+		}
+
+		unset( $this->state['sites'][ $vmid ][ $copy ] ); // site.staging_delete.
+
+		return array( 'deleted' => true, 'slug' => $slug, 'copy' => $copy );
 	}
 
 	/**

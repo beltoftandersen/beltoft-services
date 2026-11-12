@@ -82,6 +82,20 @@
 				return [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/files-link', {} ];
 			case 'tool_database':
 				return [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/database-link', {} ];
+			case 'staging_open':
+				return [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/staging/login', {} ];
+			case 'staging_create':
+				return [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/staging', {} ];
+			case 'staging_refresh':
+				return ask( button.getAttribute( 'data-confirm' ) || '', button, [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/staging/refresh', {} ], false );
+			case 'staging_delete':
+				return ask( button.getAttribute( 'data-confirm' ) || '', button, [ 'DELETE', base + '/sites/' + encodeURIComponent( slug ) + '/staging', undefined ], true );
+			case 'staging_undo':
+				return ask( button.getAttribute( 'data-confirm' ) || '', button, [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/staging/undo', {} ], true );
+			case 'staging_push':
+				var what = scope.querySelector( '[data-staging-form] input[type="radio"]:checked' );
+
+				return what ? ask( what.getAttribute( 'data-confirm' ) || '', button, [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/staging/push', { files_only: 'files' === what.value } ], 'files' !== what.value ) : null;
 			case 'country_save':
 			case 'country_off':
 				var countryScope = scope.querySelector( '[data-country-form]' ) || scope;
@@ -230,8 +244,8 @@
 		}
 
 		if ( 'Escape' === event.key ) {
-			var open = el.closest( '[data-php-form], [data-files-form], [data-country-form]' );
-			var close = open ? open.querySelector( '[data-hosting-action="php_cancel"], [data-hosting-action="files_close"], [data-hosting-action="country_cancel"]' ) : null;
+			var open = el.closest( '[data-php-form], [data-files-form], [data-country-form], [data-staging-form]' );
+			var close = open ? open.querySelector( '[data-hosting-action="php_cancel"], [data-hosting-action="files_close"], [data-hosting-action="country_cancel"], [data-hosting-action="staging_cancel"]' ) : null;
 
 			if ( close ) {
 				event.preventDefault();
@@ -275,6 +289,14 @@
 				setHidden( countryForm, 'country_cancel' === action );
 				setHidden( countryOpener, 'country_edit' === action );
 				disclosed( countryOpener, countryForm, 'country_edit' === action );
+				return true;
+			case 'staging_edit':
+			case 'staging_cancel':
+				var stagingOpener = scope.querySelector( '[data-hosting-action="staging_edit"]' );
+				var stagingForm = scope.querySelector( '[data-staging-form]' );
+
+				setHidden( stagingForm, 'staging_cancel' === action );
+				disclosed( stagingOpener, stagingForm, 'staging_edit' === action );
 				return true;
 			case 'country_list':
 				var wanted = ( button.getAttribute( 'data-codes' ) || '' ).split( ' ' );
@@ -386,7 +408,8 @@
 
 	function run( panel, button, id, action, request ) {
 		button.disabled = true;
-		var opens = 'login' === action || 'password' === action || 'tool_files' === action || 'tool_database' === action;
+		var opens = 'login' === action || 'password' === action || 'tool_files' === action || 'tool_database' === action || 'staging_open' === action;
+		var staging = 0 === action.indexOf( 'staging_' ) && ! opens;
 		var opening = 'tool_files' === action ? text.openingFiles : ( 'tool_database' === action ? text.openingDatabase : text.opening );
 
 		say( panel, opens ? ( opening || '' ) : ( text.working || '' ) );
@@ -501,11 +524,11 @@
 				return;
 			}
 
-			// A move of WordPress runs in the background: the answer says so.
-			say( panel, ( 'wp_address' === action && result.data && result.data.message ) || text.done || '' );
+			// A move of WordPress and the staging jobs run in the background: the answer says so, and the page shows the state.
+			say( panel, ( ( 'wp_address' === action || staging ) && result.data && result.data.message ) || text.done || '' );
 			window.setTimeout( function () {
 				window.location.reload();
-			}, 'wp_address' === action ? 2500 : 800 );
+			}, 'wp_address' === action ? 2500 : ( staging ? 1500 : 800 ) );
 		}, function () {
 			button.disabled = false;
 
@@ -547,4 +570,33 @@
 	}
 
 	cacheFacts();
+
+	// A staging job under way: the page asks where it is every few seconds and reloads when it is over.
+	function stagingWatch() {
+		Array.prototype.forEach.call( document.querySelectorAll( '[data-staging-busy]' ), function ( line ) {
+			var panel = line.closest( '[data-hosting-resource]' );
+			var slug = line.getAttribute( 'data-slug' ) || '';
+
+			if ( ! panel || ! slug ) {
+				return;
+			}
+
+			var look = function () {
+				call( 'GET', panel.getAttribute( 'data-hosting-resource' ) + '/hosting/sites/' + encodeURIComponent( slug ) + '/staging' ).then( function ( result ) {
+					if ( result.ok && result.data && false === result.data.busy ) {
+						window.location.reload();
+						return;
+					}
+
+					window.setTimeout( look, 6000 );
+				}, function () {
+					window.setTimeout( look, 15000 );
+				} );
+			};
+
+			window.setTimeout( look, 6000 );
+		} );
+	}
+
+	stagingWatch();
 }() );
