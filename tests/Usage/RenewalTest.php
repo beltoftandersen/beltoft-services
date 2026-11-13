@@ -58,10 +58,10 @@ class RenewalTest extends UsageTestCase {
 
 		$user = $this->new_user();
 		$sub  = $this->usage_account( $user );
-		$sub->update_meta_data( '_zerolang_lang', 'en' );
+		$sub->update_meta_data( '_order_lang', 'en' );
 		$sub->save();
 		$this->hours( 501, $user, 100 );
-		$this->settings( array( 'usage_order_language_meta' => '_zerolang_lang' ) );
+		$this->settings( array( 'usage_order_language_meta' => '_order_lang' ) );
 		$before = determine_locale();
 
 		$order = wcs_create_renewal_order( $sub );

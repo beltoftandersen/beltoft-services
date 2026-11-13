@@ -146,7 +146,7 @@
         "type": "text",
         "default": "",
         "label": "Order meta key with the customer's language",
-        "desc": "For example _zerolang_lang. The usage invoice lines are then written in that language (an installed WordPress language, matched by code such as da or da_DK). Empty: the site's language."
+        "desc": "The meta key a language plugin saves the order's language in. The usage invoice lines are then written in that language (an installed WordPress language, matched by code such as da or da_DK). Empty: the site's language."
     },
     "offer_monthly": {
         "tab": "general",

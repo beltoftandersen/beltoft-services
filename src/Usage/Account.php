@@ -116,7 +116,7 @@ final class Account {
 					'type'    => 'text',
 					'default' => '',
 					'label'   => __( 'Order meta key with the customer\'s language', 'beltoft-services' ),
-					'desc'    => __( 'For example _zerolang_lang. The usage invoice lines are then written in that language (an installed WordPress language, matched by code such as da or da_DK). Empty: the site\'s language.', 'beltoft-services' ),
+					'desc'    => __( 'The meta key a language plugin saves the order\'s language in. The usage invoice lines are then written in that language (an installed WordPress language, matched by code such as da or da_DK). Empty: the site\'s language.', 'beltoft-services' ),
 				),
 				'offer_monthly' => array(
 					'tab'     => 'general',
