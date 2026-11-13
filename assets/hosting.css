@@ -225,3 +225,21 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.
 	.beltoft-hosting .bsh-choice__opt span { width: 100%; }
 	.beltoft-hosting .bsh-sec__body .bs-action__do input[type="text"] { flex: 1 1 100%; }
 }
+
+/* Panels, 0.25: connection details as rows with their copy button, actions with the button at the right edge, small buttons for row actions. */
+.beltoft-hosting .beltoft-hosting-panel > .bs-action { padding: var(--bs-space-4, 16px) 0 0; border-top: 1px solid var(--bsh-rule); }
+.beltoft-hosting .beltoft-hosting-panel > .beltoft-hosting-panel__head + .bs-action { padding-top: 0; border-top: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting a.beltoft-hosting-btn.bsh-btn--sm { display: inline-flex; align-items: center; min-height: 36px; padding: 0 var(--bs-space-3, 12px); font-size: var(--bs-fs-small, 14px); text-decoration: none; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-conn { margin: 0; border: 1px solid var(--bsh-rule); border-radius: var(--bs-radius, 8px); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-conn .bs-item { grid-template-columns: 9em minmax(0, 1fr) auto; padding: var(--bs-space-2, 8px) var(--bs-space-2, 8px) var(--bs-space-2, 8px) var(--bs-space-4, 16px); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-conn .bs-item:first-child { border-top: 0; }
+.beltoft-hosting .bsh-conn__label { color: var(--bsh-soft); font-size: var(--bs-fs-small, 14px); }
+.beltoft-hosting .bsh-conn__value { justify-self: start; padding: 2px 8px; border-radius: var(--bs-radius-sm, 4px); background: var(--bsh-warm); font-size: var(--bs-fs-small, 14px); overflow-wrap: anywhere; }
+.beltoft-hosting .bsh-note { margin: 0; color: var(--bsh-soft); font-size: var(--bs-fs-small, 14px); }
+.beltoft-hosting .beltoft-hosting-backup-list .beltoft-hosting-actions { gap: var(--bs-space-2, 8px); justify-content: flex-end; }
+.beltoft-hosting .beltoft-hosting-checklist li { padding: var(--bs-space-3, 12px) 0; }
+@media (max-width: 640px) {
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-conn .bs-item { grid-template-columns: minmax(0, 1fr) auto; row-gap: 2px; }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-conn .bsh-conn__label { grid-column: 1 / -1; }
+	.beltoft-hosting .beltoft-hosting-backup-list .beltoft-hosting-actions { justify-content: flex-start; }
+}

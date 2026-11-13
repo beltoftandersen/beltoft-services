@@ -1052,8 +1052,7 @@ final class HostingAccount {
 		$free = (bool) \BeltoftServices\Settings::get( 'hosting_move_free' );
 
 		self::panel_open( esc_html__( 'Move a website here', 'beltoft-services' ), 'beltoft-hosting-move', '', 'beltoft-hosting-quiet' );
-		echo '<p>' . esc_html( $free ? __( 'Have a website somewhere else? We move it here for you, free of charge.', 'beltoft-services' ) : __( 'Have a website somewhere else? We can move it here for you.', 'beltoft-services' ) ) . '</p>';
-		echo '<p><a class="beltoft-hosting-btn" href="' . esc_url( $url ) . '">' . esc_html__( 'Request a move', 'beltoft-services' ) . '</a></p>';
+		self::action( esc_html( $free ? __( 'Have a website somewhere else? We move it here for you, free of charge.', 'beltoft-services' ) : __( 'Have a website somewhere else? We can move it here for you.', 'beltoft-services' ) ), '<a class="beltoft-hosting-btn" href="' . esc_url( $url ) . '">' . esc_html__( 'Request a move', 'beltoft-services' ) . '</a>' );
 		self::panel_close();
 	}
 
@@ -1089,45 +1088,47 @@ final class HostingAccount {
 		}
 
 		self::panel_open( esc_html__( 'Files (SFTP)', 'beltoft-services' ), 'beltoft-hosting-files', '', '', ' data-hosting-scope' );
-		echo '<dl class="beltoft-hosting-facts">';
+		$sm = 'beltoft-hosting-btn bsh-btn--sm';
+
+		// Where to connect: one row for each value, with its copy button at the right edge.
+		echo '<ul class="bs-list bsh-conn">';
 
 		foreach ( array(
 			__( 'Host', 'beltoft-services' )      => (string) $files['host'],
 			__( 'Port', 'beltoft-services' )      => (string) $files['port'],
 			__( 'User name', 'beltoft-services' ) => (string) $files['user'],
 		) as $label => $value ) {
-			echo '<div><dt>' . esc_html( $label ) . '</dt><dd><code>' . esc_html( $value ) . '</code> <button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="copy" data-copy="' . esc_attr( $value ) . '">' . esc_html__( 'Copy', 'beltoft-services' ) . '</button></dd></div>';
+			echo '<li class="bs-item"><span class="bsh-conn__label">' . esc_html( $label ) . '</span><code class="bsh-conn__value">' . esc_html( $value ) . '</code><button type="button" class="' . esc_attr( $sm ) . '" data-hosting-action="copy" data-copy="' . esc_attr( $value ) . '">' . esc_html__( 'Copy', 'beltoft-services' ) . '</button></li>';
 		}
 
-		echo '<div><dt>' . esc_html__( 'Access', 'beltoft-services' ) . '</dt><dd>' . esc_html( ! empty( $files['ssh'] ) ? __( 'SFTP, and SSH with WP-CLI. The user name is the same for all your websites.', 'beltoft-services' ) : __( 'SFTP only. The user name is the same for all your websites.', 'beltoft-services' ) ) . '</dd></div>';
+		echo '</ul>';
+		echo '<p class="bsh-note">' . esc_html( ! empty( $files['ssh'] ) ? __( 'SFTP, and SSH with WP-CLI. The user name is the same for all your websites.', 'beltoft-services' ) : __( 'SFTP only. The user name is the same for all your websites.', 'beltoft-services' ) ) . '</p>';
 
-		echo '<div><dt>' . esc_html__( 'Password', 'beltoft-services' ) . '</dt><dd>';
-		echo '<p class="beltoft-hosting-line">' . esc_html( ! empty( $files['password_set'] ) ? __( 'A password is set. It is not shown again.', 'beltoft-services' ) : __( 'No password is set yet.', 'beltoft-services' ) ) . '</p>';
+		// The password: what is set, and the button that opens its form.
+		$text = '<strong class="bsh-action__title">' . esc_html__( 'Password', 'beltoft-services' ) . '</strong>' . esc_html( ! empty( $files['password_set'] ) ? __( 'A password is set. It is not shown again.', 'beltoft-services' ) : __( 'No password is set yet.', 'beltoft-services' ) );
+		self::action( $text, $ready ? '<button type="button" class="beltoft-hosting-btn" data-hosting-action="files_open" data-target="password" aria-expanded="false">' . esc_html__( 'Set a password', 'beltoft-services' ) . '</button>' : '' );
 
 		if ( $ready ) {
-			echo '<button type="button" class="beltoft-hosting-btn" data-hosting-action="files_open" data-target="password" aria-expanded="false">' . esc_html__( 'Set a password', 'beltoft-services' ) . '</button>';
 			echo '<div class="beltoft-hosting-secure" data-files-form="password" hidden>';
 			self::print_code_field();
 			echo '<label class="beltoft-hosting-field"><span>' . esc_html__( 'Your own password, 16 characters or more (optional)', 'beltoft-services' ) . '</span><input type="text" data-hosting-field="sftp_password" autocomplete="off" autocapitalize="off" spellcheck="false"></label>';
 			echo '<p class="beltoft-hosting-help">' . esc_html__( 'Leave it empty to get a generated password. It is shown once and is not stored here.', 'beltoft-services' ) . '</p>';
 			echo '<div class="beltoft-hosting-buttons"><button type="button" class="beltoft-hosting-btn beltoft-hosting-btn--primary" data-hosting-action="files_password">' . esc_html__( 'Set password', 'beltoft-services' ) . '</button><button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="files_close">' . esc_html__( 'Cancel', 'beltoft-services' ) . '</button></div></div>';
-			echo '<div class="beltoft-hosting-reveal" data-files-reveal hidden><p class="beltoft-hosting-line">' . esc_html__( 'Your password. Copy it now: it is shown once and is not stored.', 'beltoft-services' ) . '</p><code data-files-secret></code> <button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="copy_secret">' . esc_html__( 'Copy', 'beltoft-services' ) . '</button></div>';
+			echo '<div class="beltoft-hosting-reveal" data-files-reveal hidden><p class="beltoft-hosting-line">' . esc_html__( 'Your password. Copy it now: it is shown once and is not stored.', 'beltoft-services' ) . '</p><code data-files-secret></code> <button type="button" class="' . esc_attr( $sm ) . '" data-hosting-action="copy_secret">' . esc_html__( 'Copy', 'beltoft-services' ) . '</button></div>';
 		}
 
-		echo '</dd></div>';
+		// SSH keys: each key a row with Remove, then the button that opens the form.
+		$text = '<strong class="bsh-action__title">' . esc_html__( 'SSH keys', 'beltoft-services' ) . '</strong>' . ( array() === $files['keys'] ? esc_html__( 'No keys added.', 'beltoft-services' ) : '' );
+		self::action( $text, $ready ? '<button type="button" class="beltoft-hosting-btn" data-hosting-action="files_open" data-target="key" aria-expanded="false">' . esc_html__( 'Add an SSH key', 'beltoft-services' ) . '</button>' : '' );
 
-		echo '<div><dt>' . esc_html__( 'SSH keys', 'beltoft-services' ) . '</dt><dd>';
-
-		if ( array() === $files['keys'] ) {
-			echo '<p class="beltoft-hosting-line">' . esc_html__( 'No keys added.', 'beltoft-services' ) . '</p>';
-		} else {
-			echo '<ul class="beltoft-hosting-names">';
+		if ( array() !== $files['keys'] ) {
+			echo '<ul class="bs-list bsh-names">';
 
 			foreach ( $files['keys'] as $key ) {
-				echo '<li><span class="beltoft-hosting-name">' . esc_html( trim( $key['type'] . ' ' . $key['comment'] ) ) . '</span> <span class="beltoft-hosting-note">' . esc_html( $key['fingerprint'] ) . '</span>';
+				echo '<li class="bs-item"><span class="beltoft-hosting-name">' . esc_html( trim( $key['type'] . ' ' . $key['comment'] ) ) . '</span><span class="bsh-names__meta">' . esc_html( $key['fingerprint'] ) . '</span>';
 
 				if ( $ready ) {
-					echo ' <button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="remove_key" data-fingerprint="' . esc_attr( $key['fingerprint'] ) . '">' . esc_html__( 'Remove', 'beltoft-services' ) . '</button>';
+					echo '<button type="button" class="' . esc_attr( $sm ) . '" data-hosting-action="remove_key" data-fingerprint="' . esc_attr( $key['fingerprint'] ) . '">' . esc_html__( 'Remove', 'beltoft-services' ) . '</button>';
 				}
 
 				echo '</li>';
@@ -1137,14 +1138,12 @@ final class HostingAccount {
 		}
 
 		if ( $ready ) {
-			echo '<button type="button" class="beltoft-hosting-btn" data-hosting-action="files_open" data-target="key" aria-expanded="false">' . esc_html__( 'Add an SSH key', 'beltoft-services' ) . '</button>';
 			echo '<div class="beltoft-hosting-secure" data-files-form="key" hidden>';
 			self::print_code_field();
 			echo '<label class="beltoft-hosting-field beltoft-hosting-field--wide"><span>' . esc_html__( 'Public key', 'beltoft-services' ) . '</span><textarea rows="3" data-hosting-field="ssh_key" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ssh-ed25519 AAAA..."></textarea></label>';
 			echo '<div class="beltoft-hosting-buttons"><button type="button" class="beltoft-hosting-btn beltoft-hosting-btn--primary" data-hosting-action="files_key">' . esc_html__( 'Add key', 'beltoft-services' ) . '</button><button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="files_close">' . esc_html__( 'Cancel', 'beltoft-services' ) . '</button></div></div>';
 		}
 
-		echo '</dd></div></dl>';
 		self::panel_close();
 	}
 
@@ -1370,7 +1369,7 @@ final class HostingAccount {
 
 				if ( $ready && ! $busy ) {
 					printf(
-						'<td><div class="beltoft-hosting-actions"><button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="restore" data-scope="account" data-volid="%1$s">%2$s</button> <button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="restore" data-scope="files" data-volid="%1$s">%3$s</button> <button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="restore" data-scope="database" data-volid="%1$s">%4$s</button></div></td>',
+						'<td><div class="beltoft-hosting-actions"><button type="button" class="beltoft-hosting-btn bsh-btn--sm" data-hosting-action="restore" data-scope="account" data-volid="%1$s">%2$s</button><button type="button" class="beltoft-hosting-btn bsh-btn--sm" data-hosting-action="restore" data-scope="files" data-volid="%1$s">%3$s</button><button type="button" class="beltoft-hosting-btn bsh-btn--sm" data-hosting-action="restore" data-scope="database" data-volid="%1$s">%4$s</button></div></td>',
 						esc_attr( (string) $b['volid'] ),
 						esc_html__( 'Restore everything', 'beltoft-services' ),
 						esc_html__( 'Restore files', 'beltoft-services' ),
@@ -1400,10 +1399,11 @@ final class HostingAccount {
 				echo '</select></label>';
 			}
 
-			echo '<button type="button" class="beltoft-hosting-btn" data-hosting-action="backup_now">' . esc_html__( 'Back up now', 'beltoft-services' ) . '</button></div>';
+			echo '</div>';
+			self::action( esc_html__( 'A backup is made every night. You can also make one now.', 'beltoft-services' ), '<button type="button" class="beltoft-hosting-btn" data-hosting-action="backup_now">' . esc_html__( 'Back up now', 'beltoft-services' ) . '</button>' );
 
 			if ( null !== $safety ) {
-				echo '<p>' . esc_html( sprintf( /* translators: %s: time the safety copy is kept until. */ __( 'A safety copy from before your last restore is kept until %s.', 'beltoft-services' ), wp_date( 'j F Y, H:i', (int) $safety['expires'] ) ) ) . ' <button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="undo">' . esc_html__( 'Undo the last restore', 'beltoft-services' ) . '</button></p>';
+				self::action( esc_html( sprintf( /* translators: %s: time the safety copy is kept until. */ __( 'A safety copy from before your last restore is kept until %s.', 'beltoft-services' ), wp_date( 'j F Y, H:i', (int) $safety['expires'] ) ) ), '<button type="button" class="beltoft-hosting-btn" data-hosting-action="undo">' . esc_html__( 'Undo the last restore', 'beltoft-services' ) . '</button>' );
 			}
 		}
 
@@ -1439,11 +1439,11 @@ final class HostingAccount {
 
 			if ( ! $is_done ) {
 				if ( 'domain' === $key && array() !== $sites ) {
-					echo '<a class="beltoft-hosting-linkbtn beltoft-hosting-check-action" href="#beltoft-site-' . esc_attr( (string) $sites[0]['slug'] ) . '-connect">' . esc_html__( 'Connect a domain', 'beltoft-services' ) . '</a>';
+					echo '<a class="beltoft-hosting-btn bsh-btn--sm beltoft-hosting-check-action" href="#beltoft-site-' . esc_attr( (string) $sites[0]['slug'] ) . '-connect">' . esc_html__( 'Connect a domain', 'beltoft-services' ) . '</a>';
 				} elseif ( 'email' === $key ) {
-					echo '<a class="beltoft-hosting-linkbtn beltoft-hosting-check-action" href="#beltoft-hosting-email">' . esc_html__( 'Set up email', 'beltoft-services' ) . '</a>';
+					echo '<a class="beltoft-hosting-btn bsh-btn--sm beltoft-hosting-check-action" href="#beltoft-hosting-email">' . esc_html__( 'Set up email', 'beltoft-services' ) . '</a>';
 				} elseif ( $ready && in_array( $key, self::MANUAL_ITEMS, true ) ) {
-					echo '<button type="button" class="beltoft-hosting-linkbtn beltoft-hosting-check-action" data-hosting-action="check_item" data-item="' . esc_attr( $key ) . '">' . esc_html__( 'Mark as done', 'beltoft-services' ) . '</button>';
+					echo '<button type="button" class="beltoft-hosting-btn bsh-btn--sm beltoft-hosting-check-action" data-hosting-action="check_item" data-item="' . esc_attr( $key ) . '">' . esc_html__( 'Mark as done', 'beltoft-services' ) . '</button>';
 				}
 			}
 
