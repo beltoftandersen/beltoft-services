@@ -45,3 +45,8 @@ body.woocommerce-account .beltoft-vm-usage p.beltoft-vm-usage__state { margin: 0
 .beltoft-vm-usage__switch input:focus-visible { outline: 2px solid var(--bs-focus); outline-offset: 2px; }
 body.woocommerce-account .beltoft-vm-usage p.beltoft-vm-usage__switch-note { margin: 4px 0 0; color: var(--bvu-soft); font-size: 13px; }
 body.woocommerce-account .beltoft-vm-usage p.beltoft-vm-usage__switch-note:empty { display: none; }
+
+/* Dashboard UI: the charts and the range switch take the account corners. */
+.beltoft-vm-usage__chart { border-radius: var(--bs-radius-lg, 12px); }
+.beltoft-vm-usage__ranges { border-radius: var(--bs-radius, 8px); overflow: hidden; }
+.beltoft-vm-usage__ranges button { border-radius: 0; }

@@ -1166,3 +1166,12 @@ body.woocommerce-account .woocommerce-MyAccount-content p.beltoft-licenses__empt
 body.woocommerce-account .woocommerce-MyAccount-content p.beltoft-licenses__empty + .beltoft-services-list-actions.is-start, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domains.is-empty .beltoft-services-list-actions { box-sizing: border-box; width: 100%; max-width: 880px; margin: 0; padding: 0 var(--bs-space-5) var(--bs-space-6); border-radius: 0 0 var(--bs-radius-lg) var(--bs-radius-lg); background: var(--bs-surface); justify-content: flex-start; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-list-btn { border-radius: var(--bs-radius); }
 body.woocommerce-account .woocommerce-MyAccount-content > p.beltoft-licenses__empty + .beltoft-services-list-actions.is-start { margin-top: -12px; } /* the content column's 12px gap would split the card */
+
+/* Server facts: tiles that wrap and fill each row (no empty cells), inside one rounded card. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts { display: flex; flex-wrap: wrap; gap: 1px; background: var(--bs-line); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts > div { flex: 1 1 200px; padding: var(--bs-space-3) var(--bs-space-4); box-shadow: none; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts code { border-radius: 4px; }
+/* The glance cards under a server (disk, extra disks, snapshots, backups): equal rounded cards in a row. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-glance { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-glance > * { border-radius: var(--bs-radius-lg); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-glance a.beltoft-services-glance__item, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-glance > div { padding: var(--bs-space-4); }
