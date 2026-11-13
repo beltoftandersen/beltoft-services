@@ -72,18 +72,13 @@ class FeedbackUiTest extends SnapshotsTestCase {
 
 	// -- Item 7: the busy indicator ----------------------------------------------------------------
 
-	public function test_the_busy_indicator_is_three_squares_not_a_turning_one(): void {
-		foreach ( array( 'assets/account.css', 'assets/thankyou.css' ) as $file ) {
-			$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . $file );
-
-			$this->assertStringNotContainsString( 'beltoft-services-spin', $css, $file );
-			$this->assertStringNotContainsString( 'rotate(360deg)', $css, $file );
-			$this->assertStringContainsString( '@keyframes beltoft-services-dots', $css, $file );
-			$this->assertStringContainsString( 'prefers-reduced-motion', $css, $file );
-		}
-
+	public function test_the_busy_indicator_moves_and_rests_for_reduced_motion(): void {
+		// Since 0.23.0 (owner 2026-11-12: a clear sign that something is happening) a busy button shows a turning ring.
 		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/account.css' );
-		$this->assertMatchesRegularExpression( '/\.is-busy::before[^{]*\{[^}]*beltoft-services-dots/s', $css );
+		$this->assertMatchesRegularExpression( '/\.is-busy::before[^{]*\{[^}]*animation: bs-turn/s', $css );
+		$this->assertStringContainsString( '@keyframes bs-turn', $css );
+		$this->assertStringContainsString( 'prefers-reduced-motion', $css );
+		$this->assertStringContainsString( 'prefers-reduced-motion', (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/thankyou.css' ) );
 	}
 
 	// -- Items 9 and 13: the dialogs and the card's own line ---------------------------------------
@@ -285,14 +280,18 @@ class FeedbackUiTest extends SnapshotsTestCase {
 		return $response->get_data();
 	}
 
-	public function test_the_new_texts_have_no_em_dash_and_no_rounded_corners(): void {
+	public function test_the_new_texts_have_no_em_dash_and_corners_use_the_account_radius(): void {
 		foreach ( array( 'assets/vm.js', 'assets/account.css', 'assets/thankyou.css', 'templates/account/vm.php', 'src/Proxmox/Disk/DiskPanels.php' ) as $file ) {
 			$this->assertStringNotContainsString( "\u{2014}", (string) file_get_contents( BELTOFT_SERVICES_PATH . $file ), $file );
 		}
 
-		$css  = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/account.css' );
-		$mine = substr( $css, (int) strpos( $css, '@keyframes beltoft-services-dots' ) );
-		$this->assertStringNotContainsString( 'border-radius', $mine );
-		$this->assertStringNotContainsString( 'border-radius', (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/thankyou.css' ) );
+		// Since 2026-11-12 (owner: rounded like the website) corners use the radius tokens or are round (50%), never a
+		// large pixel value (small bars and code may use up to 4px).
+		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/account.css' );
+		$this->assertStringContainsString( '--bs-radius: 8px', $css );
+		preg_match_all( '/border-radius:\s*([^;}]+)/', $css, $m );
+		foreach ( $m[1] as $value ) {
+			$this->assertMatchesRegularExpression( '/^(var\(--|50%|0\b|inherit|[1-4]px\b)/', trim( $value ), 'border-radius: ' . $value );
+		}
 	}
 }

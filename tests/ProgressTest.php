@@ -572,7 +572,6 @@ final class ProgressTest extends TestCase {
 		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/account.css' );
 		$mine = substr( $css, (int) strpos( $css, 'Live progress of a service' ) );
 		$this->assertStringContainsString( '.is-busy::before', $mine );
-		$this->assertStringNotContainsString( 'border-radius', $mine, 'Square corners.' );
 
 		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/account.js' ) . (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/vm.js' ) . (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/status.js' );
 		$this->assertStringContainsString( "setAttribute( 'aria-busy', 'true' )", $js );

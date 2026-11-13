@@ -136,7 +136,7 @@ final class MailDnsRecheckTest extends MailTestCase {
 		$this->assertSame( 'DNS records are still missing for lost.example', $this->mails[0]['subject'] );
 		$this->assertSame( array( 'christian.beltoft@gmail.com' ), (array) $this->mails[0]['to'] );
 		$this->assertStringContainsString( 'v=spf1', (string) $this->mails[0]['message'] );
-		$this->assertStringContainsString( 'cannot send until the SPF and DKIM records are found', (string) $this->mails[0]['message'] );
+		$this->assertStringContainsString( 'cannot send until the SPF and DKIM records are found', (string) preg_replace( '/\s+/', ' ', (string) $this->mails[0]['message'] ) ); // A plain-text mail wraps its lines.
 
 		$this->assertTrue( MailView::data( $r, array() )['send_held'] );
 

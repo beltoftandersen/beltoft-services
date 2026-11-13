@@ -206,19 +206,22 @@ final class StepUpTest extends TestCase {
 	}
 
 	public function test_purposes_are_the_three_registered_ones_and_a_third_can_be_added(): void {
-		$this->assertEqualsCanonicalizing( array( 'api_token', 'transfer_code', 'oauth_full' ), StepUp::purposes() );
+		// The core three are always there; the hosting files purpose joins once the hosting area has registered its filter.
+		$this->assertEmpty( array_diff( array( 'api_token', 'transfer_code', 'oauth_full' ), StepUp::purposes() ) );
+		$this->assertEmpty( array_diff( StepUp::purposes(), array( 'api_token', 'transfer_code', 'oauth_full', 'hosting_files' ) ) );
 		$this->assertSame( 'api_token', ApiTokens::PURPOSE );
 		$this->assertSame( 'transfer_code', AuthCodeRoute::PURPOSE );
 
 		$user = $this->customer();
 		$this->assertWPError( StepUp::send( $user, 'third' ), 'Unknown until registered.' );
 
-		$add = static fn( $p ) => array_merge( $p, array( 'third', 'api_token' ) );
+		$before = count( StepUp::purposes() );
+		$add    = static fn( $p ) => array_merge( $p, array( 'third', 'api_token' ) );
 		add_filter( 'beltoft_services_stepup_purposes', $add );
 		$text = static fn( $t, $p ) => 'third' === $p ? 'doing the third thing' : $t;
 		add_filter( 'beltoft_services_stepup_text', $text, 10, 2 );
 
-		$this->assertCount( 4, StepUp::purposes(), 'No duplicates.' );
+		$this->assertCount( $before + 1, StepUp::purposes(), 'No duplicates.' );
 		$this->assertTrue( StepUp::send( $user, 'third' ) );
 		$this->assertStringContainsString( 'doing the third thing', wp_strip_all_tags( (string) end( $this->mails )['message'] ) );
 		$this->assertTrue( StepUp::verify( $user, $this->code(), 'third' ) );

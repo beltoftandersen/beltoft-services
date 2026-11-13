@@ -967,7 +967,7 @@
         "type": "text",
         "default": "",
         "label": "Email order page",
-        "desc": "Where the Create an email domain button in the account goes, for example /business-email/#pricing. Empty uses the product page."
+        "desc": "Where the Create an email domain button in the account goes, for example /mail/#pricing. Empty uses the product page."
     },
     "mail_guide_url": {
         "tab": "mail",

@@ -85,7 +85,7 @@ final class MailHoldTest extends MailTestCase {
 		$this->assertStringContainsString( 'v=spf1', $text );
 		$this->assertStringNotContainsString( '_dmarc.rem.example', $text );
 		$this->assertStringNotContainsString( 'autoconfig.rem.example', $text );
-		$this->assertStringContainsString( 'cannot send until the SPF and DKIM records are found', $text );
+		$this->assertStringContainsString( 'cannot send until the SPF and DKIM records are found', (string) preg_replace( '/\s+/', ' ', $text ) ); // A plain-text mail wraps its lines.
 	}
 
 	public function test_no_reminder_when_only_recommended_records_are_missing(): void {
