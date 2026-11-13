@@ -385,13 +385,19 @@ final class Panels {
 			echo '<button type="button" class="button woocommerce-button" data-ssl-panel>' . esc_html__( 'Open the certificate authority page', 'beltoft-services' ) . '</button> ';
 		}
 
+		echo '</p>';
+
 		if ( isset( $actions['ssl_cancel'] ) ) {
 			/* translators: %d: days. */
-			$note = (int) $r->get( 'ssl_first_issued_at' ) > 0 ? sprintf( _n( 'You can cancel for a refund until %d day after the certificate was issued.', 'You can cancel for a refund until %d days after the certificate was issued.', SslSettings::refund_days(), 'beltoft-services' ), SslSettings::refund_days() ) : '';
-			echo '<button type="button" class="button woocommerce-button" data-ssl-cancel>' . esc_html( $actions['ssl_cancel'] ) . '</button> <span class="description">' . esc_html( $note ) . '</span>';
+			$note  = (int) $r->get( 'ssl_first_issued_at' ) > 0 ? sprintf( _n( 'You can cancel for a refund until %d day after the certificate was issued.', 'You can cancel for a refund until %d days after the certificate was issued.', SslSettings::refund_days(), 'beltoft-services' ), SslSettings::refund_days() ) : '';
+			$field = 'beltoft-ssl-cancel-' . $r->id();
+			// The same danger block as deleting a server: what happens, the typed word, the red button.
+			echo '<details class="bs-danger beltoft-services-ssl-cancel"><summary class="bs-danger__row">' . esc_html( $actions['ssl_cancel'] ) . '</summary><div class="bs-danger__body">';
+			echo '<p>' . esc_html( trim( __( 'The certificate stops working. This cannot be undone.', 'beltoft-services' ) . ' ' . $note ) ) . '</p>';
+			echo '<p><label for="' . esc_attr( $field ) . '">' . esc_html( sprintf( /* translators: %s: the word to type */ __( 'Type %s to confirm', 'beltoft-services' ), Operations::CONFIRM_CANCEL ) ) . '</label><input type="text" id="' . esc_attr( $field ) . '" data-ssl-confirm autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="' . esc_attr( Operations::CONFIRM_CANCEL ) . '"></p>';
+			echo '<p><button type="button" class="button woocommerce-button bs-btn bs-btn--danger-solid" data-ssl-cancel>' . esc_html( $actions['ssl_cancel'] ) . '</button></p>';
+			echo '</div></details>';
 		}
-
-		echo '</p>';
 	}
 
 	/**

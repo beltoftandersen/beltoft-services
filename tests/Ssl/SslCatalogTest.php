@@ -101,6 +101,7 @@ class SslCatalogTest extends TestCase {
 	}
 
 	public function test_settings_have_safe_bounds(): void {
+		$this->settings( array( 'ssl_enabled' => 0 ) );
 		$this->assertFalse( SslSettings::enabled() );
 		$this->settings( array( 'ssl_renew_days_before' => 90, 'ssl_wait_days' => 0, 'ssl_enabled' => 1 ) );
 		$this->assertSame( 30, SslSettings::renew_days() );

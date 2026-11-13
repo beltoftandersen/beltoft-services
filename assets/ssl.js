@@ -212,11 +212,10 @@
 		}
 
 		if ( target.hasAttribute( 'data-ssl-cancel' ) ) {
-			var typed = window.prompt( strings.confirm );
-
-			if ( null === typed ) {
-				return;
-			}
+			// The word typed in the danger block (the server checks it too).
+			var block = target.closest( '.beltoft-services-ssl-cancel' );
+			var input = block ? block.querySelector( '[data-ssl-confirm]' ) : null;
+			var typed = input ? input.value : '';
 
 			guarded( box, target, strings.working, function ( h ) {
 				return act( box, 'ssl_cancel', { confirm: typed.trim() }, h );
