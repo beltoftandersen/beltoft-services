@@ -38,6 +38,8 @@ final class Page {
 		add_filter( 'woocommerce_get_query_vars', array( __CLASS__, 'query_vars' ) );
 		add_filter( 'woocommerce_account_menu_items', array( __CLASS__, 'menu' ), 50 );
 		add_filter( 'woocommerce_account_menu_items', array( __CLASS__, 'ungroup' ), 100 );
+		// The gift card plugin's own "Gift Cards" page shows the same cards: the credit page is the one place for them.
+		add_filter( 'woocommerce_account_menu_items', array( __CLASS__, 'no_plugin_page' ), 110 );
 		add_filter( 'woocommerce_endpoint_' . self::ENDPOINT . '_title', array( __CLASS__, 'title' ) );
 		add_action( 'woocommerce_account_' . self::ENDPOINT . '_endpoint', array( __CLASS__, 'render' ), 5 );
 		add_filter( 'beltoft_services_billing_sets', array( __CLASS__, 'billing_set' ) );
@@ -221,5 +223,47 @@ final class Page {
 	 */
 	public static function render(): void {
 		echo self::html(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in the template.
+	}
+
+	/**
+	 * Takes the gift card plugin's own My Account item out of the menu while gift credit is on.
+	 *
+	 * @param mixed $items Menu items.
+	 * @return mixed
+	 */
+	public static function no_plugin_page( $items ) {
+		if ( is_array( $items ) && GiftCredit::active() ) {
+			unset( $items['gift-cards'] );
+		}
+
+		return $items;
+	}
+
+	/**
+	 * What an order was for: its products as the shop names them now (so in the page's language), two at most, then how many more.
+	 *
+	 * @param \WC_Order $order Order.
+	 */
+	public static function order_names( \WC_Order $order ): string {
+		$names = array();
+
+		foreach ( $order->get_items() as $item ) {
+			$product = is_callable( array( $item, 'get_product' ) ) ? $item->get_product() : null;
+			$name    = trim( wp_strip_all_tags( $product ? $product->get_name() : (string) $item->get_name() ) );
+
+			if ( '' !== $name ) {
+				$names[] = $name;
+			}
+		}
+
+		$names = array_values( array_unique( $names ) );
+
+		if ( count( $names ) > 2 ) {
+			$more = count( $names ) - 2;
+			/* translators: 1: two item names, 2: how many more items. */
+			return sprintf( _n( '%1$s and %2$d more', '%1$s and %2$d more', $more, 'beltoft-services' ), implode( ', ', array_slice( $names, 0, 2 ) ), $more );
+		}
+
+		return implode( ', ', $names );
 	}
 }

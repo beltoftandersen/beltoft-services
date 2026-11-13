@@ -116,7 +116,7 @@ $beltoft_services_first   = $credit['topup']['amounts'][0] ?? 0;
 
 	<form class="beltoft-services-credit__code" method="post" action="<?php echo esc_url( \BeltoftServices\GiftCredit\Page::url() ); ?>" novalidate data-bs-working="<?php esc_attr_e( 'Checking the code…', 'beltoft-services' ); ?>">
 		<div class="beltoft-services-ov__head">
-			<h2><?php esc_html_e( 'Have a gift card?', 'beltoft-services' ); ?></h2>
+			<h3 class="beltoft-services-credit__legend"><?php esc_html_e( 'Have a gift card?', 'beltoft-services' ); ?></h3>
 		</div>
 		<div class="beltoft-services-credit__coderow">
 			<label class="screen-reader-text" for="beltoft-credit-code"><?php esc_html_e( 'Gift card code', 'beltoft-services' ); ?></label>
@@ -153,8 +153,12 @@ $beltoft_services_first   = $credit['topup']['amounts'][0] ?? 0;
 						<td><?php echo esc_html( wp_date( (string) get_option( 'date_format' ), (int) strtotime( $beltoft_services_row['created'] . ' UTC' ) ) ); ?></td>
 						<td>
 							<?php if ( $beltoft_services_order ) : ?>
+								<?php esc_html_e( 'Used on order', 'beltoft-services' ); ?>
+								<?php $beltoft_services_names = \BeltoftServices\GiftCredit\Page::order_names( $beltoft_services_order ); ?>
 								<?php /* translators: %s: order number. */ ?>
-								<a href="<?php echo esc_url( $beltoft_services_order->get_view_order_url() ); ?>"><?php echo esc_html( sprintf( __( 'Used on order #%s', 'beltoft-services' ), $beltoft_services_order->get_order_number() ) ); ?></a>
+								<a href="<?php echo esc_url( $beltoft_services_order->get_view_order_url() ); ?>"><?php echo esc_html( sprintf( _x( '#%s', 'order number in the credit history', 'beltoft-services' ), $beltoft_services_order->get_order_number() ) ); ?></a><?php echo '' !== $beltoft_services_names ? esc_html( sprintf( /* translators: %s: what the order was for. */ __( ': %s', 'beltoft-services' ), $beltoft_services_names ) ) : ''; ?>
+							<?php elseif ( 'Moved from account credit' === (string) $beltoft_services_row['note'] ) : ?>
+								<?php esc_html_e( 'Moved from account credit', 'beltoft-services' ); ?>
 							<?php else : ?>
 								<?php echo esc_html( $beltoft_services_row['note'] ); ?>
 							<?php endif; ?>
