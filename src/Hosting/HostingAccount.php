@@ -1384,22 +1384,19 @@ final class HostingAccount {
 		}
 
 		if ( $ready && ! $busy ) {
-			echo '<div class="beltoft-hosting-formrow">';
-
 			if ( 1 === count( $sites ) ) {
 				// One website: nothing to choose, the restore buttons use it.
 				echo '<input type="hidden" data-hosting-field="restore_slug" value="' . esc_attr( (string) reset( $sites )['slug'] ) . '">';
 			} elseif ( array() !== $sites ) {
-				echo '<label class="beltoft-hosting-field"><span>' . esc_html__( 'Website to restore', 'beltoft-services' ) . '</span><select data-hosting-field="restore_slug">';
+				echo '<div class="beltoft-hosting-formrow"><label class="beltoft-hosting-field"><span>' . esc_html__( 'Website to restore', 'beltoft-services' ) . '</span><select data-hosting-field="restore_slug">';
 
 				foreach ( $sites as $site ) {
 					echo '<option value="' . esc_attr( $site['slug'] ) . '">' . esc_html( self::site_name( $site ) ) . '</option>';
 				}
 
-				echo '</select></label>';
+				echo '</select></label></div>';
 			}
 
-			echo '</div>';
 			self::action( esc_html__( 'A backup is made every night. You can also make one now.', 'beltoft-services' ), '<button type="button" class="beltoft-hosting-btn" data-hosting-action="backup_now">' . esc_html__( 'Back up now', 'beltoft-services' ) . '</button>' );
 
 			if ( null !== $safety ) {

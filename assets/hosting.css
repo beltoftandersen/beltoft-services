@@ -26,7 +26,7 @@
 .beltoft-hosting .beltoft-hosting-status.is-ok { color: var(--bs-status-ok, #28513e); font-weight: var(--bs-fw-medium, 500); }
 .beltoft-hosting .beltoft-hosting-status::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: var(--bs-space-2, 8px); background: currentColor; }
 .beltoft-hosting .beltoft-hosting-panel__foot { padding-top: var(--bs-space-3, 12px); border-top: 1px solid var(--bsh-rule); }
-.beltoft-hosting .beltoft-hosting-section { display: flex; flex-direction: column; gap: var(--bs-space-1, 4px); padding-inline: var(--bs-space-4, 16px); margin-bottom: calc(var(--bs-space-4, 16px) * -1); }
+.beltoft-hosting .beltoft-hosting-section { display: flex; flex-direction: column; gap: var(--bs-space-1, 4px); margin-bottom: calc(var(--bs-space-4, 16px) * -1); }
 .beltoft-hosting .beltoft-hosting-section__note { margin: 0; color: var(--bsh-soft); font-size: var(--bs-fs-small, 14px); }
 .beltoft-hosting .beltoft-hosting-section + .beltoft-hosting-site { margin-top: 0; }
 .beltoft-hosting .beltoft-hosting-site + .beltoft-hosting-site { margin-top: calc(var(--bs-space-4, 16px) - var(--bs-space-6, 32px)); }
@@ -243,3 +243,4 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-co
 	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-conn .bsh-conn__label { grid-column: 1 / -1; }
 	.beltoft-hosting .beltoft-hosting-backup-list .beltoft-hosting-actions { justify-content: flex-start; }
 }
+.beltoft-hosting .beltoft-hosting-backup-list td { vertical-align: middle; }
