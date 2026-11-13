@@ -22,9 +22,10 @@ class InvoiceViewTest extends GiftCreditTestCase {
 	/**
 	 * Usage invoice for October 2026: 100 hours at 0.02 = 2.00 net, 0.50 VAT.
 	 *
-	 * @param int $credit_cents Paid gift card on the account before the invoice (0: none).
+	 * @param int    $credit_cents Gift card on the account before the invoice (0: none).
+	 * @param string $source       The card's source: paid (order) by default.
 	 */
-	private function usage_invoice( int $credit_cents = 0 ): \WC_Order {
+	private function usage_invoice( int $credit_cents = 0, string $source = Source::ORDER ): \WC_Order {
 		$this->vat( true );
 		$user  = $this->new_user();
 		$sub   = $this->usage_account( $user );
@@ -35,7 +36,7 @@ class InvoiceViewTest extends GiftCreditTestCase {
 		}
 
 		if ( $credit_cents > 0 ) {
-			$this->card( $user, $credit_cents, Source::ORDER );
+			$this->card( $user, $credit_cents, $source );
 		}
 
 		$order = wcs_create_renewal_order( $sub );
@@ -117,6 +118,19 @@ class InvoiceViewTest extends GiftCreditTestCase {
 		$order->save();
 
 		$this->assertSame( array( 'Subtotal (excl. VAT):', 'VAT:', 'Paid from account credit:', 'Charged to your card:', 'Payment method:' ), $this->labels( $order ) );
+	}
+
+	public function test_a_free_card_is_a_row_before_vat_and_the_rows_add_up(): void {
+		$order = $this->usage_invoice( 100, Source::PROMOTION );
+		$order->set_status( 'processing' );
+		$order->save();
+
+		$this->assertSame( array( 'Subtotal (excl. VAT):', 'Free credit:', 'VAT:', 'Charged to your card:', 'Payment method:' ), $this->labels( $order ) );
+		$rows  = $order->get_order_item_totals();
+		$value = static fn( string $key ): string => trim( html_entity_decode( wp_strip_all_tags( $rows[ $key ]['value'] ) ) );
+		$this->assertSame( '-€0.80', $value( 'bgca_free' ), 'The card less its VAT share.' );
+		$this->assertSame( '1.50', $order->get_total(), '2.00 - 0.80 + VAT 0.30.' );
+		$this->assertSame( '0.30', wc_format_decimal( $order->get_total_tax(), 2 ) );
 	}
 
 	public function test_totals_when_credit_pays_it_all(): void {

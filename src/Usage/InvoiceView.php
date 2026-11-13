@@ -141,12 +141,30 @@ final class InvoiceView {
 	}
 
 	/**
-	 * What gift cards paid of an invoice, in cents (0: none). The add-on writes it on the order when it puts the cards on.
+	 * What gift cards paid of an invoice, in cents: free cards as their discount before VAT (net), paid cards as a payment after VAT.
+	 * The cards are the gift card plugin's coupon lines, marked bgcw_is_paid.
 	 *
 	 * @param \WC_Order $order Order.
+	 * @return array{free: int, paid: int}
 	 */
-	private static function cards_paid( \WC_Order $order ): int {
-		return class_exists( '\\Bgca\\Pay' ) ? \Bgca\Pay::applied( $order ) : 0;
+	private static function cards_paid( \WC_Order $order ): array {
+		$out = array( 'free' => 0, 'paid' => 0 );
+
+		foreach ( $order->get_items( 'coupon' ) as $coupon ) {
+			$flag = (string) $coupon->get_meta( 'bgcw_is_paid' );
+
+			if ( '' === $flag ) {
+				continue;
+			}
+
+			if ( 'yes' === $flag ) {
+				$out['paid'] += (int) round( ( (float) $coupon->get_discount() + (float) $coupon->get_discount_tax() ) * 100 );
+			} else {
+				$out['free'] += (int) round( (float) $coupon->get_discount() * 100 );
+			}
+		}
+
+		return $out;
 	}
 
 	/**
@@ -169,6 +187,7 @@ final class InvoiceView {
 		}
 
 		$cards   = self::cards_paid( $order );
+		$any     = $cards['free'] + $cards['paid'] > 0;
 		$total   = (float) $order->get_total();
 		$subtot  = array(
 			'cart_subtotal' => array(
@@ -189,8 +208,15 @@ final class InvoiceView {
 				continue;
 			}
 
-			// The cards are coupon lines the add-on put on the order: their row is placed after VAT below, as one row.
-			if ( $cards > 0 && 'discount' === $type ) {
+			// The cards are coupon lines: free cards get one row before VAT, paid cards one row after it (below).
+			if ( $any && 'discount' === $type ) {
+				if ( $cards['free'] > 0 ) {
+					$middle['bgca_free'] = array(
+						'type'  => 'discount',
+						'label' => __( 'Free credit:', 'beltoft-services' ),
+						'value' => '-' . wc_price( $cards['free'] / 100, array( 'currency' => $currency ) ),
+					);
+				}
 				continue;
 			}
 
@@ -217,13 +243,13 @@ final class InvoiceView {
 			$middle[ $key ] = $row;
 		}
 
-		if ( $cards > 0 ) {
+		if ( $cards['paid'] > 0 ) {
 			$credit_row = array(
 				'bgca_cards',
 				array(
 					'type'  => 'credit',
 					'label' => __( 'Paid from account credit:', 'beltoft-services' ),
-					'value' => '-' . wc_price( $cards / 100, array( 'currency' => $currency ) ),
+					'value' => '-' . wc_price( $cards['paid'] / 100, array( 'currency' => $currency ) ),
 				),
 			);
 		}
