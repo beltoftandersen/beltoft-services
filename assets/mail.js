@@ -245,7 +245,10 @@
 			guarded( box, target, strings.aliasing, function ( h ) {
 				return call( box, 'POST', '/mail/aliases', {
 					address: aliasField.value.trim(),
-					goto: lines( alias.querySelector( '[data-mail-alias-goto]' ).value )
+					// The chosen mailboxes, then any other addresses typed (one per line).
+					goto: Array.prototype.map.call( alias.querySelectorAll( '[data-mail-alias-box]:checked' ), function ( box ) {
+						return box.value;
+					} ).concat( alias.querySelector( '[data-mail-alias-goto]' ) ? lines( alias.querySelector( '[data-mail-alias-goto]' ).value ) : [] )
 				} ).then( function ( result ) {
 					if ( result.ok ) {
 						fresh( box );

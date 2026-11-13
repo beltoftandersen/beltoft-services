@@ -88,7 +88,7 @@ final class MailCard {
 		$area = $page && ( $page['area'] ?? null ) instanceof Email ? $page['area'] : null;
 		$nav  = $area ? $area->nav() : array();
 		$tab  = $area && '' !== (string) $page['tab'] ? (string) $page['tab'] : 'overview';
-		$want = array( 'overview' => array( 'mailboxes' ), 'aliases' => array( 'aliases' ) );
+		$want = array( 'overview' => array( 'mailboxes' ), 'aliases' => array( 'aliases', 'mailboxes' ) ); // The alias form offers the mailboxes to choose.
 		$view = MailView::data( $r, $want[ $tab ] ?? array() );
 		$link = static fn( string $slug ): string => $area && $page ? $area->url( $page['license'], 'overview' === $slug ? '' : $slug ) : '';
 

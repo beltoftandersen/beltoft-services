@@ -186,6 +186,7 @@ final class MailAccountTest extends MailTestCase {
 		$this->assertStringContainsString( 'info@boxes.example', $html );
 		$this->assertStringContainsString( 'Info desk', $html );
 		$this->assertStringContainsString( '2.5 GB of 10 GB (25%)', $html );
+		$this->assertStringContainsString( 'in webmail under Settings, Identities', $html, 'Where the sender name is set.' );
 		$this->assertStringContainsString( 'data-mail-reveal="info@boxes.example"', $html );
 		$this->assertStringContainsString( 'data-mail-reset="info@boxes.example"', $html );
 		$this->assertStringContainsString( 'data-mail-delete="info@boxes.example"', $html );
@@ -319,8 +320,23 @@ final class MailAccountTest extends MailTestCase {
 		$this->assertStringContainsString( 'in this domain or elsewhere', $html );
 		$this->assertStringNotContainsString( 'Mailboxes</h4>', $html, 'Only the tab shown.' );
 
+		// No mailbox yet: the form says to make one, and outside addresses go in the field.
+		$this->assertStringNotContainsString( 'data-mail-alias-box', $html );
+		$this->assertStringContainsString( 'data-mail-alias-goto', $html );
+
+		// With mailboxes: they are offered to tick, and the field stays for other addresses (outside forwarding is allowed).
+		\BeltoftServices\Mail\Mailboxes::create( Resource::find( $r->id() ), 'info', 'Info Shop', 1024 );
+		$html = $this->page( Resource::find( $r->id() ), 'aliases' );
+		$this->assertStringContainsString( '<input type="checkbox" value="info@al.example" data-mail-alias-box>', $html );
+		$this->assertStringContainsString( 'Info Shop', $html );
+		$this->assertStringContainsString( 'Other addresses', $html );
+		$this->assertStringNotContainsString( 'Mailboxes</h4>', $html, 'Only the tab shown, though its form offers the mailboxes.' );
+
 		$this->settings( array( 'mail_allow_external_forward' => 0 ) );
-		$this->assertStringContainsString( 'passed on to the addresses you choose in this domain', $this->page( Resource::find( $r->id() ), 'aliases' ) );
+		$html = $this->page( Resource::find( $r->id() ), 'aliases' );
+		$this->assertStringContainsString( 'passed on to the addresses you choose in this domain', $html );
+		$this->assertStringContainsString( 'data-mail-alias-box', $html );
+		$this->assertStringNotContainsString( 'data-mail-alias-goto', $html, 'Only mailboxes of the domain can be chosen.' );
 
 		\BeltoftServices\Mail\Aliases::create( Resource::find( $r->id() ), 'two', array( 'a@al.example' ) );
 		$this->assertStringContainsString( 'Your plan has no room for more aliases.', $this->page( Resource::find( $r->id() ), 'aliases' ) );
@@ -470,7 +486,8 @@ final class MailAccountTest extends MailTestCase {
 		foreach ( $files as $file ) {
 			$text = (string) file_get_contents( BELTOFT_SERVICES_PATH . $file );
 			$this->assertNotSame( '', $text, $file );
-			$this->assertStringNotContainsString( 'border-radius', $text, $file . ' has square corners.' );
+			// Since 2026-11-12 corners follow the account radius token, never a pixel value of their own.
+			$this->assertDoesNotMatchRegularExpression( '/border-radius:(?!\s*var\(--bs-radius)/', $text, $file . ' uses the radius token.' );
 			$this->assertStringNotContainsString( "\u{2014}", $text, $file . ' has no em dash.' );
 		}
 

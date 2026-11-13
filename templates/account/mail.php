@@ -217,6 +217,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 							</li>
 						<?php endforeach; ?>
 					</ul>
+					<p class="description" data-mail-sender-name><?php esc_html_e( 'The name recipients see when you send is set where you write your mail: in webmail under Settings, Identities, or in the settings of your mail program.', 'beltoft-services' ); ?></p>
 				<?php endif; ?>
 
 				<div class="beltoft-services-mail__secret" data-mail-secret hidden>
@@ -300,11 +301,26 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 							<input type="text" id="beltoft-mail-alias" autocomplete="off" maxlength="64" placeholder="<?php echo esc_attr_x( 'sales', 'example alias name', 'beltoft-services' ); ?>" data-mail-alias-local>
 							<span class="beltoft-services-mail__at">@<?php echo esc_html( $beltoft_services_shown ); ?></span>
 						</p>
-						<p>
-							<label for="beltoft-mail-goto"><?php esc_html_e( 'Pass mail on to', 'beltoft-services' ); ?></label>
-							<textarea id="beltoft-mail-goto" rows="3" autocomplete="off" data-mail-alias-goto></textarea>
-							<span class="description"><?php echo esc_html( $view['forward_external'] ? __( 'One or more addresses, one per line. Up to ten.', 'beltoft-services' ) : __( 'One or more addresses in this domain, one per line. Up to ten.', 'beltoft-services' ) ); ?></span>
-						</p>
+						<?php $beltoft_services_targets = array_values( array_filter( (array) $view['mailboxes'], static fn( $b ) => ! empty( $b['email'] ) ) ); ?>
+						<fieldset class="beltoft-services-mail__goto">
+							<legend><?php esc_html_e( 'Pass mail on to', 'beltoft-services' ); ?></legend>
+							<?php if ( array() !== $beltoft_services_targets ) : ?>
+								<div class="beltoft-services-mail__targets" data-mail-alias-boxes>
+									<?php foreach ( $beltoft_services_targets as $beltoft_services_target ) : ?>
+										<label class="beltoft-services-mail__target"><input type="checkbox" value="<?php echo esc_attr( $beltoft_services_target['email'] ); ?>" data-mail-alias-box> <span><?php echo esc_html( \BeltoftServices\Domains\HostName::display( $beltoft_services_target['email'] ) ); ?><?php echo '' !== (string) $beltoft_services_target['name'] ? ' <span class="description">' . esc_html( $beltoft_services_target['name'] ) . '</span>' : ''; ?></span></label>
+									<?php endforeach; ?>
+								</div>
+							<?php elseif ( ! $view['forward_external'] ) : ?>
+								<p class="description"><?php esc_html_e( 'Make a mailbox first. An alias passes mail on to mailboxes in this domain.', 'beltoft-services' ); ?></p>
+							<?php endif; ?>
+							<?php if ( $view['forward_external'] ) : ?>
+								<label for="beltoft-mail-goto"><?php echo esc_html( array() !== $beltoft_services_targets ? __( 'Other addresses', 'beltoft-services' ) : __( 'Addresses', 'beltoft-services' ) ); ?></label>
+								<textarea id="beltoft-mail-goto" rows="2" autocomplete="off" placeholder="name@example.com" data-mail-alias-goto></textarea>
+								<span class="description"><?php esc_html_e( 'One address per line, also outside this domain. Up to ten addresses in all.', 'beltoft-services' ); ?></span>
+							<?php else : ?>
+								<span class="description"><?php esc_html_e( 'Choose one or more mailboxes. Up to ten.', 'beltoft-services' ); ?></span>
+							<?php endif; ?>
+						</fieldset>
 						<p><button type="button" class="button woocommerce-button" data-mail-alias-submit><?php esc_html_e( 'Create alias', 'beltoft-services' ); ?></button></p>
 					</div>
 				<?php endif; ?>

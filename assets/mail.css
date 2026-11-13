@@ -1,4 +1,4 @@
-/* Email domain page. Builds on the database page styles (tabs, facts, forms) and the DNS table look of the Domains page. Square corners. */
+/* Email domain page. Builds on the database page styles (tabs, facts, forms) and the DNS table look of the Domains page. Corners use the account radius token. */
 .beltoft-services-mail { --bsm-rule: var(--rule, #d6d2c8); --bsm-soft: var(--ink-soft, #5e7080); --bsm-navy: var(--navy, #0c1535); --bsm-warm: var(--bg-warm, #eeece6); }
 .beltoft-services-mail .beltoft-services-mail__table { width: 100%; max-width: none; margin: 0 0 16px; border-collapse: collapse; table-layout: auto; }
 .beltoft-services-mail .beltoft-services-mail__table th { padding: 0 8px 8px; border: 0; border-bottom: 1px solid var(--bsm-rule); background: none; color: var(--bsm-soft); font-size: 13px; font-weight: 500; text-align: left; }
@@ -35,3 +35,15 @@
 	.beltoft-services-mail .beltoft-services-mail__table td.beltoft-services-mail__actions { width: auto; min-width: 0; padding-top: 8px; white-space: normal; text-align: left; }
 	.beltoft-services-mail .beltoft-services-mail__actions .button, .beltoft-services-mail .beltoft-services-mail__actions details { margin: 0 8px 8px 0; }
 }
+
+/* New alias: the domain's mailboxes to choose, one per row, then other addresses where that is allowed. */
+.beltoft-services-mail .beltoft-services-mail__goto { margin: 0 0 16px; padding: 0; border: 0; min-width: 0; }
+.beltoft-services-mail .beltoft-services-mail__goto legend { margin: 0 0 8px; padding: 0; font-weight: var(--bs-fw-medium, 500); }
+.beltoft-services-mail .beltoft-services-mail__targets { display: flex; flex-direction: column; margin: 0 0 12px; border-radius: var(--bs-radius, 8px); background: var(--bs-surface, #fff); }
+.beltoft-services-mail .beltoft-services-mail__target { display: flex; align-items: baseline; gap: 10px; margin: 0; padding: 10px 14px; border-top: 1px solid var(--bs-line, #e3e0d8); cursor: pointer; overflow-wrap: anywhere; }
+.beltoft-services-mail .beltoft-services-mail__target:first-child { border-top: 0; }
+.beltoft-services-mail .beltoft-services-mail__target input { flex: none; margin: 0; }
+.beltoft-services-mail .beltoft-services-mail__target .description { margin-left: 6px; color: var(--bsm-soft); }
+.beltoft-services-mail .beltoft-services-mail__goto label[for="beltoft-mail-goto"] { display: block; margin: 0 0 4px; }
+.beltoft-services-mail .beltoft-services-mail__goto textarea { width: 100%; }
+.beltoft-services-mail .beltoft-services-mail__goto > .description { display: block; margin-top: 4px; }
