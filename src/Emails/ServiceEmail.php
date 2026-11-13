@@ -109,42 +109,54 @@ abstract class ServiceEmail extends \WC_Email {
 			// The licence's address, else the customer's own: a mail about what a connected app did must not go nowhere.
 			$this->recipient = (string) ( $license['email'] ?? '' );
 			$this->recipient = '' !== $this->recipient ? $this->recipient : ( $user ? (string) $user->user_email : '' );
-			$values          = array(
-				'product_name'   => $license ? View::product_name( $license ) : '',
-				'customer_name'  => $user ? (string) ( $user->first_name ? $user->first_name : $user->display_name ) : '',
-				'account_url'    => self::account_url( $r, $license ),
-				'deletion_date'  => (string) $date,
-				'reason'         => self::customer_reason( (string) $r->get( 'paused_reason' ), $r->on_hold() ),
-				'held'           => $r->on_hold(),
-				'retention_days' => self::retention_days( $r, $license ),
-				'deletes_on'     => self::deletes_on( $r, $license ),
-				'details'        => $this->details( $r ),
-				'used'           => $used,
-				'limit'          => $limit,
-				'usage'          => $driver ? $driver->unit_label( $used, $limit ) : sprintf( '%d / %d', $used, $limit ),
-				'domain_name'    => '',
-				'notice_kind'    => in_array( $data['notice_kind'] ?? '', Notice::KINDS, true ) ? $data['notice_kind'] : 'db_access',
-				'notice_what'    => isset( $data['notice_what'] ) && is_string( $data['notice_what'] ) ? wp_strip_all_tags( $data['notice_what'] ) : '',
-				'notice_app'     => isset( $data['notice_app'] ) && is_string( $data['notice_app'] ) ? wp_strip_all_tags( $data['notice_app'] ) : '',
-				'renewal'        => is_array( $data['renewal'] ?? null ) ? array(
-					'date'       => sanitize_text_field( (string) ( $data['renewal']['date'] ?? '' ) ),
-					'plan'       => sanitize_text_field( (string) ( $data['renewal']['plan'] ?? '' ) ),
-					'price_html' => wp_kses_post( (string) ( $data['renewal']['price_html'] ?? '' ) ),
-					'view_url'   => esc_url_raw( (string) ( $data['renewal']['view_url'] ?? '' ) ),
-				) : array( 'date' => '', 'plan' => '', 'price_html' => '', 'view_url' => '' ),
-			);
+			// The values, the details table among them, in the language the customer ordered in (the licence's order), like the
+			// heading and text WooCommerce translates when the email is sent.
+			$order  = ! empty( $license['order_id'] ) ? wc_get_order( (int) $license['order_id'] ) : false;
+			$values = array();
+			$build  = function () use ( &$values, $r, $data, $license, $user, $driver, $used, $limit, $date ): void {
+				$values          = array(
+					'product_name'   => $license ? View::product_name( $license ) : '',
+					'customer_name'  => $user ? (string) ( $user->first_name ? $user->first_name : $user->display_name ) : '',
+					'account_url'    => self::account_url( $r, $license ),
+					'deletion_date'  => (string) $date,
+					'reason'         => self::customer_reason( (string) $r->get( 'paused_reason' ), $r->on_hold() ),
+					'held'           => $r->on_hold(),
+					'retention_days' => self::retention_days( $r, $license ),
+					'deletes_on'     => self::deletes_on( $r, $license ),
+					'details'        => $this->details( $r ),
+					'used'           => $used,
+					'limit'          => $limit,
+					'usage'          => $driver ? $driver->unit_label( $used, $limit ) : sprintf( '%d / %d', $used, $limit ),
+					'domain_name'    => '',
+					'notice_kind'    => in_array( $data['notice_kind'] ?? '', Notice::KINDS, true ) ? $data['notice_kind'] : 'db_access',
+					'notice_what'    => isset( $data['notice_what'] ) && is_string( $data['notice_what'] ) ? wp_strip_all_tags( $data['notice_what'] ) : '',
+					'notice_app'     => isset( $data['notice_app'] ) && is_string( $data['notice_app'] ) ? wp_strip_all_tags( $data['notice_app'] ) : '',
+					'renewal'        => is_array( $data['renewal'] ?? null ) ? array(
+						'date'       => sanitize_text_field( (string) ( $data['renewal']['date'] ?? '' ) ),
+						'plan'       => sanitize_text_field( (string) ( $data['renewal']['plan'] ?? '' ) ),
+						'price_html' => wp_kses_post( (string) ( $data['renewal']['price_html'] ?? '' ) ),
+						'view_url'   => esc_url_raw( (string) ( $data['renewal']['view_url'] ?? '' ) ),
+					) : array( 'date' => '', 'plan' => '', 'price_html' => '', 'view_url' => '' ),
+				);
 
-			/**
-			 * The template values of a service email. Each feature adds its own keys here, always all of
-			 * them with their empty defaults, so a template never meets a missing key. Display values only:
-			 * never a secret.
-			 *
-			 * @param array<string, mixed> $values Values so far.
-			 * @param Resource             $r      The resource.
-			 * @param array<string, mixed> $data   Trigger data.
-			 * @param ServiceEmail         $email  The email.
-			 */
-			$values = apply_filters( 'beltoft_services_email_values', $values, $r, $data, $this );
+				/**
+				 * The template values of a service email. Each feature adds its own keys here, always all of
+				 * them with their empty defaults, so a template never meets a missing key. Display values only:
+				 * never a secret.
+				 *
+				 * @param array<string, mixed> $values Values so far.
+				 * @param Resource             $r      The resource.
+				 * @param array<string, mixed> $data   Trigger data.
+				 * @param ServiceEmail         $email  The email.
+				 */
+				$values = apply_filters( 'beltoft_services_email_values', $values, $r, $data, $this );
+			};
+
+			if ( $order instanceof \WC_Order ) {
+				\BeltoftServices\OrderLanguage::run( $order, $build );
+			} else {
+				$build();
+			}
 
 			$this->values = is_array( $values ) ? $values : array();
 
