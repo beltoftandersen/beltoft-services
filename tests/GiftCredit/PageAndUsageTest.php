@@ -8,7 +8,6 @@
 namespace BeltoftServices\Tests\GiftCredit;
 
 use Bgca\Account;
-use Bgca\Attach;
 use Bgca\TopUp;
 use Bgcw\GiftCard\Source;
 use BeltoftServices\GiftCredit\Checkout;
@@ -50,14 +49,13 @@ class PageAndUsageTest extends GiftCreditTestCase {
 
 		$html = Page::html();
 
-		$this->assertStringContainsString( 'beltoft-services-credit', $html );
+		$this->assertStringContainsString( 'beltoft-services-credit', $html, 'The section class.' );
 		$this->assertStringContainsString( '19.00', $html );
 		$this->assertStringContainsString( '15.00', $html, 'Paid credit.' );
 		$this->assertStringContainsString( '4.00', $html, 'Free credit.' );
 		$this->assertStringContainsString( 'name="bgca_amount"', $html, 'The top-up form of the add-on.' );
-		$this->assertStringContainsString( 'name="bgca_code"', $html, 'The form that adds a gift card code.' );
+		$this->assertStringNotContainsString( 'name="bgca_code"', $html, 'Codes are typed in the coupon field at checkout.' );
 		$this->assertStringContainsString( TopUp::ACTION, $html );
-		$this->assertStringContainsString( Attach::ACTION, $html );
 		$this->assertStringContainsString( Page::url(), $html );
 	}
 
@@ -65,6 +63,12 @@ class PageAndUsageTest extends GiftCreditTestCase {
 		$this->assertSame( Page::url(), Account::url() );
 		$this->settings( array( 'gift_credit' => 0 ) );
 		$this->assertNotSame( Page::url(), Account::url() );
+	}
+
+	public function test_codes_in_the_coupon_field_go_to_credit_only_while_gift_credit_is_on(): void {
+		$this->assertTrue( apply_filters( 'bgca_coupon_field_attaches', true, 1, 'X' ) );
+		$this->settings( array( 'gift_credit' => 0 ) );
+		$this->assertFalse( apply_filters( 'bgca_coupon_field_attaches', true, 1, 'X' ) );
 	}
 
 	public function test_a_customer_sees_nothing_while_gift_credit_is_off(): void {

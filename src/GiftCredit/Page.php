@@ -209,8 +209,7 @@ final class Page {
 		}
 
 		Panel::style();
-		wp_enqueue_script( 'beltoft-services-credit', plugins_url( 'assets/credit.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Status::HANDLE ), \BeltoftServices\Assets::version( 'assets/credit.js' ), true );
-		wp_localize_script( 'beltoft-services-credit', 'beltoftCredit', array( 'empty' => __( 'Enter your gift card code.', 'beltoft-services' ) ) );
+		wp_enqueue_script( \BeltoftServices\Status::HANDLE );
 
 		ob_start();
 		wc_get_template( 'gift-credit.php', array( 'credit' => self::data( get_current_user_id() ) ), 'beltoft-services/account/', BELTOFT_SERVICES_PATH . 'templates/account/' );

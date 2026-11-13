@@ -33,6 +33,15 @@ final class GiftCredit {
 	}
 
 	/**
+	 * A code typed in the coupon field goes into the customer's credit only while gift credit is on.
+	 *
+	 * @param mixed $attach Answer so far.
+	 */
+	public static function coupon_field( $attach ): bool {
+		return (bool) $attach && self::active();
+	}
+
+	/**
 	 * Hooks. The setting is always listed (its text says what it needs); the product box is always there.
 	 */
 	public static function register(): void {
@@ -45,6 +54,7 @@ final class GiftCredit {
 
 		// The add-on's filters: every answer is "no change" while gift credit is off, except that the cards then pay nothing.
 		add_filter( 'bgca_account_view_enabled', array( __CLASS__, 'own_page_off' ) );
+		add_filter( 'bgca_coupon_field_attaches', array( __CLASS__, 'coupon_field' ) );
 		add_filter( 'bgca_account_url', array( Page::class, 'url_filter' ) );
 		add_filter( 'bgca_account_currency', array( Rules::class, 'account_currency' ), 10, 2 );
 		add_filter( 'bgca_card_may_pay_line', array( PromoFlag::class, 'card_may_pay_line' ), 10, 4 );

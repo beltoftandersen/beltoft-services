@@ -55,9 +55,5 @@ class StatusTest extends TestCase {
 		$this->assertMatchesRegularExpression( "/if \\( 'cache' === action \\) \\{\\s*return;\\s*\\}/", $hosting );
 		$this->assertStringContainsString( 'remember( action,', $hosting );
 		$this->assertStringContainsString( 'recall();', $hosting );
-
-		// Credit: an empty coupon is said under its button.
-		$credit = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/credit.js' );
-		$this->assertStringContainsString( "status.fail( button ? status.busy( '', 'page', button ) : null", $credit );
 	}
 }
