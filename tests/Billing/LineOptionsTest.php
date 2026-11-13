@@ -27,8 +27,8 @@ final class LineOptionsTest extends UsageTestCase {
 		LineOptions::keep( $item );
 
 		$options = json_decode( (string) $item->get_meta( LineOptions::META ), true );
-		$this->assertContains( array( 'Backups', 'Daily' ), $options, 'Kept before the line is saved, as at checkout.' );
-		$this->assertNotContains( array( 'gift-note', 'Happy birthday' ), $options, 'Other visible meta is not an option.' );
+		$this->assertContains( array( 'Backups', 'Daily', 'backups' ), $options, 'Kept before the line is saved, as at checkout, with its key.' );
+		$this->assertNotContains( array( 'gift-note', 'Happy birthday', 'gift-note' ), $options, 'Other visible meta is not an option.' );
 	}
 
 	public function test_a_line_without_options_gets_nothing(): void {

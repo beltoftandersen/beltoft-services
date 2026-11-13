@@ -571,11 +571,13 @@ final class UsageDiskTest extends UsageTestCase {
 
 		$this->assertSame( 'web1', Renewal::label( $disk->id() ) );
 		$this->assertSame( 'Extra disk for web1', Renewal::line_subject( 'disk', Renewal::label( $disk->id() ) ) );
-		$this->assertSame( 'Extra disk 100 GB (web1)', Renewal::invoice_title( 'disk', $disk->id(), 100.0, 'GB' ), 'The invoice title names the size and the server.' );
-		$this->assertSame( 'Backups (web1)', Renewal::invoice_title( 'backups', $server->id() ) );
+		$ref = Renewal::reference( $server->id() );
+		$this->assertMatchesRegularExpression( '/^vm-[0-9a-f]{8}$/', $ref, 'A fixed reference, not the name the customer can change.' );
+		$this->assertSame( 'Extra disk 100 GB (' . $ref . ')', Renewal::invoice_title( 'disk', $disk->id(), 100.0, 'GB' ), 'A disk is named with its server.' );
+		$this->assertSame( 'Backups (' . $ref . ')', Renewal::invoice_title( 'backups', $server->id() ) );
 		$product = wc_get_product( (int) $server->license()['product_id'] );
 		$this->assertStringStartsWith( $product->get_name(), Renewal::invoice_title( 'server', $server->id() ), 'A server line is named by its product and plan.' );
-		$this->assertStringEndsWith( '(web1)', Renewal::invoice_title( 'server', $server->id() ) );
+		$this->assertStringEndsWith( '(' . $ref . ')', Renewal::invoice_title( 'server', $server->id() ) );
 
 		\BeltoftServices\Usage\Estimate::reset();
 		$estimate = \BeltoftServices\Usage\Estimate::for_user( $this->user );

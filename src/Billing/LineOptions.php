@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class LineOptions {
 
-	/** Order item meta: a JSON list of array( label, value ). Hidden from the order screens. */
+	/** Order item meta: a JSON list of array( label, value, key ) (key: the attribute, "plan", "pa_size"). Hidden from the order screens. */
 	public const META = '_beltoft_services_options';
 
 	/**
@@ -44,10 +44,10 @@ final class LineOptions {
 	}
 
 	/**
-	 * The options of a line as the customer sees them now: array( label, value ) for each visible attribute meta of the line.
+	 * The options of a line as the customer sees them now: array( label, value, key ) for each visible attribute meta of the line.
 	 *
 	 * @param \WC_Order_Item_Product $item Order line.
-	 * @return array<int, array{0: string, 1: string}>
+	 * @return array<int, array{0: string, 1: string, 2: string}>
 	 */
 	public static function of( \WC_Order_Item_Product $item ): array {
 		$product = $item->get_product();
@@ -89,7 +89,7 @@ final class LineOptions {
 			$value = trim( html_entity_decode( wp_strip_all_tags( (string) ( $row->display_value ?? '' ) ), ENT_QUOTES, 'UTF-8' ) );
 
 			if ( '' !== $label && '' !== $value ) {
-				$out[] = array( $label, $value );
+				$out[] = array( $label, $value, (string) ( $row->key ?? '' ) );
 			}
 		}
 
