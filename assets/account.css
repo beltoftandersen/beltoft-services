@@ -1159,3 +1159,10 @@ body.woocommerce-account .woocommerce-MyAccount-content .bs-danger__row::after {
 body.woocommerce-account .woocommerce-MyAccount-content .bs-danger[open] > .bs-danger__row::after { transform: rotate(225deg) translate(-2px, -2px); }
 body.woocommerce-account .woocommerce-MyAccount-content .bs-danger__body { padding: 0 var(--bs-space-5) var(--bs-space-5); }
 body.woocommerce-account .woocommerce-MyAccount-content .bs-danger__body > p:last-child { margin-bottom: 0; }
+
+/* An empty list (no domains, no databases, ...): the line and its buttons as one card, not loose text on the page. */
+body.woocommerce-account .woocommerce-MyAccount-content p.beltoft-licenses__empty { box-sizing: border-box; width: 100%; margin: 0; max-width: 880px; padding: var(--bs-space-6) var(--bs-space-5) var(--bs-space-6); border-radius: var(--bs-radius-lg); background: var(--bs-surface); color: var(--navy, #10221b); font-size: 16px; }
+body.woocommerce-account .woocommerce-MyAccount-content p.beltoft-licenses__empty:has(+ .beltoft-services-list-actions.is-start), body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domains.is-empty p.beltoft-licenses__empty { padding-bottom: var(--bs-space-3); border-radius: var(--bs-radius-lg) var(--bs-radius-lg) 0 0; }
+body.woocommerce-account .woocommerce-MyAccount-content p.beltoft-licenses__empty + .beltoft-services-list-actions.is-start, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domains.is-empty .beltoft-services-list-actions { box-sizing: border-box; width: 100%; max-width: 880px; margin: 0; padding: 0 var(--bs-space-5) var(--bs-space-6); border-radius: 0 0 var(--bs-radius-lg) var(--bs-radius-lg); background: var(--bs-surface); justify-content: flex-start; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-list-btn { border-radius: var(--bs-radius); }
+body.woocommerce-account .woocommerce-MyAccount-content > p.beltoft-licenses__empty + .beltoft-services-list-actions.is-start { margin-top: -12px; } /* the content column's 12px gap would split the card */
