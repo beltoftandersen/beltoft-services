@@ -1150,3 +1150,12 @@ body.woocommerce-account .woocommerce-MyAccount-content .bs-confirm__body { marg
 
 /* The white boxes of every page take the card corner (overview, lists of servers and other services, facts, credit). */
 body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-ov__attention, .beltoft-services-ov__feed, .beltoft-services-ov__money, .beltoft-services-ov__rows, .beltoft-services-servers, .beltoft-services-credit__balance, .beltoft-services-credit__grid, .beltoft-services-facts) { border-radius: var(--bs-radius-lg); overflow: hidden; }
+
+/* A danger section (delete a server, a database): a closed row with a red name; it opens to what deleting does and the confirmation. */
+body.woocommerce-account .woocommerce-MyAccount-content .bs-danger { margin: var(--bs-space-6) 0 0; padding: 0; border: 1px solid #e9c9c4; border-radius: var(--bs-radius-lg); background: var(--bs-surface); max-width: 720px; }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-danger__row { display: flex; align-items: center; justify-content: space-between; gap: var(--bs-space-4); padding: var(--bs-space-4) var(--bs-space-5); color: var(--bs-status-fail); font-weight: var(--bs-fw-medium); cursor: pointer; list-style: none; }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-danger__row::-webkit-details-marker { display: none; }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-danger__row::after { content: ""; flex: none; width: 9px; height: 9px; border-right: 2px solid currentcolor; border-bottom: 2px solid currentcolor; transform: rotate(45deg) translate(-2px, -2px); }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-danger[open] > .bs-danger__row::after { transform: rotate(225deg) translate(-2px, -2px); }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-danger__body { padding: 0 var(--bs-space-5) var(--bs-space-5); }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-danger__body > p:last-child { margin-bottom: 0; }

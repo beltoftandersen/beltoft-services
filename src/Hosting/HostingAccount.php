@@ -530,7 +530,18 @@ final class HostingAccount {
 
 		// WordPress login.
 		self::sec_open( __( 'WordPress login', 'beltoft-services' ), (string) $site['admin_user'], false, 'login', $slug );
-		echo '<p class="beltoft-hosting-line" data-login-facts>' . esc_html( self::login_facts( (string) $site['admin_user'], (string) $site['admin_email'] ) ) . '</p>';
+		// Who the button signs in as, as two facts, then one line on what the button does.
+		if ( '' !== (string) $site['admin_user'] ) {
+			echo '<dl class="bsh-kv"><div><dt>' . esc_html__( 'WordPress user', 'beltoft-services' ) . '</dt><dd>' . esc_html( (string) $site['admin_user'] ) . '</dd></div>';
+
+			if ( '' !== (string) $site['admin_email'] ) {
+				echo '<div><dt>' . esc_html__( 'Email address', 'beltoft-services' ) . '</dt><dd>' . esc_html( (string) $site['admin_email'] ) . '</dd></div>';
+			}
+
+			echo '</dl>';
+		}
+
+		echo '<p class="beltoft-hosting-help" data-login-facts>' . esc_html( '' !== (string) $site['admin_user'] ? __( 'Log in to WordPress, at the top of this website, signs you in as this user. No password is needed.', 'beltoft-services' ) : __( 'Log in to WordPress, at the top of this website, signs you in as its administrator. No password is needed.', 'beltoft-services' ) ) . '</p>';
 
 		if ( $ready ) {
 			echo '<div class="beltoft-hosting-buttons"><button type="button" class="beltoft-hosting-btn" data-hosting-action="password" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Set a WordPress password', 'beltoft-services' ) . '</button></div>';

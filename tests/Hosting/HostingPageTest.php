@@ -589,7 +589,9 @@ class HostingPageTest extends HostingCase {
 		$this->assertStringContainsString( 'id="beltoft-site-w' . $r->id() . '-connect"', $html );
 		$this->assertStringContainsString( 'Log in to WordPress', $html );
 		$this->assertStringContainsString( 'Set a WordPress password', $html );
-		$this->assertStringContainsString( 'Signs you in as owner (' . $r->license()['email'] . '). No password is needed.', $html );
+		$this->assertStringContainsString( '<dt>WordPress user</dt><dd>owner</dd>', $html );
+		$this->assertStringContainsString( '<dt>Email address</dt><dd>' . esc_html( $r->license()['email'] ) . '</dd>', $html );
+		$this->assertStringContainsString( 'signs you in as this user. No password is needed.', $html );
 		$this->assertStringContainsString( 'Clears the page cache and the object cache of this website.', $html );
 		$this->assertStringContainsString( 'data-hosting-action="php_edit"', $html );
 		$this->assertStringContainsString( 'PHP 8.3', $html );

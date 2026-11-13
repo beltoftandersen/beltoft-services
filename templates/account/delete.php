@@ -26,8 +26,9 @@ $beltoft_services_delete_word  = \BeltoftServices\Usage\CustomerDelete::word( $b
 $beltoft_services_delete_title = 'database' === $beltoft_services_delete_kind ? __( 'Delete database', 'beltoft-services' ) : __( 'Delete server', 'beltoft-services' );
 $beltoft_services_delete_list  = function_exists( 'wc_get_account_endpoint_url' ) ? wc_get_account_endpoint_url( 'database' === $beltoft_services_delete_kind ? \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Databases::class )->slug() : \BeltoftServices\Account\ServerLinks::slug() ) : '';
 ?>
-<div class="beltoft-services-vm__more beltoft-services-delete" data-delete-box data-delete-after="<?php echo esc_url( $beltoft_services_delete_list ); ?>" data-resource-id="<?php echo (int) $beltoft_services_delete_id; ?>" data-bs-scope="<?php echo (int) $beltoft_services_delete_id; ?>" data-delete-word="<?php echo esc_attr( $beltoft_services_delete_word ); ?>" data-delete-ask="<?php echo esc_attr( 'database' === $beltoft_services_delete_kind ? __( 'Delete this database and all its data, including backups? This cannot be undone. Billing stops in the hour it is deleted.', 'beltoft-services' ) : __( 'Delete this server and all its data, including snapshots and backups? This cannot be undone. Billing stops in the hour it is deleted.', 'beltoft-services' ) ); ?>">
-	<h4><?php echo esc_html( $beltoft_services_delete_title ); ?></h4>
+<details class="bs-danger beltoft-services-delete" data-delete-box data-delete-after="<?php echo esc_url( $beltoft_services_delete_list ); ?>" data-resource-id="<?php echo (int) $beltoft_services_delete_id; ?>" data-bs-scope="<?php echo (int) $beltoft_services_delete_id; ?>" data-delete-word="<?php echo esc_attr( $beltoft_services_delete_word ); ?>" data-delete-ask="<?php echo esc_attr( 'database' === $beltoft_services_delete_kind ? __( 'Delete this database and all its data, including backups? This cannot be undone. Billing stops in the hour it is deleted.', 'beltoft-services' ) : __( 'Delete this server and all its data, including snapshots and backups? This cannot be undone. Billing stops in the hour it is deleted.', 'beltoft-services' ) ); ?>">
+	<summary class="bs-danger__row"><?php echo esc_html( $beltoft_services_delete_title ); ?></summary>
+	<div class="bs-danger__body">
 	<p><?php echo esc_html( \BeltoftServices\Usage\CustomerDelete::text( $beltoft_services_delete_kind ) ); ?></p>
 	<?php if ( 'server' !== $beltoft_services_delete_kind ) : /* A server's billing note is under its power buttons, once. */ ?>
 		<p class="description" data-delete-billing><?php echo esc_html( \BeltoftServices\Usage\CustomerDelete::billing_note( $beltoft_services_delete_kind ) ); ?></p>
@@ -39,6 +40,7 @@ $beltoft_services_delete_list  = function_exists( 'wc_get_account_endpoint_url' 
 			<label for="beltoft-delete-confirm-<?php echo (int) $beltoft_services_delete_id; ?>"><?php echo esc_html( sprintf( /* translators: %s: the word to type */ __( 'Type %s to confirm', 'beltoft-services' ), $beltoft_services_delete_word ) ); ?></label>
 			<input type="text" id="beltoft-delete-confirm-<?php echo (int) $beltoft_services_delete_id; ?>" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="<?php echo esc_attr( $beltoft_services_delete_word ); ?>" data-delete-confirm>
 		</p>
-		<p><button type="button" class="button woocommerce-button beltoft-services-delete__go" data-delete-go><?php echo esc_html( $beltoft_services_delete_title ); ?></button></p>
+		<p><button type="button" class="button woocommerce-button bs-btn bs-btn--danger-solid beltoft-services-delete__go" data-delete-go><?php echo esc_html( $beltoft_services_delete_title ); ?></button></p>
 	<?php endif; ?>
-</div>
+	</div>
+</details>
