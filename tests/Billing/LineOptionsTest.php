@@ -31,6 +31,22 @@ final class LineOptionsTest extends UsageTestCase {
 		$this->assertNotContains( array( 'gift-note', 'Happy birthday', 'gift-note' ), $options, 'Other visible meta is not an option.' );
 	}
 
+	public function test_a_line_keeps_the_product_name_through_the_filter(): void {
+		$v     = $this->usage_product();
+		$order = wc_create_order();
+		$item  = new \WC_Order_Item_Product();
+		$item->set_product( $v['m-Daily'] );
+		$order->add_item( $item );
+		$parent = wc_get_product( $v['m-Daily']->get_parent_id() )->get_name();
+
+		$filter = static fn( $name ) => 'Dansk ' . $name;
+		add_filter( 'beltoft_services_line_title', $filter );
+		LineOptions::keep( $item );
+		remove_filter( 'beltoft_services_line_title', $filter );
+
+		$this->assertSame( 'Dansk ' . $parent, $item->get_meta( LineOptions::META_TITLE ), 'The parent product name, as the site gives it.' );
+	}
+
 	public function test_a_line_without_options_gets_nothing(): void {
 		$order = wc_create_order();
 		$item  = new \WC_Order_Item_Product();

@@ -269,7 +269,7 @@ final class Renewal {
 			$fee->set_name(
 				sprintf(
 					/* translators: 1: product and plan with the server ("VPS hosting Performance (web1)"), 2: month and year, 3: number of hours with the word ("600 hours"), 4: rate with currency, 5: unit, 6: cap note. */
-					__( "%1\$s, %2\$s\n%3\$s at %4\$s per %5\$s%6\$s", 'beltoft-services' ),
+					__( "%1\$s\n%2\$s: %3\$s at %4\$s per %5\$s%6\$s", 'beltoft-services' ),
 					$subject,
 					$month,
 					$hours,

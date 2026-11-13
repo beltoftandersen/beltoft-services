@@ -592,7 +592,20 @@ final class Cart {
 		$domain = $item instanceof \WC_Order_Item_Product ? $item->get_meta( '_beltoft_services_domain' ) : null;
 
 		if ( is_array( $options ) && is_array( $domain ) && '' !== (string) ( $domain['domain'] ?? '' ) ) {
-			$options[] = array( __( 'Domain', 'beltoft-services' ), \BeltoftServices\Domains\HostName::display( (string) $domain['domain'] ), 'domain' );
+			// The label in the order's language, also when a scheduled job or a script writes the line.
+			$label = __( 'Domain', 'beltoft-services' );
+			$order = $item->get_order();
+
+			if ( $order instanceof \WC_Order ) {
+				\BeltoftServices\OrderLanguage::run(
+					$order,
+					static function () use ( &$label ): void {
+						$label = __( 'Domain', 'beltoft-services' );
+					}
+				);
+			}
+
+			$options[] = array( $label, \BeltoftServices\Domains\HostName::display( (string) $domain['domain'] ), 'domain' );
 		}
 
 		return $options;
