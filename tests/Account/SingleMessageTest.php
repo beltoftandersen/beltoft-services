@@ -50,6 +50,7 @@ class SingleMessageTest extends TestCase {
 		$page = self::factory()->post->create( array( 'post_type' => 'page' ) );
 		update_option( 'woocommerce_myaccount_page_id', $page );
 		$this->go_to( get_permalink( $page ) );
+		Status::assets();
 		wp_enqueue_script( Status::HANDLE );
 		wc_add_notice( 'This page expired. Reload it and try again.', 'error' );
 		wc_add_notice( 'Auto-renew is off.', 'success' );
