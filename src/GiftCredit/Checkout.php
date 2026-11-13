@@ -125,7 +125,7 @@ final class Checkout {
 			return null;
 		}
 
-		$cap = self::cart_cap( $cart, $draft );
+		$cap = Pay::free_cap( self::draft_lines( $cart, $draft ) );
 		$key = implode( '|', array( $user_id, $currency, $total, $cap, Wallet::totals( $user_id, $currency )['total'] ) );
 
 		if ( ! array_key_exists( $key, self::$memo ) ) {
@@ -164,15 +164,13 @@ final class Checkout {
 	}
 
 	/**
-	 * The most free cards may pay of a cart, in cents: the lines the box allows, with their VAT. Null when no line has an amount.
+	 * The cart's lines put on the draft order (not saved), so the add-on's own rule (Pay::free_cap) decides what free cards may pay:
+	 * one rule for the checkout forecast and for the order.
 	 *
 	 * @param \WC_Cart  $cart  Cart.
 	 * @param \WC_Order $draft Draft order.
 	 */
-	private static function cart_cap( \WC_Cart $cart, \WC_Order $draft ): ?int {
-		$sum    = 0;
-		$priced = false;
-
+	private static function draft_lines( \WC_Cart $cart, \WC_Order $draft ): \WC_Order {
 		foreach ( $cart->get_cart() as $values ) {
 			if ( ! is_array( $values ) ) {
 				continue;
@@ -187,20 +185,22 @@ final class Checkout {
 					'total_tax'    => $values['line_tax'] ?? 0,
 				)
 			);
-			$gross = Wallet::cents( (float) $item->get_total() + (float) $item->get_total_tax() );
-
-			if ( $gross < 1 ) {
-				continue;
-			}
-
-			$priced = true;
-
-			if ( apply_filters( 'bgca_card_may_pay_line', true, false, $item, $draft ) ) {
-				$sum += $gross;
-			}
+			$draft->add_item( $item );
 		}
 
-		return $priced ? $sum : null;
+		foreach ( $cart->get_fees() as $fee ) {
+			$item = new \WC_Order_Item_Fee();
+			$item->set_props(
+				array(
+					'name'      => (string) $fee->name,
+					'total'     => (string) $fee->total,
+					'total_tax' => (string) $fee->tax,
+				)
+			);
+			$draft->add_item( $item );
+		}
+
+		return $draft;
 	}
 
 	/**
