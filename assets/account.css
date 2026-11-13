@@ -1175,3 +1175,16 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts 
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-glance { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-glance > * { border-radius: var(--bs-radius-lg); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-glance a.beltoft-services-glance__item, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-glance > div { padding: var(--bs-space-4); }
+
+/* Forms that make something (a mailbox, a database user, ...): one card; a field and its suffix (@domain) on one line. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db__form[data-mail-create] { box-sizing: border-box; max-width: 880px; padding: var(--bs-space-5); border-radius: var(--bs-radius-lg); background: var(--bs-surface); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db__form p:has(> .beltoft-services-mail__at) { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bs-space-1) var(--bs-space-2); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db__form p:has(> .beltoft-services-mail__at) > label { flex: 1 1 100%; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db__form p:has(> .beltoft-services-mail__at) > input { flex: 0 1 260px; min-width: 120px; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__at { margin: 0; padding: 0; color: var(--navy, #10221b); font-weight: var(--bs-fw-medium); }
+/* The domains of a mail plan: rows in a card, not bullets. */
+body.woocommerce-account .woocommerce-MyAccount-content [data-mail-domains] ul { list-style: none; margin: 0 0 var(--bs-space-3); padding: var(--bs-space-2) var(--bs-space-5); max-width: 880px; box-sizing: border-box; border-radius: var(--bs-radius-lg); background: var(--bs-surface); }
+body.woocommerce-account .woocommerce-MyAccount-content [data-mail-domains] ul li { margin: 0; padding: var(--bs-space-3) 0; border-top: 1px solid var(--bs-line); font-weight: var(--bs-fw-medium); }
+body.woocommerce-account .woocommerce-MyAccount-content [data-mail-domains] ul li:first-child { border-top: 0; }
+/* Account notices (WooCommerce and ours) take the control corner. */
+body.woocommerce-account :is(.woocommerce-message, .woocommerce-info, .woocommerce-error, .beltoft-services-panel__notice) { border-radius: var(--bs-radius); }
