@@ -26,7 +26,7 @@ $beltoft_services_fw_id = (int) $r->id();
 				<p class="description"><?php esc_html_e( 'SSH (22), HTTP (80), HTTPS (443) and ping are open to everyone. Everything else is closed.', 'beltoft-services' ); ?></p>
 			</div>
 			<div>
-				<button type="button" class="button woocommerce-button" data-fw-start-open><?php esc_html_e( 'Keep everything open', 'beltoft-services' ); ?></button>
+				<button type="button" class="button woocommerce-button bs-btn bs-btn--secondary" data-fw-start-open><?php esc_html_e( 'Keep everything open', 'beltoft-services' ); ?></button>
 				<p class="description"><?php esc_html_e( 'Nothing changes on your server. You can close ports later.', 'beltoft-services' ); ?></p>
 			</div>
 		</div>
