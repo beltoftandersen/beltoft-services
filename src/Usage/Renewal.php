@@ -220,6 +220,45 @@ final class Renewal {
 	}
 
 	/**
+	 * The title of a usage line on the invoice: the product and plan with the server it belongs to, "VPS hosting Performance (web1)",
+	 * "Managed PostgreSQL Starter (db1)", "Backups (web1)", "Extra disk 100 GB (web1)", "Snapshot slots 2 packs (web1)".
+	 *
+	 * @param string $item        Item.
+	 * @param int    $resource_id Resource.
+	 * @param float  $quantity    Billed quantity of the unit (GB, packs; 1 for hours).
+	 * @param string $unit        Unit as stored.
+	 */
+	public static function invoice_title( string $item, int $resource_id, float $quantity = 1.0, string $unit = 'hour' ): string {
+		$label = self::label( $resource_id );
+
+		if ( in_array( $item, array( 'server', 'database' ), true ) ) {
+			$resource  = Resource::find( $resource_id );
+			$licence   = $resource ? $resource->license() : array();
+			$parent    = wc_get_product( (int) ( $licence['product_id'] ?? 0 ) );
+			$variation = wc_get_product( (int) ( $licence['variation_id'] ?? 0 ) );
+
+			if ( $parent ) {
+				$plan = $variation instanceof \WC_Product_Variation ? trim( (string) $variation->get_attribute( 'plan' ) ) : '';
+				$name = trim( $parent->get_name() . ( '' !== $plan ? ' ' . $plan : '' ) );
+
+				return $label !== $parent->get_name() ? sprintf( /* translators: 1: product and plan, 2: server or database name. */ _x( '%1$s (%2$s)', 'usage invoice line title', 'beltoft-services' ), $name, $label ) : $name;
+			}
+
+			return self::line_subject( $item, $label );
+		}
+
+		$words = array(
+			'backups'   => __( 'Backups', 'beltoft-services' ),
+			'disk'      => __( 'Extra disk', 'beltoft-services' ),
+			'snapshots' => __( 'Snapshot slots', 'beltoft-services' ),
+			'app'       => __( 'App licence', 'beltoft-services' ),
+		);
+		$what  = ( $words[ $item ] ?? $item ) . ( 'hour' === $unit ? '' : ' ' . trim( self::quantity_note( $quantity, $unit ), ' ()' ) );
+
+		return sprintf( /* translators: 1: product and plan, 2: server or database name. */ _x( '%1$s (%2$s)', 'usage invoice line title', 'beltoft-services' ), $what, $label );
+	}
+
+	/**
 	 * What a usage fee line is about, in words for the customer: "Server web1", "Backups for web1".
 	 *
 	 * @param string $item  Item.
@@ -297,17 +336,18 @@ final class Renewal {
 			$per   = 'hour' === $line['unit'] ? self::unit_name( 'hour' ) : sprintf( /* translators: %s: unit (GB, pack). */ __( '%s and hour', 'beltoft-services' ), self::unit_name( (string) $line['unit'] ) );
 			$qty   = self::quantity_note( (float) $line['quantity'], (string) $line['unit'] );
 			$hours = self::hours_text( (int) $line['hours'] );
-			$subject = self::line_subject( (string) $line['item'], self::label( $line['resource_id'] ) );
+			$subject = self::invoice_title( (string) $line['item'], (int) $line['resource_id'], (float) $line['quantity'], (string) $line['unit'] );
 			$month   = wp_date( 'F Y', (int) $line['month'], new \DateTimeZone( 'UTC' ) );
 			$rate    = Rates::money( (float) $line['rate'], 4, $currency );
+			// The name is what the accounting system prints: the title and month, then the hours and the rate on a line of its own. The
+			// amount stays the one charged, so the invoice there matches this order to the cent.
 			$fee->set_name(
 				sprintf(
-					/* translators: 1: what is billed ("Server web1"), 2: month and year, 3: number of hours with the word ("600 hours"), 4: quantity note (" (2.5 GB)" or empty), 5: rate with currency, 6: unit, 7: cap note. */
-					__( '%1$s, %2$s: %3$s%4$s at %5$s per %6$s (excl. VAT)%7$s', 'beltoft-services' ),
+					/* translators: 1: product and plan with the server ("VPS hosting Performance (web1)"), 2: month and year, 3: number of hours with the word ("600 hours"), 4: rate with currency, 5: unit, 6: cap note. */
+					__( "%1\$s, %2\$s\n%3\$s at %4\$s per %5\$s%6\$s", 'beltoft-services' ),
 					$subject,
 					$month,
 					$hours,
-					$qty,
 					$rate,
 					$per,
 					$line['capped'] ? sprintf( /* translators: %s: amount with currency. */ __( ', capped at %s a month', 'beltoft-services' ), Rates::money( (float) $line['cap'], 2, $currency ) ) : ''
