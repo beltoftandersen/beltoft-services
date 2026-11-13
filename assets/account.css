@@ -519,13 +519,16 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-fw__ag
 /* The small Copy beside a command (the server's Log in line). */
 .beltoft-services-copy, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-copy { display: inline; width: auto; min-height: 0; margin: 0 0 0 var(--bs-space-2, 8px); padding: 0; border: 0; background: none; color: var(--navy, #0c1535); font: inherit; font-size: 14px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .beltoft-services-copy:hover { background: none; color: var(--ink-mid, #3d4a44); }
+/* A copy button after its value: beside it while it fits, else at the start of the next line (no indent from a left margin). */
+dd:has(> .beltoft-services-copy) { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--bs-space-2, 8px); }
+body.woocommerce-account .woocommerce-MyAccount-content dd > .beltoft-services-copy { margin-left: 0; }
 @media (max-width: 760px) { .beltoft-services-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 .beltoft-services-tab:not([data-tab="overview"]) { padding: 16px; background: var(--bg-card, #fff); }
 .beltoft-services-tab > .beltoft-services-vm__disks { margin-top: 0; }
 .beltoft-services-glance { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
 .beltoft-services-glance a.beltoft-services-glance__item { display: grid; gap: 4px; align-content: start; padding: 8px 16px; background: var(--bg-card, #fff); color: var(--navy, #0c1535) !important; text-decoration: none !important; }
-.beltoft-services-glance a.beltoft-services-glance__item:hover { background: var(--bg, #f9f7f2); }
+.beltoft-services-glance a.beltoft-services-glance__item:hover { background: var(--bg-card, #fff); box-shadow: inset 0 0 0 1px var(--navy, #0c1535); }
 .beltoft-services-glance__label { color: var(--ink-soft, #5e7080); font-size: var(--bs-fs-caption); font-weight: var(--bs-fw-medium); }
 .beltoft-services-glance__value { font-weight: var(--bs-fw-medium); }
 @media (max-width: 760px) { .beltoft-services-glance { grid-template-columns: minmax(0, 1fr); gap: 8px; } }
@@ -1162,7 +1165,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .bs-confirm__body { marg
 body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-ov__attention, .beltoft-services-ov__feed, .beltoft-services-ov__money, .beltoft-services-ov__rows, .beltoft-services-servers, .beltoft-services-credit__balance, .beltoft-services-credit__grid, .beltoft-services-facts) { border-radius: var(--bs-radius-lg); overflow: hidden; }
 
 /* A danger section (delete a server, a database): a closed row with a red name; it opens to what deleting does and the confirmation. */
-body.woocommerce-account .woocommerce-MyAccount-content .bs-danger { margin: var(--bs-space-6) 0 0; padding: 0; border: 1px solid #e9c9c4; border-radius: var(--bs-radius-lg); background: var(--bs-surface); max-width: 720px; }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-danger { margin: var(--bs-space-6) 0 0; padding: 0; border: 1px solid #e9c9c4; border-radius: var(--bs-radius-lg); background: var(--bs-surface); }
 body.woocommerce-account .woocommerce-MyAccount-content .bs-danger__row { display: flex; align-items: center; justify-content: space-between; gap: var(--bs-space-4); padding: var(--bs-space-4) var(--bs-space-5); color: var(--bs-status-fail); font-weight: var(--bs-fw-medium); cursor: pointer; list-style: none; }
 body.woocommerce-account .woocommerce-MyAccount-content .bs-danger__row::-webkit-details-marker { display: none; }
 body.woocommerce-account .woocommerce-MyAccount-content .bs-danger__row::after { content: ""; flex: none; width: 9px; height: 9px; border-right: 2px solid currentcolor; border-bottom: 2px solid currentcolor; transform: rotate(45deg) translate(-2px, -2px); }

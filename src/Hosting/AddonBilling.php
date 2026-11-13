@@ -193,6 +193,17 @@ final class AddonBilling {
 	}
 
 	/**
+	 * An amount excluding VAT as the customer sees prices: including VAT at the standard class when the shop shows prices so, as the
+	 * subscription charges it.
+	 *
+	 * @param float  $excl     Amount excluding VAT.
+	 * @param string $currency Currency code, '' for the current one.
+	 */
+	public static function shown( float $excl, string $currency = '' ): string {
+		return self::money( \BeltoftServices\Billing\TaxNote::figure( $excl, null, '' ), $currency );
+	}
+
+	/**
 	 * What the customer confirms before an add-on is bought.
 	 *
 	 * @param string               $kind  Kind.
@@ -204,18 +215,19 @@ final class AddonBilling {
 			: __( '5 GB of extra storage for one mailbox', 'beltoft-services' );
 
 		return sprintf(
-			/* translators: 1: what is bought, 2: price per month, 3: amount charged now, 4: number of months until the next renewal, 5: price per billing period. */
+			/* translators: 1: what is bought, 2: price per month, 3: amount charged now, 4: number of months until the next renewal, 5: price per billing period, 6: "incl. VAT" or "excl. VAT". */
 			_n(
-				'%1$s costs %2$s per month, excluding VAT. We charge %3$s now for the %4$d month until your next renewal, and %5$s with each renewal after that. You can remove it later; it then ends at the next renewal and nothing is refunded.',
-				'%1$s costs %2$s per month, excluding VAT. We charge %3$s now for the %4$d months until your next renewal, and %5$s with each renewal after that. You can remove it later; it then ends at the next renewal and nothing is refunded.',
+				'%1$s costs %2$s per month, %6$s. We charge %3$s now for the %4$d month until your next renewal, and %5$s with each renewal after that. You can remove it later; it then ends at the next renewal and nothing is refunded.',
+				'%1$s costs %2$s per month, %6$s. We charge %3$s now for the %4$d months until your next renewal, and %5$s with each renewal after that. You can remove it later; it then ends at the next renewal and nothing is refunded.',
 				(int) $quote['months_now'],
 				'beltoft-services'
 			),
 			$what,
-			self::money( (float) $quote['unit'], (string) ( $quote['currency'] ?? '' ) ),
-			self::money( (float) $quote['now'], (string) ( $quote['currency'] ?? '' ) ),
+			self::shown( (float) $quote['unit'], (string) ( $quote['currency'] ?? '' ) ),
+			self::shown( (float) $quote['now'], (string) ( $quote['currency'] ?? '' ) ),
 			(int) $quote['months_now'],
-			self::money( (float) $quote['recurring'], (string) ( $quote['currency'] ?? '' ) )
+			self::shown( (float) $quote['recurring'], (string) ( $quote['currency'] ?? '' ) ),
+			\BeltoftServices\Billing\TaxNote::label()
 		);
 	}
 

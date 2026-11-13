@@ -171,6 +171,16 @@ final class Addons {
 	}
 
 	/**
+	 * An amount excluding VAT as the customer sees prices (AddonBilling::shown()).
+	 *
+	 * @param float  $excl     Amount excluding VAT.
+	 * @param string $currency Currency code.
+	 */
+	public static function shown( float $excl, string $currency = '' ): string {
+		return AddonBilling::shown( $excl, $currency );
+	}
+
+	/**
 	 * What the customer confirms before an add-on is bought.
 	 *
 	 * @param string               $kind  Kind.

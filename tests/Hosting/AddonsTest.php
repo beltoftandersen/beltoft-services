@@ -183,7 +183,7 @@ class AddonsTest extends HostingCase {
 		$this->assertSame( 12.0, $q['recurring'], 'EUR 12 with each yearly renewal.' );
 
 		$this->assertSame( 12, Addons::months_to_renewal( $this->sub( $y ), strtotime( '-1 year +10 days', (int) $this->sub( $y )->get_time( 'next_payment' ) ) ) );
-		$this->assertStringContainsString( 'excluding VAT', Addons::confirm_text( Addons::KIND_DOMAIN, $q ) );
+		$this->assertMatchesRegularExpression( '/per month, (excl|incl)\. VAT\./', Addons::confirm_text( Addons::KIND_DOMAIN, $q ) );
 	}
 
 	public function test_the_line_is_added_only_after_the_order_is_paid(): void {
@@ -280,7 +280,7 @@ class AddonsTest extends HostingCase {
 		$err = $a->add_domain( $s, 'www.other.example' );
 		$this->assertWPError( $err );
 		$this->assertSame( 'addon_required', $err->get_error_code() );
-		$this->assertStringContainsString( 'excluding VAT', $err->get_error_message() );
+		$this->assertMatchesRegularExpression( '/per month, (excl|incl)\. VAT\./', $err->get_error_message() );
 		$this->assertSame( 'other.example', $err->get_error_data()['target'] );
 		$this->assertNull( SiteDomains::find( 'www.other.example' ) );
 

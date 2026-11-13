@@ -127,9 +127,20 @@ final class Summary {
 	 * @param mixed $item     Order item.
 	 */
 	public static function order_subtotal( $subtotal, $item = null ) {
-		$rates = $item instanceof \WC_Order_Item_Product ? Rates::for_usage( $item->get_product() ) : null;
+		$product = $item instanceof \WC_Order_Item_Product ? $item->get_product() : null;
+		$product = $product instanceof \WC_Product ? $product : null;
+		$rates   = null !== $product ? Rates::for_usage( $product ) : null;
 
-		return null === $rates ? $subtotal : self::rate_and_cap( $rates );
+		if ( null === $rates ) {
+			return $subtotal;
+		}
+
+		// In the order's tax display, as the order's other figures: a VAT-exempt order shows the amounts without VAT.
+		$order   = $item->get_order();
+		$exempt  = $order instanceof \WC_Order && 'yes' === (string) $order->get_meta( 'is_vat_exempt' );
+		$display = $exempt ? 'excl' : TaxNote::display( 'cart' );
+
+		return TaxNote::in( $display, static fn() => self::rate_and_cap( $rates, $product ) );
 	}
 
 	/**
@@ -147,10 +158,11 @@ final class Summary {
 	 * "€0.0829 / hour, max €55.00 / month".
 	 *
 	 * @param array{hourly: float, cap: float} $rates Rates.
+	 * @param \WC_Product|null                 $tax   Product for the tax display, null for the amounts as given.
 	 */
-	private static function rate_and_cap( array $rates ): string {
+	private static function rate_and_cap( array $rates, ?\WC_Product $tax = null ): string {
 		/* translators: 1: price per hour such as €0.0829, 2: monthly cap such as €55 */
-		return esc_html( sprintf( __( '%1$s / hour, max %2$s / month', 'beltoft-services' ), Rates::money( $rates['hourly'], 4 ), Rates::cap_money( $rates['cap'] ) ) );
+		return esc_html( sprintf( __( '%1$s / hour, max %2$s / month', 'beltoft-services' ), Rates::money( $rates['hourly'], 4, '', $tax ), Rates::cap_money( $rates['cap'], $tax ) ) );
 	}
 
 	/**

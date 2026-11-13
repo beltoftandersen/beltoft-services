@@ -94,7 +94,7 @@ final class LineNames {
 		 * The note under a pay-as-you-go line, for the feature that bills it.
 		 *
 		 * @param string $note    Empty until the feature says it.
-		 * @param string $context 'order' (an order line: the invoice is excluding VAT) or 'cart' (the cart's tax display).
+		 * @param string $context 'order' or 'cart': both follow the cart's tax display, like the figures next to the note.
 		 */
 		return (string) apply_filters( 'beltoft_services_line_usage_note', '', $context );
 	}

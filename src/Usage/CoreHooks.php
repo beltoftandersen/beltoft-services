@@ -43,8 +43,9 @@ final class CoreHooks {
 	 * @param mixed $context 'order' or 'cart'.
 	 */
 	public static function line_usage_note( $note = '', $context = 'order' ): string {
-		// An order line says what the invoice is: excluding VAT. In the cart the note follows the cart's tax display, like the figures next to it.
-		if ( 'cart' === $context && 'incl' === \BeltoftServices\Billing\TaxNote::in_cart( static fn() => \BeltoftServices\Billing\TaxNote::display() ) ) {
+		// The cart and an order line say what the figures next to them are: the shop's tax display for the cart (an order page, the
+		// thank-you page and order emails show the order's figures the same way).
+		if ( 'incl' === \BeltoftServices\Billing\TaxNote::in_cart( static fn() => \BeltoftServices\Billing\TaxNote::display() ) ) {
 			/* translators: %s: how pay as you go is billed */
 			return sprintf( __( '%s, incl. VAT', 'beltoft-services' ), Rates::billed_note() );
 		}

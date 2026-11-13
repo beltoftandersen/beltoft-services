@@ -151,7 +151,7 @@ class PriceDisplayInclTest extends UsageTestCase {
 		$this->assertSame( '€0.0283 per hour, max €20.63 per month including VAT', Rates::terms( 0.02260274, 16.5, $v['m-None'] ) );
 	}
 
-	public function test_the_cart_and_checkout_say_what_the_cart_display_says_and_orders_say_excluding(): void {
+	public function test_the_cart_checkout_and_orders_say_what_the_cart_display_says(): void {
 		$this->display( 'incl' );
 		update_option( 'woocommerce_tax_display_cart', 'excl' );
 
@@ -160,9 +160,32 @@ class PriceDisplayInclTest extends UsageTestCase {
 		update_option( 'woocommerce_tax_display_cart', 'incl' );
 		update_option( 'woocommerce_tax_display_shop', 'excl' );
 		$this->assertStringEndsWith( 'incl. VAT', CoreHooks::line_usage_note( '', 'cart' ) );
-		$this->assertStringEndsWith( 'excl. VAT', CoreHooks::line_usage_note( '', 'order' ), 'An order line is the invoice: excluding VAT.' );
-		$this->assertStringEndsWith( 'excl. VAT', \BeltoftServices\LineNames::usage_note(), 'The default is the order.' );
+		$this->assertStringEndsWith( 'incl. VAT', CoreHooks::line_usage_note( '', 'order' ), 'An order line says what its figures are: the display.' );
+		$this->assertStringEndsWith( 'incl. VAT', \BeltoftServices\LineNames::usage_note() );
 		$this->assertStringEndsWith( 'incl. VAT', \BeltoftServices\LineNames::usage_note( 'cart' ) );
+	}
+
+	public function test_an_order_line_shows_the_rate_and_cap_in_the_display(): void {
+		$v     = $this->usage_product();
+		$order = wc_create_order();
+		$order->add_product( $v['u-None'], 1 );
+		$order->save();
+		$item = current( $order->get_items() );
+
+		$this->assertStringContainsString( '0.0283', html_entity_decode( \BeltoftServices\Usage\Summary::order_subtotal( '', $item ) ), 'Including 25 percent VAT.' );
+
+		$order->update_meta_data( 'is_vat_exempt', 'yes' );
+		$order->save();
+		$this->assertStringContainsString( '0.0226', html_entity_decode( \BeltoftServices\Usage\Summary::order_subtotal( '', current( wc_get_order( $order->get_id() )->get_items() ) ) ), 'A VAT-exempt order: excluding.' );
+
+		$this->display( 'excl' );
+		$this->assertStringContainsString( '0.0226', html_entity_decode( \BeltoftServices\Usage\Summary::order_subtotal( '', $item ) ) );
+	}
+
+	public function test_the_hosting_add_on_prices_follow_the_display(): void {
+		$this->assertSame( '€10.00', \BeltoftServices\Hosting\Addons::shown( 8.0, 'EUR' ) );
+		$this->display( 'excl' );
+		$this->assertSame( '€8.00', \BeltoftServices\Hosting\Addons::shown( 8.0, 'EUR' ) );
 	}
 
 	public function test_a_cart_row_that_is_a_price_difference_uses_the_cart_display(): void {
