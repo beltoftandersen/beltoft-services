@@ -49,5 +49,15 @@ class StatusTest extends TestCase {
 		$this->assertMatchesRegularExpression( '/if \( handle\.note \) \{\s*noteSay\( handle\.note, \'busy\', message \);\s*\} else \{\s*show\( \'busy\', message, handle \);/', $js );
 		// finish(): done and fail stay in the note too.
 		$this->assertMatchesRegularExpression( '/if \( handle && handle\.note \) \{\s*return;\s*\}/', $js );
+
+		// Hosting: clearing the cache keeps its done line (no reload); other actions show it again after the reload.
+		$hosting = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/hosting.js' );
+		$this->assertMatchesRegularExpression( "/if \\( 'cache' === action \\) \\{\\s*return;\\s*\\}/", $hosting );
+		$this->assertStringContainsString( 'remember( action,', $hosting );
+		$this->assertStringContainsString( 'recall();', $hosting );
+
+		// Credit: an empty coupon is said under its button.
+		$credit = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/credit.js' );
+		$this->assertStringContainsString( "status.fail( button ? status.busy( '', 'page', button ) : null", $credit );
 	}
 }

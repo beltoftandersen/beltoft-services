@@ -18,7 +18,9 @@
 
 		if ( input && form.classList.contains( 'beltoft-services-credit__code' ) && '' === input.value.trim() ) {
 			event.preventDefault();
-			status.fail( null, config.empty || 'Enter your coupon code.', input );
+			// Said under the button that was pressed, like every other message, and the field is marked.
+			var button = event.submitter || form.querySelector( 'button[type="submit"]' );
+			status.fail( button ? status.busy( '', 'page', button ) : null, config.empty || 'Enter your coupon code.', input );
 		}
 	}, true );
 }() );

@@ -547,7 +547,17 @@
 			}
 
 			// A move of WordPress and the staging jobs run in the background: the answer says so, and the page shows the state.
-			ok( ( ( 'wp_address' === action || staging ) && result.data && result.data.message ) || text.done || '' );
+			var said = ( ( 'wp_address' === action || staging ) && result.data && result.data.message ) || '';
+
+			ok( said || text.done || '' );
+
+			// Clearing the cache changes nothing on this page: the done line stays and the page is not reloaded.
+			if ( 'cache' === action ) {
+				return;
+			}
+
+			// Every other change reloads to show the new state; the done line is shown again under the same button after it.
+			remember( action, button.getAttribute( 'data-slug' ) || '', said || button.getAttribute( 'data-done' ) || text.done || '' );
 
 			window.setTimeout( function () {
 				window.location.reload();
@@ -563,6 +573,47 @@
 		} );
 	}
 
+
+	// The done line of an action that reloads the page: kept for the next load of this page only, then shown under the same button.
+	var DONE_KEY = 'beltoftHostingDone';
+
+	function remember( action, slug, message ) {
+		try {
+			window.sessionStorage.setItem( DONE_KEY, JSON.stringify( { action: action, slug: slug, message: message, path: window.location.pathname, at: Date.now() } ) );
+		} catch ( e ) {
+			// Without storage the page still reloads; only the line after it is missing.
+		}
+	}
+
+	function recall() {
+		var saved = null;
+
+		try {
+			saved = JSON.parse( window.sessionStorage.getItem( DONE_KEY ) || 'null' );
+			window.sessionStorage.removeItem( DONE_KEY );
+		} catch ( e ) {
+			return;
+		}
+
+		if ( ! saved || ! saved.message || saved.path !== window.location.pathname || Date.now() - saved.at > 30000 || ! S ) {
+			return;
+		}
+
+		var selector = '[data-hosting-action="' + String( saved.action ).replace( /["\\]/g, '' ) + '"]' + ( saved.slug ? '[data-slug="' + String( saved.slug ).replace( /["\\]/g, '' ) + '"]' : '' );
+		var button = document.querySelector( selector ) || document.querySelector( '[data-hosting-action="' + String( saved.action ).replace( /["\\]/g, '' ) + '"]' );
+
+		if ( button ) {
+			var section = button.closest( 'details' );
+
+			if ( section ) {
+				section.open = true;
+			}
+
+			S.done( S.busy( '', 'page', button ), saved.message );
+		}
+	}
+
+	recall();
 
 	// The caches of each website, asked from the node when the page is open (the page itself is drawn without calling the node).
 	function cacheFacts() {
