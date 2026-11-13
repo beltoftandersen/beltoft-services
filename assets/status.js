@@ -437,7 +437,7 @@
 	// Busy, done and fail are also said right where the customer clicked: a line directly under the button's group, so it
 	// is seen on a phone too. Busy has a spinner, done a check mark and stays until the next action there, fail says why.
 
-	var NOTE_ANCHOR = '[data-bs-note-anchor], .bs-item__actions, .bs-actions, .beltoft-hosting-buttons, .beltoft-services-panel__actions, .beltoft-services-vm__actions, .beltoft-services-db__form p';
+	var NOTE_ANCHOR = '[data-bs-note-anchor], .bs-action, .bs-item__actions, .bs-actions, .beltoft-hosting-buttons, .beltoft-services-panel__actions, .beltoft-services-vm__actions, .beltoft-services-db__form p';
 
 	function noteFor( button ) {
 		if ( ! button || ! button.closest || button.closest( 'dialog' ) ) {

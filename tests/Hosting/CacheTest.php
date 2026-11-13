@@ -113,7 +113,7 @@ class CacheTest extends HostingCase {
 		$html = (string) ob_get_clean();
 
 		$this->assertStringContainsString( 'data-cache-facts data-slug="w' . $r->id() . '" hidden', $html );
-		$this->assertStringContainsString( 'The page cache is switched on and off in the WordPress dashboard, under Settings.', $html );
+		$this->assertStringContainsString( 'Another caching plugin needs the page cache off first.', $html );
 		$this->assertStringContainsString( 'data-hosting-action="cache"', $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
 		$this->assertStringNotContainsString( "\u{00B7}", $html );

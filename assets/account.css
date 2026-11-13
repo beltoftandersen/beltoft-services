@@ -1099,6 +1099,20 @@ body.woocommerce-account .woocommerce-MyAccount-content :is(button, .button).is-
 .bs-note--fail { background: #fbeeec; color: var(--bs-status-fail); }
 .bs-note--fail .bs-note__icon { background: currentcolor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M12 7v6M12 17h.01'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M12 7v6M12 17h.01'/%3E%3C/svg%3E") center / contain no-repeat; }
 
+/* One action: what it does on the left, its button on the right (stacked on a phone). Rows in a group are split by a
+   line. The note of a clicked button goes under the whole row (data-bs-note-anchor). */
+.bs-action { display: flex; align-items: center; justify-content: space-between; gap: var(--bs-space-3) var(--bs-space-5); margin: 0; padding: var(--bs-space-3) 0; border-top: 1px solid var(--bs-line); }
+.bs-action:first-child { border-top: 0; padding-top: 0; }
+:is(.bs-action, .bs-note) + .bs-action { border-top: 1px solid var(--bs-line); padding-top: var(--bs-space-3); }
+.bs-action__text { flex: 1 1 auto; min-width: 0; max-width: 62ch; margin: 0; font-size: var(--bs-fs-small); line-height: var(--bs-lh-text); color: var(--navy, #10221b); }
+.bs-action__do { flex: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--bs-space-2); }
+.bs-action__do select { width: auto; min-width: 9em; }
+@media (max-width: 640px) {
+	.bs-action { flex-direction: column; align-items: stretch; }
+	.bs-action__do { justify-content: stretch; }
+	.bs-action__do > * { flex: 1 1 auto; }
+}
+
 /* A state next to a name: a coloured dot and plain text. */
 .bs-state { display: inline-flex; align-items: center; gap: 6px; font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); white-space: nowrap; color: var(--bs-muted); }
 .bs-state::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: currentcolor; }

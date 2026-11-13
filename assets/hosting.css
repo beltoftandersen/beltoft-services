@@ -188,3 +188,9 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-ju
 .beltoft-hosting .bsh-kv > div { display: contents; }
 .beltoft-hosting .bsh-kv dt { margin: 0; color: var(--bsh-soft); font-size: var(--bs-fs-small, 14px); }
 .beltoft-hosting .bsh-kv dd { margin: 0; color: var(--bsh-ink); font-weight: var(--bs-fw-medium, 500); overflow-wrap: anywhere; }
+
+/* A destructive action row's button: red outline, red fill on hover. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.beltoft-hosting-btn.bs-btn--danger { border-color: var(--bs-status-fail, #b3261e); color: var(--bs-status-fail, #b3261e); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.beltoft-hosting-btn.bs-btn--danger:hover { background: #fbeeec; color: var(--bs-status-fail, #b3261e); }
+/* Facts and actions inside a website section sit at one width; a select in an action row keeps its size. */
+.beltoft-hosting .bsh-sec__body .bs-action__do .beltoft-hosting-inline { display: flex; flex-wrap: wrap; gap: var(--bs-space-2, 8px); align-items: center; }

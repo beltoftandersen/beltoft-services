@@ -246,7 +246,7 @@ class CountryBlockTest extends HostingCase {
 		$slug = 'w' . $r->id();
 
 		$html = $this->page( $r );
-		$this->assertStringContainsString( 'Country block: off. Visitors from every country can reach this website.', $html );
+		$this->assertStringContainsString( 'Visitors from every country can reach this website.', $html );
 		$this->assertStringContainsString( 'data-hosting-action="country_edit"', $html );
 		$this->assertStringContainsString( 'data-hosting-action="country_save"', $html );
 		$this->assertStringContainsString( 'data-codes="RU BY IR KP SY CU"', $html );
@@ -258,7 +258,7 @@ class CountryBlockTest extends HostingCase {
 
 		( new HostingActions( $r ) )->set_country_block( $slug, array( 'RU', 'BY' ), 'login' );
 		$html = $this->page( $r );
-		$this->assertStringContainsString( 'Country block: on for the login and the admin area. Blocked: Belarus, Russia.', $html );
+		$this->assertStringContainsString( '<dt>Applies to</dt><dd>Login and admin only</dd></div><div><dt>Blocked</dt><dd>Belarus, Russia</dd>', $html );
 		$this->assertMatchesRegularExpression( '/<input type="checkbox" data-country value="RU" checked/', $html );
 		$this->assertDoesNotMatchRegularExpression( '/value="DK" checked/', $html );
 		$this->assertStringContainsString( 'data-hosting-action="country_off"', $html );
@@ -269,7 +269,7 @@ class CountryBlockTest extends HostingCase {
 		$r->set( array( 'state' => 'paused', 'desired' => 'paused' ) );
 
 		$html = $this->page( $r );
-		$this->assertStringContainsString( 'Country block: off', $html );
+		$this->assertStringContainsString( 'Visitors from every country can reach this website.', $html );
 		$this->assertStringNotContainsString( 'data-hosting-action="country_save"', $html );
 	}
 

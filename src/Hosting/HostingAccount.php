@@ -102,12 +102,14 @@ final class HostingAccount {
 					'confirmRestore' => __( 'Restore from this backup? A safety copy of your hosting is made first, so you can undo it for 24 hours.', 'beltoft-services' ),
 					'confirmPack' => __( 'Remove one extra storage pack from this mailbox? It ends at your next renewal, the storage stays until then, and nothing is refunded.', 'beltoft-services' ),
 					'confirmUndo' => __( 'Go back to the safety copy? Changes made since the restore are lost.', 'beltoft-services' ),
-					'cachePageOn' => __( 'Page cache: on.', 'beltoft-services' ),
-					'cachePageOff' => __( 'Page cache: off in WordPress.', 'beltoft-services' ),
-					'cachePageInactive' => __( 'Page cache: off, its WordPress plugin is deactivated.', 'beltoft-services' ),
-					'cachePageMissing' => __( 'Page cache: off, its WordPress plugin is not installed.', 'beltoft-services' ),
-					'cacheObjectOn' => __( 'Object cache: on.', 'beltoft-services' ),
-					'cacheObjectOff' => __( 'Object cache: off.', 'beltoft-services' ),
+					'cachePageOn' => __( 'On', 'beltoft-services' ),
+					'cachePageOff' => __( 'Off, switched off in WordPress', 'beltoft-services' ),
+					'cachePageInactive' => __( 'Off, its WordPress plugin is deactivated', 'beltoft-services' ),
+					'cachePageMissing' => __( 'Off, its WordPress plugin is not installed', 'beltoft-services' ),
+					'cacheObjectOn' => __( 'On', 'beltoft-services' ),
+					'cacheObjectOff' => __( 'Off', 'beltoft-services' ),
+					/* translators: %s: the state of the page cache, for example On. */
+					'cacheRowValue' => __( 'Page cache: %s', 'beltoft-services' ),
 					'saveAnyway' => __( 'Save anyway', 'beltoft-services' ),
 				),
 			)
@@ -334,6 +336,34 @@ final class HostingAccount {
 	}
 
 	/**
+	 * One action: what it does, and its button (or buttons) beside it.
+	 *
+	 * @param string $text    What the action does (already escaped markup).
+	 * @param string $buttons The button markup (already escaped).
+	 * @param string $attrs   Extra attributes (already escaped), or ''.
+	 */
+	private static function action( string $text, string $buttons, string $attrs = '' ): void {
+		echo '<div class="bs-action"' . $attrs . '><p class="bs-action__text">' . $text . '</p><div class="bs-action__do">' . $buttons . '</div></div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Callers pass escaped markup.
+	}
+
+	/**
+	 * Facts as label and value rows.
+	 *
+	 * @param array<string, string|array{html: string, attrs?: string}> $rows  Label => plain text, or array( 'html' => escaped markup, 'attrs' => escaped dd attributes ).
+	 * @param string                                                   $attrs Extra attributes (already escaped), or ''.
+	 */
+	private static function facts( array $rows, string $attrs = '' ): void {
+		echo '<dl class="bsh-kv"' . $attrs . '>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Callers pass escaped attributes.
+
+		foreach ( $rows as $label => $value ) {
+			$html = is_array( $value ) ? (string) $value['html'] : esc_html( (string) $value );
+			echo '<div><dt>' . esc_html( (string) $label ) . '</dt><dd' . ( is_array( $value ) ? (string) ( $value['attrs'] ?? '' ) : '' ) . '>' . $html . '</dd></div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Markup values and attributes are escaped by the caller.
+		}
+
+		echo '</dl>';
+	}
+
+	/**
 	 * The notices that belong to no website: a hint, a paid domain that is being connected, an unsupported PHP version
 	 * and a refused loader file.
 	 *
@@ -505,67 +535,102 @@ final class HostingAccount {
 
 		self::sec_close();
 
-		// PHP.
+		// PHP: the version and the way to change it on one row.
 		self::sec_open( __( 'PHP', 'beltoft-services' ), 'PHP ' . $site['php'], false, 'php', $slug );
-		echo '<span class="beltoft-hosting-php">' . esc_html( 'PHP ' . $site['php'] ) . '</span>';
 
 		if ( $ready ) {
-			echo ' <button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="php_edit" aria-expanded="false">' . esc_html__( 'Change', 'beltoft-services' ) . '</button>';
-			echo '<span class="beltoft-hosting-inline" data-php-form hidden><label class="screen-reader-text" for="beltoft-php-' . esc_attr( $slug ) . '">' . esc_html__( 'PHP version', 'beltoft-services' ) . '</label><select id="beltoft-php-' . esc_attr( $slug ) . '" data-hosting-field="php_version">';
+			$select = '<span class="beltoft-hosting-inline" data-php-form><label class="screen-reader-text" for="beltoft-php-' . esc_attr( $slug ) . '">' . esc_html__( 'PHP version', 'beltoft-services' ) . '</label><select id="beltoft-php-' . esc_attr( $slug ) . '" data-hosting-field="php_version">';
 
 			foreach ( $limits['php_versions'] as $version ) {
-				echo '<option value="' . esc_attr( $version ) . '"' . selected( $version, (string) $site['php'], false ) . '>' . esc_html( 'PHP ' . $version ) . '</option>';
+				$select .= '<option value="' . esc_attr( $version ) . '"' . selected( $version, (string) $site['php'], false ) . '>' . esc_html( 'PHP ' . $version ) . '</option>';
 			}
 
-			echo '</select><button type="button" class="beltoft-hosting-btn" data-hosting-action="php_save" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Save', 'beltoft-services' ) . '</button><button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="php_cancel">' . esc_html__( 'Cancel', 'beltoft-services' ) . '</button></span>';
+			$select .= '</select><button type="button" class="beltoft-hosting-btn" data-hosting-action="php_save" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Save', 'beltoft-services' ) . '</button></span>';
+			/* translators: %s: PHP version. */
+			self::action( esc_html( sprintf( __( 'This website runs on PHP %s. Choose another version if your theme or plugins need it.', 'beltoft-services' ), (string) $site['php'] ) ), $select );
 
 			$marker = ( (array) $r->get( 'php_rollback' ) )[ $slug ] ?? null;
 
 			if ( is_array( $marker ) && (int) ( $marker['until'] ?? 0 ) > \BeltoftServices\Jobs::now() ) {
-				echo ' <button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="php_rollback" data-slug="' . esc_attr( $slug ) . '">' . esc_html( sprintf( /* translators: %s: PHP version. */ __( 'Go back to PHP %s', 'beltoft-services' ), (string) $marker['from'] ) ) . '</button>';
+				self::action(
+					/* translators: %s: PHP version. */
+					esc_html( sprintf( __( 'The version was changed from PHP %s. You can go back if something stopped working.', 'beltoft-services' ), (string) $marker['from'] ) ),
+					/* translators: %s: PHP version. */
+					'<button type="button" class="beltoft-hosting-btn" data-hosting-action="php_rollback" data-slug="' . esc_attr( $slug ) . '">' . esc_html( sprintf( __( 'Go back to PHP %s', 'beltoft-services' ), (string) $marker['from'] ) ) . '</button>'
+				);
 			}
+		} else {
+			self::facts( array( __( 'Version', 'beltoft-services' ) => 'PHP ' . $site['php'] ) );
 		}
 
 		self::sec_close();
 
-		// WordPress login.
+		// WordPress login: who the buttons sign in as, then the two ways in.
 		self::sec_open( __( 'WordPress login', 'beltoft-services' ), (string) $site['admin_user'], false, 'login', $slug );
-		// Who the button signs in as, as two facts, then one line on what the button does.
+
 		if ( '' !== (string) $site['admin_user'] ) {
-			echo '<dl class="bsh-kv"><div><dt>' . esc_html__( 'WordPress user', 'beltoft-services' ) . '</dt><dd>' . esc_html( (string) $site['admin_user'] ) . '</dd></div>';
+			$who = array( __( 'WordPress user', 'beltoft-services' ) => (string) $site['admin_user'] );
 
 			if ( '' !== (string) $site['admin_email'] ) {
-				echo '<div><dt>' . esc_html__( 'Email address', 'beltoft-services' ) . '</dt><dd>' . esc_html( (string) $site['admin_email'] ) . '</dd></div>';
+				$who[ __( 'Email address', 'beltoft-services' ) ] = (string) $site['admin_email'];
 			}
 
-			echo '</dl>';
+			self::facts( $who );
 		}
-
-		echo '<p class="beltoft-hosting-help" data-login-facts>' . esc_html( '' !== (string) $site['admin_user'] ? __( 'Log in to WordPress, at the top of this website, signs you in as this user. No password is needed.', 'beltoft-services' ) : __( 'Log in to WordPress, at the top of this website, signs you in as its administrator. No password is needed.', 'beltoft-services' ) ) . '</p>';
 
 		if ( $ready ) {
-			echo '<div class="beltoft-hosting-buttons"><button type="button" class="beltoft-hosting-btn" data-hosting-action="password" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Set a WordPress password', 'beltoft-services' ) . '</button></div>';
+			self::action(
+				esc_html( '' !== (string) $site['admin_user'] ? __( 'Signs you in to WordPress as this user, in a new tab. No password is needed.', 'beltoft-services' ) : __( 'Signs you in to WordPress as its administrator, in a new tab. No password is needed.', 'beltoft-services' ) ),
+				'<button type="button" class="beltoft-hosting-btn" data-hosting-action="login" data-slug="' . esc_attr( $slug ) . '" data-busy="' . esc_attr__( 'Opening WordPress in a new tab...', 'beltoft-services' ) . '" data-done="' . esc_attr__( 'WordPress opened in a new tab.', 'beltoft-services' ) . '">' . esc_html__( 'Log in to WordPress', 'beltoft-services' ) . '</button>',
+				' data-login-facts'
+			);
+			self::action(
+				/* translators: %s: the website's WordPress sign-in address. */
+				esc_html( sprintf( __( 'You have no WordPress password until you set one. With a password you can also log in at %s.', 'beltoft-services' ), 'https://' . $wp['address'] . '/wp-login.php' ) ),
+				'<button type="button" class="beltoft-hosting-btn" data-hosting-action="password" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Set a WordPress password', 'beltoft-services' ) . '</button>'
+			);
 		}
 
-		echo '<p class="beltoft-hosting-help">' . esc_html( sprintf( /* translators: %s: the website's WordPress sign-in address. */ __( 'You have no WordPress password until you set one. With a password you can log in at %s without this page.', 'beltoft-services' ), 'https://' . $wp['address'] . '/wp-login.php' ) ) . '</p>';
 		self::sec_close();
 
-		// Cache.
+		// Cache: what is on (asked from the node when the page opens), the button, and where the page cache is switched.
 		self::sec_open( __( 'Cache', 'beltoft-services' ), '', false, 'cache', $slug );
 
 		if ( $ready ) {
-			echo '<p class="beltoft-hosting-line" data-cache-facts data-slug="' . esc_attr( $slug ) . '" hidden></p>';
+			self::facts(
+				array(
+					__( 'Page cache', 'beltoft-services' )   => array( 'html' => '', 'attrs' => ' data-cache-page' ),
+					__( 'Object cache', 'beltoft-services' ) => array( 'html' => '', 'attrs' => ' data-cache-object' ),
+				),
+				' data-cache-facts data-slug="' . esc_attr( $slug ) . '" hidden'
+			);
+			self::action(
+				esc_html__( 'Clears the page cache and the object cache of this website. Visitors then get fresh pages.', 'beltoft-services' ),
+				'<button type="button" class="beltoft-hosting-btn" data-hosting-action="cache" data-slug="' . esc_attr( $slug ) . '" data-busy="' . esc_attr__( 'Clearing the cache...', 'beltoft-services' ) . '" data-done="' . esc_attr__( 'The cache of this website was cleared.', 'beltoft-services' ) . '">' . esc_html__( 'Clear cache', 'beltoft-services' ) . '</button>'
+			);
 		}
 
-		echo '<p class="beltoft-hosting-help">' . esc_html__( 'Clears the page cache and the object cache of this website.', 'beltoft-services' ) . '</p>';
-		echo '<p class="beltoft-hosting-help">' . esc_html__( 'The page cache is switched on and off in the WordPress dashboard, under Settings. Switch it off there, or deactivate or delete its plugin, to use another caching plugin.', 'beltoft-services' ) . '</p>';
+		echo '<p class="beltoft-hosting-help">' . esc_html__( 'Another caching plugin needs the page cache off first. Switch it off in WordPress under Settings, or deactivate its plugin.', 'beltoft-services' ) . '</p>';
 		self::sec_close();
 
-		// Files and database: the buttons are in the row above; the section says how they work and where SFTP is.
-		self::sec_open( __( 'Files and database', 'beltoft-services' ), '', false, 'tools', $slug );
-		echo '<p class="beltoft-hosting-help">' . esc_html__( 'Opens in a new tab and shows the files of this website. The tab ends after 30 minutes without use.', 'beltoft-services' ) . '</p>';
-		echo '<p class="beltoft-hosting-help">' . esc_html__( 'Opens phpMyAdmin for the database of this website in a new tab. You do not need a password. The tab ends after 30 minutes without use.', 'beltoft-services' ) . '</p>';
-		echo '<p class="beltoft-hosting-help">' . esc_html__( 'Upload and download files with SFTP.', 'beltoft-services' ) . ' <a class="beltoft-hosting-link" href="#beltoft-hosting-files">' . esc_html__( 'Files (SFTP)', 'beltoft-services' ) . '</a></p>';
+		// Files and database: each tool with what it does, and SFTP for a program on your computer.
+		self::sec_open( __( 'Files and database', 'beltoft-services' ), __( 'File manager, phpMyAdmin, SFTP', 'beltoft-services' ), false, 'tools', $slug );
+
+		if ( $ready ) {
+			self::action(
+				esc_html__( 'Shows the files of this website in a new tab, to upload, edit and delete them. The tab ends after 30 minutes without use.', 'beltoft-services' ),
+				'<button type="button" class="beltoft-hosting-btn" data-hosting-action="tool_files" data-slug="' . esc_attr( $slug ) . '" data-done="' . esc_attr__( 'The file manager opened in a new tab.', 'beltoft-services' ) . '">' . esc_html__( 'Open file manager', 'beltoft-services' ) . '</button>'
+			);
+			self::action(
+				esc_html__( 'Opens phpMyAdmin for the database of this website in a new tab. No password is needed. The tab ends after 30 minutes without use.', 'beltoft-services' ),
+				'<button type="button" class="beltoft-hosting-btn" data-hosting-action="tool_database" data-slug="' . esc_attr( $slug ) . '" data-done="' . esc_attr__( 'The database tool opened in a new tab.', 'beltoft-services' ) . '">' . esc_html__( 'Open database', 'beltoft-services' ) . '</button>'
+			);
+		}
+
+		self::action(
+			esc_html__( 'To work with an FTP program on your computer, connect with SFTP.', 'beltoft-services' ),
+			'<a class="beltoft-hosting-btn" href="#beltoft-hosting-files">' . esc_html__( 'SFTP details', 'beltoft-services' ) . '</a>'
+		);
 		self::sec_close();
 
 		self::print_scan( (array) $site['scan'], $slug );
@@ -649,34 +714,36 @@ final class HostingAccount {
 				echo '<p class="beltoft-hosting-warning" data-staging-note>' . esc_html( $words ) . '</p>';
 			}
 
+			$about = __( 'A staging copy is a copy of this website on an address of its own, to try changes in before they go live. It sends no email, is not shown to search engines and does not count as a website.', 'beltoft-services' );
+			$shown = false;
+
 			if ( $v['exists'] ) {
-				echo '<p class="beltoft-hosting-line" data-staging-state>';
-				/* translators: %s: the address of the staging copy. */
-				echo wp_kses( sprintf( esc_html__( 'The staging copy is ready at %s.', 'beltoft-services' ), '<a class="beltoft-hosting-link" href="' . esc_url( 'https://' . $v['host'] . '/' ) . '" target="_blank" rel="noopener">' . esc_html( \BeltoftServices\Domains\HostName::display( (string) $v['host'] ) ) . '</a>' ), array( 'a' => array( 'class' => true, 'href' => true, 'target' => true, 'rel' => true ) ) );
+				$facts = array(
+					__( 'Address', 'beltoft-services' ) => array( 'html' => '<a class="beltoft-hosting-link" href="' . esc_url( 'https://' . $v['host'] . '/' ) . '" target="_blank" rel="noopener">' . esc_html( \BeltoftServices\Domains\HostName::display( (string) $v['host'] ) ) . '</a>' ),
+				);
 
 				if ( $v['at'] > 0 ) {
-					/* translators: %s: date and time. */
-					echo ' ' . esc_html( sprintf( __( 'Made on %s.', 'beltoft-services' ), $when( (int) $v['at'] ) ) );
+					$facts[ __( 'Made', 'beltoft-services' ) ] = $when( (int) $v['at'] );
 				}
 
 				if ( $v['refreshed'] > 0 ) {
-					/* translators: %s: date and time. */
-					echo ' ' . esc_html( sprintf( __( 'Refreshed from the live website on %s.', 'beltoft-services' ), $when( (int) $v['refreshed'] ) ) );
+					$facts[ __( 'Refreshed from live', 'beltoft-services' ) ] = $when( (int) $v['refreshed'] );
 				}
 
-				echo '</p>';
+				self::facts( $facts, ' data-staging-state' );
 
 				if ( $ready ) {
 					$files = __( 'Push the staging copy to the live website? Its files replace the files of the live website. The database and the media library of the live website stay as they are. A safety point of the live website is made first, and you can undo the push for 7 days.', 'beltoft-services' );
 					$both  = __( 'Push the staging copy to the live website? Its files and its database replace those of the live website. Orders, customers, comments and other changes made on the live website since the copy was made are lost. A safety point of the live website is made first, and you can undo the push for 7 days.', 'beltoft-services' );
 
-					echo '<div class="beltoft-hosting-buttons">';
-					echo '<button type="button" class="beltoft-hosting-btn beltoft-hosting-btn--primary" data-hosting-action="staging_open" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Open staging', 'beltoft-services' ) . '</button>';
-					echo '<button type="button" class="beltoft-hosting-btn" data-hosting-action="staging_edit" aria-expanded="false" aria-controls="' . esc_attr( $id ) . '">' . esc_html__( 'Push to live', 'beltoft-services' ) . '</button>';
-					echo '<button type="button" class="beltoft-hosting-btn" data-hosting-action="staging_refresh" data-slug="' . esc_attr( $slug ) . '" data-confirm="' . esc_attr__( 'Refresh the staging copy from the live website? Changes made only in the staging copy are lost.', 'beltoft-services' ) . '">' . esc_html__( 'Refresh from live', 'beltoft-services' ) . '</button>';
-					echo '<button type="button" class="beltoft-hosting-linkbtn beltoft-hosting-linkbtn--danger" data-hosting-action="staging_delete" data-slug="' . esc_attr( $slug ) . '" data-confirm="' . esc_attr__( 'Delete the staging copy? Its files and its database are deleted. The live website is not changed.', 'beltoft-services' ) . '">' . esc_html__( 'Delete staging copy', 'beltoft-services' ) . '</button>';
-					echo '</div>';
-					echo '<p class="beltoft-hosting-help">' . esc_html__( 'Open staging signs you in to the WordPress of the staging copy. The address above shows the copy as visitors would see it.', 'beltoft-services' ) . '</p>';
+					self::action(
+						esc_html__( 'Signs you in to the WordPress of the staging copy, in a new tab. The address above shows the copy as visitors see it.', 'beltoft-services' ),
+						'<button type="button" class="beltoft-hosting-btn" data-hosting-action="staging_open" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Open staging', 'beltoft-services' ) . '</button>'
+					);
+					self::action(
+						esc_html__( 'Puts the staging copy on the live website. You choose files only, or files and database. A safety point is made first, and you can undo the push for 7 days.', 'beltoft-services' ),
+						'<button type="button" class="beltoft-hosting-btn" data-hosting-action="staging_edit" aria-expanded="false" aria-controls="' . esc_attr( $id ) . '">' . esc_html__( 'Push to live', 'beltoft-services' ) . '</button>'
+					);
 					echo '<div class="beltoft-hosting-secure" id="' . esc_attr( $id ) . '" data-staging-form hidden>';
 					echo '<fieldset class="beltoft-hosting-fieldset"><legend>' . esc_html__( 'What to push', 'beltoft-services' ) . '</legend>';
 					echo '<label class="beltoft-hosting-radio"><input type="radio" name="' . esc_attr( $id ) . '-what" value="full" data-confirm="' . esc_attr( $both ) . '" checked> <span>' . esc_html__( 'Files and database', 'beltoft-services' ) . '</span></label> ';
@@ -684,12 +751,17 @@ final class HostingAccount {
 					echo '<p class="beltoft-hosting-warning">' . esc_html__( 'Files and database: orders, customers, comments and other changes made on the live website since the staging copy was made are replaced.', 'beltoft-services' ) . '</p>';
 					echo '<p class="beltoft-hosting-help">' . esc_html__( 'Files only: themes, plugins and other files are pushed. The database and the media library of the live website stay as they are.', 'beltoft-services' ) . '</p></fieldset>';
 					echo '<div class="beltoft-hosting-buttons"><button type="button" class="beltoft-hosting-btn" data-hosting-action="staging_push" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Push to live', 'beltoft-services' ) . '</button><button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="staging_cancel">' . esc_html__( 'Cancel', 'beltoft-services' ) . '</button></div></div>';
+					self::action(
+						esc_html__( 'Copies the live website over the staging copy again. Changes made only in the staging copy are lost.', 'beltoft-services' ),
+						'<button type="button" class="beltoft-hosting-btn" data-hosting-action="staging_refresh" data-slug="' . esc_attr( $slug ) . '" data-confirm="' . esc_attr__( 'Refresh the staging copy from the live website? Changes made only in the staging copy are lost.', 'beltoft-services' ) . '">' . esc_html__( 'Refresh from live', 'beltoft-services' ) . '</button>'
+					);
 				}
 			} elseif ( $ready ) {
 				if ( 'one' === (string) ( $limits['staging'] ?? 'one' ) && (int) ( $limits['staging_used'] ?? 0 ) > 0 ) {
 					echo '<p class="beltoft-hosting-line">' . esc_html__( 'Your plan includes one staging copy, and another website has it.', 'beltoft-services' ) . '</p>';
 				} else {
-					echo '<div class="beltoft-hosting-buttons"><button type="button" class="beltoft-hosting-btn" data-hosting-action="staging_create" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Create staging copy', 'beltoft-services' ) . '</button></div>';
+					self::action( esc_html( $about ), '<button type="button" class="beltoft-hosting-btn" data-hosting-action="staging_create" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Create staging copy', 'beltoft-services' ) . '</button>' );
+					$shown = true;
 				}
 			}
 
@@ -699,13 +771,25 @@ final class HostingAccount {
 					? __( 'Undo the last push? The live website goes back to how it was before the push, its files and its database. Orders, comments and other changes made on the live website since the push are lost.', 'beltoft-services' )
 					: __( 'Undo the last push? The files of the live website go back to how they were before the push. The database is not changed.', 'beltoft-services' );
 
-				echo '<p class="beltoft-hosting-line"><button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="staging_undo" data-slug="' . esc_attr( $slug ) . '" data-confirm="' . esc_attr( $ask ) . '">' . esc_html__( 'Undo last push', 'beltoft-services' ) . '</button> ';
-				/* translators: %s: date and time. */
-				echo esc_html( sprintf( __( 'You can undo the last push until %s.', 'beltoft-services' ), $when( (int) $v['undo']['at'] + SiteStaging::KEEP ) ) ) . '</p>';
+				self::action(
+					/* translators: %s: date and time. */
+					esc_html( sprintf( __( 'You can undo the last push until %s.', 'beltoft-services' ), $when( (int) $v['undo']['at'] + SiteStaging::KEEP ) ) ),
+					'<button type="button" class="beltoft-hosting-btn" data-hosting-action="staging_undo" data-slug="' . esc_attr( $slug ) . '" data-confirm="' . esc_attr( $ask ) . '">' . esc_html__( 'Undo last push', 'beltoft-services' ) . '</button>'
+				);
+			}
+
+			if ( $ready && $v['exists'] ) {
+				self::action(
+					esc_html__( 'Deletes the staging copy, its files and its database. The live website is not changed.', 'beltoft-services' ),
+					'<button type="button" class="beltoft-hosting-btn bs-btn--danger" data-hosting-action="staging_delete" data-slug="' . esc_attr( $slug ) . '" data-confirm="' . esc_attr__( 'Delete the staging copy? Its files and its database are deleted. The live website is not changed.', 'beltoft-services' ) . '">' . esc_html__( 'Delete staging copy', 'beltoft-services' ) . '</button>'
+				);
 			}
 		}
 
-		echo '<p class="beltoft-hosting-help">' . esc_html__( 'A staging copy is a copy of this website on an address of its own, to try changes in before they go live. It sends no email, is not shown to search engines and does not count as a website.', 'beltoft-services' ) . '</p>';
+		if ( empty( $shown ) ) {
+			echo '<p class="beltoft-hosting-help">' . esc_html__( 'A staging copy is a copy of this website on an address of its own, to try changes in before they go live. It sends no email, is not shown to search engines and does not count as a website.', 'beltoft-services' ) . '</p>';
+		}
+
 		self::sec_close();
 	}
 
@@ -726,12 +810,14 @@ final class HostingAccount {
 
 		self::sec_open( __( 'Country block', 'beltoft-services' ), $enabled ? __( 'On', 'beltoft-services' ) : __( 'Off', 'beltoft-services' ), false, 'country', $slug );
 
-		if ( ! $enabled ) {
-			echo '<p class="beltoft-hosting-line" data-country-state>' . esc_html__( 'Country block: off. Visitors from every country can reach this website.', 'beltoft-services' ) . '</p>';
-		} else {
-			$list = implode( ', ', array_map( static fn( $c ) => (string) $c['name'], (array) $block['countries'] ) );
-			/* translators: 1: where the block applies, 2: the blocked countries. */
-			echo '<p class="beltoft-hosting-line" data-country-state>' . esc_html( sprintf( __( 'Country block: on for %1$s. Blocked: %2$s.', 'beltoft-services' ), 'login' === $scope ? __( 'the login and the admin area', 'beltoft-services' ) : __( 'the whole website', 'beltoft-services' ), $list ) ) . '</p>';
+		if ( $enabled ) {
+			self::facts(
+				array(
+					__( 'Applies to', 'beltoft-services' ) => 'login' === $scope ? __( 'Login and admin only', 'beltoft-services' ) : __( 'Whole website', 'beltoft-services' ),
+					__( 'Blocked', 'beltoft-services' )    => implode( ', ', array_map( static fn( $c ) => (string) $c['name'], (array) $block['countries'] ) ),
+				),
+				' data-country-state'
+			);
 
 			if ( false === $block['active'] ) {
 				echo '<p class="beltoft-hosting-warning">' . esc_html__( 'The list is saved, but the country database is not in place on your server yet, so nothing is blocked until it is.', 'beltoft-services' ) . '</p>';
@@ -739,7 +825,15 @@ final class HostingAccount {
 		}
 
 		if ( $ready ) {
-			echo '<div class="beltoft-hosting-buttons"><button type="button" class="beltoft-hosting-btn" data-hosting-action="country_edit" aria-expanded="false" aria-controls="' . esc_attr( $id ) . '">' . esc_html( $enabled ? __( 'Change', 'beltoft-services' ) : __( 'Block countries', 'beltoft-services' ) ) . '</button></div>';
+			self::action(
+				esc_html( $enabled ? __( 'Change the countries, or where the block applies, or turn it off.', 'beltoft-services' ) : __( 'Visitors from every country can reach this website. Block the countries you choose, on the whole website or only on the login.', 'beltoft-services' ) ),
+				'<button type="button" class="beltoft-hosting-btn" data-hosting-action="country_edit" aria-expanded="false" aria-controls="' . esc_attr( $id ) . '">' . esc_html( $enabled ? __( 'Change', 'beltoft-services' ) : __( 'Block countries', 'beltoft-services' ) ) . '</button>'
+			);
+		} elseif ( ! $enabled ) {
+			echo '<p class="beltoft-hosting-line" data-country-state>' . esc_html__( 'Visitors from every country can reach this website.', 'beltoft-services' ) . '</p>';
+		}
+
+		if ( $ready ) {
 			echo '<div class="beltoft-hosting-secure" id="' . esc_attr( $id ) . '" data-country-form hidden>';
 			echo '<fieldset class="beltoft-hosting-fieldset"><legend>' . esc_html__( 'Countries to block', 'beltoft-services' ) . '</legend>';
 

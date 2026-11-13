@@ -591,9 +591,10 @@ class HostingPageTest extends HostingCase {
 		$this->assertStringContainsString( 'Set a WordPress password', $html );
 		$this->assertStringContainsString( '<dt>WordPress user</dt><dd>owner</dd>', $html );
 		$this->assertStringContainsString( '<dt>Email address</dt><dd>' . esc_html( $r->license()['email'] ) . '</dd>', $html );
-		$this->assertStringContainsString( 'signs you in as this user. No password is needed.', $html );
+		$this->assertStringContainsString( 'Signs you in to WordPress as this user, in a new tab. No password is needed.', $html );
 		$this->assertStringContainsString( 'Clears the page cache and the object cache of this website.', $html );
-		$this->assertStringContainsString( 'data-hosting-action="php_edit"', $html );
+		$this->assertStringContainsString( 'data-hosting-action="php_save"', $html );
+		$this->assertStringContainsString( 'This website runs on PHP 8.3.', $html );
 		$this->assertStringContainsString( 'PHP 8.3', $html );
 		$this->assertStringContainsString( 'type="radio"', $html );
 		$this->assertStringContainsString( 'The other address redirects to the main address. This does not change the address set in WordPress.', $html );

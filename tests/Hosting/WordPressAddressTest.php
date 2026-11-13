@@ -544,7 +544,7 @@ class WordPressAddressTest extends HostingCase {
 		$this->assertStringStartsWith( 'https://example.org/', $a->login_link( $slug )['url'] );
 		$this->assertStringStartsWith( 'https://example.org/', $a->password_link( $slug )['url'] );
 		$html = $this->page( $r );
-		$this->assertStringContainsString( 'log in at https://example.org/wp-login.php without this page', $html );
+		$this->assertStringContainsString( 'log in at https://example.org/wp-login.php.', $html );
 		$this->assertStringNotContainsString( 'https://' . EdgeMap::preview_host( $slug ) . '/wp-login.php', $html );
 		$this->assertMatchesRegularExpression( '/example\.org<\/span> <span class="beltoft-hosting-note">Main address, WordPress address/', $html );
 		$this->assertMatchesRegularExpression( '/' . preg_quote( EdgeMap::preview_host( $slug ), '/' ) . '<\/span> <span class="beltoft-hosting-note">Temporary address/', $html );

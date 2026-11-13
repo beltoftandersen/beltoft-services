@@ -287,7 +287,6 @@
 				var countryForm = scope.querySelector( '[data-country-form]' );
 
 				setHidden( countryForm, 'country_cancel' === action );
-				setHidden( countryOpener, 'country_edit' === action );
 				disclosed( countryOpener, countryForm, 'country_edit' === action );
 				return true;
 			case 'staging_edit':
@@ -582,11 +581,33 @@
 
 				var pages = { on: text.cachePageOn, off: text.cachePageOff, inactive: text.cachePageInactive, missing: text.cachePageMissing };
 				var objects = { on: text.cacheObjectOn, off: text.cacheObjectOff };
-				var parts = [ pages[ result.data.page_cache ], objects[ result.data.object_cache ] ].filter( Boolean );
+				var page = pages[ result.data.page_cache ] || '';
+				var object = objects[ result.data.object_cache ] || '';
+				var pageBox = box.querySelector( '[data-cache-page]' );
+				var objectBox = box.querySelector( '[data-cache-object]' );
 
-				if ( parts.length ) {
-					box.textContent = parts.join( ' ' );
-					box.hidden = false;
+				if ( ! page && ! object ) {
+					return;
+				}
+
+				if ( pageBox ) {
+					pageBox.textContent = page;
+					pageBox.parentNode.hidden = ! page;
+				}
+
+				if ( objectBox ) {
+					objectBox.textContent = object;
+					objectBox.parentNode.hidden = ! object;
+				}
+
+				box.hidden = false;
+
+				// The closed row shows the page cache state beside its name.
+				var row = box.closest( 'details' );
+				var value = row ? row.querySelector( '.bsh-sec__value' ) : null;
+
+				if ( value && page ) {
+					value.textContent = text.cacheRowValue ? text.cacheRowValue.replace( '%s', page ) : page;
 				}
 			}, function () {
 				// The facts are an extra: without them the line stays hidden.
