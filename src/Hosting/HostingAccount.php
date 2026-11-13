@@ -481,38 +481,45 @@ final class HostingAccount {
 			'domains',
 			$slug
 		);
-		echo '<ul class="beltoft-hosting-names">';
+		// Each name a row: the name and its state, its roles under it, and its button at the right.
+		echo '<ul class="bs-list bsh-names">';
 
 		foreach ( $site['domains'] as $d ) {
 			$is_main = $d['host'] === $main && 'preview' !== $d['kind'];
-			$notes   = array();
+			$roles   = array();
 
 			if ( 'preview' === $d['kind'] ) {
-				$notes[] = __( 'Temporary address', 'beltoft-services' );
+				$roles[] = __( 'Temporary address', 'beltoft-services' );
 			} elseif ( $is_main ) {
-				$notes[] = __( 'Main address', 'beltoft-services' );
+				$roles[] = __( 'Main address', 'beltoft-services' );
 			}
 
 			if ( $own && $d['host'] === $wp['address'] ) {
-				$notes[] = __( 'WordPress address', 'beltoft-services' );
-			}
-
-			if ( 'active' !== $d['state'] ) {
-				$notes[] = 'waiting' === $d['state'] ? __( 'waiting for DNS', 'beltoft-services' ) : __( 'pending', 'beltoft-services' );
+				$roles[] = __( 'WordPress address', 'beltoft-services' );
 			}
 
 			if ( 'preview' !== $d['kind'] && in_array( Addons::registrable( $d['host'] ), $ending, true ) ) {
-				$notes[] = __( 'ends at the next renewal', 'beltoft-services' );
+				$roles[] = __( 'ends at the next renewal', 'beltoft-services' );
 			}
 
-			echo '<li><span class="beltoft-hosting-name">' . esc_html( \BeltoftServices\Domains\HostName::display( $d['host'] ) ) . '</span>';
-
-			if ( array() !== $notes ) {
-				echo ' <span class="beltoft-hosting-note">' . esc_html( implode( ', ', $notes ) ) . '</span>';
+			if ( 'active' === $d['state'] ) {
+				$state = array( 'ok', __( 'Connected', 'beltoft-services' ) );
+			} elseif ( 'waiting' === $d['state'] ) {
+				$state = array( 'warn', __( 'Waiting for DNS', 'beltoft-services' ) );
+			} else {
+				$state = array( 'muted', __( 'Pending', 'beltoft-services' ) );
 			}
+
+			echo '<li class="bs-item"><div class="bs-item__main"><p class="bs-item__title"><span class="bs-item__name">' . esc_html( \BeltoftServices\Domains\HostName::display( $d['host'] ) ) . '</span> <span class="bs-state bs-state--' . esc_attr( $state[0] ) . '">' . esc_html( $state[1] ) . '</span></p>';
+
+			if ( array() !== $roles ) {
+				echo '<p class="bs-item__meta">' . esc_html( implode( ', ', $roles ) ) . '</p>';
+			}
+
+			echo '</div>';
 
 			if ( $ready && 'preview' !== $d['kind'] ) {
-				echo ' <button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="remove_domain" data-host="' . esc_attr( $d['host'] ) . '">' . esc_html__( 'Remove', 'beltoft-services' ) . '</button>';
+				echo '<div class="bs-item__actions"><button type="button" class="beltoft-hosting-btn bsh-btn--sm" data-hosting-action="remove_domain" data-host="' . esc_attr( $d['host'] ) . '">' . esc_html__( 'Remove', 'beltoft-services' ) . '</button></div>';
 			}
 
 			echo '</li>';
@@ -529,8 +536,11 @@ final class HostingAccount {
 		DnsGuide::render( $r, $site, $node, $ready );
 
 		if ( $ready ) {
-			echo '<div class="beltoft-hosting-formrow" data-hosting-scope id="beltoft-site-' . esc_attr( $slug ) . '-connect"><label class="beltoft-hosting-field"><span>' . esc_html__( 'Connect a domain', 'beltoft-services' ) . '</span><input type="text" data-hosting-field="host" placeholder="example.com" autocomplete="off" autocapitalize="off" spellcheck="false"></label><button type="button" class="beltoft-hosting-btn" data-hosting-action="add_domain" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Connect', 'beltoft-services' ) . '</button></div>';
-			echo '<p class="beltoft-hosting-help">' . esc_html__( 'A domain is connected with and without www. A subdomain is connected only as typed.', 'beltoft-services' ) . '</p>';
+			self::action(
+				'<label for="beltoft-connect-' . esc_attr( $slug ) . '"><strong class="bsh-action__title">' . esc_html__( 'Connect a domain', 'beltoft-services' ) . '</strong></label> ' . esc_html__( 'A domain is connected with and without www. A subdomain is connected only as typed.', 'beltoft-services' ),
+				'<span class="beltoft-hosting-inline"><input type="text" id="beltoft-connect-' . esc_attr( $slug ) . '" data-hosting-field="host" placeholder="example.com" autocomplete="off" autocapitalize="off" spellcheck="false"><button type="button" class="beltoft-hosting-btn" data-hosting-action="add_domain" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Connect', 'beltoft-services' ) . '</button></span>',
+				' data-hosting-scope id="beltoft-site-' . esc_attr( $slug ) . '-connect"'
+			);
 		}
 
 		self::sec_close();
@@ -942,19 +952,24 @@ final class HostingAccount {
 			return;
 		}
 
-		echo '<p class="beltoft-hosting-line" data-wp-address>' . esc_html( $line );
+		$do = '';
 
 		if ( $ready && null !== $button ) {
 			/* translators: %s: address. */
-			echo ' <button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="wp_address" data-slug="' . esc_attr( $slug ) . '" data-host="' . esc_attr( $button[0] ) . '" data-confirm="' . esc_attr( $button[1] ) . '">' . esc_html( sprintf( __( 'Make %s the WordPress address', 'beltoft-services' ), $show( $button[0] ) ) ) . '</button>';
+			$do = '<button type="button" class="beltoft-hosting-btn" data-hosting-action="wp_address" data-slug="' . esc_attr( $slug ) . '" data-host="' . esc_attr( $button[0] ) . '" data-confirm="' . esc_attr( $button[1] ) . '">' . esc_html( sprintf( __( 'Make %s the WordPress address', 'beltoft-services' ), $show( $button[0] ) ) ) . '</button>';
 		}
 
 		if ( $ready && null === $button && '' === $wp['moving'] && '' !== $wp['prev'] && $wp['prev'] !== $wp['address'] ) {
 			/* translators: %s: address. */
-			echo ' <button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="wp_address" data-slug="' . esc_attr( $slug ) . '" data-host="' . esc_attr( (string) $wp['prev'] ) . '" data-confirm="' . esc_attr( sprintf( __( 'Move WordPress back to %s? A copy of the database is made first, and put back if the change fails.', 'beltoft-services' ), $show( (string) $wp['prev'] ) ) ) . '">' . esc_html( sprintf( __( 'Go back to %s', 'beltoft-services' ), $show( (string) $wp['prev'] ) ) ) . '</button>';
+			$do = '<button type="button" class="beltoft-hosting-btn" data-hosting-action="wp_address" data-slug="' . esc_attr( $slug ) . '" data-host="' . esc_attr( (string) $wp['prev'] ) . '" data-confirm="' . esc_attr( sprintf( __( 'Move WordPress back to %s? A copy of the database is made first, and put back if the change fails.', 'beltoft-services' ), $show( (string) $wp['prev'] ) ) ) . '">' . esc_html( sprintf( __( 'Go back to %s', 'beltoft-services' ), $show( (string) $wp['prev'] ) ) ) . '</button>';
 		}
 
-		echo '</p>';
+		if ( '' === $do ) {
+			echo '<p class="beltoft-hosting-line" data-wp-address>' . esc_html( $line ) . '</p>';
+			return;
+		}
+
+		self::action( '<strong class="bsh-action__title">' . esc_html__( 'WordPress address', 'beltoft-services' ) . '</strong> ' . esc_html( $line ), $do, ' data-wp-address' );
 	}
 
 	/**
@@ -993,26 +1008,27 @@ final class HostingAccount {
 
 		$name = 'beltoft-main-' . $slug . '-' . preg_replace( '/[^a-z0-9]/', '-', (string) $pair['base'] );
 
-		echo '<div class="beltoft-hosting-main" role="radiogroup" aria-labelledby="' . esc_attr( $name ) . '-label" data-hosting-scope><span class="beltoft-hosting-main__label" id="' . esc_attr( $name ) . '-label">' . esc_html__( 'Main address', 'beltoft-services' ) . '</span>';
-
-		foreach ( array( (string) $pair['base'], (string) $pair['www'] ) as $host ) {
-			echo '<label class="beltoft-hosting-radio"><input type="radio" name="' . esc_attr( $name ) . '" value="' . esc_attr( $host ) . '"' . checked( $host, (string) $pair['main'], false ) . ( $ready ? '' : ' disabled' ) . '> <span>' . esc_html( \BeltoftServices\Domains\HostName::display( $host ) ) . '</span></label>';
-		}
-
-		if ( $ready ) {
-			echo '<button type="button" class="beltoft-hosting-btn" data-hosting-action="set_main">' . esc_html__( 'Save', 'beltoft-services' ) . '</button>';
-		}
-
 		// WordPress follows the choice when it is on a name of this pair; otherwise the choice leaves its address alone.
 		$follows = in_array( $wp_address, array( (string) $pair['base'], (string) $pair['www'] ), true );
-
-		echo '<p class="beltoft-hosting-help">' . esc_html( $follows ? __( 'The other address redirects to the main address. WordPress moves to the main address too.', 'beltoft-services' ) : __( 'The other address redirects to the main address. This does not change the address set in WordPress.', 'beltoft-services' ) ) . '</p>';
+		$text    = $follows ? __( 'The other address redirects to the main address. WordPress moves to the main address too.', 'beltoft-services' ) : __( 'The other address redirects to the main address. This does not change the address set in WordPress.', 'beltoft-services' );
 
 		if ( '' === (string) $pair['main'] ) {
-			echo '<p class="beltoft-hosting-help">' . esc_html__( 'Both addresses show the website. Choose a main address to redirect the other one.', 'beltoft-services' ) . '</p>';
+			$text = __( 'Both addresses show the website. Choose a main address to redirect the other one.', 'beltoft-services' ) . ' ' . $text;
 		}
 
-		echo '</div>';
+		$choice = '<span class="bsh-choice" role="radiogroup" aria-labelledby="' . esc_attr( $name ) . '-label">';
+
+		foreach ( array( (string) $pair['base'], (string) $pair['www'] ) as $host ) {
+			$choice .= '<label class="bsh-choice__opt"><input type="radio" name="' . esc_attr( $name ) . '" value="' . esc_attr( $host ) . '"' . checked( $host, (string) $pair['main'], false ) . ( $ready ? '' : ' disabled' ) . '><span>' . esc_html( \BeltoftServices\Domains\HostName::display( $host ) ) . '</span></label>';
+		}
+
+		$choice .= '</span>';
+
+		if ( $ready ) {
+			$choice .= '<button type="button" class="beltoft-hosting-btn" data-hosting-action="set_main">' . esc_html__( 'Save', 'beltoft-services' ) . '</button>';
+		}
+
+		self::action( '<strong class="bsh-action__title" id="' . esc_attr( $name ) . '-label">' . esc_html__( 'Main address', 'beltoft-services' ) . '</strong> ' . esc_html( $text ), '<span class="beltoft-hosting-inline">' . $choice . '</span>', ' data-hosting-scope' );
 	}
 
 	/**
@@ -1271,10 +1287,11 @@ final class HostingAccount {
 
 		echo '<div class="beltoft-hosting-packs"><h4>' . esc_html__( 'Extra mailbox storage', 'beltoft-services' ) . '</h4><p>' . esc_html(
 			sprintf(
-				/* translators: 1: price per month and pack, 2: most packs on one mailbox. */
-				__( 'Add 5 GB to a mailbox for %1$s per month, up to %2$d packs for each mailbox.', 'beltoft-services' ),
-				Addons::money( (float) $quote['unit'], (string) ( $quote['currency'] ?? '' ) ),
-				Addons::MAX_PACKS
+				/* translators: 1: price per month and pack, 2: most packs on one mailbox, 3: "incl. VAT" or "excl. VAT". */
+				__( 'Add 5 GB to a mailbox for %1$s per month (%3$s), up to %2$d packs for each mailbox.', 'beltoft-services' ),
+				Addons::shown( (float) $quote['unit'], (string) ( $quote['currency'] ?? '' ) ),
+				Addons::MAX_PACKS,
+				\BeltoftServices\Billing\TaxNote::label()
 			)
 		) . '</p><ul class="beltoft-hosting-pack-list">';
 
