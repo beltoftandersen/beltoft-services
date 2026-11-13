@@ -22,9 +22,12 @@ class ClassAliasTest extends TestCase {
 	 * @return array<string, array{string, string}>
 	 */
 	private function expected(): array {
-		$old = 'BeltoftServices\\Proxmox\\';
+		$old    = 'BeltoftServices\\Proxmox\\';
+		$credit = 'BeltoftServices\\Credit\\';
 
 		return array(
+			$credit . 'CheckoutCredit' => array( 'BeltoftServices\\GiftCredit\\Checkout', 'preview', '' ),
+			$credit . 'Topup'          => array( 'BeltoftServices\\GiftCredit\\Topup', 'max', 'CART_KEY' ),
 			$old . 'AppField'    => array( 'BeltoftServices\\Apps\\AppField', 'offer_for', 'POST_APP,POST_TIER,POST_VERSION' ),
 			$old . 'AppLicence'  => array( 'BeltoftServices\\Apps\\AppLicence', 'tier', '' ),
 			$old . 'Backups'     => array( 'BeltoftServices\\Proxmox\\Backup\\Backups', 'sibling', '' ),
