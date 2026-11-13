@@ -110,6 +110,14 @@ final class Account {
 					'label'   => __( 'Minimum amount to charge a card for pay as you go', 'beltoft-services' ),
 					'desc'    => __( 'In the shop\'s currency. Another currency takes its own amount from the filter beltoft_services_amount_setting; with none there, it has no value. Including VAT. When the amount left to charge the card for a month is under this, it is carried to the next month\'s invoice instead. 0 turns this off.', 'beltoft-services' ),
 				),
+				'usage_order_language_meta' => array(
+					'tab'     => 'general',
+					'section' => 'usage',
+					'type'    => 'text',
+					'default' => '',
+					'label'   => __( 'Order meta key with the customer\'s language', 'beltoft-services' ),
+					'desc'    => __( 'For example _zerolang_lang. The usage invoice lines are then written in that language (an installed WordPress language, matched by code such as da or da_DK). Empty: the site\'s language.', 'beltoft-services' ),
+				),
 				'offer_monthly' => array(
 					'tab'     => 'general',
 					'section' => 'usage',

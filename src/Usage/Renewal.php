@@ -220,6 +220,57 @@ final class Renewal {
 	}
 
 	/**
+	 * Runs a callback in the language of an order: the order meta named by the setting usage_order_language_meta ("da", "da_DK")
+	 * picks an installed WordPress locale; the site's locale is put back afterwards, also when the callback throws.
+	 *
+	 * @param \WC_Order $order Order.
+	 * @param callable  $fn    What to run.
+	 */
+	private static function in_order_language( \WC_Order $order, callable $fn ): void {
+		$key      = trim( (string) \BeltoftServices\Settings::get( 'usage_order_language_meta' ) );
+		$locale   = '' !== $key ? self::locale_for( (string) $order->get_meta( $key ) ) : '';
+		$switched = '' !== $locale && determine_locale() !== $locale && switch_to_locale( $locale );
+
+		try {
+			$fn();
+		} finally {
+			if ( $switched ) {
+				restore_previous_locale();
+			}
+		}
+	}
+
+	/**
+	 * The installed WordPress locale for a language value: the same code ("da_DK", "da-DK"), else the first installed locale of that
+	 * language ("da"), else ''.
+	 *
+	 * @param string $value Language as the order keeps it.
+	 */
+	public static function locale_for( string $value ): string {
+		$value = strtolower( str_replace( '-', '_', trim( $value ) ) );
+
+		if ( '' === $value ) {
+			return '';
+		}
+
+		$installed = array_merge( array( 'en_US' ), get_available_languages() );
+
+		foreach ( $installed as $locale ) {
+			if ( strtolower( $locale ) === $value ) {
+				return $locale;
+			}
+		}
+
+		foreach ( $installed as $locale ) {
+			if ( strtolower( strtok( $locale, '_' ) ) === $value ) {
+				return $locale;
+			}
+		}
+
+		return '';
+	}
+
+	/**
 	 * The title of a usage line on the invoice: the product and plan with the server it belongs to, "VPS hosting Performance (web1)",
 	 * "Managed PostgreSQL Starter (db1)", "Backups (web1)", "Extra disk 100 GB (web1)", "Snapshot slots 2 packs (web1)".
 	 *
@@ -331,52 +382,58 @@ final class Renewal {
 		// the order's product lines, so without it a failed usage invoice cannot be paid ("Your checkout is empty").
 		// The fee lines below travel into that cart with it (WCS_Cart_Renewal::maybe_add_fees()).
 
-		foreach ( $statement['lines'] as $line ) {
-			$fee = new \WC_Order_Item_Fee();
-			$per   = 'hour' === $line['unit'] ? self::unit_name( 'hour' ) : sprintf( /* translators: %s: unit (GB, pack). */ __( '%s and hour', 'beltoft-services' ), self::unit_name( (string) $line['unit'] ) );
-			$qty   = self::quantity_note( (float) $line['quantity'], (string) $line['unit'] );
-			$hours = self::hours_text( (int) $line['hours'] );
-			$subject = self::invoice_title( (string) $line['item'], (int) $line['resource_id'], (float) $line['quantity'], (string) $line['unit'] );
-			$month   = wp_date( 'F Y', (int) $line['month'], new \DateTimeZone( 'UTC' ) );
-			$rate    = Rates::money( (float) $line['rate'], 4, $currency );
-			// The name is what the accounting system prints: the title and month, then the hours and the rate on a line of its own. The
-			// amount stays the one charged, so the invoice there matches this order to the cent.
-			$fee->set_name(
-				sprintf(
-					/* translators: 1: product and plan with the server ("VPS hosting Performance (web1)"), 2: month and year, 3: number of hours with the word ("600 hours"), 4: rate with currency, 5: unit, 6: cap note. */
-					__( "%1\$s, %2\$s\n%3\$s at %4\$s per %5\$s%6\$s", 'beltoft-services' ),
-					$subject,
-					$month,
-					$hours,
-					$rate,
-					$per,
-					$line['capped'] ? sprintf( /* translators: %s: amount with currency. */ __( ', capped at %s a month', 'beltoft-services' ), Rates::money( (float) $line['cap'], 2, $currency ) ) : ''
-				)
-			);
-			// What the invoice views show as name and detail (InvoiceView), so they need not take the long name apart.
-			$fee->add_meta_data( InvoiceView::META_NAME, $subject, true );
-			$fee->add_meta_data(
-				InvoiceView::META_DETAIL,
-				sprintf(
-					/* translators: 1: month and year, 2: number of hours with the word ("600 hours"), 3: quantity note (" (2.5 GB)" or empty), 4: rate with currency, 5: unit, 6: cap note. */
-					__( '%1$s: %2$s%3$s at %4$s per %5$s%6$s', 'beltoft-services' ),
-					$month,
-					$hours,
-					$qty,
-					$rate,
-					$per,
-					$line['capped'] ? sprintf( /* translators: %s: amount with currency. */ __( ', capped at %s', 'beltoft-services' ), Rates::money( (float) $line['cap'], 2, $currency ) ) : ''
-				),
-				true
-			);
-			$fee->set_total( (string) $line['charge'] );
-			$fee->set_tax_status( 'taxable' );
-			$fee->set_tax_class( '' );
-			$fee->add_meta_data( '_beltoft_services_usage_resource', $line['resource_id'], true );
-			$fee->add_meta_data( '_beltoft_services_usage_item', $line['item'], true );
-			$fee->add_meta_data( '_beltoft_services_usage_hours', $line['hours'], true );
-			$order->add_item( $fee );
-		}
+		// The lines are written in the order's language (setting usage_order_language_meta), so the invoice in the accounting system and
+		// the emails read in the customer's language. Without it they are in the site's language.
+		$write = static function () use ( $currency, $order, $statement ): void {
+			foreach ( $statement['lines'] as $line ) {
+				$fee = new \WC_Order_Item_Fee();
+				$per   = 'hour' === $line['unit'] ? self::unit_name( 'hour' ) : sprintf( /* translators: %s: unit (GB, pack). */ __( '%s and hour', 'beltoft-services' ), self::unit_name( (string) $line['unit'] ) );
+				$qty   = self::quantity_note( (float) $line['quantity'], (string) $line['unit'] );
+				$hours = self::hours_text( (int) $line['hours'] );
+				$subject = self::invoice_title( (string) $line['item'], (int) $line['resource_id'], (float) $line['quantity'], (string) $line['unit'] );
+				$month   = wp_date( 'F Y', (int) $line['month'], new \DateTimeZone( 'UTC' ) );
+				$rate    = Rates::money( (float) $line['rate'], 4, $currency );
+				// The name is what the accounting system prints: the title and month, then the hours and the rate on a line of its own. The
+				// amount stays the one charged, so the invoice there matches this order to the cent.
+				$fee->set_name(
+					sprintf(
+						/* translators: 1: product and plan with the server ("VPS hosting Performance (web1)"), 2: month and year, 3: number of hours with the word ("600 hours"), 4: rate with currency, 5: unit, 6: cap note. */
+						__( "%1\$s, %2\$s\n%3\$s at %4\$s per %5\$s%6\$s", 'beltoft-services' ),
+						$subject,
+						$month,
+						$hours,
+						$rate,
+						$per,
+						$line['capped'] ? sprintf( /* translators: %s: amount with currency. */ __( ', capped at %s a month', 'beltoft-services' ), Rates::money( (float) $line['cap'], 2, $currency ) ) : ''
+					)
+				);
+				// What the invoice views show as name and detail (InvoiceView), so they need not take the long name apart.
+				$fee->add_meta_data( InvoiceView::META_NAME, $subject, true );
+				$fee->add_meta_data(
+					InvoiceView::META_DETAIL,
+					sprintf(
+						/* translators: 1: month and year, 2: number of hours with the word ("600 hours"), 3: quantity note (" (2.5 GB)" or empty), 4: rate with currency, 5: unit, 6: cap note. */
+						__( '%1$s: %2$s%3$s at %4$s per %5$s%6$s', 'beltoft-services' ),
+						$month,
+						$hours,
+						$qty,
+						$rate,
+						$per,
+						$line['capped'] ? sprintf( /* translators: %s: amount with currency. */ __( ', capped at %s', 'beltoft-services' ), Rates::money( (float) $line['cap'], 2, $currency ) ) : ''
+					),
+					true
+				);
+				$fee->set_total( (string) $line['charge'] );
+				$fee->set_tax_status( 'taxable' );
+				$fee->set_tax_class( '' );
+				$fee->add_meta_data( '_beltoft_services_usage_resource', $line['resource_id'], true );
+				$fee->add_meta_data( '_beltoft_services_usage_item', $line['item'], true );
+				$fee->add_meta_data( '_beltoft_services_usage_hours', $line['hours'], true );
+				$order->add_item( $fee );
+			}
+		};
+
+		self::in_order_language( $order, $write );
 
 		$order->calculate_totals( true );
 

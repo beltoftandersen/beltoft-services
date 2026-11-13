@@ -50,6 +50,26 @@ class RenewalTest extends UsageTestCase {
 		return array_values( $order->get_items( 'fee' ) );
 	}
 
+	public function test_the_order_language_picks_an_installed_locale_and_the_site_language_comes_back(): void {
+		$this->assertSame( 'en_US', Renewal::locale_for( 'en' ) );
+		$this->assertSame( 'en_US', Renewal::locale_for( 'EN-us' ) );
+		$this->assertSame( '', Renewal::locale_for( 'xx' ) );
+		$this->assertSame( '', Renewal::locale_for( '' ) );
+
+		$user = $this->new_user();
+		$sub  = $this->usage_account( $user );
+		$sub->update_meta_data( '_zerolang_lang', 'en' );
+		$sub->save();
+		$this->hours( 501, $user, 100 );
+		$this->settings( array( 'usage_order_language_meta' => '_zerolang_lang' ) );
+		$before = determine_locale();
+
+		$order = wcs_create_renewal_order( $sub );
+
+		$this->assertCount( 1, $this->fees( $order ) );
+		$this->assertSame( $before, determine_locale(), 'The site language is back after the lines.' );
+	}
+
 	public function test_the_renewal_gets_one_line_per_resource_and_item_with_hours_times_rate(): void {
 		$user = $this->new_user();
 		$sub  = $this->usage_account( $user );

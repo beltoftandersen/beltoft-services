@@ -259,7 +259,7 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 == Changelog ==
 
 = 0.25.2 =
-* Usage invoice lines are named by product, plan and server ("VPS hosting Performance (web1), October 2026"), with the hours and the rate on a second line; the amount is unchanged, so an accounting system shows the same figures to the cent.
+* Usage invoice lines are named by product, plan and server ("VPS hosting Performance (web1), October 2026"), with the hours and the rate on a second line, in the order's language (new setting usage_order_language_meta); the amount is unchanged, so an accounting system shows the same figures to the cent.
 
 = 0.25.1 =
 * Hosting account page: domain names as rows with their state and a Remove button; connecting a domain, the WordPress address, the main address, the Files (SFTP) details, password and SSH keys, backups, the first-visit list and moving a website as rows with their buttons at the right edge; small buttons for row actions. Prices of extra mailbox storage in the customer's tax display.
