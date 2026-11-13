@@ -209,7 +209,6 @@ final class Page {
 		}
 
 		Panel::style();
-		wp_enqueue_script( \BeltoftServices\Status::HANDLE );
 
 		ob_start();
 		wc_get_template( 'gift-credit.php', array( 'credit' => self::data( get_current_user_id() ) ), 'beltoft-services/account/', BELTOFT_SERVICES_PATH . 'templates/account/' );
