@@ -1199,3 +1199,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-fw__ch
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-fw__choices > div > p { margin: 0; }
 /* Add-on tiles (disk sizes and other add-ons to buy). */
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-add__tile { border-radius: var(--bs-radius-lg); }
+
+/* Progress steps: round markers like every state dot. The SSL page: room between a heading and what follows. */
+.beltoft-services-progress__steps li::before { border-radius: 50%; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-ssl h3 { margin: var(--bs-space-5) 0 var(--bs-space-3); }
