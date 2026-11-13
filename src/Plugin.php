@@ -263,6 +263,7 @@ final class Plugin {
 		Credit\CheckoutCredit::register();
 		Credit\Grant::register();
 		Credit\Code::register();
+		GiftCredit\GiftCredit::register();
 
 		// Later tasks register their parts here.
 		self::$booted = true;

@@ -199,6 +199,14 @@
         "label": "Largest top-up",
         "desc": "In the shop's currency. Another currency takes its own amount from the filter beltoft_services_amount_setting; with none there, it has no value."
     },
+    "gift_credit": {
+        "tab": "general",
+        "section": "credit",
+        "type": "checkbox",
+        "default": 0,
+        "label": "Account credit as gift cards",
+        "desc": "Account credit is gift cards of the plugin Beltoft Gift Cards for WooCommerce, handled by the add-on Beltoft Gift Cards Account Credit: a top-up buys a card for the customer, free credit is a free card made in the gift card plugin, and the cards pay checkout orders, renewals and usage invoices (set in the add-on). Credit already on the old ledger is not applied while this is on, so move it to cards first. Needs both plugins to be active; without them this setting does nothing."
+    },
     "site_tag": {
         "tab": "proxmox",
         "section": "proxmox",
