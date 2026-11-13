@@ -1,6 +1,6 @@
 <?php
 /**
- * Version 6 of the schema: the currency column of the usage and credit ledgers.
+ * Version 6 of the schema: the currency column of the usage ledger.
  *
  * @package BeltoftServices
  */
@@ -20,7 +20,7 @@ final class SchemaCurrencyTest extends TestCase {
 	public function tear_down(): void {
 		global $wpdb;
 
-		foreach ( array( 'usage', 'credit' ) as $key ) {
+		foreach ( array( 'usage' ) as $key ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test schema.
 			$wpdb->query( 'DROP TEMPORARY TABLE IF EXISTS ' . Schema::tables()[ $key ] );
 		}
@@ -40,7 +40,7 @@ final class SchemaCurrencyTest extends TestCase {
 		return $wpdb->get_col( $wpdb->prepare( 'SHOW COLUMNS FROM %i', $table ) );
 	}
 
-	/** Version 5 copies of both tables, with rows, as old code left them. */
+	/** A version 5 copy of the usage table, with rows, as old code left it. */
 	private function version_5_tables( bool $rows = true ): void {
 		global $wpdb;
 
@@ -48,7 +48,6 @@ final class SchemaCurrencyTest extends TestCase {
 
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test schema.
 		$wpdb->query( 'DROP TEMPORARY TABLE IF EXISTS ' . $t['usage'] );
-		$wpdb->query( 'DROP TEMPORARY TABLE IF EXISTS ' . $t['credit'] );
 		$wpdb->query(
 			'CREATE TABLE ' . $t['usage'] . " (
 				id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -67,22 +66,6 @@ final class SchemaCurrencyTest extends TestCase {
 				KEY order_id (order_id)
 			)"
 		);
-		$wpdb->query(
-			'CREATE TABLE ' . $t['credit'] . " (
-				id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-				user_id bigint(20) unsigned NOT NULL,
-				kind varchar(12) NOT NULL,
-				amount_cents bigint(20) NOT NULL,
-				balance_after_cents bigint(20) NOT NULL,
-				ref_type varchar(20) NOT NULL DEFAULT '',
-				ref_id varchar(64) NOT NULL DEFAULT '',
-				note varchar(255) NOT NULL DEFAULT '',
-				created datetime NOT NULL,
-				PRIMARY KEY  (id),
-				UNIQUE KEY kind_ref (kind,ref_type,ref_id),
-				KEY user_id (user_id,id)
-			)"
-		);
 		if ( $rows ) {
 			$this->version_5_rows();
 		}
@@ -92,7 +75,7 @@ final class SchemaCurrencyTest extends TestCase {
 		delete_transient( Schema::RETRY_TRANSIENT );
 	}
 
-	/** Two usage rows and one credit row, as old code left them. */
+	/** Two usage rows, as old code left them. */
 	private function version_5_rows(): void {
 		global $wpdb;
 
@@ -100,7 +83,6 @@ final class SchemaCurrencyTest extends TestCase {
 
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test schema.
 		$wpdb->query( 'INSERT INTO ' . $t['usage'] . " (resource_id, user_id, item, rate, hour_bucket, created) VALUES (1, 7, 'server', 0.05, '2026-11-01 10:00:00', '2026-11-01 11:00:00'), (1, 7, 'server', 0.05, '2026-11-01 11:00:00', '2026-11-01 12:00:00')" );
-		$wpdb->query( 'INSERT INTO ' . $t['credit'] . " (user_id, kind, amount_cents, balance_after_cents, ref_id, created) VALUES (7, 'topup', 500, 500, 'a', '2026-11-01 10:00:00')" );
 		// phpcs:enable
 	}
 
@@ -117,7 +99,6 @@ final class SchemaCurrencyTest extends TestCase {
 
 		$this->assertSame( '6', Schema::DB_VERSION );
 		$this->assertContains( 'currency', $this->columns( $t['usage'] ) );
-		$this->assertContains( 'currency', $this->columns( $t['credit'] ) );
 		$this->assertSame( array(), Schema::missing_columns() );
 	}
 
@@ -126,14 +107,13 @@ final class SchemaCurrencyTest extends TestCase {
 		$this->version_5_tables();
 		$t = Schema::tables();
 
-		$this->assertSame( array( 'usage.currency', 'credit.currency' ), Schema::missing_columns() );
+		$this->assertSame( array( 'usage.currency' ), Schema::missing_columns() );
 
 		Schema::maybe_upgrade();
 
 		$this->assertSame( array(), Schema::missing_columns() );
 		$this->assertSame( '6', get_option( Schema::OPTION_DB_VERSION ) );
 		$this->assertSame( array( 'EUR', 'EUR' ), $this->values( $t['usage'] ) );
-		$this->assertSame( array( 'EUR' ), $this->values( $t['credit'] ) );
 	}
 
 	public function test_the_upgrade_changes_nothing_but_the_new_column(): void {
@@ -258,16 +238,11 @@ final class SchemaCurrencyTest extends TestCase {
 		$t = Schema::tables();
 		// Old code lists its columns and never the new one.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test write.
-		$wpdb->query( 'INSERT INTO ' . $t['credit'] . " (user_id, kind, amount_cents, balance_after_cents, ref_type, ref_id, note, created) VALUES (9, 'topup', 100, 100, 'x', 'old', '', '2026-11-01 10:00:00')" );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test write.
 		$wpdb->query( 'INSERT INTO ' . $t['usage'] . " (resource_id, user_id, item, rate, hour_bucket, created) VALUES (99, 9, 'server', 0.05, '2026-11-01 10:00:00', '2026-11-01 11:00:00')" );
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test read.
-		$credit = $wpdb->get_row( 'SELECT * FROM ' . $t['credit'] . ' WHERE user_id = 9', ARRAY_A );
 		$usage  = Ledger::unbilled( 9, strtotime( '2026-11-02 00:00:00 UTC' ) )[0];
 
-		$this->assertSame( '', $credit['currency'] );
-		$this->assertSame( 'EUR', Currency::of_row( $credit ) );
+		$this->assertSame( '', $usage['currency'] );
 		$this->assertSame( 'EUR', Currency::of_row( $usage ) );
 		$this->assertSame( 'EUR', Currency::of_row( array() ) );
 		$this->assertSame( 'DKK', Currency::of_row( array( 'currency' => 'DKK' ) ) );
@@ -305,7 +280,7 @@ final class SchemaCurrencyTest extends TestCase {
 		remove_filter( 'query', $break );
 
 		$this->assertSame( '5', get_option( Schema::OPTION_DB_VERSION ), 'an empty table has nothing to backfill, but the column is still missing' );
-		$this->assertSame( array( 'usage.currency', 'credit.currency' ), Schema::missing_columns() );
+		$this->assertSame( array( 'usage.currency' ), Schema::missing_columns() );
 	}
 
 	public function test_a_failed_alter_with_no_shop_currency_does_not_store_the_version(): void {
@@ -370,7 +345,7 @@ final class SchemaCurrencyTest extends TestCase {
 
 		foreach ( array( 1, 2, 500, 2000000000, 2000000001 ) as $id ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test write.
-			$wpdb->query( 'INSERT INTO ' . $t['credit'] . " (id, user_id, kind, amount_cents, balance_after_cents, ref_id, created) VALUES ($id, 7, 'topup', 1, 1, 'r$id', '2026-11-01 10:00:00')" );
+			$wpdb->query( 'INSERT INTO ' . $t['usage'] . " (id, resource_id, user_id, item, rate, hour_bucket, created) VALUES ($id, $id, 7, 'server', 0.05, '2026-11-01 10:00:00', '2026-11-01 11:00:00')" );
 		}
 
 		$batch = static function () {
@@ -393,7 +368,7 @@ final class SchemaCurrencyTest extends TestCase {
 		remove_filter( 'beltoft_services_schema_backfill_batch', $batch );
 
 		$this->assertSame( '6', get_option( Schema::OPTION_DB_VERSION ) );
-		$this->assertSame( array_fill( 0, 5, 'EUR' ), $this->values( $t['credit'] ) );
+		$this->assertSame( array_fill( 0, 5, 'EUR' ), $this->values( $t['usage'] ) );
 		$this->assertLessThanOrEqual( 6, $queries, 'one update per window of rows, not per id range' );
 	}
 
@@ -408,7 +383,7 @@ final class SchemaCurrencyTest extends TestCase {
 		foreach ( array( 1, 2, 3, 4, 5 ) as $id ) {
 			$currency = $id < 5 ? 'DKK' : '';
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test write.
-			$wpdb->query( 'INSERT INTO ' . $t['credit'] . " (id, user_id, kind, amount_cents, balance_after_cents, ref_id, created, currency) VALUES ($id, 7, 'topup', 1, 1, 'r$id', '2026-11-01 10:00:00', '$currency')" );
+			$wpdb->query( 'INSERT INTO ' . $t['usage'] . " (id, resource_id, user_id, item, rate, hour_bucket, created, currency) VALUES ($id, $id, 7, 'server', 0.05, '2026-11-01 10:00:00', '2026-11-01 11:00:00', '$currency')" );
 		}
 
 		$batch = static function () {
@@ -418,7 +393,7 @@ final class SchemaCurrencyTest extends TestCase {
 		Schema::create_tables();
 		remove_filter( 'beltoft_services_schema_backfill_batch', $batch );
 
-		$this->assertSame( array( 'DKK', 'DKK', 'DKK', 'DKK', 'EUR' ), $this->values( $t['credit'] ) );
+		$this->assertSame( array( 'DKK', 'DKK', 'DKK', 'DKK', 'EUR' ), $this->values( $t['usage'] ) );
 	}
 
 	public function test_a_ledger_writer_cleans_the_currency_code(): void {
