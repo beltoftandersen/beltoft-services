@@ -238,7 +238,7 @@ final class Renewal {
 			self::write_lines( $order, $statement, $currency );
 		};
 		$run   = static function () use ( $order, $write ): void {
-			self::in_order_language( $order, $write );
+			\BeltoftServices\OrderLanguage::run( $order, $write );
 		};
 
 		// With no way to put the order's currency in force the lines are still written, in the site's number format.
@@ -257,12 +257,13 @@ final class Renewal {
 	private static function write_lines( \WC_Order $order, array $statement, string $currency ): void {
 		foreach ( $statement['lines'] as $line ) {
 			$fee = new \WC_Order_Item_Fee();
-			$per   = 'hour' === $line['unit'] ? self::unit_name( 'hour' ) : sprintf( /* translators: %s: unit (GB, pack). */ __( '%s and hour', 'beltoft-services' ), self::unit_name( (string) $line['unit'] ) );
 			$qty   = self::quantity_note( (float) $line['quantity'], (string) $line['unit'] );
 			$hours = self::hours_text( (int) $line['hours'] );
 			$subject = self::invoice_title( (string) $line['item'], (int) $line['resource_id'], (float) $line['quantity'], (string) $line['unit'] );
 			$month   = wp_date( 'F Y', (int) $line['month'], new \DateTimeZone( 'UTC' ) );
-			$rate    = Rates::money( (float) $line['rate'], 4, $currency );
+			// The price of one hour of the whole item (a 100 GB disk, two snapshot packs), so the invoice reads hours x price per hour.
+			$hourly  = (float) $line['rate'] * (float) $line['quantity'];
+			$rate    = Rates::money( $hourly, 4, $currency );
 			// The name is what the accounting system prints: the title and month, then the hours and the rate on a line of its own. The
 			// amount stays the one charged, so the invoice there matches this order to the cent.
 			$fee->set_name(
@@ -273,9 +274,18 @@ final class Renewal {
 					$month,
 					$hours,
 					$rate,
-					$per,
+					self::unit_name( 'hour' ),
 					$line['capped'] ? sprintf( /* translators: %s: amount with currency. */ __( ', capped at %s a month', 'beltoft-services' ), Rates::money( (float) $line['cap'], 2, $currency ) ) : ''
 				)
+			);
+			// For an accounting system that prints hours and the price per hour as columns: the hours, the price of one hour (a capped
+			// month: the charge spread over its hours, so hours x price is the charge), and the line under the title.
+			$hours_n = max( 1, (int) $line['hours'] );
+			$fee->add_meta_data( '_beltoft_services_usage_price', (string) round( $line['capped'] ? (float) $line['charge'] / $hours_n : $hourly, 6 ), true );
+			$fee->add_meta_data(
+				'_beltoft_services_usage_note',
+				sprintf( /* translators: %s: month and year. */ __( 'Usage %s', 'beltoft-services' ), $month ) . ( $line['capped'] ? sprintf( /* translators: %s: amount with currency. */ __( ', capped at %s a month', 'beltoft-services' ), Rates::money( (float) $line['cap'], 2, $currency ) ) : '' ),
+				true
 			);
 			// What the invoice views show as name and detail (InvoiceView), so they need not take the long name apart.
 			$fee->add_meta_data( InvoiceView::META_NAME, $subject, true );
@@ -288,7 +298,7 @@ final class Renewal {
 					$hours,
 					$qty,
 					$rate,
-					$per,
+					self::unit_name( 'hour' ),
 					$line['capped'] ? sprintf( /* translators: %s: amount with currency. */ __( ', capped at %s', 'beltoft-services' ), Rates::money( (float) $line['cap'], 2, $currency ) ) : ''
 				),
 				true
@@ -330,54 +340,12 @@ final class Renewal {
 	}
 
 	/**
-	 * Runs a callback in the language of an order: the order meta named by the setting usage_order_language_meta ("da", "da_DK")
-	 * picks an installed WordPress locale; the site's locale is put back afterwards, also when the callback throws.
-	 *
-	 * @param \WC_Order $order Order.
-	 * @param callable  $fn    What to run.
-	 */
-	private static function in_order_language( \WC_Order $order, callable $fn ): void {
-		$key      = trim( (string) \BeltoftServices\Settings::get( 'usage_order_language_meta' ) );
-		$locale   = '' !== $key ? self::locale_for( (string) $order->get_meta( $key ) ) : '';
-		$switched = '' !== $locale && determine_locale() !== $locale && switch_to_locale( $locale );
-
-		try {
-			$fn();
-		} finally {
-			if ( $switched ) {
-				restore_previous_locale();
-			}
-		}
-	}
-
-	/**
-	 * The installed WordPress locale for a language value: the same code ("da_DK", "da-DK"), else the first installed locale of that
-	 * language ("da"), else ''.
+	 * The installed WordPress locale for a language value (OrderLanguage::locale_for(), kept here for callers of this class).
 	 *
 	 * @param string $value Language as the order keeps it.
 	 */
 	public static function locale_for( string $value ): string {
-		$value = strtolower( str_replace( '-', '_', trim( $value ) ) );
-
-		if ( '' === $value ) {
-			return '';
-		}
-
-		$installed = array_merge( array( 'en_US' ), get_available_languages() );
-
-		foreach ( $installed as $locale ) {
-			if ( strtolower( $locale ) === $value ) {
-				return $locale;
-			}
-		}
-
-		foreach ( $installed as $locale ) {
-			if ( strtolower( strtok( $locale, '_' ) ) === $value ) {
-				return $locale;
-			}
-		}
-
-		return '';
+		return \BeltoftServices\OrderLanguage::locale_for( $value );
 	}
 
 	/**

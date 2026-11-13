@@ -149,6 +149,7 @@ final class Plugin {
 		Billing\ExistingFlow::register();
 		Billing\SubscriptionNames::register();
 		Billing\LineOptions::register();
+		Billing\LinePeriod::register();
 		Billing\SwitchCurrency::register();
 		Billing\CostGuardCart::register();
 		BillingRequirements::register();

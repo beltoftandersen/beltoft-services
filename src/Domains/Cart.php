@@ -39,6 +39,7 @@ final class Cart {
 		add_filter( 'woocommerce_add_to_cart_validation', array( __CLASS__, 'validate_direct_add' ), 20, 6 );
 		add_filter( 'woocommerce_add_cart_item_data', array( __CLASS__, 'require_domain_selection' ), 20, 2 );
 		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'order_item' ), 10, 4 );
+		add_filter( 'beltoft_services_line_options', array( __CLASS__, 'line_option' ), 10, 2 );
 		foreach ( array( 'woocommerce_order_status_failed', 'woocommerce_order_status_cancelled', 'woocommerce_order_status_refunded', 'woocommerce_trash_order', 'woocommerce_before_delete_order', 'wp_trash_post', 'before_delete_post' ) as $hook ) {
 			add_action( $hook, array( __CLASS__, 'wipe_transfer_codes' ) );
 		}
@@ -578,6 +579,23 @@ final class Cart {
 			$product->update_meta_data( self::TRIAL_LENGTH, '0' );
 			$product->delete_meta_data( self::TRIAL_MARK );
 		}
+	}
+
+	/**
+	 * The domain of a line among its options in the customer's words (Billing\LineOptions), as "Domain: example.com".
+	 *
+	 * @param mixed $options array( label, value, key ) pairs.
+	 * @param mixed $item    Order line.
+	 * @return mixed
+	 */
+	public static function line_option( $options, $item = null ) {
+		$domain = $item instanceof \WC_Order_Item_Product ? $item->get_meta( '_beltoft_services_domain' ) : null;
+
+		if ( is_array( $options ) && is_array( $domain ) && '' !== (string) ( $domain['domain'] ?? '' ) ) {
+			$options[] = array( __( 'Domain', 'beltoft-services' ), \BeltoftServices\Domains\HostName::display( (string) $domain['domain'] ), 'domain' );
+		}
+
+		return $options;
 	}
 
 	public static function order_item( \WC_Order_Item_Product $item, string $cart_item_key, array $values, \WC_Order $order ): void {

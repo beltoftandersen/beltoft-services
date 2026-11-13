@@ -93,6 +93,12 @@ final class LineOptions {
 			}
 		}
 
-		return $out;
+		/**
+		 * The options of an order line in the customer's words, for a feature to add what is not a product attribute (a domain).
+		 *
+		 * @param array<int, array{0: string, 1: string, 2: string}> $out  array( label, value, key ) pairs.
+		 * @param \WC_Order_Item_Product                             $item The line.
+		 */
+		return (array) apply_filters( 'beltoft_services_line_options', $out, $item );
 	}
 }
