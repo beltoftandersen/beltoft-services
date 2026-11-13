@@ -165,4 +165,16 @@ final class Rules {
 	public static function usage_credit_cents( $cents, $user_id = 0, $currency = '' ) {
 		return (int) $cents + GiftCredit::balance( (int) $user_id, '' !== (string) $currency ? (string) $currency : Currency::current() );
 	}
+
+	/**
+	 * Free cards pay the fee lines of a usage invoice (as promotional credit always did: "a usage invoice takes both without limit").
+	 * The add-on takes their VAT share off with them, so free money carries no VAT there either. Other fee lines: the add-on's answer.
+	 *
+	 * @param mixed $allowed The add-on's answer (false by default).
+	 * @param mixed $fee     The fee line.
+	 * @param mixed $order   The order.
+	 */
+	public static function card_may_pay_fee( $allowed, $fee, $order ): bool {
+		return \BeltoftServices\Usage\Emails::is_usage( $order ) ? true : (bool) $allowed;
+	}
 }

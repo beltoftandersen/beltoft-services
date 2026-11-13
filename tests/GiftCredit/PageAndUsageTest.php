@@ -118,6 +118,21 @@ class PageAndUsageTest extends GiftCreditTestCase {
 		$order = wcs_create_renewal_order( $sub );
 
 		$this->assertSame( array( strtoupper( $card->code ) => 200 ), $this->coupon_lines( $order ) );
+		$this->assertEqualsWithDelta( 0.0, (float) $order->get_total(), 0.001 );
+		$this->assertEqualsWithDelta( 0.0, (float) $order->get_total_tax(), 0.001, 'Free money on a usage invoice carries no VAT.' );
+	}
+
+	public function test_paid_cards_pay_a_usage_invoice_and_its_vat_stays(): void {
+		$user = $this->new_user();
+		$sub  = $this->usage_account( $user );
+		$this->hours( 502, $user, 100 ); // 2.00 due.
+		$card = $this->card( $user, 1000, Source::ORDER );
+
+		$order = wcs_create_renewal_order( $sub );
+
+		$this->assertSame( array( strtoupper( $card->code ) => 200 ), $this->coupon_lines( $order ) );
+		$this->assertEqualsWithDelta( 0.0, (float) $order->get_total(), 0.001 );
+		$this->assertSame( wc_format_decimal( $order->get_total_tax(), 2 ), wc_format_decimal( (float) $order->get_cart_tax(), 2 ), 'A paid card is a payment: the VAT lines are as before.' );
 	}
 
 	public function test_the_usage_minimum_counts_the_cards_when_it_decides_to_carry_a_month(): void {

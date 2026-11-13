@@ -48,6 +48,7 @@ final class GiftCredit {
 		add_filter( 'bgca_account_url', array( Page::class, 'url_filter' ) );
 		add_filter( 'bgca_account_currency', array( Rules::class, 'account_currency' ), 10, 2 );
 		add_filter( 'bgca_card_may_pay_line', array( PromoFlag::class, 'card_may_pay_line' ), 10, 4 );
+		add_filter( 'bgca_card_may_pay_fee', array( Rules::class, 'card_may_pay_fee' ), 10, 3 );
 		add_filter( 'bgca_allow_partial_use', array( Rules::class, 'allow_partial_use' ), 10, 4 );
 		add_filter( 'bgca_auto_apply', array( Rules::class, 'auto_apply' ), 10, 4 );
 		// After the usage account's own answer (20) is not needed: a customer with cards and no other currency is in the cards' currency.
