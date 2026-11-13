@@ -617,6 +617,12 @@ class HostingPageTest extends HostingCase {
 		( new HostingActions( $r ) )->add_site( 'second', 'Second' );
 		$this->assertStringContainsString( 'data-hosting-action="remove_site"', $this->page( $r ) );
 		$this->assertStringContainsString( 'Remove website', $this->page( $r ) );
+		// The same danger block as deleting a server: folded, the typed name in a field of its own, no browser prompt.
+		$html = $this->page( $r );
+		$this->assertStringContainsString( '<details class="bs-danger beltoft-hosting-remove" data-hosting-scope data-slug="second">', $html );
+		$this->assertStringContainsString( 'data-hosting-field="remove_confirm"', $html );
+		$this->assertStringContainsString( 'placeholder="second"', $html );
+		$this->assertStringNotContainsString( 'window.prompt', (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/hosting.js' ) );
 	}
 
 	public function test_the_checklist_actions_point_to_where_the_item_is_done_and_the_password_item_is_optional(): void {

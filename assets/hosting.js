@@ -132,9 +132,8 @@
 			case 'cache':
 				return [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/cache', {} ];
 			case 'remove_site':
-				var typed = window.prompt( text.confirm || '' );
-
-				return null === typed ? null : [ 'DELETE', base + '/sites/' + encodeURIComponent( slug ) + '?confirm=' + encodeURIComponent( typed ), undefined ];
+				// The name typed in the danger block of the website (the server checks it too).
+				return [ 'DELETE', base + '/sites/' + encodeURIComponent( slug ) + '?confirm=' + encodeURIComponent( field( scope, 'remove_confirm' ) ), undefined ];
 			case 'add_site':
 				return [ 'POST', base + '/sites', { slug: '', label: field( scope, 'label' ), php: field( scope, 'php' ) } ];
 			case 'add_domain':

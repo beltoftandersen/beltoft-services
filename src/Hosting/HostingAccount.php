@@ -650,7 +650,13 @@ final class HostingAccount {
 		echo '</div>';
 
 		if ( $ready && $many ) {
-			echo '<footer class="beltoft-hosting-panel__foot"><button type="button" class="beltoft-hosting-linkbtn beltoft-hosting-linkbtn--danger" data-hosting-action="remove_site" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Remove website', 'beltoft-services' ) . '</button></footer>';
+			// The same danger block as deleting a server: what happens, the typed name, the red button.
+			$field = 'beltoft-remove-' . $slug;
+			echo '<details class="bs-danger beltoft-hosting-remove" data-hosting-scope data-slug="' . esc_attr( $slug ) . '"><summary class="bs-danger__row">' . esc_html__( 'Remove website', 'beltoft-services' ) . '</summary><div class="bs-danger__body">';
+			echo '<p>' . esc_html__( 'The website\'s files and database are deleted. This cannot be undone.', 'beltoft-services' ) . '</p>';
+			echo '<p><label for="' . esc_attr( $field ) . '">' . esc_html( sprintf( /* translators: %s: the word to type */ __( 'Type %s to confirm', 'beltoft-services' ), $slug ) ) . '</label><input type="text" id="' . esc_attr( $field ) . '" data-hosting-field="remove_confirm" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="' . esc_attr( $slug ) . '"></p>';
+			echo '<p><button type="button" class="button woocommerce-button bs-btn bs-btn--danger-solid" data-hosting-action="remove_site" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Remove website', 'beltoft-services' ) . '</button></p>';
+			echo '</div></details>';
 		}
 
 		self::panel_close();
