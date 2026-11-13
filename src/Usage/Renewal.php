@@ -278,15 +278,10 @@ final class Renewal {
 					$line['capped'] ? sprintf( /* translators: %s: amount with currency. */ __( ', capped at %s a month', 'beltoft-services' ), Rates::money( (float) $line['cap'], 2, $currency ) ) : ''
 				)
 			);
-			// For an accounting system that prints hours and the price per hour as columns: the hours, the price of one hour (a capped
-			// month: the charge spread over its hours, so hours x price is the charge), and the line under the title.
+			// For an accounting system that prints hours and the price per hour as columns: the hours and the price of one hour (a
+			// capped month: the charge spread over its hours, so hours x price is the charge).
 			$hours_n = max( 1, (int) $line['hours'] );
 			$fee->add_meta_data( '_beltoft_services_usage_price', (string) round( $line['capped'] ? (float) $line['charge'] / $hours_n : $hourly, 6 ), true );
-			$fee->add_meta_data(
-				'_beltoft_services_usage_note',
-				sprintf( /* translators: %s: month and year. */ __( 'Usage %s', 'beltoft-services' ), $month ) . ( $line['capped'] ? sprintf( /* translators: %s: amount with currency. */ __( ', capped at %s a month', 'beltoft-services' ), Rates::money( (float) $line['cap'], 2, $currency ) ) : '' ),
-				true
-			);
 			// What the invoice views show as name and detail (InvoiceView), so they need not take the long name apart.
 			$fee->add_meta_data( InvoiceView::META_NAME, $subject, true );
 			$fee->add_meta_data(

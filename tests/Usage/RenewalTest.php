@@ -96,7 +96,6 @@ class RenewalTest extends UsageTestCase {
 		// Hours x price per hour is what an accounting system prints as columns; it comes to the charge.
 		$this->assertSame( '100', (string) $fees[1]->get_meta( '_beltoft_services_usage_hours' ) );
 		$this->assertEqualsWithDelta( 2.26, 100 * (float) $fees[1]->get_meta( '_beltoft_services_usage_price' ), 0.005 );
-		$this->assertStringStartsWith( 'Usage ', (string) $fees[1]->get_meta( '_beltoft_services_usage_note' ) );
 		$this->assertSame( '0.23', $fees[2]->get_total() );
 		$this->assertSame( '2.99', $order->get_total() );
 		$this->assertSame( '2.99', $order->get_meta( Renewal::META_BILLED ) );

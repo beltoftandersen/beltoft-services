@@ -10,17 +10,17 @@ namespace BeltoftServices\Billing;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * When an order line is made at checkout, the chosen options of the product (its variation attributes, "Billing: Pay as you go")
- * are kept on the line as the customer saw them, in the language of the checkout. An accounting system can print them on the invoice
- * in that language; the shop's own attribute keys and values stay as they are. Renewals copy the line, and so the text.
+ * When an order line is made at checkout, it keeps one line of text for the invoice, in the language of the checkout: the product's
+ * name with its main choice, "Ekstra disk - 100 GB", "WordPress webhotel - Pro", "Domænenavn - eksempel.dk". An accounting system
+ * prints it as the line. Renewals copy the line, and so the text.
  */
 final class LineOptions {
 
-	/** Order item meta: the product's name in the order's language (filter beltoft_services_line_title), for the invoice line. */
-	public const META_TITLE = '_beltoft_services_line_title';
+	/** Order item meta: the invoice text of the line. Hidden from the order screens. */
+	public const META = '_beltoft_services_invoice_text';
 
-	/** Order item meta: a JSON list of array( label, value, key ) (key: the attribute, "plan", "pa_size"). Hidden from the order screens. */
-	public const META = '_beltoft_services_options';
+	/** The option keys whose value names the line, in this order (the plan, else the size, and so on). */
+	private const MAIN_KEYS = array( 'plan', 'size', 'pack', 'tier', 'type', 'licence', 'domain' );
 
 	/**
 	 * Hooks.
@@ -30,7 +30,7 @@ final class LineOptions {
 	}
 
 	/**
-	 * Keeps the options of a new order line.
+	 * Keeps the invoice text of a new order line.
 	 *
 	 * @param mixed $item Order line.
 	 */
@@ -39,17 +39,42 @@ final class LineOptions {
 			return;
 		}
 
-		$options = self::of( $item );
+		$text = self::text( $item );
 
-		if ( array() !== $options ) {
-			$item->update_meta_data( self::META, wp_json_encode( $options ) );
+		if ( '' !== $text ) {
+			$item->update_meta_data( self::META, $text );
 		}
+	}
 
+	/**
+	 * The invoice text of a line: the product's name, then " - " and the value of its first main option.
+	 *
+	 * @param \WC_Order_Item_Product $item Order line.
+	 */
+	public static function text( \WC_Order_Item_Product $item ): string {
 		$title = self::title( $item );
 
-		if ( '' !== $title ) {
-			$item->update_meta_data( self::META_TITLE, $title );
+		if ( '' === $title ) {
+			return '';
 		}
+
+		$values = array();
+
+		foreach ( self::of( $item ) as $pair ) {
+			$key = strtolower( preg_replace( '/^pa_/', '', (string) ( $pair[2] ?? '' ) ) );
+
+			if ( in_array( $key, self::MAIN_KEYS, true ) && ! isset( $values[ $key ] ) ) {
+				$values[ $key ] = (string) $pair[1];
+			}
+		}
+
+		foreach ( self::MAIN_KEYS as $key ) {
+			if ( isset( $values[ $key ] ) && '' !== $values[ $key ] ) {
+				return $title . ' - ' . $values[ $key ];
+			}
+		}
+
+		return $title;
 	}
 
 	/**

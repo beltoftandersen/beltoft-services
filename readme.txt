@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.25.7
+Stable tag: 0.26.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.26.0 =
+* Invoice text kept simple: each order line keeps one line of text, the product's name with its main choice in the customer's language (meta _beltoft_services_invoice_text); usage lines keep their hours and price per hour. Removed again: the kept options, the product title meta, the period of a line (Billing\\LinePeriod) and the usage note line.
 
 = 0.25.7 =
 * The filter beltoft_services_line_title also gets the product, and usage lines use it too, so a usage line names the product as the order line does.
