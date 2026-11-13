@@ -621,7 +621,7 @@ class AddonsTest extends HostingCase {
 
 		ob_start();
 		HostingAccount::render( Resource::find( $r->id() ) );
-		$this->assertMatchesRegularExpression( '/www\.other\.example<\/span> <span class="beltoft-hosting-note">[^<]*ends at the next renewal/', (string) ob_get_clean() );
+		$this->assertMatchesRegularExpression( '/www\.other\.example<\/span> <span class="bs-state[^"]*">[^<]*<\/span><\/p><p class="bs-item__meta">[^<]*ends at the next renewal/', (string) ob_get_clean() );
 
 		// Added again before the renewal: the line bills again and the domain stays.
 		$this->assertIsArray( $a->add_domain( $s, 'shop.other.example' ) );

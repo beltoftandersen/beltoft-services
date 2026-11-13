@@ -253,7 +253,7 @@ class HostingPageTest extends HostingCase {
 		HostingAccount::render( Resource::find( $r->id() ) );
 		$html = (string) ob_get_clean();
 		$this->assertStringContainsString( 'The redirect starts when both addresses point here.', $html );
-		$this->assertMatchesRegularExpression( '/www\.example\.org<\/span> <span class="beltoft-hosting-note">waiting for DNS/', $html );
+		$this->assertMatchesRegularExpression( '/www\.example\.org<\/span> <span class="bs-state bs-state--warn">Waiting for DNS/', $html );
 		$this->assertSame( 'example.org', $a->sites()[0]['main'], 'The main address shown is a name that works.' );
 	}
 
@@ -657,7 +657,7 @@ class HostingPageTest extends HostingCase {
 		$r    = $this->account();
 		$html = $this->page( $r );
 
-		$this->assertStringContainsString( '<code>198.51.100.7</code>', $html );
+		$this->assertStringContainsString( '<code class="bsh-conn__value">198.51.100.7</code>', $html );
 		$this->assertStringContainsString( 'data-copy="web"', $html );
 		$this->assertStringContainsString( 'data-hosting-action="files_password"', $html );
 		$this->assertStringContainsString( 'data-hosting-action="files_key"', $html );

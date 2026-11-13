@@ -455,7 +455,7 @@ class AccountTest extends HostingCase {
 
 		$this->assertStringContainsString( '<dt>Websites</dt><dd>2 of 3</dd>', $html );
 		$this->assertStringContainsString( 'blog.preview.example.test', $html );
-		$this->assertMatchesRegularExpression( '/www\.outside\.example<\/span> <span class="beltoft-hosting-note">waiting for DNS/', $html );
+		$this->assertMatchesRegularExpression( '/www\.outside\.example<\/span> <span class="bs-state bs-state--warn">Waiting for DNS/', $html );
 		$this->assertStringContainsString( '>Blog</h3>', $html );
 		$this->assertStringNotContainsString( '<b>', $html );
 		$this->assertStringContainsString( 'Email lite gives you mailboxes on your own domain', $html );

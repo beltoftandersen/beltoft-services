@@ -1062,7 +1062,7 @@ final class HostingAccount {
 	 * @param array<string, mixed> $limits Ceilings.
 	 */
 	private static function print_add_site( array $limits ): void {
-		self::panel_open( esc_html__( 'Add a website', 'beltoft-services' ), 'beltoft-hosting-add', '', 'beltoft-hosting-panel--quiet', ' data-hosting-scope' );
+		self::panel_open( esc_html__( 'Add a website', 'beltoft-services' ), 'beltoft-hosting-add', '', '', ' data-hosting-scope' );
 		echo '<div class="beltoft-hosting-formrow"><label class="beltoft-hosting-field"><span>' . esc_html__( 'Website title', 'beltoft-services' ) . '</span><input type="text" data-hosting-field="label" maxlength="100" autocomplete="off"></label>';
 		echo '<label class="beltoft-hosting-field"><span>' . esc_html__( 'PHP version', 'beltoft-services' ) . '</span><select data-hosting-field="php">';
 

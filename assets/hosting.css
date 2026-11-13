@@ -253,3 +253,4 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-co
 	.beltoft-hosting .bsh-conn .bs-item > .bsh-btn--sm { grid-column: 2; grid-row: 2; }
 	.beltoft-hosting .bsh-names .bs-item > .bsh-btn--sm { justify-self: start; }
 }
+.beltoft-hosting .bsh-kv[hidden], .beltoft-hosting [hidden] { display: none; }
