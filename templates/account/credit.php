@@ -53,7 +53,7 @@ $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 	<?php endif; ?>
 	<?php if ( $beltoft_services_reserve ) : ?>
 		<div class="beltoft-services-credit__balance">
-			<span class="beltoft-services-credit__label"><?php esc_html_e( 'Used so far this month (estimate)', 'beltoft-services' ); ?></span>
+			<span class="beltoft-services-credit__label"><?php esc_html_e( 'Server and database usage so far this month (estimate)', 'beltoft-services' ); ?></span>
 			<span class="beltoft-services-credit__amount"><?php echo esc_html( Page::money( $beltoft_services_reserve['usage'], $credit['currency'] ) ); ?></span>
 		</div>
 		<div class="beltoft-services-credit__balance">
@@ -111,10 +111,10 @@ $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 
 	<form class="beltoft-services-credit__code" method="post" action="<?php echo esc_url( Page::url() ); ?>" novalidate data-bs-working="<?php esc_attr_e( 'Checking the code…', 'beltoft-services' ); ?>">
 		<div class="beltoft-services-ov__head">
-			<h2><?php esc_html_e( 'Have a credit code?', 'beltoft-services' ); ?></h2>
+			<h2><?php esc_html_e( 'Have a coupon?', 'beltoft-services' ); ?></h2>
 		</div>
 		<div class="beltoft-services-credit__coderow">
-			<label class="screen-reader-text" for="beltoft-credit-code"><?php esc_html_e( 'Credit code', 'beltoft-services' ); ?></label>
+			<label class="screen-reader-text" for="beltoft-credit-code"><?php esc_html_e( 'Coupon code', 'beltoft-services' ); ?></label>
 			<input id="beltoft-credit-code" type="text" name="beltoft_credit_code" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
 			<?php wp_nonce_field( Code::NONCE ); ?>
 			<input type="hidden" name="<?php echo esc_attr( Code::ACTION ); ?>" value="1">
@@ -142,7 +142,7 @@ $beltoft_services_credit_first = $credit['amounts'][0] ?? 0;
 				<?php foreach ( $credit['history'] as $beltoft_services_credit_row ) : ?>
 					<tr>
 						<td><?php echo esc_html( wp_date( (string) get_option( 'date_format' ), (int) strtotime( $beltoft_services_credit_row['created'] . ' UTC' ) ) ); ?></td>
-						<td><?php echo esc_html( Page::row_label( $beltoft_services_credit_row ) ); ?></td>
+						<td><?php echo Page::row_html( $beltoft_services_credit_row ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- row_html() escapes. ?></td>
 						<td><?php echo esc_html( Page::money( (int) $beltoft_services_credit_row['amount_cents'], $credit['currency'], true ) ); ?></td>
 						<td><?php echo esc_html( Page::money( (int) $beltoft_services_credit_row['balance_after_cents'], $credit['currency'] ) ); ?></td>
 					</tr>

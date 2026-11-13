@@ -503,10 +503,16 @@
 		} );
 
 		active.push( handle );
-		show( 'busy', message, handle );
 
+		// One message, where the customer clicked: the note under the button. The state line at the top is only for work
+		// that no button started (owner 2026-11-13: one loader, not two).
 		handle.note = noteFor( handle.button );
-		noteSay( handle.note, 'busy', message );
+
+		if ( handle.note ) {
+			noteSay( handle.note, 'busy', message );
+		} else {
+			show( 'busy', message, handle );
+		}
 
 		return handle;
 	}
@@ -515,6 +521,11 @@
 		if ( handle ) {
 			release( handle );
 			noteSay( handle.note, kind, message );
+		}
+
+		// The note under the button already says it.
+		if ( handle && handle.note ) {
+			return;
 		}
 
 		// A newer request is still working: its busy line stays, a failure is the only thing that may replace it.
@@ -534,8 +545,8 @@
 
 		finish( handle, 'fail', message );
 
-		// The message is at the top: bring the state line into view when it is not.
-		var line = inlineTarget();
+		// The message is under the button, or at the top: bring it into view when it is not.
+		var line = handle && handle.note ? handle.note : inlineTarget();
 
 		if ( line && line.getBoundingClientRect ) {
 			var seen = line.getBoundingClientRect();

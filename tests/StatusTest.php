@@ -41,4 +41,13 @@ class StatusTest extends TestCase {
 		$this->assertStringContainsString( 'scroll-margin-top: var(--bs-overlay-clear', $css );
 		$this->assertStringContainsString( "'alert'", $js, 'A failure is announced as an alert.' );
 	}
+
+	public function test_a_clicked_button_gets_one_message_not_two(): void {
+		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/status.js' );
+
+		// busy(): the note under the button, or the state line when no button started the work, never both.
+		$this->assertMatchesRegularExpression( '/if \( handle\.note \) \{\s*noteSay\( handle\.note, \'busy\', message \);\s*\} else \{\s*show\( \'busy\', message, handle \);/', $js );
+		// finish(): done and fail stay in the note too.
+		$this->assertMatchesRegularExpression( '/if \( handle && handle\.note \) \{\s*return;\s*\}/', $js );
+	}
 }

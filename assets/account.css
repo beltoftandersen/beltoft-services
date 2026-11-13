@@ -1205,7 +1205,7 @@ body.woocommerce-account :is(.woocommerce-message, .woocommerce-info, .woocommer
 
 /* Server tabs: the tab card and the boxes inside it (disk guide, forms, OS and size tiles, command blocks) take the corners. */
 body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab { border-radius: var(--bs-radius-lg); }
-body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-disk__guide, form.beltoft-services-vm-form, .beltoft-services-tile__face) { border-radius: var(--bs-radius-lg); }
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-disk__guide, form.beltoft-services-vm-form, .beltoft-services-tile__face, .beltoft-services-plan__face) { border-radius: var(--bs-radius-lg); }
 body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab pre { border-radius: var(--bs-radius); }
 /* Firewall: the two ways to start as two option cards, each with its button and what it does. */
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-fw__choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--bs-space-3); margin-top: var(--bs-space-3); }

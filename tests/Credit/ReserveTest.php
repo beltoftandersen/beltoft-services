@@ -55,7 +55,7 @@ class ReserveTest extends CreditTestCase {
 		$this->top_up( $user, 1000 );
 		$html = Page::html();
 
-		$this->assertStringContainsString( 'Used so far this month (estimate)', $html );
+		$this->assertStringContainsString( 'Server and database usage so far this month (estimate)', $html );
 		$this->assertStringContainsString( "\u{20AC}2.50", $html );
 		$this->assertStringContainsString( 'Left after this month', $html );
 		$this->assertStringContainsString( "\u{20AC}7.50", $html );
@@ -87,7 +87,7 @@ class ReserveTest extends CreditTestCase {
 	public function test_no_balance_or_no_usage_looks_as_before(): void {
 		$user = $this->customer( 100 );
 		$this->assertNull( Reserve::for_user( $user ) );
-		$this->assertStringNotContainsString( 'Used so far this month', Page::html() );
+		$this->assertStringNotContainsString( 'Server and database usage so far this month', Page::html() );
 
 		$other = $this->new_user();
 		$this->usage_account( $other );
@@ -95,7 +95,7 @@ class ReserveTest extends CreditTestCase {
 		$this->top_up( $other, 500 );
 		Estimate::reset();
 		$this->assertNull( Reserve::for_user( $other ) );
-		$this->assertStringNotContainsString( 'Used so far this month', Page::html() );
+		$this->assertStringNotContainsString( 'Server and database usage so far this month', Page::html() );
 		$this->assertStringContainsString( 'Balance', Page::html() );
 	}
 
@@ -104,7 +104,7 @@ class ReserveTest extends CreditTestCase {
 
 		$this->assertSame( 1000, Balance::get_in( $user, 'DKK' ) );
 		$this->assertNull( Reserve::for_user( $user ) );
-		$this->assertStringNotContainsString( 'Used so far this month', Page::html() );
+		$this->assertStringNotContainsString( 'Server and database usage so far this month', Page::html() );
 	}
 
 	public function test_a_month_under_the_minimum_is_carried_and_uses_no_credit(): void {

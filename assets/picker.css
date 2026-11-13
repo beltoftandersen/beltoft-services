@@ -6,7 +6,7 @@
 .beltoft-services-picker .beltoft-services-picker__plans { min-width: 0; margin: 0; padding: 0; border: 0; }
 .beltoft-services-picker .beltoft-services-picker__legend, .woocommerce-account .woocommerce .beltoft-services-picker legend.beltoft-services-picker__legend { margin: 0 0 8px; padding: 0; color: var(--navy, #0c1535); font-size: var(--bs-fs-body); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-text); }
 .beltoft-services-picker__product { margin: 0 0 8px; color: var(--ink-soft, #5e7080); font-size: 14px; }
-.beltoft-services-picker__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; margin: 0 0 8px; }
+.beltoft-services-picker__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0 0 8px; }
 .beltoft-services-plan { position: relative; display: block; margin: 0; padding: 0; cursor: pointer; }
 .beltoft-services-plan .beltoft-services-plan__input { position: absolute; top: 0; left: 0; width: 1px; height: 1px; margin: 0; opacity: 0; }
 .beltoft-services-plan__face { display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; height: 100%; min-height: 168px; padding: 16px; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); transition: background-color 0.12s ease, color 0.12s ease; }

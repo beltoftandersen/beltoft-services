@@ -148,7 +148,7 @@ class CodeTest extends CreditTestCase {
 		$this->assertStringContainsString( '10.00', $r['message'] );
 		$this->assertSame( 1000, Balance::get( $user ) );
 		$row = Balance::history( $user, 1 )[0];
-		$this->assertSame( 'Credit code CREDITTEST10', $row['note'] );
+		$this->assertSame( 'Coupon CREDITTEST10', $row['note'] );
 		$this->assertSame( Balance::PROMO, $row['kind'] );
 		$this->assertSame( 1, $this->fresh( $coupon )->get_usage_count() );
 		$this->assertSame( 1, (int) $this->fresh( $coupon )->get_data_store()->get_usage_by_user_id( $coupon, (string) $user ) );
@@ -319,7 +319,7 @@ class CodeTest extends CreditTestCase {
 
 		$this->assertFalse( $applied );
 		$this->assertFalse( WC()->cart->has_discount( $coupon->get_code() ) );
-		$this->assertSame( 'This is a credit code. Redeem it on your Billing page.', wp_strip_all_tags( $errors[0]['notice'] ?? '' ) );
+		$this->assertSame( 'This coupon gives account credit. Redeem it on your Billing page.', wp_strip_all_tags( $errors[0]['notice'] ?? '' ) );
 		wc_clear_notices();
 	}
 
@@ -330,7 +330,7 @@ class CodeTest extends CreditTestCase {
 		WC()->cart->apply_coupon( $coupon->get_code() );
 		$errors = wc_get_notices( 'error' );
 
-		$this->assertSame( 'This is a credit code. Redeem it on your Billing page.', wp_strip_all_tags( $errors[0]['notice'] ?? '' ) );
+		$this->assertSame( 'This coupon gives account credit. Redeem it on your Billing page.', wp_strip_all_tags( $errors[0]['notice'] ?? '' ) );
 		wc_clear_notices();
 	}
 
@@ -402,7 +402,7 @@ class CodeTest extends CreditTestCase {
 		wp_set_current_user( $this->customer() );
 		$html = \BeltoftServices\Credit\Page::html();
 
-		$this->assertStringContainsString( 'Have a credit code?', $html );
+		$this->assertStringContainsString( 'Have a coupon?', $html );
 		$this->assertStringContainsString( 'name="beltoft_credit_code"', $html );
 		$this->assertStringNotContainsString( '—', $html );
 		$this->assertStringNotContainsString( '·', $html );

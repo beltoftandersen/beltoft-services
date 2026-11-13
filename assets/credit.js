@@ -18,7 +18,7 @@
 
 		if ( input && form.classList.contains( 'beltoft-services-credit__code' ) && '' === input.value.trim() ) {
 			event.preventDefault();
-			status.fail( null, config.empty || 'Enter your credit code.', input );
+			status.fail( null, config.empty || 'Enter your coupon code.', input );
 		}
 	}, true );
 }() );

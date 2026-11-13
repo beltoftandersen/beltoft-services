@@ -189,7 +189,7 @@ final class Page {
 
 		Panel::style();
 		wp_enqueue_script( 'beltoft-services-credit', plugins_url( 'assets/credit.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Status::HANDLE ), \BeltoftServices\Assets::version( 'assets/credit.js' ), true );
-		wp_localize_script( 'beltoft-services-credit', 'beltoftCredit', array( 'empty' => __( 'Enter your credit code.', 'beltoft-services' ) ) );
+		wp_localize_script( 'beltoft-services-credit', 'beltoftCredit', array( 'empty' => __( 'Enter your coupon code.', 'beltoft-services' ) ) );
 
 		ob_start();
 		wc_get_template( 'credit.php', array( 'credit' => self::data() ), 'beltoft-services/account/', BELTOFT_SERVICES_PATH . 'templates/account/' );
@@ -258,6 +258,74 @@ final class Page {
 		}
 
 		return array_slice( $out, 0, $limit );
+	}
+
+	/**
+	 * The order a "used on invoice" row paid, when it is the customer's own; else null.
+	 *
+	 * @param array<string, mixed> $row Ledger row.
+	 */
+	public static function row_order( array $row ): ?\WC_Order {
+		if ( Balance::INVOICE !== (string) $row['kind'] || Invoice::REF_TYPE !== (string) $row['ref_type'] || ! function_exists( 'wc_get_order' ) ) {
+			return null;
+		}
+
+		$order = wc_get_order( (int) $row['ref_id'] );
+
+		return $order instanceof \WC_Order && (int) $order->get_customer_id() === (int) $row['user_id'] ? $order : null;
+	}
+
+	/**
+	 * What an order was for: the names of its products as the shop shows them now (so in the page's language), two at
+	 * most and then how many more.
+	 *
+	 * @param \WC_Order $order Order.
+	 */
+	public static function order_names( \WC_Order $order ): string {
+		$names = array();
+
+		foreach ( $order->get_items() as $item ) {
+			$product = is_callable( array( $item, 'get_product' ) ) ? $item->get_product() : null;
+			$name    = trim( wp_strip_all_tags( $product ? $product->get_name() : (string) $item->get_name() ) );
+
+			if ( '' !== $name ) {
+				$names[] = $name;
+			}
+		}
+
+		$names = array_values( array_unique( $names ) );
+
+		if ( count( $names ) > 2 ) {
+			$more = count( $names ) - 2;
+			/* translators: 1: two item names, 2: how many more items. */
+			return sprintf( _n( '%1$s and %2$d more', '%1$s and %2$d more', $more, 'beltoft-services' ), implode( ', ', array_slice( $names, 0, 2 ) ), $more );
+		}
+
+		return implode( ', ', $names );
+	}
+
+	/**
+	 * One history row's "What" as markup: for credit used on an order, the order number links to the order and the products
+	 * follow; every other row is row_label(), escaped.
+	 *
+	 * @param array<string, mixed> $row Ledger row.
+	 */
+	public static function row_html( array $row ): string {
+		$order = self::row_order( $row );
+
+		if ( null === $order ) {
+			return esc_html( self::row_label( $row ) );
+		}
+
+		/* translators: %s: order number. */
+		$link  = '<a href="' . esc_url( $order->get_view_order_url() ) . '">' . esc_html( sprintf( _x( '#%s', 'order number in the credit history', 'beltoft-services' ), $order->get_order_number() ) ) . '</a>';
+		$names = self::order_names( $order );
+
+		return '' === $names
+			/* translators: %s: order number, as a link. */
+			? sprintf( esc_html__( 'Used on invoice %s', 'beltoft-services' ), $link )
+			/* translators: 1: order number, as a link, 2: what the order was for. */
+			: sprintf( esc_html__( 'Used on invoice %1$s: %2$s', 'beltoft-services' ), $link, esc_html( $names ) );
 	}
 
 	/**

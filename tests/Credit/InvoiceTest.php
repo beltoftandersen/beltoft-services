@@ -221,7 +221,7 @@ class InvoiceTest extends CreditTestCase {
 		$r = $this->usage_vm( $v['u-None'], $user, 5, $sub->get_id() );
 
 		$html = Page::html();
-		$this->assertStringContainsString( 'Used on invoice #' . $order->get_order_number(), $html );
+		$this->assertStringContainsString( 'Used on invoice <a href="' . esc_url( $order->get_view_order_url() ) . '">#' . $order->get_order_number() . '</a>', $html );
 		$this->assertStringContainsString( 'No VAT on top-ups; VAT is on your usage invoices.', $html );
 		$this->assertStringNotContainsString( 'VAT included', $html );
 		$this->assertStringNotContainsString( 'incl. VAT', $html );

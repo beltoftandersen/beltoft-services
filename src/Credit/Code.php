@@ -122,7 +122,7 @@ final class Code {
 	 * What a cart or checkout says about a credit code.
 	 */
 	public static function cart_text(): string {
-		return __( 'This is a credit code. Redeem it on your Billing page.', 'beltoft-services' );
+		return __( 'This coupon gives account credit. Redeem it on your Billing page.', 'beltoft-services' );
 	}
 
 	/**
@@ -292,7 +292,7 @@ final class Code {
 			return self::fail( __( 'This code was already used with this card.', 'beltoft-services' ) );
 		}
 
-		$note = sprintf( /* translators: %s: the code. */ __( 'Credit code %s', 'beltoft-services' ), strtoupper( $coupon->get_code() ) );
+		$note = sprintf( /* translators: %s: the code. */ __( 'Coupon %s', 'beltoft-services' ), strtoupper( $coupon->get_code() ) );
 
 		if ( ! Balance::credit( $user_id, $cents, Balance::PROMO, 'code', $ref, $note, $currency ) ) {
 			return self::fail( __( 'The credit could not be added. Try again.', 'beltoft-services' ) );
