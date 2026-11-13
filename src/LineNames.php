@@ -47,7 +47,8 @@ final class LineNames {
 
 		foreach ( $meta as $id => $row ) {
 			$slug  = sanitize_title( (string) preg_replace( '/^(attribute_)?(pa_)?/', '', (string) ( $row->key ?? '' ) ) );
-			$value = strtolower( trim( wp_strip_all_tags( (string) ( $row->display_value ?? '' ) ) ) );
+			// The stored value, not the shown one: a translated "None" (Danish "Ingen") is still none.
+			$value = strtolower( trim( wp_strip_all_tags( (string) ( $row->value ?? $row->display_value ?? '' ) ) ) );
 
 			if ( 'billing' === $slug || ( in_array( $slug, array( 'backups', 'public-ip', 'extra-storage' ), true ) && in_array( $value, array( 'none', 'no', '' ), true ) ) ) {
 				unset( $meta[ $id ] );

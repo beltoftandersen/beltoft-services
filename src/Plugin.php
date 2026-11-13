@@ -148,6 +148,7 @@ final class Plugin {
 		RenewalReminder::register();
 		Billing\ExistingFlow::register();
 		Billing\SubscriptionNames::register();
+		Billing\LineOptions::register();
 		Billing\SwitchCurrency::register();
 		Billing\CostGuardCart::register();
 		BillingRequirements::register();
