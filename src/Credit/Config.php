@@ -25,6 +25,14 @@ final class Config {
 	}
 
 	/**
+	 * Is credit held as gift cards (the setting `gift_credit`, with the add-on active)? Then src/GiftCredit/ draws the credit page and
+	 * pays the orders; this folder is on its way out and draws nothing.
+	 */
+	public static function gift(): bool {
+		return (bool) Settings::get( 'gift_credit' ) && class_exists( '\\Bgca\\Plugin' );
+	}
+
+	/**
 	 * Is credit also applied to the renewal orders of other subscriptions? Needs account credit to be on.
 	 */
 	public static function renewals(): bool {

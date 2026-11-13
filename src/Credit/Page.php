@@ -183,7 +183,7 @@ final class Page {
 	 * The page's markup.
 	 */
 	public static function html(): string {
-		if ( ! is_user_logged_in() || ! Config::enabled() ) {
+		if ( ! is_user_logged_in() || ! Config::enabled() || Config::gift() ) {
 			return '';
 		}
 

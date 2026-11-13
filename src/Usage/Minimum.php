@@ -100,7 +100,17 @@ final class Minimum {
 			return false;
 		}
 
-		$credit = Config::enabled() && $user_id > 0 ? max( 0, min( Balance::get_in( $user_id, Currency::or_current( $currency ) ), $total_cents ) ) : 0;
+		$have = Config::enabled() && $user_id > 0 ? Balance::get_in( $user_id, Currency::or_current( $currency ) ) : 0;
+
+		/**
+		 * The credit a customer holds in a currency for a usage invoice, in cents, on top of the old ledger's (gift card credit adds its cards).
+		 *
+		 * @param int    $cents    Cents so far.
+		 * @param int    $user_id  Customer.
+		 * @param string $currency Currency code.
+		 */
+		$have   = $user_id > 0 ? (int) apply_filters( 'beltoft_services_usage_credit_cents', $have, $user_id, Currency::or_current( $currency ) ) : $have;
+		$credit = max( 0, min( $have, $total_cents ) );
 		$rest   = $total_cents - $credit;
 
 		return $rest > 0 && $rest < $minimum;

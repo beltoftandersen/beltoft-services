@@ -19,6 +19,12 @@ if ( 'cli' !== PHP_SAPI ) {
 $beltoft_services_tests_dir = getenv( 'WP_TESTS_DIR' ) ? getenv( 'WP_TESTS_DIR' ) : '/tmp/wordpress-tests-lib';
 $beltoft_services_site      = getenv( 'SITE_PLUGINS' );
 $beltoft_services_licenses  = getenv( 'BELTOFT_LICENSES_DIR' ) ? getenv( 'BELTOFT_LICENSES_DIR' ) : dirname( __DIR__, 2 ) . '/beltoft-licenses';
+// The free plugin Beltoft Gift Cards for WooCommerce, optional: the tests of src/GiftCredit/ skip without it.
+$beltoft_services_giftcards = getenv( 'BELTOFT_GIFT_CARDS_DIR' ) ? getenv( 'BELTOFT_GIFT_CARDS_DIR' ) : dirname( __DIR__, 2 ) . '/beltoft-gift-cards';
+$beltoft_services_giftcards = file_exists( $beltoft_services_giftcards . '/beltoft-gift-cards.php' ) ? $beltoft_services_giftcards : '';
+// Its add-on Beltoft Gift Cards Account Credit (both are needed by the tests of src/GiftCredit/).
+$beltoft_services_account = getenv( 'BELTOFT_GIFT_CARDS_ACCOUNT_DIR' ) ? getenv( 'BELTOFT_GIFT_CARDS_ACCOUNT_DIR' ) : dirname( __DIR__, 2 ) . '/beltoft-gift-cards-account';
+$beltoft_services_account = '' !== $beltoft_services_giftcards && file_exists( $beltoft_services_account . '/beltoft-gift-cards-account.php' ) ? $beltoft_services_account : '';
 
 require_once $beltoft_services_tests_dir . '/includes/functions.php';
 
@@ -36,9 +42,15 @@ if ( ! file_exists( $beltoft_services_licenses . '/beltoft-licenses.php' ) ) {
 
 tests_add_filter(
 	'muplugins_loaded',
-	static function () use ( $beltoft_services_site, $beltoft_services_licenses ) {
+	static function () use ( $beltoft_services_site, $beltoft_services_licenses, $beltoft_services_giftcards, $beltoft_services_account ) {
 		require $beltoft_services_site . '/woocommerce/woocommerce.php';
 		require $beltoft_services_licenses . '/beltoft-licenses.php';
+		if ( '' !== $beltoft_services_giftcards ) {
+			require $beltoft_services_giftcards . '/beltoft-gift-cards.php';
+		}
+		if ( '' !== $beltoft_services_account ) {
+			require $beltoft_services_account . '/beltoft-gift-cards-account.php';
+		}
 		require dirname( __DIR__ ) . '/beltoft-services.php';
 	}
 );
@@ -68,6 +80,9 @@ tests_add_filter(
 
 		\BeltoftLicenses\Install::create_tables();
 		\BeltoftLicenses\Install::ensure_secret();
+		if ( class_exists( '\\Bgcw\\Support\\Installer' ) ) {
+			\Bgcw\Support\Installer::create_tables();
+		}
 		\BeltoftServices\Proxmox\Vm\Schema::create_tables();
 		\BeltoftServices\Hosting\Schema::create_tables();
 
