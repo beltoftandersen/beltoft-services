@@ -320,7 +320,7 @@ final class MailAccountTest extends MailTestCase {
 		$this->assertStringNotContainsString( 'Mailboxes</h4>', $html, 'Only the tab shown.' );
 
 		$this->settings( array( 'mail_allow_external_forward' => 0 ) );
-		$this->assertStringContainsString( 'to one or more other addresses in this domain.', $this->page( Resource::find( $r->id() ), 'aliases' ) );
+		$this->assertStringContainsString( 'passed on to the addresses you choose in this domain', $this->page( Resource::find( $r->id() ), 'aliases' ) );
 
 		\BeltoftServices\Mail\Aliases::create( Resource::find( $r->id() ), 'two', array( 'a@al.example' ) );
 		$this->assertStringContainsString( 'Your plan has no room for more aliases.', $this->page( Resource::find( $r->id() ), 'aliases' ) );

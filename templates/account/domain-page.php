@@ -54,7 +54,7 @@ if ( $d['dns_only'] ) {
 				<div><dt><?php esc_html_e( 'Registered until', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( $d['expires'] ); ?></dd></div>
 			<?php endif; ?>
 			<?php if ( '' !== $d['renews'] ) : ?>
-				<div><dt><?php esc_html_e( 'Renewal', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( $d['renews'] ); ?></dd></div>
+				<div><dt><?php esc_html_e( 'Subscription', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( $d['renews'] ); ?></dd></div>
 			<?php endif; ?>
 			<div><dt><?php esc_html_e( 'Name servers', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( $beltoft_hosts_text ); ?></dd></div>
 			<?php if ( ! $d['dns_only'] ) : ?>

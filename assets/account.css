@@ -1217,3 +1217,6 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-add__t
 /* Progress steps: round markers like every state dot. The SSL page: room between a heading and what follows. */
 .beltoft-services-progress__steps li::before { border-radius: 50%; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-ssl h3 { margin: var(--bs-space-5) 0 var(--bs-space-3); }
+
+/* The subscription list: the names of what a subscription is for, under its number. */
+body.woocommerce-account .woocommerce-MyAccount-content .bs-sub-name { display: block; margin-top: 2px; font-size: var(--bs-fs-small); color: var(--bs-muted); text-decoration: none; }

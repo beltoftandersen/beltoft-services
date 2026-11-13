@@ -126,7 +126,7 @@ final class MailSettings {
 			'type'    => 'text',
 			'default' => '',
 			'label'   => __( 'Email order page', 'beltoft-services' ),
-			'desc'    => __( 'Where the Create an email domain button in the account goes, for example /business-email/#pricing. Empty uses the product page.', 'beltoft-services' ),
+			'desc'    => __( 'Where the Create an email domain button in the account goes, for example /mail/#pricing. Empty uses the product page.', 'beltoft-services' ),
 		);
 		$fields['mail_guide_url'] = $server + array(
 			'type'    => 'url',

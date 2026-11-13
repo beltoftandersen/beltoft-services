@@ -679,6 +679,25 @@ class OverviewTest extends MonitoringTestCase {
 		$this->assertStringNotContainsString( 'other-01', $html );
 	}
 
+	public function test_the_same_line_twice_is_shown_once_the_newest(): void {
+		global $wpdb;
+		$user   = self::factory()->user->create();
+		$mine   = $this->server( $user );
+		$id     = (int) $mine->license()['id'];
+		$events = \BeltoftLicenses\Install::tables()['events'];
+
+		foreach ( array( 900, 700, 500 ) as $ago ) {
+			$wpdb->insert( $events, array( 'license_id' => $id, 'type' => 'service', 'message' => 'Service provisioned', 'created_at' => gmdate( 'Y-m-d H:i:s', time() - $ago ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Test fixture.
+		}
+
+		$this->as_user( $user );
+		$items = Overview::data()['activity'];
+		$texts = array_column( $items, 'text' );
+
+		$this->assertSame( count( $texts ), count( array_unique( $texts ) ) );
+		$this->assertNotEmpty( $texts );
+	}
+
 	public function test_matching_events_are_found_behind_many_other_events(): void {
 		global $wpdb;
 		$user   = self::factory()->user->create();

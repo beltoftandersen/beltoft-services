@@ -193,4 +193,10 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-ju
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.beltoft-hosting-btn.bs-btn--danger { border-color: var(--bs-status-fail, #b3261e); color: var(--bs-status-fail, #b3261e); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.beltoft-hosting-btn.bs-btn--danger:hover { background: #fbeeec; color: var(--bs-status-fail, #b3261e); }
 /* Facts and actions inside a website section sit at one width; a select in an action row keeps its size. */
-.beltoft-hosting .bsh-sec__body .bs-action__do .beltoft-hosting-inline { display: flex; flex-wrap: wrap; gap: var(--bs-space-2, 8px); align-items: center; }
+.beltoft-hosting .bsh-sec__body .bs-action__do .beltoft-hosting-inline { display: flex; flex-wrap: nowrap; gap: var(--bs-space-2, 8px); align-items: center; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bs-action__do select { width: 10em; min-width: 0; }
+@media (max-width: 640px) {
+	.beltoft-hosting .bsh-sec__body .bs-action__do .beltoft-hosting-inline { flex-direction: row; }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bs-action__do select { flex: 1 1 auto; width: auto; }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bs-action__do .beltoft-hosting-inline .beltoft-hosting-btn { width: auto; }
+}

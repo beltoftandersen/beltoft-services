@@ -78,6 +78,7 @@ final class OverviewActivity {
 		}
 
 		$items = array();
+		$seen  = array();
 
 		if ( $ids && class_exists( \BeltoftLicenses\Install::class ) ) {
 			$table = \BeltoftLicenses\Install::tables()['events'];
@@ -122,8 +123,10 @@ final class OverviewActivity {
 
 				$text = self::describe( (string) $row['message'], (string) ( $names[ $license_id ] ?? '' ), $held, $failed );
 
-				if ( '' !== $text ) {
-					$items[] = array(
+				// The same line again (a server made ready several times) says nothing new: only the newest is kept.
+				if ( '' !== $text && ! isset( $seen[ $text ] ) ) {
+					$seen[ $text ] = true;
+					$items[]       = array(
 						'at'   => $at,
 						'text' => $text,
 					);

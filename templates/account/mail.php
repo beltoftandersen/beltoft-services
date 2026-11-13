@@ -269,7 +269,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 		<?php else : ?>
 			<div class="beltoft-services-vm__more" data-mail-aliases data-confirm="<?php esc_attr_e( 'Delete this alias?', 'beltoft-services' ); ?>">
 				<h4><?php esc_html_e( 'Aliases', 'beltoft-services' ); ?></h4>
-				<p class="description"><?php echo esc_html( $view['forward_external'] ? __( 'An alias is an address that delivers to one or more other addresses, in this domain or elsewhere.', 'beltoft-services' ) : __( 'An alias is an address that delivers to one or more other addresses in this domain.', 'beltoft-services' ) ); ?></p>
+				<p class="description"><?php echo esc_html( $view['forward_external'] ? __( 'An alias is an extra address with no mailbox of its own. Mail sent to it is passed on to the addresses you choose, for example sales@ to two colleagues. Those addresses can be in this domain or elsewhere.', 'beltoft-services' ) : __( 'An alias is an extra address with no mailbox of its own. Mail sent to it is passed on to the addresses you choose in this domain, for example sales@ to two colleagues.', 'beltoft-services' ) ); ?></p>
 				<?php if ( isset( $view['errors']['aliases'] ) ) : ?>
 					<p class="beltoft-services-panel__notice" role="status"><?php echo esc_html( $view['errors']['aliases'] ); ?></p>
 				<?php elseif ( array() === (array) $view['aliases'] ) : ?>
@@ -280,7 +280,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 							<li class="bs-item">
 								<div class="bs-item__main">
 									<p class="bs-item__title"><span class="bs-item__name"><?php echo esc_html( \BeltoftServices\Domains\HostName::display( $beltoft_services_alias['address'] ) ); ?></span></p>
-									<p class="bs-item__meta"><?php /* translators: %s: the mailboxes an alias delivers to */ echo esc_html( sprintf( __( 'Delivers to %s', 'beltoft-services' ), implode( ', ', $beltoft_services_alias['goto'] ) ) ); ?></p>
+									<p class="bs-item__meta"><?php /* translators: %s: the addresses an alias passes mail on to */ echo esc_html( sprintf( __( 'Mail goes on to %s', 'beltoft-services' ), implode( ', ', $beltoft_services_alias['goto'] ) ) ); ?></p>
 								</div>
 								<div class="bs-item__actions beltoft-services-mail__actions"><button type="button" class="button woocommerce-button bs-btn bs-btn--danger bs-btn--sm beltoft-services-mail__outline" data-mail-alias-delete="<?php echo esc_attr( $beltoft_services_alias['address'] ); ?>"><?php esc_html_e( 'Delete', 'beltoft-services' ); ?></button></div>
 							</li>
@@ -297,11 +297,11 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 					<div class="beltoft-services-db__form" data-mail-alias-create>
 						<p>
 							<label for="beltoft-mail-alias"><?php esc_html_e( 'Name before the @', 'beltoft-services' ); ?></label>
-							<input type="text" id="beltoft-mail-alias" autocomplete="off" maxlength="64" placeholder="sales" data-mail-alias-local>
+							<input type="text" id="beltoft-mail-alias" autocomplete="off" maxlength="64" placeholder="<?php echo esc_attr_x( 'sales', 'example alias name', 'beltoft-services' ); ?>" data-mail-alias-local>
 							<span class="beltoft-services-mail__at">@<?php echo esc_html( $beltoft_services_shown ); ?></span>
 						</p>
 						<p>
-							<label for="beltoft-mail-goto"><?php esc_html_e( 'Deliver to', 'beltoft-services' ); ?></label>
+							<label for="beltoft-mail-goto"><?php esc_html_e( 'Pass mail on to', 'beltoft-services' ); ?></label>
 							<textarea id="beltoft-mail-goto" rows="3" autocomplete="off" data-mail-alias-goto></textarea>
 							<span class="description"><?php echo esc_html( $view['forward_external'] ? __( 'One or more addresses, one per line. Up to ten.', 'beltoft-services' ) : __( 'One or more addresses in this domain, one per line. Up to ten.', 'beltoft-services' ) ); ?></span>
 						</p>
