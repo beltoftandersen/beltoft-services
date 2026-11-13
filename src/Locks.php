@@ -41,27 +41,6 @@ final class Locks {
 	}
 
 	/**
-	 * The lock name for one customer's account credit balance (at most 64 chars). Every write to the balance ledger holds it.
-	 *
-	 * @param int $user_id Customer.
-	 */
-	public static function balance( int $user_id ): string {
-		return self::name( 'balance', $user_id );
-	}
-
-	/**
-	 * Seconds a balance write waits for the balance lock (default 10).
-	 */
-	public static function balance_wait(): int {
-		/**
-		 * Filters how long a balance write waits for the customer's balance lock.
-		 *
-		 * @param int $seconds Seconds (default 10).
-		 */
-		return max( 0, (int) apply_filters( 'beltoft_services_balance_lock_wait', 10 ) );
-	}
-
-	/**
 	 * The lock name for one DNS zone, case-insensitive (at most 64 chars). Every read-modify-write of a
 	 * zone's customer records holds it, so a save, a pause and an app's A record never overwrite each other.
 	 *

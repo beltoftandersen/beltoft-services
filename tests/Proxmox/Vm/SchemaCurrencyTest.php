@@ -7,7 +7,6 @@
 
 namespace BeltoftServices\Tests\Proxmox\Vm;
 
-use BeltoftServices\Credit\Balance;
 use BeltoftServices\Currency;
 use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Tests\TestCase;
@@ -263,7 +262,8 @@ final class SchemaCurrencyTest extends TestCase {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test write.
 		$wpdb->query( 'INSERT INTO ' . $t['usage'] . " (resource_id, user_id, item, rate, hour_bucket, created) VALUES (99, 9, 'server', 0.05, '2026-11-01 10:00:00', '2026-11-01 11:00:00')" );
 
-		$credit = Balance::history( 9, 1 )[0];
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test read.
+		$credit = $wpdb->get_row( 'SELECT * FROM ' . $t['credit'] . ' WHERE user_id = 9', ARRAY_A );
 		$usage  = Ledger::unbilled( 9, strtotime( '2026-11-02 00:00:00 UTC' ) )[0];
 
 		$this->assertSame( '', $credit['currency'] );
@@ -273,15 +273,12 @@ final class SchemaCurrencyTest extends TestCase {
 		$this->assertSame( 'DKK', Currency::of_row( array( 'currency' => 'DKK' ) ) );
 	}
 
-	public function test_new_rows_carry_the_shop_currency_and_balances_are_unchanged(): void {
+	public function test_new_usage_rows_carry_the_shop_currency(): void {
 		update_option( 'woocommerce_currency', 'EUR' );
 
 		$this->assertTrue( Ledger::record( 55, 11, 'server', 1.0, 'hour', 0.05, strtotime( '2026-11-01 10:00:00 UTC' ) ) );
-		$this->assertTrue( Balance::credit( 11, 500, Balance::TOPUP, 'order_item', 'new' ) );
 
 		$this->assertSame( 'EUR', Currency::of_row( Ledger::unbilled( 11, strtotime( '2026-11-02 00:00:00 UTC' ) )[0] ) );
-		$this->assertSame( 'EUR', Balance::history( 11, 1 )[0]['currency'] );
-		$this->assertSame( 500, Balance::get( 11 ) );
 	}
 
 	public function test_while_the_upgrade_is_unfinished_writers_use_the_old_columns(): void {
@@ -338,15 +335,6 @@ final class SchemaCurrencyTest extends TestCase {
 
 		$this->assertSame( '6', get_option( Schema::OPTION_DB_VERSION ) );
 		$this->assertSame( array( '', '' ), $this->values( $t['usage'] ) );
-	}
-
-	public function test_balance_at_version_5_writes_the_old_columns(): void {
-		update_option( Schema::OPTION_DB_VERSION, '5' );
-
-		$this->assertTrue( Balance::credit( 13, 500, Balance::TOPUP, 'order_item', 'v5' ) );
-
-		$this->assertSame( '', Balance::history( 13, 1 )[0]['currency'] );
-		$this->assertSame( 500, Balance::get( 13 ) );
 	}
 
 	public function test_the_backfill_stops_at_its_time_cap_and_resumes(): void {

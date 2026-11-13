@@ -7,22 +7,22 @@
 
 namespace BeltoftServices\Tests\Usage;
 
-use BeltoftServices\Credit\Balance;
-use BeltoftServices\Tests\Credit\CreditTestCase;
+use BeltoftServices\Tests\GiftCredit\GiftCreditTestCase;
+use Bgcw\GiftCard\Source;
 use BeltoftServices\Usage\InvoiceView;
 use BeltoftServices\Usage\Ledger;
 
-require_once dirname( __DIR__ ) . '/Credit/CreditTestCase.php';
+require_once dirname( __DIR__ ) . '/GiftCredit/GiftCreditTestCase.php';
 
 /**
  * Display only: fee lines become item rows, totals read in order, intros say usage invoice.
  */
-class InvoiceViewTest extends CreditTestCase {
+class InvoiceViewTest extends GiftCreditTestCase {
 
 	/**
 	 * Usage invoice for October 2026: 100 hours at 0.02 = 2.00 net, 0.50 VAT.
 	 *
-	 * @param int $credit_cents Credit on the account before the invoice (0: none).
+	 * @param int $credit_cents Paid gift card on the account before the invoice (0: none).
 	 */
 	private function usage_invoice( int $credit_cents = 0 ): \WC_Order {
 		$this->vat( true );
@@ -35,7 +35,7 @@ class InvoiceViewTest extends CreditTestCase {
 		}
 
 		if ( $credit_cents > 0 ) {
-			$this->assertTrue( Balance::credit( $user, $credit_cents, Balance::TOPUP, 'order_item', 'seed-' . wp_generate_uuid4() ) );
+			$this->card( $user, $credit_cents, Source::ORDER );
 		}
 
 		$order = wcs_create_renewal_order( $sub );

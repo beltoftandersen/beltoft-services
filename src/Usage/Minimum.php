@@ -7,8 +7,6 @@
 
 namespace BeltoftServices\Usage;
 
-use BeltoftServices\Credit\Balance;
-use BeltoftServices\Credit\Config;
 use BeltoftServices\Alerts;
 use BeltoftServices\Currency;
 
@@ -21,9 +19,9 @@ defined( 'ABSPATH' ) || exit;
  * again and bills them together with the new usage. Each month keeps its own cap (Renewal::statement groups by month),
  * so carrying never lets a month cost more than its cap.
  *
- * What the card would pay is the order total incl. VAT less the account credit that covers it. Credit that covers the
+ * What the card would pay is the order total incl. VAT less the account credit (gift cards) that covers it. Credit that covers the
  * whole total is always used (no card fee). Credit that covers only part, with a rest under the minimum, is not used:
- * the whole month is carried and the credit stays in the balance, because splitting would charge the card the small rest.
+ * the whole month is carried and the credit stays on the cards, because splitting would charge the card the small rest.
  *
  * The carried amount (incl. VAT) is kept on the account (META_AMOUNT) for the display. Carried rows wait for the next
  * renewal with no time limit; nothing is written off.
@@ -41,6 +39,15 @@ final class Minimum {
 		add_filter( 'woocommerce_email_enabled_customer_completed_renewal_order', array( __CLASS__, 'email_enabled' ), 20, 2 );
 		add_filter( 'woocommerce_email_enabled_customer_renewal_invoice', array( __CLASS__, 'email_enabled' ), 20, 2 );
 		add_filter( 'woocommerce_email_enabled_new_renewal_order', array( __CLASS__, 'email_enabled' ), 20, 2 );
+	}
+
+	/**
+	 * Cents of an amount in the major unit (a number or a numeric string), rounded to two decimals first.
+	 *
+	 * @param mixed $amount Amount.
+	 */
+	public static function cents( $amount ): int {
+		return (int) round( round( (float) $amount, 2 ) * 100 );
 	}
 
 	/**
@@ -100,12 +107,12 @@ final class Minimum {
 			return false;
 		}
 
-		$have = Config::enabled() && $user_id > 0 ? Balance::get_in( $user_id, Currency::or_current( $currency ) ) : 0;
+		$have = 0;
 
 		/**
-		 * The credit a customer holds in a currency for a usage invoice, in cents, on top of the old ledger's (gift card credit adds its cards).
+		 * The credit a customer holds in a currency for a usage invoice, in cents (the gift cards, see GiftCredit\Rules).
 		 *
-		 * @param int    $cents    Cents so far.
+		 * @param int    $cents    Cents so far (0).
 		 * @param int    $user_id  Customer.
 		 * @param string $currency Currency code.
 		 */
@@ -125,7 +132,7 @@ final class Minimum {
 	 * @return string Amount carried, formatted.
 	 */
 	public static function carry( \WC_Order $order, \WC_Subscription $account, bool $early ): string {
-		$cents    = Balance::cents( $order->get_total() );
+		$cents    = self::cents( $order->get_total() );
 		$amount   = Rates::money( $cents / 100, 2, $order->get_currency() );
 		$minimum  = Rates::money( self::amount( $order->get_currency() ), 2, $order->get_currency() );
 

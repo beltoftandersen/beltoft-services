@@ -133,38 +133,38 @@ final class CurrencyTest extends TestCase {
 
 	public function test_amount_in_the_base_currency_is_the_setting_with_no_filter(): void {
 		update_option( 'woocommerce_currency', 'EUR' );
-		$this->settings( array( 'credit_min' => 25 ) );
+		$this->settings( array( 'usage_minimum' => 25 ) );
 
-		$this->assertSame( Settings::get( 'credit_min' ), Currency::amount( 'credit_min' ) );
-		$this->assertSame( Settings::get( 'credit_min' ), Currency::amount( 'credit_min', 'EUR' ) );
+		$this->assertSame( Settings::get( 'usage_minimum' ), Currency::amount( 'usage_minimum' ) );
+		$this->assertSame( Settings::get( 'usage_minimum' ), Currency::amount( 'usage_minimum', 'EUR' ) );
 	}
 
 	public function test_amount_in_the_base_currency_can_be_changed_by_the_filter(): void {
 		update_option( 'woocommerce_currency', 'EUR' );
-		$this->settings( array( 'credit_min' => 25 ) );
-		$this->fake_amounts( array( 'EUR' => array( 'credit_min' => 30 ) ) );
+		$this->settings( array( 'usage_minimum' => 25 ) );
+		$this->fake_amounts( array( 'EUR' => array( 'usage_minimum' => 30 ) ) );
 
-		$this->assertSame( 30, Currency::amount( 'credit_min', 'EUR' ) );
+		$this->assertSame( 30, Currency::amount( 'usage_minimum', 'EUR' ) );
 	}
 
 	public function test_amount_in_another_currency_is_null_unless_the_filter_answers(): void {
 		update_option( 'woocommerce_currency', 'EUR' );
-		$this->settings( array( 'credit_min' => 25 ) );
+		$this->settings( array( 'usage_minimum' => 25 ) );
 
-		$this->assertNull( Currency::amount( 'credit_min', 'DKK' ), 'The euro number is never reused.' );
+		$this->assertNull( Currency::amount( 'usage_minimum', 'DKK' ), 'The euro number is never reused.' );
 
-		$this->fake_amounts( array( 'DKK' => array( 'credit_min' => 200 ) ) );
+		$this->fake_amounts( array( 'DKK' => array( 'usage_minimum' => 200 ) ) );
 
-		$this->assertSame( 200, Currency::amount( 'credit_min', 'DKK' ) );
-		$this->assertNull( Currency::amount( 'credit_max', 'DKK' ) );
+		$this->assertSame( 200, Currency::amount( 'usage_minimum', 'DKK' ) );
+		$this->assertNull( Currency::amount( 'usage_threshold', 'DKK' ) );
 	}
 
 	public function test_amount_with_no_currency_means_the_current_one(): void {
 		update_option( 'woocommerce_currency', 'EUR' );
 		$this->fake_currency_up( 'DKK' );
-		$this->fake_amounts( array( 'DKK' => array( 'credit_min' => 200 ) ) );
+		$this->fake_amounts( array( 'DKK' => array( 'usage_minimum' => 200 ) ) );
 
-		$this->assertSame( 200, Currency::amount( 'credit_min' ) );
+		$this->assertSame( 200, Currency::amount( 'usage_minimum' ) );
 	}
 
 	public function test_with_an_invalid_non_empty_code_never_runs_the_callback(): void {

@@ -8,7 +8,7 @@
 namespace BeltoftServices\Tests\Account;
 
 use BeltoftServices\Account\Flash;
-use BeltoftServices\Credit\Page;
+use BeltoftServices\GiftCredit\Page;
 use BeltoftServices\Status;
 use BeltoftServices\Tests\TestCase;
 
@@ -32,7 +32,11 @@ class SingleMessageTest extends TestCase {
 	}
 
 	public function test_a_refused_credit_code_is_in_the_page_once(): void {
-		$this->settings( array( 'credit_enabled' => 1 ) );
+		if ( ! class_exists( '\Bgca\Plugin' ) || ! \Bgca\Plugin::requirements_met() ) {
+			$this->markTestSkipped( 'The gift card plugin and its add-on are not loaded.' );
+		}
+
+		$this->settings( array( 'gift_credit' => 1 ) );
 		wc_add_notice( 'That code is not valid.', 'error', array( 'beltoft_field' => 'code' ) );
 
 		$html = Page::html();

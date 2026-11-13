@@ -14,13 +14,13 @@ use PHPUnit\Framework\TestCase;
  * Domains not on Proxmox, Mail or Mcp. Today's violations are listed in ALLOWED so the test passes now
  * and stops new ones (Plugin.php, the composition root, is exempt); remove an entry when the leak is fixed (a stale entry fails the test).
  *
- * FEATURES lists every feature folder (widened 2026-11 to Hosting, Ssl, Licences, Credit, Card, Admin and Cli; the widening found no new leak).
+ * FEATURES lists every feature folder (widened 2026-11 to Hosting, Ssl, Licences, Credit (since removed), Card, Admin and Cli; the widening found no new leak).
  * Drivers, Billing, Checkout and Emails count as core when they are the importing side (CORE_FOLDERS, widened 2026-11-10);
  * as imported classes they are not features, because core imports Billing\CartFlow and the email registry.
  */
 class DependencyDirectionTest extends TestCase {
 
-	private const FEATURES = array( 'Proxmox', 'Domains', 'Mail', 'Mcp', 'Account', 'Usage', 'Http', 'Oauth', 'Api', 'Bricks', 'Hosting', 'Ssl', 'Licences', 'Credit', 'GiftCredit', 'Card', 'Admin', 'Cli', 'Apps' );
+	private const FEATURES = array( 'Proxmox', 'Domains', 'Mail', 'Mcp', 'Account', 'Usage', 'Http', 'Oauth', 'Api', 'Bricks', 'Hosting', 'Ssl', 'Licences', 'GiftCredit', 'Card', 'Admin', 'Cli', 'Apps' );
 
 	/**
 	 * Folders that belong to the core layer as sources (they may not import a feature). As targets they stay what they are.
@@ -36,8 +36,6 @@ class DependencyDirectionTest extends TestCase {
 		'Ssl'     => array( 'Mail' ),
 		'Proxmox' => array( 'Mcp' ),
 		'Domains' => array( 'Proxmox', 'Mail', 'Mcp' ),
-		// The gift card credit is the way out of Credit: nothing new may lean on it.
-		'GiftCredit' => array( 'Credit' ),
 	);
 
 	/**

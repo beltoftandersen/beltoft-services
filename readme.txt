@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.24.0
+Stable tag: 0.25.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -63,20 +63,18 @@ Connection secrets are encrypted with a key from `wp-config.php`, and they are n
 For a site builder. The plugin never converts a price. It reads prices from WooCommerce and amounts from its own settings, in the currency of the customer, and it asks the site (through filters) for everything that differs per currency. A plugin that gives WooCommerce a second currency connects to these hooks in a small site file.
 
 * `beltoft_services_currency_runner`: returns a callable `function ( string $code, callable $fn )` that runs `$fn` with that currency in force and puts the old one back in a `finally`. Without it only the shop's own currency can be worked in, and a call in another currency (a meter run, an API call, a reminder mail) is refused or skipped with an admin alert.
-* `beltoft_services_user_currency( $code, $user_id )`: the currency a customer is in. Run at priority 5 by your connection; the plugin adds the customer's credit currency at 10 and their usage account at 20.
-* `beltoft_services_amount_setting( $value, $key, $currency )`: the amount of a setting in a currency (`usage_minimum`, `usage_threshold`, `usage_threshold_new`, `credit_min`, `credit_max`, `domain_price_overrides`). `$value` is null for a currency other than the shop's, and null back means "no amount": no early bill, no minimum, no top-ups, the domain extension is not sold.
+* `beltoft_services_user_currency( $code, $user_id )`: the currency a customer is in. Run at priority 5 by your connection; the plugin adds the currency of the customer's gift cards at 11 and their usage account at 20.
+* `beltoft_services_amount_setting( $value, $key, $currency )`: the amount of a setting in a currency (`usage_minimum`, `usage_threshold`, `usage_threshold_new`, `domain_price_overrides`). `$value` is null for a currency other than the shop's, and null back means "no amount": no early bill, no minimum, the domain extension is not sold.
 * `beltoft_services_guard_rate( $rate, $code )`, or the setting Guard rates (lines such as `DKK=7.60`, a little above the real rate): how many units of the currency are worth one euro. Used only to check that an order covers what a supplier is paid in euro. No rate: the order is refused and the admin is mailed once.
-* `beltoft_services_credit_applies_to_order( $applies, $order, $user_id )`: whether account credit may pay this renewal order (default true while "Account credit pays renewals" is on).
-* `beltoft_services_promo_credit_line( $allowed, $item, $order )`: whether promotional credit may pay this product line of a renewal order (default: the product's box "Promotional credit can pay renewals").
-* `beltoft_services_currencies( $codes )`: the currencies of the shop, for the currency field of a credit code.
+* `beltoft_services_promo_credit_line( $allowed, $item, $order )`: whether free gift cards (promotional credit) may pay this product line of an order (default: the product's box "Promotional credit can pay orders and renewals").
+* `beltoft_services_currencies( $codes )`: the currencies of the shop.
 * `beltoft_services_price_html( $html, $amount, $currency, $context, $render )`: every catalogue price printed as markup passes it; `$render( 'incl' | 'excl' | '' )` renders the same price in a tax display, so a site can show both figures.
 * `beltoft_services_app_text( $text, $app_id, $field )`: the summary and getting-started text of a one-click app, after translation.
 * `beltoft_services_checkout_field_heading( $show, $kind )`: a checkout with its own step heading leaves the fields' heading out.
 * Action `beltoft_services_usage_account_created( $user_id, $account )`: a usage account was made with no order behind it; fix the customer's currency here.
-* Action `beltoft_services_credit_currency_set( $user_id, $currency )`: the customer's first credit row was written (a code, a top-up or an admin grant), so their credit is now in that currency for good. Fired once per customer, after the balance lock is released; not for later rows and not when a write is refused. Fix the customer's shop currency here, so they cannot place an order in another currency and strand the credit.
-* The cart item key `beltoft_services_price_currency` (`Currency::CART_KEY`) holds the currency a runtime price (a domain line, a top-up line) was worked out in. A site that approves runtime prices in another currency must approve a line only when this key equals the cart's currency.
+* The cart item key `beltoft_services_price_currency` (`Currency::CART_KEY`) holds the currency a runtime price (a domain line) was worked out in. A site that approves runtime prices in another currency must approve a line only when this key equals the cart's currency.
 
-What the plugin never does: convert an amount for a customer, show a price in a currency other than the customer's, or put one customer's money in two currencies (a credit balance has one currency, and rows in another currency are never billed on an order of the first).
+What the plugin never does: convert an amount for a customer, show a price in a currency other than the customer's, or put one customer's money in two currencies (the gift cards of a customer are in one currency, and usage rows in another currency are never billed on an order of the first).
 
 What must be set for each currency: the price of every product and variation (also 0 for a pay as you go variation), the pay as you go monthly prices the rates come from, the minimum, the early billing thresholds, the top-up limits, a domain price line per extension, and a guard rate. A currency with no value for one of them simply does not get that feature.
 
@@ -259,6 +257,11 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.25.0 =
+* The old account credit ledger code is removed (src/Credit/): credit is gift cards only, and the setting gift_credit stays. The settings Account credit, Account credit pays renewals and orders at checkout, and the top-up amounts are gone (the add-on has its own), and so are the credit codes, the credit coupon type, the admin credit grant and the command wp beltoft-services credit. The table bs_credit stays in the database, unused, until it is dropped by hand.
+* The names the site calls stay: BeltoftServices\Credit\CheckoutCredit and Credit\Topup are aliases of the gift card forms.
+* Removed hooks: beltoft_services_credit_applies_to_order, beltoft_services_credit_currency_set, beltoft_services_balance_lock_wait.
 
 = 0.24.0 =
 * Account credit as gift cards (setting gift_credit, with Beltoft Gift Cards for WooCommerce and its add-on Beltoft Gift Cards Account Credit): paid cards are a payment, free cards a discount before VAT; they pay checkout orders, renewals and usage invoices under today's rules (promotional box, saved card, usage minimum). The credit page shows the cards.

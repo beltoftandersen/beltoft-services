@@ -341,7 +341,7 @@ final class Renewal {
 		$order->calculate_totals( true );
 
 		// A month whose card amount is under the minimum is carried: the lines go, the rows wait for the next renewal.
-		if ( Minimum::carries( \BeltoftServices\Credit\Balance::cents( $order->get_total() ), (int) $subscription->get_customer_id(), $currency ) ) {
+		if ( Minimum::carries( Minimum::cents( $order->get_total() ), (int) $subscription->get_customer_id(), $currency ) ) {
 			Minimum::carry( $order, $subscription, self::$early );
 			$order->save();
 
@@ -353,8 +353,7 @@ final class Renewal {
 		$order->update_meta_data( self::META_BILLED, (string) $statement['total'] );
 		// The latest month among the lines (Unix time of its first hour), for the emails.
 		$order->update_meta_data( self::META_PERIOD, (string) max( array_column( $statement['lines'], 'month' ) ) );
-		// Credit pays after the usage lines and taxes are final.
-		\BeltoftServices\Credit\Invoice::apply( $order, (int) $subscription->get_customer_id() );
+		// Gift cards pay after the usage lines and taxes are final: the add-on does it in its own renewal hook.
 		$order->save();
 
 		return $order;

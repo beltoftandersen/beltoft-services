@@ -297,7 +297,6 @@ final class Commands {
 			\WP_CLI::add_command( 'beltoft-services dns-claims', DnsClaimsCommand::class );
 			\WP_CLI::add_command( 'beltoft-services private-net', PrivateNetCommand::class );
 			\WP_CLI::add_command( 'beltoft-services mail-products', MailProductsCommand::class );
-			\WP_CLI::add_command( 'beltoft-services credit', CreditCommand::class );
 			\WP_CLI::add_command( 'beltoft-services plesk-product', PleskProductCommand::class );
 			\WP_CLI::add_command( 'beltoft-services ssl', SslCommand::class );
 			\WP_CLI::add_command( 'beltoft-services licence-product', LicenceProductCommand::class );

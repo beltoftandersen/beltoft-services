@@ -7,8 +7,6 @@
 
 namespace BeltoftServices\Usage;
 
-use BeltoftServices\Credit\Invoice;
-
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -143,18 +141,12 @@ final class InvoiceView {
 	}
 
 	/**
-	 * The credit fee line of an invoice, if credit paid part of it.
+	 * What gift cards paid of an invoice, in cents (0: none). The add-on writes it on the order when it puts the cards on.
 	 *
 	 * @param \WC_Order $order Order.
 	 */
-	private static function credit_fee( \WC_Order $order ): ?\WC_Order_Item_Fee {
-		foreach ( $order->get_items( 'fee' ) as $fee ) {
-			if ( $fee instanceof \WC_Order_Item_Fee && 'yes' === $fee->get_meta( Invoice::META_FEE ) ) {
-				return $fee;
-			}
-		}
-
-		return null;
+	private static function cards_paid( \WC_Order $order ): int {
+		return class_exists( '\\Bgca\\Pay' ) ? \Bgca\Pay::applied( $order ) : 0;
 	}
 
 	/**
@@ -176,7 +168,7 @@ final class InvoiceView {
 			$usage += (float) $fee->get_total();
 		}
 
-		$credit  = self::credit_fee( $order );
+		$cards   = self::cards_paid( $order );
 		$total   = (float) $order->get_total();
 		$subtot  = array(
 			'cart_subtotal' => array(
@@ -197,16 +189,17 @@ final class InvoiceView {
 				continue;
 			}
 
-			if ( 'fee' === $type ) {
-				// The usage fees are item rows now; the credit fee is placed after VAT below.
-				if ( $credit && 'fee_' . $credit->get_id() === $key ) {
-					$credit_row = array( $key, $row );
-				} else {
-					$item = $order->get_item( (int) substr( (string) $key, 4 ) );
+			// The cards are coupon lines the add-on put on the order: their row is placed after VAT below, as one row.
+			if ( $cards > 0 && 'discount' === $type ) {
+				continue;
+			}
 
-					if ( ! $item instanceof \WC_Order_Item_Fee || '' === (string) $item->get_meta( '_beltoft_services_usage_item' ) ) {
-						$middle[ $key ] = $row;
-					}
+			if ( 'fee' === $type ) {
+				// The usage fees are item rows now.
+				$item = $order->get_item( (int) substr( (string) $key, 4 ) );
+
+				if ( ! $item instanceof \WC_Order_Item_Fee || '' === (string) $item->get_meta( '_beltoft_services_usage_item' ) ) {
+					$middle[ $key ] = $row;
 				}
 				continue;
 			}
@@ -222,6 +215,17 @@ final class InvoiceView {
 			}
 
 			$middle[ $key ] = $row;
+		}
+
+		if ( $cards > 0 ) {
+			$credit_row = array(
+				'bgca_cards',
+				array(
+					'type'  => 'credit',
+					'label' => __( 'Paid from account credit:', 'beltoft-services' ),
+					'value' => '-' . wc_price( $cards / 100, array( 'currency' => $currency ) ),
+				),
+			);
 		}
 
 		$out = $subtot + $middle;

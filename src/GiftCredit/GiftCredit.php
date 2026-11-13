@@ -21,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
  * - {@see Checkout}: what the checkout shows before the order is made, and the card that is still asked for.
  *
  * It does nothing unless the setting `gift_credit` is on and the add-on is active (active()). Money in campaigns is a free gift card
- * made in the gift card plugin (source promotion); there is no credit coupon type. Nothing in this folder uses src/Credit/.
+ * made in the gift card plugin (source promotion); there is no credit coupon type.
  */
 final class GiftCredit {
 
@@ -85,7 +85,7 @@ final class GiftCredit {
 					'type'    => 'checkbox',
 					'default' => 0,
 					'label'   => __( 'Account credit as gift cards', 'beltoft-services' ),
-					'desc'    => __( 'Account credit is gift cards of the plugin Beltoft Gift Cards for WooCommerce, handled by the add-on Beltoft Gift Cards Account Credit: a top-up buys a card for the customer, free credit is a free card made in the gift card plugin, and the cards pay checkout orders, renewals and usage invoices (set in the add-on). Credit already on the old ledger is not applied while this is on, so move it to cards first. Needs both plugins to be active; without them this setting does nothing.', 'beltoft-services' ),
+					'desc'    => __( 'Account credit is gift cards of the plugin Beltoft Gift Cards for WooCommerce, handled by the add-on Beltoft Gift Cards Account Credit: a top-up buys a card for the customer, free credit is a free card made in the gift card plugin, and the cards pay checkout orders, renewals and usage invoices (set in the add-on). Needs both plugins to be active; without them this setting does nothing.', 'beltoft-services' ),
 				),
 			)
 		);

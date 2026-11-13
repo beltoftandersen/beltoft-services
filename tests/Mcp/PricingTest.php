@@ -9,7 +9,6 @@
 namespace BeltoftServices\Tests\Mcp;
 
 use BeltoftServices\Api\Tokens;
-use BeltoftServices\Credit\Balance;
 use BeltoftServices\Mcp\Endpoint;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Vm\Offers;
@@ -55,7 +54,7 @@ final class PricingTest extends UsageTestCase {
 		$this->save_cluster( array( 'templates' => "9000 = Debian 12", 'default_template' => '9000' ) );
 		$this->server = $this->usage_product( '0' );
 		$this->db     = $this->database_product();
-		$this->settings( array( 'offer_monthly' => 0, 'usage_new_limit' => 0, 'db_disk_max_gb' => 1000, 'db_disk_step_gb' => 10, 'credit_enabled' => 1 ) );
+		$this->settings( array( 'offer_monthly' => 0, 'usage_new_limit' => 0, 'db_disk_max_gb' => 1000, 'db_disk_step_gb' => 10, 'gift_credit' => 1 ) );
 		$this->mcp_set_up();
 		add_filter( 'beltoft_services_mcp_rate_limit', '__return_zero' );
 		update_option( 'woocommerce_currency', 'EUR' );
@@ -185,12 +184,16 @@ final class PricingTest extends UsageTestCase {
 	}
 
 	public function test_billing_summary_says_card_credit_and_usage(): void {
+		if ( ! class_exists( '\Bgca\Plugin' ) || ! \Bgca\Plugin::requirements_met() ) {
+			$this->markTestSkipped( 'The gift card plugin and its add-on are not loaded.' );
+		}
+
 		$none = $this->call( 'billing_summary' )['account'];
 		$this->assertTrue( $none['card_saved'] );
 		$this->assertTrue( $none['credit']['enabled'] );
 		$this->assertEquals( 0.0, $none['credit']['balance'] );
 
-		Balance::credit( $this->user, 2500, Balance::TOPUP, 'test', 'pricing-1' );
+		$this->assertGreaterThan( 0, \Bgca\Wallet::create( $this->user, 2500, \Bgcw\GiftCard\Source::ORDER, 'EUR', 'Seed' ) );
 		$some = $this->call( 'billing_summary' )['account'];
 		$this->assertEquals( 25.0, $some['credit']['balance'] );
 		$this->assertSame( '€25.00', $some['credit']['text'] );

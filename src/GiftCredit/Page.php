@@ -16,7 +16,7 @@ use BeltoftServices\Usage\Minimum;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * A My Account endpoint, "credit" (the address the older credit page had, so links keep working), only while gift credit is on. With the
+ * A My Account endpoint, "credit" (the address the old credit page had, so links keep working), only while gift credit is on. With the
  * Billing grouping on it is a tab of Billing, otherwise a menu item before "Log out". The page shows the add-on's wallet (balance, paid and
  * free credit, history, the top-up form and the form that adds a gift card code, both handled by the add-on and returning here) and the
  * estimate of this month's pay as you go usage. Template: templates/account/gift-credit.php (copy to
@@ -219,7 +219,7 @@ final class Page {
 	}
 
 	/**
-	 * Endpoint output. The older credit page also draws on this endpoint until it is gone, and says nothing while gift credit is on.
+	 * Endpoint output.
 	 */
 	public static function render(): void {
 		echo self::html(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in the template.

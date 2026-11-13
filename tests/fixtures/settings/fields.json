@@ -157,55 +157,13 @@
         "label": "Pay as you go services before the first paid usage invoice",
         "desc": "The most services an account may run until a usage invoice has been paid. 0 means no limit."
     },
-    "credit_enabled": {
-        "tab": "general",
-        "section": "credit",
-        "type": "checkbox",
-        "default": 0,
-        "label": "Account credit for pay as you go",
-        "desc": "Customers prepay a balance, without VAT. It is applied first to their Pay as you go usage invoices, which carry the VAT. Off, nothing about credit shows."
-    },
-    "credit_renewals": {
-        "tab": "general",
-        "section": "credit",
-        "type": "checkbox",
-        "default": 0,
-        "label": "Account credit pays renewals",
-        "desc": "Credit also pays the renewal orders of subscriptions, before the card is charged. Credit a customer paid for can pay any renewal. Promotional credit (credit codes and grants) pays pay as you go usage and the renewals of products that have the box \"Promotional credit can pay orders and renewals\" ticked. A renewal whose rest for the card would be under the usage minimum is paid by the card in full. Needs account credit."
-    },
-    "credit_checkout": {
-        "tab": "general",
-        "section": "credit",
-        "type": "checkbox",
-        "default": 0,
-        "label": "Account credit pays orders at checkout",
-        "desc": "Credit also pays the first order of a signed-in customer, before the card is charged: the checkout shows the credit and the amount left to pay. Credit a customer paid for can pay any order. Promotional credit pays only products that have the box \"Promotional credit can pay orders and renewals\" ticked. An order whose rest for the card would be under the usage minimum is paid by the card in full. A card always needs to be there: the checkout still asks for a payment method, and an order with nothing that saves a card (no subscription, no pay as you go) uses credit only when the customer already has a saved card. Top-ups and plan switches are never paid from credit. Needs account credit."
-    },
-    "credit_min": {
-        "tab": "general",
-        "section": "credit",
-        "type": "number",
-        "default": 10,
-        "min": 1,
-        "label": "Smallest top-up",
-        "desc": "In the shop's currency. Another currency takes its own amount from the filter beltoft_services_amount_setting; with none there, it has no value. No VAT is charged on a top-up: the customer pays this amount and all of it is credited."
-    },
-    "credit_max": {
-        "tab": "general",
-        "section": "credit",
-        "type": "number",
-        "default": 1000,
-        "min": 1,
-        "label": "Largest top-up",
-        "desc": "In the shop's currency. Another currency takes its own amount from the filter beltoft_services_amount_setting; with none there, it has no value."
-    },
     "gift_credit": {
         "tab": "general",
         "section": "credit",
         "type": "checkbox",
         "default": 0,
         "label": "Account credit as gift cards",
-        "desc": "Account credit is gift cards of the plugin Beltoft Gift Cards for WooCommerce, handled by the add-on Beltoft Gift Cards Account Credit: a top-up buys a card for the customer, free credit is a free card made in the gift card plugin, and the cards pay checkout orders, renewals and usage invoices (set in the add-on). Credit already on the old ledger is not applied while this is on, so move it to cards first. Needs both plugins to be active; without them this setting does nothing."
+        "desc": "Account credit is gift cards of the plugin Beltoft Gift Cards for WooCommerce, handled by the add-on Beltoft Gift Cards Account Credit: a top-up buys a card for the customer, free credit is a free card made in the gift card plugin, and the cards pay checkout orders, renewals and usage invoices (set in the add-on). Needs both plugins to be active; without them this setting does nothing."
     },
     "site_tag": {
         "tab": "proxmox",

@@ -7,25 +7,28 @@
 
 namespace BeltoftServices\Tests\Usage;
 
-use BeltoftServices\Credit\Balance;
-use BeltoftServices\Tests\Credit\CreditTestCase;
 use BeltoftServices\Usage\Estimate;
 use BeltoftServices\Usage\Ledger;
 use BeltoftServices\Usage\Minimum;
 use BeltoftServices\Usage\Renewal;
 use BeltoftServices\Usage\Threshold;
 
-require_once dirname( __DIR__ ) . '/Credit/CreditTestCase.php';
-
 /**
- * Carried, billed, credit, cap, early bill, setting 0, UI and MCP.
+ * Carried, billed, cap, early bill, setting 0, UI and MCP.
  */
-class MinimumTest extends CreditTestCase {
+class MinimumTest extends UsageTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
 		$this->settings( array( 'usage_minimum' => 5 ) );
 		$this->vat( false );
+		Estimate::reset();
+	}
+
+	public function tear_down(): void {
+		$this->vat( false );
+		Estimate::reset();
+		parent::tear_down();
 	}
 
 	private function hours( int $resource, int $user, int $hours, float $rate = 0.02, int $offset = 0 ): void {
@@ -91,44 +94,6 @@ class MinimumTest extends CreditTestCase {
 		$this->assertEqualsWithDelta( 5.0, (float) $order->get_total(), 0.001 );
 		$this->assertSame( 'yes', $order->get_meta( Renewal::META_LINES ) );
 		$this->assertTrue( $this->email_on( 'customer_processing_renewal_order', $order ) );
-	}
-
-	public function test_credit_that_covers_it_pays_it(): void {
-		$user = $this->new_user();
-		$sub  = $this->usage_account( $user );
-		$this->hours( 501, $user, 100 );
-		Balance::credit( $user, 1000, Balance::TOPUP, 'order_item', 'seed-a' );
-
-		$order = wcs_create_renewal_order( $sub );
-
-		$this->assertSame( 'yes', $order->get_meta( Renewal::META_LINES ) );
-		$this->assertEqualsWithDelta( 0.0, (float) $order->get_total(), 0.001 );
-		$this->assertSame( 800, Balance::get( $user ) );
-	}
-
-	public function test_partial_credit_with_a_rest_under_the_minimum_carries_the_whole_month(): void {
-		$user = $this->new_user();
-		$sub  = $this->usage_account( $user );
-		$this->hours( 501, $user, 100 ); // 2.00.
-		Balance::credit( $user, 100, Balance::TOPUP, 'order_item', 'seed-b' );
-
-		$order = wcs_create_renewal_order( $sub );
-
-		$this->assertSame( '', (string) $order->get_meta( Renewal::META_LINES ) );
-		$this->assertSame( 100, Balance::get( $user ), 'The credit is not touched.' );
-		$this->assertCount( 100, Ledger::unbilled( $user, time() + DAY_IN_SECONDS ) );
-	}
-
-	public function test_partial_credit_with_a_rest_at_the_minimum_is_billed(): void {
-		$user = $this->new_user();
-		$sub  = $this->usage_account( $user );
-		$this->hours( 501, $user, 350 ); // 7.00.
-		Balance::credit( $user, 200, Balance::TOPUP, 'order_item', 'seed-c' );
-
-		$order = wcs_create_renewal_order( $sub );
-
-		$this->assertEqualsWithDelta( 5.0, (float) $order->get_total(), 0.001 );
-		$this->assertSame( 0, Balance::get( $user ) );
 	}
 
 	public function test_the_monthly_cap_holds_across_carried_months(): void {

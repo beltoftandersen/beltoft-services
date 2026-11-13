@@ -9,8 +9,7 @@
 namespace BeltoftServices\Mcp;
 
 use BeltoftServices\Account\DbPicker;
-use BeltoftServices\Credit\Balance;
-use BeltoftServices\Credit\Config;
+use BeltoftServices\GiftCredit\GiftCredit;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Db\DbDisk;
@@ -448,18 +447,18 @@ final class Pricing {
 		$out      = array(
 			'card_saved'  => null !== $account && Account::chargeable( $account ),
 			'card_note'   => 'A saved card is required to order servers and databases. The check reads the usage account, not the payment provider.',
-			'credit'      => array( 'enabled' => Config::enabled() ),
+			'credit'      => array( 'enabled' => GiftCredit::active() ),
 			'vat_note'    => 'VAT is added on the usage invoice. Prices elsewhere exclude VAT.',
 		);
 
-		if ( Config::enabled() ) {
-			// Credit is in one currency, the customer's own, and is named with its code: it is never added to another currency.
-			$credit_currency          = Balance::currency_or_user( $user_id );
-			$cents                    = Balance::get( $user_id );
+		if ( GiftCredit::active() ) {
+			// Credit is gift cards in one currency, the customer's own, and is named with its code: it is never added to another currency.
+			$credit_currency          = \Bgca\Wallet::account_currency( $user_id );
+			$cents                    = GiftCredit::balance( $user_id, $credit_currency );
 			$out['credit']['balance'] = round( $cents / 100, 2 );
 			$out['credit']['currency'] = $credit_currency;
 			$out['credit']['text']    = Rates::money( $cents / 100, 2, $credit_currency );
-			$out['credit']['note']    = 'Credit is applied first on usage invoices as "Paid from account credit"; the rest goes to the card. Top-ups carry no VAT. Credit alone is not enough to order.';
+			$out['credit']['note']    = 'Credit (gift cards) is applied first on usage invoices as "Paid from account credit"; the rest goes to the card. Top-ups carry no VAT. Credit alone is not enough to order.';
 		}
 
 		$estimate = Estimate::for_user( $user_id );

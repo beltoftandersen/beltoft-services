@@ -63,7 +63,7 @@ final class UsageView {
 		ob_start();
 		wc_get_template( 'usage.php', array(
 				'estimate' => $estimate,
-				'credit'   => \BeltoftServices\Credit\Config::enabled() ? \BeltoftServices\Credit\Balance::get_in( get_current_user_id(), (string) $estimate['currency'] ) : 0,
+				'credit'   => \BeltoftServices\GiftCredit\GiftCredit::balance( get_current_user_id(), (string) $estimate['currency'] ),
 			), 'beltoft-services/account/', BELTOFT_SERVICES_PATH . 'templates/account/' );
 
 		return (string) ob_get_clean();

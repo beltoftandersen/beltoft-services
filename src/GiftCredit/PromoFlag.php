@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Free cards (promotional credit) pay only the lines of products with this box ticked, including their VAT. Paid cards pay any line. The
- * meta key is the one the older credit code used, so the boxes already ticked keep working. The filter beltoft_services_promo_credit_line
+ * meta key is the one the old credit ledger used, so the boxes already ticked keep working. The filter beltoft_services_promo_credit_line
  * can change the answer for one line.
  */
 final class PromoFlag {
@@ -25,9 +25,6 @@ final class PromoFlag {
 	 * Hooks.
 	 */
 	public static function register(): void {
-		// The older credit code draws and saves the same box; this one replaces it.
-		remove_action( 'beltoft_services_product_panel_after_reminder', array( '\\BeltoftServices\\Credit\\RenewalCredit', 'product_field' ), 20 );
-		remove_action( 'beltoft_services_product_save', array( '\\BeltoftServices\\Credit\\RenewalCredit', 'save_product_field' ), 20 );
 		add_action( 'beltoft_services_product_panel_after_reminder', array( __CLASS__, 'product_field' ), 20, 1 );
 		add_action( 'beltoft_services_product_save', array( __CLASS__, 'save_product_field' ), 20, 1 );
 	}

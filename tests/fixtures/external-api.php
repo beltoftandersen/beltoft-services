@@ -14,7 +14,7 @@ return array(
 	'Account\\ServiceArea' => array( 'tab_nav()', 'url_for_license()' ),
 	'BillingRequirements' => array( 'cart_needs_billing()' ),
 	'Credit\\CheckoutCredit' => array( 'preview()' ),
-	'Credit\\Topup' => array( 'max()', 'min()' ),
+	'Credit\\Topup' => array( 'CART_KEY', 'available()', 'is_product()', 'max()', 'min()' ),
 	'Domains\\Prices' => array( 'price()' ),
 	'Hosting\\SiteField' => array( 'is_hosting_product()' ),
 	'Http\\Connections' => array( 'all()', 'defaults()', 'scheme_allowed()' ),
