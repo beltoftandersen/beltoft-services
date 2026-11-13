@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.23.10
+Stable tag: 0.24.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -259,6 +259,10 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.24.0 =
+* Account credit as gift cards (setting gift_credit, with Beltoft Gift Cards for WooCommerce and its add-on Beltoft Gift Cards Account Credit): paid cards are a payment, free cards a discount before VAT; they pay checkout orders, renewals and usage invoices under today's rules (promotional box, saved card, usage minimum). The credit page shows the cards.
+* wp beltoft-services credit move-to-cards moves account credit to gift cards.
 
 = 0.23.10 =
 * New alias: the domain's mailboxes to tick, and a field for other addresses where forwarding outside the domain is allowed.
