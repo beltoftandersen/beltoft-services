@@ -44,23 +44,6 @@ abstract class GiftCreditTestCase extends UsageTestCase {
 	}
 
 	/**
-	 * Turns a flat 25 percent VAT on or off (prices without VAT).
-	 */
-	protected function vat( bool $on ): void {
-		update_option( 'woocommerce_calc_taxes', $on ? 'yes' : 'no' );
-		update_option( 'woocommerce_tax_based_on', 'billing' );
-		update_option( 'woocommerce_prices_include_tax', 'no' );
-
-		global $wpdb;
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture.
-		$wpdb->query( "DELETE FROM {$wpdb->prefix}woocommerce_tax_rates" );
-		if ( $on ) {
-			\WC_Tax::_insert_tax_rate( array( 'tax_rate_country' => '', 'tax_rate_state' => '', 'tax_rate' => '25.0000', 'tax_rate_name' => 'VAT', 'tax_rate_priority' => 1, 'tax_rate_compound' => 0, 'tax_rate_shipping' => 0, 'tax_rate_order' => 1, 'tax_rate_class' => '' ) );
-		}
-		\WC_Cache_Helper::invalidate_cache_group( 'taxes' );
-	}
-
-	/**
 	 * A card for a customer: free by default, in EUR, created $age seconds ago.
 	 */
 	protected function card( int $user, int $cents, string $source = Source::PROMOTION, string $currency = 'EUR', int $age = 0 ): object {
