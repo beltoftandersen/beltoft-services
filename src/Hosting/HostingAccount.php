@@ -258,7 +258,7 @@ final class HostingAccount {
 	}
 
 	/**
-	 * The account at a glance, at the top: websites, PHP workers and storage, and links to the account-wide sections
+	 * The account at a glance, at the top: websites and storage, and links to the account-wide sections
 	 * further down (files, backups, email).
 	 *
 	 * @param Resource             $r      Hosting resource.
@@ -274,8 +274,6 @@ final class HostingAccount {
 				/* translators: 1: websites used, 2: websites allowed. */
 				: sprintf( __( '%1$d of %2$d', 'beltoft-services' ), (int) $limits['sites_used'], (int) $limits['sites'] )
 		) . '</dd></div>';
-		/* translators: 1: PHP workers in use, 2: PHP workers allowed. */
-		echo '<div><dt>' . esc_html__( 'PHP workers', 'beltoft-services' ) . '</dt><dd>' . esc_html( sprintf( __( '%1$d of %2$d', 'beltoft-services' ), (int) $limits['workers_used'], (int) $limits['php_workers'] ) ) . '</dd></div>';
 
 		if ( null !== $storage ) {
 			$percent = (int) round( max( 0.0, min( 100.0, (float) $storage ) ) );
