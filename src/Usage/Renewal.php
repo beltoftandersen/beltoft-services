@@ -368,7 +368,9 @@ final class Renewal {
 
 			if ( $parent ) {
 				$plan = $variation instanceof \WC_Product_Variation ? trim( (string) $variation->get_attribute( 'plan' ) ) : '';
-				$name = trim( $parent->get_name() . ( '' !== $plan ? ' ' . $plan : '' ) );
+				// The product's name in the language in force (the order's), as the site gives it (Billing\LineOptions::title()).
+				$base = (string) apply_filters( 'beltoft_services_line_title', $parent->get_name(), null, $parent );
+				$name = trim( $base . ( '' !== $plan ? ' ' . $plan : '' ) );
 
 				return $label !== $parent->get_name() ? sprintf( /* translators: 1: product and plan, 2: server or database name. */ _x( '%1$s (%2$s)', 'usage invoice line title', 'beltoft-services' ), $name, $label ) : $name;
 			}

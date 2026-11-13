@@ -69,14 +69,15 @@ final class LineOptions {
 		$name   = $parent instanceof \WC_Product ? $parent->get_name() : $product->get_name();
 		$order  = $item->get_order();
 		$title  = $name;
-		$write  = static function () use ( &$title, $name, $item ): void {
+		$write  = static function () use ( &$title, $name, $item, $parent ): void {
 			/**
 			 * The name of a product on an invoice line, in the language in force (the order's).
 			 *
-			 * @param string                 $name The product's name in the shop.
-			 * @param \WC_Order_Item_Product $item The line.
+			 * @param string                     $name    The product's name in the shop.
+			 * @param \WC_Order_Item_Product|null $item    The line, or null for a usage line.
+			 * @param \WC_Product|null            $product The product (the parent of a variation).
 			 */
-			$title = (string) apply_filters( 'beltoft_services_line_title', $name, $item );
+			$title = (string) apply_filters( 'beltoft_services_line_title', $name, $item, $parent instanceof \WC_Product ? $parent : null );
 		};
 
 		if ( $order instanceof \WC_Order ) {
