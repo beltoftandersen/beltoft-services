@@ -29,9 +29,9 @@ $beltoft_services_power_text = $busy ? __( 'Busy', 'beltoft-services' ) : ( 'run
 						<?php if ( ! isset( $actions[ $beltoft_services_name ] ) ) { continue; } ?>
 						<?php $beltoft_services_label = $actions[ $beltoft_services_name ]; ?>
 						<?php if ( 'start' === $beltoft_services_name ) : ?>
-							<button type="button" class="button woocommerce-button beltoft-services-btn beltoft-services-action" data-action="start"><?php echo esc_html( $beltoft_services_label ); ?></button>
+							<button type="button" class="button woocommerce-button bs-btn bs-btn--secondary beltoft-services-btn beltoft-services-action" data-action="start"><?php echo esc_html( $beltoft_services_label ); ?></button>
 						<?php else : ?>
-							<button type="button" class="button woocommerce-button beltoft-services-btn" data-power-action="<?php echo esc_attr( $beltoft_services_name ); ?>"><?php echo esc_html( $beltoft_services_label ); ?></button>
+							<button type="button" class="button woocommerce-button bs-btn bs-btn--secondary beltoft-services-btn" data-power-action="<?php echo esc_attr( $beltoft_services_name ); ?>"><?php echo esc_html( $beltoft_services_label ); ?></button>
 						<?php endif; ?>
 					<?php endforeach; ?>
 				</div>
@@ -52,8 +52,8 @@ $beltoft_services_power_text = $busy ? __( 'Busy', 'beltoft-services' ) : ( 'run
 					<label class="screen-reader-text" for="<?php echo esc_attr( $beltoft_services_field ); ?>"><?php esc_html_e( 'Server name', 'beltoft-services' ); ?></label>
 					<input type="text" id="<?php echo esc_attr( $beltoft_services_field ); ?>" name="name" value="<?php echo esc_attr( '' !== (string) $server_name ? (string) $server_name : $title ); ?>" maxlength="63" autocomplete="off" spellcheck="false" required aria-describedby="<?php echo esc_attr( $beltoft_services_field ); ?>-help">
 					<span class="screen-reader-text" id="<?php echo esc_attr( $beltoft_services_field ); ?>-help"><?php esc_html_e( "Used as the server's hostname, for example web-01. Lowercase letters, digits and hyphens. The change shows on the server after the next reboot.", 'beltoft-services' ); ?></span>
-					<button type="submit" class="button woocommerce-button beltoft-services-btn"><?php esc_html_e( 'Save', 'beltoft-services' ); ?></button>
-					<button type="button" class="button woocommerce-button beltoft-services-btn" data-rename-cancel><?php esc_html_e( 'Cancel', 'beltoft-services' ); ?></button>
+					<button type="submit" class="button woocommerce-button bs-btn bs-btn--secondary beltoft-services-btn"><?php esc_html_e( 'Save', 'beltoft-services' ); ?></button>
+					<button type="button" class="button woocommerce-button bs-btn bs-btn--secondary beltoft-services-btn" data-rename-cancel><?php esc_html_e( 'Cancel', 'beltoft-services' ); ?></button>
 				</form>
 			</div>
 		<?php else : ?>

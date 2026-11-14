@@ -1225,3 +1225,22 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-ssl h3
 
 /* The subscription list: the names of what a subscription is for, under its number. */
 body.woocommerce-account .woocommerce-MyAccount-content .bs-sub-name { display: block; margin-top: 2px; font-size: var(--bs-fs-small); color: var(--bs-muted); text-decoration: none; }
+
+/* ==== Redesign 4 (2026-11-14): server tabs ======================================================================
+   One card per tab: 24px inside (16px on a phone), blocks 24px apart, the first block on the top edge, every heading the same
+   size, forms flat in the card (no card in the card), the facts as the shared facts card (warm tiles on white). */
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab:not([data-tab="overview"]) { padding: var(--bs-space-5); }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab:not([data-tab="overview"]) > * { margin-top: 0; margin-bottom: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab:not([data-tab="overview"]) > * + * { margin-top: var(--bs-space-5); }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab :is(h3, h4) { margin: 0 0 var(--bs-space-3); color: var(--navy, #10221b); font-family: inherit; font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); letter-spacing: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab h5 { margin: 0 0 var(--bs-space-2); font-family: inherit; font-size: var(--bs-fs-body); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-text); }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab form.beltoft-services-vm-form { display: grid; gap: var(--bs-space-4); margin: 0; padding: 0; border-radius: 0; background: none; }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab form.beltoft-services-vm-form > * { margin: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab .beltoft-services-facts { margin: 0 0 var(--bs-space-4); background: var(--bs-surface); }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab .beltoft-services-facts > div { background: var(--bg-warm, #eeece6); }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab .beltoft-services-facts:last-child { margin-bottom: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab .beltoft-services-add { margin: var(--bs-space-4) 0 0; }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab .beltoft-services-vm__disk { padding: var(--bs-space-3) 0; border-top: 1px solid var(--bs-line); }
+@media (max-width: 600px) {
+	body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab:not([data-tab="overview"]) { padding: var(--bs-space-4); }
+}

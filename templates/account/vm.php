@@ -337,9 +337,8 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 		<?php $beltoft_services_open( 'disks' ); ?>
 	<section class="beltoft-services-vm__disks">
 		<h4><?php esc_html_e( 'Disks', 'beltoft-services' ); ?></h4>
-		<dl class="beltoft-services-vm__facts">
-			<dt><?php esc_html_e( 'Boot disk', 'beltoft-services' ); ?></dt>
-			<dd><?php echo esc_html( (int) $plan['disk_gb'] . ' GB' ); ?></dd>
+		<dl class="beltoft-services-facts beltoft-services-vm__facts">
+			<div><dt><?php esc_html_e( 'Boot disk', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( (int) $plan['disk_gb'] . ' GB' ); ?></dd></div>
 		</dl>
 		<?php foreach ( $extra_disks['items'] as $beltoft_extra_disk ) : ?>
 			<div class="beltoft-services-vm__disk">
@@ -504,7 +503,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 			<h4><?php esc_html_e( 'Backups', 'beltoft-services' ); ?></h4>
 			<?php if ( ! $backups['enabled'] ) : ?>
 				<p>
-					<a class="button woocommerce-button" href="<?php echo esc_url( $backups['add_url'] ); ?>">
+					<a class="button woocommerce-button bs-btn" href="<?php echo esc_url( $backups['add_url'] ); ?>">
 						<?php
 						echo esc_html(
 							'' === $backups['add_price']
@@ -578,7 +577,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 								<?php if ( '' !== $snapshot_warnings['restore'] ) : ?><p><?php esc_html_e( 'The snapshots of this server are deleted.', 'beltoft-services' ); ?></p><?php endif; ?>
 								<?php if ( $extra_disks['items'] ) : ?><p><?php esc_html_e( 'Extra disks are not part of the backup. They keep their current data and are attached again after the restore.', 'beltoft-services' ); ?></p><?php endif; ?>
 							</div>
-							<p><button type="submit" class="button woocommerce-button"><?php esc_html_e( 'Restore now', 'beltoft-services' ); ?></button></p>
+							<p><button type="submit" class="button woocommerce-button bs-btn"><?php esc_html_e( 'Restore now', 'beltoft-services' ); ?></button></p>
 						</form>
 					</details>
 				<?php endif; ?>
@@ -657,10 +656,10 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 			<?php else : ?>
 				<?php foreach ( $snapshots['entries'] as $beltoft_services_snapshot ) : ?>
 					<div class="beltoft-services-vm__disk beltoft-services-vm__snapshot" data-snapshot="<?php echo esc_attr( $beltoft_services_snapshot['id'] ); ?>">
-						<dl class="beltoft-services-vm__facts">
-							<dt><?php esc_html_e( 'Snapshot', 'beltoft-services' ); ?></dt>
-							<dd><?php echo esc_html( $beltoft_services_snapshot['label'] ); ?></dd>
-							<dt><?php esc_html_e( 'Taken', 'beltoft-services' ); ?></dt>
+						<dl class="beltoft-services-facts beltoft-services-vm__facts">
+							<div><dt><?php esc_html_e( 'Snapshot', 'beltoft-services' ); ?></dt>
+							<dd><?php echo esc_html( $beltoft_services_snapshot['label'] ); ?></dd></div>
+							<div><dt><?php esc_html_e( 'Taken', 'beltoft-services' ); ?></dt>
 							<dd>
 								<?php
 								if ( 'creating' === $beltoft_services_snapshot['state'] ) {
@@ -675,16 +674,16 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 
 								echo esc_html( $beltoft_services_snapshot['taken'] . ', ' . $beltoft_services_how );
 								?>
-							</dd>
-							<dt><?php esc_html_e( 'Kept until', 'beltoft-services' ); ?></dt>
-							<dd><?php echo esc_html( $beltoft_services_snapshot['keeps'] ); ?></dd>
-						</dl>
+							</dd></div>
+							<div><dt><?php esc_html_e( 'Kept until', 'beltoft-services' ); ?></dt>
+							<dd><?php echo esc_html( $beltoft_services_snapshot['keeps'] ); ?></dd></div>
+</dl>
 						<?php if ( 'ok' === $beltoft_services_snapshot['state'] && in_array( $snapshots['mode'], array( 'full', 'delete' ), true ) ) : ?>
 							<p class="beltoft-services-panel__actions">
 								<?php if ( 'full' === $snapshots['mode'] ) : ?>
-								<button type="button" class="button woocommerce-button" data-snapshot-rollback="<?php echo esc_attr( $beltoft_services_snapshot['id'] ); ?>" data-snapshot-name="<?php echo esc_attr( '' !== $beltoft_services_snapshot['label'] ? $beltoft_services_snapshot['label'] : $beltoft_services_snapshot['taken'] ); ?>"><?php esc_html_e( 'Go back to this snapshot', 'beltoft-services' ); ?></button>
+								<button type="button" class="button woocommerce-button bs-btn bs-btn--sm bs-btn--secondary" data-snapshot-rollback="<?php echo esc_attr( $beltoft_services_snapshot['id'] ); ?>" data-snapshot-name="<?php echo esc_attr( '' !== $beltoft_services_snapshot['label'] ? $beltoft_services_snapshot['label'] : $beltoft_services_snapshot['taken'] ); ?>"><?php esc_html_e( 'Go back to this snapshot', 'beltoft-services' ); ?></button>
 								<?php endif; ?>
-								<button type="button" class="button woocommerce-button beltoft-services-btn" data-snapshot-delete="<?php echo esc_attr( $beltoft_services_snapshot['id'] ); ?>" data-snapshot-name="<?php echo esc_attr( '' !== $beltoft_services_snapshot['label'] ? $beltoft_services_snapshot['label'] : $beltoft_services_snapshot['taken'] ); ?>"><?php esc_html_e( 'Delete', 'beltoft-services' ); ?></button>
+								<button type="button" class="button woocommerce-button bs-btn bs-btn--sm bs-btn--danger" data-snapshot-delete="<?php echo esc_attr( $beltoft_services_snapshot['id'] ); ?>" data-snapshot-name="<?php echo esc_attr( '' !== $beltoft_services_snapshot['label'] ? $beltoft_services_snapshot['label'] : $beltoft_services_snapshot['taken'] ); ?>"><?php esc_html_e( 'Delete', 'beltoft-services' ); ?></button>
 							</p>
 						<?php endif; ?>
 					</div>
@@ -705,7 +704,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 						<label for="beltoft-vm-snapshot-label-<?php echo (int) $resource_id; ?>"><?php esc_html_e( 'Name (optional)', 'beltoft-services' ); ?></label>
 						<input type="text" id="beltoft-vm-snapshot-label-<?php echo (int) $resource_id; ?>" name="label" maxlength="<?php echo (int) $snapshots['max_label']; ?>" autocomplete="off">
 					</p>
-					<p><button type="submit" class="button woocommerce-button"><?php esc_html_e( 'Take a snapshot', 'beltoft-services' ); ?></button></p>
+					<p><button type="submit" class="button woocommerce-button bs-btn"><?php esc_html_e( 'Take a snapshot', 'beltoft-services' ); ?></button></p>
 				</form>
 			<?php endif; ?>
 
@@ -746,15 +745,15 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 		<?php if ( $forms ) : ?>
 		<?php if ( $can_reveal ) : ?>
 			<p class="beltoft-services-vm__reveal">
-				<button type="button" class="button woocommerce-button" data-vm-reveal><?php esc_html_e( 'Show password once', 'beltoft-services' ); ?></button>
+				<button type="button" class="button woocommerce-button bs-btn" data-vm-reveal><?php esc_html_e( 'Show password once', 'beltoft-services' ); ?></button>
 				<code class="beltoft-services-vm__password" data-vm-password hidden></code>
-				<button type="button" class="button woocommerce-button beltoft-services-vm__copy" data-vm-password-copy data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button>
+				<button type="button" class="button woocommerce-button bs-btn bs-btn--secondary beltoft-services-vm__copy" data-vm-password-copy data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button>
 			</p>
 			<p class="description"><?php esc_html_e( 'The password is shown one time only. Copy it now and keep it safe.', 'beltoft-services' ); ?></p>
 		<?php endif; ?>
 			<?php if ( $beltoft_services_reset && null !== $beltoft_services_page ) : ?>
 				<div class="beltoft-services-vm__reset">
-					<p><button type="button" class="button woocommerce-button" data-reset-password><?php esc_html_e( 'Reset password', 'beltoft-services' ); ?></button></p>
+					<p><button type="button" class="button woocommerce-button bs-btn" data-reset-password><?php esc_html_e( 'Reset password', 'beltoft-services' ); ?></button></p>
 					<p class="description"><?php esc_html_e( 'Sets a new password on the server. Use Show password once to see it.', 'beltoft-services' ); ?></p>
 				</div>
 			<?php endif; ?>
@@ -766,7 +765,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 					<textarea id="beltoft-vm-key" name="key" rows="3" maxlength="8192" autocomplete="off" spellcheck="false" required></textarea>
 				</p>
 				<p class="description"><?php esc_html_e( 'Paste the single line from your .pub file. It replaces the key now on the server.', 'beltoft-services' ); ?></p>
-				<p><button type="submit" class="button woocommerce-button"><?php echo $has_key ? esc_html__( 'Replace SSH key', 'beltoft-services' ) : esc_html__( 'Add SSH key', 'beltoft-services' ); ?></button></p>
+				<p><button type="submit" class="button woocommerce-button bs-btn"><?php echo $has_key ? esc_html__( 'Replace SSH key', 'beltoft-services' ) : esc_html__( 'Add SSH key', 'beltoft-services' ); ?></button></p>
 			</form>
 		<?php $beltoft_services_more_close(); ?>
 		<?php endif; ?>
@@ -820,7 +819,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 					<p><?php esc_html_e( 'The IP address stays.', 'beltoft-services' ); ?></p>
 					<?php do_action( 'beltoft_services_reinstall_confirm', (int) $resource_id ); ?>
 				</div>
-				<p><button type="submit" class="button woocommerce-button"><?php esc_html_e( 'Reinstall now', 'beltoft-services' ); ?></button></p>
+				<p><button type="submit" class="button woocommerce-button bs-btn"><?php esc_html_e( 'Reinstall now', 'beltoft-services' ); ?></button></p>
 			</form>
 		<?php $beltoft_services_more_close(); ?>
 		<?php endif; ?>
@@ -865,8 +864,8 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 				<input type="text" id="beltoft-vm-rollback-confirm-<?php echo (int) $resource_id; ?>" name="confirm" autocomplete="off" required>
 			</p>
 			<p class="beltoft-services-vm__buttons">
-				<button type="submit" class="button woocommerce-button"><?php esc_html_e( 'Go back now', 'beltoft-services' ); ?></button>
-				<button type="button" class="button woocommerce-button" data-snapshot-cancel><?php esc_html_e( 'Cancel', 'beltoft-services' ); ?></button>
+				<button type="submit" class="button woocommerce-button bs-btn"><?php esc_html_e( 'Go back now', 'beltoft-services' ); ?></button>
+				<button type="button" class="button woocommerce-button bs-btn bs-btn--secondary" data-snapshot-cancel><?php esc_html_e( 'Cancel', 'beltoft-services' ); ?></button>
 			</p>
 		</form>
 	</dialog>
@@ -878,8 +877,8 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 			<h5 id="beltoft-vm-confirm-title-<?php echo (int) $resource_id; ?>" data-confirm-heading></h5>
 			<div class="beltoft-services-vm__confirm-body" data-confirm-body></div>
 			<p class="beltoft-services-vm__buttons">
-				<button type="submit" class="button woocommerce-button" data-confirm-submit></button>
-				<button type="button" class="button woocommerce-button" data-confirm-cancel><?php esc_html_e( 'Cancel', 'beltoft-services' ); ?></button>
+				<button type="submit" class="button woocommerce-button bs-btn" data-confirm-submit></button>
+				<button type="button" class="button woocommerce-button bs-btn bs-btn--secondary" data-confirm-cancel><?php esc_html_e( 'Cancel', 'beltoft-services' ); ?></button>
 			</p>
 		</form>
 	</dialog>
