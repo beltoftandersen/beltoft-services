@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.26.5
+Stable tag: 0.26.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,11 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.26.6 =
+* A new server can attach the private network before its guest agent was seen; the attach job asks the agent itself.
+* Before attaching, the Network tab shows the customer's network and the servers on it, which Attach joins.
+* The note under Attach and Detach has room above it; on a phone the server list shows one usage bar per line.
 
 = 0.26.5 =
 * The "Go to your dashboard" button on the order page has the rounded corners and height of the account buttons.

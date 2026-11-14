@@ -47,12 +47,16 @@ $beltoft_services_net_words = array(
 		</ul>
 	<?php endif; ?>
 
+	<?php if ( '' === $beltoft_services_net_state && array() !== $view['others'] ) : ?>
+		<p class="description"><?php esc_html_e( 'Attach puts this server on the same private network as the servers above.', 'beltoft-services' ); ?></p>
+	<?php endif; ?>
+
 	<?php if ( 'attached' === $beltoft_services_net_state ) : ?>
 		<p class="description"><?php esc_html_e( 'To check inside the server, run this and look for the private address:', 'beltoft-services' ); ?> <code>ip -br a</code></p>
 	<?php endif; ?>
 
 
-	<p class="beltoft-services-net__buttons">
+	<p class="beltoft-services-net__buttons" data-bs-note-anchor>
 		<?php if ( $view['can_attach'] ) : ?>
 			<button type="button" class="button woocommerce-button" data-net-attach><?php esc_html_e( 'Attach', 'beltoft-services' ); ?></button>
 		<?php endif; ?>

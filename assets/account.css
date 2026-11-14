@@ -425,7 +425,9 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 }
 @media (max-width: 700px) {
 	.beltoft-services-servers a.beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; }
-	.beltoft-services-srv__bars { grid-column: 1 / -1; }
+	/* A phone: one bar per line, labels in one column, so every track is long and they line up (2026-11-14). */
+	.beltoft-services-srv__bars { grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr); gap: 6px; margin-top: 8px; }
+	.beltoft-services-bar { grid-template-columns: 104px minmax(0, 1fr) 40px; }
 	.beltoft-services-srv__go { display: none; }
 }
 

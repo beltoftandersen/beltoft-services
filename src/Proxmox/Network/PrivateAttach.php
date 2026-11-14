@@ -166,10 +166,7 @@ final class PrivateAttach {
 		}
 
 		if ( self::ATTACH === $action && ! in_array( (string) $r->get( self::STATE ), array( 'attaching', 'attached' ), true ) ) {
-			if ( ! Actions::agent_ok( $r ) ) {
-				return self::notice_text( 'agent' );
-			}
-
+			// The guest agent is not checked here: a new server's agent often starts after the build looked, so the job asks it.
 			$status = Operations::cached_status( $r->id() );
 
 			if ( null !== $status && 'stopped' === (string) $status['power'] ) {
@@ -316,9 +313,21 @@ final class PrivateAttach {
 		$row   = PrivateNets::for_resource( $r->id() );
 		$state = in_array( $state, array( 'attaching', 'attached', 'detaching', 'failed' ), true ) ? $state : '';
 		$others = array();
+		$net_id = null === $row ? 0 : (int) $row['net_id'];
 
-		if ( null !== $row ) {
-			foreach ( PrivateNets::members( $row['net_id'] ) as $id => $address ) {
+		if ( null === $row ) {
+			// Not on it yet: the customer's network that the other servers are on, which Attach joins.
+			$license = $r->license();
+			$mine    = PrivateNets::for_user( (int) ( is_array( $license ) ? ( $license['user_id'] ?? 0 ) : 0 ) );
+
+			if ( null !== $mine && in_array( (string) $mine['state'], array( 'held', 'held_return' ), true ) ) {
+				$net_id = (int) $mine['id'];
+				$row    = array( 'cidr' => (string) $mine['cidr'] );
+			}
+		}
+
+		if ( $net_id > 0 ) {
+			foreach ( PrivateNets::members( $net_id ) as $id => $address ) {
 				$other = Resource::find( (int) $id );
 				if ( $id === $r->id() || ! $other || 'deleted' === $other->get( 'state' ) ) {
 					continue;
@@ -417,6 +426,8 @@ final class PrivateAttach {
 
 				return StepResult::done( array(), 'Private network attach refused: the guest agent did not answer' );
 			}
+
+			$this->r->set( array( 'agent' => 'ok', 'agent_checked_at' => null ) );
 
 			$nic = PrivateNic::attach( $this->r, $this->client, false );
 

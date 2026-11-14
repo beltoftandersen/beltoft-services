@@ -342,6 +342,36 @@ class PrivateAttachTest extends TestCase {
 		$this->assertSame( 'held', $row['state'], 'The network stays with its owner.' );
 	}
 
+	public function test_a_new_server_whose_agent_was_not_seen_yet_may_still_attach_and_sees_the_network_it_joins(): void {
+		$one   = $this->attached();
+		$owner = (int) $one->license()['user_id'];
+		$product  = $this->service_product( 'proxmox', array( 'cluster' => 'lab', 'template' => 9000, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 30 ), array( 'max' => 3, 'slug' => 'vm-' . wp_generate_password( 5, false ) ) );
+		$license  = $this->service_license( $product, array( 'fire' => false, 'user_id' => $owner ) );
+		$resource = Resource::create( $license, Registry::get( 'proxmox' ), Product::plan( $product->get_id() ) );
+		Jobs::run( $resource->id() );
+		$two = Resource::find( $resource->id() );
+		$two->set( array( 'agent' => null ) );
+		$this->assertNull( Actions::check( Resource::find( $two->id() ), 'private_attach', array() ), 'An agent not seen yet is asked by the job, not refused here.' );
+
+		$view = PrivateAttach::view( Resource::find( $two->id() ) );
+		$this->assertSame( '', $view['state'] );
+		$this->assertSame( '10.64.0.0/28', $view['cidr'], 'The network Attach joins is shown before attaching.' );
+		$this->assertSame( '10.64.0.2', $view['others'][0]['address'] );
+		$this->assertSame( '', $view['address'] );
+		ob_start();
+		NetworkTab::pane( 'network', $two->id() );
+		$html = (string) ob_get_clean();
+		$this->assertStringContainsString( 'same private network as the servers above', $html );
+		$this->assertStringContainsString( 'data-bs-note-anchor', $html );
+
+		$this->fake->set_osinfo( (int) $two->get( 'vmid' ), array( 'id' => 'ubuntu' ) );
+		Jobs::act( $two->id(), 'private_attach', array() );
+		$fresh = Resource::find( $two->id() );
+		$this->assertSame( 'attached', $fresh->get( 'private_state' ) );
+		$this->assertSame( 'ok', $fresh->get( 'agent' ) );
+		$this->assertSame( '10.64.0.3', PrivateNets::address_for_resource( $two->id() ) );
+	}
+
 	public function test_the_network_tab_follows_the_rules(): void {
 		$r = $this->ready();
 		$tabs = array( 'overview' => 'Overview', 'access' => 'Access', 'reinstall' => 'Reinstall' );
