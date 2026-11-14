@@ -96,7 +96,7 @@ final class DeletedServicesTest extends UsageTestCase {
 		$account = $this->usage_account( $user );
 		$gone    = $this->db( $user, $account->get_id(), 'gone-db' );
 		$live    = $this->db( $user, $account->get_id(), 'live-db' );
-		$this->assertTrue( CustomerDelete::run( $gone, $user, 'DELETE' ) );
+		$this->assertTrue( CustomerDelete::run( $gone, $user, CustomerDelete::word( $gone ) ) );
 		$this->run_jobs();
 		wp_set_current_user( $user );
 		Overview::reset();
@@ -131,7 +131,7 @@ final class DeletedServicesTest extends UsageTestCase {
 		$user    = $this->new_user();
 		$account = $this->usage_account( $user );
 		$gone    = $this->db( $user, $account->get_id(), 'gone-db' );
-		$this->assertTrue( CustomerDelete::run( $gone, $user, 'DELETE' ) );
+		$this->assertTrue( CustomerDelete::run( $gone, $user, CustomerDelete::word( $gone ) ) );
 		$this->run_jobs();
 		wp_set_current_user( $user );
 		$GLOBALS['wp']->query_vars['databases'] = (string) $gone->license()['id'];

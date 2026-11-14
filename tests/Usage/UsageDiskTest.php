@@ -278,7 +278,7 @@ final class UsageDiskTest extends UsageTestCase {
 		$this->assertSame( 'disk', CustomerDelete::kind( $disk ) );
 		$subscription_notes = count( wc_get_order_notes( array( 'order_id' => $this->account->get_id() ) ) );
 
-		$done = CustomerDelete::run( $disk, $this->user, 'DELETE' );
+		$done = CustomerDelete::run( $disk, $this->user, CustomerDelete::word( $disk ) );
 		$this->assertTrue( $done, is_wp_error( $done ) ? $done->get_error_message() : '' );
 		$this->assertSame( Licenses::STATUS_REVOKED, Licenses::find( (int) $disk->license()['id'] )['status'], 'The disk licence is ended.' );
 
@@ -307,7 +307,7 @@ final class UsageDiskTest extends UsageTestCase {
 		$server = $this->server();
 		$disk   = $this->usage_disk( $server );
 		$other  = $this->new_user();
-		$this->assertTrue( is_wp_error( CustomerDelete::run( $disk, $other, 'DELETE' ) ) );
+		$this->assertTrue( is_wp_error( CustomerDelete::run( $disk, $other, CustomerDelete::word( $disk ) ) ) );
 		$this->assertSame( 'ready', Resource::find( $disk->id() )->get( 'desired' ) );
 		$this->assertStringContainsString( 'extra disk', (string) CustomerDelete::blocker( $server ) );
 	}

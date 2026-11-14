@@ -47,10 +47,12 @@ final class CustomerDeleteTest extends UsageTestCase {
 		$one     = $this->usage_vm( $v['u-None'], $user, 5, $account->get_id() );
 		$two     = $this->usage_vm( $v['u-None'], $user, 5, $account->get_id() );
 		$this->assertSame( 'server', CustomerDelete::kind( $one ) );
-		$this->assertSame( 'DELETE', CustomerDelete::word( $one ) );
+		// An unnamed server is confirmed with the name its page shows, vm-<first 8 of its uuid>, or DELETE when it has no uuid.
+		$uuid = (string) $one->get( 'uuid' );
+		$this->assertSame( '' !== $uuid ? 'vm-' . substr( $uuid, 0, 8 ) : 'DELETE', CustomerDelete::word( $one ) );
 		$this->assertSame( 'off', \BeltoftServices\Settings::get( 'deletion_mode' ), 'A customer deletion does not wait for deletion mode.' );
 
-		$done = CustomerDelete::run( $one, $user, 'DELETE' );
+		$done = CustomerDelete::run( $one, $user, CustomerDelete::word( $one ) );
 		$this->assertTrue( $done, is_wp_error( $done ) ? $done->get_error_message() : '' );
 
 		$fresh = Resource::find( $one->id() );
@@ -90,7 +92,7 @@ final class CustomerDeleteTest extends UsageTestCase {
 		$r       = $this->usage_vm( $v['u-None'], $user, 5, $account->get_id() );
 		$license = (int) $r->license()['id'];
 
-		$this->assertTrue( CustomerDelete::run( $r, $user, 'DELETE' ) );
+		$this->assertTrue( CustomerDelete::run( $r, $user, CustomerDelete::word( $r ) ) );
 		$this->run_jobs();
 		$this->assertNull( Resource::for_license( $license ), 'The deleted service is closed.' );
 
@@ -115,7 +117,7 @@ final class CustomerDeleteTest extends UsageTestCase {
 			return true;
 		} );
 
-		$this->assertTrue( CustomerDelete::run( $r, $user, 'DELETE' ) );
+		$this->assertTrue( CustomerDelete::run( $r, $user, CustomerDelete::word( $r ) ) );
 		$this->assertSame( 0, $sent );
 		remove_all_filters( 'pre_wp_mail' );
 	}
@@ -146,10 +148,10 @@ final class CustomerDeleteTest extends UsageTestCase {
 		$user = $this->new_user();
 		$r    = $this->usage_vm( $v['u-None'], $user, 5 );
 
-		$bad = CustomerDelete::run( $r, $this->new_user(), 'DELETE' );
+		$bad = CustomerDelete::run( $r, $this->new_user(), CustomerDelete::word( $r ) );
 		$this->assertWPError( $bad );
 		$this->assertSame( 'beltoft_services_forbidden', $bad->get_error_code() );
-		$this->assertWPError( CustomerDelete::run( $r, 0, 'DELETE' ) );
+		$this->assertWPError( CustomerDelete::run( $r, 0, CustomerDelete::word( $r ) ) );
 		$this->assertSame( 'ready', Resource::find( $r->id() )->get( 'desired' ) );
 	}
 
@@ -159,14 +161,14 @@ final class CustomerDeleteTest extends UsageTestCase {
 		$r    = $this->usage_vm( $v['u-None'], $user, 5 );
 
 		$r->set( array( 'protected' => true ) );
-		$bad = CustomerDelete::run( Resource::find( $r->id() ), $user, 'DELETE' );
+		$bad = CustomerDelete::run( Resource::find( $r->id() ), $user, CustomerDelete::word( Resource::find( $r->id() ) ) );
 		$this->assertWPError( $bad );
 		$this->assertStringContainsString( 'protected', $bad->get_error_message() );
 		$this->assertSame( 'ready', Resource::find( $r->id() )->get( 'desired' ) );
 		$r->set( array( 'protected' => false ) );
 
 		$r->set( array( 'state' => 'provisioning' ) );
-		$bad = CustomerDelete::run( Resource::find( $r->id() ), $user, 'DELETE' );
+		$bad = CustomerDelete::run( Resource::find( $r->id() ), $user, CustomerDelete::word( Resource::find( $r->id() ) ) );
 		$this->assertWPError( $bad );
 		$this->assertStringContainsString( 'still running', $bad->get_error_message() );
 		$r->set( array( 'state' => 'ready' ) );
@@ -175,8 +177,8 @@ final class CustomerDeleteTest extends UsageTestCase {
 		$this->assertStringContainsString( 'on hold', (string) CustomerDelete::blocker( Resource::find( $r->id() ) ) );
 		$r->set( array( 'breach_at' => null ) );
 
-		$this->assertTrue( CustomerDelete::run( Resource::find( $r->id() ), $user, 'DELETE' ) );
-		$again = CustomerDelete::run( Resource::find( $r->id() ), $user, 'DELETE' );
+		$this->assertTrue( CustomerDelete::run( Resource::find( $r->id() ), $user, CustomerDelete::word( Resource::find( $r->id() ) ) ) );
+		$again = CustomerDelete::run( Resource::find( $r->id() ), $user, CustomerDelete::word( Resource::find( $r->id() ) ) );
 		$this->assertStringContainsString( 'already being deleted', $again->get_error_message() );
 	}
 
@@ -187,7 +189,7 @@ final class CustomerDeleteTest extends UsageTestCase {
 		$r    = Resource::create( $row, Registry::get( 'proxmox' ), array(), array( 'state' => 'ready', 'desired' => 'ready' ) );
 
 		$this->assertSame( '', CustomerDelete::kind( $r ) );
-		$bad = CustomerDelete::run( $r, $user, 'DELETE' );
+		$bad = CustomerDelete::run( $r, $user, CustomerDelete::word( $r ) );
 		$this->assertWPError( $bad );
 		$this->assertSame( 'ready', Resource::find( $r->id() )->get( 'desired' ) );
 
@@ -206,7 +208,7 @@ final class CustomerDeleteTest extends UsageTestCase {
 		$this->assertSame( 'database', CustomerDelete::kind( $db ) );
 		$this->assertSame( 'DELETE', CustomerDelete::word( $db ) );
 		$this->assertWPError( CustomerDelete::run( $db, $user, 'delete me' ) );
-		$this->assertTrue( CustomerDelete::run( $db, $user, 'DELETE' ) );
+		$this->assertTrue( CustomerDelete::run( $db, $user, CustomerDelete::word( $db ) ) );
 
 		$fresh = Resource::find( $db->id() );
 		$this->assertSame( 'deleted', $fresh->get( 'desired' ) );
@@ -231,7 +233,8 @@ final class CustomerDeleteTest extends UsageTestCase {
 		$r     = $this->usage_vm( $v['u-None'], $user, 5 );
 		$db    = $this->db_usage_resource( $user );
 
-		foreach ( array( $r->id() => array( 'Delete server', 'Type DELETE to confirm' ), $db->id() => array( 'Delete database', 'Type DELETE to confirm' ) ) as $id => $needles ) {
+		// A server is confirmed with the name its page shows; a database with DELETE.
+		foreach ( array( $r->id() => array( 'Delete server', 'Type ' . CustomerDelete::word( $r ) . ' to confirm' ), $db->id() => array( 'Delete database', 'Type DELETE to confirm' ) ) as $id => $needles ) {
 			$beltoft_services_delete_id = $id;
 			ob_start();
 			include BELTOFT_SERVICES_PATH . 'templates/account/delete.php';
@@ -282,7 +285,7 @@ final class CustomerDeleteTest extends UsageTestCase {
 		$this->assertSame( 422, $wrong->get_status() );
 		$this->assertSame( 'ready', Resource::find( $r->id() )->get( 'desired' ) );
 
-		$ok = $call( $r->id(), 'DELETE' );
+		$ok = $call( $r->id(), CustomerDelete::word( $r ) );
 		$this->assertSame( 202, $ok->get_status() );
 		$this->assertTrue( $ok->get_data()['deleting'] );
 		$this->assertSame( 'deleted', Resource::find( $r->id() )->get( 'desired' ) );

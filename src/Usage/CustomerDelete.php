@@ -107,9 +107,10 @@ final class CustomerDelete {
 	 * @param Resource $r Resource.
 	 */
 	public static function word( Resource $r ): string {
-		$name = 'server' === self::kind( $r ) ? trim( (string) $r->get( ServerName::META ) ) : '';
+		// A server is confirmed with the name its page shows: the customer's name for it, else vm-<first 8 characters of its uuid>.
+		$name = 'server' === self::kind( $r ) ? trim( \BeltoftServices\Proxmox\Vm\Provision::vm_name( $r ) ) : '';
 
-		return '' !== $name ? $name : self::CONFIRM;
+		return '' !== $name && 'vm-' !== $name ? $name : self::CONFIRM;
 	}
 
 	/**
