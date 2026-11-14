@@ -1288,3 +1288,10 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dnsg code { bor
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-fw__main > :is(.beltoft-services-fw__add, .beltoft-services-fw__fixed, .beltoft-services-fw__layers, .beltoft-services-fw__again) { margin-top: var(--bs-space-5); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-fw__main > .beltoft-services-fw__apply { margin-top: var(--bs-space-4); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-fw__main :is(.beltoft-services-fw__add, .beltoft-services-fw__fixed, .beltoft-services-fw__layers) > h5:first-child { margin-top: 0; }
+
+/* ==== Redesign 4: the new alias form is a card like the other create forms ======================================== */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db__form[data-mail-alias-create] { box-sizing: border-box; max-width: 880px; padding: var(--bs-space-5); border-radius: var(--bs-radius-lg); background: var(--bs-surface); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__goto legend { float: none; width: auto; margin: 0 0 var(--bs-space-2); font-family: inherit; font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); line-height: var(--bs-lh-text); letter-spacing: 0; }
+@media (max-width: 767px) {
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db__form:is([data-mail-create], [data-mail-domain-add], [data-mail-alias-create]) { padding: var(--bs-space-4); }
+}
