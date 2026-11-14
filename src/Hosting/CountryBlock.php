@@ -47,7 +47,7 @@ final class CountryBlock {
 				'countries'  => self::outside_europe(),
 				'help'       => __( 'Every country outside the EU/EEA, Switzerland and the United Kingdom.', 'beltoft-services' ),
 				'scope'      => 'login',
-				'scope_help' => __( 'Blocking the whole website with this list also blocks search engines and payment callbacks from outside Europe.', 'beltoft-services' ),
+				'scope_help' => __( 'Blocking the whole website with the list Everything outside Europe also blocks search engines and payment callbacks from outside Europe.', 'beltoft-services' ),
 			),
 		);
 
