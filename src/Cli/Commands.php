@@ -184,7 +184,11 @@ final class Commands {
 	 * for the once-a-minute cron tick. Only this plugin's reconcile and customer-action jobs are run; Action Scheduler's
 	 * own runner keeps everything else. It honours the kill switch, the resource locks and the run budget.
 	 *
-	 * Put it in cron next to the normal WordPress cron line. `flock -n` is required: it keeps a slow minute from stacking a second runner:
+	 * Best as always-on services (systemd), several side by side: each claims one job at a time and the resource lock keeps
+	 * two runners off the same service. A stop signal ends a runner between two jobs, so stop the runners before files of
+	 * the site are replaced and start them after. Example ExecStart, with Restart=always:
+	 * `wp beltoft-services run-due --seconds=600 --interval=1 --path=<wordpress path> --quiet`
+	 * Or in cron next to the normal WordPress cron line, under `flock -n` (one runner, a slow minute can skip the next one):
 	 * `* * * * * <user> flock -n /run/lock/beltoft-services-runner.lock wp beltoft-services run-due --seconds=55 --path=<wordpress path> --quiet`
 	 * Without it everything still works, only slower.
 	 *

@@ -1093,6 +1093,8 @@ body.woocommerce-account .woocommerce-MyAccount-content :is(button, .button).is-
 /* Working, done, failed: the line right under the clicked button's group. */
 .bs-note { display: flex; align-items: flex-start; gap: var(--bs-space-2); margin: var(--bs-space-2) 0 0; padding: var(--bs-space-2) var(--bs-space-3); border-radius: var(--bs-radius); font-size: var(--bs-fs-small); line-height: var(--bs-lh-text); color: var(--navy, #10221b); background: var(--bg-warm, #eeece6); max-width: 70ch; }
 .bs-note[hidden] { display: none; }
+/* A panel's own paragraph rule (".beltoft-services-net p { margin: 0 0 12px }") must not take the room above the note: it sat on the button. */
+body.woocommerce-account .woocommerce-MyAccount-content p.bs-note { margin: var(--bs-space-2) 0 0; }
 .bs-note__icon { flex: none; width: 14px; height: 14px; margin-top: 3px; }
 .bs-note--busy .bs-note__icon { border: 2px solid currentcolor; border-right-color: transparent; border-radius: 50%; animation: bs-turn .7s linear infinite; box-sizing: border-box; }
 .bs-note--done, .bs-note--info { background: #e7f1ea; color: var(--bs-status-ok); }

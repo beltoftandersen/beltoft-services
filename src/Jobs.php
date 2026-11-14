@@ -103,6 +103,9 @@ final class Jobs {
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
 		add_action( self::SWEEP, array( __CLASS__, 'sweep' ) );
 		add_action( self::ACT, array( __CLASS__, 'act' ), 10, 3 );
+		// A job that throws, or a PHP process that dies in one, must not leave the customer waiting or the service unbuilt.
+		add_action( 'action_scheduler_failed_execution', array( __CLASS__, 'job_failed' ), 10, 2 );
+		add_action( 'action_scheduler_unexpected_shutdown', array( __CLASS__, 'job_failed' ), 10, 2 );
 		add_action( self::USAGE, array( __CLASS__, 'refresh_usage' ) );
 		self::recurring( array( __CLASS__, 'schedule' ) );
 		add_action( 'action_scheduler_init', array( __CLASS__, 'ensure_recurring' ) );
@@ -541,6 +544,14 @@ final class Jobs {
 			return 0;
 		}
 
+		// A stop signal (systemd stop or restart, a deploy) ends the runner between two jobs, never inside one.
+		self::$stopping = false;
+		if ( function_exists( 'pcntl_async_signals' ) && function_exists( 'pcntl_signal' ) && defined( 'SIGTERM' ) ) {
+			pcntl_async_signals( true );
+			pcntl_signal( SIGTERM, array( __CLASS__, 'stop_runner' ) );
+			pcntl_signal( SIGINT, array( __CLASS__, 'stop_runner' ) );
+		}
+
 		$sleep    = $sleep ?? 'sleep';
 		$now      = $now ?? 'time';
 		$interval = max( 1, $interval );
@@ -548,6 +559,10 @@ final class Jobs {
 		$ran      = 0;
 
 		while ( true ) {
+			if ( self::$stopping ) {
+				break;
+			}
+
 			if ( self::run_one() ) {
 				++$ran;
 
@@ -568,6 +583,63 @@ final class Jobs {
 		}
 
 		return $ran;
+	}
+
+	/** @var bool Set by a stop signal: the runner ends after the job it is running. */
+	private static bool $stopping = false;
+
+	/**
+	 * Signal handler of the runner: finish the current job, then end. Public for pcntl and the tests.
+	 */
+	public static function stop_runner(): void {
+		self::$stopping = true;
+	}
+
+	/**
+	 * Action Scheduler gave up on one of our jobs: it threw, or its PHP process died (a fatal error, a deploy that
+	 * changed files under it). A build or reconcile job is queued again in a minute (the reconciler starts from the
+	 * stored state, so this is safe); a customer action is not repeated, because it may have done part of its work,
+	 * but it gets a failed result so the page that waits for it stops and says so, and staff are told.
+	 *
+	 * @param mixed $action_id Action Scheduler action id.
+	 * @param mixed $error     The exception, or the error array of an unexpected shutdown.
+	 */
+	public static function job_failed( $action_id, $error = null ): void {
+		if ( ! class_exists( '\ActionScheduler' ) ) {
+			return;
+		}
+
+		try {
+			$action = \ActionScheduler::store()->fetch_action( (string) (int) $action_id );
+		} catch ( \Throwable $e ) {
+			return;
+		}
+
+		$hook = method_exists( $action, 'get_hook' ) ? (string) $action->get_hook() : '';
+		$args = method_exists( $action, 'get_args' ) ? (array) $action->get_args() : array();
+		$id   = (int) ( $args[0] ?? 0 );
+
+		if ( $id < 1 || ! in_array( $hook, array( self::HOOK, self::ACT ), true ) ) {
+			return;
+		}
+
+		$why = $error instanceof \Throwable ? $error->getMessage() : ( is_array( $error ) ? (string) ( $error['message'] ?? '' ) : '' );
+
+		if ( self::HOOK === $hook ) {
+			self::enqueue( $id, 60 );
+			return;
+		}
+
+		$resource = Resource::find( $id );
+
+		if ( ! $resource ) {
+			return;
+		}
+
+		$name = (string) ( $args[1] ?? '' );
+		Progress::clear( $resource );
+		$resource->set( array( self::RESULT => self::result( $name, false, true ) ) );
+		Alerts::admin( $resource, sprintf( 'Customer action "%s" stopped with an error and was not finished: %s', $name, '' !== $why ? $why : 'no message' ) );
 	}
 
 	/**

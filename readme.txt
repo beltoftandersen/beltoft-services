@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.27.1
+Stable tag: 0.27.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,11 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.27.2 =
+* A job that crashes (an error, or its PHP process ending, as during a deploy) no longer leaves the customer's page waiting: a customer action gets a failed result and staff are told; a build job is queued again in a minute.
+* The job runner (`wp beltoft-services run-due`) ends between two jobs on a stop signal, so a service manager can stop or restart it without cutting a job.
+* The status note under a button keeps its room above it in every panel.
 
 = 0.27.1 =
 * The "Open your server" link on the order page opens the server's overview, not its Disks tab; an app licence opens its server's App tab.

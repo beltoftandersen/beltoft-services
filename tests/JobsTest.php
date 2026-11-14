@@ -69,6 +69,34 @@ final class JobsTest extends TestCase {
 		return $times;
 	}
 
+	public function test_a_customer_action_that_crashes_gets_a_failed_result_and_is_not_repeated(): void {
+		list( $r ) = $this->resource( array( 'state' => 'ready', 'desired' => 'ready' ) );
+		$action_id = as_schedule_single_action( time(), Jobs::ACT, array( $r->id(), 'private_detach', array() ), Jobs::GROUP );
+		Jobs::job_failed( $action_id, new \Error( 'Class "BeltoftServices\\Locks" not found' ) );
+		$result = Resource::find( $r->id() )->get( Jobs::RESULT );
+		$this->assertSame( 'private_detach', $result['action'] );
+		$this->assertFalse( $result['ok'], 'The page waiting for it stops and says so.' );
+		$this->assertNotSame( '', $result['text'] );
+	}
+
+	public function test_a_build_job_whose_process_died_is_queued_again(): void {
+		list( $r ) = $this->resource();
+		as_unschedule_all_actions( Jobs::HOOK, array( $r->id() ), Jobs::GROUP );
+		$action_id = as_schedule_single_action( time() - 5, Jobs::HOOK, array( $r->id() ), Jobs::GROUP );
+		\ActionScheduler::store()->mark_failure( $action_id );
+		Jobs::job_failed( $action_id, array( 'message' => 'Allowed memory size exhausted' ) );
+		$this->assertCount( 1, $this->pending( $r->id() ), 'A new reconcile job is waiting.' );
+	}
+
+	public function test_a_stop_signal_ends_the_runner_between_jobs(): void {
+		$this->settings( array( 'pause_all' => 1 ) );
+		$slept = 0;
+		// The signal arrives while the runner waits for work: it ends after that wait instead of running on.
+		$ran = Jobs::run_due( 30, 1, static function () use ( &$slept ) { ++$slept; Jobs::stop_runner(); }, static fn() => 1000 );
+		$this->assertSame( 0, $ran );
+		$this->assertSame( 1, $slept );
+	}
+
 	public function test_enqueue_keeps_one_pending_job_per_resource(): void {
 		list( $resource ) = $this->resource();
 
