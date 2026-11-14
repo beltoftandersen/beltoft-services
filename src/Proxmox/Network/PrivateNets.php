@@ -76,13 +76,36 @@ final class PrivateNets {
 		return $row;
 	}
 
-	/** The one network+address reservation operation used by attach. */
-	public static function reserve( int $user_id, int $resource_id ): ?array {
+	/**
+	 * The one network+address reservation operation used by attach.
+	 *
+	 * A resource that already holds an address keeps its network (a retry, a rebuild), whatever is asked. Otherwise:
+	 * $net_id picks one of the customer's own held networks (never a quarantined or foreign one: null);
+	 * $new_name creates a network of that name first (null at the maximum or with an empty pool), under the same
+	 * lock as the address; neither is the customer's default network, as before.
+	 *
+	 * @param int    $user_id     Customer.
+	 * @param int    $resource_id Resource.
+	 * @param int    $net_id      A network of the customer, or 0.
+	 * @param string $new_name    Name of a network to create, or ''.
+	 * @return ?array{network:array<string,mixed>,address:string}
+	 */
+	public static function reserve( int $user_id, int $resource_id, int $net_id = 0, string $new_name = '' ): ?array {
 		if ( ! self::valid_resource_owner( $user_id, $resource_id ) || ! self::db_ready() ) {
 			return null;
 		}
-		list( $locked, $result ) = Locks::with( Locks::name( 'privnet', 0 ), Locks::allocation_wait(), static function () use ( $user_id, $resource_id ) {
-			$net = self::hold_locked( $user_id );
+		list( $locked, $result ) = Locks::with( Locks::name( 'privnet', 0 ), Locks::allocation_wait(), static function () use ( $user_id, $resource_id, $net_id, $new_name ) {
+			$existing = self::for_resource( $resource_id );
+			if ( null !== $existing ) {
+				$net = $existing['user_id'] === $user_id ? self::net_by_id( $existing['net_id'] ) : null;
+			} elseif ( $net_id > 0 ) {
+				$net = self::net_by_id( $net_id );
+				$net = null !== $net && $net['user_id'] === $user_id ? $net : null;
+			} elseif ( '' !== $new_name ) {
+				$net = self::create_locked( $user_id, $new_name );
+			} else {
+				$net = self::hold_locked( $user_id );
+			}
 			$address = $net && in_array( $net['state'], array( 'held', 'held_return' ), true ) ? self::address_locked( $net, $resource_id ) : null;
 			return $net && $address ? array( 'network' => $net, 'address' => $address ) : null;
 		} );
@@ -91,6 +114,151 @@ final class PrivateNets {
 		}
 		self::check_pool();
 		return $result;
+	}
+
+	/** Networks a customer may hold at once (held or held for a return); a filter changes it. */
+	public static function max_per_user(): int {
+		/**
+		 * The most private networks one customer can hold at the same time.
+		 *
+		 * @param int $max Default 5.
+		 */
+		return max( 1, (int) apply_filters( 'beltoft_services_private_networks_max', 5 ) );
+	}
+
+	/**
+	 * The customer's networks that are in use (held and held for a return), oldest first. A quarantined one is
+	 * empty and not shown. The first is the default network.
+	 *
+	 * @return array<int,array<string,mixed>> Each row of the table plus: position (1 based), label, members (resource ids), full.
+	 */
+	public static function nets_for_user( int $user_id ): array {
+		global $wpdb;
+		if ( $user_id < 1 || ! self::db_ready() ) {
+			return array();
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- fresh allocation state.
+		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM %i WHERE user_id = %d AND state IN ('held','held_return') ORDER BY id", Schema::tables()['private_nets'], $user_id ), ARRAY_A );
+		$out  = array();
+		foreach ( is_array( $rows ) ? $rows : array() as $row ) {
+			$net             = self::shape( $row );
+			$net['position'] = count( $out ) + 1;
+			$net['label']    = self::label( $net, $net['position'] );
+			$net['members']  = array_keys( self::members( $net['id'] ) );
+			$net['full']     = count( $net['members'] ) >= self::HOSTS;
+			$out[]           = $net;
+		}
+		return $out;
+	}
+
+	/**
+	 * What a network is called: its name, or "Network N" by position.
+	 *
+	 * @param array<string,mixed> $net      Row.
+	 * @param int                 $position 1 based place among the customer's networks.
+	 */
+	public static function label( array $net, int $position ): string {
+		$name = trim( (string) ( $net['name'] ?? '' ) );
+		/* translators: %d: number of the private network among the customer's networks. */
+		return '' !== $name ? $name : sprintf( __( 'Network %d', 'beltoft-services' ), $position );
+	}
+
+	/** Longest name of a network. */
+	public const NAME_MAX = 40;
+
+	/**
+	 * A typed network name, cleaned, or '' when it is empty or too long (1 to 40 characters).
+	 *
+	 * @param string $name Typed value.
+	 */
+	public static function clean_name( string $name ): string {
+		$name = trim( sanitize_text_field( $name ) );
+		return '' !== $name && mb_strlen( $name ) <= self::NAME_MAX ? $name : '';
+	}
+
+	/**
+	 * Could this customer get one more network now? Read-only, no lock: under the maximum, and an own quarantined
+	 * network or a free one in the pool.
+	 */
+	public static function can_create( int $user_id ): bool {
+		global $wpdb;
+		if ( $user_id < 1 || ! self::db_ready() || count( self::nets_for_user( $user_id ) ) >= self::max_per_user() ) {
+			return false;
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- fresh pool state.
+		$own = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM %i WHERE user_id = %d AND state = 'quarantine'", Schema::tables()['private_nets'], $user_id ) );
+		return $own > 0 || self::free_count() > 0;
+	}
+
+	/**
+	 * Give the customer one more network with this name: their own quarantined one first (its quarantine time is kept,
+	 * as in a return), else the lowest free one. Null at the maximum or with an empty pool.
+	 *
+	 * @return ?array<string,mixed>
+	 */
+	public static function create_for_user( int $user_id, string $name ): ?array {
+		if ( $user_id < 1 || '' === self::clean_name( $name ) || ! self::db_ready() ) {
+			return null;
+		}
+		list( $locked, $row ) = Locks::with( Locks::name( 'privnet', 0 ), Locks::allocation_wait(), static fn() => self::create_locked( $user_id, $name ) );
+		if ( ! $locked ) {
+			throw new \RuntimeException( 'The private network pool is busy.' );
+		}
+		return $row;
+	}
+
+	/** Caller holds the privnet lock. */
+	private static function create_locked( int $user_id, string $name ): ?array {
+		global $wpdb;
+		$name = self::clean_name( $name );
+		if ( $user_id < 1 || '' === $name ) {
+			return null;
+		}
+		$table = Schema::tables()['private_nets'];
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- fresh allocation state.
+		$held = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM %i WHERE user_id = %d AND state IN ('held','held_return')", $table, $user_id ) );
+		if ( $held >= self::max_per_user() ) {
+			return null;
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- fresh allocation state.
+		$own = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM %i WHERE user_id = %d AND state = 'quarantine' ORDER BY id LIMIT 1", $table, $user_id ) );
+		if ( null !== $own ) {
+			// Keep the original quarantine timestamp, as hold_locked() does for a returning customer.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- returning customer keeps their VLAN.
+			$wpdb->update( $table, array( 'state' => 'held_return', 'name' => $name ), array( 'id' => (int) $own, 'state' => 'quarantine' ) );
+			return self::net_by_id( (int) $own );
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- fresh pool state.
+		$free = $wpdb->get_var( "SELECT id FROM {$table} WHERE state = 'free' AND user_id IS NULL ORDER BY id LIMIT 1" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- our own table name.
+		if ( null === $free ) {
+			return null;
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- one UPDATE claims one row under the privnet lock.
+		$wpdb->query( $wpdb->prepare( "UPDATE %i SET user_id = %d, state = 'held', name = %s, updated_at = %s WHERE id = %d AND state = 'free' AND user_id IS NULL", $table, $user_id, $name, gmdate( 'Y-m-d H:i:s' ), (int) $free ) );
+		$net = self::net_by_id( (int) $free );
+		return null !== $net && $net['user_id'] === $user_id ? $net : null;
+	}
+
+	/** One network by id, whoever holds it. */
+	private static function net_by_id( int $net_id ): ?array {
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- fresh allocation state.
+		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', Schema::tables()['private_nets'], $net_id ), ARRAY_A );
+		return is_array( $row ) ? self::shape( $row ) : null;
+	}
+
+	/**
+	 * One of the customer's networks that is in use, by id. Read-only.
+	 *
+	 * @return ?array<string,mixed>
+	 */
+	public static function net_of_user( int $user_id, int $net_id ): ?array {
+		foreach ( self::nets_for_user( $user_id ) as $net ) {
+			if ( $net['id'] === $net_id ) {
+				return $net;
+			}
+		}
+		return null;
 	}
 
 	/** Addresses a /28 can give out (.2 to .14). */
@@ -169,16 +337,19 @@ final class PrivateNets {
 			}
 			return $existing;
 		}
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- one UPDATE claims one row; unique user_id backs it.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- one UPDATE claims one row under the privnet lock.
 		$wpdb->query( $wpdb->prepare( "UPDATE %i SET user_id = %d, state = 'held', updated_at = %s WHERE state = 'free' AND user_id IS NULL ORDER BY id LIMIT 1", Schema::tables()['private_nets'], $user_id, gmdate( 'Y-m-d H:i:s' ) ) );
 		return self::for_user( $user_id );
 	}
 
-	/** Customer's assigned network, including a quarantined one. */
+	/**
+	 * The customer's default network: the lowest held (or held for a return) one; when none is in use, the lowest
+	 * quarantined one. A customer with one network has only this one.
+	 */
 	public static function for_user( int $user_id ): ?array {
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- fresh allocation state.
-		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE user_id = %d', Schema::tables()['private_nets'], $user_id ), ARRAY_A );
+		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM %i WHERE user_id = %d ORDER BY (state = 'quarantine'), id LIMIT 1", Schema::tables()['private_nets'], $user_id ), ARRAY_A );
 		return is_array( $row ) ? self::shape( $row ) : null;
 	}
 
@@ -305,7 +476,7 @@ final class PrivateNets {
 				$wpdb->update( Schema::tables()['private_nets'], array( 'state' => 'quarantine' ), array( 'id' => $row['net_id'], 'user_id' => $user_id, 'state' => 'held_return' ) );
 			} elseif ( 0 === $count && 'held' === $row['state'] ) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- a newly claimed, unexposed network can be free immediately.
-				$wpdb->update( Schema::tables()['private_nets'], array( 'user_id' => null, 'state' => 'free', 'updated_at' => gmdate( 'Y-m-d H:i:s' ) ), array( 'id' => $row['net_id'], 'user_id' => $user_id, 'state' => 'held' ) );
+				$wpdb->update( Schema::tables()['private_nets'], array( 'user_id' => null, 'state' => 'free', 'name' => '', 'updated_at' => gmdate( 'Y-m-d H:i:s' ) ), array( 'id' => $row['net_id'], 'user_id' => $user_id, 'state' => 'held' ) );
 			}
 			return true;
 		} );
@@ -442,7 +613,7 @@ final class PrivateNets {
 			static function () use ( $wpdb ) {
 				$cutoff = gmdate( 'Y-m-d H:i:s', time() - self::QUARANTINE_DAYS * DAY_IN_SECONDS );
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- our own allocation table.
-				return (int) $wpdb->query( $wpdb->prepare( "UPDATE %i n SET n.user_id = NULL, n.state = 'free', n.updated_at = %s WHERE n.state = 'quarantine' AND n.updated_at < %s AND NOT EXISTS (SELECT 1 FROM %i i WHERE i.net_id = n.id)", Schema::tables()['private_nets'], gmdate( 'Y-m-d H:i:s' ), $cutoff, Schema::tables()['private_ips'] ) );
+				return (int) $wpdb->query( $wpdb->prepare( "UPDATE %i n SET n.user_id = NULL, n.state = 'free', n.name = '', n.updated_at = %s WHERE n.state = 'quarantine' AND n.updated_at < %s AND NOT EXISTS (SELECT 1 FROM %i i WHERE i.net_id = n.id)", Schema::tables()['private_nets'], gmdate( 'Y-m-d H:i:s' ), $cutoff, Schema::tables()['private_ips'] ) );
 			}
 			);
 		} catch ( \RuntimeException $e ) {
@@ -479,6 +650,7 @@ final class PrivateNets {
 		$row['id']      = (int) $row['id'];
 		$row['user_id'] = null === $row['user_id'] ? null : (int) $row['user_id'];
 		$row['vlan']    = (int) $row['vlan'];
+		$row['name']    = (string) ( $row['name'] ?? '' );
 		return $row;
 	}
 

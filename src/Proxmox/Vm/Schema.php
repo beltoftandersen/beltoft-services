@@ -23,7 +23,7 @@ final class Schema {
 
 	use VersionedSchema;
 
-	public const DB_VERSION        = '6';
+	public const DB_VERSION        = '7';
 	public const OPTION_DB_VERSION = 'beltoft_services_db_version';
 	public const RETRY_TRANSIENT   = 'beltoft_services_proxmox_schema_retry';
 
@@ -40,7 +40,6 @@ final class Schema {
 			'cluster_vm'  => array( 'cluster', 'vmid' ),
 		),
 		'private_nets' => array(
-			'user_id' => array( 'user_id' ),
 			'vlan'    => array( 'vlan' ),
 			'cidr'    => array( 'cidr' ),
 		),
@@ -59,9 +58,11 @@ final class Schema {
 	/**
 	 * Columns that the code writes and that a version may be stored only once they exist, per table.
 	 * Version 6: the currency of a ledger row. An empty value reads as the shop's currency (Currency::of_row()).
+	 * Version 7: the name of a customer private network (empty reads as "Network N").
 	 */
 	private const REQUIRED_COLUMNS = array(
-		'usage'  => array( 'currency' ),
+		'usage'        => array( 'currency' ),
+		'private_nets' => array( 'name' ),
 	);
 
 	/** Rows per backfill statement, and the seconds one request may spend on the backfill. */
@@ -127,6 +128,37 @@ final class Schema {
 		}
 
 		return $missing;
+	}
+
+	/**
+	 * Is the key on private_nets.user_id still a unique one (the version 6 shape, one network per customer)?
+	 * False when it is a plain key, or when the table or the key is not there at all.
+	 */
+	public static function private_user_key_unique(): bool {
+		global $wpdb;
+
+		$suppress = $wpdb->suppress_errors( true );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- schema check on our own table.
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i WHERE Key_name = %s AND Non_unique = 0', self::tables()['private_nets'], 'user_id' ), ARRAY_A );
+		$wpdb->suppress_errors( $suppress );
+
+		return is_array( $rows ) && array() !== $rows;
+	}
+
+	/**
+	 * Drops the version 6 unique key on private_nets.user_id when it is there. A plain key is left alone.
+	 */
+	private static function drop_unique_user_key(): void {
+		global $wpdb;
+
+		if ( ! self::private_user_key_unique() ) {
+			return;
+		}
+
+		$suppress = $wpdb->suppress_errors( true );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- our own table; an index cannot be a placeholder.
+		$wpdb->query( 'ALTER TABLE `' . esc_sql( self::tables()['private_nets'] ) . '` DROP INDEX `user_id`' );
+		$wpdb->suppress_errors( $suppress );
 	}
 
 	/**
@@ -261,6 +293,10 @@ final class Schema {
 			) $collate;"
 		);
 
+		// Version 7: a customer may hold several networks. dbDelta never drops an index, so the old unique key on
+		// user_id goes first (explicitly); the plain key of the same name is then added by the statement below.
+		self::drop_unique_user_key();
+
 		dbDelta(
 			"CREATE TABLE {$t['private_nets']} (
 				id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -269,8 +305,9 @@ final class Schema {
 				cidr varchar(18) NOT NULL,
 				state varchar(12) NOT NULL DEFAULT 'free',
 				updated_at datetime NOT NULL,
+				name varchar(40) NOT NULL DEFAULT '',
 				PRIMARY KEY  (id),
-				UNIQUE KEY user_id (user_id),
+				KEY user_id (user_id),
 				UNIQUE KEY vlan (vlan),
 				UNIQUE KEY cidr (cidr),
 				KEY state (state,id)
@@ -329,7 +366,7 @@ final class Schema {
 		$wpdb->suppress_errors( $suppress );
 
 		// The version is stored only when the keys and the new columns are in place and the backfill finished: a failed ALTER or an unfinished backfill is tried again.
-		if ( array() === self::missing_keys() && array() === self::missing_columns() && self::backfill_currency() ) {
+		if ( array() === self::missing_keys() && array() === self::missing_columns() && ! self::private_user_key_unique() && self::backfill_currency() ) {
 			update_option( self::OPTION_DB_VERSION, self::DB_VERSION );
 			delete_transient( self::RETRY_TRANSIENT );
 		}

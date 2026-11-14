@@ -59,19 +59,23 @@ final class PrivateNic {
 	 * running VM is accepted: the caller restarts it afterwards, so whether PVE hot-plugs the NIC
 	 * or keeps it pending does not matter.
 	 *
+	 * $want is the customer's choice of network on a first attach: `net` (id of one of their networks) or `new`
+	 * (a name for a network to create); empty means their default network. A server that already has an address keeps its network.
+	 *
+	 * @param array<string,mixed> $want Choice of network.
 	 * @return array{network:array<string,mixed>,address:string,changed:bool}|\WP_Error
 	 */
-	public static function attach( Resource $resource, Client $client, bool $ipconfig = true ) {
+	public static function attach( Resource $resource, Client $client, bool $ipconfig = true, array $want = array() ) {
 		$result = null;
-		$locked = $resource->locked( static function () use ( $resource, $client, $ipconfig, &$result ) {
-			$result = self::attach_locked( $resource, $client, $ipconfig );
+		$locked = $resource->locked( static function () use ( $resource, $client, $ipconfig, $want, &$result ) {
+			$result = self::attach_locked( $resource, $client, $ipconfig, $want );
 			return true;
 		} );
 		return null === $locked ? new \WP_Error( 'network_busy', __( 'The VM resource is busy.', 'beltoft-services' ) ) : $result;
 	}
 
 	/** Called only while holding the resource lock. */
-	private static function attach_locked( Resource $resource, Client $client, bool $ipconfig ) {
+	private static function attach_locked( Resource $resource, Client $client, bool $ipconfig, array $want = array() ) {
 		if ( ! $resource->is_valid() || 'deleted' === $resource->get( 'state' ) ) {
 			return new \WP_Error( 'invalid_resource', __( 'The VM resource is not active.', 'beltoft-services' ) );
 		}
@@ -144,7 +148,7 @@ final class PrivateNic {
 			return new \WP_Error( 'private_nic_occupied', __( 'The VM already has a different second network interface.', 'beltoft-services' ) );
 		}
 		try {
-			$reserved = PrivateNets::reserve( $user_id, $resource->id() );
+			$reserved = PrivateNets::reserve( $user_id, $resource->id(), (int) ( $want['net'] ?? 0 ), (string) ( $want['new'] ?? '' ) );
 		} catch ( \RuntimeException $e ) {
 			return new \WP_Error( 'network_busy', __( 'The private network pool is busy.', 'beltoft-services' ) );
 		}

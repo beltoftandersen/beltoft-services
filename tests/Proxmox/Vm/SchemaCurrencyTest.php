@@ -97,7 +97,7 @@ final class SchemaCurrencyTest extends TestCase {
 	public function test_a_fresh_install_has_the_columns(): void {
 		$t = Schema::tables();
 
-		$this->assertSame( '6', Schema::DB_VERSION );
+		$this->assertSame( '7', Schema::DB_VERSION );
 		$this->assertContains( 'currency', $this->columns( $t['usage'] ) );
 		$this->assertSame( array(), Schema::missing_columns() );
 	}
@@ -112,7 +112,7 @@ final class SchemaCurrencyTest extends TestCase {
 		Schema::maybe_upgrade();
 
 		$this->assertSame( array(), Schema::missing_columns() );
-		$this->assertSame( '6', get_option( Schema::OPTION_DB_VERSION ) );
+		$this->assertSame( Schema::DB_VERSION, get_option( Schema::OPTION_DB_VERSION ) );
 		$this->assertSame( array( 'EUR', 'EUR' ), $this->values( $t['usage'] ) );
 	}
 
@@ -144,7 +144,7 @@ final class SchemaCurrencyTest extends TestCase {
 
 		$this->assertSame( $columns, $this->columns( $t['usage'] ) );
 		$this->assertSame( $values, $this->values( $t['usage'] ) );
-		$this->assertSame( '6', get_option( Schema::OPTION_DB_VERSION ) );
+		$this->assertSame( Schema::DB_VERSION, get_option( Schema::OPTION_DB_VERSION ) );
 	}
 
 	public function test_the_backfill_never_touches_a_value_that_is_set(): void {
@@ -183,7 +183,7 @@ final class SchemaCurrencyTest extends TestCase {
 		delete_transient( Schema::RETRY_TRANSIENT );
 		Schema::maybe_upgrade();
 
-		$this->assertSame( '6', get_option( Schema::OPTION_DB_VERSION ) );
+		$this->assertSame( Schema::DB_VERSION, get_option( Schema::OPTION_DB_VERSION ) );
 	}
 
 	public function test_a_failed_backfill_keeps_the_version_and_resumes(): void {
@@ -207,7 +207,7 @@ final class SchemaCurrencyTest extends TestCase {
 		delete_transient( Schema::RETRY_TRANSIENT );
 		Schema::maybe_upgrade();
 
-		$this->assertSame( '6', get_option( Schema::OPTION_DB_VERSION ) );
+		$this->assertSame( Schema::DB_VERSION, get_option( Schema::OPTION_DB_VERSION ) );
 		$this->assertSame( array( 'EUR', 'EUR' ), $this->values( $t['usage'] ) );
 	}
 
@@ -228,7 +228,7 @@ final class SchemaCurrencyTest extends TestCase {
 
 		Schema::create_tables();
 
-		$this->assertSame( '6', get_option( Schema::OPTION_DB_VERSION ) );
+		$this->assertSame( Schema::DB_VERSION, get_option( Schema::OPTION_DB_VERSION ) );
 	}
 
 	public function test_a_row_written_by_old_code_reads_as_the_shop_currency(): void {
@@ -308,7 +308,7 @@ final class SchemaCurrencyTest extends TestCase {
 
 		Schema::maybe_upgrade();
 
-		$this->assertSame( '6', get_option( Schema::OPTION_DB_VERSION ) );
+		$this->assertSame( Schema::DB_VERSION, get_option( Schema::OPTION_DB_VERSION ) );
 		$this->assertSame( array( '', '' ), $this->values( $t['usage'] ) );
 	}
 
@@ -332,7 +332,7 @@ final class SchemaCurrencyTest extends TestCase {
 		delete_transient( Schema::RETRY_TRANSIENT );
 		Schema::maybe_upgrade();
 
-		$this->assertSame( '6', get_option( Schema::OPTION_DB_VERSION ) );
+		$this->assertSame( Schema::DB_VERSION, get_option( Schema::OPTION_DB_VERSION ) );
 		$this->assertSame( array( 'EUR', 'EUR' ), $this->values( $t['usage'] ) );
 	}
 
@@ -367,7 +367,7 @@ final class SchemaCurrencyTest extends TestCase {
 		remove_filter( 'query', $count );
 		remove_filter( 'beltoft_services_schema_backfill_batch', $batch );
 
-		$this->assertSame( '6', get_option( Schema::OPTION_DB_VERSION ) );
+		$this->assertSame( Schema::DB_VERSION, get_option( Schema::OPTION_DB_VERSION ) );
 		$this->assertSame( array_fill( 0, 5, 'EUR' ), $this->values( $t['usage'] ) );
 		$this->assertLessThanOrEqual( 6, $queries, 'one update per window of rows, not per id range' );
 	}
@@ -398,7 +398,7 @@ final class SchemaCurrencyTest extends TestCase {
 
 	public function test_a_ledger_writer_cleans_the_currency_code(): void {
 		update_option( 'woocommerce_currency', 'EUR' );
-		update_option( Schema::OPTION_DB_VERSION, '6' );
+		update_option( Schema::OPTION_DB_VERSION, Schema::DB_VERSION );
 		$hour = strtotime( '2026-11-01 10:00:00 UTC' );
 
 		Ledger::record( 70, 21, 'server', 1.0, 'hour', 0.05, $hour, 'dkk' );

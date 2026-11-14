@@ -81,7 +81,7 @@ final class Acts {
 				return $done instanceof \WP_Error ? $done : array( 'requested' => true, 'message' => 'Requested. It is applied in the background. Use get_database_access to follow it.' );
 
 			case 'private_network':
-				return Tools::action( (int) $args['id'], 'attach' === $args['action'] ? PrivateAttach::ATTACH : PrivateAttach::DETACH, array(), 'private network ' . (string) $args['action'] . ' requested' );
+				return Tools::action( (int) $args['id'], 'attach' === $args['action'] ? PrivateAttach::ATTACH : PrivateAttach::DETACH, 'attach' === $args['action'] && ! empty( $args['network'] ) ? array( 'net' => (string) (int) $args['network'] ) : array(), 'private network ' . (string) $args['action'] . ' requested' );
 
 			case 'set_usage_alerts':
 				$id   = (int) $args['id'];

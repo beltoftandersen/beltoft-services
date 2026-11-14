@@ -3,8 +3,9 @@
  * The Network tab of a server page. Printed by BeltoftServices\Proxmox\Network\NetworkTab::pane().
  *
  * Variables: $view (PrivateAttach::view()): resource_id, state (empty, attaching, attached, detaching, failed),
- * address, cidr, others (address and name of the customer's other servers on the network), notice, mac,
- * can_attach, can_detach. assets/network-tab.js posts the actions and waits for the job.
+ * address, cidr, network (name of the network this server is on), networks (id, label and full of each
+ * network of the customer), can_new, next_name, name_max, others (address and name of the customer's other servers on the
+ * network), notice, mac, can_attach, can_detach. assets/network-tab.js posts the actions and waits for the job.
  *
  * @package BeltoftServices
  */
@@ -29,8 +30,11 @@ $beltoft_services_net_words = array(
 		<?php if ( '' !== $view['address'] ) : ?>
 			<div><dt><?php esc_html_e( 'Private address', 'beltoft-services' ); ?></dt><dd><code><?php echo esc_html( (string) $view['address'] ); ?></code></dd></div>
 		<?php endif; ?>
+		<?php if ( '' !== $view['network'] ) : ?>
+			<div><dt><?php esc_html_e( 'Network', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( (string) $view['network'] ); ?></dd></div>
+		<?php endif; ?>
 		<?php if ( '' !== $view['cidr'] ) : ?>
-			<div><dt><?php esc_html_e( 'Network', 'beltoft-services' ); ?></dt><dd><code><?php echo esc_html( (string) $view['cidr'] ); ?></code></dd></div>
+			<div><dt><?php esc_html_e( 'Address range', 'beltoft-services' ); ?></dt><dd><code><?php echo esc_html( (string) $view['cidr'] ); ?></code></dd></div>
 		<?php endif; ?>
 	</dl>
 
@@ -47,8 +51,29 @@ $beltoft_services_net_words = array(
 		</ul>
 	<?php endif; ?>
 
-	<?php if ( '' === $beltoft_services_net_state && array() !== $view['others'] ) : ?>
-		<p class="description"><?php esc_html_e( 'Attach puts this server on the same private network as the servers above.', 'beltoft-services' ); ?></p>
+	<?php if ( $view['can_attach'] && ( array() !== $view['networks'] || $view['can_new'] ) ) : ?>
+		<?php $beltoft_services_net_has = array() !== $view['networks']; ?>
+		<div class="beltoft-services-net__choose" data-net-choose>
+			<?php if ( $beltoft_services_net_has ) : ?>
+				<p>
+					<label for="beltoft-net-select"><?php esc_html_e( 'Network', 'beltoft-services' ); ?></label><br>
+					<select id="beltoft-net-select" data-net-select>
+						<?php foreach ( (array) $view['networks'] as $beltoft_services_net_opt ) : ?>
+							<option value="<?php echo (int) $beltoft_services_net_opt['id']; ?>"<?php disabled( ! empty( $beltoft_services_net_opt['full'] ) ); ?>><?php echo esc_html( (string) $beltoft_services_net_opt['label'] ); ?></option>
+						<?php endforeach; ?>
+						<?php if ( $view['can_new'] ) : ?>
+							<option value="new"><?php esc_html_e( 'New network', 'beltoft-services' ); ?></option>
+						<?php endif; ?>
+					</select>
+				</p>
+			<?php endif; ?>
+			<?php if ( $view['can_new'] ) : ?>
+				<p data-net-name-row<?php echo $beltoft_services_net_has ? ' hidden' : ''; ?>>
+					<label for="beltoft-net-name"><?php esc_html_e( 'Name of the new network', 'beltoft-services' ); ?></label><br>
+					<input type="text" id="beltoft-net-name" maxlength="<?php echo (int) $view['name_max']; ?>" autocomplete="off" value="<?php echo esc_attr( (string) $view['next_name'] ); ?>" data-net-name>
+				</p>
+			<?php endif; ?>
+		</div>
 	<?php endif; ?>
 
 	<?php if ( 'attached' === $beltoft_services_net_state ) : ?>

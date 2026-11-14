@@ -355,13 +355,14 @@ class PrivateAttachTest extends TestCase {
 
 		$view = PrivateAttach::view( Resource::find( $two->id() ) );
 		$this->assertSame( '', $view['state'] );
-		$this->assertSame( '10.64.0.0/28', $view['cidr'], 'The network Attach joins is shown before attaching.' );
-		$this->assertSame( '10.64.0.2', $view['others'][0]['address'] );
+		$this->assertSame( '', $view['cidr'], 'Not attached: no range of its own yet.' );
+		$this->assertCount( 1, $view['networks'], 'The network Attach can join is offered.' );
+		$this->assertStringContainsString( '10.64.0.0/28', $view['networks'][0]['label'] );
 		$this->assertSame( '', $view['address'] );
 		ob_start();
 		NetworkTab::pane( 'network', $two->id() );
 		$html = (string) ob_get_clean();
-		$this->assertStringContainsString( 'same private network as the servers above', $html );
+		$this->assertStringContainsString( 'data-net-select', $html );
 		$this->assertStringContainsString( 'data-bs-note-anchor', $html );
 
 		$this->fake->set_osinfo( (int) $two->get( 'vmid' ), array( 'id' => 'ubuntu' ) );
@@ -482,6 +483,184 @@ class PrivateAttachTest extends TestCase {
 		$this->assertSame( 'failed', $fresh->get( 'private_state' ) );
 		$this->assertSame( 'failed', $fresh->get( 'private_notice' ) );
 		$this->assertNotNull( PrivateNets::for_resource( $r->id() ), 'The address stays reserved.' );
+	}
+
+	/** More networks in the pool (setUp seeds the first). */
+	private function more_nets( int $count ): void {
+		for ( $i = 1; $i <= $count; $i++ ) {
+			$this->assertTrue( PrivateNets::add( 1000 + $i, '10.64.0.' . ( 16 * $i ) . '/28' ) );
+		}
+	}
+
+	private function owner_of( Resource $r ): int {
+		return (int) $r->license()['user_id'];
+	}
+
+	public function test_attach_with_a_chosen_network_puts_the_server_there_and_clears_the_choice(): void {
+		$this->more_nets( 2 );
+		$r      = $this->ready();
+		$owner  = $this->owner_of( $r );
+		PrivateNets::hold( $owner );
+		$second = PrivateNets::create_for_user( $owner, 'Two' );
+
+		$this->assertNull( Actions::check( $r, 'private_attach', array( 'net' => (string) $second['id'] ) ) );
+		Jobs::act( $r->id(), 'private_attach', array( 'net' => (string) $second['id'] ) );
+
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( 'attached', $fresh->get( 'private_state' ) );
+		$row = PrivateNets::for_resource( $r->id() );
+		$this->assertSame( $second['id'], $row['net_id'] );
+		$this->assertSame( '10.64.0.18', $row['address'] );
+		$this->assertStringContainsString( 'tag=1001', $this->fake->vm( (int) $fresh->get( 'vmid' ) )['config']['net1'] );
+		$this->assertNull( $fresh->get( 'private_want' ), 'The choice is cleared when the attach ends.' );
+		$this->assertSame( 'Two', PrivateAttach::view( $fresh )['network'] );
+	}
+
+	public function test_attach_with_a_new_network_creates_it_in_the_job_and_names_it(): void {
+		$this->more_nets( 1 );
+		$r     = $this->ready();
+		$owner = $this->owner_of( $r );
+		$this->assertCount( 0, PrivateNets::nets_for_user( $owner ) );
+
+		$args = array( 'net' => 'new', 'name' => 'Backend' );
+		$this->assertNull( Actions::check( $r, 'private_attach', $args ) );
+		$this->assertCount( 0, PrivateNets::nets_for_user( $owner ), 'check() creates nothing.' );
+		Jobs::act( $r->id(), 'private_attach', $args );
+
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( 'attached', $fresh->get( 'private_state' ) );
+		$nets = PrivateNets::nets_for_user( $owner );
+		$this->assertCount( 1, $nets );
+		$this->assertSame( 'Backend', $nets[0]['name'] );
+		$this->assertSame( $nets[0]['id'], PrivateNets::for_resource( $r->id() )['net_id'] );
+		$this->assertNull( $fresh->get( 'private_want' ) );
+	}
+
+	public function test_an_attach_without_a_choice_joins_the_default_network_as_before(): void {
+		$this->more_nets( 1 );
+		$r     = $this->ready();
+		$owner = $this->owner_of( $r );
+		PrivateNets::hold( $owner );
+		PrivateNets::create_for_user( $owner, 'Two' );
+		Jobs::act( $r->id(), 'private_attach', array() );
+		$this->assertSame( 1000, PrivateNets::for_resource( $r->id() )['vlan'] );
+	}
+
+	public function test_the_choice_is_cleared_when_the_attach_is_refused(): void {
+		$this->more_nets( 1 );
+		$r    = $this->ready( '' );
+		Jobs::act( $r->id(), 'private_attach', array( 'net' => 'new', 'name' => 'Nope' ) );
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( 'agent', $fresh->get( 'private_notice' ) );
+		$this->assertNull( $fresh->get( 'private_want' ) );
+		$this->assertCount( 0, PrivateNets::nets_for_user( $this->owner_of( $r ) ), 'No network was created for a refused attach.' );
+	}
+
+	public function test_check_refuses_a_foreign_a_full_a_bad_named_and_a_too_many_network(): void {
+		global $wpdb;
+		$this->more_nets( 3 );
+		$r      = $this->ready();
+		$owner  = $this->owner_of( $r );
+		$mine   = PrivateNets::hold( $owner );
+		$other  = PrivateNets::hold( $owner + 1000 );
+
+		$this->assertStringContainsString( 'not one of yours', (string) Actions::check( $r, 'private_attach', array( 'net' => (string) $other['id'] ) ) );
+		$this->assertStringContainsString( 'not one of yours', (string) Actions::check( $r, 'private_attach', array( 'net' => '99999' ) ) );
+		$this->assertStringContainsString( 'not one of yours', (string) Actions::check( $r, 'private_attach', array( 'net' => 'abc' ) ) );
+		$this->assertStringContainsString( 'name', (string) Actions::check( $r, 'private_attach', array( 'net' => 'new', 'name' => '' ) ) );
+		$this->assertStringContainsString( 'name', (string) Actions::check( $r, 'private_attach', array( 'net' => 'new', 'name' => str_repeat( 'x', 41 ) ) ) );
+		$this->assertNull( Actions::check( $r, 'private_attach', array( 'net' => 'new', 'name' => str_repeat( 'x', 40 ) ) ) );
+
+		// At the maximum no new network, the filter lifts it.
+		add_filter( 'beltoft_services_private_networks_max', static fn() => 1 );
+		try {
+			$this->assertStringContainsString( 'up to 1', (string) Actions::check( $r, 'private_attach', array( 'net' => 'new', 'name' => 'More' ) ) );
+		} finally {
+			remove_all_filters( 'beltoft_services_private_networks_max' );
+		}
+		$this->assertNull( Actions::check( $r, 'private_attach', array( 'net' => 'new', 'name' => 'More' ) ) );
+
+		// A full network (13 addresses) is refused.
+		foreach ( range( 2, 14 ) as $host ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture.
+			$wpdb->insert( Schema::tables()['private_ips'], array( 'net_id' => $mine['id'], 'resource_id' => 900000 + $host, 'address' => '10.64.0.' . $host, 'updated_at' => gmdate( 'Y-m-d H:i:s' ) ) );
+		}
+		$this->assertStringContainsString( 'full', (string) Actions::check( $r, 'private_attach', array( 'net' => (string) $mine['id'] ) ) );
+	}
+
+	public function test_check_refuses_a_new_network_when_the_pool_is_empty(): void {
+		$r = $this->ready();
+		PrivateNets::hold( $this->owner_of( $r ) );
+		$this->assertStringContainsString( 'No private network is available', (string) Actions::check( $r, 'private_attach', array( 'net' => 'new', 'name' => 'More' ) ) );
+	}
+
+	public function test_the_pane_offers_the_networks_and_new_unless_at_the_maximum(): void {
+		$this->more_nets( 3 );
+		$r      = $this->ready();
+		$owner  = $this->owner_of( $r );
+		PrivateNets::hold( $owner );
+		$second = PrivateNets::create_for_user( $owner, 'Two' );
+		$member = $this->service_product( 'fake' );
+		$db     = Resource::create( $this->service_license( $member, array( 'user_id' => $owner, 'fire' => false ) ), Registry::get( 'fake' ) ?? new \BeltoftServices\Tests\Support\FakeDriver(), Product::plan( $member->get_id() ) );
+		$this->assertNotNull( PrivateNets::reserve( $owner, $db->id(), $second['id'] ) );
+
+		$pane = function () use ( $r ): string {
+			ob_start();
+			NetworkTab::pane( 'network', $r->id() );
+			return (string) ob_get_clean();
+		};
+		$html = $pane();
+		$this->assertStringContainsString( 'data-net-select', $html );
+		$this->assertStringContainsString( 'Network 1, 10.64.0.0/28, 0 servers', $html );
+		$this->assertStringContainsString( 'Two, 10.64.0.16/28, 0 servers, database', $html );
+		$this->assertStringContainsString( 'value="new"', $html );
+		$this->assertStringContainsString( 'data-net-name', $html );
+		$this->assertStringContainsString( 'value="Network 3"', $html, 'The name field is prefilled.' );
+		$this->assertStringNotContainsString( 'same private network as the servers above', $html );
+		$this->assertStringNotContainsString( "\u{2014}", $html );
+		$this->assertStringNotContainsString( "\u{00B7}", $html );
+
+		add_filter( 'beltoft_services_private_networks_max', static fn() => 2 );
+		try {
+			$html = $pane();
+		} finally {
+			remove_all_filters( 'beltoft_services_private_networks_max' );
+		}
+		$this->assertStringContainsString( 'data-net-select', $html );
+		$this->assertStringNotContainsString( 'value="new"', $html, 'No New at the maximum.' );
+		$this->assertStringNotContainsString( 'data-net-name', $html );
+	}
+
+	public function test_the_pane_of_a_customer_without_networks_asks_for_a_name_only(): void {
+		$this->more_nets( 1 );
+		$r = $this->ready();
+		ob_start();
+		NetworkTab::pane( 'network', $r->id() );
+		$html = (string) ob_get_clean();
+		$this->assertStringNotContainsString( 'data-net-select', $html );
+		$this->assertStringContainsString( 'data-net-name', $html );
+		$this->assertStringContainsString( 'value="Network 1"', $html );
+		$this->assertStringContainsString( 'data-net-attach', $html );
+	}
+
+	public function test_an_attached_server_shows_its_network_name_and_range(): void {
+		$this->more_nets( 1 );
+		$r = $this->ready();
+		Jobs::act( $r->id(), 'private_attach', array( 'net' => 'new', 'name' => 'Backend' ) );
+		ob_start();
+		NetworkTab::pane( 'network', $r->id() );
+		$html = (string) ob_get_clean();
+		$this->assertStringContainsString( 'Backend', $html );
+		$this->assertStringContainsString( 'Address range', $html );
+		$this->assertStringContainsString( '10.64.0.0/28', $html );
+		$this->assertStringNotContainsString( 'data-net-select', $html );
+	}
+
+	public function test_the_mcp_tool_passes_the_network_on(): void {
+		$def = \BeltoftServices\Mcp\Definitions::all();
+		$this->assertArrayHasKey( 'network', $def['private_network']['schema']['properties'] );
+		$this->assertContains( 'id', $def['private_network']['schema']['required'] );
+		$this->assertNotContains( 'network', $def['private_network']['schema']['required'] );
 	}
 
 	private function wipe_nets(): void {

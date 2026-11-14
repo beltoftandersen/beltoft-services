@@ -73,7 +73,7 @@ class SchemaTest extends TestCase {
 			),
 			$this->unique_keys( $t['vms'] )
 		);
-		$this->assertSame( array( 'PRIMARY' => array( 'id' ), 'vlan' => array( 'vlan' ), 'cidr' => array( 'cidr' ), 'user_id' => array( 'user_id' ) ), $this->unique_keys( $t['private_nets'] ) );
+		$this->assertSame( array( 'PRIMARY' => array( 'id' ), 'vlan' => array( 'vlan' ), 'cidr' => array( 'cidr' ) ), $this->unique_keys( $t['private_nets'] ) );
 		$this->assertSame( array( 'PRIMARY' => array( 'id' ), 'resource_id' => array( 'resource_id' ), 'net_address' => array( 'net_id', 'address' ) ), $this->unique_keys( $t['private_ips'] ) );
 	}
 

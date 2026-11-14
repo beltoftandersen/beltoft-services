@@ -23,6 +23,7 @@ use BeltoftServices\Proxmox\Vm\GuestDisk;
 use BeltoftServices\Proxmox\Network\LiveUsage;
 use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Proxmox\Network\PrivateAttach;
+use BeltoftServices\Proxmox\Network\PrivateNets;
 use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Resource;
 
@@ -139,6 +140,22 @@ final class Details {
 		if ( PrivateAttach::eligible( $r ) ) {
 			$state                  = (string) $r->get( PrivateAttach::STATE );
 			$out['private_network'] = '' === $state ? 'detached' : $state;
+			$view                   = PrivateAttach::view( $r );
+
+			if ( '' !== $view['network'] ) {
+				$out['private_network_name'] = $view['network'];
+			}
+
+			$out['private_networks'] = array_map(
+				static fn( array $net ): array => array(
+					'id'      => $net['id'],
+					'name'    => $net['label'],
+					'range'   => $net['cidr'],
+					'servers' => count( $net['members'] ),
+					'full'    => $net['full'],
+				),
+				PrivateNets::nets_for_user( (int) ( $r->license()['user_id'] ?? 0 ) )
+			);
 		}
 
 		$snapshots = Snapshots::panel( $r );

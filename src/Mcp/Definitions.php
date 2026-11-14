@@ -196,7 +196,7 @@ final class Definitions {
 				),
 				true
 			),
-			'private_network'  => self::act( 'Attaches a server to the customer\'s private network, or detaches it. The change runs in the background.', self::obj( array( 'id' => $id, 'action' => array( 'type' => 'string', 'enum' => array( 'attach', 'detach' ) ) ), array( 'id', 'action' ) ), true ),
+			'private_network'  => self::act( 'Attaches a server to one of the customer\'s private networks, or detaches it. The customer can have up to five; without a network id the first one is used. The change runs in the background.', self::obj( array( 'id' => $id, 'action' => array( 'type' => 'string', 'enum' => array( 'attach', 'detach' ) ), 'network' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'For attach: the id of one of the customer\'s private networks (see the private_networks of service_details). Optional.' ) ), array( 'id', 'action' ) ), true ),
 			'set_usage_alerts' => self::act( 'Turns the e-mails about high usage of one server on or off.', self::obj( array( 'id' => $id, 'on' => array( 'type' => 'boolean' ) ), array( 'id', 'on' ) ), false, true ),
 			'retry_app_install' => self::act( 'Tries again to install the app of a server whose installation failed or did not finish. It does not reinstall the server.', $by_id, false ),
 			'domain_settings'  => self::act(

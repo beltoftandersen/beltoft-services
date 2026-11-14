@@ -45,13 +45,32 @@
 		} );
 	}
 
-	function run( action, button ) {
+	// The network the customer chose: an id, or "new" with a name. Without the choice box (a server that is attached) nothing is sent.
+	function chosen() {
+		var select = root.querySelector( '[data-net-select]' );
+		var name = root.querySelector( '[data-net-name]' );
+		var args = {};
+
+		if ( select ) {
+			args.net = select.value;
+		} else if ( name ) {
+			args.net = 'new';
+		}
+
+		if ( args.net === 'new' && name ) {
+			args.name = name.value;
+		}
+
+		return args;
+	}
+
+	function run( action, button, args ) {
 		if ( bs.locked( id ) ) {
 			return;
 		}
 
 		handle = bs.busy( S.working, id, button );
-		request( 'POST', account.root + id + '/actions/' + action, { args: {} } ).then( function ( reply ) {
+		request( 'POST', account.root + id + '/actions/' + action, { args: args || {} } ).then( function ( reply ) {
 			if ( reply.ok ) {
 				wait( action, reply.data && reply.data.at ? reply.data.at - 1 : 0 );
 			} else {
@@ -71,7 +90,7 @@
 		if ( target.hasAttribute( 'data-net-attach' ) ) {
 			bs.confirm( { title: S.attachTitle, text: S.attachBody, confirm: S.attach } ).then( function ( yes ) {
 				if ( yes ) {
-					run( 'private_attach', target );
+					run( 'private_attach', target, chosen() );
 				}
 			} );
 		} else if ( target.hasAttribute( 'data-net-detach' ) ) {
@@ -82,6 +101,16 @@
 			} );
 		}
 	} );
+
+	// The name field shows only for a new network.
+	var picker = root.querySelector( '[data-net-select]' );
+	var nameRow = root.querySelector( '[data-net-name-row]' );
+
+	if ( picker && nameRow ) {
+		picker.addEventListener( 'change', function () {
+			nameRow.hidden = picker.value !== 'new';
+		} );
+	}
 
 	// A job that was already running when the page opened is followed to its end.
 	var state = root.getAttribute( 'data-net-state' );

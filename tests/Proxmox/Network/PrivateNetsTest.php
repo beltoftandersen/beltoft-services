@@ -176,4 +176,129 @@ class PrivateNetsTest extends TestCase {
 		}
 		$this->assertCount( 0, array_filter( $queries, static fn( $sql ) => str_contains( $sql, 'SELECT vlan, cidr FROM' ) ) );
 	}
+
+	private function seed( int $count ): void {
+		for ( $i = 0; $i < $count; $i++ ) {
+			$this->assertTrue( PrivateNets::add( 1000 + $i, '10.64.0.' . ( 16 * $i ) . '/28' ) );
+		}
+	}
+
+	public function test_a_customer_holds_several_networks_up_to_the_maximum_and_the_filter_changes_it(): void {
+		$this->seed( 8 );
+		$this->assertSame( 1000, PrivateNets::hold( 11 )['vlan'] );
+		for ( $i = 2; $i <= 5; $i++ ) {
+			$net = PrivateNets::create_for_user( 11, 'Net ' . $i );
+			$this->assertNotNull( $net );
+			$this->assertSame( 'Net ' . $i, $net['name'] );
+			$this->assertSame( 'held', $net['state'] );
+		}
+		$nets = PrivateNets::nets_for_user( 11 );
+		$this->assertCount( 5, $nets );
+		$this->assertSame( 'Network 1', $nets[0]['label'], 'An empty name reads as Network N by position.' );
+		$this->assertSame( 'Net 2', $nets[1]['label'] );
+		$this->assertSame( 1000, PrivateNets::for_user( 11 )['vlan'], 'The default network is the lowest.' );
+
+		$this->assertFalse( PrivateNets::can_create( 11 ) );
+		$this->assertNull( PrivateNets::create_for_user( 11, 'Sixth' ), 'The sixth is refused.' );
+		$this->assertCount( 5, PrivateNets::nets_for_user( 11 ) );
+
+		add_filter( 'beltoft_services_private_networks_max', static fn() => 6 );
+		try {
+			$this->assertTrue( PrivateNets::can_create( 11 ) );
+			$this->assertNotNull( PrivateNets::create_for_user( 11, 'Sixth' ) );
+		} finally {
+			remove_all_filters( 'beltoft_services_private_networks_max' );
+		}
+		$this->assertNull( PrivateNets::create_for_user( 11, '' ), 'A name is needed.' );
+		$this->assertNull( PrivateNets::create_for_user( 11, str_repeat( 'x', 41 ) ) );
+		$this->assertSame( 1006, PrivateNets::hold( 12 )['vlan'], 'Another customer gets the next free one.' );
+	}
+
+	public function test_reserve_takes_only_the_customers_own_held_network_and_zero_is_the_default(): void {
+		$this->seed( 4 );
+		PrivateNets::hold( 11 );
+		$second = PrivateNets::create_for_user( 11, 'Second' );
+		$one    = $this->resource( 11 );
+		$two    = $this->resource( 11 );
+		$other  = $this->resource( 12 );
+
+		$default = PrivateNets::reserve( 11, $one->id() );
+		$this->assertSame( 1000, $default['network']['vlan'] );
+		$this->assertSame( '10.64.0.2', $default['address'] );
+
+		$chosen = PrivateNets::reserve( 11, $two->id(), $second['id'] );
+		$this->assertSame( 1001, $chosen['network']['vlan'] );
+		$this->assertSame( '10.64.0.18', $chosen['address'] );
+		$this->assertSame( $chosen, PrivateNets::reserve( 11, $two->id() ), 'A server that holds an address keeps its network.' );
+
+		$this->assertNull( PrivateNets::reserve( 12, $other->id(), $second['id'] ), 'Not the customer\'s network.' );
+		$this->assertNull( PrivateNets::for_resource( $other->id() ) );
+
+		// A quarantined network of the customer is not handed out by id either.
+		$third = PrivateNets::create_for_user( 11, 'Third' );
+		$four  = $this->resource( 11 );
+		$this->assertNotNull( PrivateNets::reserve( 11, $four->id(), $third['id'] ) );
+		$this->assertTrue( PrivateNets::release_and_retire( $four->id() ) );
+		$this->assertSame( 'quarantine', array_column( PrivateNets::rows(), 'state', 'vlan' )[1002] );
+		$five = $this->resource( 11 );
+		$this->assertNull( PrivateNets::reserve( 11, $five->id(), $third['id'] ) );
+		$this->assertNull( PrivateNets::for_resource( $five->id() ) );
+	}
+
+	public function test_reserve_can_create_the_network_in_the_same_step_and_a_retry_adds_none(): void {
+		$this->seed( 3 );
+		$one = $this->resource( 11 );
+		$got = PrivateNets::reserve( 11, $one->id(), 0, 'Fresh' );
+		$this->assertSame( 'Fresh', $got['network']['name'] );
+		$this->assertSame( '10.64.0.2', $got['address'] );
+		$this->assertSame( $got, PrivateNets::reserve( 11, $one->id(), 0, 'Fresh' ) );
+		$this->assertCount( 1, PrivateNets::nets_for_user( 11 ), 'The retry did not create a second network.' );
+	}
+
+	public function test_the_last_server_leaving_the_second_network_quarantines_only_that_one(): void {
+		$this->seed( 3 );
+		PrivateNets::hold( 11 );
+		$second = PrivateNets::create_for_user( 11, 'Second' );
+		$one    = $this->resource( 11 );
+		$two    = $this->resource( 11 );
+		PrivateNets::reserve( 11, $one->id() );
+		PrivateNets::reserve( 11, $two->id(), $second['id'] );
+
+		$this->assertTrue( PrivateNets::release_and_retire( $two->id() ) );
+		$nets = PrivateNets::nets_for_user( 11 );
+		$this->assertCount( 1, $nets, 'The emptied network is no longer listed.' );
+		$this->assertSame( 'held', $nets[0]['state'] );
+		$this->assertSame( 1000, PrivateNets::for_user( 11 )['vlan'], 'The default stays.' );
+		$rows = array_column( PrivateNets::rows(), 'state', 'vlan' );
+		$this->assertSame( 'quarantine', $rows[1001] );
+		$this->assertSame( 'held', $rows[1000] );
+	}
+
+	public function test_a_new_network_reuses_the_customers_own_quarantined_one_before_a_free_one(): void {
+		global $wpdb;
+		$this->seed( 3 );
+		PrivateNets::hold( 11 );
+		$second = PrivateNets::create_for_user( 11, 'Second' );
+		$two    = $this->resource( 11 );
+		PrivateNets::reserve( 11, $two->id(), $second['id'] );
+		$this->assertTrue( PrivateNets::release_and_retire( $two->id() ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture: quarantine began a while ago.
+		$wpdb->update( Schema::tables()['private_nets'], array( 'updated_at' => '2026-10-01 10:00:00' ), array( 'id' => $second['id'] ) );
+
+		$again = PrivateNets::create_for_user( 11, 'Again' );
+		$this->assertSame( $second['id'], $again['id'] );
+		$this->assertSame( 'held_return', $again['state'] );
+		$this->assertSame( 'Again', $again['name'] );
+		$this->assertSame( '2026-10-01 10:00:00', $again['updated_at'], 'The quarantine timestamp is kept.' );
+		$this->assertSame( 1, PrivateNets::free_count(), 'The free network was not touched.' );
+	}
+
+	public function test_a_freed_network_loses_its_name(): void {
+		$this->seed( 2 );
+		$one = $this->resource( 11 );
+		PrivateNets::reserve( 11, $one->id(), 0, 'Temp' );
+		$this->assertTrue( PrivateNets::abandon_address( 11, $one->id() ) );
+		$this->assertSame( 'free', array_column( PrivateNets::rows(), 'state', 'vlan' )[1000] );
+		$this->assertSame( '', array_column( PrivateNets::rows(), 'name', 'vlan' )[1000] );
+	}
 }

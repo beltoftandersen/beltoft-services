@@ -26,3 +26,10 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net .b
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net .beltoft-services-net__buttons { margin: 16px 0 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net button[data-net-detach] { border: 1px solid var(--navy, #10221b); background: transparent; color: var(--navy, #10221b); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net button[data-net-detach]:hover { background: var(--bg-warm, #eeece6); }
+
+/* 2026-11-14: the network choice before Attach. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net__choose { margin: 16px 0 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net__choose p { margin: 0 0 12px; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net__choose label { display: inline-block; margin-bottom: 4px; color: var(--ink-soft, #5e7080); font-size: var(--bs-fs-small, 14px); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net__choose select,
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net__choose input[type="text"] { width: 100%; max-width: 420px; border-radius: var(--bs-radius, 8px); }

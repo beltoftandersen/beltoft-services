@@ -56,6 +56,9 @@ final class PrivateAttach {
 	public const FAMILY = 'private_family';
 	public const NOTICE = 'private_notice';
 
+	/** The customer's choice of network for a first attach: array( 'net' => id ) or array( 'new' => name ). Cleared when the attach ends. */
+	public const WANT = 'private_want';
+
 	public const NETPLAN_FILE = '/etc/netplan/60-beltoft-private.yaml';
 	public const NM_FILE      = '/etc/NetworkManager/system-connections/beltoft-private.nmconnection';
 
@@ -71,6 +74,13 @@ final class PrivateAttach {
 	 * @var array<string, mixed>
 	 */
 	private $cluster = array();
+
+	/**
+	 * Arguments of the action being run, set by run().
+	 *
+	 * @var array<string, mixed>
+	 */
+	private $args = array();
 
 	/**
 	 * @param Resource $r Resource.
@@ -120,7 +130,22 @@ final class PrivateAttach {
 
 		$user = (int) ( $r->license()['user_id'] ?? 0 );
 
-		return $user > 0 && PrivateNets::capacity_for_user( $user );
+		return $user > 0 && ( PrivateNets::capacity_for_user( $user ) || PrivateNets::can_create( $user ) || self::room_in_any( $user ) );
+	}
+
+	/**
+	 * Does one of the customer's networks have a free address?
+	 *
+	 * @param int $user Customer.
+	 */
+	private static function room_in_any( int $user ): bool {
+		foreach ( PrivateNets::nets_for_user( $user ) as $net ) {
+			if ( ! $net['full'] ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -159,10 +184,17 @@ final class PrivateAttach {
 	 * @param array<string, mixed> $args   Arguments.
 	 */
 	public static function check( Resource $r, string $action, array $args ): ?string {
-		unset( $args );
-
 		if ( ! self::eligible( $r ) ) {
 			return __( 'The private network is not available for this server.', 'beltoft-services' );
+		}
+
+		// A server that already holds an address (a retry after the choice was acted on) keeps its network: nothing to choose.
+		if ( self::ATTACH === $action && null === PrivateNets::for_resource( $r->id() ) && ! in_array( (string) $r->get( self::STATE ), array( 'attaching', 'attached' ), true ) ) {
+			$why = self::check_choice( (int) ( $r->license()['user_id'] ?? 0 ), $args );
+
+			if ( null !== $why ) {
+				return $why;
+			}
 		}
 
 		if ( self::ATTACH === $action && ! in_array( (string) $r->get( self::STATE ), array( 'attaching', 'attached' ), true ) ) {
@@ -175,6 +207,67 @@ final class PrivateAttach {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Why the chosen network cannot be used, in words for the customer, or null. Nothing chosen (no `net`, or 0)
+	 * means the customer's default network, as before.
+	 *
+	 * @param int                  $user Customer.
+	 * @param array<string, mixed> $args Arguments: net (an id or `new`) and name.
+	 */
+	private static function check_choice( int $user, array $args ): ?string {
+		$net = trim( (string) ( $args['net'] ?? '' ) );
+
+		if ( '' === $net || '0' === $net ) {
+			return null;
+		}
+
+		if ( 'new' === $net ) {
+			if ( '' === PrivateNets::clean_name( (string) ( $args['name'] ?? '' ) ) ) {
+				return sprintf(
+					/* translators: %d: longest length of a private network name. */
+					__( 'Give the new private network a name of 1 to %d characters.', 'beltoft-services' ),
+					PrivateNets::NAME_MAX
+				);
+			}
+
+			if ( count( PrivateNets::nets_for_user( $user ) ) >= PrivateNets::max_per_user() ) {
+				return sprintf(
+					/* translators: %d: most private networks one customer can have. */
+					__( 'You can have up to %d private networks. Choose one of them.', 'beltoft-services' ),
+					PrivateNets::max_per_user()
+				);
+			}
+
+			return PrivateNets::can_create( $user ) ? null : self::notice_text( 'unavailable' );
+		}
+
+		$found = ctype_digit( $net ) ? PrivateNets::net_of_user( $user, (int) $net ) : null;
+
+		if ( null === $found ) {
+			return __( 'That private network is not one of yours.', 'beltoft-services' );
+		}
+
+		return $found['full'] ? __( 'That private network is full. Choose another one or a new one.', 'beltoft-services' ) : null;
+	}
+
+	/**
+	 * The choice of network in the arguments of an attach, in the form stored on the resource.
+	 *
+	 * @param array<string, mixed> $args Arguments.
+	 * @return array<string, mixed> array( 'net' => id ), array( 'new' => name ) or empty (the default network).
+	 */
+	private static function want_from( array $args ): array {
+		$net = trim( (string) ( $args['net'] ?? '' ) );
+
+		if ( 'new' === $net ) {
+			$name = PrivateNets::clean_name( (string) ( $args['name'] ?? '' ) );
+
+			return '' === $name ? array() : array( 'new' => $name );
+		}
+
+		return ctype_digit( $net ) && (int) $net > 0 ? array( 'net' => (int) $net ) : array();
 	}
 
 	/**
@@ -309,33 +402,40 @@ final class PrivateAttach {
 	 * @return array<string, mixed>
 	 */
 	public static function view( Resource $r ): array {
-		$state = (string) $r->get( self::STATE );
-		$row   = PrivateNets::for_resource( $r->id() );
-		$state = in_array( $state, array( 'attaching', 'attached', 'detaching', 'failed' ), true ) ? $state : '';
+		$state  = (string) $r->get( self::STATE );
+		$row    = PrivateNets::for_resource( $r->id() );
+		$state  = in_array( $state, array( 'attaching', 'attached', 'detaching', 'failed' ), true ) ? $state : '';
 		$others = array();
-		$net_id = null === $row ? 0 : (int) $row['net_id'];
+		$user   = (int) ( is_array( $r->license() ) ? ( $r->license()['user_id'] ?? 0 ) : 0 );
+		$nets   = PrivateNets::nets_for_user( $user );
+		$name   = '';
 
-		if ( null === $row ) {
-			// Not on it yet: the customer's network that the other servers are on, which Attach joins.
-			$license = $r->license();
-			$mine    = PrivateNets::for_user( (int) ( is_array( $license ) ? ( $license['user_id'] ?? 0 ) : 0 ) );
-
-			if ( null !== $mine && in_array( (string) $mine['state'], array( 'held', 'held_return' ), true ) ) {
-				$net_id = (int) $mine['id'];
-				$row    = array( 'cidr' => (string) $mine['cidr'] );
+		if ( null !== $row ) {
+			foreach ( $nets as $net ) {
+				if ( $net['id'] === (int) $row['net_id'] ) {
+					$name = (string) $net['label'];
+				}
 			}
-		}
 
-		if ( $net_id > 0 ) {
-			foreach ( PrivateNets::members( $net_id ) as $id => $address ) {
+			foreach ( PrivateNets::members( (int) $row['net_id'] ) as $id => $address ) {
 				$other = Resource::find( (int) $id );
 				if ( $id === $r->id() || ! $other || 'deleted' === $other->get( 'state' ) ) {
 					continue;
 				}
-				$license = $other->license();
-				$label   = ServerName::display( $other, is_array( $license ) ? $license : array() );
+				$license  = $other->license();
+				$label    = ServerName::display( $other, is_array( $license ) ? $license : array() );
 				$others[] = array( 'address' => $address, 'name' => $label );
 			}
+		}
+
+		$networks = array();
+
+		foreach ( $nets as $net ) {
+			$networks[] = array(
+				'id'    => $net['id'],
+				'label' => self::option_label( $net ),
+				'full'  => $net['full'],
+			);
 		}
 
 		$notice = (string) $r->get( self::NOTICE );
@@ -348,12 +448,50 @@ final class PrivateAttach {
 			'state'       => $state,
 			'address'     => 'attached' === $state || 'attaching' === $state || 'failed' === $state || 'detaching' === $state ? (string) ( $row['address'] ?? '' ) : '',
 			'cidr'        => null === $row ? '' : (string) $row['cidr'],
+			'network'     => $name,
+			'networks'    => $networks,
+			'can_new'     => PrivateNets::can_create( $user ),
+			'next_name'   => PrivateNets::label( array(), count( $nets ) + 1 ),
+			'name_max'    => PrivateNets::NAME_MAX,
 			'others'      => $others,
 			'notice'      => self::notice_text( $notice ),
 			'mac'         => (string) $r->get( self::MAC ),
 			'can_attach'  => 'attached' !== $state && 'detaching' !== $state && 'attaching' !== $state,
 			'can_detach'  => in_array( $state, array( 'attached', 'failed' ), true ),
 		);
+	}
+
+	/**
+	 * One line of the network choice: the name, the range, the servers on it, and a database when one is.
+	 *
+	 * @param array<string, mixed> $net A row of PrivateNets::nets_for_user().
+	 */
+	private static function option_label( array $net ): string {
+		$servers   = 0;
+		$databases = 0;
+
+		foreach ( (array) $net['members'] as $id ) {
+			$member = Resource::find( (int) $id );
+
+			if ( ! $member || 'deleted' === $member->get( 'state' ) ) {
+				continue;
+			}
+
+			if ( ProxmoxDriver::ID === $member->get( 'driver' ) && Profiles::for_resource( $member ) instanceof VpsProfile ) {
+				++$servers;
+			} else {
+				++$databases;
+			}
+		}
+
+		/* translators: 1: network name, 2: address range, 3: number of servers on it. */
+		$label = sprintf( _n( '%1$s, %2$s, %3$d server', '%1$s, %2$s, %3$d servers', $servers, 'beltoft-services' ), (string) $net['label'], (string) $net['cidr'], $servers );
+
+		if ( $databases > 0 ) {
+			$label .= ', ' . _n( 'database', 'databases', $databases, 'beltoft-services' );
+		}
+
+		return $net['full'] ? $label . ', ' . __( 'full', 'beltoft-services' ) : $label;
 	}
 
 	// -- Run -------------------------------------------------------------------------------------------
@@ -365,7 +503,7 @@ final class PrivateAttach {
 	 * @param array<string, mixed> $args   Arguments.
 	 */
 	public function run( string $action, array $args ): StepResult {
-		unset( $args );
+		$this->args = $args;
 
 		$record = VmRecords::for_resource( $this->r->id() );
 
@@ -413,7 +551,7 @@ final class PrivateAttach {
 			}
 
 			if ( 'running' !== $v['status'] ) {
-				$this->r->set( array( self::NOTICE => 'stopped' ) );
+				$this->r->set( array( self::NOTICE => 'stopped', self::WANT => null ) );
 
 				return StepResult::done( array(), 'Private network attach refused: the server is not running' );
 			}
@@ -422,14 +560,16 @@ final class PrivateAttach {
 			$info = $this->osinfo( $record, $v );
 
 			if ( null === $info ) {
-				$this->r->set( array( self::NOTICE => 'agent' ) );
+				$this->r->set( array( self::NOTICE => 'agent', self::WANT => null ) );
 
 				return StepResult::done( array(), 'Private network attach refused: the guest agent did not answer' );
 			}
 
 			$this->r->set( array( 'agent' => 'ok', 'agent_checked_at' => null ) );
 
-			$nic = PrivateNic::attach( $this->r, $this->client, false );
+			// The customer's choice of network rides on the resource until the attach has its address and its file phase.
+			$want = $this->want();
+			$nic  = PrivateNic::attach( $this->r, $this->client, false, $want );
 
 			if ( is_wp_error( $nic ) ) {
 				return $this->nic_failed( $nic );
@@ -456,7 +596,7 @@ final class PrivateAttach {
 
 			$op = array( 'action' => 'attach', 'phase' => 'file', 'rebuild' => false, 'family' => self::family( (string) ( $info['id'] ?? '' ) ) );
 
-			if ( ! $this->r->set( array( self::STATE => 'attaching', self::OP => $op, self::MAC => $mac, self::FAMILY => $op['family'], self::NOTICE => null ) ) ) {
+			if ( ! $this->r->set( array( self::STATE => 'attaching', self::OP => $op, self::MAC => $mac, self::FAMILY => $op['family'], self::NOTICE => null, self::WANT => null ) ) ) {
 				return StepResult::retry( 0, 'private: the state could not be stored' );
 			}
 
@@ -464,6 +604,23 @@ final class PrivateAttach {
 		}
 
 		return $this->signal( $this->drive( $record, $this->op(), array( 'file', 'stop', 'start', 'agent' ) ) );
+	}
+
+	/**
+	 * The choice of network for this attach. The action's arguments are the source: they are written to the resource at
+	 * the first step (an attach without a choice clears an old one), and every retry of that step reads it back from there.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function want(): array {
+		$want   = self::want_from( $this->args );
+		$stored = $this->r->get( self::WANT );
+
+		if ( ( is_array( $stored ) ? $stored : array() ) !== $want ) {
+			$this->r->set( array( self::WANT => array() === $want ? null : $want ) );
+		}
+
+		return $want;
 	}
 
 	/**
@@ -546,7 +703,7 @@ final class PrivateAttach {
 			return StepResult::retry( 0, 'private: ' . $this->text( $e ) );
 		}
 
-		$this->r->set( array( self::NOTICE => 'private_nic_occupied' === $code ? 'occupied' : 'unavailable' ) );
+		$this->r->set( array( self::NOTICE => 'private_nic_occupied' === $code ? 'occupied' : 'unavailable', self::WANT => null ) );
 
 		return StepResult::done( array(), 'Private network attach refused: ' . $this->scrub( $e->get_error_message(), 120 ) );
 	}
@@ -581,7 +738,7 @@ final class PrivateAttach {
 			Events::add( (int) ( $this->r->license()['id'] ?? 0 ), 'service', 'Private network not restored after the rebuild: ' . $this->scrub( $nic->get_error_message(), 120 ) );
 			Alerts::admin( $this->r, 'The private network could not be put back after a rebuild: ' . $this->scrub( $nic->get_error_message(), 120 ) );
 
-			return $this->r->set( array( self::STATE => 'failed', self::OP => null, self::NOTICE => 'failed' ) ) ? array() : StepResult::retry( 0, 'private: the state could not be stored' );
+			return $this->r->set( array( self::STATE => 'failed', self::OP => null, self::NOTICE => 'failed', self::WANT => null ) ) ? array() : StepResult::retry( 0, 'private: the state could not be stored' );
 		}
 
 		$v = $this->verified( $record, 'private' );
@@ -734,7 +891,7 @@ final class PrivateAttach {
 
 		if ( null === $info ) {
 			if ( ! empty( $op['rebuild'] ) && Jobs::now() > (int) ( $op['deadline'] ?? 0 ) ) {
-				$this->r->set( array( self::STATE => 'failed', self::OP => null, self::NOTICE => 'failed' ) );
+				$this->r->set( array( self::STATE => 'failed', self::OP => null, self::NOTICE => 'failed', self::WANT => null ) );
 				Events::add( (int) ( $this->r->license()['id'] ?? 0 ), 'service', 'Private network not restored after the rebuild: the guest agent did not answer' );
 				Alerts::admin( $this->r, 'The private network could not be put back after a rebuild: the guest agent did not answer' );
 
@@ -1056,7 +1213,7 @@ final class PrivateAttach {
 			return StepResult::poll( 5, 'private: waiting for the guest agent after the restart', 300 );
 		}
 
-		return $this->r->set( array( self::STATE => 'attached', self::OP => null, 'agent' => 'ok', 'private_nic_pending' => null ) ) ? null : StepResult::retry( 0, 'private: the state could not be stored' );
+		return $this->r->set( array( self::STATE => 'attached', self::OP => null, self::WANT => null, 'agent' => 'ok', 'private_nic_pending' => null ) ) ? null : StepResult::retry( 0, 'private: the state could not be stored' );
 	}
 
 	/**
@@ -1069,6 +1226,6 @@ final class PrivateAttach {
 	private function phase_finish( array $record, array $op ) {
 		unset( $record, $op );
 
-		return $this->r->set( array( self::STATE => '', self::OP => null, self::MAC => null, self::FAMILY => null, self::NOTICE => null ) ) ? null : StepResult::retry( 0, 'private: the state could not be stored' );
+		return $this->r->set( array( self::STATE => '', self::OP => null, self::WANT => null, self::MAC => null, self::FAMILY => null, self::NOTICE => null ) ) ? null : StepResult::retry( 0, 'private: the state could not be stored' );
 	}
 }

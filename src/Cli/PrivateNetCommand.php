@@ -82,9 +82,10 @@ final class PrivateNetCommand {
 				'state'     => $row['state'],
 				'user'      => null === $row['user_id'] ? '' : (string) $row['user_id'],
 				'addresses' => (string) $row['addresses'],
+				'name'      => $row['name'],
 			);
 		}
 
-		\WP_CLI\Utils\format_items( 'json' === ( $assoc_args['format'] ?? 'table' ) ? 'json' : 'table', $items, array( 'vlan', 'cidr', 'state', 'user', 'addresses' ) );
+		\WP_CLI\Utils\format_items( 'json' === ( $assoc_args['format'] ?? 'table' ) ? 'json' : 'table', $items, array( 'vlan', 'cidr', 'state', 'user', 'name', 'addresses' ) );
 	}
 }
