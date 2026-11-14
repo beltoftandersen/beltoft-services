@@ -492,7 +492,7 @@ final class AppReinstall {
 		echo '<span class="description">' . esc_html__( 'For a domain registered or hosted elsewhere. We change no DNS records. After the server starts you point an A record at its address, and the app is installed with HTTPS when the name resolves to the server. For a bare domain such as example.com, point A records for both example.com and www.example.com at the address; www redirects to example.com.', 'beltoft-services' ) . '</span></label>';
 		echo '<div class="beltoft-services-app-reinstall__domain-fields" data-app-domain-own-fields hidden>';
 		echo '<label for="' . esc_attr( $id . '-own' ) . '">' . esc_html__( 'Your domain name', 'beltoft-services' ) . '</label>';
-		echo '<input type="text" id="' . esc_attr( $id . '-own' ) . '" name="app_own" maxlength="253" placeholder="shop.example.com" autocomplete="off" spellcheck="false"></div>';
+		echo '<input type="text" id="' . esc_attr( $id . '-own' ) . '" name="app_own" maxlength="253" placeholder="' . esc_attr( /* translators: example shop address shown in an empty field. */ __( 'shop.example.com', 'beltoft-services' ) ) . '" autocomplete="off" spellcheck="false"></div>';
 		echo '<label class="beltoft-services-app-reinstall__choice"><input type="radio" name="app_domain_mode" value="none"' . checked( $default, 'none', false ) . '> ' . esc_html__( 'No domain', 'beltoft-services' );
 		echo '<span class="description">' . esc_html__( 'The app uses the server address.', 'beltoft-services' ) . '</span></label>';
 		echo '</fieldset>';

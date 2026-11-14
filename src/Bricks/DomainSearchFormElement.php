@@ -54,7 +54,7 @@ class DomainSearchFormElement extends DomainSearchElement {
 		$defaults    = Search::default_texts();
 		$label       = '' !== (string) ( $settings['labelText'] ?? '' ) ? (string) $settings['labelText'] : $defaults['label'];
 		$button      = '' !== (string) ( $settings['buttonText'] ?? '' ) ? (string) $settings['buttonText'] : $defaults['button'];
-		$placeholder = '' !== (string) ( $settings['placeholder'] ?? '' ) ? (string) $settings['placeholder'] : 'example.com';
+		$placeholder = '' !== (string) ( $settings['placeholder'] ?? '' ) ? (string) $settings['placeholder'] : __( 'example.com', 'beltoft-services' );
 		$param       = DomainQuery::param();
 		echo '<form ' . $this->render_attributes( '_root' ) . '><label for="beltoft-domain-name-' . esc_attr( (string) $this->id ) . '">' . esc_html( $label ) . '</label><input id="beltoft-domain-name-' . esc_attr( (string) $this->id ) . '" type="search" name="' . esc_attr( $param ) . '" value="' . esc_attr( DomainQuery::term() ) . '" placeholder="' . esc_attr( $placeholder ) . '" autocomplete="off"><button type="submit">' . esc_html( $button ) . '</button></form>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 	}

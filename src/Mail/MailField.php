@@ -312,7 +312,7 @@ final class MailField {
 			echo '<p class="form-row form-row-wide validate-required"><label for="' . esc_attr( $id ) . '_own">' . esc_html__( 'Domain you want email for', 'beltoft-services' ) . '&nbsp;<abbr class="required" title="' . esc_attr__( 'required', 'beltoft-services' ) . '" style="text-decoration:none">*</abbr></label>';
 		}
 
-		echo '<span class="woocommerce-input-wrapper"><input type="text" class="input-text" name="' . esc_attr( $name ) . '[own]" id="' . esc_attr( $id ) . '_own" maxlength="253" autocomplete="off" spellcheck="false" placeholder="example.com" value="' . esc_attr( $own ) . '"></span>';
+		echo '<span class="woocommerce-input-wrapper"><input type="text" class="input-text" name="' . esc_attr( $name ) . '[own]" id="' . esc_attr( $id ) . '_own" maxlength="253" autocomplete="off" spellcheck="false" placeholder="' . esc_attr( /* translators: example domain shown in an empty field; use the usual example for your language. */ __( 'example.com', 'beltoft-services' ) ) . '" value="' . esc_attr( $own ) . '"></span>';
 		echo '<span class="description">' . esc_html__( 'You add the DNS records where the domain is hosted. We show you which ones after the order, and we first ask for a TXT record that proves the domain is yours.', 'beltoft-services' ) . '</span></p>';
 
 		$find = $news ? '' : (string) \BeltoftServices\Account\Domains::url_register();

@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 	<form class="beltoft-dns-claim__form" data-dns-claim-add novalidate>
 		<label for="beltoft-dns-claim-domain"><?php esc_html_e( 'Domain name', 'beltoft-services' ); ?></label>
 		<span class="beltoft-dns-claim__field">
-			<input type="text" id="beltoft-dns-claim-domain" name="domain" placeholder="example.com" autocomplete="off" autocapitalize="off" spellcheck="false" required>
+			<input type="text" id="beltoft-dns-claim-domain" name="domain" placeholder="<?php echo esc_attr( __( 'example.com', 'beltoft-services' ) ); ?>" autocomplete="off" autocapitalize="off" spellcheck="false" required>
 			<button type="submit" class="button woocommerce-button"><?php esc_html_e( 'Add domain', 'beltoft-services' ); ?></button>
 		</span>
 	</form>

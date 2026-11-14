@@ -432,7 +432,7 @@ final class SslField {
 		$meth = '' !== $post['validation'] ? $post['validation'] : ( $have ? 'auto' : 'dns' );
 
 		echo '<p class="form-row form-row-wide validate-required"><label for="' . esc_attr( $id ) . '_domain">' . esc_html( $plan['wildcard'] ? __( 'Domain for the wildcard certificate', 'beltoft-services' ) : __( 'Domain name', 'beltoft-services' ) ) . '&nbsp;<abbr class="required" title="' . esc_attr__( 'required', 'beltoft-services' ) . '" style="text-decoration:none">*</abbr></label>';
-		echo '<span class="woocommerce-input-wrapper"><input type="text" class="input-text" name="' . esc_attr( $name ) . '[domain]" id="' . esc_attr( $id ) . '_domain" maxlength="253" autocomplete="off" spellcheck="false" placeholder="example.com" list="' . esc_attr( $id ) . '_zones" value="' . esc_attr( $post['domain'] ) . '"></span>';
+		echo '<span class="woocommerce-input-wrapper"><input type="text" class="input-text" name="' . esc_attr( $name ) . '[domain]" id="' . esc_attr( $id ) . '_domain" maxlength="253" autocomplete="off" spellcheck="false" placeholder="' . esc_attr( /* translators: example domain shown in an empty field; use the usual example for your language. */ __( 'example.com', 'beltoft-services' ) ) . '" list="' . esc_attr( $id ) . '_zones" value="' . esc_attr( $post['domain'] ) . '"></span>';
 
 		if ( $have ) {
 			echo '<datalist id="' . esc_attr( $id ) . '_zones">';
@@ -528,7 +528,7 @@ final class SslField {
 
 			// The method list sits in its own row: in the name's row its value would make an empty required name pass the step check.
 			echo '<p class="form-row form-row-wide' . ( 0 === $i ? ' validate-required' : '' ) . '"><label for="' . esc_attr( $id ) . '_name_' . (int) $i . '">' . esc_html( $label ) . ( 0 === $i ? '&nbsp;<abbr class="required" title="' . esc_attr__( 'required', 'beltoft-services' ) . '" style="text-decoration:none">*</abbr>' : '' ) . '</label>';
-			echo '<span class="woocommerce-input-wrapper"><input type="text" class="input-text" name="' . esc_attr( $name ) . '[names][' . (int) $i . '][domain]" id="' . esc_attr( $id ) . '_name_' . (int) $i . '" maxlength="253" autocomplete="off" spellcheck="false" placeholder="example.com" list="' . esc_attr( $id ) . '_zones" value="' . esc_attr( (string) $row['domain'] ) . '"></span></p>';
+			echo '<span class="woocommerce-input-wrapper"><input type="text" class="input-text" name="' . esc_attr( $name ) . '[names][' . (int) $i . '][domain]" id="' . esc_attr( $id ) . '_name_' . (int) $i . '" maxlength="253" autocomplete="off" spellcheck="false" placeholder="' . esc_attr( /* translators: example domain shown in an empty field; use the usual example for your language. */ __( 'example.com', 'beltoft-services' ) ) . '" list="' . esc_attr( $id ) . '_zones" value="' . esc_attr( (string) $row['domain'] ) . '"></span></p>';
 			echo '<p class="form-row form-row-wide"><span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[names][' . (int) $i . '][validation]" aria-label="' . esc_attr( sprintf( /* translators: %d: row number. */ __( 'How name %d is validated', 'beltoft-services' ), $i + 1 ) ) . '">';
 
 			foreach ( $methods as $value => $m ) {
