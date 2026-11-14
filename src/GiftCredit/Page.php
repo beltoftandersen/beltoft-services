@@ -40,6 +40,7 @@ final class Page {
 		add_filter( 'woocommerce_account_menu_items', array( __CLASS__, 'ungroup' ), 100 );
 		// The gift card plugin's own "Gift Cards" page shows the same cards: the credit page is the one place for them.
 		add_filter( 'woocommerce_account_menu_items', array( __CLASS__, 'no_plugin_page' ), 110 );
+		add_action( 'template_redirect', array( __CLASS__, 'redirect_plugin_page' ), 5 );
 		add_filter( 'woocommerce_endpoint_' . self::ENDPOINT . '_title', array( __CLASS__, 'title' ) );
 		add_action( 'woocommerce_account_' . self::ENDPOINT . '_endpoint', array( __CLASS__, 'render' ), 5 );
 		add_filter( 'beltoft_services_billing_sets', array( __CLASS__, 'billing_set' ) );
@@ -235,6 +236,30 @@ final class Page {
 		}
 
 		return $items;
+	}
+
+	/**
+	 * Where a request for the gift card plugin's own My Account page goes: the credit page, while gift credit is on. Null for every other
+	 * request (the endpoint only counts on the My Account page, so the plugin's shop pages are never touched).
+	 */
+	public static function plugin_page_target(): ?string {
+		if ( ! GiftCredit::active() || ! function_exists( 'is_account_page' ) || ! is_account_page() || ! is_wc_endpoint_url( 'gift-cards' ) ) {
+			return null;
+		}
+
+		return self::url();
+	}
+
+	/**
+	 * Sends a visitor of the gift card plugin's My Account page to the credit page, signed in or not (a guest gets the login there).
+	 */
+	public static function redirect_plugin_page(): void {
+		$target = self::plugin_page_target();
+
+		if ( null !== $target && '' !== $target ) {
+			wp_safe_redirect( $target );
+			exit;
+		}
 	}
 
 	/**

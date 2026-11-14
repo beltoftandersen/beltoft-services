@@ -42,6 +42,15 @@ final class GiftCredit {
 	}
 
 	/**
+	 * Answer for the add-on's filter bgca_credit_wording: credit wording only while gift credit is on.
+	 *
+	 * The add-on's default is "it draws its own page", which this plugin switches off, so the answer here replaces it.
+	 */
+	public static function credit_wording(): bool {
+		return self::active();
+	}
+
+	/**
 	 * Hooks. The setting is always listed (its text says what it needs); the product box is always there.
 	 */
 	public static function register(): void {
@@ -55,6 +64,8 @@ final class GiftCredit {
 		// The add-on's filters: every answer is "no change" while gift credit is off, except that the cards then pay nothing.
 		add_filter( 'bgca_account_view_enabled', array( __CLASS__, 'own_page_off' ) );
 		add_filter( 'bgca_coupon_field_attaches', array( __CLASS__, 'coupon_field' ) );
+		// The add-on words the gift card plugin's customer texts as credit, and new card codes with the credit prefix, only while this is on.
+		add_filter( 'bgca_credit_wording', array( __CLASS__, 'credit_wording' ) );
 		add_filter( 'bgca_account_url', array( Page::class, 'url_filter' ) );
 		add_filter( 'bgca_account_currency', array( Rules::class, 'account_currency' ), 10, 2 );
 		add_filter( 'bgca_card_may_pay_line', array( PromoFlag::class, 'card_may_pay_line' ), 10, 4 );

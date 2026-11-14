@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.27.6
+Stable tag: 0.27.7
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,10 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.27.7 =
+* Account credit is never called a gift card to a customer: the API note on usage invoices and the credit page notes say credit.
+* While account credit is on, the gift card plugin's My Account page (gift-cards) sends the visitor to the Credit page, and the add-on (0.3.1 or newer) words the plugin's cart and checkout texts as credit.
 
 = 0.27.6 =
 * The example domain in empty fields (domain search, mail and SSL checkout fields, DNS claim, app address) is translatable, so a language can show its own example.

@@ -1,6 +1,6 @@
 <?php
 /**
- * My Account: credit held as gift cards, its history, the top-up form and the form that adds a gift card code.
+ * My Account: account credit, its history, the top-up form and the form that adds a code.
  *
  * Override by copying to yourtheme/beltoft-services/account/gift-credit.php.
  *

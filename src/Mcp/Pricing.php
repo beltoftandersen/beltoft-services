@@ -458,7 +458,7 @@ final class Pricing {
 			$out['credit']['balance'] = round( $cents / 100, 2 );
 			$out['credit']['currency'] = $credit_currency;
 			$out['credit']['text']    = Rates::money( $cents / 100, 2, $credit_currency );
-			$out['credit']['note']    = 'Credit (gift cards) is applied first on usage invoices as "Paid from account credit"; the rest goes to the card. Top-ups carry no VAT. Credit alone is not enough to order.';
+			$out['credit']['note']    = 'Credit is applied first on usage invoices as "Paid from account credit"; the rest goes to the card. Top-ups carry no VAT. Credit alone is not enough to order.';
 		}
 
 		$estimate = Estimate::for_user( $user_id );
