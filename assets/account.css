@@ -1237,9 +1237,9 @@ body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services
 body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab h5:first-child { margin-top: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab form.beltoft-services-vm-form { display: grid; gap: var(--bs-space-4); margin: 0; padding: 0; border-radius: 0; background: none; }
 body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab form.beltoft-services-vm-form > * { margin: 0; }
-body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab .beltoft-services-facts { margin: 0 0 var(--bs-space-4); background: var(--bs-surface); }
-body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab .beltoft-services-facts > div { background: var(--bg-warm, #eeece6); }
-body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab .beltoft-services-facts:last-child { margin-bottom: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab:not([data-tab="overview"]) .beltoft-services-facts { margin: 0 0 var(--bs-space-4); background: var(--bs-surface); }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab:not([data-tab="overview"]) .beltoft-services-facts > div { background: var(--bg-warm, #eeece6); }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab:not([data-tab="overview"]) .beltoft-services-facts:last-child { margin-bottom: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab .beltoft-services-add { margin: var(--bs-space-4) 0 0; }
 body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab .beltoft-services-vm__disk { padding: var(--bs-space-3) 0; border-top: 1px solid var(--bs-line); }
 @media (max-width: 600px) {
@@ -1295,3 +1295,8 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__
 @media (max-width: 767px) {
 	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db__form:is([data-mail-create], [data-mail-domain-add], [data-mail-alias-create]) { padding: var(--bs-space-4); }
 }
+
+/* Redesign 4, review: the domain overview facts are the server overview's white facts card; credit history amounts stay on one line. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domain--page .beltoft-services-facts { gap: 1px; background: var(--bs-line); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domain--page .beltoft-services-facts > div { background: var(--bs-surface); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit__history :is(td, th):nth-child(n+3) { white-space: nowrap; }
