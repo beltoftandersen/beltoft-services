@@ -106,6 +106,8 @@ final class Jobs {
 		// A job that throws, or a PHP process that dies in one, must not leave the customer waiting or the service unbuilt.
 		add_action( 'action_scheduler_failed_execution', array( __CLASS__, 'job_failed' ), 10, 2 );
 		add_action( 'action_scheduler_unexpected_shutdown', array( __CLASS__, 'job_failed' ), 10, 2 );
+		// Action Scheduler's cleaner marks a job failed that stayed in progress too long (its process was killed or the server stopped).
+		add_action( 'action_scheduler_failed_action', array( __CLASS__, 'job_failed' ), 10, 2 );
 		add_action( self::USAGE, array( __CLASS__, 'refresh_usage' ) );
 		self::recurring( array( __CLASS__, 'schedule' ) );
 		add_action( 'action_scheduler_init', array( __CLASS__, 'ensure_recurring' ) );
@@ -432,7 +434,7 @@ final class Jobs {
 	 * @param int $activation_id Activation id.
 	 */
 	public static function run( int $activation_id ): void {
-		if ( Settings::get( 'pause_all' ) ) {
+		if ( self::on_hold() ) {
 			self::enqueue( $activation_id, self::PAUSED_DELAY );
 			return;
 		}
@@ -596,6 +598,23 @@ final class Jobs {
 	}
 
 	/**
+	 * Are service jobs held: the kill switch, or a hold a site sets while its code is replaced (filter
+	 * beltoft_services_jobs_hold). A held job is queued again a little later, before it loads more of the plugin.
+	 */
+	public static function on_hold(): bool {
+		if ( Settings::get( 'pause_all' ) ) {
+			return true;
+		}
+
+		/**
+		 * Holds every service job for a while, for example while a deploy replaces the plugin's files.
+		 *
+		 * @param bool $hold Default false.
+		 */
+		return (bool) apply_filters( 'beltoft_services_jobs_hold', false );
+	}
+
+	/**
 	 * Action Scheduler gave up on one of our jobs: it threw, or its PHP process died (a fatal error, a deploy that
 	 * changed files under it). A build or reconcile job is queued again in a minute (the reconciler starts from the
 	 * stored state, so this is safe); a customer action is not repeated, because it may have done part of its work,
@@ -608,6 +627,24 @@ final class Jobs {
 		if ( ! class_exists( '\ActionScheduler' ) ) {
 			return;
 		}
+
+		// Never let the handling of a failure end the runner that reports it.
+		try {
+			self::handle_failed( (int) $action_id, $error );
+		} catch ( \Throwable $e ) {
+			unset( $e );
+		}
+	}
+
+	/**
+	 * The body of job_failed(). One failure can be reported twice (a fatal error, then the cleaner's timeout): the admin
+	 * mail is sent once per error (Alerts::admin), and a reconcile job is queued once (enqueue keeps one pending).
+	 * An action that did its work and then threw in an after-execute listener is reported as failed too: rare, and visible.
+	 *
+	 * @param int   $action_id Action Scheduler action id.
+	 * @param mixed $error     The exception, the error array of an unexpected shutdown, or the cleaner's timeout.
+	 */
+	private static function handle_failed( int $action_id, $error ): void {
 
 		try {
 			$action = \ActionScheduler::store()->fetch_action( (string) (int) $action_id );
@@ -623,14 +660,17 @@ final class Jobs {
 			return;
 		}
 
-		$why = $error instanceof \Throwable ? $error->getMessage() : ( is_array( $error ) ? (string) ( $error['message'] ?? '' ) : '' );
+		$why = $error instanceof \Throwable ? $error->getMessage() : ( is_array( $error ) ? (string) ( $error['message'] ?? '' ) : ( is_int( $error ) ? sprintf( 'stopped without finishing (marked failed after %d seconds)', $error ) : '' ) );
+		$resource = Resource::find( $id );
 
 		if ( self::HOOK === $hook ) {
+			// The reconciler starts again from the stored state, as after a driver exception. Staff hear of it once per error.
 			self::enqueue( $id, 60 );
+			if ( $resource ) {
+				Alerts::admin( $resource, 'A service job stopped with an error and is tried again: ' . ( '' !== $why ? $why : 'no message' ) );
+			}
 			return;
 		}
-
-		$resource = Resource::find( $id );
 
 		if ( ! $resource ) {
 			return;
@@ -666,7 +706,12 @@ final class Jobs {
 	 * @return bool Whether a job was run.
 	 */
 	private static function run_one(): bool {
-		if ( Settings::get( 'pause_all' ) ) {
+		// A long-running runner must see what other processes wrote (the kill switch above all), not its own cached copy.
+		if ( function_exists( 'wp_cache_flush_runtime' ) ) {
+			wp_cache_flush_runtime();
+		}
+
+		if ( self::on_hold() ) {
 			return false;
 		}
 
@@ -682,12 +727,23 @@ final class Jobs {
 
 		$ran = false;
 
+		// The same watch Action Scheduler's own runner keeps: a fatal error in the job fires action_scheduler_unexpected_shutdown
+		// (job_failed) before the process ends.
+		$monitor = class_exists( '\ActionScheduler_FatalErrorMonitor' ) ? new \ActionScheduler_FatalErrorMonitor( $store ) : null;
+
+		if ( $monitor ) {
+			$monitor->attach( $claim );
+		}
+
 		try {
 			foreach ( $claim->get_actions() as $action_id ) {
 				\ActionScheduler::runner()->process_action( (int) $action_id, 'Beltoft Services' );
 				$ran = true;
 			}
 		} finally {
+			if ( $monitor ) {
+				$monitor->detach();
+			}
 			$store->release_claim( $claim );
 		}
 
@@ -747,7 +803,7 @@ final class Jobs {
 	public static function act( int $activation_id, string $action, $args = array() ): void {
 		$args = is_array( $args ) ? $args : array();
 
-		if ( Settings::get( 'pause_all' ) ) {
+		if ( self::on_hold() ) {
 			self::queue_act( $activation_id, $action, $args, self::PAUSED_DELAY );
 			return;
 		}

@@ -88,6 +88,25 @@ final class JobsTest extends TestCase {
 		$this->assertCount( 1, $this->pending( $r->id() ), 'A new reconcile job is waiting.' );
 	}
 
+	public function test_a_hold_queues_jobs_again_without_running_them(): void {
+		list( $r, $driver ) = $this->resource();
+		as_unschedule_all_actions( Jobs::HOOK, array( $r->id() ), Jobs::GROUP );
+		add_filter( 'beltoft_services_jobs_hold', '__return_true' );
+		Jobs::run( $r->id() );
+		Jobs::act( $r->id(), 'reboot', array() );
+		remove_filter( 'beltoft_services_jobs_hold', '__return_true' );
+		$this->assertSame( array(), $driver->calls(), 'Nothing reached the driver while held.' );
+		$this->assertCount( 1, $this->pending( $r->id() ), 'The job waits to run after the hold.' );
+		$this->assertTrue( as_has_scheduled_action( Jobs::ACT, array( $r->id(), 'reboot', array() ), Jobs::GROUP ) );
+	}
+
+	public function test_the_cleaners_timeout_reports_a_customer_action_that_never_finished(): void {
+		list( $r ) = $this->resource( array( 'state' => 'ready', 'desired' => 'ready' ) );
+		$action_id = as_schedule_single_action( time(), Jobs::ACT, array( $r->id(), 'reboot', array() ), Jobs::GROUP );
+		Jobs::job_failed( $action_id, 300 );
+		$this->assertFalse( Resource::find( $r->id() )->get( Jobs::RESULT )['ok'] );
+	}
+
 	public function test_a_stop_signal_ends_the_runner_between_jobs(): void {
 		$this->settings( array( 'pause_all' => 1 ) );
 		$slept = 0;
