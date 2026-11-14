@@ -1233,7 +1233,8 @@ body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services
 body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab:not([data-tab="overview"]) > * { margin-top: 0; margin-bottom: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab:not([data-tab="overview"]) > * + * { margin-top: var(--bs-space-5); }
 body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab :is(h3, h4) { margin: 0 0 var(--bs-space-3); color: var(--navy, #10221b); font-family: inherit; font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); letter-spacing: 0; }
-body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab h5 { margin: 0 0 var(--bs-space-2); font-family: inherit; font-size: var(--bs-fs-body); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-text); }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab h5 { margin: var(--bs-space-5) 0 var(--bs-space-2); font-family: inherit; font-size: var(--bs-fs-body); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-text); }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab h5:first-child { margin-top: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab form.beltoft-services-vm-form { display: grid; gap: var(--bs-space-4); margin: 0; padding: 0; border-radius: 0; background: none; }
 body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab form.beltoft-services-vm-form > * { margin: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab .beltoft-services-facts { margin: 0 0 var(--bs-space-4); background: var(--bs-surface); }
@@ -1243,4 +1244,27 @@ body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services
 body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab .beltoft-services-vm__disk { padding: var(--bs-space-3) 0; border-top: 1px solid var(--bs-line); }
 @media (max-width: 600px) {
 	body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab:not([data-tab="overview"]) { padding: var(--bs-space-4); }
+}
+
+/* ==== Redesign 4: Credit ========================================================================================
+   The balance rows are one card (rounded at the first and the last row only), the amounts are separate tiles that fill the row (no
+   empty cell), and History is a section heading like Top up. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit > .beltoft-services-credit__balance { border-radius: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit > .beltoft-services-credit__balance:not(.beltoft-services-credit__balance + .beltoft-services-credit__balance) { border-top-left-radius: var(--bs-radius-lg); border-top-right-radius: var(--bs-radius-lg); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit > .beltoft-services-credit__balance:not(:has(+ .beltoft-services-credit__balance)) { border-bottom-left-radius: var(--bs-radius-lg); border-bottom-right-radius: var(--bs-radius-lg); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit__grid { display: flex; flex-wrap: wrap; gap: var(--bs-space-2); padding: 0; border-radius: 0; background: none; overflow: visible; }
+.beltoft-services-credit__tile { flex: 1 1 110px; max-width: 200px; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit__face { border-radius: var(--bs-radius); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit__historyhead { margin: var(--bs-space-6) 0 var(--bs-space-3); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit .beltoft-services-credit__historyhead h2 { font-family: inherit; font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); letter-spacing: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit__history { border-radius: var(--bs-radius-lg); }
+
+/* ==== Redesign 4: an app's page (the portal's panel inside the service page) ====================================
+   The panel sits 16px under the head like a tab card, has the tab card's 24px inside, and its section titles are the headings of the
+   server tabs. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-area-page .beltoft-services-panel__driver > .odoowoo-account-panel:first-child { margin-top: var(--bs-space-4); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-area-page .odoowoo-account-panel { padding: var(--bs-space-5); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-area-page .odoowoo-account-panel .odoowoo-card__title.odoowoo-card__title { margin-bottom: var(--bs-space-3); font-family: inherit; font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); letter-spacing: 0; }
+@media (max-width: 600px) {
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-area-page .odoowoo-account-panel { padding: var(--bs-space-4); }
 }
