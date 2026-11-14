@@ -1283,3 +1283,8 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dnsg code { bor
 @media (max-width: 767px) {
 	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dnsg { padding: var(--bs-space-4); }
 }
+
+/* ==== Redesign 4: the Firewall tab's blocks are 24px apart like the blocks of every tab ============================ */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-fw__main > :is(.beltoft-services-fw__add, .beltoft-services-fw__fixed, .beltoft-services-fw__layers, .beltoft-services-fw__again) { margin-top: var(--bs-space-5); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-fw__main > .beltoft-services-fw__apply { margin-top: var(--bs-space-4); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-fw__main :is(.beltoft-services-fw__add, .beltoft-services-fw__fixed, .beltoft-services-fw__layers) > h5:first-child { margin-top: 0; }
