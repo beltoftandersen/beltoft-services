@@ -155,6 +155,14 @@ final class CoreHooks {
 		$row['name'] = ServerName::display( $r, $license );
 		$row['url']  = DiskGuide::card_url( $r );
 
+		// A server opens on its overview, an app licence on its server's App tab; the Disks tab is for an extra disk.
+		if ( ProxmoxDriver::ID === (string) $r->get( 'driver' ) ) {
+			$row['url'] = ServerLinks::url( $license ) . '#beltoft-service-' . $r->id();
+		} elseif ( AppLicenceDriver::ID === (string) $r->get( 'driver' ) ) {
+			$server     = Resource::for_license( (int) $r->get( 'server_license' ) );
+			$row['url'] = $server ? DiskGuide::card_url( $server, '', \BeltoftServices\Apps\AppTab::SLUG ) : $row['url'];
+		}
+
 		if ( SnapshotDriver::ID === (string) $r->get( 'driver' ) ) {
 			$row['url']      = DiskGuide::server_url( $r );
 			$row['snapshot'] = array(

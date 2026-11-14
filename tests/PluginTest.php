@@ -110,7 +110,7 @@ class PluginTest extends TestCase {
 		$data = get_file_data( BELTOFT_SERVICES_FILE, array( 'Version' => 'Version' ) );
 
 		$this->assertSame( BELTOFT_SERVICES_VERSION, $data['Version'] );
-		$this->assertSame( '0.27.0', BELTOFT_SERVICES_VERSION );
+		$this->assertSame( '0.27.1', BELTOFT_SERVICES_VERSION );
 	}
 
 	public function test_no_code_needs_a_newer_php_than_the_header_says(): void {
