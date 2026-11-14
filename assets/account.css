@@ -547,9 +547,9 @@ div.beltoft-services-vm__more > h4 { margin-top: 16px; }
 .beltoft-services-vm--page details.beltoft-services-vm__more { margin-top: 12px; }
 .beltoft-services-vm__reset { margin-top: 16px; }
 
-/* An extra disk, snapshot pack or app licence with no server on the list: a row like the others, the status on the right. Under the server list it continues it. */
+/* An extra disk, snapshot pack or app licence with no server on the list: a row like the others, the status on the right. Under the server list it continues it (the -12px takes back the content column's gap). */
 .beltoft-services-servers--addons { margin-top: 12px; }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-servers--addons.is-joined { margin-top: 0; border-top: 1px solid var(--bg-warm, #eeece6); border-top-left-radius: 0; border-top-right-radius: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-servers--addons.is-joined { margin-top: -12px; border-top: 1px solid var(--bg-warm, #eeece6); border-top-left-radius: 0; border-top-right-radius: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-servers:has(+ .beltoft-services-servers--addons.is-joined) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
 .beltoft-services-servers .beltoft-services-srv--addon { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 8px 16px; border-top: 1px solid var(--bg-warm, #eeece6); color: var(--navy, #0c1535); }
 .beltoft-services-servers .beltoft-services-srv--addon:first-child { border-top: 0; }
