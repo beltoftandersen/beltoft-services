@@ -179,6 +179,19 @@ class ServerAddonsTest extends SnapshotsTestCase {
 		$this->assertStringNotContainsString( 'You have no servers yet', $html );
 	}
 
+	public function test_an_add_on_under_the_server_list_continues_it_and_one_alone_does_not(): void {
+		$server = $this->server();
+		$disk   = $this->disk_for( $server );
+		$disk->set( array( 'server_license' => 0 ) );
+
+		$with = $this->render( $this->views( $server, $disk ) );
+		$this->assertStringContainsString( 'beltoft-services-servers--addons is-joined', $with );
+		$this->assertStringContainsString( 'beltoft-services-srv__state', substr( $with, (int) strpos( $with, 'srv--addon' ) ) );
+
+		$alone = $this->render( $this->views( $disk ) );
+		$this->assertStringNotContainsString( 'is-joined', $alone );
+	}
+
 	public function test_a_disk_with_no_server_linked_is_a_plain_card_too(): void {
 		$server = $this->server();
 		$disk   = $this->disk_for( $server );

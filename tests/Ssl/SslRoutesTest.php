@@ -179,6 +179,7 @@ class SslRoutesTest extends SslTestCase {
 		Panels::account( $r );
 		$html = (string) ob_get_clean();
 		$this->assertStringContainsString( 'example.com', $html );
+		$this->assertStringContainsString( '<dl class="beltoft-services-facts beltoft-services-ssl__facts">', $html, 'The facts are the shared facts card.' );
 		$this->assertStringContainsString( 'data-ssl-download="fullchain"', $html );
 		$this->assertStringContainsString( 'data-ssl-key', $html );
 		$this->assertStringContainsString( 'ssl-certificate', $html );
