@@ -304,6 +304,18 @@
 						box.checked = true;
 					}
 				} );
+
+				// A list that suits the login only sets that scope, unless the website already has a saved block.
+				var listScope = button.getAttribute( 'data-scope' );
+				var listForm = scope.querySelector( '[data-country-form]' );
+
+				if ( listScope && listForm && ! listForm.hasAttribute( 'data-country-set' ) ) {
+					var radio = listForm.querySelector( 'input[type="radio"][value="' + listScope + '"]' );
+
+					if ( radio ) {
+						radio.checked = true;
+					}
+				}
 				return true;
 			case 'files_open':
 				Array.prototype.forEach.call( scope.querySelectorAll( '[data-files-form]' ), function ( form ) {
