@@ -1268,3 +1268,18 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-area-p
 @media (max-width: 600px) {
 	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-area-page .odoowoo-account-panel { padding: var(--bs-space-4); }
 }
+
+/* ==== Redesign 4: database and email pages, DNS records guide ====================================================
+   Section headings are the same sans 18px as everywhere, sections are 32px apart on the page, the add-a-domain form is a card like the
+   create forms, and the DNS records guide is a warm card with the records as white tiles (no lines, no card inside a lined card). */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db :is(h3, h4) { margin: 0 0 var(--bs-space-3); color: var(--navy, #10221b); font-family: inherit; font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); letter-spacing: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db .beltoft-services-vm__more { margin: var(--bs-space-6) 0 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db .beltoft-services-vm__more > h4 { margin: 0 0 var(--bs-space-3); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db__form[data-mail-domain-add] { box-sizing: border-box; max-width: 880px; padding: var(--bs-space-5); border-radius: var(--bs-radius-lg); background: var(--bs-surface); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dnsg { padding: var(--bs-space-5); border: 0; border-radius: var(--bs-radius-lg); background: var(--bg-warm, #eeece6); font-size: var(--bs-fs-body); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dnsg .beltoft-dnsg__title { margin: 0 0 var(--bs-space-3); font-family: inherit; font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); letter-spacing: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dnsg .beltoft-dnsg__rec { padding: var(--bs-space-4); border: 0; border-radius: var(--bs-radius); background: var(--bs-surface); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dnsg code { border-radius: 4px; background: var(--bg-warm, #eeece6); }
+@media (max-width: 767px) {
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dnsg { padding: var(--bs-space-4); }
+}
