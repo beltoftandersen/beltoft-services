@@ -492,7 +492,6 @@
 			handle.beltoftButtonWasDisabled = el.disabled;
 			el.disabled = true;
 			el.setAttribute( 'aria-busy', 'true' );
-			el.classList.add( 'is-busy' );
 		}
 
 		Array.prototype.forEach.call( area.querySelectorAll( SELECTOR ), function ( other ) {
@@ -507,6 +506,12 @@
 		// One message, where the customer clicked: the note under the button. The state line at the top is only for work
 		// that no button started (owner 2026-11-13: one loader, not two).
 		handle.note = noteFor( handle.button );
+
+		// One loader (owner 2026-11-14): the note under the button carries it, and the button is only disabled. A button with no
+		// note of its own shows the loader itself.
+		if ( handle.button && ! handle.note ) {
+			handle.button.classList.add( 'is-busy' );
+		}
 
 		if ( handle.note ) {
 			noteSay( handle.note, 'busy', message );

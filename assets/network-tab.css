@@ -7,11 +7,22 @@
 /* Plain label and value pairs in the card, in line with the text above, not boxed cells. */
 .beltoft-services-net .beltoft-services-facts { display: flex; flex-wrap: wrap; gap: 8px 40px; margin: 12px 0 16px; overflow: visible; background: none; }
 .beltoft-services-net .beltoft-services-facts > div { padding: 0; box-shadow: none; }
-.beltoft-services-net .button { margin: 0 8px 0 0; border-radius: 0; }
+.beltoft-services-net .button { margin: 0 8px 0 0; border-radius: var(--bs-radius, 8px); }
 .beltoft-services-net code { overflow-wrap: anywhere; }
+.beltoft-services-net p.description code { white-space: nowrap; overflow-wrap: normal; }
 .beltoft-services-net__notice { padding: 8px 12px; background: var(--bg-warm, #eeece6); max-width: 640px; }
 .beltoft-services-net__others { margin: 0 0 12px; padding-left: 1.25em; }
 /* Like the Reboot dialog: title and text on one left edge. */
 .beltoft-services-net__dialog h5 { margin: 0; font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); }
 .beltoft-services-net__dialog p { margin: 0 0 12px; }
 .beltoft-services-net__dialog .beltoft-services-vm__buttons { margin: 0; }
+
+/* 2026-11-14: the facts as label and value rows like the hosting page (the general facts boxes add an indent and lines here), room
+   above the buttons, Detach outlined. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net .beltoft-services-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 24px; margin: 16px 0; padding: 0; overflow: visible; border-radius: 0; background: none; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net .beltoft-services-facts > div { display: contents; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net .beltoft-services-facts dt { margin: 0; color: var(--ink-soft, #5e7080); font-size: var(--bs-fs-small, 14px); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net .beltoft-services-facts dd { margin: 0; color: var(--navy, #10221b); font-weight: var(--bs-fw-medium, 500); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net .beltoft-services-net__buttons { margin: 16px 0 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net button[data-net-detach] { border: 1px solid var(--navy, #10221b); background: transparent; color: var(--navy, #10221b); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net button[data-net-detach]:hover { background: var(--bg-warm, #eeece6); }

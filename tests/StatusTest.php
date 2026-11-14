@@ -50,6 +50,9 @@ class StatusTest extends TestCase {
 		// finish(): done and fail stay in the note too.
 		$this->assertMatchesRegularExpression( '/if \( handle && handle\.note \) \{\s*return;\s*\}/', $js );
 
+		// One loader: a button with a note under it is only disabled, the note carries the loader (no spinner in the button too).
+		$this->assertStringContainsString( "if ( handle.button && ! handle.note ) {\n\t\t\thandle.button.classList.add( 'is-busy' );", $js );
+
 		// Hosting: clearing the cache keeps its done line (no reload); other actions show it again after the reload.
 		$hosting = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/hosting.js' );
 		$this->assertMatchesRegularExpression( "/if \\( 'cache' === action \\) \\{\\s*return;\\s*\\}/", $hosting );
