@@ -62,6 +62,15 @@ class PowerLagTest extends BackupTestCase {
 
 	// -- 2.3 start re-reads ----------------------------------------------------------------------
 
+	public function test_an_unknown_agent_is_asked_every_two_minutes_at_first_then_hourly(): void {
+		$now = 1000000;
+		$this->assertTrue( \BeltoftServices\Proxmox\Vm\PowerJobs::agent_recheck_due( 0, 0, $now ), 'Never asked: due.' );
+		$this->assertFalse( \BeltoftServices\Proxmox\Vm\PowerJobs::agent_recheck_due( 1, $now - 60, $now ) );
+		$this->assertTrue( \BeltoftServices\Proxmox\Vm\PowerJobs::agent_recheck_due( 1, $now - 120, $now ), 'A new server is asked again after two minutes.' );
+		$this->assertFalse( \BeltoftServices\Proxmox\Vm\PowerJobs::agent_recheck_due( 30, $now - 600, $now ), 'After 30 tries, hourly.' );
+		$this->assertTrue( \BeltoftServices\Proxmox\Vm\PowerJobs::agent_recheck_due( 30, $now - 3600, $now ) );
+	}
+
 	public function test_a_start_whose_status_lags_by_one_read_is_no_error(): void {
 		$r = $this->ready_vm();
 		Jobs::act( $r->id(), 'shutdown', array() );

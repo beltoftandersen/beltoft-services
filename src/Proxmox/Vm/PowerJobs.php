@@ -192,8 +192,9 @@ final class PowerJobs {
 	}
 
 	/**
-	 * A server whose guest agent was not up yet when it was built: ask again, at most once an hour,
-	 * until it answers. Reset password and consistent snapshots depend on it.
+	 * A server whose guest agent was not up yet when it was built: ask again until it answers, every two minutes for the
+	 * first hour (a new server's agent starts a few minutes after the build looked), then once an hour. Reset password and
+	 * consistent snapshots depend on it.
 	 *
 	 * @param Client   $client Cluster client.
 	 * @param Resource $r      Server resource.
@@ -201,12 +202,25 @@ final class PowerJobs {
 	 * @param int      $vmid   VMID.
 	 */
 	private static function refresh_agent( Client $client, Resource $r, string $node, int $vmid ): void {
-		if ( 'unknown' !== $r->get( 'agent' ) || '' === $node || (int) $r->get( 'agent_checked_at' ) > time() - HOUR_IN_SECONDS ) {
+		$tries = (int) $r->get( 'agent_tries' );
+
+		if ( 'unknown' !== $r->get( 'agent' ) || '' === $node || ! self::agent_recheck_due( $tries, (int) $r->get( 'agent_checked_at' ), time() ) ) {
 			return;
 		}
 
 		$ping = $client->request( 'POST', '/nodes/' . rawurlencode( $node ) . '/qemu/' . $vmid . '/agent/ping' );
 
-		$r->set( is_wp_error( $ping ) ? array( 'agent_checked_at' => time() ) : array( 'agent' => 'ok', 'agent_checked_at' => null ) );
+		$r->set( is_wp_error( $ping ) ? array( 'agent_checked_at' => time(), 'agent_tries' => $tries + 1 ) : array( 'agent' => 'ok', 'agent_checked_at' => null, 'agent_tries' => null ) );
+	}
+
+	/**
+	 * Is an unknown guest agent due to be asked again: every two minutes for the first 30 tries, then hourly.
+	 *
+	 * @param int $tries      Failed tries so far.
+	 * @param int $checked_at Time of the last try, 0 for none.
+	 * @param int $now        Now.
+	 */
+	public static function agent_recheck_due( int $tries, int $checked_at, int $now ): bool {
+		return $checked_at <= $now - ( $tries < 30 ? 2 * MINUTE_IN_SECONDS : HOUR_IN_SECONDS );
 	}
 }
