@@ -133,7 +133,7 @@ final class Panels {
 		$actions = Operations::offered( $r );
 
 		echo '<div class="beltoft-services-ssl" data-resource="' . esc_attr( (string) $r->id() ) . '" data-name="' . esc_attr( $name ) . '">';
-		echo '<dl class="beltoft-services-ssl__facts">';
+		echo '<dl class="beltoft-services-facts beltoft-services-ssl__facts">';
 		$names = array_column( SslNames::entries( $r ), 'name' );
 
 		if ( Provision::is_smime( $r ) ) {

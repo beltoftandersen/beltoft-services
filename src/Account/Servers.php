@@ -375,6 +375,8 @@ final class Servers {
 		}
 
 		if ( $addons ) {
+			$joined = (bool) $rows;
+
 			include self::file( 'addons.php' );
 		}
 
