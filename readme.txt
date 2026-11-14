@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.27.3
+Stable tag: 0.27.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.27.4 =
+* Jobs are held while the file wp-content/.beltoft-services-hold exists (younger than 15 minutes): a deploy writes it while it replaces code. No site code is needed for the hold.
 
 = 0.27.3 =
 * The job runner watches for a fatal error in the job it runs (as Action Scheduler's own runner does), and the cleaner's timeout of a job that never finished is handled too: a customer action always gets a result, staff get one mail per error.

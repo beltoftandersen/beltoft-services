@@ -100,6 +100,16 @@ final class JobsTest extends TestCase {
 		$this->assertTrue( as_has_scheduled_action( Jobs::ACT, array( $r->id(), 'reboot', array() ), Jobs::GROUP ) );
 	}
 
+	public function test_the_hold_file_holds_jobs_and_an_old_one_is_ignored(): void {
+		$file = trailingslashit( WP_CONTENT_DIR ) . Jobs::HOLD_FILE;
+		touch( $file );
+		$this->assertTrue( Jobs::on_hold() );
+		touch( $file, time() - 1000 );
+		$this->assertFalse( Jobs::on_hold(), 'A forgotten hold does not stop the service for ever.' );
+		unlink( $file );
+		$this->assertFalse( Jobs::on_hold() );
+	}
+
 	public function test_the_cleaners_timeout_reports_a_customer_action_that_never_finished(): void {
 		list( $r ) = $this->resource( array( 'state' => 'ready', 'desired' => 'ready' ) );
 		$action_id = as_schedule_single_action( time(), Jobs::ACT, array( $r->id(), 'reboot', array() ), Jobs::GROUP );

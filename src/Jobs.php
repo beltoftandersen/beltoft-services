@@ -597,12 +597,27 @@ final class Jobs {
 		self::$stopping = true;
 	}
 
+	/** The hold file: while it exists (and is younger than HOLD_MAX seconds), service jobs wait. A deploy writes it. */
+	public const HOLD_FILE = '.beltoft-services-hold';
+
+	/** Seconds after which a forgotten hold file is ignored. */
+	private const HOLD_MAX = 900;
+
 	/**
-	 * Are service jobs held: the kill switch, or a hold a site sets while its code is replaced (filter
-	 * beltoft_services_jobs_hold). A held job is queued again a little later, before it loads more of the plugin.
+	 * Are service jobs held: the kill switch, the hold file in wp-content (written by a deploy while it replaces code, so
+	 * no runner loads half-replaced files), or filter beltoft_services_jobs_hold. A held job is queued again a little later,
+	 * before it loads more of the plugin.
 	 */
 	public static function on_hold(): bool {
 		if ( Settings::get( 'pause_all' ) ) {
+			return true;
+		}
+
+		$file = trailingslashit( WP_CONTENT_DIR ) . self::HOLD_FILE;
+		clearstatcache( true, $file );
+		$time = file_exists( $file ) ? (int) filemtime( $file ) : 0;
+
+		if ( $time > time() - self::HOLD_MAX ) {
 			return true;
 		}
 
