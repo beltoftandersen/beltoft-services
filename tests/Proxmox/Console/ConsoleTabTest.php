@@ -99,7 +99,7 @@ class ConsoleTabTest extends MonitoringTestCase {
 		ConsoleTab::pane( 'console', $this->server()->id() );
 		$html = (string) ob_get_clean();
 		foreach ( array( 'fullscreen', 'cad', 'keyboard', 'disconnect' ) as $key ) {
-			$this->assertMatchesRegularExpression( '#<button type="button" class="beltoft-services-btn beltoft-services-console__action" data-console-' . $key . '>#', $html );
+			$this->assertMatchesRegularExpression( '#<button type="button" class="bs-btn bs-btn--secondary bs-btn--sm beltoft-services-btn beltoft-services-console__action" data-console-' . $key . '>#', $html );
 		}
 		$this->assertStringNotContainsString( 'data-console-status', $html, 'The console reports in the shared status bar.' );
 		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/account.css' );
