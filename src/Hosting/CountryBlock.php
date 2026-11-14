@@ -40,7 +40,14 @@ final class CountryBlock {
 			),
 			'login_risk' => array(
 				'label'     => __( 'High-risk for logins', 'beltoft-services' ),
-				'countries' => array( 'CN', 'VN', 'IN', 'PK', 'TH', 'KZ', 'SC', 'SG', 'MA' ),
+				'countries' => array( 'CN', 'VN', 'IN', 'PK', 'TH', 'KZ', 'SC', 'MA', 'RU', 'UA', 'BR', 'MX', 'AR', 'CO', 'BD' ),
+			),
+			'outside_europe' => array(
+				'label'      => __( 'Everything outside Europe (EU/EEA, Switzerland, UK)', 'beltoft-services' ),
+				'countries'  => self::outside_europe(),
+				'help'       => __( 'Every country outside the EU/EEA, Switzerland and the United Kingdom.', 'beltoft-services' ),
+				'scope'      => 'login',
+				'scope_help' => __( 'Blocking the whole website with this list also blocks search engines and payment callbacks from outside Europe.', 'beltoft-services' ),
 			),
 		);
 
@@ -58,10 +65,34 @@ final class CountryBlock {
 
 			if ( array() !== $codes && is_string( $id ) && '' !== (string) ( $list['label'] ?? '' ) ) {
 				$out[ $id ] = array( 'label' => (string) $list['label'], 'countries' => $codes );
+
+				foreach ( array( 'help', 'scope_help' ) as $key ) {
+					if ( '' !== (string) ( $list[ $key ] ?? '' ) ) {
+						$out[ $id ][ $key ] = (string) $list[ $key ];
+					}
+				}
+
+				if ( in_array( $list['scope'] ?? '', self::SCOPES, true ) ) {
+					$out[ $id ]['scope'] = (string) $list['scope'];
+				}
 			}
 		}
 
 		return $out;
+	}
+
+	/**
+	 * Every country that can be chosen except the EU, the EEA, Switzerland and the United Kingdom.
+	 *
+	 * @return string[]
+	 */
+	public static function outside_europe(): array {
+		$europe = array(
+			'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE',
+			'IS', 'LI', 'NO', 'CH', 'GB',
+		);
+
+		return array_values( array_diff( array_keys( self::names() ), $europe ) );
 	}
 
 	/**

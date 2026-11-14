@@ -87,7 +87,7 @@ class CountryBlockTest extends HostingCase {
 		$again = ( new HostingActions( Resource::find( $r->id() ) ) )->country_block( $slug );
 		$this->assertSame( array( 'BY', 'RU' ), array_column( $again['countries'], 'code' ) );
 		$this->assertSame( 'login', $again['scope'] );
-		$this->assertSame( array( 'sanctioned', 'login_risk' ), array_keys( $again['lists'] ) );
+		$this->assertSame( array( 'sanctioned', 'login_risk', 'outside_europe' ), array_keys( $again['lists'] ) );
 
 		$sites = $a->sites();
 		$this->assertTrue( $sites[0]['country']['enabled'] );
@@ -216,7 +216,16 @@ class CountryBlockTest extends HostingCase {
 	public function test_the_ready_lists_are_data_with_names_from_the_shop_and_the_filter_changes_them(): void {
 		$lists = CountryBlock::lists();
 		$this->assertSame( array( 'RU', 'BY', 'IR', 'KP', 'SY', 'CU' ), $lists['sanctioned']['countries'] );
-		$this->assertSame( array( 'CN', 'VN', 'IN', 'PK', 'TH', 'KZ', 'SC', 'SG', 'MA' ), $lists['login_risk']['countries'] );
+		$this->assertSame( array( 'CN', 'VN', 'IN', 'PK', 'TH', 'KZ', 'SC', 'MA', 'RU', 'UA', 'BR', 'MX', 'AR', 'CO', 'BD' ), $lists['login_risk']['countries'] );
+
+		$out = $lists['outside_europe']['countries'];
+		$this->assertLessThanOrEqual( 250, count( $out ) );
+		$this->assertNotNull( CountryBlock::clean( $out ) );
+		$this->assertSame( 'login', $lists['outside_europe']['scope'] );
+		$this->assertSame( array(), array_intersect( $out, array( 'DE', 'FR', 'DK', 'SE', 'IS', 'LI', 'NO', 'CH', 'GB', 'CY', 'MT' ) ) );
+		$this->assertContains( 'US', $out );
+		$this->assertContains( 'RU', $out );
+		$this->assertSame( count( CountryBlock::names() ) - 32, count( $out ) );
 		$this->assertSame( 'Denmark', CountryBlock::name( 'DK' ) );
 		$this->assertSame( 'ZZ', CountryBlock::name( 'ZZ' ) );
 
@@ -251,6 +260,12 @@ class CountryBlockTest extends HostingCase {
 		$this->assertStringContainsString( 'data-hosting-action="country_save"', $html );
 		$this->assertStringContainsString( 'data-codes="RU BY IR KP SY CU"', $html );
 		$this->assertStringContainsString( 'Select: Sanctioned countries', $html );
+		$this->assertStringContainsString( 'Select: Everything outside Europe (EU/EEA, Switzerland, UK)', $html );
+		$this->assertStringContainsString( 'Every country outside the EU/EEA, Switzerland and the United Kingdom.', $html );
+		$this->assertStringContainsString( 'data-scope="login"', $html );
+		$this->assertStringNotContainsString( 'data-country-set', $html );
+		$this->assertStringContainsString( 'also blocks search engines and payment callbacks', $html );
+		$this->assertStringNotContainsString( 'Afghanistan, Albania', $html, 'The long list is not printed.' );
 		$this->assertStringContainsString( 'Login and admin only', $html );
 		$this->assertStringContainsString( 'a VPN gets around it', $html );
 		$this->assertStringContainsString( 'This product includes GeoLite2 data created by MaxMind, available from https://www.maxmind.com', $html );
