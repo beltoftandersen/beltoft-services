@@ -150,9 +150,10 @@
 			case 'backup_now':
 				return [ 'POST', base + '/backups', {} ];
 			case 'restore':
-				var scope = button.getAttribute( 'data-scope' ) || '';
+				// What is restored (account, files, database); `scope` stays the page section the fields are read from.
+				var what = button.getAttribute( 'data-scope' ) || '';
 
-				return ask( text.confirmRestore || '', button, [ 'POST', base + '/backups/restore', { scope: scope, volid: button.getAttribute( 'data-volid' ) || '', slug: field( scope, 'restore_slug' ) } ], false );
+				return ask( text.confirmRestore || '', button, [ 'POST', base + '/backups/restore', { scope: what, volid: button.getAttribute( 'data-volid' ) || '', slug: field( scope, 'restore_slug' ) } ], false );
 			case 'undo':
 				return ask( text.confirmUndo || '', button, [ 'POST', base + '/backups/undo', {} ], false );
 			case 'check_item':
