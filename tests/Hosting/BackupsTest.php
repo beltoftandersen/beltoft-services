@@ -589,6 +589,24 @@ class BackupsTest extends HostingCase {
 		$this->assertCount( 1, $this->node->calls_to( '#/nodes/pve1/lxc$#', 'POST' ), 'The container was restored once.' );
 	}
 
+	public function test_a_big_restore_asks_for_twice_its_estimate_within_the_shared_cap(): void {
+		$this->assertSame( 21600, \BeltoftServices\Reconciler::poll_budget( 999999 ), 'The default cap is six hours.' );
+		$this->assertSame( 600, \BeltoftServices\Reconciler::poll_budget( 600 ), 'It only caps: a driver that asks less waits less.' );
+
+		list( $r, $volid ) = $this->with_backup();
+		$list = HostingBackups::stored( $r );
+		$list[0]['size'] = 100 * 1073741824;
+		$r->set( array( 'backup_list' => $list ) );
+		( new HostingActions( Resource::find( $r->id() ) ) )->queue( 'restore', array( 'account', $volid, '' ) );
+		$this->node->next_task( array( 'polls' => 30 ) );
+
+		$result = \BeltoftServices\Hosting\Actions\Steps::run( Resource::find( $r->id() ), 'restore_backup', array( 'account', $volid, '' ) );
+		$this->assertTrue( $result->is_poll() );
+		$this->assertSame( 2 * 60 * HostingRestore::estimate_minutes( 100 * 1073741824 ), $result->poll_budget() );
+		$this->assertGreaterThan( 1800, $result->poll_budget() );
+		$this->assertSame( $result->poll_budget(), \BeltoftServices\Reconciler::poll_budget( $result->poll_budget() ), 'Within the cap.' );
+	}
+
 	public function test_a_lost_restore_job_is_queued_again_and_restores_once(): void {
 		list( $r, $volid ) = $this->with_backup();
 		( new HostingActions( $r ) )->queue( 'restore', array( 'account', $volid, '' ) );

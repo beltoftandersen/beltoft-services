@@ -51,6 +51,9 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Reconciler {
 
+	/** The longest a wait may last whatever a driver asks for (seconds). */
+	public const POLL_BUDGET_MAX = 21600;
+
 	/**
 	 * Seconds to wait before retry N (1-based: retry 1 waits 60 s). After the last one the
 	 * resource fails.
@@ -591,9 +594,10 @@ final class Reconciler {
 		/**
 		 * The longest a wait may last whatever a driver asks for.
 		 *
-		 * @param int $seconds Default 1800.
+		 * @param int $seconds Default 21600 (6 hours): a long node task such as a restore of a big account.
+		 *                     It only caps what a driver asks for; no driver asks for "the most".
 		 */
-		return min( $budget, max( 1, (int) apply_filters( 'beltoft_services_poll_budget_max', 1800 ) ) );
+		return min( $budget, max( 1, (int) apply_filters( 'beltoft_services_poll_budget_max', self::POLL_BUDGET_MAX ) ) );
 	}
 
 	/**

@@ -207,6 +207,34 @@ final class HostingRestore {
 	}
 
 	/**
+	 * How long a wait for one of the round's node tasks may last: twice the estimate for the backup (see estimate_minutes()), at least the
+	 * usual 30 minutes. The shared controller caps it (Reconciler::poll_budget()).
+	 *
+	 * @param string $phase Phase kept with the task.
+	 */
+	protected function task_budget( string $phase ): int {
+		$usual = 1800;
+
+		if ( in_array( $phase, array( 'shutdown', 'stop' ), true ) ) {
+			return max( 10, (int) \BeltoftServices\Settings::get( 'shutdown_timeout' ) ) + 60;
+		}
+
+		$round = (array) ( Resource::find( $this->r->id() ) ?? $this->r )->get( 'restore' );
+		$size  = 0;
+		$volid = (string) ( $round['volid'] ?? '' );
+		$safe  = self::safety( $this->r );
+		$volid = '' !== $volid ? $volid : (string) ( $safe['volid'] ?? '' );
+
+		foreach ( array_merge( HostingBackups::stored( $this->r ), array() ) as $b ) {
+			if ( $b['volid'] === $volid ) {
+				$size = (int) $b['size'];
+			}
+		}
+
+		return max( 1, (int) apply_filters( 'beltoft_services_poll_budget', max( $usual, 2 * 60 * self::estimate_minutes( $size ) ), $phase ) );
+	}
+
+	/**
 	 * A rough time for restoring a whole account: the backup size over an assumed rate, in minutes (filter
 	 * `beltoft_services_hosting_restore_mbs` sets the rate in MB a second).
 	 *
