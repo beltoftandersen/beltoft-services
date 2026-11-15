@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
  * of that kind. Nothing here calls Proxmox or a registrar: it reads the license rows, the resource meta,
  * the status the power job already cached, the subscriptions and the license history.
  *
- * Shortcodes: beltoft_services_attention, _servers, _databases, _domains, _licenses, _apps, _mail, _next_payment, _activity, _welcome,
+ * Shortcodes: beltoft_services_attention, _servers, _databases, _hosting, _domains, _licenses, _apps, _mail, _next_payment, _activity, _welcome,
  * and _overview (all of them). The templates are in templates/account/overview/ and can be copied to
  * yourtheme/beltoft-services/account/overview/. On the WooCommerce Dashboard endpoint the whole overview is
  * printed by woocommerce_account_dashboard, unless the beltoft_services_overview_auto filter says false (a site
@@ -31,6 +31,7 @@ final class Overview {
 		'attention'    => 'beltoft_services_attention',
 		'servers'      => 'beltoft_services_servers',
 		'databases'    => 'beltoft_services_databases',
+		'hosting'      => 'beltoft_services_hosting',
 		'domains'      => 'beltoft_services_domains',
 		'apps'         => 'beltoft_services_apps',
 		'mail'         => 'beltoft_services_mail',
@@ -45,6 +46,7 @@ final class Overview {
 	 */
 	public const AREAS = array(
 		'databases' => Databases::class,
+		'hosting'   => Hosting::class,
 		'apps'      => Apps::class,
 		'mail'      => Email::class,
 	);
@@ -239,6 +241,7 @@ final class Overview {
 					)
 				) : '';
 			case 'databases':
+			case 'hosting':
 			case 'apps':
 			case 'mail':
 				// Every area shows, with its empty line and create button when the customer has nothing in it.

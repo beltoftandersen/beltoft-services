@@ -24,8 +24,9 @@ $beltoft_services_status = array(
 	'removed'  => __( 'Removed', 'beltoft-services' ),
 );
 $beltoft_services_wait   = array(
+	// While the proof is missing the page head already says so (MailField::proof_text(), printed once): no second line here.
 	'building' => null !== $view['dns']['proof']
-		? __( 'We are waiting for the proof that the domain is yours. Add the record on the DNS tab. This page updates by itself.', 'beltoft-services' )
+		? ''
 		: __( 'Your email domain is being set up. Mailboxes can be made when it is ready. You can leave this page.', 'beltoft-services' ),
 	'paused'   => __( 'Your email service is paused. Mail to your addresses is not delivered until it is active again.', 'beltoft-services' ),
 	'failed'   => __( 'Your email domain could not be set up. We have been told about the problem. Please contact support.', 'beltoft-services' ),
@@ -51,7 +52,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 	<?php if ( $beltoft_services_all || 'overview' === $active ) : ?>
 		<dl class="beltoft-services-facts">
 			<?php
-			$beltoft_services_row( __( 'Status', 'beltoft-services' ), esc_html( $beltoft_services_status[ $view['kind'] ] ?? '' ) );
+			$beltoft_services_row( __( 'Status', 'beltoft-services' ), esc_html( '' !== (string) ( $view['status'] ?? '' ) ? (string) $view['status'] : ( $beltoft_services_status[ $view['kind'] ] ?? '' ) ) );
 			if ( '' !== (string) $view['included'] ) {
 				$beltoft_services_row( __( 'Plan', 'beltoft-services' ), esc_html( (string) $view['included'] ) );
 			}
@@ -156,7 +157,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 		<?php endif; ?>
 
 		<?php if ( isset( $beltoft_services_wait[ $view['kind'] ] ) ) : ?>
-			<p><?php echo esc_html( $beltoft_services_wait[ $view['kind'] ] ); ?></p>
+			<?php if ( '' !== $beltoft_services_wait[ $view['kind'] ] ) : ?><p><?php echo esc_html( $beltoft_services_wait[ $view['kind'] ] ); ?></p><?php endif; ?>
 			<?php if ( 'building' === $view['kind'] && null !== $view['dns']['proof'] ) : ?>
 				<p><button type="button" class="button woocommerce-button" data-mail-proof-check><?php esc_html_e( 'Check now', 'beltoft-services' ); ?></button></p>
 			<?php endif; ?>
@@ -266,7 +267,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 
 	<?php if ( $beltoft_services_all || 'aliases' === $active ) : ?>
 		<?php if ( isset( $beltoft_services_wait[ $view['kind'] ] ) ) : ?>
-			<p><?php echo esc_html( $beltoft_services_wait[ $view['kind'] ] ); ?></p>
+			<?php if ( '' !== $beltoft_services_wait[ $view['kind'] ] ) : ?><p><?php echo esc_html( $beltoft_services_wait[ $view['kind'] ] ); ?></p><?php endif; ?>
 		<?php else : ?>
 			<div class="beltoft-services-vm__more" data-mail-aliases data-confirm="<?php esc_attr_e( 'Delete this alias?', 'beltoft-services' ); ?>">
 				<h4><?php esc_html_e( 'Aliases', 'beltoft-services' ); ?></h4>

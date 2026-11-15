@@ -348,7 +348,7 @@
 				return true;
 			case 'send_code':
 				button.disabled = true;
-				window.beltoftApi.call( account.root + 'step-up/send', { method: 'POST', body: { purpose: 'hosting_files' }, holder: account } ).then( function ( result ) {
+				window.beltoftApi.call( account.stepUpUrl, { method: 'POST', body: { purpose: 'hosting_files' }, holder: account } ).then( function ( result ) {
 					button.disabled = false;
 
 					if ( result.ok ) {
@@ -697,7 +697,10 @@
 		} );
 	}
 
-	cacheFacts();
+	// While a task runs the node is busy: the facts are asked once it is over (finish).
+	if ( ! ( document.querySelector( '.beltoft-hosting' ) || document.createElement( 'i' ) ).getAttribute( 'data-hosting-task' ) ) {
+		cacheFacts();
+	}
 
 	// The change of the account that runs in the background (a task), and the watcher that follows it.
 	var root = document.querySelector( '.beltoft-hosting' );
@@ -775,6 +778,18 @@
 		if ( line ) {
 			line.hidden = true;
 		}
+
+		// The step lines of the task are gone with it: a row says what it is again (Online), the others are emptied.
+		Array.prototype.forEach.call( root.querySelectorAll( '[data-task-step]' ), function ( el ) {
+			el.textContent = '';
+		} );
+
+		Array.prototype.forEach.call( root.querySelectorAll( '[data-site-status]' ), function ( el ) {
+			if ( el.hasAttribute( 'data-idle-text' ) ) {
+				el.textContent = el.getAttribute( 'data-idle-text' );
+				el.classList.toggle( 'is-ok', '1' === el.getAttribute( 'data-idle-ok' ) );
+			}
+		} );
 	}
 
 	// The task is over: a failure is printed by the page itself (the reason, in words); a success is said once after the reload.
@@ -794,6 +809,7 @@
 			unlock();
 			say( null, message );
 			current = null;
+			cacheFacts();
 			return;
 		}
 
@@ -817,7 +833,9 @@
 		var path = root.getAttribute( 'data-hosting-resource' ) + '/hosting';
 		var started = Date.now();
 
-		function again() {
+		// The overview route allows 20 reads a minute: one every 5 seconds (every 15 after ten minutes) stays well below it, and a
+		// 429 waits for as long as the server asks.
+		function again( wait ) {
 			var slow = Date.now() - started > 600000;
 
 			if ( Date.now() - started > 25200000 ) {
@@ -826,12 +844,19 @@
 				return;
 			}
 
-			window.setTimeout( look, slow ? 10000 : 3000 );
+			window.setTimeout( look, wait || ( slow ? 15000 : 5000 ) );
 		}
 
 		function look() {
 			window.beltoftApi.call( path, { holder: account } ).then( function ( reply ) {
 				var data = reply.data || {};
+
+				if ( 429 === reply.status ) {
+					var seconds = parseInt( reply.response && reply.response.headers ? reply.response.headers.get( 'Retry-After' ) : '', 10 );
+
+					again( ( isNaN( seconds ) ? 30 : Math.min( 120, Math.max( 5, seconds ) ) ) * 1000 );
+					return;
+				}
 
 				if ( ! reply.ok ) {
 					again();
@@ -851,7 +876,9 @@
 				}
 
 				finish( data.last ? { ok: false } : { ok: true } );
-			}, again );
+			}, function () {
+				again();
+			} );
 		}
 
 		look();

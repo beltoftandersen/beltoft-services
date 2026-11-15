@@ -96,10 +96,41 @@ class OverviewTest extends MonitoringTestCase {
 			$this->assertSame( '', $this->html( $section ), $section );
 		}
 
-		foreach ( array( 'servers', 'databases', 'domains', 'mail', 'apps' ) as $section ) {
+		foreach ( array( 'servers', 'databases', 'hosting', 'domains', 'mail', 'apps' ) as $section ) {
 			$this->assertStringContainsString( 'ov__' . $section . ' is-empty', $this->html( $section ), $section );
 			$this->assertStringNotContainsString( 'list-btn', $this->html( $section ), 'No product, no button: ' . $section );
 		}
+	}
+
+	public function test_a_hosting_account_has_its_own_overview_section(): void {
+		$user = self::factory()->user->create();
+		$this->as_user( $user );
+		$this->dns( $user, 'hosted-example.dk', 'hosting' );
+		Overview::reset();
+
+		$data = Overview::data();
+
+		$this->assertCount( 1, $data['hosting'] );
+		$this->assertNotSame( '', $data['hosting_url'] );
+		$this->assertStringContainsString( 'ov__hosting', $this->html( 'hosting' ) );
+		$this->assertStringNotContainsString( 'is-empty', $this->html( 'hosting' ) );
+		$this->assertArrayHasKey( 'hosting', Overview::SECTIONS );
+	}
+
+	public function test_one_set_of_words_for_a_service_that_is_being_set_up(): void {
+		$user = self::factory()->user->create();
+		$r    = $this->server( $user );
+		$r->set( array( 'state' => 'provisioning' ) );
+		$r = Resource::find( $r->id() );
+		Progress::mark( $r, 'reboot', 'Restart' );
+		$this->as_user( $user );
+
+		$this->assertSame( 'Getting ready', \BeltoftServices\Account\ServiceArea::state( $r )[0], 'The list says what the page head says.' );
+
+		$ready = $this->server( $user );
+		Progress::mark( $ready, 'reboot', 'Restart' );
+
+		$this->assertSame( 'Working', \BeltoftServices\Account\ServiceArea::state( Resource::find( $ready->id() ) )[0], 'A ready service that is doing something is working.' );
 	}
 
 	public function test_a_visitor_sees_nothing(): void {

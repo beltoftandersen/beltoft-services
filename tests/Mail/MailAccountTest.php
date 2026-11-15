@@ -291,7 +291,7 @@ final class MailAccountTest extends MailTestCase {
 		$r = Resource::find( $r->id() );
 
 		$mailboxes = $this->page( $r );
-		$this->assertStringContainsString( 'We are waiting for the proof that the domain is yours', $mailboxes );
+		$this->assertStringContainsString( 'Waiting for the proof that the domain is yours.', $mailboxes );
 		$this->assertStringNotContainsString( 'data-mail-create-submit', $mailboxes );
 
 		$dns = $this->page( $r, 'dns' );
@@ -656,8 +656,11 @@ final class MailAccountTest extends MailTestCase {
 		\BeltoftServices\Jobs::enqueue( $r->id() );
 		$this->run_jobs( 3 );
 		$html = $this->page( Resource::find( $r->id() ) );
-		$this->assertStringContainsString( 'We are waiting for the proof that the domain is yours.', $html );
+		$this->assertSame( 1, substr_count( $html, 'Waiting for the proof that the domain is yours.' ), 'The proof text is printed once.' );
+		$this->assertStringNotContainsString( 'We are waiting for the proof', $html );
 		$this->assertStringContainsString( 'data-mail-proof-check', $html );
+		$this->assertStringContainsString( 'Getting ready', $html, 'The head and the Status row use the same words.' );
+		$this->assertStringNotContainsString( 'Being set up', $html );
 		$this->assertStringContainsString( '/mail/proof/check', (string) file_get_contents( dirname( __DIR__, 2 ) . '/assets/mail.js' ) );
 
 		$ready = $this->ready_mail( 'noproofbtn.example', array(), $this->user );

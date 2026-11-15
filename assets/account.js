@@ -159,13 +159,13 @@
 					return;
 				}
 
-				window.setTimeout( again, 2000 );
+				window.setTimeout( again, 4000 );
 			} ).catch( function () {
-				window.setTimeout( again, 2000 );
+				window.setTimeout( again, 4000 );
 			} );
 		}
 
-		window.setTimeout( again, 2000 );
+		window.setTimeout( again, 4000 );
 	}
 
 	function act( panel, button ) {

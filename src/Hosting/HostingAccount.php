@@ -169,7 +169,8 @@ final class HostingAccount {
 			return $name;
 		}
 
-		return SiteField::slug_is_made( $name, $label ) ? $label : $label . ' (' . $name . ')';
+		// The title the customer gave, alone: the website's own address is in the row beside it.
+		return $label;
 	}
 
 	/**
@@ -560,7 +561,7 @@ final class HostingAccount {
 		$wp      = (array) $site['wp'];
 		$own     = array() !== array_filter( $site['domains'], static fn( $d ) => 'preview' !== $d['kind'] );
 		$head    = '<a class="beltoft-hosting-link beltoft-hosting-panel__main" href="' . esc_url( 'https://' . $main . '/' ) . '" target="_blank" rel="noopener">' . esc_html( \BeltoftServices\Domains\HostName::display( $main ) ) . '</a>'
-			. '<span class="beltoft-hosting-status' . ( $ready && empty( $site['task'] ) ? ' is-ok' : '' ) . '" data-site-status>' . esc_html( ! empty( $site['task'] ) ? (string) $site['task']['step_label'] : ( $ready ? __( 'Online', 'beltoft-services' ) : __( 'Not ready', 'beltoft-services' ) ) ) . '</span>';
+			. '<span class="beltoft-hosting-status' . ( $ready && empty( $site['task'] ) ? ' is-ok' : '' ) . '" data-site-status data-idle-text="' . esc_attr( $ready ? __( 'Online', 'beltoft-services' ) : __( 'Not ready', 'beltoft-services' ) ) . '" data-idle-ok="' . ( $ready ? '1' : '0' ) . '">' . esc_html( ! empty( $site['task'] ) ? (string) $site['task']['step_label'] : ( $ready ? __( 'Online', 'beltoft-services' ) : __( 'Not ready', 'beltoft-services' ) ) ) . '</span>';
 
 		self::panel_open( esc_html( self::site_name( $site ) ), 'beltoft-site-' . $slug, $head, 'beltoft-hosting-site', ' data-hosting-scope data-slug="' . esc_attr( $slug ) . '"' );
 

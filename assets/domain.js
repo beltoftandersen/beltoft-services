@@ -211,7 +211,7 @@
 		var scope = form.closest( '[data-domain-resource]' ).dataset.domainResource;
 		if ( bs && bs.locked( scope ) ) { return; }
 		var handle = bs.busy( form.getAttribute( 'data-sending' ) || __( 'Sending the code…', 'beltoft-services' ), scope, send );
-		window.beltoftApi.call( config.root + 'step-up/send', { method: 'POST', body: { purpose: 'transfer_code' }, holder: config } ).then( unwrap ).then( function () {
+		window.beltoftApi.call( config.stepUpUrl, { method: 'POST', body: { purpose: 'transfer_code' }, holder: config } ).then( unwrap ).then( function () {
 			if ( ask ) { ask.hidden = true; }
 			enter.hidden = false;
 			form.querySelector( 'input[name="secret"]' ).value = '';

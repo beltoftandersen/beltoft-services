@@ -308,3 +308,6 @@
 	outline: 2px solid currentColor;
 	outline-offset: 2px;
 }
+
+/* The heading sits above its text with a gap, not against it (themes zero heading margins). */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dns-claim .beltoft-dns-claim__title { margin: 0 0 var(--bs-space-3, 12px); }

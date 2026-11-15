@@ -106,7 +106,7 @@ class DnsClaimRoutesTest extends TestCase {
 		$this->assertSame( 201, $response->get_status() );
 		$this->assertSame( 'no-store', $response->get_headers()['Cache-Control'] );
 		$this->assertSame(
-			array( 'id', 'domain', 'domain_display', 'status', 'txt_name', 'txt_value', 'expires_at', 'verified_at', 'checked_at', 'ds_present', 'servers', 'reason', 'message', 'scan', 'zone_file', 'draft_records' ),
+			array( 'id', 'domain', 'domain_display', 'status', 'txt_name', 'txt_value', 'expires_at', 'expires_label', 'checked_label', 'verified_at', 'checked_at', 'ds_present', 'servers', 'reason', 'message', 'scan', 'zone_file', 'draft_records' ),
 			array_keys( $data )
 		);
 		$this->assertSame( 'example.com', $data['domain'] );

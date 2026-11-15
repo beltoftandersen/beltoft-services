@@ -523,6 +523,13 @@ final class DnsClaimRoutes {
 			return $stamp ? gmdate( 'Y-m-d\TH:i:s\Z', $stamp ) : null;
 		};
 
+		// The same date and time format and the same language as the rest of the site, in the site's time zone.
+		$label = static function ( $time, string $format ): string {
+			$stamp = $time ? strtotime( (string) $time . ' UTC' ) : false;
+
+			return $stamp ? (string) wp_date( $format, $stamp ) : '';
+		};
+
 		return array(
 			'id'             => (int) $claim['id'],
 			'domain'         => (string) $claim['domain'],
@@ -531,6 +538,8 @@ final class DnsClaimRoutes {
 			'txt_name'       => DnsClaims::txt_name( $claim ),
 			'txt_value'      => $open ? DnsClaims::txt_value( $claim ) : null,
 			'expires_at'     => $iso( $claim['expires_at'] ),
+			'expires_label'  => $label( $claim['expires_at'], get_option( 'date_format' ) . ' ' . get_option( 'time_format' ) ),
+			'checked_label'  => $label( $claim['checked_at'] ?? null, (string) get_option( 'time_format' ) ),
 			'verified_at'    => $iso( $claim['verified_at'] ?? null ),
 			'checked_at'     => $iso( $claim['checked_at'] ?? null ),
 			'ds_present'     => null === $claim['ds_present'] ? null : (bool) $claim['ds_present'],

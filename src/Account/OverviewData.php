@@ -74,6 +74,8 @@ final class OverviewData {
 			'servers'      => array(),
 			'databases'    => array(),
 			'databases_url' => '',
+			'hosting'      => array(),
+			'hosting_url'  => '',
 			'apps'         => array(),
 			'apps_url'     => '',
 			'mail'         => array(),
@@ -135,7 +137,7 @@ final class OverviewData {
 			}
 		}
 
-		$area_views = array( 'databases' => array(), 'apps' => array(), 'mail' => array() );
+		$area_views = array( 'databases' => array(), 'hosting' => array(), 'apps' => array(), 'mail' => array() );
 
 		foreach ( Overview::AREAS as $key => $class ) {
 			foreach ( array_slice( (array) ( $groups[ ServiceArea::get( $class )->slug() ] ?? array() ), 0, 50 ) as $license ) {
