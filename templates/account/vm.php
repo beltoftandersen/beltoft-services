@@ -233,8 +233,8 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 					<div class="beltoft-vm-usage__plot" aria-label="<?php esc_attr_e( 'Memory in use (excluding cache)', 'beltoft-services' ); ?>"></div>
 					<p class="beltoft-vm-usage__axis" data-axis></p>
 					<p class="beltoft-vm-usage__readout" data-readout></p>
-					<p class="beltoft-vm-usage__axis" data-mem-hint role="status"></p>
-					<p class="beltoft-vm-usage__axis"><?php esc_html_e( 'Linux uses free memory as a file cache and gives it back when programs need it; that part is not counted.', 'beltoft-services' ); ?></p>
+					<p class="beltoft-vm-usage__note" data-mem-hint role="status"></p>
+					<p class="beltoft-vm-usage__note"><?php esc_html_e( 'Linux uses free memory as a file cache and gives it back when programs need it; that part is not counted.', 'beltoft-services' ); ?></p>
 				</div>
 				<?php
 				// The disk has no history: one reading from the server's guest agent every six hours, drawn as a bar.

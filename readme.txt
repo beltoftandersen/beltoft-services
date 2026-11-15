@@ -258,6 +258,9 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 == Changelog ==
 
+= 0.31.4 =
+* Phone: the server page no longer grows wider than the screen. The memory chart's help sentence wraps inside its card, and long host names, addresses and commands in the facts and in the address tables break inside their own box.
+
 = 0.31.3 =
 * A code check that a site refuses for another reason (for example an unconfirmed email address) can now say so: the message goes through the filter `beltoft_services_step_up_refusal( $message, $user_id, $purpose )`.
 * The hosting page follows a running change until the account has no task left, through the shared script helper, instead of its own polling.
