@@ -20,6 +20,11 @@ defined( 'ABSPATH' ) || exit;
  * customer owns both licenses, the account is live) and attached through HostingActions::add_domain, the same way as a
  * domain the customer connects later. Past the deadline, or when it is refused, nothing breaks: the site stays on the
  * temporary address and the account page offers the normal "connect a domain" option.
+ *
+ * This is a background follow-up of the order, not a customer's change, and it has no loop of its own: the attach is queued as
+ * a change of the account through the shared controller (HostingActions::queue(), the same checks as a customer's), and when
+ * the account is busy or not ready the domain sweep (DomainSweep, every quarter of an hour) asks again, until the deadline. The
+ * state is the resource meta below, which the sweep reads.
  */
 final class SiteNewDomain {
 
@@ -27,14 +32,12 @@ final class SiteNewDomain {
 	public const META_UNTIL  = 'site_new_domain_until';
 	public const META_DONE   = 'site_new_domain_done';
 	public const META_WHY    = 'site_new_domain_why';
-	public const RETRY_HOOK  = 'beltoft_services_site_new_domain';
 
 	/**
 	 * Hooks.
 	 */
 	public static function register(): void {
 		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'on_state_changed' ), 10, 3 );
-		add_action( self::RETRY_HOOK, array( __CLASS__, 'retry' ) );
 	}
 
 	/**
@@ -67,14 +70,12 @@ final class SiteNewDomain {
 	}
 
 	/**
-	 * Action of the scheduled retry.
+	 * The domain sweep's look at one account: a domain of the order that is waiting is attached when everything is in place.
 	 *
-	 * @param mixed $resource_id Hosting resource id.
+	 * @param Resource $r Hosting resource.
 	 */
-	public static function retry( $resource_id ): void {
-		$r = Resource::find( (int) $resource_id );
-
-		if ( $r ) {
+	public static function sweep( Resource $r ): void {
+		if ( '' !== (string) $r->get( self::META_DOMAIN ) && ! $r->get( self::META_DONE ) ) {
 			self::attempt( $r );
 		}
 	}
@@ -120,7 +121,7 @@ final class SiteNewDomain {
 		}
 
 		$site = Sites::for_resource( $r->id() )[0] ?? null;
-		$out  = null === $site ? new \WP_Error( 'no_site', 'the website does not exist yet' ) : ( new HostingActions( $r ) )->add_domain( (string) $site['slug'], $name );
+		$out  = null === $site ? new \WP_Error( 'no_site', 'the website does not exist yet' ) : ( new HostingActions( $r ) )->queue( 'add_domain', array( (string) $site['slug'], $name ) );
 
 		// Read fresh: another run of the same event may have finished while this one worked.
 		$r = Resource::find( $r->id() ) ?? $r;
@@ -139,12 +140,8 @@ final class SiteNewDomain {
 
 		$code = $out->get_error_code();
 
-		// Busy or not ready yet: try again until the deadline, one pending retry at a time. Anything else is final.
-		if ( in_array( $code, array( 'busy', 'not_ready', 'no_site' ), true ) && function_exists( 'as_schedule_single_action' ) ) {
-			if ( time() + 600 <= (int) $r->get( self::META_UNTIL ) ) {
-				\BeltoftServices\Jobs::schedule_once( time() + 600, self::RETRY_HOOK, array( $r->id() ) );
-			}
-
+		// Busy or not ready yet: the domain sweep asks again until the deadline. Anything else is final.
+		if ( in_array( $code, array( 'busy', 'not_ready', 'no_site' ), true ) ) {
 			return;
 		}
 

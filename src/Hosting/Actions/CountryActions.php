@@ -129,45 +129,56 @@ final class CountryActions {
 	 * Sends the stored block of a website to the node again (after a restore, or any path that renders the website afresh
 	 * and so loses the node's copy). Nothing is changed in the shop: the stored setting is the truth. A website that never
 	 * had a block set is left alone; one whose block was turned off is sent as off, so a restored older copy does not bring
-	 * a removed block back.
+	 * a removed block back. A change of the shared controller (the action `resend_country`, queued by Steps::done() after a
+	 * restore): in a job each website is one agent step, and the ones that could not be sent are named in the failure staff are
+	 * told about.
 	 *
-	 * @param string $slug Site.
+	 * @param string $slug Site, or '' for every website with a stored block.
 	 * @return true|\WP_Error True when sent or when there is nothing stored.
 	 */
-	public function resend( string $slug ) {
-		return $this->locked( fn() => $this->resend_locked( $slug ) );
+	public function resend_country( string $slug = '' ) {
+		return $this->queued_only() ?? $this->locked( fn() => $this->resend_locked( $slug ) );
 	}
 
 	/**
-	 * resend with the site lock held.
+	 * resend_country with the site lock held.
 	 *
-	 * @param string $slug Site.
+	 * @param string $slug Site, or ''.
 	 * @return true|\WP_Error
 	 */
 	private function resend_locked( string $slug ) {
-		$site = Sites::find( $this->r->id(), $slug );
-
-		if ( null === $site || ! isset( $site['flags']['country_block'] ) ) {
-			return true;
-		}
-
 		$ready = $this->ready();
 
 		if ( is_wp_error( $ready ) ) {
 			return $ready;
 		}
 
-		$stored = CountryBlock::stored( $site );
 		$record = (array) Records::for_resource( $this->r->id() );
-		$done   = $this->call( 'site_country_' . $slug, 'site.country_block', array( 'vmid' => (int) $record['vmid'], 'slug' => $slug, 'countries' => $stored['countries'], 'scope' => $stored['scope'] ) );
+		$failed = array();
 
-		if ( is_wp_error( $done ) ) {
-			return $done;
+		foreach ( Sites::for_resource( $this->r->id() ) as $site ) {
+			if ( ( '' !== $slug && $site['slug'] !== $slug ) || ! isset( $site['flags']['country_block'] ) ) {
+				continue;
+			}
+
+			$stored = CountryBlock::stored( $site );
+
+			// In a request nothing is sent: the first agent call ends it with the queued change.
+			$done = $this->call( 'site_country_' . $site['slug'], 'site.country_block', array( 'vmid' => (int) $record['vmid'], 'slug' => (string) $site['slug'], 'countries' => $stored['countries'], 'scope' => $stored['scope'] ) );
+
+			if ( is_wp_error( $done ) ) {
+				$failed[] = (string) $site['slug'];
+				continue;
+			}
+
+			$block           = (array) $site['flags']['country_block'];
+			$block['active'] = array() === $stored['countries'] ? null : ! empty( $done['active'] );
+			Sites::update( $this->r->id(), (string) $site['slug'], array( 'flags' => array( 'country_block' => $block ) ) );
 		}
 
-		$block           = (array) $site['flags']['country_block'];
-		$block['active'] = array() === $stored['countries'] ? null : ! empty( $done['active'] );
-		Sites::update( $this->r->id(), $slug, array( 'flags' => array( 'country_block' => $block ) ) );
+		if ( array() !== $failed ) {
+			return new \WP_Error( 'failed', sprintf( 'The stored country block of website "%s" could not be sent to the node after a restore. The node may not block the chosen countries. Open the website on the hosting page and save its country block again.', implode( '", "', $failed ) ) );
+		}
 
 		return true;
 	}

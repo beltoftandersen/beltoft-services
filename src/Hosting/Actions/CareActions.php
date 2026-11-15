@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Hosting\Actions;
 
+use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Hosting\HostingAccount;
 use BeltoftServices\Hosting\HostingBackups;
 use BeltoftServices\Hosting\HostingRestore;
@@ -39,18 +40,49 @@ final class CareActions {
 	}
 
 	/**
-	 * Back up now.
+	 * Back up now. A change of the shared controller (the action `backup_now`): the request checks the rules and stores the round, the
+	 * job drives it (HostingBackups::step()) as far as the node's tasks take it.
 	 *
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public function backup_now() {
-		$ready = $this->ready();
-
-		return is_wp_error( $ready ) ? $ready : ( new HostingBackups( $this->r ) )->now();
+		return $this->queued_only() ?? $this->locked( fn() => $this->backup_now_locked() );
 	}
 
 	/**
-	 * Starts a restore.
+	 * backup_now with the site lock held.
+	 *
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private function backup_now_locked() {
+		$ready = $this->ready();
+
+		if ( is_wp_error( $ready ) ) {
+			return $ready;
+		}
+
+		$round = new HostingBackups( Resource::find( $this->r->id() ) ?? $this->r );
+
+		if ( $this->in_job() ) {
+			// One run of the round: a poll or a retry ends this run only, a done or failed result ends the change.
+			throw new TaskPending( $round->active() ? $round->signal( $round->step() ) : StepResult::done( array(), 'Backup finished' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- a control-flow signal between request and job, never printed.
+		}
+
+		$checked = $round->prepare_manual();
+
+		if ( is_wp_error( $checked ) ) {
+			return $checked;
+		}
+
+		$this->defer_with( $checked );
+		$this->defer_now( 'backup' );
+
+		return $checked;
+	}
+
+	/**
+	 * Starts a restore. A change of the shared controller (the action `restore_backup`): the request checks it and stores the round,
+	 * the job drives it (HostingRestore::step()), waiting for the node's tasks with the shared poll budget.
 	 *
 	 * @param string $scope account, files or database.
 	 * @param string $volid Backup.
@@ -58,20 +90,50 @@ final class CareActions {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public function restore( string $scope, string $volid, string $slug = '' ) {
-		$ready = $this->ready();
-
-		return is_wp_error( $ready ) ? $ready : ( new HostingRestore( $this->r ) )->start( $scope, $volid, $slug );
+		return $this->queued_only() ?? $this->locked( fn() => $this->restore_locked( 'restore', $scope, $volid, $slug ) );
 	}
 
 	/**
-	 * Goes back to the safety point.
+	 * Goes back to the safety point (the action `restore_undo`).
 	 *
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public function undo() {
+		return $this->queued_only() ?? $this->locked( fn() => $this->restore_locked( 'undo', '', '', '' ) );
+	}
+
+	/**
+	 * A restore or an undo with the site lock held.
+	 *
+	 * @param string $what  restore or undo.
+	 * @param string $scope account, files or database.
+	 * @param string $volid Backup.
+	 * @param string $slug  Site.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private function restore_locked( string $what, string $scope, string $volid, string $slug ) {
 		$ready = $this->ready();
 
-		return is_wp_error( $ready ) ? $ready : ( new HostingRestore( $this->r ) )->undo();
+		if ( is_wp_error( $ready ) ) {
+			return $ready;
+		}
+
+		$round = new HostingRestore( Resource::find( $this->r->id() ) ?? $this->r );
+
+		if ( $this->in_job() ) {
+			throw new TaskPending( HostingRestore::active( Resource::find( $this->r->id() ) ?? $this->r ) ? $round->step() : StepResult::done( array(), 'Restore finished' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- a control-flow signal between request and job, never printed.
+		}
+
+		$checked = 'undo' === $what ? $round->prepare_undo() : $round->prepare( $scope, $volid, $slug );
+
+		if ( is_wp_error( $checked ) ) {
+			return $checked;
+		}
+
+		$this->defer_with( $checked, 'undo' === $what ? array() : array( $scope, $volid, $slug ) );
+		$this->defer_now( 'restore' );
+
+		return $checked;
 	}
 
 	/**

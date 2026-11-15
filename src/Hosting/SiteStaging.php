@@ -7,28 +7,28 @@
 
 namespace BeltoftServices\Hosting;
 
-use BeltoftServices\Alerts;
-use BeltoftServices\Drivers\StepResult;
+use BeltoftServices\Hosting\Actions\Steps;
 use BeltoftServices\Jobs;
-use BeltoftServices\Locks;
 use BeltoftServices\Resource;
-use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * A website may have one staging copy: its files and database on a temporary address of its own, to try changes in and push
- * back. The node agent does the work (`site.staging_create`, `_refresh`, `_push`, `_undo`, `_delete`); this class decides what is
- * allowed, keeps what happened in the flags of the website, and runs each long step as an Action Scheduler job under the
- * account's site lock, the way SiteWordPress runs the move of WordPress. The flag `staging` of the website holds:
+ * back. The node agent does the work (`site.staging_create`, `_refresh`, `_push`, `_undo`, `_delete`). Making, refreshing, pushing,
+ * undoing and deleting a copy are changes of the account on the shared action controller (Actions\StagingActions, the internal
+ * actions `staging_create` ... `staging_delete`): no loop, retry counter or outcome of their own. This class decides what is
+ * allowed and keeps the feature state in the flag `staging` of the website:
  *
  * - `copy`, `host`: the copy's name on the node and its temporary address (`<copy>.<preview zone>`);
- * - `state`: '' (no copy), creating, ready, refreshing, pushing, undoing or deleting; `phase` says how far a create or delete is;
+ * - `state`: '' (no copy), creating, ready or deleting. A refresh, a push and an undo leave it `ready`: that they run is read
+ *   from the account's task (view() says refreshing, pushing or undoing then);
  * - `routed`: the copy's address is in DNS and on the edge map;
- * - `files_only`: the push under way leaves the database alone;
  * - `at`, `refreshed`: when the copy was made and last made again;
- * - `undo`: the way back of the last push (`at`, `scope` files or full), offered for 7 days;
- * - `note` and `failed`: what the last job found (failed, unsupported, unsafe) and which job (create, refresh, push, undo, delete).
+ * - `undo`: the way back of the last push (`at`, `scope` files or full), offered for 7 days.
+ *
+ * What the last job found (failed, unsupported, unsafe) is the shared last_result, not a flag; which step a job is at, and
+ * whether the push is files only, are the task's steps and arguments.
  *
  * The copy's address is a `preview` row in SiteDomains that belongs to no website (site id 0): DNS, the edge map and the deletion
  * of an account treat it as they treat every temporary address, and the website's own list of names does not show it.
@@ -37,13 +37,8 @@ final class SiteStaging {
 
 	use Runs;
 
-	public const HOOK = 'beltoft_services_hosting_staging';
-
 	/** The ways a job can go. */
 	public const KINDS = array( 'create', 'refresh', 'push', 'undo', 'delete' );
-
-	/** Attempts of one job (a busy lock, a failed agent job). */
-	public const TRIES = 3;
 
 	/** The way back of a push is offered, and kept by the node, this long. */
 	public const KEEP = 7 * DAY_IN_SECONDS;
@@ -54,15 +49,8 @@ final class SiteStaging {
 	/** The share of the plan's storage above which a copy is not made: it needs as much space as the website. */
 	public const STORAGE_PERCENT = 50.0;
 
-	/** Seconds between two looks at a job that waits for the node. */
-	private const POLL = 10;
-
-	/**
-	 * Hooks the job.
-	 */
-	public static function register(): void {
-		add_action( self::HOOK, array( __CLASS__, 'run' ), 10, 5 );
-	}
+	/** Seconds a run may wait for the node's job (a copy takes minutes; the shared controller caps it). */
+	public const BUDGET = 1800;
 
 	/**
 	 * @param Resource $r Hosting resource.
@@ -74,32 +62,42 @@ final class SiteStaging {
 	// What the page and the rules read.
 
 	/**
-	 * What a website's flags say about its staging copy, with every key present.
+	 * What a website's flags and the account's task say about its staging copy, with every key present.
 	 *
-	 * @param array<string, mixed> $site Site row.
-	 * @return array{copy: string, host: string, state: string, phase: string, routed: bool, files_only: bool, at: int, refreshed: int, undo: array{at: int, scope: string}|null, note: string, failed: string, busy: bool, exists: bool}
+	 * @param array<string, mixed>      $site Site row.
+	 * @param array<string, mixed>|null $task The account's task (Actions\Steps::view()), or null to read it.
+	 * @return array{copy: string, host: string, state: string, routed: bool, at: int, refreshed: int, undo: array{at: int, scope: string}|null, busy: bool, exists: bool}
 	 */
-	public static function view( array $site ): array {
-		$f     = (array) ( $site['flags']['staging'] ?? array() );
-		$state = (string) ( $f['state'] ?? '' );
-		$undo  = is_array( $f['undo'] ?? null ) && (int) ( $f['undo']['at'] ?? 0 ) + self::KEEP > Jobs::now() && in_array( (string) ( $f['undo']['scope'] ?? '' ), array( 'files', 'full' ), true )
+	public static function view( array $site, ?array $task = null ): array {
+		$f      = (array) ( $site['flags']['staging'] ?? array() );
+		$stored = (string) ( $f['state'] ?? '' );
+		$undo   = is_array( $f['undo'] ?? null ) && (int) ( $f['undo']['at'] ?? 0 ) + self::KEEP > Jobs::now() && in_array( (string) ( $f['undo']['scope'] ?? '' ), array( 'files', 'full' ), true )
 			? array( 'at' => (int) $f['undo']['at'], 'scope' => (string) $f['undo']['scope'] )
 			: null;
 
+		// A flag an older version left while a job ran: the copy is there.
+		if ( in_array( $stored, array( 'refreshing', 'pushing', 'undoing' ), true ) ) {
+			$stored = 'ready';
+		}
+
+		if ( null === $task && isset( $site['resource_id'] ) ) {
+			$fresh = Resource::find( (int) $site['resource_id'] );
+			$task  = null === $fresh ? null : Steps::view( $fresh );
+		}
+
+		$kind  = null !== $task && (string) $task['slug'] === (string) ( $site['slug'] ?? '' ) && 0 === strpos( (string) $task['action'], 'staging_' ) ? substr( (string) $task['action'], 8 ) : '';
+		$state = array( 'create' => 'creating', 'refresh' => 'refreshing', 'push' => 'pushing', 'undo' => 'undoing', 'delete' => 'deleting' )[ $kind ] ?? $stored;
+
 		return array(
-			'copy'       => '' === $state ? '' : (string) ( $f['copy'] ?? '' ),
-			'host'       => '' === $state ? '' : (string) ( $f['host'] ?? '' ),
-			'state'      => $state,
-			'phase'      => (string) ( $f['phase'] ?? '' ),
-			'routed'     => ! empty( $f['routed'] ),
-			'files_only' => ! empty( $f['files_only'] ),
-			'at'         => (int) ( $f['at'] ?? 0 ),
-			'refreshed'  => (int) ( $f['refreshed'] ?? 0 ),
-			'undo'       => $undo,
-			'note'       => (string) ( $f['note'] ?? '' ),
-			'failed'     => (string) ( $f['failed'] ?? '' ),
-			'busy'       => in_array( $state, array( 'creating', 'refreshing', 'pushing', 'undoing', 'deleting' ), true ),
-			'exists'     => '' !== $state,
+			'copy'      => '' === $stored ? '' : (string) ( $f['copy'] ?? '' ),
+			'host'      => '' === $stored ? '' : (string) ( $f['host'] ?? '' ),
+			'state'     => $state,
+			'routed'    => ! empty( $f['routed'] ),
+			'at'        => (int) ( $f['at'] ?? 0 ),
+			'refreshed' => (int) ( $f['refreshed'] ?? 0 ),
+			'undo'      => $undo,
+			'busy'      => in_array( $state, array( 'creating', 'refreshing', 'pushing', 'undoing', 'deleting' ), true ),
+			'exists'    => '' !== $stored,
 		);
 	}
 
@@ -113,7 +111,7 @@ final class SiteStaging {
 		$out = array();
 
 		foreach ( Sites::for_resource( $resource_id ) as $site ) {
-			$view = self::view( $site );
+			$view = self::view( $site, array( 'action' => '', 'slug' => '' ) );
 
 			if ( $view['exists'] ) {
 				$out[ (string) $site['slug'] ] = $view;
@@ -195,363 +193,162 @@ final class SiteStaging {
 		return null !== $used && $used > self::STORAGE_PERCENT ? __( 'There is not enough storage left for a staging copy. A copy needs as much space as the website.', 'beltoft-services' ) : null;
 	}
 
-	// Queueing, for the customer actions.
+	/**
+	 * What the customer reads when a job did not work: the outcome of the action (the shared last_result), one sentence for each way
+	 * it can end.
+	 *
+	 * @param string $kind One of KINDS.
+	 * @param string $note failed, unsupported or unsafe.
+	 */
+	public static function outcome_text( string $kind, string $note = 'failed' ): string {
+		if ( 'unsupported' === $note ) {
+			return __( 'Your hosting cannot do this yet. Contact support.', 'beltoft-services' );
+		}
+
+		if ( 'unsafe' === $note ) {
+			return __( 'The push did not work and the live website could not be put back automatically. Support has been told.', 'beltoft-services' );
+		}
+
+		$fail = array(
+			'create'  => __( 'The staging copy could not be made. Your website was not changed.', 'beltoft-services' ),
+			'refresh' => __( 'The staging copy could not be refreshed. Your website was not changed. Refresh it again, or delete it.', 'beltoft-services' ),
+			'push'    => __( 'The push did not work. Your live website was put back as it was.', 'beltoft-services' ),
+			'undo'    => __( 'The undo did not work. Try again, or contact support.', 'beltoft-services' ),
+			'delete'  => __( 'The staging copy could not be deleted. Try again.', 'beltoft-services' ),
+		);
+
+		return (string) ( $fail[ $kind ] ?? __( 'That did not work. Try again, or contact support.', 'beltoft-services' ) );
+	}
+
+	// What a job records (called by Actions\StagingActions, in the request that queues it and in the job).
 
 	/**
-	 * Records the start of a job and queues it. Nothing is sent to the node here.
+	 * The request that queues a create or a delete records the start: a copy being made or deleted exists for the plan's limit, DNS
+	 * and the edge map from now on. A refresh, a push and an undo record nothing: the task says they run.
 	 *
-	 * @param Resource $r          Hosting resource.
-	 * @param string   $slug       Website.
-	 * @param string   $kind       One of KINDS.
-	 * @param bool     $files_only A push of files only.
-	 * @param string   $label      The copy's name (create).
+	 * @param Resource $r     Hosting resource.
+	 * @param string   $slug  Website.
+	 * @param string   $kind  create or delete.
+	 * @param string   $label The copy's name (create).
 	 */
-	public static function queue( Resource $r, string $slug, string $kind, bool $files_only = false, string $label = '' ): void {
-		$site = (array) Sites::find( $r->id(), $slug );
-		$view = self::view( $site );
-		$now  = Jobs::now();
-		$base = array( 'note' => '', 'failed' => '', 'files_only' => $files_only );
-		$next = array(
-			'create'  => array( 'state' => 'creating', 'phase' => 'dns', 'routed' => false, 'copy' => $label, 'host' => EdgeMap::preview_host( $label ), 'at' => $now, 'refreshed' => 0 ),
-			'refresh' => array( 'state' => 'refreshing' ),
-			'push'    => array( 'state' => 'pushing' ),
-			'undo'    => array( 'state' => 'undoing' ),
-			'delete'  => array( 'state' => 'deleting', 'phase' => 'copy' ),
-		)[ $kind ];
+	public static function begin( Resource $r, string $slug, string $kind, string $label = '' ): void {
+		$site  = (array) Sites::find( $r->id(), $slug );
+		$flags = (array) ( $site['flags']['staging'] ?? array() );
 
-		$flags = array_merge( (array) ( $site['flags']['staging'] ?? array() ), $base, $next );
-
-		if ( 'create' !== $kind ) {
-			$flags['copy'] = $view['copy'];
-			$flags['host'] = $view['host'];
+		if ( 'create' === $kind ) {
+			$flags = array_merge( $flags, array( 'state' => 'creating', 'routed' => false, 'copy' => $label, 'host' => EdgeMap::preview_host( $label ), 'at' => Jobs::now(), 'refreshed' => 0 ) );
+		} else {
+			$flags['state'] = 'deleting';
 		}
 
 		Sites::update( $r->id(), $slug, array( 'flags' => array( 'staging' => $flags ) ) );
-		Jobs::schedule_once( time() + 2, self::HOOK, array( $r->id(), $slug, $kind, $files_only ? 1 : 0, 0 ) );
-	}
-
-	// The job.
-
-	/**
-	 * Background run of one job.
-	 *
-	 * @param int    $id         Resource id.
-	 * @param string $slug       Website.
-	 * @param string $kind       One of KINDS.
-	 * @param int    $files_only 1 for a push of files only.
-	 * @param int    $try        Attempt, from 0.
-	 */
-	public static function run( int $id, string $slug, string $kind, int $files_only = 0, int $try = 0 ): void {
-		$args = array( $id, $slug, $kind, $files_only, $try );
-
-		if ( Settings::get( 'pause_all' ) ) {
-			Jobs::schedule_once( time() + 300, self::HOOK, $args );
-
-			return;
-		}
-
-		$r = Resource::find( $id );
-
-		if ( ! $r || HostingDriver::ID !== $r->get( 'driver' ) || ! in_array( $kind, self::KINDS, true ) ) {
-			return;
-		}
-
-		$me    = new self( $r );
-		$delay = $me->step( $slug, $kind, 1 === $files_only, $try );
-
-		if ( $delay <= 0 ) {
-			return;
-		}
-
-		if ( $try + 1 >= self::TRIES ) {
-			$me->give_up( $slug, $kind );
-
-			return;
-		}
-
-		$args[4] = $try + 1;
-		Jobs::schedule_once( time() + $delay, self::HOOK, $args );
 	}
 
 	/**
-	 * One look at the job.
+	 * Keeps what the agent answered for a job that worked.
 	 *
-	 * @param string $slug       Website.
-	 * @param string $kind       Job.
-	 * @param bool   $files_only A push of files only.
-	 * @param int    $try        Attempt.
-	 * @return int Seconds until the next look, 0 when it is over.
-	 */
-	private function step( string $slug, string $kind, bool $files_only, int $try ): int {
-		unset( $try );
-		$this->r = Resource::find( $this->r->id() ) ?? $this->r;
-		$site    = Sites::find( $this->r->id(), $slug );
-
-		if ( null === $site || 'ready' !== $this->r->get( 'state' ) || 'ready' !== $this->r->get( 'desired' ) ) {
-			return 0;
-		}
-
-		$view = self::view( $site );
-
-		// A job that is not the one the flags wait for (it was queued twice, or ended already) does nothing.
-		if ( $view['state'] !== array( 'create' => 'creating', 'refresh' => 'refreshing', 'push' => 'pushing', 'undo' => 'undoing', 'delete' => 'deleting' )[ $kind ] ) {
-			return 0;
-		}
-
-		$early = $this->connect();
-
-		if ( null !== $early ) {
-			return $early->is_retry() ? max( 60, $early->delay() ) : 0;
-		}
-
-		list( $taken, $answer ) = Locks::with( Locks::name( 'hosting-site', $this->r->id() ), (int) apply_filters( 'beltoft_services_hosting_lock_wait', 10 ), fn() => $this->send( $site, $view, $kind, $files_only ) );
-
-		if ( ! $taken ) {
-			return 30;
-		}
-
-		if ( $answer instanceof StepResult ) {
-			if ( $answer->is_poll() ) {
-				return max( self::POLL, $answer->poll_seconds() );
-			}
-
-			return $this->failed_call( $answer, $slug, $kind );
-		}
-
-		return 0;
-	}
-
-	/**
-	 * Does the next part of the job. Returns the agent's result once the job is done (after it was recorded), or a StepResult to
-	 * wait or try again.
-	 *
-	 * @param array<string, mixed> $site       Site row.
-	 * @param array<string, mixed> $view       self::view().
-	 * @param string               $kind       Job.
-	 * @param bool                 $files_only A push of files only.
-	 * @return array<string, mixed>|StepResult
-	 */
-	private function send( array $site, array $view, string $kind, bool $files_only ) {
-		$slug   = (string) $site['slug'];
-		$record = (array) Records::for_resource( $this->r->id() );
-		$vmid   = (int) $record['vmid'];
-
-		if ( 'create' === $kind && 'dns' === $view['phase'] ) {
-			$named = $this->name_in_dns( $site, $view );
-
-			if ( null !== $named ) {
-				return $named;
-			}
-
-			$view['phase'] = 'copy';
-		}
-
-		if ( 'delete' === $kind && 'dns' === $view['phase'] ) {
-			return $this->finish_delete( $slug, $view );
-		}
-
-		$op   = array( 'create' => 'site.staging_create', 'refresh' => 'site.staging_refresh', 'push' => 'site.staging_push', 'undo' => 'site.staging_undo', 'delete' => 'site.staging_delete' )[ $kind ];
-		$args = array( 'vmid' => $vmid, 'slug' => $slug );
-
-		if ( 'create' === $kind ) {
-			$args += array( 'copy' => $view['copy'], 'host' => $view['host'] );
-		}
-
-		if ( 'push' === $kind && $files_only ) {
-			$args['files_only'] = true;
-		}
-
-		$answer = $this->agent_call( 'staging_' . $kind . '_' . $slug, $op, $args );
-
-		if ( $answer instanceof StepResult ) {
-			return $answer;
-		}
-
-		return $this->record( $slug, $kind, $answer, $view );
-	}
-
-	/**
-	 * Create, first part: the copy's address is recorded and written to DNS.
-	 *
-	 * @param array<string, mixed> $site Site row.
-	 * @param array<string, mixed> $view self::view().
-	 * @return StepResult|null Null when the address is in DNS.
-	 */
-	private function name_in_dns( array $site, array $view ): ?StepResult {
-		$host = $view['host'];
-
-		if ( ! SiteDomains::add( $this->r->id(), 0, $host, 'preview' ) ) {
-			return StepResult::fail( 'staging: the address "' . $host . '" could not be recorded (is it taken?)' );
-		}
-
-		$done = SiteDns::publish_preview( $view['copy'], $this->node );
-
-		if ( is_wp_error( $done ) ) {
-			return StepResult::retry( 0, 'staging: ' . $this->scrub( $done->get_error_message(), 160 ) );
-		}
-
-		if ( true !== $done ) {
-			return StepResult::fail( 'staging: ' . $this->scrub( (string) $done, 160 ) );
-		}
-
-		SiteDomains::set_state( $host, 'active' );
-		$this->settle( (string) $site['slug'], array( 'phase' => 'copy' ) );
-
-		return null;
-	}
-
-	/**
-	 * Keeps what the agent answered.
-	 *
+	 * @param Resource             $r      Hosting resource.
 	 * @param string               $slug   Website.
-	 * @param string               $kind   Job.
+	 * @param string               $kind   create, refresh, push or undo.
 	 * @param array<string, mixed> $answer The agent's result.
-	 * @param array<string, mixed> $view   self::view() as the job began.
-	 * @return array<string, mixed>|StepResult
+	 * @return true|\WP_Error An error with the customer's sentence when the node put a push back.
 	 */
-	private function record( string $slug, string $kind, array $answer, array $view ) {
+	public static function record( Resource $r, string $slug, string $kind, array $answer ) {
 		$now = Jobs::now();
 
 		switch ( $kind ) {
 			case 'create':
-				$this->settle( $slug, array( 'state' => 'ready', 'phase' => '', 'routed' => true, 'at' => $now, 'refreshed' => 0, 'note' => '', 'failed' => '' ) );
-				$this->push_edge();
+				self::settle( $r, $slug, array( 'state' => 'ready', 'routed' => true, 'at' => $now, 'refreshed' => 0 ) );
 
-				return $answer;
+				return true;
 
 			case 'refresh':
-				$this->settle( $slug, array( 'state' => 'ready', 'refreshed' => $now, 'note' => '', 'failed' => '' ) );
+				self::settle( $r, $slug, array( 'state' => 'ready', 'refreshed' => $now ) );
 
-				return $answer;
+				return true;
 
 			case 'push':
 				if ( ! empty( $answer['failed'] ) ) {
-					// The node put the website back as it was.
-					$this->settle( $slug, array( 'state' => 'ready', 'note' => 'failed', 'failed' => 'push', 'undo' => null ) );
+					// The node put the website back as it was: there is no way back to offer, and the customer is told so.
+					self::settle( $r, $slug, array( 'state' => 'ready', 'undo' => null ) );
 
-					return $answer;
+					return new \WP_Error( 'failed', 'The push did not work, the node put the website back.', array( 'text' => self::outcome_text( 'push' ), 'expected' => true ) );
 				}
 
-				$files_only = empty( $answer['database'] );
-				$this->settle( $slug, array( 'state' => 'ready', 'note' => '', 'failed' => '', 'undo' => array( 'at' => $now, 'scope' => $files_only ? 'files' : 'full' ) ) );
+				self::settle( $r, $slug, array( 'state' => 'ready', 'undo' => array( 'at' => $now, 'scope' => empty( $answer['database'] ) ? 'files' : 'full' ) ) );
 
-				return $answer;
-
-			case 'undo':
-				$this->settle( $slug, array( 'state' => 'ready', 'note' => '', 'failed' => '', 'undo' => null ) );
-
-				return $answer;
+				return true;
 		}
 
-		// Delete: the node removed the copy; now its address.
-		$this->settle( $slug, array( 'phase' => 'dns' ) );
+		self::settle( $r, $slug, array( 'state' => 'ready', 'undo' => null ) );
 
-		return $this->finish_delete( $slug, $view );
+		return true;
 	}
 
 	/**
-	 * Delete, last part: the copy's address leaves DNS, the edge map and the records.
+	 * Delete, last part: the copy's flags go, the way back of the last push stays (it belongs to the website, not to the copy).
 	 *
-	 * @param string               $slug Website.
-	 * @param array<string, mixed> $view self::view().
-	 * @return array<string, mixed>|StepResult
+	 * @param Resource $r    Hosting resource.
+	 * @param string   $slug Website.
 	 */
-	private function finish_delete( string $slug, array $view ) {
-		$gone = SiteDns::remove_domain( $this->r, $view['host'], $this->node );
+	public static function forget( Resource $r, string $slug ): void {
+		$site = (array) Sites::find( $r->id(), $slug );
+		$undo = self::view( $site, array( 'action' => '', 'slug' => '' ) )['undo'];
 
-		if ( is_wp_error( $gone ) ) {
-			return StepResult::retry( 0, 'staging: ' . $this->scrub( $gone->get_error_message(), 160 ) );
-		}
-
-		// The way back of the last push belongs to the website, not to the copy: it stays.
-		Sites::update( $this->r->id(), $slug, array( 'flags' => array( 'staging' => null === $view['undo'] ? array() : array( 'undo' => $view['undo'] ) ) ) );
-		$this->push_edge();
-
-		return array( 'deleted' => true );
-	}
-
-	/**
-	 * A job the agent refused or failed.
-	 *
-	 * @param StepResult $answer Result.
-	 * @param string     $slug   Website.
-	 * @param string     $kind   Job.
-	 * @return int Seconds until the next look.
-	 */
-	private function failed_call( StepResult $answer, string $slug, string $kind ): int {
-		$text = $answer->error();
-
-		if ( false !== strpos( $text, 'unknown_op' ) ) {
-			$this->give_up( $slug, $kind, 'unsupported' );
-
-			return 0;
-		}
-
-		if ( false !== strpos( $text, 'could not be put back' ) ) {
-			$this->give_up( $slug, $kind, 'unsafe' );
-			Alerts::notify( 'A push from a staging copy failed and could not be undone', array( 'Hosting resource ' . $this->r->id() . ', website ' . $slug . '. The safety point is on the node, in the website\'s .staging-undo folder and /var/backups/db/stgpush/.' ), $this->r, 'hosting-staging-' . $this->r->id() );
-
-			return 0;
-		}
-
-		if ( $answer->is_failed() ) {
-			$this->give_up( $slug, $kind );
-
-			return 0;
-		}
-
-		return 30;
-	}
-
-	/**
-	 * The job did not work: the website and the copy are as the node left them, and the page says so.
-	 *
-	 * @param string $slug Website.
-	 * @param string $kind Job.
-	 * @param string $note failed, unsupported or unsafe.
-	 */
-	private function give_up( string $slug, string $kind, string $note = 'failed' ): void {
-		$site = Sites::find( $this->r->id(), $slug );
-
-		if ( null === $site ) {
-			return;
-		}
-
-		$view = self::view( $site );
-
-		if ( 'create' === $kind ) {
-			// Nothing of the copy is left on the node (the agent removes a copy it could not finish): its address goes too.
-			if ( '' !== $view['host'] ) {
-				$this->connect();
-				SiteDns::remove_domain( $this->r, $view['host'], $this->node );
-			}
-
-			Sites::update( $this->r->id(), $slug, array( 'flags' => array( 'staging' => array( 'note' => $note, 'failed' => 'create', 'undo' => $view['undo'] ) ) ) );
-			$this->push_edge();
-
-			return;
-		}
-
-		$this->settle( $slug, array( 'state' => 'ready', 'phase' => '', 'note' => $note, 'failed' => $kind ) );
+		Sites::update( $r->id(), $slug, array( 'flags' => array( 'staging' => null === $undo ? array() : array( 'undo' => $undo ) ) ) );
 	}
 
 	/**
 	 * Changes some of the staging flags of a website.
 	 *
+	 * @param Resource             $r     Hosting resource.
 	 * @param string               $slug  Website.
 	 * @param array<string, mixed> $flags Keys to set.
 	 */
-	private function settle( string $slug, array $flags ): void {
-		$site = (array) Sites::find( $this->r->id(), $slug );
+	private static function settle( Resource $r, string $slug, array $flags ): void {
+		$site = (array) Sites::find( $r->id(), $slug );
 
-		Sites::update( $this->r->id(), $slug, array( 'flags' => array( 'staging' => array_merge( (array) ( $site['flags']['staging'] ?? array() ), $flags ) ) ) );
+		Sites::update( $r->id(), $slug, array( 'flags' => array( 'staging' => array_merge( (array) ( $site['flags']['staging'] ?? array() ), $flags ) ) ) );
+	}
+
+	// What an ended change leaves (hooked through Actions\Steps::failed()).
+
+	/**
+	 * A copy that could not be made: nothing of it is left on the node (the agent removes a copy it could not finish), so its address
+	 * goes too, and the website is as it was. A copy that was recorded as made stays: only the edge map failed.
+	 *
+	 * @param Resource $r    Hosting resource.
+	 * @param string   $slug Website.
+	 */
+	public static function abandon_create( Resource $r, string $slug ): void {
+		$site = '' === $slug ? null : Sites::find( $r->id(), $slug );
+
+		if ( null === $site || 'creating' !== (string) ( $site['flags']['staging']['state'] ?? '' ) ) {
+			return;
+		}
+
+		$view = self::view( $site, array( 'action' => '', 'slug' => '' ) );
+		$me   = new self( $r );
+
+		if ( '' !== $view['host'] && null === $me->connect() ) {
+			SiteDns::remove_domain( $r, $view['host'], $me->node );
+		}
+
+		self::forget( $r, $slug );
 	}
 
 	/**
-	 * Sends the edge map again, with or without the copy's address.
+	 * A delete that did not finish: the copy is a copy again (the customer may delete it again).
+	 *
+	 * @param Resource $r    Hosting resource.
+	 * @param string   $slug Website.
 	 */
-	private function push_edge(): void {
-		( new HostingActions( Resource::find( $this->r->id() ) ?? $this->r ) )->sync_edge();
+	public static function resume_after_failed_delete( Resource $r, string $slug ): void {
+		$site = '' === $slug ? null : Sites::find( $r->id(), $slug );
+
+		if ( null !== $site && 'deleting' === (string) ( $site['flags']['staging']['state'] ?? '' ) ) {
+			self::settle( $r, $slug, array( 'state' => 'ready' ) );
+		}
 	}
 
 	/**
@@ -563,7 +360,7 @@ final class SiteStaging {
 	 * @return true|\WP_Error
 	 */
 	public static function release( Resource $r, array $site, array $node ) {
-		$view = self::view( $site );
+		$view = self::view( $site, array( 'action' => '', 'slug' => '' ) );
 
 		if ( '' === $view['host'] ) {
 			return true;

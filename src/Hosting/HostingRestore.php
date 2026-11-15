@@ -9,9 +9,7 @@ namespace BeltoftServices\Hosting;
 
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
-use BeltoftServices\Locks;
 use BeltoftServices\Resource;
-use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -29,46 +27,26 @@ defined( 'ABSPATH' ) || exit;
  * same name. It is kept 24 hours. **Undo** goes back to it: the container is rolled back to the snapshot and the
  * databases imported from the labelled dump, so files and databases stay in step. Only a backup the plugin lists for
  * this container can be restored, and one round runs at a time.
+ *
+ * Since 0.31.0 a restore and an undo are changes of the account on the shared action controller (the internal actions
+ * `restore_backup` and `restore_undo`, run by Actions\CareActions in job mode): the request checks and stores the round
+ * (prepare(), prepare_undo()), the job drives step() and answers the shared poll budget with the Proxmox task's wait, and the
+ * outcome is the shared last_result. The round in the resource meta `restore` is the step memory of a round that has many Proxmox
+ * tasks; `restore_last` is the record the backups panel and the email read. A round whose job ended without finishing is put right
+ * by give_up() (hooked through Actions\Steps::failed()).
  */
 final class HostingRestore {
 
 	use Runs;
 
-	public const HOOK        = 'beltoft_services_hosting_restore';
 	public const SAFETY_TTL  = DAY_IN_SECONDS;
 	public const ASSUMED_MBS = 50;
 
 	/**
-	 * Hooks the background run and the expiry of safety points.
+	 * Hooks the expiry of safety points.
 	 */
 	public static function register(): void {
-		add_action( self::HOOK, array( __CLASS__, 'run' ) );
 		add_action( HostingBackups::HOOK, array( __CLASS__, 'expire_all' ), 20 );
-	}
-
-	/**
-	 * Background run of one account's round.
-	 *
-	 * @param int $id Resource id.
-	 */
-	public static function run( int $id ): void {
-		if ( Settings::get( 'pause_all' ) ) {
-			as_schedule_single_action( time() + 300, self::HOOK, array( $id ), Jobs::GROUP );
-
-			return;
-		}
-
-		$r = Resource::find( $id );
-
-		if ( ! $r || HostingDriver::ID !== $r->get( 'driver' ) || ! self::active( $r ) ) {
-			return;
-		}
-
-		$answer = ( new self( $r ) )->step();
-
-		if ( $answer->is_retry() ) {
-			as_schedule_single_action( time() + max( 5, $answer->delay() ), self::HOOK, array( $id ), Jobs::GROUP );
-		}
 	}
 
 	/**
@@ -115,39 +93,15 @@ final class HostingRestore {
 	}
 
 	/**
-	 * Starts a restore. The round runs in the background.
+	 * Checks a restore and stores its round (the request that queues the change calls this, with the account's site lock held).
+	 * The round is driven by step() in the job of the change.
 	 *
 	 * @param string $kind  account, files or database.
 	 * @param string $volid Backup volume id, from the listing of this container.
 	 * @param string $slug  Site (files and database).
-	 * @return array<string, mixed>|\WP_Error
+	 * @return array<string, mixed>|\WP_Error started and the minutes it takes, or the refusal.
 	 */
-	public function start( string $kind, string $volid, string $slug = '' ) {
-		return $this->exclusive( fn() => $this->start_locked( $kind, $volid, $slug ) );
-	}
-
-	/**
-	 * Runs a start or an undo while no other backup, restore or undo of the account starts (they check each other's state, so they
-	 * must not check at the same moment).
-	 *
-	 * @param callable $change The change.
-	 * @return mixed|\WP_Error
-	 */
-	private function exclusive( callable $change ) {
-		list( $taken, $result ) = Locks::with( Locks::name( 'hosting-backup', $this->r->id() ), (int) apply_filters( 'beltoft_services_hosting_lock_wait', 10 ), $change );
-
-		return $taken ? $result : new \WP_Error( 'busy', __( 'Something else is starting on your hosting. Try again in a few minutes.', 'beltoft-services' ) );
-	}
-
-	/**
-	 * Starts a restore with the lock held.
-	 *
-	 * @param string $kind  account, files or database.
-	 * @param string $volid Backup.
-	 * @param string $slug  Website.
-	 * @return array<string, mixed>|\WP_Error
-	 */
-	private function start_locked( string $kind, string $volid, string $slug ) {
+	public function prepare( string $kind, string $volid, string $slug = '' ) {
 		$this->r = Resource::find( $this->r->id() ) ?? $this->r;
 
 		if ( 'ready' !== $this->r->get( 'state' ) || 'ready' !== $this->r->get( 'desired' ) || ! HostingBackups::enabled( $this->r ) ) {
@@ -192,29 +146,18 @@ final class HostingRestore {
 			return new \WP_Error( 'failed', __( 'The restore could not be started. Try again.', 'beltoft-services' ) );
 		}
 
-		as_enqueue_async_action( self::HOOK, array( (int) $this->r->id() ), Jobs::GROUP );
-
 		return array(
-			'started'  => true,
-			'minutes'  => 'account' === $kind ? self::estimate_minutes( (int) $backup['size'] ) : 2,
+			'started' => true,
+			'minutes' => 'account' === $kind ? self::estimate_minutes( (int) $backup['size'] ) : 2,
 		);
 	}
 
 	/**
-	 * Undo: back to the safety point.
+	 * Checks an undo and stores its round: back to the safety point.
 	 *
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	public function undo() {
-		return $this->exclusive( fn() => $this->undo_locked() );
-	}
-
-	/**
-	 * Starts the undo with the lock held.
-	 *
-	 * @return array<string, mixed>|\WP_Error
-	 */
-	private function undo_locked() {
+	public function prepare_undo() {
 		$this->r = Resource::find( $this->r->id() ) ?? $this->r;
 		$safety  = self::safety( $this->r );
 
@@ -240,9 +183,27 @@ final class HostingRestore {
 			return new \WP_Error( 'failed', __( 'The undo could not be started. Try again.', 'beltoft-services' ) );
 		}
 
-		as_enqueue_async_action( self::HOOK, array( (int) $this->r->id() ), Jobs::GROUP );
-
 		return array( 'started' => true );
+	}
+
+	/**
+	 * A round whose job ended without finishing (it failed for good, was lost, or nothing worked on it): the round ends, so the account
+	 * is not left half way. An account restore that had stopped the container starts it again. Nothing happens when no round runs.
+	 *
+	 * @param string $why Admin text.
+	 */
+	public function give_up( string $why ): void {
+		$this->r = Resource::find( $this->r->id() ) ?? $this->r;
+
+		if ( ! self::active( $this->r ) ) {
+			return;
+		}
+
+		if ( null === $this->client ) {
+			$this->connect();
+		}
+
+		$this->abort( (array) $this->r->get( 'restore' ), $why );
 	}
 
 	/**
@@ -285,7 +246,7 @@ final class HostingRestore {
 		$early = $this->poll_task();
 
 		if ( null !== $early ) {
-			return $early;
+			return $this->signal( $early );
 		}
 
 		$round = (array) ( Resource::find( $this->r->id() ) ?? $this->r )->get( 'restore' );
@@ -298,7 +259,7 @@ final class HostingRestore {
 			$result = $this->{'phase_' . $phase}( $round );
 
 			if ( $result instanceof StepResult ) {
-				return $result->is_failed() ? $this->abort( $round, $result->error() ) : $result;
+				return $result->is_failed() ? $this->abort( $round, $result->error() ) : $this->signal( $result );
 			}
 
 			$round['done'][] = $phase;
@@ -312,15 +273,12 @@ final class HostingRestore {
 		}
 
 		$this->r = Resource::find( $this->r->id() ) ?? $this->r;
-		$this->r->set( array( 'restore' => array( 'kind' => '' ), 'restore_last' => array( 'kind' => $round['kind'], 'at' => Jobs::now(), 'ok' => true ) ) );
+		$this->r->set( array( 'restore' => null, 'restore_last' => array( 'kind' => $round['kind'], 'at' => Jobs::now(), 'ok' => true ) ) );
 		$this->tell( $round, true );
 
-		// A restored container or website may have lost the node's copy of a country block: send the stored one again, in the background.
-		if ( in_array( (string) $round['kind'], array( 'account', 'files', 'undo' ), true ) ) {
-			CountryResend::queue( $this->r, 'files' === $round['kind'] ? (string) $round['slug'] : '' );
-		}
-
-		return $this->signal( StepResult::done( array(), 'Restore finished' ) );
+		// A restored container or website may have lost the node's copy of a country block: the stored one is sent again by the change
+		// that follows this one (Actions\Steps::done()).
+		return StepResult::done( array(), 'Restore finished' );
 	}
 
 	/**
@@ -337,11 +295,18 @@ final class HostingRestore {
 			$this->phase_start( $round );
 		}
 
-		$this->r->set( array( 'restore' => array( 'kind' => '' ), 'restore_last' => array( 'kind' => $round['kind'], 'at' => Jobs::now(), 'ok' => false, 'why' => $this->scrub( $why, 200 ) ) ) );
+		$this->r->set( array( 'restore' => null, 'restore_last' => array( 'kind' => $round['kind'], 'at' => Jobs::now(), 'ok' => false, 'why' => $this->scrub( $why, 200 ) ) ) );
 		\BeltoftServices\Alerts::admin( $this->r, 'A restore failed and stopped: ' . $this->scrub( $why, 200 ) );
 		$this->tell( $round, false );
 
-		return StepResult::done( array(), 'Restore failed' );
+		// Staff and the customer were told above: the outcome is a failure the customer reads in these words, and no second mail goes out.
+		return StepResult::fail(
+			'Restore failed: ' . $this->scrub( $why, 160 ),
+			array(
+				Jobs::TEXT     => __( 'The restore did not work. Your hosting was put back as far as it could be, and we have been told.', 'beltoft-services' ),
+				Jobs::EXPECTED => true,
+			)
+		);
 	}
 
 	/**

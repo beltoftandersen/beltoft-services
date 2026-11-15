@@ -488,12 +488,17 @@ class DnsTest extends HostingCase {
 
 		$this->lookups( array( '198.51.100.7' ), array( SiteDns::proof_token( $r->id(), $host ) ) );
 		$this->assertSame( array( $host => 'active' ), \BeltoftServices\Hosting\DomainSweep::run() );
+		$this->assertTrue( \BeltoftServices\Jobs::acting( $r->id() ), 'The sweep queued the change that sends the names (it sends nothing itself).' );
+		$this->run_account( $r );
 		$edge = array_filter( $this->agent->calls_of( 'edge.apply' ), static fn( $c ) => in_array( 'www.sweep.example', array_column( (array) ( $c['args']['routes'] ?? array() ), 'host' ), true ) );
 		$this->assertNotEmpty( $edge, 'The edge was told.' );
 		$this->assertSame( array(), \BeltoftServices\Hosting\DomainSweep::run(), 'Nothing changed.' );
 
 		$this->lookups( array( '198.51.100.7' ), array() );
 		$this->assertSame( array( $host => 'waiting' ), \BeltoftServices\Hosting\DomainSweep::run(), 'The proof was removed.' );
+		$this->run_account( $r );
+		$last = $this->agent->calls_of( 'edge.apply' );
+		$this->assertNotContains( $host, array_column( (array) end( $last )['args']['routes'], 'host' ), 'The edge was told that the name stopped.' );
 		remove_all_filters( 'beltoft_services_dns_resolve' );
 	}
 

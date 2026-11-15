@@ -116,8 +116,7 @@ class SafetyTest extends HostingCase {
 		list( $r, $volid ) = $this->with_backup();
 		$vmid = Records::for_resource( $r->id() )['vmid'];
 
-		( new HostingRestore( $r ) )->start( 'account', $volid );
-		HostingRestore::run( $r->id() );
+		$this->change( $r, 'restore', array( 'account', $volid, '' ) );
 		$r      = Resource::find( $r->id() );
 		$safety = HostingRestore::safety( $r );
 
@@ -137,14 +136,12 @@ class SafetyTest extends HostingCase {
 
 	public function test_undo_restores_the_container_from_the_safety_backup_and_the_databases_from_its_dump(): void {
 		list( $r, $volid ) = $this->with_backup();
-		( new HostingRestore( $r ) )->start( 'account', $volid );
-		HostingRestore::run( $r->id() );
+		$this->change( $r, 'restore', array( 'account', $volid, '' ) );
 		$r      = Resource::find( $r->id() );
 		$safety = HostingRestore::safety( $r );
 		$before = count( $this->agent->state()['restores'] );
 
-		$this->assertSame( array( 'started' => true ), ( new HostingRestore( $r ) )->undo() );
-		HostingRestore::run( $r->id() );
+		$this->assertTrue( $this->change( $r, 'undo' )['started'] );
 
 		$vmid = Records::for_resource( $r->id() )['vmid'];
 		$this->assertSame( $safety['volid'], $this->node->state()['cts'][ $vmid ]['restored_from'] );
@@ -161,8 +158,7 @@ class SafetyTest extends HostingCase {
 
 	public function test_a_safety_backup_survives_the_nightly_prune_and_is_removed_after_24_hours(): void {
 		list( $r, $volid ) = $this->with_backup();
-		( new HostingRestore( $r ) )->start( 'account', $volid );
-		HostingRestore::run( $r->id() );
+		$this->change( $r, 'restore', array( 'account', $volid, '' ) );
 		$safety = HostingRestore::safety( Resource::find( $r->id() ) );
 
 		// Several nightly rounds on the same day would prune all but the newest: the protected one stays.
@@ -182,13 +178,11 @@ class SafetyTest extends HostingCase {
 
 	public function test_a_new_restore_replaces_the_old_safety_backup(): void {
 		list( $r, $volid ) = $this->with_backup();
-		( new HostingRestore( $r ) )->start( 'account', $volid );
-		HostingRestore::run( $r->id() );
+		$this->change( $r, 'restore', array( 'account', $volid, '' ) );
 		$first = HostingRestore::safety( Resource::find( $r->id() ) );
 
 		$this->move_to( $this->clock + HOUR_IN_SECONDS );
-		( new HostingRestore( Resource::find( $r->id() ) ) )->start( 'account', $volid );
-		HostingRestore::run( $r->id() );
+		$this->change( $r, 'restore', array( 'account', $volid, '' ) );
 		$second = HostingRestore::safety( Resource::find( $r->id() ) );
 
 		$this->assertNotSame( $first['volid'], $second['volid'] );
@@ -198,10 +192,10 @@ class SafetyTest extends HostingCase {
 
 	public function test_a_failed_safety_backup_stops_the_restore_before_the_container_is_touched(): void {
 		list( $r, $volid ) = $this->with_backup();
-		( new HostingRestore( $r ) )->start( 'account', $volid );
+		( new HostingActions( $r ) )->queue( 'restore', array( 'account', $volid, '' ) );
 		$this->node->next_task( array( 'exitstatus' => 'storage offline' ) );
 
-		HostingRestore::run( $r->id() );
+		$this->run_account( $r );
 		$r = Resource::find( $r->id() );
 
 		$this->assertFalse( $r->get( 'restore_last' )['ok'] );
@@ -212,8 +206,7 @@ class SafetyTest extends HostingCase {
 
 	public function test_files_and_database_restores_still_use_a_snapshot(): void {
 		list( $r, $volid ) = $this->with_backup();
-		( new HostingRestore( $r ) )->start( 'files', $volid, 'w' . $r->id() );
-		HostingRestore::run( $r->id() );
+		$this->change( $r, 'restore', array( 'files', $volid, 'w' . $r->id() ) );
 
 		$safety = HostingRestore::safety( Resource::find( $r->id() ) );
 		$this->assertSame( 'snapshot', $safety['mode'] );

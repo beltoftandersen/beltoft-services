@@ -116,7 +116,8 @@ final class AddonEffects {
 			return;
 		}
 
-		$added = ( new HostingActions( $r ) )->add_domain( $slug, $host );
+		// A change of the account like any other: its checks and local work here, the names to the node in its job.
+		$added = ( new HostingActions( $r ) )->queue( 'add_domain', array( $slug, $host ) );
 
 		if ( is_wp_error( $added ) ) {
 			$order->add_order_note( 'The domain ' . $host . ' is paid but could not be added to the website: ' . $added->get_error_message() );
@@ -133,16 +134,14 @@ final class AddonEffects {
 	 * @return bool False when a name could not be removed.
 	 */
 	public static function drop_domain( Resource $r, string $reg ): bool {
-		$actions = new HostingActions( $r );
-		$ok      = true;
-
+		// One change takes every name of the domain (queued through the shared controller; the names reach the node in its job).
 		foreach ( SiteDomains::for_resource( $r->id() ) as $row ) {
-			if ( 'preview' !== $row['kind'] && self::registrable( $row['host'] ) === $reg && is_wp_error( $actions->remove_domain( $row['host'], true ) ) ) {
-				$ok = false;
+			if ( 'preview' !== $row['kind'] && self::registrable( $row['host'] ) === $reg ) {
+				return ! is_wp_error( ( new HostingActions( $r ) )->queue( 'remove_domain', array( $row['host'], true ) ) );
 			}
 		}
 
-		return $ok;
+		return true;
 	}
 
 	/**

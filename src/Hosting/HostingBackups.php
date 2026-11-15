@@ -10,7 +10,7 @@ namespace BeltoftServices\Hosting;
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
-use BeltoftServices\Locks;
+use BeltoftServices\Progress;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
@@ -29,6 +29,11 @@ defined( 'ABSPATH' ) || exit;
  *
  * Nightly rounds start in a slot between 00:30 and 05:30 UTC chosen by the account id (the plan lets the agent assign
  * slots by size; the plugin spreads by id until the agent does). "Back up now": 3 a day.
+ *
+ * The nightly round is the sweep's own (a cron, not a customer's change). "Back up now" is a change of the account on the shared
+ * action controller since 0.31.0 (the internal action `backup_now`, run by Actions\CareActions in job mode): the request checks the
+ * rules and stores the round (prepare_manual()), the job drives step(), and the sweep leaves a manual round to that job. A round
+ * whose job ended without finishing is closed by give_up() (hooked through Actions\Steps::failed()).
  */
 final class HostingBackups {
 
@@ -60,7 +65,7 @@ final class HostingBackups {
 	/**
 	 * The job: rounds in progress go on, due accounts start one.
 	 *
-	 * @param int $only One account only (0: every account).
+	 * @param int $only One account only (0: every account); a round of an older version that was queued for one account.
 	 */
 	public static function run( int $only = 0 ): void {
 		if ( Settings::get( 'pause_all' ) ) {
@@ -82,15 +87,16 @@ final class HostingBackups {
 				continue;
 			}
 
+			// A manual round belongs to the job of "Back up now" while that change is under way; a round nobody works on is taken up here.
+			if ( $round->active() && 'manual' === (string) ( ( (array) $r->get( 'backup' ) )['kind'] ?? '' ) && $round->owned_by_job() ) {
+				continue;
+			}
+
 			if ( ! $round->active() ) {
 				$round->start( 'nightly' );
 			}
 
-			$answer = ( new self( Resource::find( $r->id() ) ?? $r ) )->step();
-
-			if ( $answer->is_retry() && 0 < $answer->delay() && $only > 0 ) {
-				as_schedule_single_action( time() + max( 5, $answer->delay() ), self::HOOK, array( 'only' => (int) $r->id() ), Jobs::GROUP );
-			}
+			( new self( Resource::find( $r->id() ) ?? $r ) )->step();
 		}
 	}
 
@@ -167,30 +173,28 @@ final class HostingBackups {
 	}
 
 	/**
-	 * Back up now: up to 3 in 24 hours. The round runs in the background.
-	 *
-	 * @return array<string, mixed>|\WP_Error
+	 * Is the change "Back up now" under way for this account (its marker, which lapses when nothing works on it)? Then its job drives the round.
 	 */
-	public function now() {
-		// One start at a time per account: a double click or two tabs start one backup, not two.
-		list( $taken, $result ) = Locks::with( Locks::name( 'hosting-backup', $this->r->id() ), (int) apply_filters( 'beltoft_services_hosting_lock_wait', 10 ), fn() => $this->now_locked() );
+	public function owned_by_job(): bool {
+		$marker = Progress::pending( Resource::find( $this->r->id() ) ?? $this->r );
 
-		return $taken ? $result : new \WP_Error( 'busy', __( 'A backup is already starting.', 'beltoft-services' ) );
+		return null !== $marker && 'backup_now' === $marker['action'];
 	}
 
 	/**
-	 * Back up now with the lock held.
+	 * Checks "Back up now" and stores its round: up to 3 in 24 hours. The request that queues the change calls this, with the
+	 * account's site lock held; the round is driven by step() in the job of the change.
 	 *
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	private function now_locked() {
+	public function prepare_manual() {
 		$this->r = Resource::find( $this->r->id() ) ?? $this->r;
 
 		if ( ! self::enabled( $this->r ) || 'ready' !== $this->r->get( 'state' ) || 'ready' !== $this->r->get( 'desired' ) ) {
 			return new \WP_Error( 'not_ready', __( 'Backups are not available for your hosting right now.', 'beltoft-services' ) );
 		}
 
-		if ( $this->active() ) {
+		if ( $this->active() || HostingRestore::active( $this->r ) ) {
 			return new \WP_Error( 'busy', __( 'A backup is already running.', 'beltoft-services' ) );
 		}
 
@@ -207,9 +211,21 @@ final class HostingBackups {
 			return new \WP_Error( 'failed', __( 'The backup could not be started. Try again.', 'beltoft-services' ) );
 		}
 
-		as_enqueue_async_action( self::HOOK, array( 'only' => (int) $this->r->id() ), Jobs::GROUP );
-
 		return array( 'started' => true );
+	}
+
+	/**
+	 * A round whose job ended without finishing: it ends like a failed night (counted, staff told), so the next backup can start.
+	 * Nothing happens when no round runs.
+	 *
+	 * @param string $why Admin text.
+	 */
+	public function give_up( string $why ): void {
+		$this->r = Resource::find( $this->r->id() ) ?? $this->r;
+
+		if ( $this->active() ) {
+			$this->failed( array_merge( array( 'phase' => '', 'kind' => 'nightly' ), (array) $this->r->get( 'backup' ) ), $why );
+		}
 	}
 
 	/**
@@ -422,7 +438,14 @@ final class HostingBackups {
 			Alerts::admin( $this->r, sprintf( 'Backup failed (%d in a row): %s', $fails, $this->scrub( $why, 200 ) ) );
 		}
 
-		return StepResult::done( array(), 'Backup failed: round ended' );
+		// The round is over and staff were told above (the first failure and the third): a manual backup's outcome is a failure the customer reads.
+		return StepResult::fail(
+			'Backup failed: ' . $this->scrub( $why, 160 ),
+			array(
+				Jobs::TEXT     => __( 'The backup did not work. We have been told.', 'beltoft-services' ),
+				Jobs::EXPECTED => true,
+			)
+		);
 	}
 
 	/**

@@ -211,9 +211,10 @@ final class DnsGuide {
 
 		set_transient( self::key( $r->id(), $domain ), array( 'time' => time(), 'provider' => self::provider( $domain ), 'rows' => $rows ), self::KEEP );
 
+		// A name that went live or stopped being: the node is told by the change `apply_names` (queued through the shared controller;
+		// when another change runs, the domain sweep sends it), and WordPress's own address is looked at when that change has ended.
 		if ( $changed && 'ready' === $r->get( 'state' ) && 'ready' === $r->get( 'desired' ) ) {
-			( new HostingActions( $r ) )->sync_edge();
-			SiteWordPress::consider_all( $r );
+			\BeltoftServices\Hosting\Actions\Steps::start_follow( $r, 'apply_names', array() );
 		}
 
 		return array( 'checked' => true, 'live' => $live, 'waiting' => $waiting );

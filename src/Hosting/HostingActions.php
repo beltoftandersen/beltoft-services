@@ -192,6 +192,16 @@ final class HostingActions {
 			'set_workers'       => $this->php,
 			'purge_cache'       => $this->php,
 			'set_country_block' => $this->country,
+			'resend_country'    => $this->country,
+			'wordpress_address' => $this->sites,
+			'create_staging'    => $this->staging,
+			'refresh_staging'   => $this->staging,
+			'push_staging'      => $this->staging,
+			'undo_staging'      => $this->staging,
+			'delete_staging'    => $this->staging,
+			'backup_now'        => $this->care,
+			'restore'           => $this->care,
+			'undo'              => $this->care,
 			'set_sftp_password' => $this->files,
 			'add_ssh_key'       => $this->files,
 			'remove_ssh_key'    => $this->files,
@@ -315,23 +325,43 @@ final class HostingActions {
 	}
 
 	/**
-	 * Moves WordPress itself to one of the website's addresses (background job; see SiteWordPress).
+	 * Moves WordPress itself to one of the website's addresses (a change of the shared controller; see SiteWordPress).
 	 *
-	 * @param string $slug Site.
-	 * @param string $host The address, or '' for the main address.
+	 * @param string $slug   Site.
+	 * @param string $host   The address, or '' for the main address.
+	 * @param string $from   In a job: the address of her own the customer agreed to replace.
+	 * @param bool   $manual In a job: false for the automatic move.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	public function wordpress_address( string $slug, string $host = '' ) {
-		return $this->sites->wordpress_address( $slug, $host );
+	public function wordpress_address( string $slug, string $host = '', string $from = '', bool $manual = true ) {
+		return $this->sites->wordpress_address( $slug, $host, $from, $manual );
 	}
 
 	/**
-	 * Sends the account's current routes to the edge (a name became active or stopped being).
+	 * Sends the account's current routes to the edge (a name became active or stopped being). Only a job runs this (the change
+	 * `apply_names`); the domain sweep and the DNS guide queue that change (Actions\Steps::start_follow()).
 	 *
 	 * @return true|\WP_Error
 	 */
 	public function sync_edge() {
 		return $this->sites->sync_edge();
+	}
+
+	/**
+	 * Does the node lack what the shop says about the account's names or edge map? (Derived from what was sent last.)
+	 */
+	public function names_stale(): bool {
+		return $this->sites->names_stale();
+	}
+
+	/**
+	 * Sends the stored country block of a website to the node again (the job of the change `resend_country`).
+	 *
+	 * @param string $slug Website, or '' for every website with a stored block.
+	 * @return true|\WP_Error
+	 */
+	public function resend_country( string $slug = '' ) {
+		return $this->country->resend_country( $slug );
 	}
 
 	/**

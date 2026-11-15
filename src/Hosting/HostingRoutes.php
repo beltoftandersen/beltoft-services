@@ -460,14 +460,15 @@ final class HostingRoutes {
 	}
 
 	/**
-	 * Moves WordPress to an address of the website, in the background. Its own hourly group: every move copies the database.
+	 * Moves WordPress to an address of the website, in the background (a change of the shared controller: 202 with the task). Its own
+	 * hourly group: every move copies the database.
 	 *
 	 * @param \WP_REST_Request $request Request.
 	 */
 	public static function wordpress_address( \WP_REST_Request $request ): \WP_REST_Response {
 		$r = self::guard( $request, true, Routes::RATE_LIMIT, 'address', SiteWordPress::LIMIT );
 
-		return $r instanceof Resource ? self::reply( ( new HostingActions( $r ) )->wordpress_address( (string) $request['slug'], (string) $request['host'] ), 202 ) : $r;
+		return $r instanceof Resource ? self::reply( ( new HostingActions( $r ) )->queue( 'wordpress_address', array( (string) $request['slug'], (string) $request['host'] ) ), 202 ) : $r;
 	}
 
 	/**
@@ -482,7 +483,7 @@ final class HostingRoutes {
 	}
 
 	/**
-	 * One of the staging changes. Their own hourly group: each one copies a website.
+	 * One of the staging changes (each a change of the shared controller: 202 with the task). Their own hourly group: each one copies a website.
 	 *
 	 * @param \WP_REST_Request $request Request.
 	 * @param callable         $do      fn( HostingActions ): array|\WP_Error.
@@ -494,23 +495,23 @@ final class HostingRoutes {
 	}
 
 	public static function create_staging( \WP_REST_Request $request ): \WP_REST_Response {
-		return self::staging_change( $request, static fn( HostingActions $a ) => $a->create_staging( (string) $request['slug'] ) );
+		return self::staging_change( $request, static fn( HostingActions $a ) => $a->queue( 'create_staging', array( (string) $request['slug'] ) ) );
 	}
 
 	public static function delete_staging( \WP_REST_Request $request ): \WP_REST_Response {
-		return self::staging_change( $request, static fn( HostingActions $a ) => $a->delete_staging( (string) $request['slug'] ) );
+		return self::staging_change( $request, static fn( HostingActions $a ) => $a->queue( 'delete_staging', array( (string) $request['slug'] ) ) );
 	}
 
 	public static function refresh_staging( \WP_REST_Request $request ): \WP_REST_Response {
-		return self::staging_change( $request, static fn( HostingActions $a ) => $a->refresh_staging( (string) $request['slug'] ) );
+		return self::staging_change( $request, static fn( HostingActions $a ) => $a->queue( 'refresh_staging', array( (string) $request['slug'] ) ) );
 	}
 
 	public static function push_staging( \WP_REST_Request $request ): \WP_REST_Response {
-		return self::staging_change( $request, static fn( HostingActions $a ) => $a->push_staging( (string) $request['slug'], true === $request['files_only'] ) );
+		return self::staging_change( $request, static fn( HostingActions $a ) => $a->queue( 'push_staging', array( (string) $request['slug'], true === $request['files_only'] ) ) );
 	}
 
 	public static function undo_staging( \WP_REST_Request $request ): \WP_REST_Response {
-		return self::staging_change( $request, static fn( HostingActions $a ) => $a->undo_staging( (string) $request['slug'] ) );
+		return self::staging_change( $request, static fn( HostingActions $a ) => $a->queue( 'undo_staging', array( (string) $request['slug'] ) ) );
 	}
 
 	public static function staging_login( \WP_REST_Request $request ): \WP_REST_Response {
@@ -565,15 +566,15 @@ final class HostingRoutes {
 	}
 
 	public static function backup_now( \WP_REST_Request $request ): \WP_REST_Response {
-		return self::change( $request, static fn( HostingActions $a ) => $a->backup_now(), 202 );
+		return self::change( $request, static fn( HostingActions $a ) => $a->queue( 'backup_now' ), 202 );
 	}
 
 	public static function restore( \WP_REST_Request $request ): \WP_REST_Response {
-		return self::change( $request, static fn( HostingActions $a ) => $a->restore( (string) $request['scope'], (string) $request['volid'], (string) $request['slug'] ), 202 );
+		return self::change( $request, static fn( HostingActions $a ) => $a->queue( 'restore', array( (string) $request['scope'], (string) $request['volid'], (string) $request['slug'] ) ), 202 );
 	}
 
 	public static function undo( \WP_REST_Request $request ): \WP_REST_Response {
-		return self::change( $request, static fn( HostingActions $a ) => $a->undo(), 202 );
+		return self::change( $request, static fn( HostingActions $a ) => $a->queue( 'undo' ), 202 );
 	}
 
 	public static function checklist( \WP_REST_Request $request ): \WP_REST_Response {

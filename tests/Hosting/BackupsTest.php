@@ -222,7 +222,7 @@ class BackupsTest extends HostingCase {
 			$b = new HostingBackups( Resource::find( $r->id() ) );
 			$b->start( 'nightly' );
 			$result = ( new HostingBackups( Resource::find( $r->id() ) ) )->step();
-			$this->assertTrue( $result->is_done(), 'The round is over, not retried.' );
+			$this->assertTrue( $result->is_failed(), 'The round is over, not retried.' );
 			$this->assertSame( $night, (int) Resource::find( $r->id() )->get( 'backup_fails' ) );
 			$this->assertFalse( ( new HostingBackups( Resource::find( $r->id() ) ) )->active() );
 		}
@@ -271,13 +271,15 @@ class BackupsTest extends HostingCase {
 
 		for ( $i = 1; $i <= 3; $i++ ) {
 			$this->clock_to( strtotime( '2027-03-01 10:00:00 UTC' ) + $i * 600 );
-			$this->assertSame( array( 'started' => true ), $a->backup_now() );
-			HostingBackups::run( $r->id() );
+			$out = $this->change( $r, 'backup_now' );
+			$this->assertTrue( $out['started'] );
+			$this->assertSame( 'backup_now', $out['task']['action'] );
 			$this->assertFalse( ( new HostingBackups( Resource::find( $r->id() ) ) )->active() );
+			$this->assertTrue( $this->last_outcome( $r )['ok'] );
 		}
 
 		$this->clock_to( $this->clock + 600 );
-		$limit = $a->backup_now();
+		$limit = ( new HostingActions( Resource::find( $r->id() ) ) )->queue( 'backup_now' );
 		$this->assertWPError( $limit );
 		$this->assertSame( 'limit', $limit->get_error_code() );
 		$this->assertCount( 3, $this->stored_backups() );
@@ -286,8 +288,7 @@ class BackupsTest extends HostingCase {
 
 		// A day later a fourth is allowed; the oldest manual one goes.
 		$this->clock_to( strtotime( '2027-03-02 12:00:00 UTC' ) );
-		$this->assertSame( array( 'started' => true ), $a->backup_now() );
-		HostingBackups::run( $r->id() );
+		$this->assertTrue( $this->change( $r, 'backup_now' )['started'] );
 		$this->assertCount( 3, $this->stored_backups(), 'Three manual backups are kept.' );
 		$times = array_column( $this->stored_backups(), 'ctime' );
 		$this->assertContains( $this->clock, $times );
@@ -296,20 +297,20 @@ class BackupsTest extends HostingCase {
 	public function test_back_up_now_is_refused_when_unavailable_or_running(): void {
 		$r = $this->account();
 		( new HostingBackups( $r ) )->start( 'nightly' );
-		$this->assertSame( 'busy', ( new HostingBackups( Resource::find( $r->id() ) ) )->now()->get_error_code() );
+		$this->assertSame( 'busy', ( new HostingActions( Resource::find( $r->id() ) ) )->queue( 'backup_now' )->get_error_code() );
+		$this->assertFalse( \BeltoftServices\Jobs::acting( $r->id() ), 'A refusal queues nothing.' );
 
 		$off = $this->account( array( 'backup_days' => 0 ) );
-		$this->assertSame( 'not_ready', ( new HostingBackups( $off ) )->now()->get_error_code() );
+		$this->assertSame( 'not_ready', ( new HostingActions( $off ) )->queue( 'backup_now' )->get_error_code() );
 
 		$paused = $this->account();
 		$paused->set( array( 'desired' => 'paused' ) );
-		$this->assertSame( 'not_ready', ( new HostingBackups( Resource::find( $paused->id() ) ) )->now()->get_error_code() );
+		$this->assertSame( 'not_ready', ( new HostingActions( Resource::find( $paused->id() ) ) )->queue( 'backup_now' )->get_error_code() );
 	}
 
 	public function test_a_delete_removes_the_protected_safety_backup_too_and_waits_when_the_node_refuses_one(): void {
 		list( $r, $volid ) = $this->with_backup();
-		( new HostingRestore( $r ) )->start( 'account', $volid );
-		HostingRestore::run( $r->id() );
+		$this->change( $r, 'restore', array( 'account', $volid, '' ) );
 		$r      = Resource::find( $r->id() );
 		$safety = HostingRestore::safety( $r );
 		$this->assertSame( 'vzdump', $safety['mode'] );
@@ -393,16 +394,22 @@ class BackupsTest extends HostingCase {
 		list( $r, $volid, $label ) = $this->with_backup();
 		$vmid = Records::for_resource( $r->id() )['vmid'];
 
-		$start = ( new HostingRestore( $r ) )->start( 'account', $volid );
+		$start = ( new HostingActions( $r ) )->queue( 'restore', array( 'account', $volid, '' ) );
 		$this->assertTrue( $start['started'] );
+		$this->assertSame( 'pending', $start['status'] );
+		$this->assertSame( 'restore_backup', $start['task']['action'] );
 		$this->assertGreaterThanOrEqual( 2, $start['minutes'] );
 		$this->assertTrue( HostingRestore::active( Resource::find( $r->id() ) ) );
+		$this->assertSame( array(), $this->node->calls_to( '#/nodes/pve1/lxc$#', 'POST' ), 'Nothing reaches the node inside the request.' );
 
-		HostingRestore::run( $r->id() );
+		$this->run_account( $r );
 		$r = Resource::find( $r->id() );
 
 		$this->assertFalse( HostingRestore::active( $r ) );
 		$this->assertTrue( $r->get( 'restore_last' )['ok'] );
+		$this->assertSame( 'resend_country', $this->last_outcome( $r )['action'], 'The change that follows a restore ended well (the stored country blocks go to the node again).' );
+		$this->assertTrue( $this->last_outcome( $r )['ok'] );
+		$this->assertNull( $r->get( 'restore' ), 'The round leaves nothing behind.' );
 
 		$safety = HostingRestore::safety( $r );
 		$this->assertSame( 'account', $safety['scope'] );
@@ -429,15 +436,14 @@ class BackupsTest extends HostingCase {
 	public function test_undo_goes_back_to_the_safety_point_for_files_and_databases(): void {
 		$this->save_node( array( 'restore_safety' => 'snapshot' ) ); // A node shown to keep snapshots over a forced restore.
 		list( $r, $volid ) = $this->with_backup();
-		( new HostingRestore( $r ) )->start( 'account', $volid );
-		HostingRestore::run( $r->id() );
+		$this->change( $r, 'restore', array( 'account', $volid, '' ) );
 		$r      = Resource::find( $r->id() );
 		$safety = HostingRestore::safety( $r );
 		$before = count( $this->agent->state()['restores'] );
 
-		$undo = ( new HostingRestore( $r ) )->undo();
-		$this->assertSame( array( 'started' => true ), $undo );
-		HostingRestore::run( $r->id() );
+		$undo = $this->change( $r, 'undo' );
+		$this->assertTrue( $undo['started'] );
+		$this->assertSame( 'restore_undo', $undo['task']['action'] );
 
 		$vmid = Records::for_resource( $r->id() )['vmid'];
 		$this->assertSame( $safety['name'], $this->node->state()['cts'][ $vmid ]['rolled_back_to'] );
@@ -453,8 +459,7 @@ class BackupsTest extends HostingCase {
 		list( $r, $volid, $label ) = $this->with_backup();
 		$slug = 'w' . $r->id();
 
-		$this->assertTrue( ( new HostingRestore( $r ) )->start( 'files', $volid, $slug )['started'] );
-		HostingRestore::run( $r->id() );
+		$this->assertTrue( $this->change( $r, 'restore', array( 'files', $volid, $slug ) )['started'] );
 		$files = array_values( array_filter( $this->agent->state()['restores'], static fn( $x ) => 'backup.file_restore' === $x['op'] ) );
 		$this->assertCount( 1, $files );
 		$this->assertSame( array( 'slug' => $slug, 'snapshot' => $label ), array( 'slug' => $files[0]['slug'], 'snapshot' => $files[0]['snapshot'] ) );
@@ -462,8 +467,7 @@ class BackupsTest extends HostingCase {
 		$this->assertCount( 0, $this->node->calls_to( '#/nodes/pve1/lxc$#', 'POST' ), 'The container is not restored for one site.' );
 
 		$this->clock_to( $this->clock + HOUR_IN_SECONDS );
-		$this->assertTrue( ( new HostingRestore( Resource::find( $r->id() ) ) )->start( 'database', $volid, 'blog' )['started'] );
-		HostingRestore::run( $r->id() );
+		$this->assertTrue( $this->change( $r, 'restore', array( 'database', $volid, 'blog' ) )['started'] );
 		$dbs = array_values( array_filter( $this->agent->state()['restores'], static fn( $x ) => 'backup.db_restore' === $x['op'] ) );
 		$this->assertSame( 'c' . $r->id() . '_blog', $dbs[0]['database'] );
 		$this->assertSame( $label, $dbs[0]['snapshot'] );
@@ -475,13 +479,15 @@ class BackupsTest extends HostingCase {
 	public function test_a_failed_safety_dump_stops_the_restore_before_anything_is_changed(): void {
 		list( $r, $volid ) = $this->with_backup();
 		$this->agent->fail_next( 'backup.prepare', 'dump failed' );
-		( new HostingRestore( $r ) )->start( 'account', $volid );
-
-		HostingRestore::run( $r->id() );
+		$this->change( $r, 'restore', array( 'account', $volid, '' ) );
 		$r = Resource::find( $r->id() );
 
 		$this->assertFalse( HostingRestore::active( $r ) );
 		$this->assertFalse( $r->get( 'restore_last' )['ok'] );
+		$out = $this->last_outcome( $r );
+		$this->assertFalse( $out['ok'] );
+		$this->assertSame( 'The restore did not work. Your hosting was put back as far as it could be, and we have been told.', $out['text'] );
+		$this->assertCount( 1, array_filter( $this->mails, static fn( $m ) => false !== strpos( (string) $m['message'], 'restore failed' ) ), 'Staff are told once: by the round, not again by the shared alert.' );
 		$this->assertCount( 0, $this->node->calls_to( '#/nodes/pve1/lxc$#', 'POST' ), 'The container was not restored.' );
 		$this->assertSame( 'running', $this->node->state()['cts'][1000]['status'] );
 		$this->assertNull( HostingRestore::safety( $r ) );
@@ -490,12 +496,12 @@ class BackupsTest extends HostingCase {
 
 	public function test_a_failed_container_restore_ends_the_round_with_an_alert(): void {
 		list( $r, $volid ) = $this->with_backup();
-		( new HostingRestore( $r ) )->start( 'account', $volid );
+		( new HostingActions( $r ) )->queue( 'restore', array( 'account', $volid, '' ) );
 		$this->node->next_task( array() ); // The snapshot.
 		$this->node->next_task( array() ); // The shutdown.
 		$this->node->next_task( array( 'exitstatus' => 'restore failed: out of space' ) );
 
-		HostingRestore::run( $r->id() );
+		$this->run_account( $r );
 		$r = Resource::find( $r->id() );
 
 		$this->assertFalse( $r->get( 'restore_last' )['ok'] );
@@ -506,26 +512,26 @@ class BackupsTest extends HostingCase {
 
 	public function test_a_restore_is_refused_for_a_backup_that_is_not_listed_a_bad_choice_or_while_busy(): void {
 		list( $r, $volid ) = $this->with_backup();
-		$h = new HostingRestore( $r );
+		$h = new HostingActions( $r );
 
-		$this->assertSame( 'not_found', $h->start( 'account', 'pbs-store:backup/ct/1000/2020-01-01T00:00:00Z' )->get_error_code() );
-		$this->assertSame( 'not_found', $h->start( 'account', 'pbs-store:backup/ct/1001/2027-03-01T03:00:00Z' )->get_error_code() );
-		$this->assertSame( 'invalid', $h->start( 'everything', $volid )->get_error_code() );
-		$this->assertSame( 'not_found', $h->start( 'files', $volid, 'ghost' )->get_error_code() );
+		$this->assertSame( 'not_found', $h->queue( 'restore', array( 'account', 'pbs-store:backup/ct/1000/2020-01-01T00:00:00Z', '' ) )->get_error_code() );
+		$this->assertSame( 'not_found', $h->queue( 'restore', array( 'account', 'pbs-store:backup/ct/1001/2027-03-01T03:00:00Z', '' ) )->get_error_code() );
+		$this->assertSame( 'invalid', $h->queue( 'restore', array( 'everything', $volid, '' ) )->get_error_code() );
+		$this->assertSame( 'not_found', $h->queue( 'restore', array( 'files', $volid, 'ghost' ) )->get_error_code() );
+		$this->assertFalse( HostingRestore::active( Resource::find( $r->id() ) ), 'A refusal stores nothing.' );
 
-		$this->assertIsArray( $h->start( 'account', $volid ) );
-		$this->assertSame( 'busy', ( new HostingRestore( Resource::find( $r->id() ) ) )->start( 'account', $volid )->get_error_code() );
-		$this->assertSame( 'busy', ( new HostingRestore( Resource::find( $r->id() ) ) )->undo()->get_error_code() );
+		$this->assertIsArray( $h->queue( 'restore', array( 'account', $volid, '' ) ) );
+		$this->assertSame( 'busy', ( new HostingActions( Resource::find( $r->id() ) ) )->queue( 'restore', array( 'account', $volid, '' ) )->get_error_code() );
+		$this->assertSame( 'busy', ( new HostingActions( Resource::find( $r->id() ) ) )->queue( 'undo' )->get_error_code() );
 
 		$off = $this->account( array( 'backup_days' => 0 ) );
-		$this->assertSame( 'not_ready', ( new HostingRestore( $off ) )->start( 'account', $volid )->get_error_code() );
-		$this->assertSame( 'not_found', ( new HostingRestore( $this->account() ) )->undo()->get_error_code(), 'Nothing to undo.' );
+		$this->assertSame( 'not_ready', ( new HostingActions( $off ) )->queue( 'restore', array( 'account', $volid, '' ) )->get_error_code() );
+		$this->assertSame( 'not_found', ( new HostingActions( $this->account() ) )->queue( 'undo' )->get_error_code(), 'Nothing to undo.' );
 	}
 
 	public function test_the_safety_point_is_kept_24_hours_then_removed(): void {
 		list( $r, $volid ) = $this->with_backup();
-		( new HostingRestore( $r ) )->start( 'database', $volid, 'w' . $r->id() );
-		HostingRestore::run( $r->id() );
+		$this->change( $r, 'restore', array( 'database', $volid, 'w' . $r->id() ) );
 		$this->assertNotNull( HostingRestore::safety( Resource::find( $r->id() ) ) );
 
 		$this->clock_to( $this->clock + 23 * HOUR_IN_SECONDS );
@@ -536,32 +542,138 @@ class BackupsTest extends HostingCase {
 		HostingRestore::expire_all();
 		$this->assertNull( HostingRestore::safety( Resource::find( $r->id() ) ) );
 		$this->assertSame( array(), $this->node->state()['cts'][1000]['snapshots'] );
-		$this->assertSame( 'not_found', ( new HostingRestore( Resource::find( $r->id() ) ) )->undo()->get_error_code() );
+		$this->assertSame( 'not_found', ( new HostingActions( Resource::find( $r->id() ) ) )->queue( 'undo' )->get_error_code() );
 	}
 
 	public function test_a_second_backup_or_restore_start_while_one_is_starting_is_refused(): void {
 		list( $r, $volid ) = $this->with_backup();
 
+		// Another request holds the account's one lock for changes: a start is refused, nothing is stored.
 		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME );
-		$name  = \BeltoftServices\Locks::name( 'hosting-backup', $r->id() );
+		$name  = \BeltoftServices\Locks::name( 'hosting-site', $r->id() );
 		$other->query( "SELECT GET_LOCK('" . $other->real_escape_string( $name ) . "', 0)" );
 		add_filter( 'beltoft_services_hosting_lock_wait', '__return_zero' );
 
-		$fresh = Resource::find( $r->id() );
-		$now   = ( new HostingBackups( $fresh ) )->now();
+		$a   = new HostingActions( Resource::find( $r->id() ) );
+		$now = $a->queue( 'backup_now' );
 		$this->assertWPError( $now );
 		$this->assertSame( 'busy', $now->get_error_code() );
 
-		$start = ( new HostingRestore( $fresh ) )->start( 'account', $volid );
+		$start = $a->queue( 'restore', array( 'account', $volid, '' ) );
 		$this->assertWPError( $start );
 		$this->assertSame( 'busy', $start->get_error_code() );
 		$this->assertFalse( HostingRestore::active( Resource::find( $r->id() ) ), 'Nothing was started.' );
-		$this->assertSame( 'busy', ( new HostingRestore( $fresh ) )->undo()->get_error_code() );
+		$this->assertFalse( ( new HostingBackups( Resource::find( $r->id() ) ) )->active(), 'Nothing was started.' );
+		$this->assertSame( 'busy', $a->queue( 'undo' )->get_error_code() );
 
 		$other->query( "SELECT RELEASE_LOCK('" . $other->real_escape_string( $name ) . "')" );
 		$other->close();
 		remove_all_filters( 'beltoft_services_hosting_lock_wait' );
-		$this->assertIsArray( ( new HostingBackups( Resource::find( $r->id() ) ) )->now() );
+		$this->assertIsArray( ( new HostingActions( Resource::find( $r->id() ) ) )->queue( 'backup_now' ) );
+	}
+
+	// -- On the shared controller ------------------------------------------------------------------------
+
+	public function test_a_restore_waits_for_the_nodes_tasks_with_the_shared_poll_budget_and_goes_on(): void {
+		list( $r, $volid ) = $this->with_backup();
+		( new HostingActions( $r ) )->queue( 'restore', array( 'account', $volid, '' ) );
+		$this->node->next_task( array( 'polls' => 30 ) ); // The safety backup is a long task.
+
+		$result = \BeltoftServices\Hosting\Actions\Steps::run( Resource::find( $r->id() ), 'restore_backup', array( 'account', $volid, '' ) );
+		$this->assertTrue( $result->is_poll(), 'The run ends while the node works.' );
+		$this->assertSame( 1800, $result->poll_budget(), 'The one budget of the shared controller for a node task.' );
+		$this->assertSame( 'Restoring from a backup', \BeltoftServices\Progress::pending( Resource::find( $r->id() ) )['label'] );
+
+		$this->run_account( $r );
+		$this->assertTrue( Resource::find( $r->id() )->get( 'restore_last' )['ok'] );
+		$this->assertCount( 1, $this->node->calls_to( '#/nodes/pve1/lxc$#', 'POST' ), 'The container was restored once.' );
+	}
+
+	public function test_a_lost_restore_job_is_queued_again_and_restores_once(): void {
+		list( $r, $volid ) = $this->with_backup();
+		( new HostingActions( $r ) )->queue( 'restore', array( 'account', $volid, '' ) );
+		$this->node->next_task( array( 'polls' => 10 ) );
+
+		$this->assertSame( 1, $this->run_one_job( $r ) );
+		$this->kill_job( $r );
+		$this->assertTrue( \BeltoftServices\Jobs::acting( $r->id() ), 'Queued again once.' );
+		$this->assertArrayNotHasKey( 'ok', $this->last_outcome( $r ), 'No failed result.' );
+
+		$this->run_account( $r );
+		$this->assertTrue( Resource::find( $r->id() )->get( 'restore_last' )['ok'] );
+		$this->assertCount( 1, $this->node->calls_to( '#/nodes/pve1/lxc$#', 'POST' ), 'The restore was not started twice.' );
+		$this->assertSame( 'running', $this->node->state()['cts'][1000]['status'] );
+	}
+
+	public function test_a_restore_nobody_works_on_any_more_is_closed_so_the_account_is_not_left_half_way(): void {
+		list( $r, $volid ) = $this->with_backup();
+		( new HostingActions( $r ) )->queue( 'restore', array( 'account', $volid, '' ) );
+		$this->assertTrue( HostingRestore::active( Resource::find( $r->id() ) ) );
+
+		$this->lose_the_change( $r );
+		\BeltoftServices\Jobs::sweep();
+
+		$fresh = Resource::find( $r->id() );
+		$this->assertFalse( HostingRestore::active( $fresh ), 'The round is over: another backup or restore may start.' );
+		$this->assertFalse( $fresh->get( 'restore_last' )['ok'] );
+		$this->assertFalse( $this->last_outcome( $r )['ok'] );
+		$this->assertSame( 'running', $this->node->state()['cts'][1000]['status'] );
+		$this->assertIsArray( ( new HostingActions( Resource::find( $r->id() ) ) )->queue( 'backup_now' ) );
+	}
+
+	public function test_a_backup_nobody_works_on_any_more_ends_like_a_failed_night(): void {
+		$r = $this->account();
+		( new HostingActions( $r ) )->queue( 'backup_now' );
+		$this->assertTrue( ( new HostingBackups( Resource::find( $r->id() ) ) )->active() );
+
+		$this->lose_the_change( $r );
+		\BeltoftServices\Jobs::sweep();
+
+		$fresh = Resource::find( $r->id() );
+		$this->assertFalse( ( new HostingBackups( $fresh ) )->active() );
+		$this->assertSame( 1, (int) $fresh->get( 'backup_fails' ) );
+		$this->assertFalse( $this->last_outcome( $r )['ok'] );
+	}
+
+	public function test_the_nightly_sweep_leaves_a_manual_round_to_its_job_and_takes_up_one_nobody_works_on(): void {
+		$r = $this->account();
+		( new HostingActions( $r ) )->queue( 'backup_now' );
+
+		HostingBackups::run();
+		$this->assertTrue( ( new HostingBackups( Resource::find( $r->id() ) ) )->active(), 'The job of "Back up now" owns the round.' );
+		$this->assertCount( 0, $this->stored_backups() );
+
+		$this->run_account( $r );
+		$this->assertCount( 1, $this->stored_backups() );
+		$this->assertFalse( ( new HostingBackups( Resource::find( $r->id() ) ) )->active() );
+
+		// A manual round that no job holds (nothing is marked) is finished by the sweep, as it always was.
+		$this->clock_to( $this->clock + HOUR_IN_SECONDS );
+		( new HostingBackups( Resource::find( $r->id() ) ) )->start( 'manual' );
+		HostingBackups::run();
+		$this->assertFalse( ( new HostingBackups( Resource::find( $r->id() ) ) )->active() );
+		$this->assertCount( 2, $this->stored_backups() );
+	}
+
+	/**
+	 * One run of the account's waiting job.
+	 *
+	 * @param Resource $r Resource.
+	 * @return int Runs made.
+	 */
+	private function run_one_job( Resource $r ): int {
+		foreach ( as_get_scheduled_actions( array( 'hook' => \BeltoftServices\Jobs::ACT, 'group' => \BeltoftServices\Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => -1 ), 'ids' ) as $id ) {
+			$args = \ActionScheduler::store()->fetch_action( (string) $id )->get_args();
+
+			if ( (int) $args[0] === $r->id() ) {
+				\ActionScheduler::store()->cancel_action( (int) $id );
+				\BeltoftServices\Jobs::act( $r->id(), (string) $args[1], (array) $args[2] );
+
+				return 1;
+			}
+		}
+
+		return 0;
 	}
 
 	public function test_the_estimate_follows_the_backup_size(): void {
@@ -595,14 +707,14 @@ class BackupsTest extends HostingCase {
 		$this->assertNull( $list->get_data()['safety'] );
 
 		$this->assertSame( 202, $call( 'POST', '', $user )->get_status() );
-		HostingBackups::run( $r->id() );
+		$this->run_account( $r );
 
 		$this->assertSame( 422, $call( 'POST', '/restore', $user, array( 'scope' => 'nothing', 'volid' => $volid ) )->get_status() );
 		$this->assertSame( 404, $call( 'POST', '/restore', $user, array( 'scope' => 'account', 'volid' => 'pbs-store:backup/ct/1000/x' ) )->get_status() );
 		$ok = $call( 'POST', '/restore', $user, array( 'scope' => 'account', 'volid' => $volid ) );
 		$this->assertSame( 202, $ok->get_status(), (string) wp_json_encode( $ok->get_data() ) );
 		$this->assertSame( 409, $call( 'POST', '/undo', $user )->get_status(), 'A restore is running.' );
-		HostingRestore::run( $r->id() );
+		$this->run_account( $r );
 		$this->assertSame( 202, $call( 'POST', '/undo', $user )->get_status() );
 
 		$stranger = self::factory()->user->create();
@@ -623,14 +735,14 @@ class BackupsTest extends HostingCase {
 		$this->assertStringContainsString( 'data-scope="account" data-volid="' . esc_attr( $volid ) . '"', $html );
 		$this->assertStringNotContainsString( 'data-hosting-action="undo"', $html );
 
-		( new HostingRestore( Resource::find( $r->id() ) ) )->start( 'database', $volid, 'w' . $r->id() );
+		( new HostingActions( Resource::find( $r->id() ) ) )->queue( 'restore', array( 'database', $volid, 'w' . $r->id() ) );
 		ob_start();
 		HostingAccount::render( Resource::find( $r->id() ) );
 		$running = (string) ob_get_clean();
 		$this->assertStringContainsString( 'A backup or a restore is running.', $running );
 		$this->assertStringNotContainsString( 'data-hosting-action="restore"', $running );
 
-		HostingRestore::run( $r->id() );
+		$this->run_account( $r );
 		ob_start();
 		HostingAccount::render( Resource::find( $r->id() ) );
 		$done = (string) ob_get_clean();

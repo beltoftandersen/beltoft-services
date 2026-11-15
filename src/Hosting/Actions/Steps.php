@@ -10,9 +10,14 @@ namespace BeltoftServices\Hosting\Actions;
 use BeltoftServices\Crypto;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Hosting\HostingActions;
+use BeltoftServices\Hosting\HostingBackups;
 use BeltoftServices\Hosting\HostingDriver;
+use BeltoftServices\Hosting\HostingRestore;
+use BeltoftServices\Hosting\SiteStaging;
+use BeltoftServices\Hosting\SiteWordPress;
 use BeltoftServices\Hosting\Sites;
 use BeltoftServices\Jobs;
+use BeltoftServices\Locks;
 use BeltoftServices\Progress;
 use BeltoftServices\Resource;
 
@@ -26,9 +31,15 @@ defined( 'ABSPATH' ) || exit;
  * until ... is done".
  *
  * What is hosting's own is the memory that lets a change of several agent calls go on where it stopped without starting an
- * agent job twice: resource meta `hosting_steps` = action, slug, step and step_label (what the page says), memo (call name =>
- * ok and result), fail (the failure the clean-up of a new website works from) and secret (encrypted, the SFTP password only,
- * never in the arguments of the job). It is replaced when a change is queued and removed when the change ends.
+ * agent job twice: resource meta `hosting_steps` = action, slug, args (the job's arguments, public ones: the page says where a
+ * move goes), step and step_label (what the page says), memo (call name => ok, result and, for a failed call, what the agent
+ * said), fail (the failure the clean-up of a new website works from) and secret (encrypted, the SFTP password only, never in the
+ * arguments of the job). It is replaced when a change is queued and removed when the change ends.
+ *
+ * Since 0.31.0 the staging copy, the move of WordPress to another address, "Back up now" and the restores are changes of this
+ * kind too (their own loops, retry counters and outcome fields are gone). Their feature state stays with the feature: the
+ * copy's address, time and undo window (SiteStaging), WordPress's address and the way back (SiteWordPress), the restore round
+ * and safety point (HostingRestore) and the backup round (HostingBackups).
  */
 final class Steps {
 
@@ -45,6 +56,7 @@ final class Steps {
 	public static function register(): void {
 		add_filter( 'beltoft_services_action_resumable', array( __CLASS__, 'resumable' ), 10, 3 );
 		add_action( 'beltoft_services_action_failed', array( __CLASS__, 'failed' ), 10, 4 );
+		add_action( 'beltoft_services_action_done', array( __CLASS__, 'done' ), 10, 3 );
 		add_filter( 'beltoft_services_progress_text', array( __CLASS__, 'words' ), 10, 3 );
 	}
 
@@ -60,23 +72,93 @@ final class Steps {
 	}
 
 	/**
-	 * A website that was being added when its change ended without finishing (the job was lost twice, nothing worked on it, or
-	 * it ran out of retries): its clean-up is queued as a change of its own, through the same path.
+	 * A change ended without finishing (it failed for good, its job was lost twice, nothing worked on it, or it ran out of
+	 * retries): each feature puts right what the change left half done.
+	 *
+	 * - A website that was being added: its clean-up is queued as a change of its own, through the same path.
+	 * - A staging copy that was being made: its address goes and the website is as it was; one that was being deleted is a copy again.
+	 * - A restore or a backup that was under way: its round ends, so the account is not left half way (an account restore that had
+	 *   stopped the container starts it again).
 	 *
 	 * @param Resource             $r      Resource.
 	 * @param string               $action Action name.
-	 * @param array<string, mixed> $args   Arguments, when known.
+	 * @param array<string, mixed> $args   Arguments, when known (empty for a lapsed one: the steps hold the website then).
+	 * @param string               $why    failed, stopped or lapsed.
 	 */
-	public static function failed( $r, $action, $args ): void {
-		if ( ! $r instanceof Resource || HostingDriver::ID !== $r->get( 'driver' ) || 'add_site' !== $action ) {
+	public static function failed( $r, $action, $args, $why = 'failed' ): void {
+		if ( ! $r instanceof Resource || HostingDriver::ID !== $r->get( 'driver' ) ) {
 			return;
 		}
 
 		$slug = (string) ( ( (array) $args )[0] ?? self::state( $r )['slug'] ?? '' );
-		$site = '' === $slug ? null : Sites::find( $r->id(), $slug );
 
-		if ( null !== $site && ! empty( $site['flags']['pending'] ) ) {
-			self::start( $r, 'abandon_site', array( $slug ) );
+		switch ( (string) $action ) {
+			case 'add_site':
+				$site = '' === $slug ? null : Sites::find( $r->id(), $slug );
+
+				if ( null !== $site && ! empty( $site['flags']['pending'] ) ) {
+					self::start( $r, 'abandon_site', array( $slug ) );
+				}
+
+				break;
+
+			case 'staging_create':
+				SiteStaging::abandon_create( $r, $slug );
+				break;
+
+			case 'staging_delete':
+				SiteStaging::resume_after_failed_delete( $r, $slug );
+				break;
+
+			case 'restore_backup':
+			case 'restore_undo':
+				( new HostingRestore( $r ) )->give_up( 'The restore job ended without finishing (' . (string) $why . ')' );
+				break;
+
+			case 'backup_now':
+				( new HostingBackups( $r ) )->give_up( 'The backup job ended without finishing (' . (string) $why . ')' );
+				break;
+		}
+
+		// What the change left is gone with it: its steps are not read again.
+		if ( in_array( (string) $why, array( 'stopped', 'lapsed' ), true ) && self::state( $r )['action'] === (string) $action ) {
+			( Resource::find( $r->id() ) ?? $r )->set( array( self::META => null ) );
+		}
+	}
+
+	/**
+	 * A change ended well. A change of the addresses may call for WordPress to move to the website's own domain, and a restore
+	 * puts older files back, so the stored country blocks go to the node again: each is the follow-up change of the account,
+	 * queued through the same path now that the marker is gone.
+	 *
+	 * @param Resource             $r      Resource.
+	 * @param string               $action Action name.
+	 * @param array<string, mixed> $args   Arguments.
+	 */
+	public static function done( $r, $action, $args ): void {
+		if ( ! $r instanceof Resource || HostingDriver::ID !== $r->get( 'driver' ) ) {
+			return;
+		}
+
+		$args = (array) $args;
+
+		if ( 'names' === $action ) {
+			if ( isset( $args[0] ) && '' !== (string) $args[0] ) {
+				SiteWordPress::consider( $r, (string) $args[0], true );
+			}
+
+			SiteWordPress::consider_all( $r );
+
+			return;
+		}
+
+		if ( in_array( $action, array( 'restore_backup', 'restore_undo' ), true ) ) {
+			$kind = (string) ( $args[0] ?? '' );
+			$slug = 'restore_backup' === $action && 'files' === $kind ? (string) ( $args[2] ?? '' ) : '';
+
+			if ( 'restore_undo' === $action || in_array( $kind, array( 'account', 'files' ), true ) ) {
+				self::start_follow( $r, 'resend_country', array( $slug ) );
+			}
 		}
 	}
 
@@ -88,7 +170,7 @@ final class Steps {
 	 * @param string   $kind  Kind of work.
 	 */
 	public static function words( $words, $r, $kind ) {
-		$view = $r instanceof Resource && 'action' === $kind ? self::view( $r ) : null;
+		$view = $r instanceof Resource ? self::view( $r ) : null;
 
 		return null === $view || ! is_array( $words ) ? $words : array_merge( $words, array( 'title' => $view['label'], 'text' => $view['step_label'] ) );
 	}
@@ -115,6 +197,17 @@ final class Steps {
 			'add_ssh_key'       => array( 'add_ssh_key', __( 'Adding an SSH key', 'beltoft-services' ) ),
 			'remove_ssh_key'    => array( 'remove_ssh_key', __( 'Removing an SSH key', 'beltoft-services' ) ),
 			'abandon_site'      => array( 'abandon_site', __( 'Cleaning up a website that was not finished', 'beltoft-services' ) ),
+			'apply_names'       => array( 'names', __( 'Updating the addresses', 'beltoft-services' ) ),
+			'wordpress_address' => array( 'wordpress_address', __( 'Moving WordPress to another address', 'beltoft-services' ) ),
+			'create_staging'    => array( 'staging_create', __( 'Making a staging copy', 'beltoft-services' ) ),
+			'refresh_staging'   => array( 'staging_refresh', __( 'Refreshing the staging copy', 'beltoft-services' ) ),
+			'push_staging'      => array( 'staging_push', __( 'Pushing the staging copy to the live website', 'beltoft-services' ) ),
+			'undo_staging'      => array( 'staging_undo', __( 'Undoing the last push', 'beltoft-services' ) ),
+			'delete_staging'    => array( 'staging_delete', __( 'Deleting the staging copy', 'beltoft-services' ) ),
+			'backup_now'        => array( 'backup_now', __( 'Backing up', 'beltoft-services' ) ),
+			'restore'           => array( 'restore_backup', __( 'Restoring from a backup', 'beltoft-services' ) ),
+			'undo'              => array( 'restore_undo', __( 'Undoing the restore', 'beltoft-services' ) ),
+			'resend_country'    => array( 'resend_country', __( 'Sending the country block to the server again', 'beltoft-services' ) ),
 		);
 	}
 
@@ -148,10 +241,22 @@ final class Steps {
 	 * @param string $action Action name.
 	 */
 	public static function method_of( string $action ): string {
-		return array(
+		$named = array(
 			'names'        => 'apply_names',
 			'abandon_site' => 'abandon_new_site',
-		)[ $action ] ?? $action;
+		);
+
+		if ( isset( $named[ $action ] ) ) {
+			return $named[ $action ];
+		}
+
+		foreach ( self::table() as $method => $row ) {
+			if ( $row[0] === $action ) {
+				return $method;
+			}
+		}
+
+		return $action;
 	}
 
 	/**
@@ -160,7 +265,7 @@ final class Steps {
 	 * @param string $method Facade method.
 	 */
 	private static function about_site( string $method ): bool {
-		return in_array( $method, array( 'add_site', 'remove_site', 'set_php', 'php_rollback', 'set_workers', 'purge_cache', 'set_country_block', 'abandon_site' ), true );
+		return in_array( $method, array( 'add_site', 'remove_site', 'set_php', 'php_rollback', 'set_workers', 'purge_cache', 'set_country_block', 'abandon_site', 'wordpress_address', 'create_staging', 'refresh_staging', 'push_staging', 'undo_staging', 'delete_staging', 'resend_country' ), true );
 	}
 
 	/**
@@ -187,6 +292,7 @@ final class Steps {
 		$state = array(
 			'action'     => $row[0],
 			'slug'       => self::about_site( $method ) ? (string) ( $args[0] ?? '' ) : '',
+			'args'       => array_values( $args ),
 			'secret'     => null === $secret ? '' : Crypto::encrypt( $secret ),
 			'step'       => '',
 			'step_label' => '',
@@ -216,13 +322,35 @@ final class Steps {
 		);
 	}
 
+	/**
+	 * Queues a change the system itself wants (a follow-up of another change, the domain sweep) through the same path: the account's
+	 * site lock is taken without waiting, an account that is not ready is left alone, and a change that is already under way
+	 * refuses it (the caller looks again later: the sweep derives the need from the stored state, nothing is kept here).
+	 *
+	 * @param Resource          $r      Hosting resource.
+	 * @param string            $method Facade method of the change.
+	 * @param array<int, mixed> $args   Its arguments.
+	 * @return bool Whether the change was queued.
+	 */
+	public static function start_follow( Resource $r, string $method, array $args ): bool {
+		$fresh = Resource::find( $r->id() ) ?? $r;
+
+		if ( 'ready' !== $fresh->get( 'state' ) || 'ready' !== $fresh->get( 'desired' ) ) {
+			return false;
+		}
+
+		list( $taken, $started ) = Locks::with( Locks::name( 'hosting-site', $r->id() ), 0, static fn() => self::start( $fresh, $method, $args ) );
+
+		return $taken && ! is_wp_error( $started );
+	}
+
 	// What the page shows.
 
 	/**
 	 * The change in progress as the page shows it (from the Progress marker and the step state), or null.
 	 *
 	 * @param Resource $r Hosting resource.
-	 * @return array{action: string, label: string, slug: string, step_label: string, started: int}|null
+	 * @return array{action: string, label: string, slug: string, args: array<int, mixed>, step_label: string, started: int}|null
 	 */
 	public static function view( Resource $r ): ?array {
 		$fresh  = Resource::find( $r->id() ) ?? $r;
@@ -239,6 +367,7 @@ final class Steps {
 			'action'     => $marker['action'],
 			'label'      => '' !== $marker['label'] ? $marker['label'] : self::label_of( $marker['action'] ),
 			'slug'       => $mine ? (string) $state['slug'] : '',
+			'args'       => $mine ? (array) $state['args'] : array(),
 			'step_label' => $mine && '' !== (string) $state['step_label'] ? (string) $state['step_label'] : ( '' !== $marker['label'] ? $marker['label'] : self::label_of( $marker['action'] ) ),
 			'started'    => $marker['at'],
 		);
@@ -253,7 +382,8 @@ final class Steps {
 	public static function last( Resource $r ): ?array {
 		$last = ( Resource::find( $r->id() ) ?? $r )->get( Jobs::RESULT );
 
-		if ( ! is_array( $last ) || ! in_array( (string) ( $last['action'] ?? '' ), self::actions(), true ) || (int) ( $last['at'] ?? 0 ) < time() - self::LAST_SHOWN ) {
+		// A follow-up the customer did not ask for (the country block sent again after a restore) is staff's concern: they were told.
+		if ( ! is_array( $last ) || ! in_array( (string) ( $last['action'] ?? '' ), self::actions(), true ) || 'resend_country' === (string) $last['action'] || (int) ( $last['at'] ?? 0 ) < time() - self::LAST_SHOWN ) {
 			return null;
 		}
 
@@ -291,7 +421,7 @@ final class Steps {
 	public static function state( Resource $r ): array {
 		$state = ( Resource::find( $r->id() ) ?? $r )->get( self::META );
 
-		return array_merge( array( 'action' => '', 'slug' => '', 'secret' => '', 'step' => '', 'step_label' => '', 'memo' => array(), 'fail' => null ), is_array( $state ) ? $state : array() );
+		return array_merge( array( 'action' => '', 'slug' => '', 'args' => array(), 'secret' => '', 'step' => '', 'step_label' => '', 'memo' => array(), 'fail' => null ), is_array( $state ) ? $state : array() );
 	}
 
 	/**
@@ -315,13 +445,14 @@ final class Steps {
 	 * @param string                    $call   Call name.
 	 * @param bool                      $ok     Whether the job was done.
 	 * @param array<string, mixed>|null $result The result of a job that was done.
+	 * @param string                    $why    What the agent said when the job failed (scrubbed, short).
 	 * @return bool Whether it was stored.
 	 */
-	public static function remember( Resource $r, string $call, bool $ok, ?array $result = null ): bool {
+	public static function remember( Resource $r, string $call, bool $ok, ?array $result = null, string $why = '' ): bool {
 		$fresh = Resource::find( $r->id() ) ?? $r;
 		$state = self::state( $fresh );
 
-		$state['memo'][ $call ] = $ok ? array( 'ok' => true, 'result' => (array) $result ) : array( 'ok' => false );
+		$state['memo'][ $call ] = $ok ? array( 'ok' => true, 'result' => (array) $result ) : array( 'ok' => false, 'why' => mb_substr( $why, 0, 200 ) );
 
 		return $fresh->set( array( self::META => $state ) );
 	}
@@ -362,6 +493,18 @@ final class Steps {
 				'site_workers_' => __( 'Making room for the new website', 'beltoft-services' ),
 				'db_drop_new_'  => __( 'Cleaning up', 'beltoft-services' ),
 				'site_del_new_' => __( 'Cleaning up', 'beltoft-services' ),
+			);
+		} elseif ( 0 === strpos( $action, 'staging_' ) ) {
+			$steps = array(
+				'staging_dns'  => __( 'Making the address of the copy', 'beltoft-services' ),
+				'staging_'     => __( 'Copying the website', 'beltoft-services' ),
+				'edge_update'  => __( 'Setting up the address', 'beltoft-services' ),
+			);
+		} elseif ( 'wordpress_address' === $action ) {
+			$steps = array(
+				'wp_address_' => __( 'Changing the address in WordPress', 'beltoft-services' ),
+				'site_names_' => __( 'Updating the addresses', 'beltoft-services' ),
+				'edge_update' => __( 'Updating the addresses', 'beltoft-services' ),
 			);
 		} elseif ( 'remove_site' === $action ) {
 			$steps = array(
@@ -412,7 +555,7 @@ final class Steps {
 
 		// A job whose steps are not the steps of this action (they were lost, or are an older change's) starts clean.
 		if ( $state['action'] !== $action ) {
-			$state = array_merge( $state, array( 'action' => $action, 'slug' => '', 'secret' => '', 'step' => '', 'step_label' => '', 'memo' => array(), 'fail' => null ) );
+			$state = array_merge( $state, array( 'action' => $action, 'slug' => '', 'args' => array(), 'secret' => '', 'step' => '', 'step_label' => '', 'memo' => array(), 'fail' => null ) );
 			$fresh->set( array( self::META => $state ) );
 		}
 
@@ -423,14 +566,40 @@ final class Steps {
 		try {
 			$out = ( new HostingActions( $fresh, 'job' ) )->job( self::method_of( $action ), array_values( $args ) );
 		} catch ( TaskPending $pending ) {
-			return $pending->result;
+			$result = $pending->result;
+
+			// A poll or a retry ends this run only: the change goes on. A done or failed result is the end of the change.
+			if ( $result->is_retry() ) {
+				return $result;
+			}
+
+			( Resource::find( $r->id() ) ?? $r )->set( array( self::META => null ) );
+
+			return $result;
 		}
 
 		// The change is over: its steps are gone, and the outcome is the shared last_result.
 		( Resource::find( $r->id() ) ?? $r )->set( array( self::META => null ) );
 
-		return is_wp_error( $out )
-			? StepResult::fail( sprintf( '%s (%s)', $out->get_error_message(), $out->get_error_code() ) )
-			: StepResult::done( array(), sprintf( 'Hosting change "%s" done', $action ) );
+		if ( is_wp_error( $out ) ) {
+			$data = $out->get_error_data();
+			$meta = array();
+
+			// A refusal that the customer reads in its own words, and one that is expected (no mail to staff): see Jobs::TEXT.
+			if ( is_array( $data ) && '' !== (string) ( $data['text'] ?? '' ) ) {
+				$meta[ Jobs::TEXT ] = (string) $data['text'];
+
+				if ( ! empty( $data['expected'] ) ) {
+					$meta[ Jobs::EXPECTED ] = true;
+				}
+			}
+
+			// What the agent said (scrubbed, short) goes to staff with the failure; the customer reads only the text above.
+			$why = is_array( $data ) && '' !== (string) ( $data['why'] ?? '' ) ? ' [' . (string) $data['why'] . ']' : '';
+
+			return StepResult::fail( sprintf( '%s (%s)%s', $out->get_error_message(), $out->get_error_code(), $why ), $meta );
+		}
+
+		return StepResult::done( array(), sprintf( 'Hosting change "%s" done', $action ) );
 	}
 }

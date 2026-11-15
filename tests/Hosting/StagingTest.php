@@ -1,8 +1,8 @@
 <?php
 /**
- * The staging copy of a hosting website: the rules (plan limit, storage), the jobs (create, refresh, push, undo, delete),
- * what the page and the edge map say, and what happens when the node fails. Everything runs against the FakeAgent; no job
- * waits for Action Scheduler, the tests call the job's own entry point.
+ * The staging copy of a hosting website: the rules (plan limit, storage), the jobs (create, refresh, push, undo, delete) as changes
+ * of the shared action controller, what the page and the edge map say, and what happens when the node fails or the job is lost.
+ * Everything runs against the FakeAgent; the jobs are run the way the runner runs them (HostingCase::drive()).
  *
  * @package BeltoftServices
  */
@@ -12,6 +12,7 @@ namespace BeltoftServices\Tests\Hosting;
 require_once __DIR__ . '/HostingCase.php';
 
 use BeltoftServices\Api\Routes;
+use BeltoftServices\Hosting\Actions\Steps;
 use BeltoftServices\Hosting\EdgeMap;
 use BeltoftServices\Hosting\HostingAccount;
 use BeltoftServices\Hosting\HostingActions;
@@ -20,6 +21,7 @@ use BeltoftServices\Hosting\SiteDomains;
 use BeltoftServices\Hosting\SiteStaging;
 use BeltoftServices\Hosting\Sites;
 use BeltoftServices\Jobs;
+use BeltoftServices\Progress;
 use BeltoftServices\Resource;
 
 /**
@@ -27,27 +29,37 @@ use BeltoftServices\Resource;
  */
 class StagingTest extends HostingCase {
 
+	/**
+	 * Mails to the operator.
+	 *
+	 * @var array<int, array<string, mixed>>
+	 */
+	private array $mails = array();
+
 	public function set_up(): void {
 		parent::set_up();
 		$this->settings( array( 'hosting_php_versions' => '8.3,8.4,8.5' ) );
 		add_filter( 'beltoft_services_rest_rate_limit', '__return_zero' );
-		$this->clear_queue();
+		$this->mails = array();
+		add_filter(
+			'pre_wp_mail',
+			function ( $pre, $atts ) {
+				$this->mails[] = $atts;
+				return true;
+			},
+			10,
+			2
+		);
 	}
 
 	public function tear_down(): void {
-		$this->clear_queue();
 		remove_all_filters( 'beltoft_services_rest_rate_limit' );
+		remove_all_filters( 'pre_wp_mail' );
 		wp_set_current_user( 0 );
 		global $wp_rest_server;
 		$wp_rest_server = null;
 
 		parent::tear_down();
-	}
-
-	private function clear_queue(): void {
-		foreach ( as_get_scheduled_actions( array( 'hook' => SiteStaging::HOOK, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => -1 ), 'ids' ) as $id ) {
-			\ActionScheduler::store()->cancel_action( (int) $id );
-		}
 	}
 
 	/**
@@ -67,15 +79,9 @@ class StagingTest extends HostingCase {
 	}
 
 	private function view( Resource $r, string $slug ): array {
-		return SiteStaging::view( (array) Sites::find( $r->id(), $slug ) );
-	}
+		wp_cache_flush();
 
-	/**
-	 * Runs the queued job the way Action Scheduler would.
-	 */
-	private function run_job( Resource $r, string $slug, string $kind, int $files_only = 0, int $try = 0 ): void {
-		$this->clear_queue();
-		SiteStaging::run( $r->id(), $slug, $kind, $files_only, $try );
+		return SiteStaging::view( (array) Sites::find( $r->id(), $slug ) );
 	}
 
 	/**
@@ -93,9 +99,9 @@ class StagingTest extends HostingCase {
 	 */
 	private function with_copy( array $plan = array() ): array {
 		list( $r, $slug ) = $this->account( $plan );
-		$out = ( new HostingActions( $r ) )->create_staging( $slug );
+		$out = $this->change( $r, 'create_staging', array( $slug ) );
 		$this->assertSame( 'creating', $out['state'] );
-		$this->run_job( $r, $slug, 'create' );
+		$this->assertTrue( $this->last_outcome( $r )['ok'], 'The copy was made.' );
 
 		return array( Resource::find( $r->id() ), $slug );
 	}
@@ -111,14 +117,17 @@ class StagingTest extends HostingCase {
 
 	public function test_creating_records_the_start_holds_the_address_and_queues_the_job(): void {
 		list( $r, $slug ) = $this->account();
-		$out = ( new HostingActions( $r ) )->create_staging( $slug );
+		$out = ( new HostingActions( $r ) )->queue( 'create_staging', array( $slug ) );
 
 		$this->assertSame( 'creating', $out['state'] );
+		$this->assertSame( 'pending', $out['status'] );
+		$this->assertSame( 'staging_create', $out['task']['action'] );
+		$this->assertSame( $slug, $out['task']['slug'] );
 		$view = $this->view( $r, $slug );
 		$this->assertTrue( $view['busy'] );
 		$this->assertSame( $slug . '-stg', $view['copy'] );
 		$this->assertSame( $slug . '-stg.preview.example.test', $view['host'] );
-		$this->assertTrue( Jobs::pending_action( SiteStaging::HOOK, array( $r->id(), $slug, 'create', 0, 0 ) ) );
+		$this->assertTrue( Jobs::acting( $r->id() ), 'The shared controller holds the job.' );
 		$this->assertSame( array(), $this->calls( 'site.staging_create' ), 'Nothing is sent to the node inside the request.' );
 		// The name is held at once: no other website can take it, and it is nobody's website.
 		$row = SiteDomains::find( $view['host'] );
@@ -128,11 +137,10 @@ class StagingTest extends HostingCase {
 
 	public function test_the_job_writes_dns_asks_the_node_and_opens_the_edge_route(): void {
 		list( $r, $slug ) = $this->account();
-		( new HostingActions( $r ) )->create_staging( $slug );
-		$this->run_job( $r, $slug, 'create' );
+		$this->change( $r, 'create_staging', array( $slug ) );
 
 		$view = $this->view( $r, $slug );
-		$this->assertSame( array( 'ready', true, '' ), array( $view['state'], $view['routed'], $view['note'] ) );
+		$this->assertSame( array( 'ready', true ), array( $view['state'], $view['routed'] ) );
 		$call = $this->calls( 'site.staging_create' );
 		$this->assertCount( 1, $call );
 		$this->assertSame( array( 'vmid' => $this->vmid( $r ), 'slug' => $slug, 'copy' => $slug . '-stg', 'host' => $slug . '-stg.preview.example.test' ), $call[0]['args'] );
@@ -145,6 +153,52 @@ class StagingTest extends HostingCase {
 		$this->assertContains( $view['host'], array_column( end( $edge )['args']['routes'], 'host' ) );
 		$zone = (string) wp_json_encode( $this->dns->zone( 'preview.example.test' ) );
 		$this->assertStringContainsString( $slug . '-stg', $zone, 'The temporary address of the copy is in DNS.' );
+		$this->assertSame( 'staging_create', $this->last_outcome( $r )['action'] );
+	}
+
+	public function test_each_step_of_the_job_is_said_in_words_and_runs_in_its_own_run(): void {
+		list( $r, $slug ) = $this->account();
+		$this->agent->pending( 'site.staging_create', 2 );
+		( new HostingActions( $r ) )->queue( 'create_staging', array( $slug ) );
+
+		$seen = array();
+
+		for ( $i = 0; $i < 20; $i++ ) {
+			wp_cache_flush();
+			$task = Steps::view( Resource::find( $r->id() ) );
+
+			if ( null === $task ) {
+				break;
+			}
+
+			$seen[] = $task['step_label'];
+			$this->assertSame( 1, $this->run_once( $r ) );
+		}
+
+		$this->assertContains( 'Copying the website', $seen );
+		$this->assertTrue( $this->last_outcome( $r )['ok'] );
+		$this->assertCount( 1, $this->agent_jobs( 'site.staging_create' ), 'One job on the node, however many runs waited for it.' );
+	}
+
+	/**
+	 * One run of the account's next waiting job.
+	 *
+	 * @param Resource $r Resource.
+	 * @return int Runs made (0 or 1).
+	 */
+	private function run_once( Resource $r ): int {
+		foreach ( as_get_scheduled_actions( array( 'hook' => Jobs::ACT, 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => -1 ), 'ids' ) as $id ) {
+			$args = \ActionScheduler::store()->fetch_action( (string) $id )->get_args();
+
+			if ( (int) $args[0] === $r->id() ) {
+				\ActionScheduler::store()->cancel_action( (int) $id );
+				Jobs::act( $r->id(), (string) $args[1], (array) $args[2] );
+
+				return 1;
+			}
+		}
+
+		return 0;
 	}
 
 	public function test_the_copy_is_not_one_of_the_websites_and_does_not_show_among_its_addresses(): void {
@@ -164,68 +218,74 @@ class StagingTest extends HostingCase {
 		$a = new HostingActions( $r );
 		$a->add_site( 'second', '', '', false );
 
-		$refused = $a->create_staging( 'second' );
+		$refused = $a->queue( 'create_staging', array( 'second' ) );
 		$this->assertWPError( $refused );
 		$this->assertSame( 'limit', $refused->get_error_code() );
-		$this->assertSame( 'This website has a staging copy already.', ( new HostingActions( $r ) )->create_staging( $slug )->get_error_message() );
+		$this->assertSame( 'This website has a staging copy already.', ( new HostingActions( $r ) )->queue( 'create_staging', array( $slug ) )->get_error_message() );
 
 		list( $q, $first ) = $this->account( array( 'staging' => 'per_site' ) );
-		$b = new HostingActions( $q );
-		$b->add_site( 'other', '', '', false );
-		$this->assertSame( 'creating', $b->create_staging( $first )['state'] );
-		$this->assertSame( 'creating', $b->create_staging( 'other' )['state'] );
-		$this->assertWPError( $b->create_staging( $first ), 'One copy for each website.' );
+		( new HostingActions( $q ) )->add_site( 'other', '', '', false );
+		$this->assertSame( 'creating', $this->change( $q, 'create_staging', array( $first ) )['state'] );
+		$this->assertSame( 'creating', $this->change( $q, 'create_staging', array( 'other' ) )['state'] );
+		$this->assertWPError( ( new HostingActions( Resource::find( $q->id() ) ) )->queue( 'create_staging', array( $first ) ), 'One copy for each website.' );
 	}
 
 	public function test_no_copy_is_made_when_more_than_half_of_the_storage_is_used(): void {
 		list( $r, $slug ) = $this->account();
 		$r->set( array( 'usage' => array( 'disk_mb' => 6000, 'db_mb' => 100 ) ) );
 
-		$out = ( new HostingActions( Resource::find( $r->id() ) ) )->create_staging( $slug );
+		$out = ( new HostingActions( Resource::find( $r->id() ) ) )->queue( 'create_staging', array( $slug ) );
 		$this->assertWPError( $out );
 		$this->assertSame( 'limit', $out->get_error_code() );
 		$this->assertStringContainsString( 'not enough storage', $out->get_error_message() );
 		$this->assertSame( array(), $this->calls( 'site.staging_create' ) );
 		$this->assertFalse( $this->view( $r, $slug )['exists'] );
+		$this->assertFalse( Jobs::acting( $r->id() ), 'A refusal queues nothing.' );
 	}
 
 	public function test_a_failed_create_takes_back_the_address_and_says_so(): void {
 		list( $r, $slug ) = $this->account();
-		( new HostingActions( $r ) )->create_staging( $slug );
+		( new HostingActions( $r ) )->queue( 'create_staging', array( $slug ) );
 		$host = $this->view( $r, $slug )['host'];
-
-		for ( $try = 0; $try < SiteStaging::TRIES; $try++ ) {
-			$this->agent->fail_next( 'site.staging_create', 'broke' );
-			$this->run_job( $r, $slug, 'create', 0, $try );
-		}
+		$this->agent->fail_next( 'site.staging_create', 'broke' );
+		$this->run_account( $r );
 
 		$view = $this->view( $r, $slug );
-		$this->assertSame( array( false, 'failed', 'create' ), array( $view['exists'], $view['note'], $view['failed'] ) );
+		$this->assertFalse( $view['exists'] );
 		$this->assertNull( SiteDomains::find( $host ), 'The copy\'s address is free again.' );
 		$this->assertNotContains( $host, array_column( EdgeMap::routes( $r->id(), false ), 'host' ) );
-		$this->assertStringContainsString( 'The staging copy could not be made. Your website was not changed.', $this->page( $r ) );
-		$this->assertStringContainsString( 'Create staging copy', $this->page( $r ), 'It can be tried again.' );
-		$this->assertCount( SiteStaging::TRIES, $this->calls( 'site.staging_create' ) );
+		$out = $this->last_outcome( $r );
+		$this->assertFalse( $out['ok'] );
+		$this->assertSame( 'The staging copy could not be made. Your website was not changed.', $out['text'] );
+		$html = $this->page( $r );
+		$this->assertStringContainsString( 'The staging copy could not be made. Your website was not changed.', $html );
+		$this->assertStringContainsString( 'Create staging copy', $html, 'It can be tried again.' );
+		$this->assertCount( 1, $this->calls( 'site.staging_create' ), 'A job the node failed is not sent again: no loop of its own.' );
+		$this->assertCount( 1, $this->mails, 'Staff are told once, by the shared alert.' );
 	}
 
 	public function test_an_agent_without_the_operation_is_told_to_the_customer_and_nothing_is_retried(): void {
 		list( $r, $slug ) = $this->account();
 		$this->agent->set_unsupported( array( 'site.staging_create' ) );
-		( new HostingActions( $r ) )->create_staging( $slug );
-		$this->run_job( $r, $slug, 'create' );
+		$this->change( $r, 'create_staging', array( $slug ) );
 
-		$this->assertSame( 'unsupported', $this->view( $r, $slug )['note'] );
+		$out = $this->last_outcome( $r );
+		$this->assertFalse( $out['ok'] );
+		$this->assertSame( 'Your hosting cannot do this yet. Contact support.', $out['text'] );
 		$this->assertStringContainsString( 'Your hosting cannot do this yet.', $this->page( $r ) );
-		$this->assertFalse( Jobs::pending_action( SiteStaging::HOOK, array( $r->id(), $slug, 'create', 0, 1 ) ) );
+		$this->assertFalse( $this->view( $r, $slug )['exists'] );
+		$this->assertFalse( Jobs::acting( $r->id() ) );
+		$this->assertSame( array(), $this->mails, 'An expected refusal tells no one.' );
 	}
 
 	// -- Refresh, push, undo ------------------------------------------------------------------------------------
 
 	public function test_refresh_asks_the_node_and_keeps_the_time(): void {
 		list( $r, $slug ) = $this->with_copy();
-		$this->assertSame( 'refreshing', ( new HostingActions( $r ) )->refresh_staging( $slug )['state'] );
+		$out = ( new HostingActions( $r ) )->queue( 'refresh_staging', array( $slug ) );
+		$this->assertSame( 'refreshing', $out['state'] );
 		$this->assertTrue( $this->view( $r, $slug )['busy'] );
-		$this->run_job( $r, $slug, 'refresh' );
+		$this->run_account( $r );
 
 		$view = $this->view( $r, $slug );
 		$this->assertSame( 'ready', $view['state'] );
@@ -235,16 +295,13 @@ class StagingTest extends HostingCase {
 
 	public function test_a_push_of_files_and_database_and_one_of_files_only_send_what_was_chosen_and_keep_the_way_back(): void {
 		list( $r, $slug ) = $this->with_copy();
-		$a = new HostingActions( $r );
 
-		$this->assertSame( 'pushing', $a->push_staging( $slug, false )['state'] );
-		$this->run_job( $r, $slug, 'push', 0 );
+		$this->assertSame( 'pushing', $this->change( $r, 'push_staging', array( $slug, false ) )['state'] );
 		$this->assertArrayNotHasKey( 'files_only', $this->calls( 'site.staging_push' )[0]['args'] );
 		$view = $this->view( $r, $slug );
 		$this->assertSame( array( 'ready', 'full' ), array( $view['state'], $view['undo']['scope'] ) );
 
-		$a->push_staging( $slug, true );
-		$this->run_job( $r, $slug, 'push', 1 );
+		$this->change( $r, 'push_staging', array( $slug, true ) );
 		$this->assertTrue( $this->calls( 'site.staging_push' )[1]['args']['files_only'] );
 		$this->assertSame( 'files', $this->view( $r, $slug )['undo']['scope'] );
 	}
@@ -252,110 +309,175 @@ class StagingTest extends HostingCase {
 	public function test_a_push_the_node_put_back_leaves_no_way_back_and_says_so(): void {
 		list( $r, $slug ) = $this->with_copy();
 		$this->agent->script_staging( 'site.staging_push', array( 'pushed' => false, 'failed' => true, 'restored' => true ) );
-		( new HostingActions( $r ) )->push_staging( $slug, false );
-		$this->run_job( $r, $slug, 'push' );
+		$this->change( $r, 'push_staging', array( $slug, false ) );
 
 		$view = $this->view( $r, $slug );
-		$this->assertSame( array( 'ready', 'failed', 'push', null ), array( $view['state'], $view['note'], $view['failed'], $view['undo'] ) );
+		$this->assertSame( array( 'ready', null ), array( $view['state'], $view['undo'] ) );
+		$out = $this->last_outcome( $r );
+		$this->assertFalse( $out['ok'] );
+		$this->assertSame( 'The push did not work. Your live website was put back as it was.', $out['text'] );
 		$this->assertStringContainsString( 'The push did not work. Your live website was put back as it was.', $this->page( $r ) );
+		$this->assertSame( array(), $this->mails, 'The node put the website back: nothing for staff to do.' );
 	}
 
 	public function test_a_push_that_could_not_be_put_back_tells_the_operator(): void {
 		list( $r, $slug ) = $this->with_copy();
-		$mails = array();
-		add_filter(
-			'pre_wp_mail',
-			static function ( $pre, $atts ) use ( &$mails ) {
-				$mails[] = $atts;
-				return true;
-			},
-			10,
-			2
-		);
 		$this->agent->fail_next( 'site.staging_push', 'the push failed and the safety point could not be put back' );
-		( new HostingActions( $r ) )->push_staging( $slug, false );
-		$this->run_job( $r, $slug, 'push' );
-		remove_all_filters( 'pre_wp_mail' );
+		$this->change( $r, 'push_staging', array( $slug, false ) );
 
-		$this->assertSame( 'unsafe', $this->view( $r, $slug )['note'] );
-		$this->assertCount( 1, $mails );
+		$this->assertSame( 'The push did not work and the live website could not be put back automatically. Support has been told.', $this->last_outcome( $r )['text'] );
+		$this->assertCount( 1, $this->mails );
 		$this->assertStringContainsString( 'The push did not work and the live website could not be put back automatically.', $this->page( $r ) );
+		$this->assertSame( 'ready', $this->view( $r, $slug )['state'], 'The copy is still there.' );
+	}
+
+	public function test_a_push_always_has_a_safety_point_to_come_back_to_and_the_page_never_pushes_twice(): void {
+		list( $r, $slug ) = $this->with_copy();
+
+		// The safety point is the node's (it makes it before the push and puts it back when the push fails): the shop sends one push
+		// and keeps the way back only for a push that worked.
+		$this->change( $r, 'push_staging', array( $slug, false ) );
+		$this->assertCount( 1, $this->agent_jobs( 'site.staging_push' ) );
+		$this->assertNotNull( $this->view( $r, $slug )['undo'] );
+		$this->assertSame( array(), $this->calls( 'site.staging_undo' ), 'The way back is only used when the customer asks for it.' );
 	}
 
 	public function test_undo_goes_back_to_the_safety_point_and_is_offered_for_seven_days(): void {
 		list( $r, $slug ) = $this->with_copy();
 		$a = new HostingActions( $r );
 
-		$refused = $a->undo_staging( $slug );
+		$refused = $a->queue( 'undo_staging', array( $slug ) );
 		$this->assertSame( 'invalid', $refused->get_error_code(), 'No push, nothing to undo.' );
 
-		$a->push_staging( $slug, false );
-		$this->run_job( $r, $slug, 'push' );
+		$this->change( $r, 'push_staging', array( $slug, false ) );
 		$html = $this->page( $r );
 		$this->assertStringContainsString( 'Undo last push', $html );
 		$this->assertStringContainsString( 'Orders, comments and other changes made on the live website since the push are lost.', $html );
 
-		$this->assertSame( 'undoing', $a->undo_staging( $slug )['state'] );
-		$this->run_job( $r, $slug, 'undo' );
+		$this->assertSame( 'undoing', $this->change( $r, 'undo_staging', array( $slug ) )['state'] );
 		$this->assertNull( $this->view( $r, $slug )['undo'] );
 		$this->assertCount( 1, $this->calls( 'site.staging_undo' ) );
 
 		// Seven days after a push the way back is not offered, whatever the node still holds.
-		$a->push_staging( $slug, true );
-		$this->run_job( $r, $slug, 'push', 1 );
+		$this->change( $r, 'push_staging', array( $slug, true ) );
 		$flags = (array) Sites::find( $r->id(), $slug )['flags']['staging'];
 		$flags['undo']['at'] = Jobs::now() - SiteStaging::KEEP - 10;
 		Sites::update( $r->id(), $slug, array( 'flags' => array( 'staging' => $flags ) ) );
 		$this->assertNull( $this->view( $r, $slug )['undo'] );
 		$this->assertStringNotContainsString( 'Undo last push', $this->page( $r ) );
-		$this->assertSame( 'invalid', ( new HostingActions( Resource::find( $r->id() ) ) )->undo_staging( $slug )->get_error_code() );
+		$this->assertSame( 'invalid', ( new HostingActions( Resource::find( $r->id() ) ) )->queue( 'undo_staging', array( $slug ) )->get_error_code() );
 	}
+
+	// -- One change at a time -----------------------------------------------------------------------------------
 
 	public function test_one_change_at_a_time(): void {
 		list( $r, $slug ) = $this->with_copy();
 		$a = new HostingActions( $r );
-		$a->refresh_staging( $slug );
+		$a->queue( 'refresh_staging', array( $slug ) );
 
-		foreach ( array( $a->push_staging( $slug, false ), $a->refresh_staging( $slug ), $a->delete_staging( $slug ), $a->undo_staging( $slug ), $a->create_staging( $slug ) ) as $out ) {
+		foreach ( array( $a->queue( 'push_staging', array( $slug, false ) ), $a->queue( 'refresh_staging', array( $slug ) ), $a->queue( 'delete_staging', array( $slug ) ), $a->queue( 'undo_staging', array( $slug ) ), $a->queue( 'create_staging', array( $slug ) ), $a->queue( 'purge_cache', array( $slug ) ), $a->queue( 'backup_now' ) ) as $out ) {
 			$this->assertWPError( $out );
 			$this->assertSame( 'busy', $out->get_error_code() );
+			$this->assertSame( 'Wait until refreshing the staging copy is done.', $out->get_error_message() );
 		}
 	}
 
-	public function test_no_staging_change_while_a_restore_round_runs(): void {
+	public function test_a_staging_change_refuses_while_a_restore_or_a_backup_runs_and_they_refuse_while_it_runs(): void {
 		list( $r, $slug ) = $this->with_copy();
-		$r->set( array( 'restore' => array( 'kind' => 'account', 'phase' => 'restore' ) ) );
+		Progress::mark( Resource::find( $r->id() ), 'restore_backup', 'Restoring from a backup' );
 		$a = new HostingActions( Resource::find( $r->id() ) );
 
-		foreach ( array( $a->push_staging( $slug, false ), $a->refresh_staging( $slug ), $a->delete_staging( $slug ) ) as $out ) {
+		foreach ( array( $a->queue( 'push_staging', array( $slug, false ) ), $a->queue( 'refresh_staging', array( $slug ) ), $a->queue( 'delete_staging', array( $slug ) ) ) as $out ) {
 			$this->assertWPError( $out );
 			$this->assertSame( 'busy', $out->get_error_code() );
+			$this->assertSame( 'Wait until restoring from a backup is done.', $out->get_error_message() );
 		}
 
 		$this->assertFalse( $this->view( $r, $slug )['busy'] );
+		Progress::clear( Resource::find( $r->id() ) );
+
+		// The other way round: a push that runs holds the restore and the backup.
+		$a = new HostingActions( Resource::find( $r->id() ) );
+		$a->queue( 'push_staging', array( $slug, false ) );
+		$this->assertSame( 'busy', $a->queue( 'restore', array( 'account', 'x', '' ) )->get_error_code() );
+		$this->assertSame( 'busy', $a->queue( 'backup_now' )->get_error_code() );
+		$this->assertSame( 'busy', $a->queue( 'undo' )->get_error_code() );
 	}
 
-	public function test_a_job_that_is_no_longer_the_one_the_flags_wait_for_does_nothing(): void {
-		list( $r, $slug ) = $this->with_copy();
-		$before = count( $this->agent->calls() );
-		$this->run_job( $r, $slug, 'push' );
-		$this->run_job( $r, $slug, 'delete' );
+	// -- A job that is lost or does not finish --------------------------------------------------------------------
 
-		$this->assertCount( $before, $this->agent->calls() );
+	public function test_a_job_that_is_lost_in_the_middle_goes_on_where_it_stopped_and_starts_nothing_twice(): void {
+		list( $r, $slug ) = $this->account();
+		$this->agent->pending( 'site.staging_create', 3 );
+		( new HostingActions( $r ) )->queue( 'create_staging', array( $slug ) );
+
+		// Two runs, then the process dies (a deploy): the dns step is done, the node's job runs.
+		$this->assertSame( 1, $this->run_once( $r ) );
+		$this->assertSame( 1, $this->run_once( $r ) );
+		$this->assertArrayHasKey( 'staging_dns', Steps::state( Resource::find( $r->id() ) )['memo'] );
+		$this->kill_job( $r );
+
+		$this->assertTrue( Jobs::acting( $r->id() ), 'Queued again.' );
+		$this->assertArrayNotHasKey( 'ok', $this->last_outcome( $r ), 'No failed result.' );
+
+		$this->run_account( $r );
+		$this->assertTrue( $this->last_outcome( $r )['ok'] );
 		$this->assertSame( 'ready', $this->view( $r, $slug )['state'] );
+		$this->assertCount( 1, $this->agent_jobs( 'site.staging_create' ), 'The node was not asked twice.' );
+	}
+
+	public function test_a_lost_push_goes_on_and_keeps_one_safety_point_and_one_way_back(): void {
+		list( $r, $slug ) = $this->with_copy();
+		$this->agent->pending( 'site.staging_push', 3 );
+		( new HostingActions( $r ) )->queue( 'push_staging', array( $slug, false ) );
+
+		$this->run_once( $r );
+		$this->kill_job( $r );
+		$this->assertSame( 'pushing', $this->view( $r, $slug )['state'] );
+		$this->assertNull( $this->view( $r, $slug )['undo'], 'No way back is offered before the push worked.' );
+
+		$this->run_account( $r );
+		$this->assertTrue( $this->last_outcome( $r )['ok'] );
+		$this->assertCount( 1, $this->agent_jobs( 'site.staging_push' ), 'The push was never started twice.' );
+		$this->assertSame( 'full', $this->view( $r, $slug )['undo']['scope'] );
+	}
+
+	public function test_a_copy_nobody_works_on_any_more_is_given_up_and_its_address_is_free_again(): void {
+		list( $r, $slug ) = $this->account();
+		( new HostingActions( $r ) )->queue( 'create_staging', array( $slug ) );
+		$host = $this->view( $r, $slug )['host'];
+		$this->assertNotNull( SiteDomains::find( $host ) );
+
+		$this->lose_the_change( $r );
+		Jobs::sweep();
+
+		$this->assertFalse( $this->view( $r, $slug )['exists'] );
+		$this->assertNull( SiteDomains::find( $host ), 'The held address is free.' );
+		$this->assertFalse( $this->last_outcome( $r )['ok'] );
+		$this->assertCount( 1, $this->mails, 'One staff mail.' );
+	}
+
+	public function test_a_delete_that_fails_leaves_the_copy_to_delete_again(): void {
+		list( $r, $slug ) = $this->with_copy();
+		$this->agent->fail_next( 'site.staging_delete', 'broke' );
+		$this->change( $r, 'delete_staging', array( $slug ) );
+
+		$view = $this->view( $r, $slug );
+		$this->assertSame( array( true, 'ready', false ), array( $view['exists'], $view['state'], $view['busy'] ) );
+		$this->assertSame( 'The staging copy could not be deleted. Try again.', $this->last_outcome( $r )['text'] );
+
+		$this->change( $r, 'delete_staging', array( $slug ) );
+		$this->assertFalse( $this->view( $r, $slug )['exists'] );
 	}
 
 	// -- Delete -------------------------------------------------------------------------------------------------
 
 	public function test_deleting_the_copy_removes_it_from_the_node_dns_and_the_edge_and_keeps_the_way_back(): void {
 		list( $r, $slug ) = $this->with_copy();
-		$a = new HostingActions( $r );
-		$a->push_staging( $slug, false );
-		$this->run_job( $r, $slug, 'push' );
+		$this->change( $r, 'push_staging', array( $slug, false ) );
 		$host = $this->view( $r, $slug )['host'];
 
-		$this->assertSame( 'deleting', $a->delete_staging( $slug )['state'] );
-		$this->run_job( $r, $slug, 'delete' );
+		$this->assertSame( 'deleting', $this->change( $r, 'delete_staging', array( $slug ) )['state'] );
 
 		$view = $this->view( $r, $slug );
 		$this->assertFalse( $view['exists'] );
@@ -366,7 +488,7 @@ class StagingTest extends HostingCase {
 		$this->assertNotContains( $host, array_column( end( $edge )['args']['routes'], 'host' ) );
 		$this->assertFalse( Sites::taken( $slug . '-stg' ) );
 		$this->assertSame( 'full', $view['undo']['scope'], 'The way back of the push belongs to the website, not to the copy.' );
-		$this->assertNotNull( ( new HostingActions( Resource::find( $r->id() ) ) )->undo_staging( $slug )['state'] ?? null );
+		$this->assertSame( 'undoing', ( new HostingActions( Resource::find( $r->id() ) ) )->queue( 'undo_staging', array( $slug ) )['state'] );
 	}
 
 	public function test_removing_the_website_removes_its_copy_and_its_address(): void {
@@ -383,7 +505,7 @@ class StagingTest extends HostingCase {
 
 		list( $q, $first ) = $this->with_copy();
 		( new HostingActions( $q ) )->add_site( 'other', '', '', false );
-		( new HostingActions( $q ) )->refresh_staging( $first );
+		( new HostingActions( $q ) )->queue( 'refresh_staging', array( $first ) );
 		$this->assertSame( 'busy', ( new HostingActions( Resource::find( $q->id() ) ) )->remove_site( $first, $first )->get_error_code(), 'Not while the copy is being changed.' );
 	}
 
@@ -397,9 +519,22 @@ class StagingTest extends HostingCase {
 		$this->assertSame( 'https://' . $slug . '-stg.preview.example.test/?fake-login=1', $out['url'] );
 		$this->assertSame( $slug . '-stg', $this->calls( 'site.wp_login_link' )[0]['args']['slug'] );
 
-		$a->refresh_staging( $slug );
-		$this->assertSame( 'not_found', $a->staging_login( $slug )->get_error_code(), 'Not while it is being changed.' );
+		$a->queue( 'refresh_staging', array( $slug ) );
+		$this->assertSame( 'not_found', ( new HostingActions( Resource::find( $r->id() ) ) )->staging_login( $slug )->get_error_code(), 'Not while it is being changed.' );
 		$this->assertSame( 'not_found', $a->staging_login( 'nosuch' )->get_error_code() );
+	}
+
+	public function test_a_change_called_outside_the_shared_path_is_refused(): void {
+		list( $r, $slug ) = $this->account();
+		$a = new HostingActions( $r );
+
+		$this->assertSame( 'failed', $a->create_staging( $slug )->get_error_code() );
+		$this->assertSame( 'failed', $a->push_staging( $slug )->get_error_code() );
+		$this->assertSame( 'failed', $a->wordpress_address( $slug, '' )->get_error_code() );
+		$this->assertSame( 'failed', $a->backup_now()->get_error_code() );
+		$this->assertSame( 'failed', $a->restore( 'account', 'x' )->get_error_code() );
+		$this->assertFalse( Jobs::acting( $r->id() ) );
+		$this->assertSame( array(), $this->agent->calls_of( 'site.staging_create' ) );
 	}
 
 	// -- The page and the routes ---------------------------------------------------------------------------------
@@ -412,13 +547,14 @@ class StagingTest extends HostingCase {
 		$this->assertStringContainsString( 'It sends no email, is not shown to search engines and does not count as a website.', $html );
 		$this->assertStringNotContainsString( 'data-staging-busy', $html );
 
-		( new HostingActions( $r ) )->create_staging( $slug );
+		( new HostingActions( $r ) )->queue( 'create_staging', array( $slug ) );
 		$html = $this->page( $r );
 		$this->assertStringContainsString( 'data-staging-busy', $html );
 		$this->assertStringContainsString( 'The staging copy is being made. This can take a few minutes.', $html );
 		$this->assertStringNotContainsString( 'data-hosting-action="staging_create"', $html );
+		$this->assertStringContainsString( 'data-hosting-task=', $html, 'The page follows the account\'s task.' );
 
-		$this->run_job( $r, $slug, 'create' );
+		$this->run_account( $r );
 		$html = $this->page( $r );
 
 		foreach ( array( 'staging_open', 'staging_edit', 'staging_refresh', 'staging_delete', 'staging_push', 'staging_cancel' ) as $action ) {
@@ -455,7 +591,7 @@ class StagingTest extends HostingCase {
 		return rest_get_server()->dispatch( $request );
 	}
 
-	public function test_the_routes_queue_the_jobs_answer_202_and_report_the_state(): void {
+	public function test_the_routes_queue_the_jobs_answer_202_with_the_task_and_report_the_state(): void {
 		list( $r, $slug ) = $this->account();
 		wp_set_current_user( (int) $r->license()['user_id'] );
 		global $wp_rest_server;
@@ -464,26 +600,30 @@ class StagingTest extends HostingCase {
 		$response = $this->dispatch( 'POST', $r, $slug );
 		$this->assertSame( 202, $response->get_status() );
 		$this->assertSame( 'creating', $response->get_data()['state'] );
+		$this->assertSame( 'pending', $response->get_data()['status'] );
+		$this->assertSame( 'staging_create', $response->get_data()['task']['action'] );
 		$this->assertSame( 'private, no-store', $response->get_headers()['Cache-Control'] ?? '', 'No reply is cached.' );
 
 		$state = $this->dispatch( 'GET', $r, $slug );
 		$this->assertSame( 200, $state->get_status() );
 		$this->assertTrue( $state->get_data()['busy'] );
+		$this->assertArrayNotHasKey( 'note', $state->get_data(), 'What a job found is the outcome of the action, not a field of the state.' );
 
-		$this->run_job( $r, $slug, 'create' );
+		$this->run_account( $r );
 		$this->assertFalse( $this->dispatch( 'GET', $r, $slug )->get_data()['busy'] );
 		$this->assertSame( 202, $this->dispatch( 'POST', $r, $slug, '/refresh' )->get_status() );
 		$this->assertSame( 409, $this->dispatch( 'POST', $r, $slug, '/push', array( 'files_only' => true ) )->get_status(), 'Busy: one change at a time.' );
-		$this->run_job( $r, $slug, 'refresh' );
+		$this->run_account( $r );
 		$this->assertSame( 202, $this->dispatch( 'POST', $r, $slug, '/push', array( 'files_only' => true ) )->get_status() );
-		$this->assertTrue( Jobs::pending_action( SiteStaging::HOOK, array( $r->id(), $slug, 'push', 1, 0 ) ) );
-		$this->run_job( $r, $slug, 'push', 1 );
+		$this->run_account( $r );
+		$this->assertTrue( $this->calls( 'site.staging_push' )[0]['args']['files_only'] );
 		$this->assertSame( 202, $this->dispatch( 'POST', $r, $slug, '/undo' )->get_status() );
-		$this->run_job( $r, $slug, 'undo' );
+		$this->run_account( $r );
 		$login = $this->dispatch( 'POST', $r, $slug, '/login' );
 		$this->assertSame( 200, $login->get_status() );
 		$this->assertStringStartsWith( 'https://' . $slug . '-stg.', $login->get_data()['url'] );
 		$this->assertSame( 202, $this->dispatch( 'DELETE', $r, $slug )->get_status() );
+		$this->run_account( $r );
 		$this->assertSame( 404, $this->dispatch( 'POST', $r, 'nosuch', '/refresh' )->get_status() );
 	}
 

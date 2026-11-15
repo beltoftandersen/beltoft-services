@@ -232,6 +232,111 @@ abstract class HostingCase extends TestCase {
 	}
 
 	/**
+	 * Runs the account's queued actions the way the runner does (each one under the resource lock, a poll or a retry queues the next
+	 * run), without waiting for time to pass, until none is left.
+	 *
+	 * @param Resource $r    Resource.
+	 * @param int      $most Most runs.
+	 * @return int Runs made.
+	 */
+	protected function run_account( Resource $r, int $most = 120 ): int {
+		for ( $runs = 0; $runs < $most; $runs++ ) {
+			$mine = null;
+
+			foreach ( as_get_scheduled_actions( array( 'hook' => Jobs::ACT, 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => -1 ), 'ids' ) as $id ) {
+				$args = \ActionScheduler::store()->fetch_action( (string) $id )->get_args();
+
+				if ( (int) $args[0] === $r->id() ) {
+					$mine = array( (int) $id, $args );
+					break;
+				}
+			}
+
+			if ( null === $mine ) {
+				return $runs;
+			}
+
+			// The queue hands the job over: a run that polls or retries queues the next one itself.
+			\ActionScheduler::store()->cancel_action( $mine[0] );
+			Jobs::act( $r->id(), (string) $mine[1][1], (array) ( $mine[1][2] ?? array() ) );
+		}
+
+		$this->fail( 'The account still had actions to run after ' . $most . ' runs.' );
+	}
+
+	/**
+	 * Asks for a change of the account the way a route does (checked and queued), then runs its job.
+	 *
+	 * @param Resource          $r      Hosting resource.
+	 * @param string            $method A change of Actions\Steps::table().
+	 * @param array<int, mixed> $args   Its arguments.
+	 * @return array<string, mixed>|\WP_Error What the request answered (status pending with the task), or its refusal.
+	 */
+	protected function change( Resource $r, string $method, array $args = array() ) {
+		$out = ( new \BeltoftServices\Hosting\HostingActions( Resource::find( $r->id() ) ) )->queue( $method, $args );
+
+		if ( ! is_wp_error( $out ) ) {
+			$this->run_account( $r );
+		}
+
+		return $out;
+	}
+
+	/**
+	 * The waiting job of the account's change, the way Action Scheduler marks it when its process died (a deploy, a fatal error).
+	 *
+	 * @param Resource $r Resource.
+	 * @return int The action id.
+	 */
+	protected function kill_job( Resource $r ): int {
+		$ids = as_get_scheduled_actions( array( 'hook' => Jobs::ACT, 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => -1 ), 'ids' );
+		$this->assertNotEmpty( $ids, 'A job waits.' );
+		$id = (int) end( $ids );
+		\ActionScheduler::store()->mark_failure( $id );
+		Jobs::job_failed( $id, new \Error( 'Class not found' ) );
+
+		return $id;
+	}
+
+	/**
+	 * Nobody works on the change any more: its job is gone and its marker is old.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	protected function lose_the_change( Resource $r ): void {
+		foreach ( as_get_scheduled_actions( array( 'hook' => Jobs::ACT, 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => -1 ), 'ids' ) as $id ) {
+			\ActionScheduler::store()->cancel_action( (string) $id );
+		}
+
+		wp_cache_flush();
+		$fresh  = Resource::find( $r->id() );
+		$marker = (array) $fresh->get( \BeltoftServices\Progress::MARKER );
+		$fresh->set( array( \BeltoftServices\Progress::MARKER => array_merge( $marker, array( 'at' => time() - \BeltoftServices\Progress::MARKER_TTL - 10 ) ) ) );
+	}
+
+	/**
+	 * The distinct agent job ids submitted for an operation (a job started twice would show twice).
+	 *
+	 * @param string $op Operation.
+	 * @return string[]
+	 */
+	protected function agent_jobs( string $op ): array {
+		return array_values( array_unique( array_column( $this->agent->calls_of( $op ), 'job_id' ) ) );
+	}
+
+	/**
+	 * The shared outcome of the account's last action (a fresh read).
+	 *
+	 * @param Resource $r Hosting resource.
+	 * @return array<string, mixed>
+	 */
+	protected function last_outcome( Resource $r ): array {
+		wp_cache_flush();
+
+		return (array) ( Resource::find( $r->id() ) )->get( Jobs::RESULT );
+	}
+
+	/**
 	 * The container of a resource in the fake node.
 	 *
 	 * @param Resource $r Resource.

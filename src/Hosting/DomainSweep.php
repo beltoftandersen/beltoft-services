@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Hosting;
 
+use BeltoftServices\Hosting\Actions\Steps;
 use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
@@ -16,8 +17,11 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Also writes the temporary address of a website whose add stopped before the DNS record. A domain the customer
  * points at us themselves is never on the edge on the customer's word: every quarter of an hour
- * this sweep looks at each external name (SiteDns::check_external: our edge address AND the ownership TXT record), and when a
- * name became active, or stopped being, the account's routes are sent to the edge again.
+ * this sweep looks at each external name (SiteDns::check_external: our edge address AND the ownership TXT record). It then
+ * looks at every ready hosting account the way a reconciler does: when the node is behind what the shop says (a name became
+ * active, or stopped being, a change that failed half way), the change `apply_names` is queued through the shared controller
+ * (Actions\Steps::start_follow(); it waits when another change runs, the next sweep looks again); otherwise WordPress's own address
+ * is looked at (SiteWordPress::consider_all(), which also queues through that path). No flag of "wanted" and no wait in the sweep.
  */
 final class DomainSweep {
 
@@ -51,8 +55,6 @@ final class DomainSweep {
 			return $changed;
 		}
 
-		$touched = array();
-
 		foreach ( SiteDomains::external() as $row ) {
 			$record = Records::for_resource( $row['resource_id'] );
 			$node   = $record ? Nodes::get( (string) $record['node'] ) : null;
@@ -64,8 +66,7 @@ final class DomainSweep {
 			$state = SiteDns::check_external( $row['host'], $node );
 
 			if ( null !== $state && $state !== $row['state'] ) {
-				$changed[ $row['host'] ]        = $state;
-				$touched[ $row['resource_id'] ] = true;
+				$changed[ $row['host'] ] = $state;
 			}
 		}
 
@@ -86,17 +87,23 @@ final class DomainSweep {
 			}
 
 			SiteDomains::set_state( $row['host'], 'active' );
-			$changed[ $row['host'] ]        = 'active';
-			$touched[ $row['resource_id'] ] = true;
+			$changed[ $row['host'] ] = 'active';
 		}
 
-		foreach ( array_keys( $touched ) as $resource_id ) {
+		foreach ( Resource::live_ids( HostingDriver::KIND ) as $resource_id ) {
 			$r = Resource::find( (int) $resource_id );
 
-			if ( $r && 'ready' === $r->get( 'state' ) && 'ready' === $r->get( 'desired' ) ) {
-				( new HostingActions( $r ) )->sync_edge();
+			if ( ! $r || HostingDriver::ID !== $r->get( 'driver' ) || 'ready' !== $r->get( 'state' ) || 'ready' !== $r->get( 'desired' ) ) {
+				continue;
+			}
+
+			if ( ( new HostingActions( $r ) )->names_stale() ) {
+				Steps::start_follow( $r, 'apply_names', array() );
+			} else {
 				SiteWordPress::consider_all( $r );
 			}
+
+			SiteNewDomain::sweep( $r );
 		}
 
 		return $changed;

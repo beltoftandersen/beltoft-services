@@ -667,7 +667,7 @@ class SiteTasksTest extends HostingCase {
 
 		$this->assertSame( array(), $driver->customer_actions( $r ), 'The generic action route and buttons never reach a hosting change.' );
 		$this->assertInstanceOf( \BeltoftServices\Drivers\InternalActions::class, $driver );
-		$this->assertEqualsCanonicalizing( array( 'add_site', 'remove_site', 'set_php', 'php_rollback', 'set_workers', 'purge_cache', 'set_country_block', 'names', 'set_sftp_password', 'add_ssh_key', 'remove_ssh_key', 'abandon_site' ), $driver->internal_actions() );
+		$this->assertEqualsCanonicalizing( array( 'add_site', 'remove_site', 'set_php', 'php_rollback', 'set_workers', 'purge_cache', 'set_country_block', 'names', 'set_sftp_password', 'add_ssh_key', 'remove_ssh_key', 'abandon_site', 'wordpress_address', 'staging_create', 'staging_refresh', 'staging_push', 'staging_undo', 'staging_delete', 'backup_now', 'restore_backup', 'restore_undo', 'resend_country' ), $driver->internal_actions() );
 		$this->assertTrue( $driver->act( $r, 'bogus', array() )->is_failed() );
 	}
 }

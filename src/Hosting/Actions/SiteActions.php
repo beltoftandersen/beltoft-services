@@ -21,6 +21,7 @@ use BeltoftServices\Hosting\SiteNames;
 use BeltoftServices\Hosting\SiteStaging;
 use BeltoftServices\Hosting\SiteWordPress;
 use BeltoftServices\Hosting\Sites;
+use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -94,11 +95,11 @@ final class SiteActions {
 				'pairs'     => $pairs,
 				'preview'   => $preview,
 				'main'      => SiteAddresses::main_address( $rows, $preview ),
-				'wp'        => SiteWordPress::view( $site, $rows, $preview ),
+				'wp'        => SiteWordPress::view( $site, $rows, $preview, $task ),
 				'admin_user'  => (string) ( $site['flags']['admin_user'] ?? '' ),
 				'admin_email' => (string) ( $site['flags']['admin_email'] ?? '' ),
 				'country'     => \BeltoftServices\Hosting\CountryBlock::view( $site ),
-				'staging'     => SiteStaging::view( $site ),
+				'staging'     => SiteStaging::view( $site, $task ),
 				'scan'        => \BeltoftServices\Hosting\MalwareScan::view( $site ),
 				'task'        => null !== $task && $task['slug'] === $site['slug'] ? $task : null,
 			);
@@ -565,9 +566,7 @@ final class SiteActions {
 			return $edge;
 		}
 
-		// A first own domain that is live moves WordPress to it (queued, done in the background).
-		SiteWordPress::consider( $this->r, $slug );
-
+		// A first own domain that is live moves WordPress to it: Steps::done() looks at that when this change has ended.
 		return $answer;
 	}
 
@@ -619,6 +618,38 @@ final class SiteActions {
 			}
 		}
 
+		// The names that go: the one asked for, or (its paid add-on ended) every name of that domain, in this one change.
+		$rows = array( $row );
+
+		if ( $final ) {
+			$reg  = Addons::registrable( $row['host'] );
+			$rows = array_values( array_filter( SiteDomains::for_resource( $this->r->id() ), static fn( $d ) => 'preview' !== $d['kind'] && Addons::registrable( $d['host'] ) === $reg ) );
+		}
+
+		foreach ( $rows as $one ) {
+			$local = $this->remove_domain_row( $one, $final );
+
+			if ( is_wp_error( $local ) ) {
+				return $local;
+			}
+		}
+
+		$this->defer_with( array( 'removed' => $row['host'] ), array() );
+
+		$edge = $this->names_and_edge();
+
+		return is_wp_error( $edge ) ? $edge : array( 'removed' => $row['host'] );
+	}
+
+	/**
+	 * The local part of removing one name: WordPress leaves it, DNS and the records let it go. The names reach the node afterwards,
+	 * once for all of them.
+	 *
+	 * @param array<string, mixed> $row   The name's row.
+	 * @param bool                 $final The paid add-on has ended.
+	 * @return true|\WP_Error
+	 */
+	private function remove_domain_row( array $row, bool $final ) {
 		// WordPress itself is on this name: it is not left on a name that is gone.
 		foreach ( Sites::for_resource( $this->r->id() ) as $own ) {
 			if ( $own['id'] === $row['site_id'] && (string) ( $own['flags']['wp_address'] ?? '' ) === $row['host'] ) {
@@ -641,24 +672,28 @@ final class SiteActions {
 			SiteDomains::set_www_mode( substr( $row['host'], 4 ), '' );
 		}
 
-		$this->defer_with( array( 'removed' => $row['host'] ), array() );
-
-		$edge = $this->names_and_edge();
-
-		return is_wp_error( $edge ) ? $edge : array( 'removed' => $row['host'] );
+		return true;
 	}
 
 	/**
 	 * Moves WordPress itself to one of the website's addresses, in the background: its database is copied first, every address
 	 * in it is replaced, and when anything fails the copy is put back. The temporary address and the website's working names
-	 * can be chosen. Also the way back to the address WordPress had before.
+	 * can be chosen. Also the way back to the address WordPress had before. A change of the shared action controller (the action
+	 * `wordpress_address`): in a request it is checked and queued, in the job it is the agent's call, what is recorded and the
+	 * names sent again.
 	 *
-	 * @param string $slug Site.
-	 * @param string $host The address; empty for the main address.
+	 * @param string $slug   Site.
+	 * @param string $host   The address; empty for the main address.
+	 * @param string $from   In a job: the address of her own that WordPress has and the customer agreed to replace, '' for none.
+	 * @param bool   $manual In a job: false for the automatic move (it re-checks its reason and is silent when the agent cannot).
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	public function wordpress_address( string $slug, string $host = '' ) {
-		return $this->locked( fn() => $this->wordpress_address_locked( $slug, $host ) );
+	public function wordpress_address( string $slug, string $host = '', string $from = '', bool $manual = true ) {
+		if ( 'inline' === $this->mode ) {
+			return $this->error( 'failed', __( 'That cannot be done right now.', 'beltoft-services' ) );
+		}
+
+		return $this->locked( fn() => $this->wordpress_address_locked( $slug, $host, $from, $manual ) );
 	}
 
 	/**
@@ -666,7 +701,7 @@ final class SiteActions {
 	 *
 	 * @return mixed
 	 */
-	private function wordpress_address_locked( string $slug, string $host ) {
+	private function wordpress_address_locked( string $slug, string $host, string $from, bool $manual ) {
 		$ready = $this->ready();
 
 		if ( is_wp_error( $ready ) ) {
@@ -685,27 +720,93 @@ final class SiteActions {
 		$host    = '' === $host ? SiteAddresses::main_address( $rows, $preview ) : $host;
 
 		if ( ! SiteWordPress::is_name( $rows, $preview, $host ) ) {
-			return $this->error( 'invalid', __( 'That address is not one of this website\'s working addresses.', 'beltoft-services' ) );
+			// In a job: the name went while the change waited. Nothing to do.
+			return $this->in_job() ? array( 'skipped' => true ) : $this->error( 'invalid', __( 'That address is not one of this website\'s working addresses.', 'beltoft-services' ) );
 		}
 
-		$view = SiteWordPress::view( $site, $rows, $preview );
+		if ( ! $this->in_job() ) {
+			$view = SiteWordPress::view( $site, $rows, $preview );
 
-		if ( '' !== $view['moving'] ) {
-			return $this->error( 'busy', __( 'WordPress is being moved. Wait until that is done.', 'beltoft-services' ) );
+			if ( $view['address'] === $host && '' === $view['note'] ) {
+				return $this->error( 'invalid', __( 'WordPress already uses this address.', 'beltoft-services' ) );
+			}
+
+			// An address of her own that the customer set in WordPress is only replaced when it is the one the last look found.
+			$this->defer_with(
+				array(
+					'moving'  => $host,
+					/* translators: %s: address. */
+					'message' => sprintf( __( 'WordPress is being moved to %s. This can take a few minutes.', 'beltoft-services' ), \BeltoftServices\Domains\HostName::display( $host ) ),
+				),
+				array( $slug, $host, 'foreign' === $view['note'] ? $view['seen'] : '', true )
+			);
+		} elseif ( ! $manual && $host !== SiteWordPress::auto_target( $site, $rows, $preview, true ) && null === Steps::memo( $this->r, 'wp_address_' . $slug ) ) {
+			// An automatic move re-checks its reason: it may have been done or become wrong since it was queued.
+			return array( 'skipped' => true );
 		}
 
-		if ( $view['address'] === $host && '' === $view['note'] ) {
-			return $this->error( 'invalid', __( 'WordPress already uses this address.', 'beltoft-services' ) );
+		$record = (array) Records::for_resource( $this->r->id() );
+		$args   = array( 'vmid' => (int) $record['vmid'], 'slug' => $slug, 'to' => $host );
+
+		if ( $manual && '' !== $from ) {
+			$args['from'] = $from; // The customer agreed to replace this address of her own; the node checks that WordPress still has it.
 		}
 
-		// An address of her own that the customer set in WordPress is only replaced when it is the one the last look found.
-		SiteWordPress::queue_manual( $this->r, $slug, $host, 'foreign' === $view['note'] ? $view['seen'] : '' );
+		$done = $this->call( 'wp_address_' . $slug, 'site.wp_address', $args, 900 );
 
-		return array(
-			'moving'  => $host,
-			/* translators: %s: address. */
-			'message' => sprintf( __( 'WordPress is being moved to %s. This can take a few minutes.', 'beltoft-services' ), \BeltoftServices\Domains\HostName::display( $host ) ),
-		);
+		if ( is_wp_error( $done ) ) {
+			return $this->wordpress_failed( $slug, $manual, $done );
+		}
+
+		$note = SiteWordPress::record( $this->r, $slug, $host, $done );
+
+		// The node put the database back after a move that did not work: nothing changed, and the customer is told (not staff).
+		if ( 'failed' === $note ) {
+			return new \WP_Error( 'failed', 'The WordPress address change failed, the node put the database back.', array( 'text' => __( 'Moving WordPress did not work. Your website was not changed.', 'beltoft-services' ), 'expected' => true ) );
+		}
+
+		// The names of the website go again: the temporary name redirects once WordPress is on the main address, and stops when it
+		// is not, and a redirect between the names of a pair that waited for the move is sent now.
+		$sent = $this->names_and_edge();
+
+		if ( is_wp_error( $sent ) ) {
+			return $sent;
+		}
+
+		return array( 'moved' => $host );
+	}
+
+	/**
+	 * A move the agent refused or failed: what the page says is the website's note, what the customer reads and staff are told is the
+	 * outcome of the action.
+	 *
+	 * @param string    $slug   Site.
+	 * @param bool      $manual The customer asked.
+	 * @param \WP_Error $e      The failed call.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private function wordpress_failed( string $slug, bool $manual, \WP_Error $e ) {
+		$data = $e->get_error_data();
+		$why  = is_array( $data ) ? (string) ( $data['why'] ?? '' ) : '';
+		$text = __( 'Moving WordPress did not work. Your website was not changed.', 'beltoft-services' );
+
+		// An agent that does not have the operation: nothing is shown for an automatic move, a customer who asked is told.
+		if ( false !== strpos( $why, 'unknown_op' ) ) {
+			$this->r->set( array( 'wp_address_unsupported' => \BeltoftServices\Jobs::now() ) );
+
+			if ( ! $manual ) {
+				return array( 'skipped' => true );
+			}
+
+			SiteWordPress::settle( $this->r, $slug, array( 'wp_note' => 'unsupported' ) );
+
+			return new \WP_Error( 'failed', $e->get_error_message(), array( 'text' => __( 'Your hosting cannot move WordPress to another address yet. Contact support.', 'beltoft-services' ), 'expected' => true, 'why' => $why ) );
+		}
+
+		// A move that failed, or whose dump could not even be put back (the shared alert tells staff: nobody tries again).
+		SiteWordPress::settle( $this->r, $slug, array( 'wp_note' => 'failed' ) );
+
+		return new \WP_Error( 'failed', $e->get_error_message(), array( 'text' => $text, 'why' => $why ) );
 	}
 
 	/**
@@ -740,29 +841,25 @@ final class SiteActions {
 	}
 
 	/**
-	 * The job behind a change of the account's addresses (an address added or removed, the main address of a pair): the names go
-	 * to the node and the routes to the edge, and then WordPress's own address is looked at, as the change did when it
-	 * ran in one request.
+	 * The job behind a change of the account's addresses (an address added or removed, the main address of a pair, a name that went
+	 * live or stopped being): the names go to the node and the routes to the edge. Then WordPress's own address is looked at, as the
+	 * change did when it ran in one request: Steps::done() queues that follow-up through the same path.
 	 *
-	 * @param string $chosen The website whose main address the customer just chose, or ''.
+	 * @param string $chosen The website whose main address the customer just chose, or '' (the job's argument, read by Steps::done()).
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public function apply_names( string $chosen = '' ) {
+		unset( $chosen );
+
+		if ( 'inline' === $this->mode ) {
+			return $this->error( 'failed', __( 'That cannot be done right now.', 'beltoft-services' ) );
+		}
+
 		return $this->locked(
-			function () use ( $chosen ) {
+			function () {
 				$done = $this->sync_edge();
 
-				if ( is_wp_error( $done ) ) {
-					return $done;
-				}
-
-				if ( '' !== $chosen ) {
-					SiteWordPress::consider( $this->r, $chosen, true );
-				}
-
-				SiteWordPress::consider_all( $this->r );
-
-				return array( 'names' => true );
+				return is_wp_error( $done ) ? $done : array( 'names' => true );
 			}
 		);
 	}
@@ -872,13 +969,13 @@ final class SiteActions {
 	}
 
 	/**
-	 * Sends the names of one site (the active names of the customer, and the redirects between a pair's names) to the
-	 * node when they differ from what was sent last. A node whose agent does not know redirects still gets the names.
+	 * What the node should be told about a site's names: the active names of the customer, the redirects between a pair's names, and
+	 * the signature of both (kept in the site's flags once sent).
 	 *
 	 * @param array<string, mixed> $site Site row.
-	 * @return true|string|\WP_Error True when done or nothing to do, 'unsupported' when the names went without the redirects.
+	 * @return array{names: string[], redirects: array<int, array{from: string, to: string}>, sig: string, last: string}
 	 */
-	private function push_site_names( array $site ) {
+	private function site_names( array $site ): array {
 		$all   = array_values( array_filter( SiteDomains::for_resource( $this->r->id() ), static fn( $d ) => $d['site_id'] === $site['id'] && 'preview' !== $d['kind'] ) );
 		$names = array();
 
@@ -904,8 +1001,54 @@ final class SiteActions {
 			$names[] = $wp;
 		}
 
-		$sig       = md5( (string) wp_json_encode( array( $names, $redirects ) ) );
-		$last      = (string) ( $site['flags']['names_sig'] ?? '' );
+		return array(
+			'names'     => $names,
+			'redirects' => $redirects,
+			'sig'       => md5( (string) wp_json_encode( array( $names, $redirects ) ) ),
+			'last'      => (string) ( $site['flags']['names_sig'] ?? '' ),
+		);
+	}
+
+	/**
+	 * Is the node behind what the shop says about the account's names: a site whose names or redirects differ from what was sent last,
+	 * or an edge map that is not the one sent last? The domain sweep asks this and queues the change that sends them; the answer comes
+	 * from the stored state, so no flag of "wanted" is kept. An account whose edge map was never recorded is not called stale for it.
+	 */
+	public function names_stale(): bool {
+		foreach ( Sites::for_resource( $this->r->id() ) as $site ) {
+			if ( empty( $site['flags']['pending'] ) ) {
+				$names = $this->site_names( $site );
+
+				if ( $names['last'] !== $names['sig'] && ! ( '' === $names['last'] && array() === $names['names'] ) ) {
+					return true;
+				}
+			}
+		}
+
+		$sent = (string) ( Resource::find( $this->r->id() ) ?? $this->r )->get( 'edge_sig' );
+
+		if ( '' === $sent ) {
+			( Resource::find( $this->r->id() ) ?? $this->r )->set( array( 'edge_sig' => $this->edge_signature() ) );
+
+			return false;
+		}
+
+		return $sent !== $this->edge_signature();
+	}
+
+	/**
+	 * Sends the names of one site (the active names of the customer, and the redirects between a pair's names) to the
+	 * node when they differ from what was sent last. A node whose agent does not know redirects still gets the names.
+	 *
+	 * @param array<string, mixed> $site Site row.
+	 * @return true|string|\WP_Error True when done or nothing to do, 'unsupported' when the names went without the redirects.
+	 */
+	private function push_site_names( array $site ) {
+		$want      = $this->site_names( $site );
+		$names     = $want['names'];
+		$redirects = $want['redirects'];
+		$sig       = $want['sig'];
+		$last      = $want['last'];
 
 		if ( $last === $sig || ( '' === $last && array() === $names ) ) {
 			return true;

@@ -691,30 +691,54 @@ class CheckoutTest extends HostingCase {
 		$this->assertSame( array( 'preview' ), $kinds, 'Only the temporary address, and it works.' );
 	}
 
-	private function scheduled_retries( Resource $host ): int {
-		return count( as_get_scheduled_actions( array( 'hook' => SiteNewDomain::RETRY_HOOK, 'args' => array( $host->id() ), 'status' => \ActionScheduler_Store::STATUS_PENDING ), 'ids' ) );
-	}
-
 	private function notes( Resource $host ): int {
 		return count( wc_get_order_notes( array( 'order_id' => (int) $host->license()['order_id'] ) ) );
 	}
 
-	public function test_a_busy_account_keeps_one_retry_and_the_retry_stops_at_the_deadline(): void {
+	public function test_an_account_that_cannot_take_it_yet_leaves_the_domain_to_the_sweep_which_stops_at_the_deadline(): void {
 		list( $host, $domain ) = $this->order_with_domain( 'busy.example' );
 		$domain->set( array( 'state' => 'ready' ) );
 		$host->set( array( 'state' => 'ready', 'desired' => 'ready', 'steps' => array() ) );
 		$host = Resource::find( $host->id() );
 
+		// Not ready for changes: nothing is attached, nothing is queued, no retry of its own is kept.
 		SiteNewDomain::attempt( $host );
 		SiteNewDomain::attempt( $host );
 		SiteNewDomain::on_state_changed( $domain, 'x', 'ready' );
-		$this->assertSame( 1, $this->scheduled_retries( $host ), 'Exactly one retry chain.' );
+		$this->assertSame( '', (string) Resource::find( $host->id() )->get( SiteNewDomain::META_DONE ) );
+		$this->assertSame( array(), as_get_scheduled_actions( array( 'hook' => 'beltoft_services_site_new_domain', 'status' => \ActionScheduler_Store::STATUS_PENDING ), 'ids' ), 'No loop of its own.' );
+		$this->assertFalse( \BeltoftServices\Jobs::acting( $host->id() ) );
+
+		// The domain sweep asks again, and the deadline ends it.
+		SiteNewDomain::sweep( Resource::find( $host->id() ) );
+		$this->assertSame( '', (string) Resource::find( $host->id() )->get( SiteNewDomain::META_DONE ) );
+		$host->set( array( SiteNewDomain::META_UNTIL => time() - 5 ) );
+		SiteNewDomain::sweep( Resource::find( $host->id() ) );
+		$this->assertSame( 'expired', Resource::find( $host->id() )->get( SiteNewDomain::META_DONE ) );
+	}
+
+	public function test_a_domain_that_waits_for_a_busy_account_is_attached_by_the_sweep_through_the_shared_path(): void {
+		list( $host, $domain ) = $this->order_with_domain( 'later.example' );
+		$domain->set( array( 'state' => 'ready' ) );
+		$this->provision_fully( $host );
+		$host->set( array( 'state' => 'ready', 'desired' => 'ready' ) );
+		$host = Resource::find( $host->id() );
+
+		// Another change of the account runs: the domain waits, and nothing of its own is queued for it.
+		\BeltoftServices\Progress::mark( $host, 'purge_cache', 'Clearing the cache' );
+		SiteNewDomain::attempt( Resource::find( $host->id() ) );
+		$this->assertNull( SiteDomains::find( 'later.example' ) );
 		$this->assertSame( '', (string) Resource::find( $host->id() )->get( SiteNewDomain::META_DONE ) );
 
-		$host->set( array( SiteNewDomain::META_UNTIL => time() + 300 ) );
-		as_unschedule_all_actions( SiteNewDomain::RETRY_HOOK );
-		SiteNewDomain::attempt( Resource::find( $host->id() ) );
-		$this->assertSame( 0, $this->scheduled_retries( $host ), 'No retry is scheduled past the deadline.' );
+		// It is free again: the next sweep attaches the domain as a change like a customer's (the names reach the node in its job).
+		\BeltoftServices\Progress::clear( Resource::find( $host->id() ) );
+		\BeltoftServices\Hosting\DomainSweep::run();
+		$this->assertNotNull( SiteDomains::find( 'later.example' ) );
+		$this->assertSame( 'joined', Resource::find( $host->id() )->get( SiteNewDomain::META_DONE ) );
+		$this->assertSame( 'names', \BeltoftServices\Hosting\Actions\Steps::view( Resource::find( $host->id() ) )['action'] );
+		$this->run_account( $host );
+		$edge = $this->agent->calls_of( 'edge.apply' );
+		$this->assertContains( 'later.example', array_column( end( $edge )['args']['routes'], 'host' ) );
 	}
 
 	public function test_a_second_attempt_after_a_join_changes_nothing(): void {

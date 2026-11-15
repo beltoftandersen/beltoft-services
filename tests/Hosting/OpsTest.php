@@ -78,8 +78,7 @@ class OpsTest extends HostingCase {
 		$volid  = HostingBackups::stored( $r )[0]['volid'];
 		$slug   = 'w' . $r->id();
 
-		( new HostingRestore( $r ) )->start( 'files', $volid, $slug );
-		HostingRestore::run( $r->id() );
+		$this->change( $r, 'restore', array( 'files', $volid, $slug ) );
 
 		$to_customer = array_values( array_filter( $this->mails, static fn( $m ) => false !== stripos( (string) $m['subject'], 'restore has finished' ) ) );
 		$this->assertCount( 1, $to_customer );
@@ -93,19 +92,16 @@ class OpsTest extends HostingCase {
 	public function test_undo_and_a_failed_restore_have_their_own_words(): void {
 		$r     = $this->with_backup();
 		$volid = HostingBackups::stored( $r )[0]['volid'];
-		( new HostingRestore( $r ) )->start( 'database', $volid, 'w' . $r->id() );
-		HostingRestore::run( $r->id() );
+		$this->change( $r, 'restore', array( 'database', $volid, 'w' . $r->id() ) );
 		$this->mails = array();
 
-		( new HostingRestore( Resource::find( $r->id() ) ) )->undo();
-		HostingRestore::run( $r->id() );
+		$this->change( $r, 'undo' );
 		$undo = (string) preg_replace( '/\s+/', ' ', (string) array_values( array_filter( $this->mails, static fn( $m ) => false !== stripos( (string) $m['subject'], 'restore has finished' ) ) )[0]['message'] );
 		$this->assertStringContainsString( 'back to the state it had before your last restore', $undo );
 
 		$this->mails = array();
 		$this->agent->fail_next( 'backup.prepare', 'dump failed' );
-		( new HostingRestore( Resource::find( $r->id() ) ) )->start( 'account', $volid );
-		HostingRestore::run( $r->id() );
+		$this->change( $r, 'restore', array( 'account', $volid, '' ) );
 		$failed = array_values( array_filter( $this->mails, static fn( $m ) => false !== stripos( (string) $m['subject'], 'restore has finished' ) ) );
 		$this->assertCount( 1, $failed );
 		$text = (string) preg_replace( '/\s+/', ' ', (string) $failed[0]['message'] );

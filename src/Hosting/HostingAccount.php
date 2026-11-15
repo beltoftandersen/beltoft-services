@@ -385,7 +385,7 @@ final class HostingAccount {
 		/* translators: %s: what the account is doing now, for example "adding a website". */
 		echo '<span data-task-wait>' . esc_html( null === $task ? '' : sprintf( __( 'Wait until %s is done.', 'beltoft-services' ), $first ) ) . '</span></p>';
 
-		if ( null === $task && null !== $state['last'] && empty( $state['last']['ok'] ) ) {
+		if ( null === $task && null !== $state['last'] && empty( $state['last']['ok'] ) && 'wordpress_address' !== $state['last']['action'] ) {
 			echo '<p class="beltoft-hosting-warning" data-task-failed role="alert">' . esc_html( trim( (string) $state['last']['label'] . '. ' . (string) $state['last']['text'] ) ) . '</p>';
 		}
 	}
@@ -739,8 +739,8 @@ final class HostingAccount {
 	}
 
 	/**
-	 * The staging copy of a website: what it is, its state while a job runs (the page asks the node's state every few seconds
-	 * and reloads when the job is done), and the buttons that go with the state.
+	 * The staging copy of a website: what it is, its state while a job runs (the page follows the account's task and reloads when it is
+	 * done; why a job did not work is the line at the top of the page, the outcome of the action), and the buttons that go with the state.
 	 *
 	 * @param string               $slug   Site.
 	 * @param array<string, mixed> $v      SiteStaging::view().
@@ -757,31 +757,11 @@ final class HostingAccount {
 			'undoing'    => __( 'The last push is being undone. The live website may show a maintenance message for a short time.', 'beltoft-services' ),
 			'deleting'   => __( 'The staging copy is being deleted.', 'beltoft-services' ),
 		);
-		$fail = array(
-			'create'  => __( 'The staging copy could not be made. Your website was not changed.', 'beltoft-services' ),
-			'refresh' => __( 'The staging copy could not be refreshed. Your website was not changed. Refresh it again, or delete it.', 'beltoft-services' ),
-			'push'    => __( 'The push did not work. Your live website was put back as it was.', 'beltoft-services' ),
-			'undo'    => __( 'The undo did not work. Try again, or contact support.', 'beltoft-services' ),
-			'delete'  => __( 'The staging copy could not be deleted. Try again.', 'beltoft-services' ),
-		);
-
-		self::sec_open( __( 'Staging', 'beltoft-services' ), ! empty( $v['busy'] ) ? __( 'Working...', 'beltoft-services' ) : ( ! empty( $v['exists'] ) ? __( 'Copy ready', 'beltoft-services' ) : __( 'No staging copy', 'beltoft-services' ) ), ! empty( $v['busy'] ) || '' !== (string) ( $v['note'] ?? '' ), 'staging', $slug );
+		self::sec_open( __( 'Staging', 'beltoft-services' ), ! empty( $v['busy'] ) ? __( 'Working...', 'beltoft-services' ) : ( ! empty( $v['exists'] ) ? __( 'Copy ready', 'beltoft-services' ) : __( 'No staging copy', 'beltoft-services' ) ), ! empty( $v['busy'] ), 'staging', $slug );
 
 		if ( $v['busy'] ) {
 			echo '<p class="beltoft-hosting-line" data-staging-busy data-slug="' . esc_attr( $slug ) . '" role="status">' . esc_html( $busy[ $v['state'] ] ?? '' ) . '</p>';
 		} else {
-			if ( '' !== $v['note'] ) {
-				if ( 'unsupported' === $v['note'] ) {
-					$words = __( 'Your hosting cannot do this yet. Contact support.', 'beltoft-services' );
-				} elseif ( 'unsafe' === $v['note'] ) {
-					$words = __( 'The push did not work and the live website could not be put back automatically. Support has been told.', 'beltoft-services' );
-				} else {
-					$words = (string) ( $fail[ $v['failed'] ] ?? __( 'That did not work. Try again, or contact support.', 'beltoft-services' ) );
-				}
-
-				echo '<p class="beltoft-hosting-warning" data-staging-note>' . esc_html( $words ) . '</p>';
-			}
-
 			$about = __( 'A staging copy is a copy of this website on an address of its own, to try changes in before they go live. It sends no email, is not shown to search engines and does not count as a website.', 'beltoft-services' );
 			$shown = false;
 

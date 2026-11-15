@@ -5,8 +5,9 @@
  * request to the hosting REST routes with the wp_rest nonce that the generic panel script already holds
  * (window.beltoftServicesAccount), refreshed from every response's X-WP-Nonce header, and then reloads the page to
  * show the new state. The WordPress sign-in link opens in a new tab. A change that runs in the background (the route answers
- * 202 with a task) locks the change buttons with "Wait until ... is done", and a watcher reads the overview every 3 seconds
- * until the task is over; then the page reloads. No dependencies.
+ * 202 with a task: every change of the account, a staging copy, the move of WordPress, a backup and a restore included) locks the
+ * change buttons with "Wait until ... is done", and window.beltoftApi.follow() reads the resource every 3 seconds until the
+ * action's outcome (last_result) is there, saying the step in the line at the top; then the page reloads. No dependencies.
  */
 ( function () {
 	'use strict';
@@ -507,7 +508,7 @@
 			if ( result.ok && result.data && result.data.task && 'files_password' !== action ) {
 				button.disabled = false;
 				ok( '' );
-				begin( result.data.task, 'add_site' === action || 'remove_site' === action, button );
+				begin( result.data.task, DRAWN.indexOf( action ) >= 0, button );
 				return;
 			}
 
@@ -699,7 +700,9 @@
 
 	// The change of the account that runs in the background (a task), and the watcher that follows it.
 	var root = document.querySelector( '.beltoft-hosting' );
-	var LOCKED = [ 'php_save', 'php_rollback', 'cache', 'remove_site', 'add_site', 'add_domain', 'remove_domain', 'set_main', 'country_save', 'country_off', 'files_password', 'files_key', 'remove_key' ];
+	var LOCKED = [ 'php_save', 'php_rollback', 'cache', 'remove_site', 'add_site', 'add_domain', 'remove_domain', 'set_main', 'country_save', 'country_off', 'files_password', 'files_key', 'remove_key', 'wp_address', 'staging_create', 'staging_refresh', 'staging_delete', 'staging_undo', 'staging_push', 'backup_now', 'restore', 'undo' ];
+	// A change whose new state the page shows at once (a row that is being set up, a copy that is being made): the page reloads when it is queued.
+	var DRAWN = [ 'add_site', 'remove_site', 'wp_address', 'staging_create', 'staging_refresh', 'staging_delete', 'staging_undo', 'staging_push', 'backup_now', 'restore', 'undo' ];
 	var NO_RELOAD = [ 'cache' ];
 	var watching = false;
 	var current = null;
@@ -784,7 +787,7 @@
 			return;
 		}
 
-		message = ( current && current.message ) || ( last && last.label ? format( text.taskDone, [ last.label ] ) : '' );
+		message = ( current && current.message ) || ( current && current.label ? format( text.taskDone, [ current.label ] ) : '' );
 
 		if ( current && NO_RELOAD.indexOf( current.action ) >= 0 ) {
 			unlock();
@@ -797,44 +800,42 @@
 		window.location.reload();
 	}
 
-	// Reads the overview every 3 seconds while a task exists (the status rate of the routes allows it).
-	function watch() {
-		if ( watching || ! root ) {
+	// Follows the account's task through the shared follow (the resource's status every 3 seconds, up to 30 minutes) until its outcome is there.
+	// The step the work is at comes with every look: the status bar's own words for the action.
+	function watch( task ) {
+		if ( watching || ! root || ! task ) {
 			return;
 		}
 
 		watching = true;
 
-		var id = root.getAttribute( 'data-hosting-resource' );
-		var look = function () {
-			call( 'GET', id + '/hosting' ).then( function ( result ) {
-				if ( ! result.ok || ! result.data ) {
-					window.setTimeout( look, 6000 );
-					return;
+		var queued = { action: task.action, at: task.started || 0, status: '/resources/' + root.getAttribute( 'data-hosting-resource' ) };
+
+		window.beltoftApi.follow( queued, {
+			holder: account,
+			interval: 3000,
+			rounds: 600,
+			onTick: function ( data ) {
+				var progress = data && data.progress;
+
+				if ( progress && progress.active && progress.text ) {
+					task.step_label = progress.text;
+					lock( task );
 				}
-
-				if ( result.data.task ) {
-					lock( result.data.task );
-					window.setTimeout( look, 3000 );
-					return;
-				}
-
-				finish( result.data.last );
-			}, function () {
-				window.setTimeout( look, 6000 );
-			} );
-		};
-
-		window.setTimeout( look, 3000 );
+			}
+		} ).then( finish, function () {
+			finish( null );
+		} );
 	}
 
-	// A change was queued: the buttons wait for it. Adding and removing a website draw the row at once by reloading the page,
-	// which then watches the task; the other changes stay on the page.
+	// A change was queued: the buttons wait for it. A change whose new state is drawn by the page reloads at once, and the page
+	// then follows the task; the other changes stay on the page.
 	function begin( task, reloadNow, button ) {
 		current = {
 			action: button ? button.getAttribute( 'data-hosting-action' ) || '' : '',
 			slug: button ? button.getAttribute( 'data-slug' ) || '' : '',
-			message: button ? button.getAttribute( 'data-done' ) || '' : ''
+			message: button ? button.getAttribute( 'data-done' ) || '' : '',
+			label: task.label || ''
 		};
 		lock( task );
 
@@ -843,46 +844,20 @@
 			return;
 		}
 
-		watch();
+		watch( task );
 	}
 
 	if ( root && root.getAttribute( 'data-hosting-task' ) ) {
 		try {
-			lock( JSON.parse( root.getAttribute( 'data-hosting-task' ) ) );
-			watch();
+			var running = JSON.parse( root.getAttribute( 'data-hosting-task' ) );
+
+			current = { action: '', slug: running.slug || '', message: '', label: running.label || '' };
+			lock( running );
+			watch( running );
 		} catch ( e ) {
 			// A task that cannot be read is not shown; the buttons stay as they are.
 		}
 	}
-
-	// A staging job under way: the page asks where it is every few seconds and reloads when it is over.
-	function stagingWatch() {
-		Array.prototype.forEach.call( document.querySelectorAll( '[data-staging-busy]' ), function ( line ) {
-			var panel = line.closest( '[data-hosting-resource]' );
-			var slug = line.getAttribute( 'data-slug' ) || '';
-
-			if ( ! panel || ! slug ) {
-				return;
-			}
-
-			var look = function () {
-				call( 'GET', panel.getAttribute( 'data-hosting-resource' ) + '/hosting/sites/' + encodeURIComponent( slug ) + '/staging' ).then( function ( result ) {
-					if ( result.ok && result.data && false === result.data.busy ) {
-						window.location.reload();
-						return;
-					}
-
-					window.setTimeout( look, 6000 );
-				}, function () {
-					window.setTimeout( look, 15000 );
-				} );
-			};
-
-			window.setTimeout( look, 6000 );
-		} );
-	}
-
-	stagingWatch();
 
 	// A link or a hash that points into a closed section (for example "Connect a domain" from Get started) opens it first.
 	function openTo( hash ) {

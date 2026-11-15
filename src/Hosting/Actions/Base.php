@@ -86,6 +86,16 @@ trait Base {
 	}
 
 	/**
+	 * The refusal of a change that is called outside the shared path (inline): a change of the account is queued from a request
+	 * (HostingActions::queue()) and runs in its job. Nothing waits for the agent to change something.
+	 *
+	 * @return \WP_Error|null Null in a request and in a job.
+	 */
+	private function queued_only(): ?\WP_Error {
+		return 'inline' === $this->mode ? $this->error( 'failed', __( 'That cannot be done right now.', 'beltoft-services' ) ) : null;
+	}
+
+	/**
 	 * Says what the customer is answered and what the job is given, when the change is queued at its first agent call.
 	 *
 	 * @param array<string, mixed>   $result The answer.
@@ -158,18 +168,20 @@ trait Base {
 	 * is one step: a call that has finished is read from the task, one that has not is submitted or read once, and while the
 	 * agent is still working the run ends (TaskPending). Anywhere else the caller waits a few seconds, then is asked to try again.
 	 *
-	 * @param string               $name Job name.
-	 * @param string               $op   Operation.
-	 * @param array<string, mixed> $args Arguments.
+	 * @param string               $name   Job name.
+	 * @param string               $op     Operation.
+	 * @param array<string, mixed> $args   Arguments.
+	 * @param int                  $budget Seconds a job run may wait for the agent's job before the wait counts as an error (a copy of a
+	 *                                     website takes minutes; the shared controller caps it, see Reconciler::poll_budget()).
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	private function call( string $name, string $op, array $args ) {
+	private function call( string $name, string $op, array $args, int $budget = 600 ) {
 		if ( 'request' === $this->mode ) {
 			throw new Deferred( $name, $this->defer_answer() ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- a control-flow signal between request and job, never printed.
 		}
 
 		if ( $this->in_job() ) {
-			return $this->job_call( $name, $op, $args );
+			return $this->job_call( $name, $op, $args, $budget );
 		}
 
 		$done = $this->agent_call( $name, $op, $args );
@@ -198,6 +210,17 @@ trait Base {
 	}
 
 	/**
+	 * Ends a request that has checked a change and done its local work: the change is queued (a change whose work is not an agent
+	 * call of its own, such as a backup round, has no call() to end the request at).
+	 *
+	 * @param string $name Name of the step the job starts at.
+	 * @throws Deferred Always: queue() catches it and answers with the queued task.
+	 */
+	private function defer_now( string $name ): void {
+		throw new Deferred( $name, $this->defer_answer() ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- a control-flow signal between request and job, never printed.
+	}
+
+	/**
 	 * The answer of a change that is queued: through the shared controller (Progress marker, Jobs::queue_act), with the site lock held by the change.
 	 *
 	 * @return array<string, mixed>|\WP_Error
@@ -213,56 +236,62 @@ trait Base {
 	/**
 	 * One agent step of a job run.
 	 *
-	 * @param string               $name Call name.
-	 * @param string               $op   Operation.
-	 * @param array<string, mixed> $args Arguments.
+	 * @param string               $name   Call name.
+	 * @param string               $op     Operation.
+	 * @param array<string, mixed> $args   Arguments.
+	 * @param int                  $budget Seconds the wait for the agent's job may last.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	private function job_call( string $name, string $op, array $args ) {
+	private function job_call( string $name, string $op, array $args, int $budget = 600 ) {
 		$memo = Steps::memo( $this->r, $name );
 
 		if ( null !== $memo ) {
-			return $memo['ok'] ? (array) $memo['result'] : $this->failed_call();
+			return $memo['ok'] ? (array) $memo['result'] : $this->failed_call( (string) ( $memo['why'] ?? '' ) );
 		}
 
 		Steps::step( $this->r, $name );
 
-		$done = $this->agent_step( $name, $op, $args );
+		$done = $this->agent_step( $name, $op, $args, $budget );
 
 		if ( $done instanceof StepResult && ! $done->is_failed() ) {
 			// Still working, or the agent did not answer: this run ends, and the same action is queued again.
 			throw new TaskPending( $this->progressed ? $done->with_progress() : $done ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- a control-flow signal between request and job, never printed.
 		}
 
-		$ok = is_array( $done );
+		$ok  = is_array( $done );
+		$why = $ok ? '' : ( $done instanceof StepResult ? $done->error() : ( is_wp_error( $done ) ? $done->get_error_message() : '' ) );
 
-		if ( ! Steps::remember( $this->r, $name, $ok, $ok ? $done : null ) ) {
+		if ( ! Steps::remember( $this->r, $name, $ok, $ok ? $done : null, $why ) ) {
 			throw new TaskPending( StepResult::retry( 0, $name . ': the task step could not be stored' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- a control-flow signal between request and job, never printed.
 		}
 
 		$this->bump_job( $name );
 		$this->progressed = true;
 
-		return $ok ? $done : $this->failed_call();
+		return $ok ? $done : $this->failed_call( $why );
 	}
 
 	/**
-	 * What a call that really failed is to the customer.
+	 * What a call that really failed is to the customer. The agent's own words (scrubbed) ride in the error data under `why`, for the
+	 * job to tell an agent that lacks the operation from one that failed; they never reach a reply.
+	 *
+	 * @param string $why What the agent said, scrubbed.
 	 */
-	private function failed_call(): \WP_Error {
-		return $this->error( 'failed', __( 'That did not work. Try again in a moment, or contact support if it keeps happening.', 'beltoft-services' ) );
+	private function failed_call( string $why = '' ): \WP_Error {
+		return new \WP_Error( 'failed', __( 'That did not work. Try again in a moment, or contact support if it keeps happening.', 'beltoft-services' ), array( 'why' => $why ) );
 	}
 
 	/**
 	 * Reads or submits the agent job of a call, once.
 	 *
-	 * @param string               $name Call name.
-	 * @param string               $op   Operation.
-	 * @param array<string, mixed> $args Arguments.
+	 * @param string               $name   Call name.
+	 * @param string               $op     Operation.
+	 * @param array<string, mixed> $args   Arguments.
+	 * @param int                  $budget Seconds the wait for the agent's job may last.
 	 * @return array<string, mixed>|StepResult|\WP_Error The result of a job that is done; a poll while it works, a retry when the
 	 *                                                  agent did not answer; a failure (StepResult or WP_Error) when it failed for good.
 	 */
-	private function agent_step( string $name, string $op, array $args ) {
+	private function agent_step( string $name, string $op, array $args, int $budget = 600 ) {
 		if ( Settings::get( 'pause_all' ) ) {
 			return StepResult::wait( Jobs::PAUSED_DELAY, $name . ': all driver activity is paused', time() + 7 * DAY_IN_SECONDS );
 		}
@@ -276,7 +305,7 @@ trait Base {
 		$status = (string) ( $job['status'] ?? '' );
 
 		if ( in_array( $status, array( 'queued', 'running' ), true ) ) {
-			return StepResult::poll( 2, $name . ': waiting for the node agent', 600 );
+			return StepResult::poll( 2, $name . ': waiting for the node agent', $budget );
 		}
 
 		if ( 'failed' === $status ) {
@@ -396,7 +425,21 @@ trait Base {
 	private function edge() {
 		$done = $this->call( 'edge_update', 'edge.apply', array( 'account' => Config::account( $this->r->id() ), 'routes' => EdgeMap::routes( $this->r->id(), false ) ) );
 
-		return is_wp_error( $done ) ? $done : true;
+		if ( is_wp_error( $done ) ) {
+			return $done;
+		}
+
+		// What was sent last: the domain sweep compares it with the routes now (SiteActions::names_stale()).
+		( Resource::find( $this->r->id() ) ?? $this->r )->set( array( 'edge_sig' => $this->edge_signature() ) );
+
+		return true;
+	}
+
+	/**
+	 * A signature of the routes the edge should have now.
+	 */
+	private function edge_signature(): string {
+		return md5( (string) wp_json_encode( EdgeMap::routes( $this->r->id(), false ) ) );
 	}
 
 	/**

@@ -7,9 +7,10 @@
 
 namespace BeltoftServices\Hosting\Actions;
 
+use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Hosting\EdgeMap;
-use BeltoftServices\Hosting\HostingRestore;
 use BeltoftServices\Hosting\Records;
+use BeltoftServices\Hosting\SiteDns;
 use BeltoftServices\Hosting\SiteDomains;
 use BeltoftServices\Hosting\SiteStaging;
 use BeltoftServices\Hosting\Sites;
@@ -17,10 +18,12 @@ use BeltoftServices\Hosting\Sites;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Making, refreshing, pushing, undoing and deleting the staging copy of a website of the account. Every one of them only
- * checks the rules, records the start in the website's flags and queues the job (SiteStaging); the node agent does the work
- * in the background and the page shows the state. Opening the copy asks the node for a one-time sign-in address of the copy.
- * Reached through the HostingActions facade.
+ * Making, refreshing, pushing, undoing and deleting the staging copy of a website of the account. Each is a change of the shared
+ * action controller (Steps::start(), internal actions staging_create ... staging_delete): the request checks the rules, records
+ * the start of a create or a delete (SiteStaging::begin) and queues the job; the job runs these same methods in job mode, one agent
+ * step at a time with its steps kept (Steps), and ends with the shared last_result. The safety point before a push is the agent's
+ * (`site.staging_push` makes it, puts it back when the push fails, and keeps it for the way back). Opening the copy asks the node
+ * for a one-time sign-in address of the copy and stays in the request. Reached through the HostingActions facade.
  */
 final class StagingActions {
 
@@ -42,11 +45,9 @@ final class StagingActions {
 		$view = SiteStaging::view( $site );
 
 		return array(
-			'state'  => $view['state'],
-			'busy'   => $view['busy'],
-			'note'   => $view['note'],
-			'failed' => $view['failed'],
-			'host'   => $view['host'],
+			'state' => $view['state'],
+			'busy'  => $view['busy'],
+			'host'  => $view['host'],
 		);
 	}
 
@@ -57,7 +58,7 @@ final class StagingActions {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public function create_staging( string $slug ) {
-		return $this->locked( fn() => $this->create_locked( $slug ) );
+		return $this->queued_only() ?? $this->locked( fn() => $this->create_locked( $slug ) );
 	}
 
 	/**
@@ -176,7 +177,67 @@ final class StagingActions {
 	}
 
 	/**
-	 * create_staging with the site lock held.
+	 * What a job that did not work ends with: the customer's sentence (the shared last_result) and whether staff are told. An agent that
+	 * does not have the operation is expected (nothing was changed); a push that could not be put back is not (staff are told by the
+	 * shared alert, and the safety point is on the node).
+	 *
+	 * @param string    $kind One of SiteStaging::KINDS.
+	 * @param \WP_Error $e    The failed call.
+	 */
+	private function outcome( string $kind, \WP_Error $e ): \WP_Error {
+		$data = $e->get_error_data();
+		$why  = is_array( $data ) ? (string) ( $data['why'] ?? '' ) : '';
+		$note = 'failed';
+
+		if ( false !== strpos( $why, 'unknown_op' ) ) {
+			$note = 'unsupported';
+		} elseif ( false !== strpos( $why, 'could not be put back' ) ) {
+			$note = 'unsafe';
+		}
+
+		return new \WP_Error( 'failed', $e->get_error_message(), array( 'text' => SiteStaging::outcome_text( $kind, $note ), 'expected' => 'unsupported' === $note, 'why' => $why ) );
+	}
+
+	/**
+	 * The copy's address before the copy is made: held by the request, written to DNS here (a run that is repeated writes the same
+	 * record). A DNS that is busy is a retry of the shared controller.
+	 *
+	 * @param string $slug Website.
+	 * @return \WP_Error|null Null when the address is in DNS.
+	 */
+	private function name_in_dns( string $slug ): ?\WP_Error {
+		if ( null !== Steps::memo( $this->r, 'staging_dns' ) ) {
+			return null;
+		}
+
+		Steps::step( $this->r, 'staging_dns' );
+
+		$view = SiteStaging::view( (array) Sites::find( $this->r->id(), $slug ) );
+		$host = $view['host'];
+
+		if ( '' === $host || ! SiteDomains::add( $this->r->id(), 0, $host, 'preview' ) ) {
+			return new \WP_Error( 'failed', 'staging: the address could not be recorded (is it taken?)', array( 'text' => SiteStaging::outcome_text( 'create' ) ) );
+		}
+
+		$done = \BeltoftServices\Hosting\SiteDns::publish_preview( $view['copy'], $this->node );
+
+		if ( is_wp_error( $done ) ) {
+			throw new TaskPending( StepResult::retry( 0, 'staging: ' . $this->scrub( $done->get_error_message(), 160 ) ) ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- a control-flow signal between request and job, never printed.
+		}
+
+		if ( true !== $done ) {
+			return new \WP_Error( 'failed', 'staging: ' . $this->scrub( (string) $done, 160 ), array( 'text' => SiteStaging::outcome_text( 'create' ) ) );
+		}
+
+		SiteDomains::set_state( $host, 'active' );
+		Steps::remember( $this->r, 'staging_dns', true, array() );
+
+		return null;
+	}
+
+	/**
+	 * create_staging with the site lock held. In a request: the rules, the name held, the start recorded, then the first agent call
+	 * queues the job. In the job: the address to DNS, the node's copy, the edge map.
 	 *
 	 * @param string $slug Website.
 	 * @return mixed
@@ -194,34 +255,53 @@ final class StagingActions {
 			return $site;
 		}
 
-		if ( SiteStaging::view( $site )['busy'] ) {
-			return $this->error( 'busy', __( 'The staging copy of this website is being changed. Wait until that is done.', 'beltoft-services' ) );
+		if ( ! $this->in_job() ) {
+			if ( SiteStaging::view( $site )['busy'] ) {
+				return $this->error( 'busy', __( 'The staging copy of this website is being changed. Wait until that is done.', 'beltoft-services' ) );
+			}
+
+			$problem = SiteStaging::create_problem( $this->r, $slug );
+
+			if ( null !== $problem ) {
+				return $this->error( 'limit', $problem );
+			}
+
+			$label = SiteStaging::label_for( $slug );
+			$host  = EdgeMap::preview_host( $label );
+
+			// The name is held now, so no other website takes it before the job writes it to DNS.
+			if ( '' === $label || '' === $host || ! SiteDomains::add( $this->r->id(), 0, $host, 'preview' ) ) {
+				return $this->error( 'failed', __( 'A staging copy cannot be made right now.', 'beltoft-services' ) );
+			}
+
+			SiteStaging::begin( $this->r, $slug, 'create', $label );
+			$this->defer_with(
+				array(
+					'state'   => 'creating',
+					'message' => __( 'The staging copy is being made. This can take a few minutes.', 'beltoft-services' ),
+				)
+			);
+		} else {
+			$named = $this->name_in_dns( $slug );
+
+			if ( null !== $named ) {
+				return $named;
+			}
 		}
 
-		if ( HostingRestore::active( $this->r ) ) {
-			return $this->error( 'busy', __( 'A restore is running. Wait until it is done.', 'beltoft-services' ) );
+		$view   = SiteStaging::view( (array) Sites::find( $this->r->id(), $slug ) );
+		$record = (array) Records::for_resource( $this->r->id() );
+		$done   = $this->call( 'staging_create_' . $slug, 'site.staging_create', array( 'vmid' => (int) $record['vmid'], 'slug' => $slug, 'copy' => $view['copy'], 'host' => $view['host'] ), SiteStaging::BUDGET );
+
+		if ( is_wp_error( $done ) ) {
+			return $this->outcome( 'create', $done );
 		}
 
-		$problem = SiteStaging::create_problem( $this->r, $slug );
+		SiteStaging::record( $this->r, $slug, 'create', $done );
 
-		if ( null !== $problem ) {
-			return $this->error( 'limit', $problem );
-		}
+		$edge = $this->edge();
 
-		$label = SiteStaging::label_for( $slug );
-		$host  = EdgeMap::preview_host( $label );
-
-		// The name is held now, so no other website takes it before the job writes it to DNS.
-		if ( '' === $label || '' === $host || ! SiteDomains::add( $this->r->id(), 0, $host, 'preview' ) ) {
-			return $this->error( 'failed', __( 'A staging copy cannot be made right now.', 'beltoft-services' ) );
-		}
-
-		SiteStaging::queue( $this->r, $slug, 'create', false, $label );
-
-		return array(
-			'state'   => 'creating',
-			'message' => __( 'The staging copy is being made. This can take a few minutes.', 'beltoft-services' ),
-		);
+		return is_wp_error( $edge ) ? $edge : array( 'state' => 'ready' );
 	}
 
 	/**
@@ -233,7 +313,7 @@ final class StagingActions {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	private function change( string $slug, string $kind, bool $files_only ) {
-		return $this->locked( fn() => $this->change_locked( $slug, $kind, $files_only ) );
+		return $this->queued_only() ?? $this->locked( fn() => $this->change_locked( $slug, $kind, $files_only ) );
 	}
 
 	/**
@@ -257,44 +337,93 @@ final class StagingActions {
 			return $site;
 		}
 
-		$view = SiteStaging::view( $site );
+		if ( ! $this->in_job() ) {
+			$view = SiteStaging::view( $site );
 
-		if ( $view['busy'] ) {
-			return $this->error( 'busy', __( 'The staging copy of this website is being changed. Wait until that is done.', 'beltoft-services' ) );
-		}
-
-		if ( HostingRestore::active( $this->r ) ) {
-			return $this->error( 'busy', __( 'A restore is running. Wait until it is done.', 'beltoft-services' ) );
-		}
-
-		if ( 'undo' === $kind ) {
-			if ( null === $view['undo'] ) {
-				return $this->error( 'invalid', __( 'There is no push to undo.', 'beltoft-services' ) );
+			if ( $view['busy'] ) {
+				return $this->error( 'busy', __( 'The staging copy of this website is being changed. Wait until that is done.', 'beltoft-services' ) );
 			}
-		} elseif ( 'ready' !== $view['state'] ) {
-			return $this->error( 'not_found', __( 'This website has no staging copy.', 'beltoft-services' ) );
+
+			if ( 'undo' === $kind ) {
+				if ( null === $view['undo'] ) {
+					return $this->error( 'invalid', __( 'There is no push to undo.', 'beltoft-services' ) );
+				}
+			} elseif ( 'ready' !== $view['state'] ) {
+				return $this->error( 'not_found', __( 'This website has no staging copy.', 'beltoft-services' ) );
+			}
+
+			if ( 'refresh' === $kind ) {
+				$space = SiteStaging::space_problem( $this->r );
+
+				if ( null !== $space ) {
+					return $this->error( 'limit', $space );
+				}
+			}
+
+			if ( 'delete' === $kind ) {
+				SiteStaging::begin( $this->r, $slug, 'delete' );
+			}
+
+			$words = array(
+				'refresh' => __( 'The staging copy is being refreshed from the live website. This can take a few minutes.', 'beltoft-services' ),
+				'push'    => __( 'The staging copy is being pushed to the live website. This can take a few minutes.', 'beltoft-services' ),
+				'undo'    => __( 'The last push is being undone. This can take a few minutes.', 'beltoft-services' ),
+				'delete'  => __( 'The staging copy is being deleted.', 'beltoft-services' ),
+			);
+
+			$this->defer_with(
+				array(
+					'state'   => array( 'refresh' => 'refreshing', 'push' => 'pushing', 'undo' => 'undoing', 'delete' => 'deleting' )[ $kind ],
+					'message' => $words[ $kind ],
+				)
+			);
 		}
 
-		if ( 'refresh' === $kind ) {
-			$space = SiteStaging::space_problem( $this->r );
+		$view   = SiteStaging::view( (array) Sites::find( $this->r->id(), $slug ) );
+		$record = (array) Records::for_resource( $this->r->id() );
+		$args   = array( 'vmid' => (int) $record['vmid'], 'slug' => $slug );
 
-			if ( null !== $space ) {
-				return $this->error( 'limit', $space );
+		if ( 'push' === $kind && $files_only ) {
+			$args['files_only'] = true;
+		}
+
+		$op   = array( 'refresh' => 'site.staging_refresh', 'push' => 'site.staging_push', 'undo' => 'site.staging_undo', 'delete' => 'site.staging_delete' )[ $kind ];
+		$done = $this->call( 'staging_' . $kind . '_' . $slug, $op, $args, SiteStaging::BUDGET );
+
+		if ( is_wp_error( $done ) ) {
+			return $this->outcome( $kind, $done );
+		}
+
+		if ( 'delete' === $kind ) {
+			return $this->finish_delete( $slug, $view['host'] );
+		}
+
+		$recorded = SiteStaging::record( $this->r, $slug, $kind, $done );
+
+		return is_wp_error( $recorded ) ? $recorded : array( 'state' => 'ready' );
+	}
+
+	/**
+	 * Delete, last part: the copy's address leaves DNS, the records and the edge map (the node removed the copy). A DNS that is busy is a
+	 * retry of the shared controller; the call is the same when it is repeated.
+	 *
+	 * @param string $slug Website.
+	 * @param string $host The copy's address.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private function finish_delete( string $slug, string $host ) {
+		if ( '' !== $host ) {
+			$gone = SiteDns::remove_domain( $this->r, $host, $this->node );
+
+			if ( is_wp_error( $gone ) ) {
+				throw new TaskPending( StepResult::retry( 0, 'staging: ' . $this->scrub( $gone->get_error_message(), 160 ) ) ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- a control-flow signal between request and job, never printed.
 			}
 		}
 
-		SiteStaging::queue( $this->r, $slug, $kind, $files_only );
+		SiteStaging::forget( $this->r, $slug );
 
-		$words = array(
-			'refresh' => __( 'The staging copy is being refreshed from the live website. This can take a few minutes.', 'beltoft-services' ),
-			'push'    => __( 'The staging copy is being pushed to the live website. This can take a few minutes.', 'beltoft-services' ),
-			'undo'    => __( 'The last push is being undone. This can take a few minutes.', 'beltoft-services' ),
-			'delete'  => __( 'The staging copy is being deleted.', 'beltoft-services' ),
-		);
+		$edge = $this->edge();
 
-		return array(
-			'state'   => array( 'refresh' => 'refreshing', 'push' => 'pushing', 'undo' => 'undoing', 'delete' => 'deleting' )[ $kind ],
-			'message' => $words[ $kind ],
-		);
+		return is_wp_error( $edge ) ? $edge : array( 'deleted' => true );
 	}
 }
