@@ -146,7 +146,7 @@ trait Base {
 
 		if ( ! $taken && $this->in_job() ) {
 			// Something else (a sweep) is changing the account: look again in a few seconds, never give up the task for it.
-			throw new TaskPending( StepResult::poll( 5, 'hosting: the account is being changed by something else', 300 ) );
+			throw new TaskPending( StepResult::poll( 5, 'hosting: the account is being changed by something else', 300 ) ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- a control-flow signal between request and job, never printed.
 		}
 
 		return $taken ? $result : $this->error( 'busy', __( 'Your hosting is being changed. Try again in a moment.', 'beltoft-services' ) );
@@ -166,7 +166,7 @@ trait Base {
 	 */
 	private function call( string $name, string $op, array $args ) {
 		if ( 'request' === $this->mode ) {
-			throw new Deferred( $name, $this->defer_answer() );
+			throw new Deferred( $name, $this->defer_answer() ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- a control-flow signal between request and job, never printed.
 		}
 
 		if ( $this->in_job() ) {
@@ -232,13 +232,13 @@ trait Base {
 
 		if ( $done instanceof StepResult && ! $done->is_failed() ) {
 			// Still working, or the agent did not answer: this run ends, and the same action is queued again.
-			throw new TaskPending( $this->progressed ? $done->with_progress() : $done );
+			throw new TaskPending( $this->progressed ? $done->with_progress() : $done ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- a control-flow signal between request and job, never printed.
 		}
 
 		$ok = is_array( $done );
 
 		if ( ! Steps::remember( $this->r, $name, $ok, $ok ? $done : null ) ) {
-			throw new TaskPending( StepResult::retry( 0, $name . ': the task step could not be stored' ) );
+			throw new TaskPending( StepResult::retry( 0, $name . ': the task step could not be stored' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- a control-flow signal between request and job, never printed.
 		}
 
 		$this->bump_job( $name );
