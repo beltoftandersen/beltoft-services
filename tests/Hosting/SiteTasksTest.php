@@ -473,4 +473,80 @@ class SiteTasksTest extends HostingCase {
 		$this->drive( $r, 'names' );
 		$this->assertNotSame( array(), $this->agent->calls_of( 'site.domains' ) + $this->agent->calls_of( 'edge.apply' ) );
 	}
+
+	/**
+	 * The hosting page as the customer's browser first gets it.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	private function page( Resource $r ): string {
+		ob_start();
+		\BeltoftServices\Hosting\HostingAccount::render( $this->fresh( $r ) );
+
+		return (string) ob_get_clean();
+	}
+
+	public function test_the_page_shows_the_new_website_at_once_with_its_step_and_locks_the_changes(): void {
+		$r = $this->account();
+		$this->agent->pending( 'db.create', 3 );
+		( new HostingActions( $r ) )->queue( 'add_site', array( 'fresh-one', 'Fresh one', '', true ) );
+
+		$html = $this->page( $r );
+		$this->assertStringContainsString( 'Being set up', $html );
+		$this->assertStringContainsString( 'Fresh one', $html );
+		$this->assertStringContainsString( 'data-hosting-task=', $html, 'The script locks the buttons and watches the task from this.' );
+		$this->assertStringContainsString( 'Wait until adding a website is done.', $html );
+
+		$this->step( $r, 'add_site' );
+		$this->assertStringContainsString( 'Making the database', $this->page( $r ) );
+
+		$this->drive( $r, 'add_site' );
+		$html = $this->page( $r );
+		$this->assertStringNotContainsString( 'Being set up', $html );
+		$this->assertStringNotContainsString( 'data-hosting-task=', $html );
+		$this->assertStringContainsString( 'fresh-one', $html, 'The website is a panel of its own now.' );
+		$this->assertStringNotContainsString( "\u{2014}", $html );
+		$this->assertStringNotContainsString( "\u{00B7}", $html );
+	}
+
+	public function test_a_change_that_failed_is_told_on_the_page_with_its_reason(): void {
+		$r = $this->account();
+		$this->agent->fail_next( 'site.create' );
+		( new HostingActions( $r ) )->queue( 'add_site', array( 'nope', 'Nope', '', true ) );
+		$this->drive( $r, 'add_site' );
+
+		$html = $this->page( $r );
+		$this->assertStringContainsString( 'data-task-failed', $html );
+		$this->assertStringContainsString( 'Adding a website. That did not work.', $html );
+		$this->assertStringNotContainsString( 'Being set up', $html );
+	}
+
+	public function test_backup_sizes_are_gigabytes_with_one_decimal_and_the_list_says_what_a_backup_holds(): void {
+		$gib = 1073741824;
+
+		$this->assertSame( '1.2 GB', \BeltoftServices\Hosting\HostingAccount::backup_size( (int) ( 1.24 * $gib ) ) );
+		$this->assertSame( '1.6 GB', \BeltoftServices\Hosting\HostingAccount::backup_size( (int) ( 1.56 * $gib ) ) );
+		$this->assertSame( '2.0 GB', \BeltoftServices\Hosting\HostingAccount::backup_size( 2 * $gib ) );
+		$this->assertSame( '0.5 GB', \BeltoftServices\Hosting\HostingAccount::backup_size( (int) ( 0.5 * $gib ) ) );
+		$this->assertSame( '12.0 GB', \BeltoftServices\Hosting\HostingAccount::backup_size( 12 * $gib ) );
+		$this->assertSame( 'Under 0.1 GB', \BeltoftServices\Hosting\HostingAccount::backup_size( 5 * 1048576 ) );
+		$this->assertSame( '0.0 GB', \BeltoftServices\Hosting\HostingAccount::backup_size( 0 ) );
+
+		$r = $this->account();
+		$r->set(
+			array(
+				'plan'        => array_merge( (array) $r->get( 'plan' ), array( 'backup_days' => 14 ) ),
+				'backup_list' => array(
+					array( 'volid' => 'pbs-store:backup/ct/1000/2026-11-14', 'ctime' => time() - 86400, 'kind' => 'nightly', 'size' => (int) ( 1.38 * $gib ) ),
+					array( 'volid' => 'pbs-store:backup/ct/1000/2026-11-15', 'ctime' => time(), 'kind' => 'nightly', 'size' => (int) ( 1.24 * $gib ) ),
+				),
+			)
+		);
+		$html = $this->page( $r );
+
+		$this->assertStringContainsString( '<th>Data in backup</th>', $html );
+		$this->assertStringContainsString( '<td>1.2 GB</td>', $html );
+		$this->assertStringContainsString( '<td>1.4 GB</td>', $html );
+		$this->assertStringContainsString( 'Each backup holds your whole hosting as it was that night. Backups are kept apart from your disk and do not use its space.', $html );
+	}
 }

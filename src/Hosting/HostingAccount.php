@@ -111,6 +111,10 @@ final class HostingAccount {
 					/* translators: %s: the state of the page cache, for example On. */
 					'cacheRowValue' => __( 'Page cache: %s', 'beltoft-services' ),
 					'saveAnyway' => __( 'Save anyway', 'beltoft-services' ),
+					/* translators: %s: what the account is doing now, for example "adding a website". */
+					'waitUntil' => __( 'Wait until %s is done.', 'beltoft-services' ),
+					/* translators: %s: what was done, for example "Adding a website". */
+					'taskDone' => __( '%s is done.', 'beltoft-services' ),
 				),
 			)
 		);
@@ -232,14 +236,19 @@ final class HostingAccount {
 
 		$actions = new HostingActions( $r );
 		$limits  = $actions->limits();
-		$sites   = $actions->sites();
+		$state   = Tasks::overview( $r );
+		$all     = $actions->sites();
+		$pending = array_values( array_filter( $all, static fn( $s ) => ! empty( $s['pending'] ) ) );
+		$sites   = array_values( array_filter( $all, static fn( $s ) => empty( $s['pending'] ) ) );
 		$ready   = 'ready' === $r->get( 'state' ) && 'ready' === $r->get( 'desired' );
 
-		echo '<div class="beltoft-hosting" data-hosting-resource="' . esc_attr( (string) $r->id() ) . '">';
+		// A change that runs in the background: the script locks the change buttons and watches the task (data-hosting-task).
+		echo '<div class="beltoft-hosting" data-hosting-resource="' . esc_attr( (string) $r->id() ) . '"' . ( null === $state['task'] ? '' : ' data-hosting-task="' . esc_attr( (string) wp_json_encode( $state['task'] ) ) . '"' ) . '>';
 
+		self::print_task_line( $state );
 		self::print_notices( $r );
 		self::print_overview( $r, $limits );
-		self::print_websites( $r, $limits, $sites, $ready );
+		self::print_websites( $r, $limits, $sites, $ready, $pending );
 
 		if ( self::checklist_visible( $r ) ) {
 			self::print_checklist( $r, $ready, $sites );
@@ -362,6 +371,46 @@ final class HostingAccount {
 	}
 
 	/**
+	 * What the account is doing in the background, in words, and why the last change did not work. The line is always printed
+	 * (hidden when nothing runs) so the script can show it when a change is queued.
+	 *
+	 * @param array{task: array<string, mixed>|null, last: array<string, mixed>|null} $state Tasks::overview().
+	 */
+	private static function print_task_line( array $state ): void {
+		$task  = $state['task'];
+		$label = null === $task ? '' : (string) $task['label'];
+		$first = mb_strtolower( mb_substr( $label, 0, 1 ) ) . mb_substr( $label, 1 );
+
+		echo '<p class="beltoft-hosting-notice" data-task-line role="status"' . ( null === $task ? ' hidden' : '' ) . '><span data-task-step>' . esc_html( null === $task ? '' : (string) $task['step_label'] ) . '</span> ';
+		/* translators: %s: what the account is doing now, for example "adding a website". */
+		echo '<span data-task-wait>' . esc_html( null === $task ? '' : sprintf( __( 'Wait until %s is done.', 'beltoft-services' ), $first ) ) . '</span></p>';
+
+		if ( null === $task && null !== $state['last'] && empty( $state['last']['ok'] ) ) {
+			echo '<p class="beltoft-hosting-warning" data-task-failed role="alert">' . esc_html( trim( (string) $state['last']['label'] . '. ' . (string) $state['last']['text'] ) ) . '</p>';
+		}
+	}
+
+	/**
+	 * A website that is being added: its row is there at once, with the step the work is at.
+	 *
+	 * @param array<string, mixed> $site Pending site from HostingActions::sites().
+	 */
+	private static function print_pending_site( array $site ): void {
+		$slug  = (string) $site['slug'];
+		$title = '' !== (string) $site['label'] ? (string) $site['label'] : $slug;
+
+		self::panel_open(
+			esc_html( $title ),
+			'beltoft-site-' . $slug,
+			'<span class="beltoft-hosting-status">' . esc_html__( 'Being set up', 'beltoft-services' ) . '</span>',
+			'beltoft-hosting-site beltoft-hosting-site--pending',
+			' data-slug="' . esc_attr( $slug ) . '"'
+		);
+		echo '<p class="beltoft-hosting-line" role="status" data-task-step>' . esc_html( (string) $site['task']['step_label'] ) . '</p>';
+		self::panel_close();
+	}
+
+	/**
 	 * The notices that belong to no website: a hint, a paid domain that is being connected, an unsupported PHP version
 	 * and a refused loader file.
 	 *
@@ -418,8 +467,9 @@ final class HostingAccount {
 	 * @param array<string, mixed>             $limits Ceilings.
 	 * @param array<int, array<string, mixed>> $sites  Sites.
 	 * @param bool                             $ready  Whether the account takes changes.
+	 * @param array<int, array<string, mixed>> $pending Websites that are being added.
 	 */
-	private static function print_websites( Resource $r, array $limits, array $sites, bool $ready ): void {
+	private static function print_websites( Resource $r, array $limits, array $sites, bool $ready, array $pending = array() ): void {
 		// The counts are in the overview at the top; the heading only marks where the websites start.
 		echo '<div class="beltoft-hosting-section" id="beltoft-hosting-sites"><h3 class="beltoft-hosting-section__title">' . esc_html__( 'Websites', 'beltoft-services' ) . '</h3></div>';
 
@@ -428,6 +478,10 @@ final class HostingAccount {
 
 		foreach ( $sites as $site ) {
 			self::print_site( $r, $site, count( $sites ) > 1, $ready, $ending, $node, $limits );
+		}
+
+		foreach ( $pending as $site ) {
+			self::print_pending_site( $site );
 		}
 	}
 
@@ -449,7 +503,7 @@ final class HostingAccount {
 		$wp      = (array) $site['wp'];
 		$own     = array() !== array_filter( $site['domains'], static fn( $d ) => 'preview' !== $d['kind'] );
 		$head    = '<a class="beltoft-hosting-link beltoft-hosting-panel__main" href="' . esc_url( 'https://' . $main . '/' ) . '" target="_blank" rel="noopener">' . esc_html( \BeltoftServices\Domains\HostName::display( $main ) ) . '</a>'
-			. '<span class="beltoft-hosting-status' . ( $ready ? ' is-ok' : '' ) . '">' . esc_html( $ready ? __( 'Online', 'beltoft-services' ) : __( 'Not ready', 'beltoft-services' ) ) . '</span>';
+			. '<span class="beltoft-hosting-status' . ( $ready && empty( $site['task'] ) ? ' is-ok' : '' ) . '" data-site-status>' . esc_html( ! empty( $site['task'] ) ? (string) $site['task']['step_label'] : ( $ready ? __( 'Online', 'beltoft-services' ) : __( 'Not ready', 'beltoft-services' ) ) ) . '</span>';
 
 		self::panel_open( esc_html( self::site_name( $site ) ), 'beltoft-site-' . $slug, $head, 'beltoft-hosting-site', ' data-hosting-scope data-slug="' . esc_attr( $slug ) . '"' );
 
@@ -1351,6 +1405,22 @@ final class HostingAccount {
 	}
 
 	/**
+	 * The size of a backup for the list: always GB with one decimal, so two backups can be compared at a glance.
+	 *
+	 * @param int $bytes Bytes the backup holds.
+	 */
+	public static function backup_size( int $bytes ): string {
+		$gb = max( 0, $bytes ) / GB_IN_BYTES;
+
+		if ( $bytes > 0 && $gb < 0.05 ) {
+			return __( 'Under 0.1 GB', 'beltoft-services' );
+		}
+
+		/* translators: %s: size in gigabytes with one decimal, for example 1.2. */
+		return sprintf( __( '%s GB', 'beltoft-services' ), number_format_i18n( $gb, 1 ) );
+	}
+
+	/**
 	 * The backups: the stored list, Back up now, the restore buttons and Undo. Nothing here calls the node.
 	 *
 	 * @param Resource                         $r     Hosting resource.
@@ -1375,14 +1445,14 @@ final class HostingAccount {
 		if ( array() === $list ) {
 			echo '<p>' . esc_html__( 'No backups yet. The first one is made tonight.', 'beltoft-services' ) . '</p>';
 		} else {
-			echo '<table class="beltoft-hosting-backup-list"><thead><tr><th>' . esc_html__( 'Date', 'beltoft-services' ) . '</th><th>' . esc_html__( 'Kind', 'beltoft-services' ) . '</th><th>' . esc_html__( 'Size', 'beltoft-services' ) . '</th>' . ( $ready && ! $busy ? '<th></th>' : '' ) . '</tr></thead><tbody>';
+			echo '<table class="beltoft-hosting-backup-list"><thead><tr><th>' . esc_html__( 'Date', 'beltoft-services' ) . '</th><th>' . esc_html__( 'Kind', 'beltoft-services' ) . '</th><th>' . esc_html__( 'Data in backup', 'beltoft-services' ) . '</th>' . ( $ready && ! $busy ? '<th></th>' : '' ) . '</tr></thead><tbody>';
 
 			foreach ( $list as $b ) {
 				printf(
 					'<tr><td>%1$s</td><td>%2$s</td><td>%3$s</td>',
 					esc_html( wp_date( 'j F Y, H:i', (int) $b['ctime'] ) ),
 					esc_html( 'manual' === $b['kind'] ? __( 'Manual', 'beltoft-services' ) : __( 'Nightly', 'beltoft-services' ) ),
-					esc_html( size_format( (int) $b['size'] ) )
+					esc_html( self::backup_size( (int) $b['size'] ) )
 				);
 
 				if ( $ready && ! $busy ) {
@@ -1399,6 +1469,7 @@ final class HostingAccount {
 			}
 
 			echo '</tbody></table>';
+			echo '<p class="beltoft-hosting-help">' . esc_html__( 'Each backup holds your whole hosting as it was that night. Backups are kept apart from your disk and do not use its space.', 'beltoft-services' ) . '</p>';
 		}
 
 		if ( $ready && ! $busy ) {

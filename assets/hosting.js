@@ -4,7 +4,9 @@
  * Buttons and fields of the panel carry data-hosting-action and data-hosting-field attributes. A click sends one
  * request to the hosting REST routes with the wp_rest nonce that the generic panel script already holds
  * (window.beltoftServicesAccount), refreshed from every response's X-WP-Nonce header, and then reloads the page to
- * show the new state. The WordPress sign-in link opens in a new tab. No dependencies.
+ * show the new state. The WordPress sign-in link opens in a new tab. A change that runs in the background (the route answers
+ * 202 with a task) locks the change buttons with "Wait until ... is done", and a watcher reads the overview every 3 seconds
+ * until the task is over; then the page reloads. No dependencies.
  */
 ( function () {
 	'use strict';
@@ -501,7 +503,15 @@
 				return;
 			}
 
-			if ( result.ok && result.data && 'pending' === result.data.status ) {
+			// A change that runs in the background: the answer carries its task. The SFTP password is shown first (below).
+			if ( result.ok && result.data && result.data.task && 'files_password' !== action ) {
+				button.disabled = false;
+				ok( '' );
+				begin( result.data.task, 'add_site' === action || 'remove_site' === action, button );
+				return;
+			}
+
+			if ( result.ok && result.data && 'pending' === result.data.status && ! result.data.task ) {
 				button.disabled = false;
 				ok( result.data.message || '' );
 				return;
@@ -554,6 +564,12 @@
 					input.value = '';
 				} );
 				ok( text.done || '' );
+
+				// The password is set in the background: the account waits for it like for any other change.
+				if ( result.data.task ) {
+					begin( result.data.task, false, button );
+				}
+
 				return;
 			}
 
@@ -621,6 +637,8 @@
 			}
 
 			S.done( S.busy( '', 'page', button ), saved.message );
+		} else {
+			say( null, saved.message );
 		}
 	}
 
@@ -678,6 +696,164 @@
 	}
 
 	cacheFacts();
+
+	// The change of the account that runs in the background (a task), and the watcher that follows it.
+	var root = document.querySelector( '.beltoft-hosting' );
+	var LOCKED = [ 'php_save', 'php_rollback', 'cache', 'remove_site', 'add_site', 'add_domain', 'remove_domain', 'set_main', 'country_save', 'country_off', 'files_password', 'files_key', 'remove_key' ];
+	var NO_RELOAD = [ 'cache' ];
+	var watching = false;
+	var current = null;
+
+	function lowerFirst( value ) {
+		value = String( value || '' );
+
+		return value.charAt( 0 ).toLowerCase() + value.slice( 1 );
+	}
+
+	// The change buttons are off, with the reason, and the line at the top says what the account is doing and at which step.
+	function lock( task ) {
+		if ( ! root || ! task ) {
+			return;
+		}
+
+		var wait = format( text.waitUntil, [ lowerFirst( task.label ) ] );
+
+		root.setAttribute( 'data-hosting-task', JSON.stringify( task ) );
+
+		Array.prototype.forEach.call( root.querySelectorAll( '[data-hosting-action]' ), function ( button ) {
+			if ( LOCKED.indexOf( button.getAttribute( 'data-hosting-action' ) ) >= 0 ) {
+				button.disabled = true;
+				button.setAttribute( 'data-task-locked', '1' );
+				button.title = wait;
+			}
+		} );
+
+		var line = root.querySelector( '[data-task-line]' );
+
+		if ( line ) {
+			line.hidden = false;
+			line.querySelector( '[data-task-wait]' ).textContent = wait;
+		}
+
+		Array.prototype.forEach.call( root.querySelectorAll( '[data-task-step]' ), function ( el ) {
+			var panel = el.closest( '[data-slug]' );
+
+			if ( ! panel || panel.getAttribute( 'data-slug' ) === task.slug ) {
+				el.textContent = task.step_label || task.label || '';
+			}
+		} );
+
+		Array.prototype.forEach.call( root.querySelectorAll( '[data-site-status]' ), function ( el ) {
+			var panel = el.closest( '[data-slug]' );
+
+			if ( panel && panel.getAttribute( 'data-slug' ) === task.slug ) {
+				el.textContent = task.step_label || task.label || '';
+				el.classList.remove( 'is-ok' );
+			}
+		} );
+	}
+
+	function unlock() {
+		if ( ! root ) {
+			return;
+		}
+
+		root.removeAttribute( 'data-hosting-task' );
+
+		Array.prototype.forEach.call( root.querySelectorAll( '[data-task-locked]' ), function ( button ) {
+			button.disabled = false;
+			button.removeAttribute( 'data-task-locked' );
+			button.removeAttribute( 'title' );
+		} );
+
+		var line = root.querySelector( '[data-task-line]' );
+
+		if ( line ) {
+			line.hidden = true;
+		}
+	}
+
+	// The task is over: a failure is printed by the page itself (the reason, in words); a success is said once after the reload.
+	function finish( last ) {
+		var message = '';
+
+		watching = false;
+
+		if ( last && ! last.ok ) {
+			window.location.reload();
+			return;
+		}
+
+		message = ( current && current.message ) || ( last && last.label ? format( text.taskDone, [ last.label ] ) : '' );
+
+		if ( current && NO_RELOAD.indexOf( current.action ) >= 0 ) {
+			unlock();
+			say( null, message );
+			current = null;
+			return;
+		}
+
+		remember( current ? current.action : '', current ? current.slug : '', message );
+		window.location.reload();
+	}
+
+	// Reads the overview every 3 seconds while a task exists (the status rate of the routes allows it).
+	function watch() {
+		if ( watching || ! root ) {
+			return;
+		}
+
+		watching = true;
+
+		var id = root.getAttribute( 'data-hosting-resource' );
+		var look = function () {
+			call( 'GET', id + '/hosting' ).then( function ( result ) {
+				if ( ! result.ok || ! result.data ) {
+					window.setTimeout( look, 6000 );
+					return;
+				}
+
+				if ( result.data.task ) {
+					lock( result.data.task );
+					window.setTimeout( look, 3000 );
+					return;
+				}
+
+				finish( result.data.last );
+			}, function () {
+				window.setTimeout( look, 6000 );
+			} );
+		};
+
+		window.setTimeout( look, 3000 );
+	}
+
+	// A change was queued: the buttons wait for it. Adding and removing a website draw the row at once by reloading the page,
+	// which then watches the task; the other changes stay on the page.
+	function begin( task, reloadNow, button ) {
+		current = {
+			action: button ? button.getAttribute( 'data-hosting-action' ) || '' : '',
+			slug: button ? button.getAttribute( 'data-slug' ) || '' : '',
+			message: button ? button.getAttribute( 'data-done' ) || '' : ''
+		};
+		lock( task );
+
+		if ( reloadNow ) {
+			window.location.reload();
+			return;
+		}
+
+		watch();
+	}
+
+	if ( root && root.getAttribute( 'data-hosting-task' ) ) {
+		try {
+			lock( JSON.parse( root.getAttribute( 'data-hosting-task' ) ) );
+			watch();
+		} catch ( e ) {
+			// A task that cannot be read is not shown; the buttons stay as they are.
+		}
+	}
 
 	// A staging job under way: the page asks where it is every few seconds and reloads when it is over.
 	function stagingWatch() {
