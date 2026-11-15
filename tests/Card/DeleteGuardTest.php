@@ -153,6 +153,39 @@ class DeleteGuardTest extends UsageTestCase {
 		$this->assertStringContainsString( 'active services', (string) DeleteGuard::needed( $user, $token ) );
 	}
 
+	public function test_an_on_hold_subscription_needs_its_card_and_a_pending_cancel_one_does_not(): void {
+		$user  = $this->new_user();
+		$token = $this->card( $user );
+		$sub   = $this->subscription( $user, $token, 9.0 );
+
+		$sub->update_status( 'on-hold' );
+		$this->assertNotNull( DeleteGuard::needed( $user, $token ) );
+
+		wcs_get_subscription( $sub->get_id() )->update_status( 'pending-cancel' );
+		$this->assertNull( DeleteGuard::needed( $user, $token ) );
+	}
+
+	public function test_the_reason_id_is_printed_once_for_two_different_reasons(): void {
+		$tokens = array();
+		foreach ( array( 'The first reason.', 'The second reason.' ) as $i => $text ) {
+			$tokens[] = array( $this->card( $this->new_user(), 'pm_x' . $i ), $text );
+		}
+		foreach ( $tokens as $pair ) {
+			$text = $pair[1];
+			add_filter( 'beltoft_services_card_delete_needed', static fn() => $text );
+			DeleteGuard::list_item( array( 'actions' => array( 'delete' => array( 'url' => '#', 'name' => 'Delete' ) ) ), $pair[0] );
+			remove_all_filters( 'beltoft_services_card_delete_needed' );
+		}
+
+		ob_start();
+		DeleteGuard::print_reason();
+		$html = (string) ob_get_clean();
+
+		$this->assertSame( 2, substr_count( $html, '<p' ) );
+		$this->assertSame( 1, substr_count( $html, 'id="' . DeleteGuard::ANCHOR . '"' ) );
+		$this->assertStringStartsWith( '<p id=', $html );
+	}
+
 	public function test_a_free_subscription_or_one_on_another_card_does_not_need_it(): void {
 		$user  = $this->new_user();
 		$token = $this->card( $user, 'pm_1' );

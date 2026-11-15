@@ -130,7 +130,7 @@ final class DeleteGuard {
 	}
 
 	/**
-	 * Does an active subscription with a price pay with this card? The pay as you go account is not counted here:
+	 * Does an active or on-hold subscription with a price pay with this card? The pay as you go account is not counted here:
 	 * its price is 0 and the usage rule covers it.
 	 *
 	 * @param \WC_Payment_Token $token The card.
@@ -141,7 +141,7 @@ final class DeleteGuard {
 		}
 
 		foreach ( \WCS_Payment_Tokens::get_subscriptions_from_token( $token ) as $subscription ) {
-			if ( $subscription instanceof \WC_Subscription && $subscription->has_status( 'active' ) && ! Account::is_account( $subscription ) && (float) $subscription->get_total() > 0 ) {
+			if ( $subscription instanceof \WC_Subscription && $subscription->has_status( array( 'active', 'on-hold' ) ) && ! Account::is_account( $subscription ) && (float) $subscription->get_total() > 0 ) {
 				return true;
 			}
 		}
@@ -213,8 +213,11 @@ final class DeleteGuard {
 	 * The reason, in words, under the table.
 	 */
 	public static function print_reason(): void {
+		$first = true;
+
 		foreach ( self::$shown as $reason ) {
-			echo '<p id="' . esc_attr( self::ANCHOR ) . '" class="beltoft-services-card__needed">' . esc_html( $reason ) . '</p>';
+			echo '<p' . ( $first ? ' id="' . esc_attr( self::ANCHOR ) . '"' : '' ) . ' class="beltoft-services-card__needed">' . esc_html( $reason ) . '</p>';
+			$first = false;
 		}
 
 		self::$shown = array();
