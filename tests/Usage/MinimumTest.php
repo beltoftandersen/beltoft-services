@@ -20,6 +20,8 @@ class MinimumTest extends UsageTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		// The texts below are in euros: the shop currency is set here, not left to whatever an earlier test stored.
+		update_option( 'woocommerce_currency', 'EUR' );
 		$this->settings( array( 'usage_minimum' => 5 ) );
 		$this->vat( false );
 		Estimate::reset();
