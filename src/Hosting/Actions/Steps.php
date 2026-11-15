@@ -198,6 +198,7 @@ final class Steps {
 			'remove_ssh_key'    => array( 'remove_ssh_key', __( 'Removing an SSH key', 'beltoft-services' ) ),
 			'abandon_site'      => array( 'abandon_site', __( 'Cleaning up a website that was not finished', 'beltoft-services' ) ),
 			'apply_names'       => array( 'names', __( 'Updating the addresses', 'beltoft-services' ) ),
+			'drop_domain'       => array( 'remove_domain', __( 'Removing an address', 'beltoft-services' ) ),
 			'wordpress_address' => array( 'wordpress_address', __( 'Moving WordPress to another address', 'beltoft-services' ) ),
 			'create_staging'    => array( 'staging_create', __( 'Making a staging copy', 'beltoft-services' ) ),
 			'refresh_staging'   => array( 'staging_refresh', __( 'Refreshing the staging copy', 'beltoft-services' ) ),

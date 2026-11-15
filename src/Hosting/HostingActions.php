@@ -186,6 +186,7 @@ final class HostingActions {
 			'remove_domain'     => $this->sites,
 			'set_main_address'  => $this->sites,
 			'apply_names'       => $this->sites,
+			'drop_domain'       => $this->sites,
 			'abandon_new_site'  => $this->sites,
 			'set_php'           => $this->php,
 			'php_rollback'      => $this->php,

@@ -666,6 +666,32 @@ class WordPressAddressTest extends HostingCase {
 		$this->assertSame( array(), $this->since( $mark, 'site.wp_address' ) );
 	}
 
+	public function test_a_paid_domain_that_ends_while_wordpress_is_on_it_is_removed_by_one_job_that_moves_it_back_first(): void {
+		list( $r, $slug ) = $this->with_domain();
+		$this->change( $r, 'wordpress_address', array( $slug, 'example.org' ) );
+		$mark = count( $this->agent->calls() );
+
+		$out = ( new HostingActions( Resource::find( $r->id() ) ) )->queue( 'remove_domain', array( 'example.org', true ) );
+		$this->assertSame( 'pending', $out['status'] );
+		$this->assertSame( 'remove_domain', $out['task']['action'], 'The whole removal is the job\'s: the node must still know the name while WordPress moves back.' );
+		$this->assertNotNull( SiteDomains::find( 'example.org' ), 'Nothing is removed inside the request.' );
+		$this->assertSame( array(), array_slice( $this->agent->calls(), $mark ) );
+
+		$this->agent->pending( 'site.wp_address', 2 );
+		$this->assertTrue( $this->run_one( $r ) );
+		$this->kill_job( $r ); // The process dies in the middle: it goes on, and starts nothing twice.
+		$this->run_job( $r );
+
+		$this->assertSame( EdgeMap::preview_host( $slug ), $this->node_site( $r, $slug )['wp_address'] );
+		$this->assertSame( '', (string) $this->site( $r, $slug )['flags']['wp_address'] );
+		$this->assertNull( SiteDomains::find( 'example.org' ) );
+		$this->assertNull( SiteDomains::find( 'www.example.org' ) );
+		$ops = array_column( array_slice( $this->agent->calls(), $mark ), 'op' );
+		$this->assertLessThan( array_search( 'site.domains', $ops, true ), array_search( 'site.wp_address', $ops, true ), 'Moved back while the node still knows the name.' );
+		$this->assertCount( 1, array_unique( array_column( $this->since( $mark, 'site.wp_address' ), 'job_id' ) ), 'The move back was asked of the node once.' );
+		$this->assertTrue( $this->last_outcome( $r )['ok'] );
+	}
+
 	public function test_a_paid_domain_that_ends_leaves_in_one_queued_change(): void {
 		list( $r, $slug ) = $this->with_domain();
 

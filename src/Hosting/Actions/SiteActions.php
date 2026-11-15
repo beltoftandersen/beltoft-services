@@ -593,18 +593,16 @@ final class SiteActions {
 			return $ready;
 		}
 
-		$row = SiteDomains::find( strtolower( $host ) );
+		$host = strtolower( $host );
+		$row  = SiteDomains::find( $host );
+		$mine = null !== $row && $row['resource_id'] === $this->r->id();
 
-		if ( null === $row || $row['resource_id'] !== $this->r->id() ) {
-			return $this->error( 'not_found', __( 'That domain is not on your account.', 'beltoft-services' ) );
-		}
-
-		if ( 'preview' === $row['kind'] ) {
+		if ( $mine && 'preview' === $row['kind'] ) {
 			return $this->error( 'invalid', __( 'The temporary address cannot be removed.', 'beltoft-services' ) );
 		}
 
 		// The last name of a paid extra domain stays until the renewal: it was paid for, and no money comes back.
-		if ( ! $final ) {
+		if ( $mine && ! $final ) {
 			$reg    = Addons::registrable( $row['host'] );
 			$others = array_filter(
 				SiteDomains::for_resource( $this->r->id() ),
@@ -619,11 +617,30 @@ final class SiteActions {
 		}
 
 		// The names that go: the one asked for, or (its paid add-on ended) every name of that domain, in this one change.
-		$rows = array( $row );
+		$rows = $mine ? array( $row ) : array();
 
 		if ( $final ) {
-			$reg  = Addons::registrable( $row['host'] );
+			$reg  = Addons::registrable( $host );
 			$rows = array_values( array_filter( SiteDomains::for_resource( $this->r->id() ), static fn( $d ) => 'preview' !== $d['kind'] && Addons::registrable( $d['host'] ) === $reg ) );
+		}
+
+		if ( array() === $rows ) {
+			// A run of the job after the names went (a crash before the node was told): only the node is left to tell.
+			if ( ! $this->in_job() ) {
+				return $this->error( 'not_found', __( 'That domain is not on your account.', 'beltoft-services' ) );
+			}
+
+			$edge = $this->names_and_edge();
+
+			return is_wp_error( $edge ) ? $edge : array( 'removed' => $host );
+		}
+
+		// WordPress is on one of the names and the add-on ended: moving it back is a call to the node, made while the node still knows the
+		// name. In a request the whole removal is the job's (its steps are kept, so a repeat starts nothing twice).
+		if ( 'request' === $this->mode && $final && $this->wordpress_is_on( $rows ) ) {
+			$task = Steps::start( $this->r, 'drop_domain', array( $host, true ) );
+
+			return is_wp_error( $task ) ? $task : array( 'removed' => $host, 'status' => 'pending', 'task' => $task );
 		}
 
 		foreach ( $rows as $one ) {
@@ -634,11 +651,41 @@ final class SiteActions {
 			}
 		}
 
-		$this->defer_with( array( 'removed' => $row['host'] ), array() );
+		$this->defer_with( array( 'removed' => $host ), array() );
 
 		$edge = $this->names_and_edge();
 
-		return is_wp_error( $edge ) ? $edge : array( 'removed' => $row['host'] );
+		return is_wp_error( $edge ) ? $edge : array( 'removed' => $host );
+	}
+
+	/**
+	 * Does WordPress of one of the account's websites use one of these names?
+	 *
+	 * @param array<int, array<string, mixed>> $rows Name rows.
+	 */
+	private function wordpress_is_on( array $rows ): bool {
+		$hosts = array_column( $rows, 'host' );
+
+		foreach ( Sites::for_resource( $this->r->id() ) as $own ) {
+			if ( in_array( (string) ( $own['flags']['wp_address'] ?? '' ), $hosts, true ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * The whole removal of a domain whose paid add-on has ended, as the job of the change `remove_domain` (a request queues it when
+	 * WordPress is on one of the names): WordPress goes back to the temporary address, the names leave DNS, and then the node and the
+	 * edge are told.
+	 *
+	 * @param string $host  A name of the domain.
+	 * @param bool   $final The paid add-on has ended.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function drop_domain( string $host, bool $final = true ) {
+		return $this->queued_only() ?? $this->locked( fn() => $this->remove_domain_locked( $host, $final ) );
 	}
 
 	/**
