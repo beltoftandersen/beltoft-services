@@ -801,8 +801,12 @@
 		window.location.reload();
 	}
 
-	// Follows the account's task through the shared follow (the resource's status every 3 seconds, up to 30 minutes) until its outcome is there.
-	// The step the work is at comes with every look: the status bar's own words for the action.
+	// Follows the account's task until it is gone (the hosting overview has no task: no marker). The task, not one action's result, is
+	// what is waited for: a follow-up change (the country block sent again after a restore, the clean-up of a website that was not
+	// made) replaces the last result with its own, so a result of the asked action may never come. When the task is gone the page is
+	// asked what happened: a failure is printed by the page (it knows the clean-up too), a success is said once after the reload.
+	// A restore may take hours: the look is slower after the first ten minutes, and a task still there after seven hours is not
+	// called done, the customer is told it goes on in the background.
 	function watch( task ) {
 		if ( watching || ! root || ! task ) {
 			return;
@@ -810,23 +814,47 @@
 
 		watching = true;
 
-		var queued = { action: task.action, at: task.started || 0, status: '/resources/' + root.getAttribute( 'data-hosting-resource' ) };
+		var path = root.getAttribute( 'data-hosting-resource' ) + '/hosting';
+		var started = Date.now();
 
-		window.beltoftApi.follow( queued, {
-			holder: account,
-			interval: 3000,
-			rounds: 600,
-			onTick: function ( data ) {
-				var progress = data && data.progress;
+		function again() {
+			var slow = Date.now() - started > 600000;
 
-				if ( progress && progress.active && progress.text ) {
-					task.step_label = progress.text;
-					lock( task );
-				}
+			if ( Date.now() - started > 25200000 ) {
+				watching = false;
+				say( null, text.taskLong || '' );
+				return;
 			}
-		} ).then( finish, function () {
-			finish( null );
-		} );
+
+			window.setTimeout( look, slow ? 10000 : 3000 );
+		}
+
+		function look() {
+			window.beltoftApi.call( path, { holder: account } ).then( function ( reply ) {
+				var data = reply.data || {};
+
+				if ( ! reply.ok ) {
+					again();
+					return;
+				}
+
+				if ( data.task ) {
+					var progress = data.progress;
+
+					if ( progress && progress.active && progress.text ) {
+						task.step_label = progress.text;
+						lock( task );
+					}
+
+					again();
+					return;
+				}
+
+				finish( data.last ? { ok: false } : { ok: true } );
+			}, again );
+		}
+
+		look();
 	}
 
 	// A change was queued: the buttons wait for it. A change whose new state is drawn by the page reloads at once, and the page
