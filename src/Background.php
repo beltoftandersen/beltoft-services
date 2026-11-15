@@ -384,7 +384,7 @@ final class Background {
 		$out = array();
 
 		foreach ( array_values( $args ) as $value ) {
-			$out[] = is_string( $value ) && 1 === preg_match( '/^(0|[1-9][0-9]{0,17})$/', $value ) ? (int) $value : $value;
+			$out[] = is_string( $value ) && 1 === preg_match( '/^(0|[1-9][0-9]{0,17})\z/', $value ) ? (int) $value : $value;
 		}
 
 		return $out;
