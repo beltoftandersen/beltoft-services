@@ -15,7 +15,8 @@
  * window.beltoftApi.follow( queued, options ) follows a queued customer action to its end: queued is the 202 answer of a route
  * (its `status` path, /resources/<id>, which is read below the holder's root as the other account scripts do, and `at`), and it reads that status every few seconds until the job is over. It resolves to the outcome
  * {action, ok, at, text} (the resource's last_result) or, when the job is still going after options.rounds looks (default 30),
- * to null. Options: holder (as for call), interval (milliseconds, default 4000), rounds, onTick( data ) with every status read.
+ * to null. Options: holder (as for call), interval (milliseconds, default 4000), rounds, onTick( data ) with every status read,
+ * handle (the beltoftStatus.busy() handle of the work: every status read that lists steps moves its progress line, "step n of m").
  * Nothing is rejected for a failed job: the outcome has ok false and the server's own text.
  * With options.until = 'idle' it follows the service instead of one action: it resolves to { idle: true, data } when the status
  * shows no running task (`task` empty on the hosting overview, else no `working` and no `progress.active`), whatever the last
@@ -132,6 +133,10 @@
 
 					if ( reply.ok && settings.onTick ) {
 						settings.onTick( data );
+					}
+
+					if ( reply.ok && settings.handle && window.beltoftStatus && window.beltoftStatus.progress && data.progress && data.progress.active && data.progress.steps && data.progress.steps.length ) {
+						window.beltoftStatus.progress( settings.handle, data.progress );
 					}
 
 					if ( untilIdle ) {

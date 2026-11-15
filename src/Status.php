@@ -63,6 +63,8 @@ final class Status {
 			'cancel'       => __( 'Cancel', 'beltoft-services' ),
 			'working'      => __( 'Working…', 'beltoft-services' ),
 			'busyState'    => __( 'Busy', 'beltoft-services' ),
+			/* translators: 1: the step the work is at, 2: how many steps there are; shown in brackets after what is going on */
+			'stepOf'       => __( 'step %1$d of %2$d', 'beltoft-services' ),
 		);
 	}
 }

@@ -1,19 +1,26 @@
 /**
- * One place for feedback on My Account and the checkout fields: a state line, a lock for the buttons of the
- * service that is working, and a styled question (dialog) that replaces window.confirm / alert / prompt.
+ * One place for feedback on My Account and the checkout fields: a progress line (a thin line and a short text), a lock for
+ * the buttons of the service that is working, and a styled question (dialog) that replaces window.confirm / alert / prompt.
  *
- *   var h = beltoftStatus.busy( 'Rebooting your server…', 'resource-id', button? );   // state line + lock, returns a handle
- *   beltoftStatus.done( h, 'Your server has restarted.' );                           // shown about 5 s, then fades
+ *   var h = beltoftStatus.busy( 'Rebooting your server…', 'resource-id', button?, { lock: false }? ); // progress line + lock, returns a handle
+ *   beltoftStatus.progress( h, fraction | { step, of } | progressPayload, message? );             // makes the line determinate: "(step n of m)"
+ *   beltoftStatus.done( h, 'Your server has restarted.' );                           // shown about 5 s, then fades away
  *   beltoftStatus.fail( h, 'Failed: …', fieldElementOrSelector? );                   // stays until closed; the field is marked invalid and focused, the text is shown once, here
  *   beltoftStatus.info( 'Copied.' );                                                  // like done, without a handle
  *   beltoftStatus.confirm( { title, text, confirm, cancel, danger } ).then( function ( yes ) {} );
  *   beltoftStatus.locked( scope );                                                    // true while a handle of that scope is busy
  *
- * Every page has a state line ([data-bs-inline]): in the head of a server or database page it follows the state indicator,
- * on any other page it is the line under the title row (PageHead), and it falls back to one at the top of the content.
- * Busy, done, fail and info show there, and it goes back to what it said (the description) after a done or an info.
- * The line has a fixed height: long text is cut with an ellipsis (the title holds all of it), so nothing on the page moves.
- * The same busy, done and fail text is also shown right under the clicked button's group (.bs-note), where the customer looks.
+ * The line is shown in ONE place (owner 2026-11-15). On a wide screen it sits where the page's state line ([data-bs-inline]) is, at
+ * the top (in the head of a server or database page, else under the title row, else at the top of the content), and takes the place
+ * of the description while it shows. On a phone (max-width 767px, the phone breakpoint of account.css) it is fixed to the bottom of
+ * the screen, above the browser's toolbar, so it never moves anything. Busy is a moving line (indeterminate); progress() fills it
+ * for work whose steps are known. Done and info stay about 5 s and fade away; fail stays until closed. A failed field is only marked
+ * (aria-invalid) and focused, the text is not printed next to it. Nothing is shown under the clicked button.
+ *
+ * progress( h, value, message? ): value is a fraction from 0 to 1, { step: n, of: m }, or a payload of Progress (its `steps` with
+ * the status done, current or failed, as assets/progress.js draws them). The text is the message when given, else the text the line
+ * has, followed by "(step n of m)" when the steps are known. Only the work that is shown moves the line: a released handle is ignored.
+ * busy( ..., { lock: false } ) shows the line without locking any button (for a page that locks its own).
  *
  * Scope: the service's resource id (the container carries data-bs-scope="<id>"; a [data-resource] element is marked
  * automatically), or 'page' for the whole content area. Only the latest message is shown. No dependencies.
@@ -29,9 +36,11 @@
 	var strings = config.strings || {};
 	var SELECTOR = 'button, input[type="submit"], input[type="button"], [data-bs-action]';
 	var DONE_MS = 5000;
-	var FADE_MS = 150;
+	var FADE_MS = 300;
+	var PHONE = '(max-width: 767px)';
 	var current = null;
 	var timers = { done: 0, fade: 0 };
+	var loader = null;
 	var active = [];
 	var recent = { el: null, at: 0 };
 	var fieldNotes = [];
@@ -101,7 +110,7 @@
 		timers.fade = 0;
 	}
 
-	// ---- the state line --------------------------------------------------------------------------------------------
+	// ---- the progress line -----------------------------------------------------------------------------------------
 
 	// The line of the page: the one in a server or database head, else the one printed under the page's title row. A page that
 	// has none (a checkout step, a page of another plugin) gets one at the top of its content, made when it is first needed.
@@ -117,8 +126,6 @@
 		area = contentArea();
 		line = make( 'div', 'bs-pagehead is-empty' );
 		line.appendChild( make( 'span', 'bs-inline' ) ).setAttribute( 'data-bs-inline', '' );
-		line.firstChild.setAttribute( 'role', 'status' );
-		line.firstChild.setAttribute( 'aria-live', 'polite' );
 		area.insertBefore( line, area.firstChild );
 
 		return line.firstChild;
@@ -129,36 +136,6 @@
 		var row = target.parentNode;
 
 		return row ? ( row.querySelector( '[data-power-line]:not([hidden])' ) || row.querySelector( '[data-badge]:not([hidden])' ) ) : null;
-	}
-
-	function inlineParts( target ) {
-		var label = target.querySelector( '.bs-inline__text' );
-		var close = target.querySelector( '.bs-inline__close' );
-
-		if ( ! label ) {
-			label = make( 'span', 'bs-inline__text', target.textContent.trim() );
-			target.textContent = '';
-			target.appendChild( label );
-		}
-
-		if ( ! close ) {
-			close = make( 'button', 'bs-inline__close' );
-			close.type = 'button';
-			close.hidden = true;
-			close.setAttribute( 'aria-label', text( 'close', 'Close' ) );
-			close.setAttribute( 'data-bs-keep', '' );
-			close.textContent = '×';
-			close.addEventListener( 'click', function () {
-				inlineHide( target, true );
-			} );
-			target.appendChild( close );
-		}
-
-		if ( undefined === target.beltoftDefault ) {
-			target.beltoftDefault = label.textContent;
-		}
-
-		return { label: label, close: close };
 	}
 
 	// While work is going on the indicator says Busy; it goes back to what it said, unless something else has changed it since.
@@ -192,80 +169,229 @@
 		}
 	}
 
-	function inlineReset( target ) {
-		var parts = inlineParts( target );
+	function phone() {
+		return !! ( window.matchMedia && window.matchMedia( PHONE ).matches );
+	}
 
-		clearTimers();
-		target.classList.remove( 'is-fading', 'is-done', 'is-fail', 'is-info' );
-		parts.label.classList.remove( 'is-busy' );
-		target.removeAttribute( 'data-bs-kind' );
-		target.setAttribute( 'role', 'status' );
-		target.setAttribute( 'aria-live', 'polite' );
-		target.setAttribute( 'aria-busy', 'false' );
-		parts.label.textContent = target.beltoftDefault;
+	// The one element: made once and kept (a live region that stays in the page is announced reliably). It is moved to the
+	// state line on a wide screen and to the body on a phone, where it is fixed to the bottom and takes no room.
+	function loaderParts() {
+		var el;
+		var bar;
 
-		if ( target.beltoftDefault ) {
-			parts.label.setAttribute( 'title', target.beltoftDefault );
-		} else {
-			parts.label.removeAttribute( 'title' );
+		if ( loader ) {
+			return loader;
 		}
 
+		el = make( 'div', 'bs-loader' );
+		el.id = 'bs-status-line';
+		el.hidden = true;
+		el.setAttribute( 'data-bs-loader', '' );
+		el.setAttribute( 'role', 'status' );
+		el.setAttribute( 'aria-live', 'polite' );
+		el.setAttribute( 'aria-atomic', 'true' );
+
+		loader = { el: el, host: null, text: make( 'span', 'bs-loader__text' ), close: make( 'button', 'bs-loader__close' ), fill: make( 'i' ), base: '', stem: '' };
+		loader.close.type = 'button';
+		loader.close.hidden = true;
+		loader.close.setAttribute( 'aria-label', text( 'close', 'Close' ) );
+		loader.close.setAttribute( 'data-bs-keep', '' );
+		loader.close.textContent = '×';
+		loader.close.addEventListener( 'click', function () {
+			hide( true );
+		} );
+
+		bar = make( 'span', 'bs-loader__bar' );
+		bar.setAttribute( 'aria-hidden', 'true' );
+		bar.appendChild( loader.fill );
+
+		el.appendChild( loader.text );
+		el.appendChild( loader.close );
+		el.appendChild( bar );
+
+		return loader;
+	}
+
+	function place( host ) {
+		var parts = loaderParts();
+		var where = phone() ? document.body : host;
+
+		if ( parts.el.parentNode !== where ) {
+			where.appendChild( parts.el );
+		}
+
+		parts.host = host;
+	}
+
+	// null: the moving line; 0 to 1: that much of the line.
+	function setFraction( fraction ) {
+		var parts = loaderParts();
+
+		parts.el.classList.toggle( 'is-determinate', null !== fraction );
+		parts.fill.style.width = null === fraction ? '' : Math.round( fraction * 1000 ) / 10 + '%';
+	}
+
+	function release_host( host ) {
+		if ( host ) {
+			host.classList.remove( 'has-loader' );
+			host.removeAttribute( 'data-bs-kind' );
+			indicate( host, false );
+			live( host, false );
+		}
+	}
+
+	function reset() {
+		var parts = loaderParts();
+
+		clearTimers();
+		parts.el.hidden = true;
+		parts.el.className = 'bs-loader';
+		parts.el.setAttribute( 'role', 'status' );
+		parts.el.setAttribute( 'aria-live', 'polite' );
+		parts.el.setAttribute( 'aria-busy', 'false' );
+		parts.text.textContent = '';
+		parts.text.removeAttribute( 'title' );
 		parts.close.hidden = true;
-		indicate( target, false );
-		live( target, false );
+		parts.base = '';
+		parts.stem = '';
+		setFraction( null );
+		release_host( parts.host );
 		current = null;
 	}
 
-	function inlineHide( target, now ) {
+	function hide( now ) {
+		var parts = loaderParts();
+
 		clearTimers();
 
-		if ( now || reduced() ) {
-			inlineReset( target );
+		if ( now || reduced() || parts.el.hidden ) {
+			reset();
 
 			return;
 		}
 
-		target.classList.add( 'is-fading' );
-		timers.fade = window.setTimeout( function () {
-			inlineReset( target );
-		}, FADE_MS );
-	}
-
-	function inlineShow( target, kind, message, handle ) {
-		var parts = inlineParts( target );
-		var full = ( 'fail' === kind ? text( 'failedPrefix', 'Failed: ' ) : '' ) + message;
-
-		clearTimers();
-		target.classList.remove( 'is-fading', 'is-done', 'is-fail', 'is-info' );
-		live( target, true );
-
-		// The three squares of work in progress are the ones every busy element has (.is-busy::before), on the text.
-		parts.label.classList.toggle( 'is-busy', 'busy' === kind );
-
-		if ( 'busy' !== kind ) {
-			target.classList.add( 'is-' + kind );
-		}
-
-		target.setAttribute( 'data-bs-kind', kind );
-		target.setAttribute( 'role', 'fail' === kind ? 'alert' : 'status' );
-		target.setAttribute( 'aria-busy', 'busy' === kind ? 'true' : 'false' );
-		target.setAttribute( 'aria-live', 'fail' === kind ? 'assertive' : 'polite' );
-		parts.label.textContent = full;
-		parts.label.setAttribute( 'title', full );
-		parts.close.hidden = 'fail' !== kind;
-		indicate( target, 'busy' === kind );
-		current = handle || null;
-
-		if ( 'done' === kind || 'info' === kind ) {
-			timers.done = window.setTimeout( function () {
-				inlineHide( target, false );
-			}, DONE_MS );
-		}
+		parts.el.classList.add( 'is-fading' );
+		timers.fade = window.setTimeout( reset, FADE_MS );
 	}
 
 	// kind: busy, done, fail, info. Only the newest message is shown.
 	function show( kind, message, handle ) {
-		inlineShow( inlineTarget(), kind, message, handle );
+		var host = inlineTarget();
+		var parts = loaderParts();
+		var full = ( 'fail' === kind ? text( 'failedPrefix', 'Failed: ' ) : '' ) + message;
+
+		clearTimers();
+
+		// Shown in another place than before (the page changed): the old place is cleaned.
+		if ( parts.host && parts.host !== host ) {
+			release_host( parts.host );
+		}
+
+		place( host );
+		parts.el.className = 'bs-loader is-' + kind;
+		parts.el.hidden = false;
+		parts.el.setAttribute( 'role', 'fail' === kind ? 'alert' : 'status' );
+		parts.el.setAttribute( 'aria-busy', 'busy' === kind ? 'true' : 'false' );
+		parts.el.setAttribute( 'aria-live', 'fail' === kind ? 'assertive' : 'polite' );
+		setFraction( 'done' === kind ? 1 : null );
+
+		if ( parts.text.textContent !== full ) {
+			parts.text.textContent = full;
+		}
+
+		parts.text.setAttribute( 'title', full );
+		parts.close.hidden = 'fail' !== kind;
+
+		// A wide screen: the line takes the place of the description. A phone: nothing in the page changes, the line is overlaid.
+		if ( phone() ) {
+			release_host( host );
+		} else {
+			host.classList.add( 'has-loader' );
+			host.setAttribute( 'data-bs-kind', kind );
+			live( host, true );
+			indicate( host, 'busy' === kind );
+		}
+
+		parts.base = full;
+		parts.stem = '';
+		current = handle || null;
+
+		if ( 'done' === kind || 'info' === kind ) {
+			timers.done = window.setTimeout( function () {
+				hide( false );
+			}, DONE_MS );
+		}
+	}
+
+	// How far along, from what the caller knows: a number, { step, of }, or a Progress payload with its steps.
+	function measure( value ) {
+		var step = 0;
+		var of = 0;
+		var done = 0;
+		var i;
+
+		if ( 'number' === typeof value ) {
+			return isFinite( value ) ? { fraction: Math.min( 1, Math.max( 0, value ) ), step: 0, of: 0 } : null;
+		}
+
+		if ( ! value || 'object' !== typeof value ) {
+			return null;
+		}
+
+		if ( Array.isArray( value.steps ) && value.steps.length ) {
+			of = value.steps.length;
+
+			for ( i = 0; i < of; i++ ) {
+				if ( 'done' === value.steps[ i ].status ) {
+					done += 1;
+				}
+
+				if ( ! step && ( 'current' === value.steps[ i ].status || 'failed' === value.steps[ i ].status ) ) {
+					step = i + 1;
+				}
+			}
+
+			step = step || Math.min( of, done + 1 );
+		} else if ( value.of > 0 ) {
+			of = Math.floor( value.of );
+			step = Math.min( of, Math.max( 1, Math.floor( value.step || 1 ) ) );
+		} else {
+			return null;
+		}
+
+		// The step being worked on does not count as done; a little of the line is always drawn.
+		return { fraction: Math.max( 0.06, ( step - 1 ) / of ), step: step, of: of };
+	}
+
+	function progress( handle, value, message ) {
+		var parts = loaderParts();
+		var found = measure( value );
+		var base;
+		var full;
+
+		if ( ! found || parts.el.hidden || ! parts.el.classList.contains( 'is-busy' ) ) {
+			return;
+		}
+
+		// Only the work that is shown moves the line: a released or an older handle does not.
+		if ( handle && ( handle.released || ( current && current !== handle ) ) ) {
+			return;
+		}
+
+		base = message ? String( message ) : ( parts.stem || parts.base );
+		parts.stem = base;
+		full = base;
+
+		if ( found.of ) {
+			full = base.replace( /[….]+$/, '' ) + ' (' + text( 'stepOf', 'step %1$d of %2$d' ).replace( '%1$d', found.step ).replace( '%2$d', found.of ) + ')';
+		}
+
+		setFraction( found.fraction );
+
+		if ( parts.text.textContent !== full ) {
+			parts.text.textContent = full;
+			parts.text.setAttribute( 'title', full );
+		}
 	}
 
 	// ---- the lock -----------------------------------------------------------------------------------------------
@@ -403,22 +529,15 @@
 		fieldNotes = [];
 	}
 
-	// A failed field is marked invalid and points at the state line, which holds the one copy of the message. The text is never
-	// printed next to the field: an error is shown once, at the top.
+	// A failed field is marked invalid and points at the progress line, which holds the one copy of the message. The text is never
+	// printed next to the field: an error is shown once.
 	function fieldNote( field ) {
-		var line = inlineTarget();
+		var line = loaderParts().el;
 		var before = field.getAttribute( 'aria-describedby' );
 
 		clearFields();
 		field.setAttribute( 'aria-invalid', 'true' );
-
-		if ( line ) {
-			if ( ! line.id ) {
-				line.id = 'bs-status-line';
-			}
-
-			field.setAttribute( 'aria-describedby', before ? before + ' ' + line.id : line.id );
-		}
+		field.setAttribute( 'aria-describedby', before ? before + ' ' + line.id : line.id );
 
 		fieldNotes.push( { field: field, describedby: before } );
 
@@ -433,53 +552,14 @@
 		field.addEventListener( 'change', gone );
 	}
 
-	// ---- the note next to the button -----------------------------------------------------------------------------
-	// Busy, done and fail are also said right where the customer clicked: a line directly under the button's group, so it
-	// is seen on a phone too. Busy has a spinner, done a check mark and stays until the next action there, fail says why.
-
-	var NOTE_ANCHOR = '[data-bs-note-anchor], .bs-action, .bs-item__actions, .bs-actions, .beltoft-hosting-buttons, .beltoft-services-panel__actions, .beltoft-services-vm__actions, .beltoft-services-db__form p';
-
-	function noteFor( button ) {
-		if ( ! button || ! button.closest || button.closest( 'dialog' ) ) {
-			return null;
-		}
-
-		var anchor = button.closest( NOTE_ANCHOR ) || button;
-		var note = anchor.nextElementSibling;
-
-		if ( ! note || ! note.classList || ! note.classList.contains( 'bs-note' ) ) {
-			note = make( 'p', 'bs-note' );
-			note.appendChild( make( 'span', 'bs-note__icon' ) ).setAttribute( 'aria-hidden', 'true' );
-			note.appendChild( make( 'span', 'bs-note__text' ) );
-			anchor.insertAdjacentElement( 'afterend', note );
-		}
-
-		return note;
-	}
-
-	function noteSay( note, kind, message ) {
-		if ( ! note ) {
-			return;
-		}
-
-		note.className = 'bs-note bs-note--' + kind;
-		note.setAttribute( 'role', 'fail' === kind ? 'alert' : 'status' );
-		note.querySelector( '.bs-note__text' ).textContent = String( message || '' );
-		note.hidden = '' === String( message || '' );
-
-		var box = note.getBoundingClientRect ? note.getBoundingClientRect() : null;
-
-		if ( box && ( box.bottom > window.innerHeight || box.top < headerTop ) ) {
-			note.scrollIntoView( { block: 'nearest', behavior: reduced() ? 'auto' : 'smooth' } );
-		}
-	}
-
 	// ---- the API ----------------------------------------------------------------------------------------------
 
-	function busy( message, scope, button ) {
+	// options.lock false: only the progress line, no button is locked (a page that locks its own buttons, such as hosting).
+	function busy( message, scope, button, options ) {
 		var key = scope || 'page';
 		var area = container( key );
 		var el = chosen( button );
+		var lock = ! ( options && false === options.lock );
 		var handle = { scope: key, text: message, locked: [], button: null, released: false };
 		var label = text( 'wait', 'Wait for %s to finish' ).replace( '%s', function () {
 			return String( message ).replace( /[….]+$/, '' ).toLowerCase();
@@ -487,37 +567,26 @@
 
 		clearFields();
 
-		if ( el && ( area.contains( el ) || 'page' === key ) ) {
-			handle.button = el;
-			handle.beltoftButtonWasDisabled = el.disabled;
-			el.disabled = true;
-			el.setAttribute( 'aria-busy', 'true' );
-		}
-
-		Array.prototype.forEach.call( area.querySelectorAll( SELECTOR ), function ( other ) {
-			if ( other !== handle.button && lockable( other, area ) ) {
-				lockButton( other, label );
-				handle.locked.push( other );
+		if ( lock ) {
+			if ( el && ( area.contains( el ) || 'page' === key ) ) {
+				handle.button = el;
+				handle.beltoftButtonWasDisabled = el.disabled;
+				el.disabled = true;
+				el.setAttribute( 'aria-busy', 'true' );
 			}
-		} );
 
-		active.push( handle );
+			Array.prototype.forEach.call( area.querySelectorAll( SELECTOR ), function ( other ) {
+				if ( other !== handle.button && lockable( other, area ) ) {
+					lockButton( other, label );
+					handle.locked.push( other );
+				}
+			} );
 
-		// One message, where the customer clicked: the note under the button. The state line at the top is only for work
-		// that no button started (owner 2026-11-13: one loader, not two).
-		handle.note = noteFor( handle.button );
-
-		// One loader (owner 2026-11-14): the note under the button carries it, and the button is only disabled. A button with no
-		// note of its own shows the loader itself.
-		if ( handle.button && ! handle.note ) {
-			handle.button.classList.add( 'is-busy' );
+			active.push( handle );
 		}
 
-		if ( handle.note ) {
-			noteSay( handle.note, 'busy', message );
-		} else {
-			show( 'busy', message, handle );
-		}
+		// One loader, in one place (owner 2026-11-15): the clicked button is only disabled, the progress line says what is going on.
+		show( 'busy', message, handle );
 
 		return handle;
 	}
@@ -525,16 +594,20 @@
 	function finish( handle, kind, message ) {
 		if ( handle ) {
 			release( handle );
-			noteSay( handle.note, kind, message );
-		}
-
-		// The note under the button already says it.
-		if ( handle && handle.note ) {
-			return;
+			handle.released = true;
 		}
 
 		// A newer request is still working: its busy line stays, a failure is the only thing that may replace it.
 		if ( active.length && 'fail' !== kind ) {
+			return;
+		}
+
+		// Nothing to say (done with an empty text): the line of this work just goes, there is nothing to read.
+		if ( '' === String( message || '' ) && 'fail' !== kind ) {
+			if ( handle && current === handle ) {
+				hide( true );
+			}
+
 			return;
 		}
 
@@ -547,14 +620,16 @@
 
 	function fail( handle, message, field ) {
 		var target = resolveField( field );
+		var line;
+		var seen;
 
 		finish( handle, 'fail', message );
 
-		// The message is under the button, or at the top: bring it into view when it is not.
-		var line = handle && handle.note ? handle.note : inlineTarget();
+		// On a wide screen the line is at the top: bring it into view when it is not. On a phone it is fixed to the screen.
+		line = loaderParts().el;
 
-		if ( line && line.getBoundingClientRect ) {
-			var seen = line.getBoundingClientRect();
+		if ( ! phone() && line.getBoundingClientRect ) {
+			seen = line.getBoundingClientRect();
 
 			if ( seen.top < headerTop || seen.bottom > window.innerHeight ) {
 				line.scrollIntoView( { block: 'center' } );
@@ -567,7 +642,6 @@
 			if ( target.focus ) {
 				target.focus( { preventScroll: true } );
 			}
-
 		}
 	}
 
@@ -711,6 +785,13 @@
 		}
 	}, true );
 
+	// Escape closes a failure that stays on the screen (the close button is the same, for a pointer).
+	document.addEventListener( 'keydown', function ( event ) {
+		if ( 'Escape' === event.key && loader && ! loader.el.hidden && loader.el.classList.contains( 'is-fail' ) && ! ( dialog && dialog.open ) ) {
+			hide( true );
+		}
+	} );
+
 	// A locked link-style action does nothing, however often it is clicked.
 	document.addEventListener( 'click', function ( event ) {
 		var el = event.target && event.target.closest ? event.target.closest( '[data-bs-locked], .is-busy' ) : null;
@@ -755,11 +836,15 @@
 			} );
 		}
 
-		Array.prototype.forEach.call( document.querySelectorAll( '[data-bs-inline]' ), inlineParts );
 		offset();
 		window.addEventListener( 'resize', function () {
 			candidates = null;
 			offset();
+
+			// The line moves between the state line and the bottom of the screen when the window crosses the phone breakpoint.
+			if ( loader && ! loader.el.hidden && loader.host ) {
+				place( loader.host );
+			}
 		} );
 	}
 
@@ -774,6 +859,7 @@
 		done: done,
 		fail: fail,
 		info: info,
+		progress: progress,
 		confirm: confirm,
 		locked: isLocked,
 		clearFields: clearFields,

@@ -473,7 +473,7 @@
 			request( 'POST', id + '/dns-import', { text: area.value, apply: apply } ).then( function ( data ) {
 				if ( apply ) {
 					// The records are written in the background; the outcome is the report the job leaves.
-					return window.beltoftApi.follow( data ).then( function ( outcome ) {
+					return window.beltoftApi.follow( data, { handle: handle } ).then( function ( outcome ) {
 						if ( outcome && ! outcome.ok ) {
 							bs.fail( handle, outcome.text || t.failed, null );
 							return;
@@ -537,7 +537,7 @@
 		request( 'POST', form.getAttribute( 'data-resource' ) + '/dns-adopt', { step: form.getAttribute( 'data-dns-adopt' ), ack: !! ( box && box.checked ) } ).then( function ( data ) {
 			// The switch runs in the background: follow it to its outcome, then show the new state.
 			if ( data && data.queued ) {
-				return window.beltoftApi.follow( data ).then( function ( outcome ) {
+				return window.beltoftApi.follow( data, { handle: handle } ).then( function ( outcome ) {
 					if ( outcome && ! outcome.ok ) { bs.fail( handle, outcome.text || __( 'This did not finish. We have been told and will look into it.', 'beltoft-services' ), null ); return; }
 					bs.done( handle, ( outcome && outcome.text ) || data.message || '' );
 					window.setTimeout( function () { window.location.reload(); }, 1500 );

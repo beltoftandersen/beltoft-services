@@ -22,6 +22,19 @@
 	}
 
 	// What happened goes to the status bar at the top of the page, like every other form of My Account; nothing is printed in the panel.
+	// The line of the account's task (watch) ends with a message; without one, the message is told on its own.
+	var taskLine = null;
+
+	function end( message ) {
+		if ( taskLine && S ) {
+			S.done( taskLine, message );
+			taskLine = null;
+			return;
+		}
+
+		say( null, message );
+	}
+
 	function say( panel, message ) {
 		if ( message && S ) {
 			S.info( message );
@@ -821,7 +834,7 @@
 
 		if ( current && NO_RELOAD.indexOf( current.action ) >= 0 ) {
 			unlock();
-			say( null, message );
+			end( message );
 			current = null;
 			cacheFacts();
 			return;
@@ -844,6 +857,11 @@
 
 		watching = true;
 
+		// The progress line at the top follows the task and its steps ("Installing WordPress (step 2 of 5)"); the page locks its own buttons.
+		if ( S && task.label && ! ( taskLine && ! taskLine.released ) ) {
+			taskLine = S.busy( task.label, 'page', null, { lock: false } );
+		}
+
 		window.beltoftApi.follow( task, {
 			holder: account,
 			until: 'idle',
@@ -855,11 +873,15 @@
 					task.step_label = progress.text;
 					lock( task );
 				}
+
+				if ( taskLine && data.task && progress && progress.active ) {
+					S.progress( taskLine, progress, progress.text || task.label );
+				}
 			}
 		} ).then( function ( outcome ) {
 			if ( ! outcome ) {
 				watching = false;
-				say( null, text.taskLong || '' );
+				end( text.taskLong || '' );
 				return;
 			}
 

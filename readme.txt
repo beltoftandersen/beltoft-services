@@ -258,6 +258,12 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 == Changelog ==
 
+= 0.31.4 =
+* The shared feedback of My Account is one progress line: a thin line and a short text. It moves while the end is not known and fills, with "(step n of m)", where the steps are known (restores, installs and other background work, the hosting task, DNS changes, email changes).
+* It is shown in one place: on a wide screen in the page's state line at the top, on a phone fixed to the bottom of the screen above the browser's toolbar, so it never moves the page. Nothing is written under the clicked button any more.
+* Done stays about 5 seconds and fades away. A failure stays until it is closed (the close button or the Escape key), and a field it names is still marked and focused.
+* Scripts can call `beltoftStatus.progress( handle, fraction | { step, of } | progress payload, message )`; `beltoftApi.follow()` takes `handle` and moves the line by itself.
+
 = 0.31.3 =
 * A code check that a site refuses for another reason (for example an unconfirmed email address) can now say so: the message goes through the filter `beltoft_services_step_up_refusal( $message, $user_id, $purpose )`.
 * The hosting page follows a running change until the account has no task left, through the shared script helper, instead of its own polling.

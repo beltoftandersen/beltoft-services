@@ -1083,7 +1083,7 @@ body.woocommerce-account div.beltoft-services-domain .beltoft-dnse__table td.bel
 /* ==== Dashboard UI: one set of parts for every account page (2026-11-12) ==========================================
    Buttons: .bs-btn + --primary | --secondary | --danger | --danger-solid, and --sm for rows. Rows of items: .bs-list > .bs-item
    with __main (__title, __name, __meta), __usage (.bs-meter) and __actions. A state next to a name: .bs-state--ok|warn|fail|muted
-   (coloured dot and text, never a chip). Working, done and failed: .bs-note under the clicked button (status.js). */
+   (coloured dot and text, never a chip). Working, done and failed: the progress line (status.js, .bs-loader). */
 
 /* Every control and card in the account area uses the same two corners. */
 body.woocommerce-account .woocommerce-MyAccount-content :is(button, .button, a.button, .woocommerce-button, input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="search"], input[type="url"], input[type="tel"], select, textarea, summary.bs-btn, .bs-btn) { border-radius: var(--bs-radius); }
@@ -1103,18 +1103,6 @@ body.woocommerce-account .woocommerce-MyAccount-content .bs-btn:disabled, body.w
 body.woocommerce-account .woocommerce-MyAccount-content :is(button, .button).is-busy { position: relative; opacity: 1; cursor: progress; }
 body.woocommerce-account .woocommerce-MyAccount-content :is(button, .button).is-busy::before { content: ""; flex: none; width: 14px; height: 14px; margin-right: 2px; border: 2px solid currentcolor; border-right-color: transparent; border-radius: 50%; animation: bs-turn .7s linear infinite; }
 @keyframes bs-turn { to { transform: rotate(360deg); } }
-
-/* Working, done, failed: the line right under the clicked button's group. */
-.bs-note { display: flex; align-items: flex-start; gap: var(--bs-space-2); margin: var(--bs-space-2) 0 0; padding: var(--bs-space-2) var(--bs-space-3); border-radius: var(--bs-radius); font-size: var(--bs-fs-small); line-height: var(--bs-lh-text); color: var(--navy, #10221b); background: var(--bg-warm, #eeece6); max-width: 70ch; }
-.bs-note[hidden] { display: none; }
-/* A panel's own paragraph rule (".beltoft-services-net p { margin: 0 0 12px }") must not take the room above the note: it sat on the button. */
-body.woocommerce-account .woocommerce-MyAccount-content p.bs-note { margin: var(--bs-space-2) 0 0; }
-.bs-note__icon { flex: none; width: 14px; height: 14px; margin-top: 3px; }
-.bs-note--busy .bs-note__icon { border: 2px solid currentcolor; border-right-color: transparent; border-radius: 50%; animation: bs-turn .7s linear infinite; box-sizing: border-box; }
-.bs-note--done, .bs-note--info { background: #e7f1ea; color: var(--bs-status-ok); }
-.bs-note--done .bs-note__icon, .bs-note--info .bs-note__icon { background: currentcolor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5 9-10'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5 9-10'/%3E%3C/svg%3E") center / contain no-repeat; }
-.bs-note--fail { background: #fbeeec; color: var(--bs-status-fail); }
-.bs-note--fail .bs-note__icon { background: currentcolor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M12 7v6M12 17h.01'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M12 7v6M12 17h.01'/%3E%3C/svg%3E") center / contain no-repeat; }
 
 /* One action: what it does on the left, its button on the right (stacked on a phone). Rows in a group are split by a
    line. The note of a clicked button goes under the whole row (data-bs-note-anchor). */
@@ -1312,3 +1300,44 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domain--page .beltoft-services-facts { gap: 1px; background: var(--bs-line); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domain--page .beltoft-services-facts > div { background: var(--bs-surface); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit__history :is(td, th):nth-child(n+3) { white-space: nowrap; }
+
+/* ==== The progress line (status.js, window.beltoftStatus): one place for busy, done, info and fail ========================
+   Wide screen: it sits in the page's state line (.bs-inline) and takes the place of the description while it shows. Phone: it is
+   fixed to the bottom of the screen, above the browser's toolbar, and takes no room in the page. A thin line carries the work:
+   it moves while the end is not known and fills when the steps are known (progress()). */
+.bs-loader { position: relative; box-sizing: border-box; display: flex; align-items: center; gap: var(--bs-space-2); max-width: 100%; min-width: min(100%, 240px); min-height: 20px; color: var(--ink-mid, #2d4060); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-regular); line-height: 20px; transition: opacity .3s ease, transform .3s ease; animation: bs-loader-in .2s ease-out; }
+.bs-loader[hidden] { display: none; }
+.bs-loader__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bs-loader.is-fading { opacity: 0; }
+.bs-loader.is-fail { align-items: flex-start; color: var(--bs-status-fail); font-weight: var(--bs-fw-medium); }
+.bs-loader.is-fail .bs-loader__text { overflow: visible; text-overflow: clip; white-space: normal; }
+.bs-loader__bar { position: absolute; left: 0; right: 0; bottom: -6px; height: 2px; overflow: hidden; border-radius: 1px; background: color-mix(in srgb, var(--bs-status-ok) 16%, transparent); }
+.bs-loader__bar i { display: block; width: 100%; height: 100%; border-radius: inherit; background: var(--bs-status-ok); }
+.bs-loader.is-busy .bs-loader__bar i { width: 40%; }
+.bs-loader.is-busy.is-determinate .bs-loader__bar i { transition: width .4s ease; }
+.bs-loader.is-busy:not(.is-determinate) .bs-loader__bar i { animation: bs-loader-run 1.3s ease-in-out infinite; }
+.bs-loader.is-fail .bs-loader__bar { background: color-mix(in srgb, var(--bs-status-fail) 16%, transparent); }
+.bs-loader.is-fail .bs-loader__bar i { background: var(--bs-status-fail); }
+.bs-loader__close { flex: none; width: var(--bs-btn-h); height: var(--bs-btn-h); margin: -10px -10px -10px 0; padding: 0; border: 0; background: none; box-shadow: none; color: inherit; font-size: 22px; line-height: 1; cursor: pointer; }
+.bs-loader__close[hidden] { display: none; }
+.bs-loader__close:focus-visible { outline: 2px solid var(--bs-focus); outline-offset: -2px; }
+/* In the state line (wide screen only: status.js marks the line has-loader): the line shows instead of the description, and grows for a failure. */
+.bs-inline.has-loader > .bs-inline__text { display: none; }
+.bs-inline.has-loader { height: auto; min-height: 20px; }
+.bs-pagehead:has(.bs-inline.has-loader) { height: auto; min-height: 20px; }
+@keyframes bs-loader-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes bs-loader-run { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@media (max-width: 767px) {
+	.bs-loader { position: fixed; z-index: 100000; right: var(--bs-space-4); bottom: calc(env(safe-area-inset-bottom, 0px) + var(--bs-space-4)); left: var(--bs-space-4); min-width: 0; padding: var(--bs-space-3) var(--bs-space-4) calc(var(--bs-space-3) + 2px); overflow: hidden; border: 1px solid var(--bs-line); border-radius: var(--bs-radius); background: var(--bg-warm, #eeece6); box-shadow: 0 6px 24px rgba(12, 21, 53, 0.16); line-height: var(--bs-lh-text); animation: bs-loader-up .25s ease-out; }
+	.bs-loader.is-fading { transform: translateY(8px); }
+	.bs-loader__text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; }
+	.bs-loader.is-fail .bs-loader__text { display: block; -webkit-line-clamp: unset; }
+	.bs-loader__bar { bottom: 0; border-radius: 0; }
+	.bs-loader__close { margin: -12px -14px -12px 0; }
+}
+@keyframes bs-loader-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+	.bs-loader, .bs-loader.is-fading { transition: none; animation: none; transform: none; }
+	.bs-loader.is-busy:not(.is-determinate) .bs-loader__bar i { width: 100%; animation: none; }
+	.bs-loader.is-busy.is-determinate .bs-loader__bar i { transition: none; }
+}
