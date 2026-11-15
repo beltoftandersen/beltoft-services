@@ -6,7 +6,7 @@ use BeltoftServices\Tests\TestCase;
 
 class ServerPagePhoneTest extends TestCase {
 	public function test_the_memory_help_sentence_does_not_use_the_axis_class(): void {
-		$html = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'templates/account/vm.php' );
+		$html = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'templates/account/monitoring.php' );
 
 		$this->assertMatchesRegularExpression( '/<p class="beltoft-vm-usage__note"><\?php esc_html_e\( \'Linux uses free memory/', $html );
 		$this->assertDoesNotMatchRegularExpression( '/beltoft-vm-usage__axis"[^>]*>\s*<\?php esc_html_e\( \'Linux uses/', $html );
