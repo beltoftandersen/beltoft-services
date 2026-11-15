@@ -181,7 +181,7 @@ class RecordImportJobTest extends TestCase {
 
 		$second = $this->post( $r, true );
 		$this->assertSame( 409, $second->get_status() );
-		$this->assertSame( 'Another change is running. Try again in a moment.', $second->get_data()['message'] );
+		$this->assertSame( 'Wait until adding DNS records is done.', $second->get_data()['message'] );
 		$this->assertSame( $before, Resource::find( $r->id() )->get( RecordImport::JOB ) );
 		$this->assertCount( 1, as_get_scheduled_actions( array( 'hook' => Jobs::ACT, 'status' => \ActionScheduler_Store::STATUS_PENDING ) ) );
 	}

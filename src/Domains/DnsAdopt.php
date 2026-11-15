@@ -232,6 +232,7 @@ final class DnsAdopt {
 	 */
 	public static function run_switch( Resource $r ): StepResult {
 		$said = static fn( string $key, array $meta = array() ): array => array_merge( $meta, array( Jobs::TEXT => self::text( $key ) ) );
+		$no   = static fn( string $key ): array => $said( $key, array( Jobs::EXPECTED => true ) );
 
 		if ( ! self::eligible( $r ) ) {
 			// A replay after the work was stored: the domain uses our name servers and nothing is left to do.
@@ -239,13 +240,13 @@ final class DnsAdopt {
 				return StepResult::done( $said( 'done' ) );
 			}
 
-			return StepResult::fail( 'The switch is not available for this domain.', $said( 'gone' ) );
+			return StepResult::fail( 'The switch is not available for this domain.', $no( 'gone' ) );
 		}
 
 		$state = $r->get( 'dns_adopt' );
 
 		if ( ! is_array( $state ) || (int) ( $state['reviewed_at'] ?? 0 ) <= 0 ) {
-			return StepResult::fail( 'The records were not confirmed.', $said( 'ack' ) );
+			return StepResult::fail( 'The records were not confirmed.', $no( 'ack' ) );
 		}
 
 		// The zone answers on both name servers before the registrar is touched.

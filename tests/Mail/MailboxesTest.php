@@ -223,6 +223,42 @@ final class MailboxesTest extends MailTestCase {
 		$this->assertSame( array(), array_filter( $this->mails, static fn( $m ) => str_contains( (string) wp_json_encode( $m ), 'old@before.example' ) ), 'A refusal the customer reads is not an alert for staff.' );
 	}
 
+	public function test_what_the_request_can_know_is_said_at_once_and_queues_nothing(): void {
+		$r = $this->ready_mail( 'known.example', array( 'mailboxes' => 2 ) );
+		$r->set( array( \BeltoftServices\Mail\MailMeta::SYSTEM => 'wordpress@known.example' ) );
+		$r = Resource::find( $r->id() );
+
+		// Format, size and the hidden system address: no job.
+		$this->assertSame( 'invalid', \BeltoftServices\Mail\Mailboxes::plan_create( $r, 'not valid' )->get_error_code() );
+		$this->assertSame( 'limit', \BeltoftServices\Mail\Mailboxes::plan_create( $r, 'a', '', 99999 )->get_error_code() );
+		$this->assertSame( 'exists', \BeltoftServices\Mail\Mailboxes::plan_create( $r, 'wordpress' )->get_error_code() );
+
+		// A full plan, from the remembered count.
+		$this->assertIsArray( $this->create_box( $r, 'a' ) );
+		$this->assertIsArray( $this->create_box( $r, 'b' ) );
+		$full = \BeltoftServices\Mail\Mailboxes::plan_create( Resource::find( $r->id() ), 'c' );
+		$this->assertSame( 'limit', $full->get_error_code() );
+		$this->assertSame( 'Your plan has no room for more mailboxes.', $full->get_error_message() );
+		$this->assertSame( array(), as_get_scheduled_actions( array( 'hook' => \BeltoftServices\Jobs::ACT, 'status' => \ActionScheduler_Store::STATUS_PENDING ) ) );
+
+		// Deleting one frees the place at once (the count is remembered).
+		$this->assertTrue( \BeltoftServices\Mail\Mailboxes::delete( Resource::find( $r->id() ), 'a@known.example' ) );
+		$this->assertIsArray( \BeltoftServices\Mail\Mailboxes::plan_create( Resource::find( $r->id() ), 'c' ) );
+	}
+
+	public function test_an_expected_refusal_does_not_mail_staff_and_a_real_failure_does(): void {
+		$r = $this->ready_mail( 'alerts.example' );
+		$this->mails = array();
+		$this->mailcow->add_mailbox( array( 'local_part' => 'old', 'domain' => 'alerts.example', 'quota' => '100', 'password' => 'theirs' ) );
+		$this->assertWPError( $this->create_box( $r, 'old' ) );
+		$this->assertWPError( $this->reset_box( $r, 'none@alerts.example' ) );
+		$this->assertSame( array(), $this->mails, 'Taken name and missing mailbox: expected, no mail.' );
+
+		$this->mailcow->fail_next( 'add_mailbox', new \WP_Error( 'mailcow_error', 'refused', array( 'key' => 'x' ) ) );
+		$this->assertWPError( $this->create_box( $r, 'broken' ) );
+		$this->assertNotEmpty( $this->mails, 'A mail server that refuses something unexpected: staff are told.' );
+	}
+
 	public function test_the_password_is_never_in_a_job_argument(): void {
 		$r    = $this->ready_mail( 'args.example' );
 		$plan = \BeltoftServices\Mail\Mailboxes::plan_create( $r, 'a' );

@@ -66,7 +66,7 @@ final class Reconciler {
 	 * Meta only the reconciler, the jobs and the resource itself write. A driver's step or
 	 * action meta cannot change these.
 	 */
-	public const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'failed_desired', 'alerted', 'protected', 'paused_at', 'warned_at', 'desired_at', 'replace_after_delete', 'reported', 'act_attempts', 'notified', 'limit_notified', 'breach_at', 'breach_reason', 'breach_alerted', 'delay_notified', 'progress_resets', 'delete_paused', 'delete_held_alerted', 'delete_origin', 'delete_started', 'warn_started_at', 'warn_alerted', 'backup_purge_at', 'delete_cleanup', 'action_pending', 'waiting', 'wait_since', 'act_wait_since', 'customer_text' );
+	public const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'failed_desired', 'alerted', 'protected', 'paused_at', 'warned_at', 'desired_at', 'replace_after_delete', 'reported', 'act_attempts', 'notified', 'limit_notified', 'breach_at', 'breach_reason', 'breach_alerted', 'delay_notified', 'progress_resets', 'delete_paused', 'delete_held_alerted', 'delete_origin', 'delete_started', 'warn_started_at', 'warn_alerted', 'backup_purge_at', 'delete_cleanup', 'action_pending', 'waiting', 'wait_since', 'act_wait_since', 'customer_text', 'expected_refusal' );
 
 	/**
 	 * How often one operation may restart its retry count because a run made progress. After

@@ -226,7 +226,7 @@ class DnsAdoptTest extends TestCase {
 		$this->assertSame( 202, $this->call( $r, array( 'step' => 'switch' ) )->get_status() );
 		$second = $this->call( $r, array( 'step' => 'switch' ) );
 		$this->assertSame( 409, $second->get_status() );
-		$this->assertSame( 'Another change is running. Try again in a moment.', $second->get_data()['message'] );
+		$this->assertSame( 'Wait until switching to Beltoft DNS is done.', $second->get_data()['message'] );
 		$this->assertCount( 1, as_get_scheduled_actions( array( 'hook' => Jobs::ACT, 'status' => \ActionScheduler_Store::STATUS_PENDING ) ) );
 	}
 

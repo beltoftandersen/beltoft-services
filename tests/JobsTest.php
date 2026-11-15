@@ -552,13 +552,34 @@ final class JobsTest extends TestCase {
 		);
 		list( $r, $driver ) = $this->resource( array( 'state' => 'ready', 'desired' => 'ready' ) );
 		$driver->customer_actions = array( 'tidy' => 'Tidy up' );
-		$driver->will( 'act', StepResult::fail( 'taken', array( Jobs::TEXT => 'That name is taken.' ) ) );
+		$driver->will( 'act', StepResult::fail( 'taken', array( Jobs::TEXT => 'That name is taken.', Jobs::EXPECTED => true ) ) );
 
 		Jobs::act( $r->id(), 'tidy', array() );
 		$last = Resource::find( $r->id() )->get( Jobs::RESULT );
 		$this->assertFalse( $last['ok'] );
 		$this->assertSame( 'That name is taken.', $last['text'] );
 		$this->assertSame( 0, $mails, 'No alert for something the customer can read and fix.' );
+	}
+
+	public function test_a_sentence_alone_does_not_hide_a_real_failure_from_staff(): void {
+		$mails = 0;
+		add_filter(
+			'pre_wp_mail',
+			static function () use ( &$mails ) {
+				++$mails;
+				return true;
+			}
+		);
+		list( $r, $driver ) = $this->resource( array( 'state' => 'ready', 'desired' => 'ready' ) );
+		$driver->customer_actions = array( 'tidy' => 'Tidy up' );
+		$driver->will( 'act', StepResult::fail( 'broke', array( Jobs::TEXT => 'The password could not be stored.' ) ) );
+
+		Jobs::act( $r->id(), 'tidy', array() );
+		$last = Resource::find( $r->id() )->get( Jobs::RESULT );
+		$this->assertFalse( $last['ok'] );
+		$this->assertSame( 'The password could not be stored.', $last['text'], 'The customer reads the sentence.' );
+		$this->assertSame( 1, $mails, 'Staff are mailed once.' );
+		$this->assertNull( Resource::find( $r->id() )->get( Jobs::EXPECTED ), 'The flag is not stored.' );
 	}
 
 	public function test_a_failure_without_a_sentence_still_alerts_staff_with_the_fixed_text(): void {
@@ -602,6 +623,7 @@ final class JobsTest extends TestCase {
 		);
 		$this->assertWPError( $second );
 		$this->assertSame( 'busy', $second->get_error_code() );
+		$this->assertSame( 'Wait until tidy up is done.', $second->get_error_message(), 'The marker label, first letter lower case.' );
 		$this->assertFalse( $prepared, 'Nothing is stored for an action that is refused.' );
 		$this->assertFalse( as_has_scheduled_action( Jobs::ACT, array( $r->id(), 'tidy', array( 'x' => 2 ) ), Jobs::GROUP ) );
 	}
@@ -644,7 +666,7 @@ final class JobsTest extends TestCase {
 		$this->assertEqualsWithDelta( time(), $data['at'], 5 );
 		$this->assertStringContainsString( 'no-store', (string) $answer->get_headers()['Cache-Control'] );
 
-		$busy = \BeltoftServices\Api\Routes::not_queued( new \WP_Error( 'busy', 'Another change is running.' ) );
+		$busy = \BeltoftServices\Api\Routes::not_queued( new \WP_Error( 'busy', 'Wait until tidying is done.' ) );
 		$this->assertSame( 409, $busy->get_status() );
 		$this->assertSame( 'beltoft_services_busy', $busy->get_data()['code'] );
 		$this->assertSame( 422, \BeltoftServices\Api\Routes::not_queued( new \WP_Error( 'x', 'No.', array( 'status' => 422 ) ) )->get_status() );

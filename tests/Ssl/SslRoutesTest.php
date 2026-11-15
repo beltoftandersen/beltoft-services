@@ -138,6 +138,7 @@ class SslRoutesTest extends SslTestCase {
 		$this->assertSame( 403, $this->call( 'POST', $r->id() . '/actions/ssl_change_validation', $user, array( 'args' => array( 'method' => 'dns' ) ) )->get_status(), 'Not offered once issued.' );
 		$ok = $this->call( 'POST', $r->id() . '/actions/ssl_reissue', $user, array( 'args' => array() ) );
 		$this->assertSame( 202, $ok->get_status() );
+		$this->run_jobs();
 		$this->assertSame( 202, $this->call( 'POST', $r->id() . '/actions/ssl_cancel', $user, array( 'args' => array( 'confirm' => 'CANCEL' ) ) )->get_status() );
 	}
 

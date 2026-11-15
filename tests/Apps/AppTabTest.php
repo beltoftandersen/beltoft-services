@@ -333,6 +333,7 @@ class AppTabTest extends MonitoringTestCase {
 		$user = (int) $r->license()['user_id'];
 		for ( $i = 0; $i < 3; $i++ ) {
 			$this->assertSame( 202, $this->retry_route( $r, $user )->get_status(), 'Try ' . ( $i + 1 ) );
+			\BeltoftServices\Progress::clear( \BeltoftServices\Resource::find( $r->id() ) ); // One action at a time: the next starts when this one is done.
 		}
 		$this->assertSame( 429, $this->retry_route( $r, $user )->get_status() );
 	}

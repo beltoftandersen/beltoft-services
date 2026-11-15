@@ -138,12 +138,14 @@ class SnapshotsTest extends SnapshotsTestCase {
 		$r     = $this->server();
 		$owner = (int) $r->license()['user_id'];
 		$this->assertSame( 202, $this->route( $r->id(), $owner, 'snapshot_take', array( 'label' => 'viaroute' ) )->get_status() );
+		\BeltoftServices\Progress::clear( \BeltoftServices\Resource::find( $r->id() ) );
 		$this->assertSame( 403, $this->route( $r->id(), $owner, 'snapshot_rollback', array( 'id' => 'aaaaaaaa', 'confirm' => 'ROLLBACK' ) )->get_status(), 'Not offered: there is nothing to roll back to.' );
 		$this->assertContains( $this->route( $r->id(), $owner, 'snapshot_expire' )->get_status(), array( 400, 403, 404, 422 ), 'The internal actions are no customer route.' );
 
 		$statuses = array();
 		foreach ( range( 1, 6 ) as $n ) {
 			$statuses[] = $this->route( $r->id(), $owner, 'snapshot_take', array( 'label' => 'n' . $n ) )->get_status();
+			\BeltoftServices\Progress::clear( \BeltoftServices\Resource::find( $r->id() ) ); // One action at a time: the next starts when this one is done.
 		}
 		$this->assertSame( array( 202, 202, 202, 202, 429, 429 ), $statuses, 'Five takes an hour: the first one above counted.' );
 	}

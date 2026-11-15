@@ -132,8 +132,15 @@ final class Mailboxes {
 			return new \WP_Error( 'limit', __( 'That size is outside what your plan allows.', 'beltoft-services' ) );
 		}
 
-		// A password already kept for this address (one in flight, or one not yet shown) means the mailbox exists: it is never overwritten.
-		if ( MailAccess::has( $r, $email ) ) {
+		// The plan's room, from what is remembered (the list the page draws from): a full plan is said at once. The mail server's own count
+		// is asked again in the job, which catches a mailbox made some other way.
+		if ( MailPlan::cached( MailPlan::root( $r ) )['mailboxes'] >= MailPlan::limits( $r )['mailboxes'] ) {
+			return new \WP_Error( 'limit', __( 'Your plan has no room for more mailboxes.', 'beltoft-services' ) );
+		}
+
+		// A password already kept for this address (one in flight, or one not yet shown) or the hidden system address means it exists:
+		// it is never overwritten. Only the mail server can say that an address is taken some other way.
+		if ( MailAccess::has( $r, $email ) || ( '' !== MailGuard::system_address( $r ) && MailGuard::system_address( $r ) === $email ) ) {
 			return new \WP_Error( 'exists', __( 'That address is already in use.', 'beltoft-services' ) );
 		}
 
@@ -163,7 +170,7 @@ final class Mailboxes {
 		);
 
 		if ( null === $ran ) {
-			return new \WP_Error( 'busy', __( 'Another change is running. Try again in a moment.', 'beltoft-services' ) );
+			return new \WP_Error( 'busy', __( 'Your email is being changed. Try again in a moment.', 'beltoft-services' ) );
 		}
 
 		return $error ?? true;
@@ -181,6 +188,16 @@ final class Mailboxes {
 	}
 
 	/**
+	 * An expected refusal: the sentence for the customer, and no mail to staff (Jobs::EXPECTED).
+	 *
+	 * @param string $text Sentence.
+	 * @return array<string, mixed>
+	 */
+	private static function refused( string $text ): array {
+		return self::said( $text, array( Jobs::EXPECTED => true ) );
+	}
+
+	/**
 	 * The job `mailbox_create` (MailDriver::act). It makes the mailbox with the password kept by reserve(), sets the send limit and the
 	 * hold, and only then lets the password be revealed. Safe to run again: a mailbox that is there and was asked for by an earlier run
 	 * is taken as made (never "already in use"); one that was there before is refused and never touched; a passing mail server error
@@ -193,13 +210,13 @@ final class Mailboxes {
 		$email = MailGuard::inside( $r, (string) ( $args['email'] ?? '' ) );
 
 		if ( null === $email ) {
-			return StepResult::fail( 'Not a mailbox of this domain.', self::said( __( 'That mailbox is not part of this domain.', 'beltoft-services' ) ) );
+			return StepResult::fail( 'Not a mailbox of this domain.', self::refused( __( 'That mailbox is not part of this domain.', 'beltoft-services' ) ) );
 		}
 
 		$bad = MailGuard::check( $r );
 
 		if ( $bad ) {
-			return StepResult::fail( 'The email service is not ready.', self::said( $bad->get_error_message() ) );
+			return StepResult::fail( 'The email service is not ready.', self::refused( $bad->get_error_message() ) );
 		}
 
 		$state = MailAccess::state( $r, $email );
@@ -252,7 +269,7 @@ final class Mailboxes {
 			if ( $used >= MailPlan::limits( $r )['mailboxes'] ) {
 				MailAccess::abort( $r, $email );
 
-				return StepResult::fail( 'The plan has no room.', self::said( __( 'Your plan has no room for more mailboxes.', 'beltoft-services' ) ) );
+				return StepResult::fail( 'The plan has no room.', self::refused( __( 'Your plan has no room for more mailboxes.', 'beltoft-services' ) ) );
 			}
 
 			$password = MailAccess::pending_password( $r, $email );
@@ -283,7 +300,7 @@ final class Mailboxes {
 			// There before this request: never touched, never given a password it does not have.
 			MailAccess::abort( $r, $email );
 
-			return StepResult::fail( 'The mailbox existed before.', self::said( __( 'That address is already in use.', 'beltoft-services' ) ) );
+			return StepResult::fail( 'The mailbox existed before.', self::refused( __( 'That address is already in use.', 'beltoft-services' ) ) );
 		}
 
 		// The send limit is not optional on a mail server shared by everyone: without it the mailbox is removed again.
@@ -346,7 +363,7 @@ final class Mailboxes {
 		}
 
 		return in_array( $code, array( 'exists', 'limit' ), true )
-			? StepResult::fail( 'Refused by the mail server: ' . $code, self::said( $mapped->get_error_message() ) )
+			? StepResult::fail( 'Refused by the mail server: ' . $code, self::refused( $mapped->get_error_message() ) )
 			: StepResult::fail( 'The mail server did not accept the mailbox: ' . $e->get_error_code() );
 	}
 
@@ -452,13 +469,13 @@ final class Mailboxes {
 		$email = MailGuard::inside( $r, (string) ( $args['email'] ?? '' ) );
 
 		if ( null === $email ) {
-			return StepResult::fail( 'Not a mailbox of this domain.', self::said( __( 'That mailbox is not part of this domain.', 'beltoft-services' ) ) );
+			return StepResult::fail( 'Not a mailbox of this domain.', self::refused( __( 'That mailbox is not part of this domain.', 'beltoft-services' ) ) );
 		}
 
 		$bad = MailGuard::check( $r );
 
 		if ( $bad ) {
-			return StepResult::fail( 'The email service is not ready.', self::said( $bad->get_error_message() ) );
+			return StepResult::fail( 'The email service is not ready.', self::refused( $bad->get_error_message() ) );
 		}
 
 		if ( 'ready' === MailAccess::state( $r, $email ) ) {
@@ -481,7 +498,7 @@ final class Mailboxes {
 		if ( null === $box ) {
 			MailAccess::abort( $r, $email );
 
-			return StepResult::fail( 'The mailbox does not exist.', self::said( __( 'That mailbox does not exist.', 'beltoft-services' ) ) );
+			return StepResult::fail( 'The mailbox does not exist.', self::refused( __( 'That mailbox does not exist.', 'beltoft-services' ) ) );
 		}
 
 		$set      = $client->edit_mailbox( $email, array( 'password' => $password, 'password2' => $password, 'force_pw_update' => '0' ) );

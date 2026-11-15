@@ -165,12 +165,11 @@ final class MailRoutesTest extends MailTestCase {
 		}
 
 		$full = $this->box( $r, $user, array( 'local' => 'f' ) );
-		$this->assertSame( 202, $full->get_status(), 'The plan is counted at the mail server, in the job.' );
-		$last = Resource::find( $r->id() )->get( 'last_result' );
-		$this->assertFalse( $last['ok'] );
-		$this->assertSame( 'mailbox_create', $last['action'] );
-		$this->assertStringContainsString( 'no room', $last['text'] );
+		$this->assertSame( 409, $full->get_status(), 'A full plan is known from the remembered count: said at once, no job.' );
+		$this->assertStringContainsString( 'no room', $full->get_data()['message'] );
 		$this->assertNull( $this->mailcow->mailbox( 'f@route.example' ) );
+		$this->assertFalse( \BeltoftServices\Jobs::acting( $r->id() ) );
+		$this->assertNull( \BeltoftServices\Progress::pending( Resource::find( $r->id() ) ) );
 	}
 
 	public function test_a_size_within_the_plan_can_be_chosen(): void {

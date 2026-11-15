@@ -159,6 +159,18 @@ final class RoutesTest extends TestCase {
 		$this->assertFalse( $status(), 'Done: the page can reload.' );
 	}
 
+	public function test_the_generic_action_route_starts_through_the_one_entry_point_and_refuses_a_second_action_with_the_label(): void {
+		list( $resource, , $user ) = $this->resource();
+		$this->assertSame( 202, $this->request( 'POST', '/resources/' . $resource->id() . '/actions/restart', $user )->get_status() );
+
+		$second = $this->request( 'POST', '/resources/' . $resource->id() . '/actions/restart', $user );
+		$this->assertSame( 409, $second->get_status() );
+		$this->assertMatchesRegularExpression( '/^Wait until .+ is done\.$/', $second->get_data()['message'] );
+
+		$this->run_jobs();
+		$this->assertSame( 202, $this->request( 'POST', '/resources/' . $resource->id() . '/actions/restart', $user )->get_status(), 'Free again when the job is done.' );
+	}
+
 	public function test_a_waiting_action_is_run_by_the_status_check_instead_of_waiting_for_cron(): void {
 		list( $resource, $driver, $user ) = $this->resource();
 		$this->request( 'POST', '/resources/' . $resource->id() . '/actions/restart', $user );
@@ -282,6 +294,7 @@ final class RoutesTest extends TestCase {
 		// Another route of the same user has its own count; the action route allows 10.
 		for ( $i = 0; $i < 10; $i++ ) {
 			$this->assertSame( 202, $this->request( 'POST', $route . '/actions/restart', $user )->get_status(), 'Action ' . ( $i + 1 ) );
+			$this->run_jobs(); // One action at a time: the next starts when this one is done.
 		}
 		$this->assertSame( 429, $this->request( 'POST', $route . '/actions/restart', $user )->get_status() );
 

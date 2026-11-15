@@ -80,6 +80,7 @@ final class ActsTest extends McpTestCase {
 		foreach ( $calls as $call ) {
 			$this->assertTrue( $this->json( $this->tool( $call[0], $call[1], $token ) )['requested'], $call[0] );
 			$this->assertContains( 'Claude: ' . $call[2], $this->history( $r ) );
+			\BeltoftServices\Progress::clear( \BeltoftServices\Resource::find( $r->id() ) ); // One action at a time: the next starts when this one is done.
 		}
 
 		// An action the service does not offer is refused by the dashboard's own check, and says so in the history.

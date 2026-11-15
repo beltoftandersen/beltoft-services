@@ -207,7 +207,7 @@ final class RecordImport {
 
 		$text = self::report( $job );
 
-		return $failed ? StepResult::fail( 'Some DNS records were not added.', $meta + array( Jobs::TEXT => $text ) ) : StepResult::done( $meta + array( Jobs::TEXT => $text ) );
+		return $failed ? StepResult::fail( 'Some DNS records were not added.', $meta + array( Jobs::TEXT => $text, Jobs::EXPECTED => true ) ) : StepResult::done( $meta + array( Jobs::TEXT => $text ) );
 	}
 
 	/**

@@ -32,10 +32,16 @@ final class Jobs {
 
 	/**
 	 * Meta key of a StepResult in which a driver gives the customer its own sentence for the outcome (the text of last_result).
-	 * It is never stored as meta (Reconciler::RESERVED). A failure with a sentence is an expected refusal (a name that is taken,
-	 * a plan with no room): the customer is told, staff are not.
+	 * It is never stored as meta (Reconciler::RESERVED). It is only what the customer reads: whether staff are mailed is EXPECTED's call.
 	 */
 	public const TEXT = 'customer_text';
+
+	/**
+	 * Meta key of a failed StepResult that marks an expected refusal (a plan with no room, a name that is taken, a mailbox that does
+	 * not exist): the customer reads the sentence and staff are not mailed. Every other failure, with a sentence or not, mails staff once.
+	 * Never stored as meta (Reconciler::RESERVED).
+	 */
+	public const EXPECTED = 'expected_refusal';
 	public const USAGE = 'beltoft_services_usage_refresh';
 	public const GROUP = 'beltoft-services';
 	public const CRON  = '*/15 * * * *';
@@ -878,6 +884,27 @@ final class Jobs {
 	}
 
 	/**
+	 * The refusal of a second action while one of the service is pending: "Wait until <what it is doing> is done." The one busy check:
+	 * start_action() asks it, and a caller that must ask again under its own lock before local work calls it too.
+	 *
+	 * @param Resource $r Resource.
+	 * @return \WP_Error|null Error code busy, or null when nothing is pending.
+	 */
+	public static function busy( Resource $r ): ?\WP_Error {
+		$marker = Progress::pending( $r );
+
+		if ( null === $marker ) {
+			return null;
+		}
+
+		$label = (string) $marker['label'];
+		$label = '' !== $label ? mb_strtolower( mb_substr( $label, 0, 1 ) ) . mb_substr( $label, 1 ) : __( 'the other change', 'beltoft-services' );
+
+		/* translators: %s: what the service is doing now, for example "adding a website". */
+		return new \WP_Error( 'busy', sprintf( __( 'Wait until %s is done.', 'beltoft-services' ), $label ), array( 'status' => 409 ) );
+	}
+
+	/**
 	 * The one way a route starts a customer action that a driver carries out in a job: refused while another action of the
 	 * service is pending (one at a time), else the Progress marker is set and the job queued. A route checks its input first.
 	 *
@@ -891,9 +918,10 @@ final class Jobs {
 	 */
 	public static function start_action( Resource $r, string $action, string $label, array $args = array(), ?callable $prepare = null ) {
 		$fresh = Resource::find( $r->id() ) ?? $r;
+		$busy  = self::busy( $fresh );
 
-		if ( null !== Progress::pending( $fresh ) ) {
-			return new \WP_Error( 'busy', __( 'Another change is running. Try again in a moment.', 'beltoft-services' ) );
+		if ( null !== $busy ) {
+			return $busy;
 		}
 
 		if ( null !== $prepare ) {
@@ -1075,8 +1103,10 @@ final class Jobs {
 		$ok      = $result->is_done() && ! $refused;
 		$said    = isset( $result->meta()[ self::TEXT ] ) ? (string) $result->meta()[ self::TEXT ] : '';
 
-		// A driver's own sentence for an expected refusal is not a failure for staff.
-		if ( ! $result->is_done() && '' !== $said ) {
+		// An expected refusal (the driver says so) is not a failure for staff; a sentence alone does not make it one.
+		$expected = ! $result->is_done() && ! empty( $result->meta()[ self::EXPECTED ] );
+
+		if ( $expected ) {
 			$refused = true;
 		}
 
@@ -1096,7 +1126,7 @@ final class Jobs {
 
 		Events::add( $license_id, 'service', $error );
 
-		if ( '' === $said ) {
+		if ( ! $expected ) {
 			Alerts::admin( $r, $error );
 		}
 
