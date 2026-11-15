@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.31.3
+Stable tag: 0.31.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -264,6 +264,14 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 * No usage email about memory in the first 15 minutes after a container started. The storage notices over the plan (110 percent) and the write restriction are always sent; only the 90 percent warning follows the switch.
 * Shared code: the guest memory history, live bars, charts route and usage rules moved from `Proxmox\Network` to a neutral `Monitoring` folder; a server and a hosting account each plug in with a small `Monitoring\Guest` adapter added on the filter `beltoft_services_monitoring_guests`. The monitoring panel markup is one shared partial.
 * REST: `GET /resources/{id}/metrics`, `GET /usage` and `POST /resources/{id}/usage-alerts` answer for hosting accounts too (`disk` is files plus databases against the plan storage, in bytes). `GET /resources/{id}/hosting/usage` also gives `memory_percent`, `memory_used_mb` and `memory_total_mb` (the newest stored reading). The MCP tool `server_usage` also takes a hosting account id, and `hosting_usage` shows the memory.
+= 0.31.5 =
+* The shared feedback of My Account is one progress line: a thin line and a short text. It moves while the end is not known and fills, with "(step n of m)", where the steps are known (restores, installs and other background work, the hosting task, DNS changes, email changes).
+* It is shown in one place: on a wide screen in the page's state line at the top, on a phone fixed to the bottom of the screen above the browser's toolbar, so it never moves the page. Nothing is written under the clicked button any more.
+* Done stays about 5 seconds and fades away. A failure stays until it is closed (the close button or the Escape key), and a field it names is still marked and focused.
+* Scripts can call `beltoftStatus.progress( handle, fraction | { step, of } | progress payload, message )`; `beltoftApi.follow()` takes `handle` and moves the line by itself.
+
+= 0.31.4 =
+* Phone: the server page no longer grows wider than the screen. The memory chart's help sentence wraps inside its card, and long host names, addresses and commands in the facts and in the address tables break inside their own box.
 
 = 0.31.3 =
 * A code check that a site refuses for another reason (for example an unconfirmed email address) can now say so: the message goes through the filter `beltoft_services_step_up_refusal( $message, $user_id, $purpose )`.
