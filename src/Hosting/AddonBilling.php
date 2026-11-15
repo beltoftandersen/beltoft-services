@@ -208,8 +208,32 @@ final class AddonBilling {
 	 *
 	 * @param string               $kind  Kind.
 	 * @param array<string, mixed> $quote From quote().
+	 * @param string               $target The registrable domain of a domain add-on, '' when it is not known.
 	 */
-	public static function confirm_text( string $kind, array $quote ): string {
+	public static function confirm_text( string $kind, array $quote, string $target = '' ): string {
+		$months = (int) $quote['months_now'];
+		$args   = array(
+			self::shown( (float) $quote['unit'], (string) ( $quote['currency'] ?? '' ) ),
+			self::shown( (float) $quote['now'], (string) ( $quote['currency'] ?? '' ) ),
+			$months,
+			self::shown( (float) $quote['recurring'], (string) ( $quote['currency'] ?? '' ) ),
+			\BeltoftServices\Billing\TaxNote::label(),
+		);
+
+		if ( Addons::KIND_DOMAIN === $kind && '' !== $target ) {
+			return sprintf(
+				/* translators: 1: domain name, for example example.com, 2: price per month, 3: amount charged now, 4: number of months until the next renewal, 5: price per billing period, 6: "incl. VAT" or "excl. VAT". */
+				_n(
+					'%1$s is an extra domain. It costs %2$s per month, %6$s. We charge %3$s now for the %4$d month until your next renewal, and %5$s with each renewal after that. You can remove it later; it then ends at the next renewal and nothing is refunded.',
+					'%1$s is an extra domain. It costs %2$s per month, %6$s. We charge %3$s now for the %4$d months until your next renewal, and %5$s with each renewal after that. You can remove it later; it then ends at the next renewal and nothing is refunded.',
+					$months,
+					'beltoft-services'
+				),
+				\BeltoftServices\Domains\HostName::display( $target ),
+				...$args
+			);
+		}
+
 		$what = Addons::KIND_DOMAIN === $kind
 			? __( 'An extra domain', 'beltoft-services' )
 			: __( '5 GB of extra storage for one mailbox', 'beltoft-services' );
@@ -219,15 +243,11 @@ final class AddonBilling {
 			_n(
 				'%1$s costs %2$s per month, %6$s. We charge %3$s now for the %4$d month until your next renewal, and %5$s with each renewal after that. You can remove it later; it then ends at the next renewal and nothing is refunded.',
 				'%1$s costs %2$s per month, %6$s. We charge %3$s now for the %4$d months until your next renewal, and %5$s with each renewal after that. You can remove it later; it then ends at the next renewal and nothing is refunded.',
-				(int) $quote['months_now'],
+				$months,
 				'beltoft-services'
 			),
 			$what,
-			self::shown( (float) $quote['unit'], (string) ( $quote['currency'] ?? '' ) ),
-			self::shown( (float) $quote['now'], (string) ( $quote['currency'] ?? '' ) ),
-			(int) $quote['months_now'],
-			self::shown( (float) $quote['recurring'], (string) ( $quote['currency'] ?? '' ) ),
-			\BeltoftServices\Billing\TaxNote::label()
+			...$args
 		);
 	}
 
@@ -745,6 +765,41 @@ final class AddonBilling {
 			$sub->calculate_totals();
 			$sub->save();
 		}
+	}
+
+	/**
+	 * The account's free domain was removed: the oldest paid extra domain that is still on a website (lowest line id, not
+	 * ending yet) becomes the free one. Its line is marked as ending at the next renewal like any removal: nothing is deleted
+	 * or refunded, and it bills until then.
+	 *
+	 * @param Resource $r Hosting resource.
+	 * @return string The registrable domain whose line now ends, '' when no line was changed.
+	 */
+	public static function free_domain_replaced( Resource $r ): string {
+		$connected = AddonEffects::connected_domains( $r );
+		$lines     = self::lines( $r, Addons::KIND_DOMAIN );
+
+		ksort( $lines );
+
+		foreach ( $lines as $item ) {
+			$target = (string) $item->get_meta( Addons::I_TARGET );
+
+			if ( '' === (string) $item->get_meta( Addons::I_ENDING ) && in_array( $target, $connected, true ) ) {
+				$item->update_meta_data( Addons::I_ENDING, 'yes' );
+				$item->update_meta_data( Addons::I_INCLUDED, 'yes' );
+				$item->save();
+
+				$sub = self::subscription( $r );
+
+				if ( $sub ) {
+					$sub->add_order_note( sprintf( 'Add-on domain (%s) ends at the next renewal: the included domain was removed and this one is now included.', $target ) );
+				}
+
+				return $target;
+			}
+		}
+
+		return '';
 	}
 
 	/**

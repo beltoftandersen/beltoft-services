@@ -73,6 +73,42 @@ final class AddonEffects {
 	}
 
 	/**
+	 * Registrable domains whose add-on line ended because the domain became the account's included one.
+	 *
+	 * @param Resource $r Hosting resource.
+	 * @return array<int, string>
+	 */
+	public static function included_domains( Resource $r ): array {
+		$out = array();
+
+		foreach ( AddonBilling::lines( $r, Addons::KIND_DOMAIN ) as $item ) {
+			if ( 'yes' === (string) $item->get_meta( Addons::I_ENDING ) && 'yes' === (string) $item->get_meta( Addons::I_INCLUDED ) ) {
+				$out[] = (string) $item->get_meta( Addons::I_TARGET );
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Registrable domains of the account's names that are on a website (the temporary address left out).
+	 *
+	 * @param Resource $r Hosting resource.
+	 * @return array<int, string>
+	 */
+	public static function connected_domains( Resource $r ): array {
+		$have = array();
+
+		foreach ( SiteDomains::for_resource( $r->id() ) as $row ) {
+			if ( 'preview' !== $row['kind'] ) {
+				$have[] = self::registrable( $row['host'] );
+			}
+		}
+
+		return array_values( array_unique( $have ) );
+	}
+
+	/**
 	 * Paid extra domains that are not on a website yet (the customer has not added them, or they are being connected).
 	 *
 	 * @param Resource $r Hosting resource.

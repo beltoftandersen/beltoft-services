@@ -258,6 +258,11 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 == Changelog ==
 
+= 0.31.0 =
+* Hosting domains: the Connect field says that the plan includes one domain and all its subdomains, what each further domain costs a month (the customer's tax display, left out when no add-on is set up) and which domain is the included one.
+* The extra domain dialog names the domain ("example.com is an extra domain. It costs ...").
+* When the included domain is removed while extra domain add-ons exist, the oldest paid one becomes the included domain: its line ends at the next renewal (nothing is deleted or refunded) and the page says so. Removing an extra domain works as before.
+
 = 0.30.0 =
 * "Use Beltoft DNS": the switch of the name servers is checked at once and then done by a job (zone check, name servers, DS keys, the stored state), with the usual retries. The page shows that it is working and then the outcome. A registrar that answers late, or fails after the name servers were set, leaves nothing half stored: the page already shows our name servers while only the DS is missing, and the retry finishes it.
 * Show transfer code: the emailed one-time code is used up only after the registrar has returned the code, and the re-lock clock restarts only then. A registrar that fails costs the customer no new code ("Your code is still valid, try again in a minute").

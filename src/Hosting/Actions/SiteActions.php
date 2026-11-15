@@ -493,7 +493,7 @@ final class SiteActions {
 				return $this->error( 'failed', __( 'Your account has its domain. Another domain cannot be added online right now. Contact support.', 'beltoft-services' ) );
 			}
 
-			return new \WP_Error( 'addon_required', Addons::confirm_text( Addons::KIND_DOMAIN, $quote ), array( 'kind' => Addons::KIND_DOMAIN, 'target' => $needs, 'amount_cents' => (int) round( $quote['now'] * 100 ), 'host' => strtolower( rtrim( trim( $host ), '.' ) ), 'slug' => $slug ) );
+			return new \WP_Error( 'addon_required', Addons::confirm_text( Addons::KIND_DOMAIN, $quote, $needs ), array( 'kind' => Addons::KIND_DOMAIN, 'target' => $needs, 'amount_cents' => (int) round( $quote['now'] * 100 ), 'host' => strtolower( rtrim( trim( $host ), '.' ) ), 'slug' => $slug ) );
 		}
 
 		// A registrable domain is connected with and without www; a subdomain only as typed.
@@ -617,6 +617,9 @@ final class SiteActions {
 
 				return array( 'removed' => $row['host'], 'at_renewal' => true );
 			}
+
+			// The last name of the account's free domain: a paid extra domain takes its place as the free one.
+			$free_gone = array() === $others;
 		}
 
 		// WordPress itself is on this name: it is not left on a name that is gone.
@@ -641,11 +644,20 @@ final class SiteActions {
 			SiteDomains::set_www_mode( substr( $row['host'], 4 ), '' );
 		}
 
-		$this->defer_with( array( 'removed' => $row['host'] ), array() );
+		$result = array( 'removed' => $row['host'] );
+
+		// The name is gone from the account now, so the paid domains left are the ones on a website.
+		$included = ! empty( $free_gone ) ? Addons::free_domain_replaced( $this->r ) : '';
+
+		if ( '' !== $included ) {
+			$result['included'] = $included;
+		}
+
+		$this->defer_with( $result, array() );
 
 		$edge = $this->names_and_edge();
 
-		return is_wp_error( $edge ) ? $edge : array( 'removed' => $row['host'] );
+		return is_wp_error( $edge ) ? $edge : $result;
 	}
 
 	/**

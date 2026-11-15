@@ -281,6 +281,7 @@ class AddonsTest extends HostingCase {
 		$this->assertWPError( $err );
 		$this->assertSame( 'addon_required', $err->get_error_code() );
 		$this->assertMatchesRegularExpression( '/per month, (excl|incl)\. VAT\./', $err->get_error_message() );
+		$this->assertStringStartsWith( 'other.example is an extra domain. It costs ', $err->get_error_message() );
 		$this->assertSame( 'other.example', $err->get_error_data()['target'] );
 		$this->assertNull( SiteDomains::find( 'www.other.example' ) );
 
@@ -951,5 +952,97 @@ class AddonsTest extends HostingCase {
 
 		$this->assertSame( 'refused', wc_get_order( $order2->get_id() )->get_meta( Addons::ORDER_DONE ) );
 		$this->assertIsArray( $meta );
+	}
+
+	private function render_page( Resource $r ): string {
+		ob_start();
+		HostingAccount::render( Resource::find( $r->id() ) );
+
+		return (string) ob_get_clean();
+	}
+
+	public function test_the_connect_line_says_what_is_included_what_a_further_domain_costs_and_names_the_included_domain(): void {
+		$this->card_pays();
+		$r = $this->account();
+
+		// No domain yet: the allowance and the price, no included domain named.
+		$html = $this->render_page( $r );
+		$this->assertMatchesRegularExpression( '/Your plan includes one domain and all its subdomains\. Each further domain costs [^<]*1[^<]* a month, (incl|excl)\. VAT\./', $html );
+		$this->assertStringNotContainsString( 'Included:', $html );
+
+		$this->connect_domain( $r, 'babymama.dk' );
+		$this->assertStringContainsString( 'Included: babymama.dk.', $this->render_page( $r ) );
+	}
+
+	public function test_the_connect_line_leaves_out_the_price_without_an_add_on_product(): void {
+		$this->card_pays();
+		$r = $this->account();
+		$this->connect_domain( $r, 'babymama.dk' );
+		delete_option( 'beltoft_services_test_nothing' );
+		foreach ( get_posts( array( 'post_type' => 'product', 'numberposts' => -1, 'meta_key' => Addons::PRODUCT_KEY, 'post_status' => 'any' ) ) as $p ) {
+			delete_post_meta( $p->ID, Addons::PRODUCT_KEY );
+		}
+
+		$html = $this->render_page( $r );
+		$this->assertStringContainsString( 'Your plan includes one domain and all its subdomains. Included: babymama.dk.', $html );
+		$this->assertStringNotContainsString( 'Each further domain costs', $html );
+	}
+
+	public function test_removing_the_free_domain_ends_exactly_the_oldest_paid_domain_at_the_renewal(): void {
+		$this->card_pays();
+		$r = $this->account();
+		$this->connect_domain( $r, 'main.example' );
+		$a = new HostingActions( Resource::find( $r->id() ) );
+		$s = 'w' . $r->id();
+
+		foreach ( array( 'first.example', 'second.example' ) as $d ) {
+			$this->assertSame( 'paid', $a->buy_addon( 'domain', $d, 100 )['status'] );
+			$this->assertIsArray( $a->add_domain( $s, 'www.' . $d ) );
+		}
+
+		$before = (float) $this->sub( $r )->get_total();
+		$gone   = $a->remove_domain( 'main.example' );
+
+		$this->assertIsArray( $gone );
+		$this->assertSame( 'first.example', $gone['included'] );
+		$this->assertNull( SiteDomains::find( 'main.example' ) );
+
+		$ending = array();
+		foreach ( Addons::lines( $r, Addons::KIND_DOMAIN ) as $item ) {
+			$ending[ (string) $item->get_meta( Addons::I_TARGET ) ] = (string) $item->get_meta( Addons::I_ENDING );
+		}
+		$this->assertSame( array( 'first.example' => 'yes', 'second.example' => '' ), $ending );
+		$this->assertSame( $before, (float) $this->sub( $r )->get_total(), 'Nothing is deleted or refunded before the renewal.' );
+		$this->assertStringContainsString( 'first.example is now your included domain. Its extra domain charge ends at the next renewal.', $this->render_page( $r ) );
+
+		// At the renewal the line leaves, the domain stays (it is the free one now), the other one keeps billing.
+		wcs_create_renewal_order( $this->sub( $r ) );
+		$this->assertFalse( Addons::has( $r, Addons::KIND_DOMAIN, 'first.example' ) );
+		$this->assertTrue( Addons::has( $r, Addons::KIND_DOMAIN, 'second.example' ) );
+	}
+
+	public function test_removing_a_paid_domain_or_removing_the_free_domain_without_an_add_on_ends_nothing_else(): void {
+		$this->card_pays();
+		$r = $this->account();
+		$this->connect_domain( $r, 'main.example' );
+		$a = new HostingActions( Resource::find( $r->id() ) );
+		$s = 'w' . $r->id();
+
+		// No add-on at all: removing the free domain ends no line.
+		$this->assertIsArray( $a->remove_domain( 'main.example' ) );
+		$this->assertSame( array(), Addons::lines( $r, Addons::KIND_DOMAIN ) );
+
+		// A paid domain removed: its own line ends as before, no other line is touched and nothing is flagged as included.
+		$this->connect_domain( $r, 'free.example' );
+		$a->buy_addon( 'domain', 'one.example', 100 );
+		$a->buy_addon( 'domain', 'two.example', 100 );
+		$this->assertIsArray( $a->add_domain( $s, 'one.example' ) );
+		$this->assertIsArray( $a->add_domain( $s, 'two.example' ) );
+		$a->remove_domain( 'one.example' );
+		$gone = $a->remove_domain( 'www.one.example' );
+		$this->assertTrue( $gone['at_renewal'] );
+		$this->assertArrayNotHasKey( 'included', $gone );
+		$this->assertSame( array( 'one.example' ), Addons::ending_domains( $r ) );
+		$this->assertSame( array(), Addons::included_domains( $r ) );
 	}
 }
