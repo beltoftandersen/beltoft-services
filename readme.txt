@@ -258,6 +258,9 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 == Changelog ==
 
+= 0.32.1 =
+* No change for customers: the shared job controller was split into `Jobs` (scheduling, runner, hold, sweep), `JobActions` (customer actions) and `JobFailures` (lost and failed jobs); every public `Jobs` method is unchanged.
+
 = 0.32.0 =
 * WordPress hosting accounts have the same monitoring as a server: CPU, memory, network and disk activity graphs (1 hour, 1 day, 30 days), live CPU and memory bars on the hosting page (every 10 seconds while it is visible), the storage as a bar, and the usage emails (CPU sustained, memory high, storage at 90 percent) with the same "Usage emails" switch and settings. There is no PHP workers metric.
 * Memory is memory in use without the file cache, read inside the container by the node agent (new operation `ct.memory`, needs the agent branch `hosting-memory`); the Proxmox figure is never used. Readings go to the same history table as a server's (`bs_guest_memory`), same retention.
