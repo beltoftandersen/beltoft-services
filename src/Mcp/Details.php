@@ -103,12 +103,11 @@ final class Details {
 		$cached = Operations::cached_status( $r->id() );
 		$guest  = LiveUsage::cached_memory( $r->id() );
 		$disk   = GuestDisk::cached( $r );
-		$memory = (int) ( $plan['memory_mb'] ?? 0 ) * 1048576;
 
 		return array(
 			'power'          => null === $cached ? '' : (string) $cached['power'],
 			'cpu_percent'    => null !== $cached && 'running' === $cached['power'] ? max( 0, min( 100, (int) round( (float) $cached['cpu'] * 100 ) ) ) : null,
-			'memory_percent' => null !== $guest ? $guest : ( null !== $cached && 'running' === $cached['power'] && $memory > 0 ? max( 0, min( 100, (int) round( (int) $cached['mem'] / $memory * 100 ) ) ) : null ),
+			'memory_percent' => null !== $cached && 'running' === $cached['power'] ? $guest : null,
 			'disk_percent'   => null !== $disk ? max( 0, min( 100, (int) round( $disk['used'] / $disk['total'] * 100 ) ) ) : null,
 			'ip'             => false !== filter_var( (string) $r->get( 'ip' ), FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ? (string) $r->get( 'ip' ) : '',
 			'system'         => Servers::os_label( $r ),

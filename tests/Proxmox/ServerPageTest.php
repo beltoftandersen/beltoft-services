@@ -166,7 +166,10 @@ class ServerPageTest extends MonitoringTestCase {
 		$html = $this->page( $r, '' );
 		$this->assertSame( $before, count( $this->fake->calls() ), 'The list makes no Proxmox call.' );
 		$rows = Servers::rows( array( View::license( $r->license() ) ) );
-		$this->assertSame( array( 'CPU' => 25, 'Memory' => 25, 'Disk' => 50 ), array_column( $rows[0]['bars'], 'percent', 'label' ) );
+		$this->assertSame( array( 'CPU' => 25, 'Disk' => 50 ), array_column( $rows[0]['bars'], 'percent', 'label' ) );
+		set_transient( \BeltoftServices\Proxmox\Network\LiveUsage::MEM_PREFIX . $r->id(), array( 'percent' => 33 ), 60 );
+		$rows = Servers::rows( array( View::license( $r->license() ) ) );
+		$this->assertSame( array( 'CPU' => 25, 'Memory' => 33, 'Disk' => 50 ), array_column( $rows[0]['bars'], 'percent', 'label' ) );
 		$this->assertStringContainsString( 'Running', $html );
 		$this->assertStringContainsString( 'style="width:25%"', $html );
 	}

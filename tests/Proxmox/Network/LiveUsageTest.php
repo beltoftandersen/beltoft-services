@@ -56,12 +56,12 @@ class LiveUsageTest extends MonitoringTestCase {
 		$this->assertSame( 50, LiveUsage::cached_memory( $r->id() ) );
 	}
 
-	public function test_memory_falls_back_to_pve_when_the_agent_does_not_answer(): void {
+	public function test_there_is_no_memory_figure_when_the_agent_does_not_answer(): void {
 		$r = $this->ready_vm();
 		$this->owner( $r );
 		// No /proc/meminfo seeded: file-read fails.
 		$entry = ( (array) $this->route()->get_data()['resources'] )[ $r->id() ];
-		$this->assertIsInt( $entry['mem'] );
+		$this->assertNull( $entry['mem'], 'No Proxmox fallback: its mem counts the guest file cache.' );
 		$this->assertNull( LiveUsage::cached_memory( $r->id() ), 'A failed reading is not served as a guest figure.' );
 		$this->assertSame( 1, $this->calls( '/agent/file-read' ) );
 		$this->route();
@@ -125,11 +125,11 @@ class LiveUsageTest extends MonitoringTestCase {
 		$this->assertSame( 429, $this->route()->get_status() );
 	}
 
-	public function test_server_rows_use_the_guest_memory_when_a_fresh_reading_exists(): void {
+	public function test_server_rows_use_only_the_guest_memory(): void {
 		$r = $this->ready_vm();
 		set_transient( Operations::STATUS_PREFIX . $r->id(), array( 'power' => 'running', 'cpu' => 0.25, 'mem' => 3221225472 ), HOUR_IN_SECONDS );
 		$view = View::license( $r->license() );
-		$this->assertSame( 75, array_column( Servers::rows( array( $view ) )[0]['bars'], 'percent', 'key' )['mem'] );
+		$this->assertArrayNotHasKey( 'mem', array_column( Servers::rows( array( $view ) )[0]['bars'], 'percent', 'key' ), 'No agent reading, no memory bar (never the Proxmox figure).' );
 		set_transient( LiveUsage::MEM_PREFIX . $r->id(), array( 'percent' => 40 ), 60 );
 		$bars = array_column( Servers::rows( array( $view ) )[0]['bars'], 'percent', 'key' );
 		$this->assertSame( 40, $bars['mem'] );

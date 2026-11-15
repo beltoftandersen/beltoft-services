@@ -133,7 +133,6 @@ final class HostingUsage {
 			array(
 				'status'    => (string) ( $now['status'] ?? '' ),
 				'cpu'       => round( (float) ( $now['cpu'] ?? 0 ), 4 ),
-				'mem_mb'    => (int) round( (int) ( $now['mem'] ?? 0 ) / 1048576 ),
 				'disk_mb'   => (int) round( (int) ( $now['disk'] ?? 0 ) / 1048576 ),
 			)
 		);

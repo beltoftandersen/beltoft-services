@@ -470,7 +470,6 @@ final class Servers {
 		$status = Operations::cached_status( $resource->id() );
 		$power  = null === $status ? '' : (string) $status['power'];
 		$busy   = (bool) Progress::build( $resource )['active'];
-		$plan   = (array) $resource->get( 'plan' );
 		$ip     = (string) $resource->get( 'ip' );
 		$title  = (string) ( $view['product'] ?? '' );
 		$kind   = \BeltoftLicenses\Account\View::product_name( $license );
@@ -504,8 +503,7 @@ final class Servers {
 				'percent' => max( 0, min( 100, (int) round( (float) $status['cpu'] * 100 ) ) ),
 			);
 
-			$memory = (int) ( $plan['memory_mb'] ?? 0 ) * 1048576;
-			// The guest's own figure (MemAvailable) when a fresh reading is kept: PVE counts page cache as used.
+			// Only the guest's own figure (MemAvailable); PVE counts page cache as used, so there is no fallback.
 			$guest = \BeltoftServices\Proxmox\Network\LiveUsage::cached_memory( $resource->id() );
 
 			if ( null !== $guest ) {
@@ -513,12 +511,6 @@ final class Servers {
 					'key'     => 'mem',
 					'label'   => __( 'Memory', 'beltoft-services' ),
 					'percent' => $guest,
-				);
-			} elseif ( $memory > 0 ) {
-				$bars[] = array(
-					'key'     => 'mem',
-					'label'   => __( 'Memory', 'beltoft-services' ),
-					'percent' => max( 0, min( 100, (int) round( (int) $status['mem'] / $memory * 100 ) ) ),
 				);
 			}
 

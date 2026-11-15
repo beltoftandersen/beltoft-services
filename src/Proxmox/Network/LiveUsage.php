@@ -222,7 +222,7 @@ final class LiveUsage {
 
 	/**
 	 * Memory percent of a running VM: the guest's (MemTotal - MemAvailable) / MemTotal, kept 60 seconds;
-	 * PVE's mem over the plan's memory when the agent does not answer.
+	 * null when the agent does not answer (PVE's own mem counts the guest's file cache, so it is never shown).
 	 *
 	 * @param Resource             $resource Resource.
 	 * @param Client               $client   Client.
@@ -233,7 +233,7 @@ final class LiveUsage {
 		$kept = get_transient( $key );
 
 		if ( is_array( $kept ) ) {
-			return isset( $kept['percent'] ) ? (int) $kept['percent'] : self::pve_memory( $resource, $vm );
+			return isset( $kept['percent'] ) ? (int) $kept['percent'] : null;
 		}
 
 		$node    = (string) ( $vm['node'] ?? '' );
@@ -251,14 +251,7 @@ final class LiveUsage {
 		// A failed read or a missing tag is kept as well, so an absent agent is asked once a minute, not every poll.
 		set_transient( $key, null === $percent ? array( 'failed' => true ) : array( 'percent' => $percent ), self::MEM_TTL );
 
-		return $percent ?? self::pve_memory( $resource, $vm );
-	}
-
-	private static function pve_memory( Resource $resource, array $vm ): ?int {
-		$plan   = (array) $resource->get( 'plan' );
-		$memory = (int) ( $plan['memory_mb'] ?? 0 ) * 1048576;
-
-		return $memory > 0 ? self::percent( (int) ( $vm['mem'] ?? 0 ) / $memory * 100 ) : null;
+		return $percent;
 	}
 
 	/**

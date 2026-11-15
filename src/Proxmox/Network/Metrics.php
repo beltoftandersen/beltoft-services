@@ -6,7 +6,7 @@ defined( 'ABSPATH' ) || exit;
 
 final class Metrics {
 	public const RANGES = array( 'hour' => 'hour', 'day' => 'day', 'month' => 'month' );
-	private const FIELDS = array( 'cpu', 'mem', 'maxmem', 'netin', 'netout', 'diskread', 'diskwrite' );
+	private const FIELDS = array( 'cpu', 'netin', 'netout', 'diskread', 'diskwrite' );
 	private const STEPS = array( 'hour' => 60, 'day' => 60, 'month' => 1800 );
 
 	/** Missing values remain gaps; each bucket averages only the samples that have a value. */

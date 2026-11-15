@@ -533,7 +533,6 @@ final class HostingRoutes {
 				'at'                => (int) ( $usage['at'] ?? 0 ),
 				'status'            => (string) ( $usage['status'] ?? '' ),
 				'cpu'               => (float) ( $usage['cpu'] ?? 0 ),
-				'memory_mb'         => (int) ( $usage['mem_mb'] ?? 0 ),
 				'disk_mb'           => (int) ( $usage['disk_mb'] ?? 0 ),
 				'database_mb'       => (int) ( $usage['db_mb'] ?? 0 ),
 				'storage_limit_gb'  => (int) Plan::typed( (array) $r->get( 'plan' ) )['disk_gb'],

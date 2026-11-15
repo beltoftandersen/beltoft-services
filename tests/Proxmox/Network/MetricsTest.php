@@ -13,9 +13,9 @@ class MetricsTest extends TestCase {
 			array( 'time' => 'invalid', 'cpu' => 1 ),
 		), 'hour' );
 		$this->assertSame( 50.0, $points['points'][0]['cpu'] );
-		$this->assertSame( 1073741824.0, $points['points'][0]['mem'] );
+		$this->assertArrayNotHasKey( 'mem', $points['points'][0], 'No memory figure from Proxmox in a chart.' );
+		$this->assertArrayNotHasKey( 'maxmem', $points['points'][0] );
 		$this->assertNull( $points['points'][1]['cpu'] );
-		$this->assertNull( $points['points'][1]['mem'] );
 		$this->assertCount( 2, $points['points'] );
 	}
 

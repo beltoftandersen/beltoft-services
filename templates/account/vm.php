@@ -219,7 +219,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 				</div>
 			<?php endif; ?>
 			<div class="beltoft-vm-usage__grid">
-				<?php foreach ( array( 'cpu' => __( 'CPU', 'beltoft-services' ), 'mem' => __( 'Memory', 'beltoft-services' ) ) as $beltoft_metric => $beltoft_title ) : ?>
+				<?php foreach ( array( 'cpu' => __( 'CPU', 'beltoft-services' ) ) as $beltoft_metric => $beltoft_title ) : ?>
 					<div class="beltoft-vm-usage__chart" data-chart="<?php echo esc_attr( $beltoft_metric ); ?>">
 						<div class="beltoft-vm-usage__top"><h5><?php echo esc_html( $beltoft_title ); ?></h5><span class="beltoft-vm-usage__now" data-now></span></div>
 						<div class="beltoft-vm-usage__plot" aria-label="<?php echo esc_attr( $beltoft_title ); ?>"></div>

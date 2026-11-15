@@ -9,7 +9,6 @@
 	var ns = 'http://www.w3.org/2000/svg';
 	var specs = {
 		cpu: { keys: [ 'cpu' ], names: [ labels.cpu ], unit: '%' },
-		mem: { keys: [ 'mem', 'maxmem' ], names: [ labels.memory, labels.allocated ], unit: 'GB', divisor: 1073741824 },
 		net: { keys: [ 'netin', 'netout' ], names: [ labels.in, labels.out ], unit: 'MB/s', divisor: 1048576 },
 		io: { keys: [ 'diskread', 'diskwrite' ], names: [ labels.read, labels.write ], unit: 'MB/s', divisor: 1048576 }
 	};
@@ -128,7 +127,7 @@
 			var marker = document.createElement( 'i' );
 			var kind = chart.getAttribute( 'data-chart' );
 			big.textContent = 'cpu' === kind ? withUnit( current, spec.unit ) : format( current );
-			small.textContent = 'mem' === kind && null !== value( last, spec, 'maxmem' ) ? fill( labels.of, format( value( last, spec, 'maxmem' ) ) ) : ( 'cpu' === kind ? '' : spec.unit + ' ' + spec.names[ 0 ] );
+			small.textContent = 'cpu' === kind ? '' : spec.unit + ' ' + spec.names[ 0 ];
 			now.appendChild( big );
 			if ( small.textContent ) { now.appendChild( small ); }
 			marker.className = 'beltoft-vm-usage__point';

@@ -110,7 +110,7 @@ class UsageTest extends HostingCase {
 
 		$usage = $r->get( 'usage' );
 		$this->assertSame( 0.25, $usage['cpu'] );
-		$this->assertSame( 512, $usage['mem_mb'] );
+		$this->assertArrayNotHasKey( 'mem_mb', $usage, 'The container memory from Proxmox includes cache and is not kept.' );
 		$this->assertSame( 3072, $usage['disk_mb'] );
 		$this->assertSame( 1024, $usage['db_mb'] );
 		$this->assertSame( $this->clock, $usage['at'] );

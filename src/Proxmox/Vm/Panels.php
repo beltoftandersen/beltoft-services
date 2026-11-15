@@ -124,8 +124,6 @@ final class Panels {
 			'empty' => __( 'No data yet.', 'beltoft-services' ),
 			'unavailable' => __( 'Usage is unavailable. Please try again later.', 'beltoft-services' ),
 			'cpu' => __( 'CPU', 'beltoft-services' ),
-			'memory' => __( 'Used incl. cache', 'beltoft-services' ),
-			'allocated' => __( 'Allocated', 'beltoft-services' ),
 			'in' => __( 'In', 'beltoft-services' ),
 			'out' => __( 'Out', 'beltoft-services' ),
 			'read' => __( 'Read', 'beltoft-services' ),
@@ -133,8 +131,6 @@ final class Panels {
 			'graph' => __( 'usage graph', 'beltoft-services' ),
 			/* translators: %s: the highest value in the period, such as 31% */
 			'peak' => __( 'peak %s', 'beltoft-services' ),
-			/* translators: %s: the total, such as 2 GB */
-			'of' => __( 'of %s GB', 'beltoft-services' ),
 			'noReading' => __( 'No reading', 'beltoft-services' ),
 			'alertsOn' => __( 'Usage emails are on for this server.', 'beltoft-services' ),
 			'alertsOff' => __( 'Usage emails are off for this server.', 'beltoft-services' ),

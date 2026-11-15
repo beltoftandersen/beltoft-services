@@ -18,11 +18,13 @@ class MetricsRouteTest extends MonitoringTestCase {
 	public function test_owner_gets_series_and_second_request_uses_cache(): void {
 		$r = $this->ready_vm();
 		wp_set_current_user( (int) $r->license()['user_id'] );
-		$this->fake->set_rrd( 5000, array( array( 'time' => 100, 'cpu' => 0.25 ) ) );
+		$this->fake->set_rrd( 5000, array( array( 'time' => 100, 'cpu' => 0.25, 'mem' => 1073741824, 'maxmem' => 2147483648 ) ) );
 		$first = $this->call_route( $r->id() );
 		$second = $this->call_route( $r->id() );
 		$this->assertSame( 200, $first->get_status() );
 		$this->assertSame( 25.0, $first->get_data()['points'][0]['cpu'] );
+		$this->assertArrayNotHasKey( 'mem', $first->get_data()['points'][0] );
+		$this->assertArrayNotHasKey( 'maxmem', $first->get_data()['points'][0] );
 		$this->assertSame( $first->get_data(), $second->get_data() );
 		$calls = array_filter( $this->fake->calls(), static fn( $call ) => str_ends_with( $call['path'], '/rrddata' ) );
 		$this->assertCount( 1, $calls );

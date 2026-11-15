@@ -252,6 +252,20 @@ final class McpTest extends McpTestCase {
 		$this->assertStringNotContainsString( (string) $owner, $this->text( $denied ) );
 	}
 
+	public function test_server_memory_is_the_agent_reading_only(): void {
+		$server = $this->server();
+		$owner  = $this->owner( $server );
+		$this->assertGreaterThan( 0, $owner );
+		set_transient( \BeltoftServices\Proxmox\Vm\Operations::STATUS_PREFIX . $server->id(), array( 'power' => 'running', 'cpu' => 0.1, 'mem' => 1073741824 ), HOUR_IN_SECONDS );
+
+		$details = \BeltoftServices\Mcp\Details::vm( $server );
+		$this->assertArrayHasKey( 'memory_percent', $details );
+		$this->assertNull( $details['memory_percent'], 'No agent reading: no figure, not the Proxmox one.' );
+
+		set_transient( \BeltoftServices\Proxmox\Network\LiveUsage::MEM_PREFIX . $server->id(), array( 'percent' => 41 ), 60 );
+		$this->assertSame( 41, \BeltoftServices\Mcp\Details::vm( $server )['memory_percent'] );
+	}
+
 	public function test_no_tool_gives_another_customers_resource(): void {
 		add_filter( 'beltoft_services_mcp_rate_limit', static fn() => 0 );
 		$server = $this->server();

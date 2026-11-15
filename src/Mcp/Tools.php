@@ -512,10 +512,10 @@ final class Tools {
 			'range'     => (string) $series['range'],
 			'available' => ! empty( $series['available'] ),
 			'samples'   => count( (array) $series['points'] ),
-			'units'     => array( 'cpu' => 'percent', 'mem' => 'bytes', 'maxmem' => 'bytes', 'netin' => 'bytes per second', 'netout' => 'bytes per second', 'diskread' => 'bytes per second', 'diskwrite' => 'bytes per second' ),
+			'units'     => array( 'cpu' => 'percent', 'netin' => 'bytes per second', 'netout' => 'bytes per second', 'diskread' => 'bytes per second', 'diskwrite' => 'bytes per second' ),
 		);
 
-		foreach ( array( 'cpu', 'mem', 'netin', 'netout', 'diskread', 'diskwrite' ) as $field ) {
+		foreach ( array( 'cpu', 'netin', 'netout', 'diskread', 'diskwrite' ) as $field ) {
 			$values = array();
 
 			foreach ( (array) $series['points'] as $point ) {
