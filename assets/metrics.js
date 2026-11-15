@@ -27,9 +27,14 @@
 		return 'number' === typeof point[ key ] && isFinite( point[ key ] ) ? point[ key ] / ( spec.divisor || 1 ) : null;
 	}
 
-	// 0.8, 2, 31, 6.3: no trailing zeros.
+	// 0.8, 2, 31, 6.3: no trailing zeros, decimal sign of the page language.
 	function format( n ) {
-		return String( parseFloat( n.toFixed( n < 10 ? 2 : 1 ) ) );
+		return parseFloat( n.toFixed( n < 10 ? 2 : 1 ) ).toLocaleString( LANG, { maximumFractionDigits: 2 } );
+	}
+
+	// One decimal, for the memory figures in GB.
+	function formatGb( n ) {
+		return n.toLocaleString( LANG, { minimumFractionDigits: 1, maximumFractionDigits: 1 } );
 	}
 
 	function withUnit( n, unit ) {
@@ -141,7 +146,7 @@
 			var marker = document.createElement( 'i' );
 			var kind = chart.getAttribute( 'data-chart' );
 			if ( spec.memory ) {
-				big.textContent = fillAll( labels.memNow, [ format( current ), format( last.total_gb ), format( last.percent ) ] );
+				big.textContent = fillAll( labels.memNow, [ formatGb( current ), formatGb( last.total_gb ), format( last.percent ) ] );
 			} else {
 				big.textContent = 'cpu' === kind ? withUnit( current, spec.unit ) : format( current );
 			}

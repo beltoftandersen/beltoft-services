@@ -38,8 +38,6 @@ final class GuestMemory {
 	/** Transients: the latest reading and the time of the last failed read of a server. */
 	public const LATEST_PREFIX = 'beltoft_services_guest_mem_latest_';
 	public const FAILED_PREFIX = 'beltoft_services_guest_mem_failed_';
-	/** The background read skips a server read this recently (a customer is looking at it). */
-	public const FRESH_SECONDS = 120;
 	/** Seconds one background round may spend, and failures that make it skip the rest of a node. */
 	public const BUDGET_SECONDS = 45;
 	public const NODE_FAILURES  = 3;
@@ -422,11 +420,12 @@ final class GuestMemory {
 	/**
 	 * The recurring job (every 5 minutes): reads the memory of every running server of ours whose VM carries its tag, in
 	 * a time budget, the servers read longest ago first. A node whose reads keep failing is skipped for the round, a server whose
-	 * agent fails is marked and asked again next round. Customers looking at a server keep its reading fresh, so those are skipped.
+	 * agent fails is marked and asked again next round. A server whose current 5-minute slot already has a reading (a customer's live read) is skipped, never one by age alone.
 	 */
-	public static function run(): void {
+	public static function run( ?int $now = null ): void {
 		$deadline = microtime( true ) + self::BUDGET_SECONDS;
-		$now      = time();
+		$now      = $now ?? time();
+		$slot     = intdiv( $now, self::SPAN_RAW );
 
 		foreach ( JobScope::clusters() as $id => $one ) {
 			$rows = JobScope::vm_rows( $one['client'] );
@@ -457,7 +456,8 @@ final class GuestMemory {
 
 				$latest = self::latest( $resource->id(), $now );
 
-				if ( null !== $latest && $now - $latest['at'] < self::FRESH_SECONDS ) {
+				// Skipped only when the current 5-minute slot already has its row (every store writes the slot's row).
+				if ( null !== $latest && intdiv( $latest['at'], self::SPAN_RAW ) === $slot ) {
 					continue;
 				}
 

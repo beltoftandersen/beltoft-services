@@ -258,6 +258,10 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 == Changelog ==
 
+= 0.29.1 =
+* Fix: the guest memory history no longer misses a 5-minute point for a server a customer had open; the background read skips a server only when the current slot already has a reading.
+* Fix: the monitoring chart shows numbers with the decimal sign of the page language, and memory in GB with one decimal.
+
 = 0.29.0 =
 * Hosting changes run in the background. Adding or removing a website, a PHP version, PHP workers, the cache purge, the country block, an address (added, removed, main address) and the SFTP password and SSH keys are checked at once, then done by a job: one step at a time, so a slow agent never cuts a change off. A new website shows at once as "Being set up" with its step (making the database, making the website, installing WordPress, setting up the address). A website is only removed again after the agent says it really failed, never because it was slow; the clean-up runs as steps too.
 * One change of a hosting account at a time: a second change is refused with "Wait until ... is done" and its buttons are greyed. A change that nothing works on for 15 minutes ends as failed, staff are mailed once, and a half-made website is cleaned up. A change whose job was lost (a crash or a deploy) is queued again once and goes on where it stopped.

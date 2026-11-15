@@ -100,7 +100,17 @@ class GuestMemoryTest extends MonitoringTestCase {
 		$this->assertSame( 50, LiveUsage::cached_memory( $tagged->id() ) );
 	}
 
-	public function test_a_server_a_customer_just_read_is_not_asked_again_by_the_job(): void {
+	public function test_a_server_read_live_in_the_previous_slot_a_moment_ago_still_gets_a_row_in_the_new_slot(): void {
+		$r = $this->ready_vm( 5000 );
+		$this->fake->set_guest_file( 5000, '/proc/meminfo', self::MEMINFO );
+		$slot = intdiv( time(), 300 ) * 300;
+		GuestMemory::store( $r->id(), array( 'used_mb' => 500, 'total_mb' => 2048 ), $slot - 30 );
+		GuestMemory::run( $slot + 10 );
+		$this->assertSame( 1, $this->calls( '/agent/file-read' ), 'Read 40 s ago, but in the previous slot.' );
+		$this->assertSame( 2, $this->rows( $r->id() ) );
+	}
+
+	public function test_a_server_with_a_row_in_the_current_slot_is_not_asked_again_by_the_job(): void {
 		$r = $this->ready_vm( 5000 );
 		$this->fake->set_guest_file( 5000, '/proc/meminfo', self::MEMINFO );
 		GuestMemory::store( $r->id(), array( 'used_mb' => 500, 'total_mb' => 2048 ) );
