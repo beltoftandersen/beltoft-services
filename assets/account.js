@@ -70,6 +70,11 @@
 			window.BeltoftServicesProgress.render( block, data.progress );
 		}
 
+		// The progress line of the work this panel started knows the step: "step n of m" (only while a handle of it is shown).
+		if ( bs && panel.beltoftWork && ! panel.beltoftWork.released && data.progress && data.progress.active ) {
+			bs.progress( panel.beltoftWork, data.progress );
+		}
+
 		// Active only while the server says work is going on: a queued form alone proves nothing.
 		// A shutdown or start that the VM has not followed yet counts as work: the poll goes on until it does (or the server gives up waiting).
 		return !! ( data.working || data.power_pending || ( data.progress && data.progress.active ) );

@@ -102,8 +102,8 @@
 	}
 
 	// A change that runs in the background: follows it to its outcome ({ok, text}); null when it is still going after a while.
-	function followed( result ) {
-		return window.beltoftApi.follow( result.data, { holder: account } );
+	function followed( result, h ) {
+		return window.beltoftApi.follow( result.data, { holder: account, handle: h } );
 	}
 
 	// The end of a followed change that did not succeed: the server's own sentence, or the slow notice.
@@ -188,7 +188,7 @@
 						return null;
 					}
 
-					return followed( result ).then( function ( outcome ) {
+					return followed( result, h ).then( function ( outcome ) {
 						if ( ! outcome || ! outcome.ok ) {
 							stopped( h, outcome );
 
@@ -230,7 +230,7 @@
 						return null;
 					}
 
-					return followed( result ).then( function ( outcome ) {
+					return followed( result, h ).then( function ( outcome ) {
 						if ( ! outcome || ! outcome.ok ) {
 							stopped( h, outcome );
 
@@ -393,7 +393,7 @@
 						return null;
 					}
 
-					return followed( result ).then( function ( outcome ) {
+					return followed( result, h ).then( function ( outcome ) {
 						if ( outcome && outcome.ok ) {
 							// The outcome in words (all found, or how many are still missing), then the records drawn again.
 							S.done( h, outcome.text || strings.checked );

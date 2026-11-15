@@ -45,18 +45,55 @@ class StatusTest extends TestCase {
 	public function test_a_clicked_button_gets_one_message_not_two(): void {
 		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/status.js' );
 
-		// busy(): the note under the button, or the state line when no button started the work, never both.
-		$this->assertMatchesRegularExpression( '/if \( handle\.note \) \{\s*noteSay\( handle\.note, \'busy\', message \);\s*\} else \{\s*show\( \'busy\', message, handle \);/', $js );
-		// finish(): done and fail stay in the note too.
-		$this->assertMatchesRegularExpression( '/if \( handle && handle\.note \) \{\s*return;\s*\}/', $js );
-
-		// One loader: a button with a note under it is only disabled, the note carries the loader (no spinner in the button too).
-		$this->assertStringContainsString( "if ( handle.button && ! handle.note ) {\n\t\t\thandle.button.classList.add( 'is-busy' );", $js );
+		// One loader, in one place (owner 2026-11-15): nothing is written under the clicked button, the button is only disabled.
+		$this->assertStringNotContainsString( 'noteSay', $js );
+		$this->assertStringNotContainsString( 'noteFor', $js );
+		$this->assertStringNotContainsString( 'bs-note', $js );
+		$this->assertStringNotContainsString( "classList.add( 'is-busy' )", $js );
+		$this->assertMatchesRegularExpression( '/show\( \'busy\', message, handle \);/', $js );
 
 		// Hosting: clearing the cache keeps its done line (no reload); other actions show it again after the reload.
 		$hosting = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/hosting.js' );
 		$this->assertMatchesRegularExpression( "/if \\( 'cache' === action \\) \\{\\s*return;\\s*\\}/", $hosting );
 		$this->assertStringContainsString( 'remember( action,', $hosting );
 		$this->assertStringContainsString( 'recall();', $hosting );
+	}
+
+	public function test_the_progress_line_has_one_place_a_phone_breakpoint_and_a_progress_api(): void {
+		$js  = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/status.js' );
+		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/account.css' );
+		$own = substr( $css, (int) strpos( $css, '==== The progress line' ) );
+
+		$this->assertStringContainsString( 'progress: progress', $js );
+		$this->assertStringContainsString( "'(max-width: 767px)'", $js );
+		$this->assertStringContainsString( '@media (max-width: 767px)', $own );
+		$this->assertMatchesRegularExpression( '/\.bs-loader \{ position: fixed;[^}]*env\(safe-area-inset-bottom/', $own );
+		$this->assertMatchesRegularExpression( '/@media \(prefers-reduced-motion: reduce\) \{[^}]*\.bs-loader[^}]*animation: none/', $own );
+		$this->assertMatchesRegularExpression( '/\.bs-loader\.is-stuck \{ position: fixed;[^}]*top: var\(--bs-header-offset/', $own );
+		$this->assertStringNotContainsString( '!important', $own );
+		$this->assertStringNotContainsString( '—', $own );
+		$this->assertStringNotContainsString( '·', $own );
+		$this->assertStringContainsString( 'stepOf', implode( ' ', array_keys( Status::strings() ) ) );
+		$this->assertStringContainsString( 'handle: handle', (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/domain.js' ) );
+		$this->assertStringContainsString( 'window.beltoftStatus.progress( settings.handle', (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/api.js' ) );
+	}
+
+	/**
+	 * Drives status.js in a real browser (Playwright), with its clock under test control: busy, progress, done and the wait, fail,
+	 * the fixed line on a phone with no layout shift. Skipped where Playwright is not installed.
+	 */
+	public function test_the_line_works_in_a_browser(): void {
+		$node = trim( (string) shell_exec( 'command -v node' ) );
+		$pw   = getenv( 'BELTOFT_PLAYWRIGHT_DIR' ) ? (string) getenv( 'BELTOFT_PLAYWRIGHT_DIR' ) : '/root/e2e-tools/node_modules/playwright';
+
+		if ( '' === $node || ! is_dir( $pw ) ) {
+			$this->markTestSkipped( 'node or Playwright is not installed.' );
+		}
+
+		$cmd = escapeshellarg( $node ) . ' ' . escapeshellarg( __DIR__ . '/js/loader-check.js' ) . ' ' . escapeshellarg( $pw ) . ' ' . escapeshellarg( BELTOFT_SERVICES_PATH ) . ' 2>&1';
+		$out = (string) shell_exec( $cmd );
+
+		$this->assertStringContainsString( 'LOADER OK', $out, $out );
+		$this->assertStringNotContainsString( 'FAIL', $out, $out );
 	}
 }
