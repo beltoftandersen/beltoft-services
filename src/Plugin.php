@@ -257,6 +257,7 @@ final class Plugin {
 		Usage\Minimum::register();
 		Usage\InvoiceView::register();
 		Card\Card::register();
+		Card\DeleteGuard::register();
 		GiftCredit\GiftCredit::register();
 
 		// Later tasks register their parts here.
