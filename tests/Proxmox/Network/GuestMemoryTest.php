@@ -121,6 +121,20 @@ class GuestMemoryTest extends MonitoringTestCase {
 		$this->assertSame( 'ok', GuestMemory::view( $r->id() )['state'] );
 	}
 
+	public function test_servers_without_the_agent_do_not_stop_the_round_for_the_others_on_their_node(): void {
+		// Four servers without the guest agent (never read, so first in the queue), then one with it, all on node-a.
+		foreach ( array( 5000, 5001, 5002, 5003 ) as $vmid ) {
+			$this->ready_vm( $vmid );
+		}
+		$with = $this->ready_vm( 5004 );
+		$this->fake->set_guest_file( 5004, '/proc/meminfo', self::MEMINFO );
+
+		GuestMemory::run();
+
+		$this->assertSame( 'ok', GuestMemory::view( $with->id() )['state'], 'A missing agent is no node failure.' );
+		$this->assertSame( 1, $this->rows( $with->id() ) );
+	}
+
 	public function test_the_live_route_keeps_a_reading_ten_seconds_and_asks_only_for_the_servers_on_screen(): void {
 		$this->assertSame( 10, LiveUsage::MEM_TTL );
 		$this->assertSame( 10, LiveUsage::INTERVAL );

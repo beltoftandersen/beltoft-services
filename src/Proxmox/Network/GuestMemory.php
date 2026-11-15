@@ -87,16 +87,25 @@ final class GuestMemory {
 	 * @param Client   $client   Client.
 	 * @param string   $node     Node.
 	 * @param int      $vmid     VMID.
+	 * @param bool     $node_down Set to true when the node itself did not answer (not the guest agent).
 	 * @return array{used_mb: int, total_mb: int}|null
 	 */
-	public static function fetch( Resource $resource, Client $client, string $node, int $vmid ): ?array {
+	public static function fetch( Resource $resource, Client $client, string $node, int $vmid, ?bool &$node_down = null ): ?array {
+		$node_down = false;
+
 		if ( '' === $node || $vmid <= 0 ) {
 			return null;
 		}
 
 		$config = Ownership::config( $client, $node, $vmid );
 
-		if ( is_wp_error( $config ) || ! Ownership::has_tag( (string) ( $config['description'] ?? '' ), Ownership::tag( $resource ) ) ) {
+		if ( is_wp_error( $config ) ) {
+			$node_down = true;
+
+			return null;
+		}
+
+		if ( ! Ownership::has_tag( (string) ( $config['description'] ?? '' ), Ownership::tag( $resource ) ) ) {
 			return null;
 		}
 
@@ -452,7 +461,10 @@ final class GuestMemory {
 					continue;
 				}
 
-				$queue[] = array( $resource, $vm, null === $latest ? 0 : $latest['at'] );
+				// Oldest reading first; a server whose agent did not answer lately goes after the others, so servers without
+				// the agent never crowd out the ones that have it.
+				$failed  = get_transient( self::FAILED_PREFIX . $resource->id() );
+				$queue[] = array( $resource, $vm, max( null === $latest ? 0 : $latest['at'], is_numeric( $failed ) ? (int) $failed : 0 ) );
 			}
 
 			usort( $queue, static fn( $a, $b ) => $a[2] <=> $b[2] );
@@ -472,10 +484,15 @@ final class GuestMemory {
 					continue;
 				}
 
-				$reading = self::fetch( $resource, $one['client'], $node, (int) $vm['vmid'] );
+				$down    = false;
+				$reading = self::fetch( $resource, $one['client'], $node, (int) $vm['vmid'], $down );
 
 				if ( null === $reading ) {
-					$failures[ $node ] = ( $failures[ $node ] ?? 0 ) + 1;
+					// Only a node that does not answer counts towards skipping it; a missing guest agent is the server's own.
+					if ( $down ) {
+						$failures[ $node ] = ( $failures[ $node ] ?? 0 ) + 1;
+					}
+
 					self::failed( $resource->id(), $now );
 					continue;
 				}
