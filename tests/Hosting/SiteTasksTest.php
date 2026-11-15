@@ -482,6 +482,10 @@ class SiteTasksTest extends HostingCase {
 		$this->assertSame( 'abandon_site', $this->task( $r )['action'], 'The clean-up of the half made website is a hosting change of its own, queued through the same path.' );
 		$this->drive( $r, 'abandon_site' );
 		$this->assertNull( Sites::find( $r->id(), 'stuck' ), 'The website that was never made is removed, step by step.' );
+
+		$shown = Steps::last( $this->fresh( $r ) );
+		$this->assertSame( 'add_site', $shown['action'], 'The customer reads that the add did not work, not that a clean-up went well.' );
+		$this->assertStringContainsString( 'could not be made', $shown['text'] );
 	}
 
 	public function test_a_young_marker_without_a_waiting_job_still_holds_the_account_and_an_old_one_does_not(): void {

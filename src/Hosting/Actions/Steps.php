@@ -261,7 +261,22 @@ final class Steps {
 	public static function last( Resource $r ): ?array {
 		$last = ( Resource::find( $r->id() ) ?? $r )->get( Jobs::RESULT );
 
-		if ( ! is_array( $last ) || ! empty( $last['ok'] ) || ! in_array( (string) ( $last['action'] ?? '' ), self::actions(), true ) || (int) ( $last['at'] ?? 0 ) < time() - self::LAST_SHOWN ) {
+		if ( ! is_array( $last ) || ! in_array( (string) ( $last['action'] ?? '' ), self::actions(), true ) || (int) ( $last['at'] ?? 0 ) < time() - self::LAST_SHOWN ) {
+			return null;
+		}
+
+		// The clean-up after a new website that could not be made ends well, but what the customer must read is that the
+		// website was not made; its own result replaces the failure of the add.
+		if ( 'abandon_site' === (string) $last['action'] && ! empty( $last['ok'] ) ) {
+			return array(
+				'action' => 'add_site',
+				'label'  => self::label_of( 'add_site' ),
+				'text'   => __( 'The new website could not be made. What was made of it has been removed, and its name is free again. We have been told.', 'beltoft-services' ),
+				'at'     => (int) $last['at'],
+			);
+		}
+
+		if ( ! empty( $last['ok'] ) ) {
 			return null;
 		}
 
