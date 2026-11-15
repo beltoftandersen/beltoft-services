@@ -295,7 +295,8 @@ final class AddonBilling {
 		$kept = false;
 
 		foreach ( self::lines( $r, $kind, $target ) as $item ) {
-			if ( 'yes' === (string) $item->get_meta( Addons::I_ENDING ) ) {
+			// An included line (the domain became the account's free one) never bills again: adding another name of it is no reason to.
+			if ( 'yes' === (string) $item->get_meta( Addons::I_ENDING ) && 'yes' !== (string) $item->get_meta( Addons::I_INCLUDED ) ) {
 				$item->delete_meta_data( Addons::I_ENDING );
 				$item->save();
 				$kept = true;
@@ -837,15 +838,21 @@ final class AddonBilling {
 		}
 
 		$ended = array();
+		$gone  = false;
 
 		foreach ( $sub->get_items() as $id => $item ) {
 			if ( $item instanceof \WC_Order_Item_Product && '' !== (string) $item->get_meta( Addons::I_KIND ) && 'yes' === (string) $item->get_meta( Addons::I_ENDING ) ) {
-				$ended[] = array( (int) $item->get_meta( Addons::I_RESOURCE ), (string) $item->get_meta( Addons::I_KIND ), (string) $item->get_meta( Addons::I_TARGET ) );
+				// An included line leaves the bill, but the domain it was is now the account's free one: nothing is taken back.
+				if ( 'yes' !== (string) $item->get_meta( Addons::I_INCLUDED ) ) {
+					$ended[] = array( (int) $item->get_meta( Addons::I_RESOURCE ), (string) $item->get_meta( Addons::I_KIND ), (string) $item->get_meta( Addons::I_TARGET ) );
+				}
+
+				$gone = true;
 				$sub->remove_item( (int) $id );
 			}
 		}
 
-		if ( array() === $ended ) {
+		if ( ! $gone ) {
 			return $renewal;
 		}
 

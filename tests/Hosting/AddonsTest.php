@@ -1015,9 +1015,17 @@ class AddonsTest extends HostingCase {
 		$this->assertSame( $before, (float) $this->sub( $r )->get_total(), 'Nothing is deleted or refunded before the renewal.' );
 		$this->assertStringContainsString( 'first.example is now your included domain. Its extra domain charge ends at the next renewal.', $this->render_page( $r ) );
 
+		// Adding another name of the included domain does not arm its charge again.
+		$this->assertIsArray( $a->add_domain( $s, 'blog.first.example' ) );
+		$this->assertSame( array( 'first.example' ), Addons::included_domains( $r ), 'The included line stays ending.' );
+		$this->assertSame( array( 'first.example' ), Addons::ending_domains( $r ) );
+
 		// At the renewal the line leaves, the domain stays (it is the free one now), the other one keeps billing.
 		wcs_create_renewal_order( $this->sub( $r ) );
 		$this->assertFalse( Addons::has( $r, Addons::KIND_DOMAIN, 'first.example' ) );
+		$this->assertNotNull( SiteDomains::find( 'first.example' ), 'The included domain stays connected after the renewal.' );
+		$this->assertNotNull( SiteDomains::find( 'www.first.example' ) );
+		$this->assertNotNull( SiteDomains::find( 'blog.first.example' ) );
 		$this->assertTrue( Addons::has( $r, Addons::KIND_DOMAIN, 'second.example' ) );
 	}
 
