@@ -85,6 +85,21 @@ final class Hosting extends ServiceArea {
 	}
 
 	/**
+	 * The tabs after the overview, each its own address (the account's page, then /websites, /files, /backups, /email).
+	 * Which of them a customer is offered is HostingView::tabs(); an address of one that is not offered shows the overview.
+	 *
+	 * {@inheritDoc}
+	 */
+	protected function page_tabs(): array {
+		return array(
+			'websites' => __( 'Websites', 'beltoft-services' ),
+			'files'    => __( 'Files', 'beltoft-services' ),
+			'backups'  => __( 'Backups', 'beltoft-services' ),
+			'email'    => __( 'Email', 'beltoft-services' ),
+		);
+	}
+
+	/**
 	 * {@inheritDoc}
 	 */
 	protected function empty_text(): string {

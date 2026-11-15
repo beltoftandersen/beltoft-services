@@ -301,8 +301,8 @@ class CountryBlockTest extends HostingCase {
 	}
 
 	public function test_the_new_strings_have_no_dash_or_middle_dot(): void {
-		foreach ( array( 'src/Hosting/Actions/CountryActions.php', 'src/Hosting/CountryBlock.php', 'src/Hosting/HostingAccount.php' ) as $file ) {
-			preg_match_all( "/__\\(\\s*'((?:[^'\\\\]|\\\\.)*)'/", (string) file_get_contents( BELTOFT_SERVICES_PATH . $file ), $m );
+		foreach ( array_merge( array( 'src/Hosting/Actions/CountryActions.php', 'src/Hosting/CountryBlock.php', 'src/Hosting/HostingAccount.php', 'src/Hosting/HostingView.php' ), array_map( static fn( $f ) => 'templates/account/hosting/' . basename( $f ), glob( BELTOFT_SERVICES_PATH . 'templates/account/hosting/*.php' ) ) ) as $file ) {
+			preg_match_all( "/_[_e]\\(\\s*'((?:[^'\\\\]|\\\\.)*)'/", (string) file_get_contents( BELTOFT_SERVICES_PATH . $file ), $m );
 
 			foreach ( $m[1] as $string ) {
 				$this->assertStringNotContainsString( "\u{2014}", $string );

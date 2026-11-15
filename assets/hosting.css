@@ -183,6 +183,8 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-ju
 	.beltoft-hosting .bsh-sec__body { padding: 0 var(--bs-space-4, 16px) var(--bs-space-4, 16px); }
 	.beltoft-hosting .bsh-sec__label { min-width: 0; }
 	.beltoft-hosting .bsh-quick > .beltoft-hosting-btn { flex: 1 1 calc(50% - 4px); }
+	/* A button that holds a long domain name wraps instead of widening the page. */
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.beltoft-hosting-btn, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting a.beltoft-hosting-btn { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 	.beltoft-hosting .bsh-overview { padding: var(--bs-space-4, 16px); }
 }
 
@@ -257,3 +259,6 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-co
 	.beltoft-hosting .bsh-names .bs-item > .bsh-btn--sm { justify-self: start; }
 }
 .beltoft-hosting .bsh-kv[hidden], .beltoft-hosting [hidden] { display: none; }
+
+/* The tab strip of the page (the shared .beltoft-services-tabs): the 32px gap of the page sits below it. */
+.beltoft-hosting > .beltoft-services-tabs { margin: 0; }

@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.32.0
+Stable tag: 0.32.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -260,6 +260,9 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 = 0.32.1 =
 * No change for customers: the shared job controller was split into `Jobs` (scheduling, runner, hold, sweep), `JobActions` (customer actions) and `JobFailures` (lost and failed jobs); every public `Jobs` method is unchanged.
+* The hosting page has tabs like the server page: Overview (facts, live bars, first-visit list, monitoring), Websites (each website with its domains, PHP, cache, staging and country block, Add a website, Move a website here), Files (SFTP), Backups and Email. Each tab has its own address (`/hosting/<id>/websites`, `/files`, `/backups`, `/email`), so back and links work. Only the tab asked for is built.
+* The hosting page markup moved from PHP strings to templates in `templates/account/hosting/`, fed by `Hosting\HostingView`; `HostingAccount` keeps the data and the dispatch. No change in what buttons, forms and texts do.
+* A button with a very long domain name wraps on a phone instead of widening the page.
 
 = 0.32.0 =
 * WordPress hosting accounts have the same monitoring as a server: CPU, memory, network and disk activity graphs (1 hour, 1 day, 30 days), live CPU and memory bars on the hosting page (every 10 seconds while it is visible), the storage as a bar, and the usage emails (CPU sustained, memory high, storage at 90 percent) with the same "Usage emails" switch and settings. There is no PHP workers metric.
