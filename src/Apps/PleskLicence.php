@@ -8,6 +8,7 @@
 namespace BeltoftServices\Apps;
 
 use BeltoftServices\Alerts;
+use BeltoftServices\Background;
 use BeltoftServices\Crypto;
 use BeltoftServices\Domains\Client as RegistrarClient;
 use BeltoftServices\Domains\Clients as RegistrarClients;
@@ -99,6 +100,20 @@ final class PleskLicence {
 		add_action( 'beltoft_services_reinstall_started', array( __CLASS__, 'reinstall_started' ), 5, 2 );
 		add_action( self::KEY_HOOK, array( __CLASS__, 'run_key' ) );
 		add_action( self::SYNC_HOOK, array( __CLASS__, 'run_sync' ) );
+		Background::declare(
+			self::KEY_HOOK,
+			array(
+				'due'   => array( __CLASS__, 'key_due' ),
+				'label' => 'Plesk key fetch and install',
+			)
+		);
+		Background::declare(
+			self::SYNC_HOOK,
+			array(
+				'due'   => array( __CLASS__, 'sync_due' ),
+				'label' => 'Plesk licence change at the vendor',
+			)
+		);
 		add_filter( 'beltoft_services_settings_fields', array( __CLASS__, 'fields' ) );
 	}
 
@@ -636,6 +651,45 @@ final class PleskLicence {
 		}
 
 		return false;
+	}
+
+	/**
+	 * The watchdog's list (Background): a licence whose key was never fetched and that has no job. Only the fetch is
+	 * covered: a key that is kept but not yet confirmed on the server is pushed by its own steps (PUSHES).
+	 *
+	 * @return array<int, array<int, int>>
+	 */
+	public static function key_due(): array {
+		$sets = array();
+
+		foreach ( Resource::ids_with_meta_value( 'plesk_key_id' ) as $id ) {
+			$licence = Resource::find( (int) $id );
+
+			if ( $licence && $licence->is_live() && self::is_plesk( $licence ) && (int) $licence->get( 'plesk_key_id' ) > 0 && '' === (string) $licence->get( 'plesk_key' ) && 'ended' !== AppLicence::state( $licence ) && (int) $licence->get( 'plesk_sync_tries' ) < 3 * self::TRIES ) {
+				$sets[] = array( (int) $id );
+			}
+		}
+
+		return $sets;
+	}
+
+	/**
+	 * The watchdog's list (Background): an ended licence whose deletion at Openprovider has not gone through.
+	 *
+	 * @return array<int, array<int, int>>
+	 */
+	public static function sync_due(): array {
+		$sets = array();
+
+		foreach ( Resource::ids_with_meta_value( 'plesk_key_id' ) as $id ) {
+			$licence = Resource::find( (int) $id );
+
+			if ( $licence && self::is_plesk( $licence ) && (int) $licence->get( 'plesk_key_id' ) > 0 && 'ended' === AppLicence::state( $licence ) && (int) $licence->get( 'plesk_sync_tries' ) < 3 * self::TRIES ) {
+				$sets[] = array( (int) $id );
+			}
+		}
+
+		return $sets;
 	}
 
 	/**

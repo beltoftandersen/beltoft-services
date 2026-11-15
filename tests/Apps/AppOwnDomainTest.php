@@ -262,11 +262,11 @@ final class AppOwnDomainTest extends MonitoringTestCase {
 	public function test_the_sweep_finds_a_lost_check(): void {
 		$r = $this->waiting( array( 'app_domain_dns_since' => time() ) );
 		$this->assertSame( 0, $this->pending( $r->id(), AppOwnDomain::HOOK ) );
-		AppOwnDomain::sweep();
+		\BeltoftServices\Background::watchdog();
 		$this->assertSame( 1, $this->pending( $r->id(), AppOwnDomain::HOOK ) );
 
 		$done = $this->waiting( array( 'app_domain_dns' => 'live', 'app_domain' => self::NAME ), 5001 );
-		AppOwnDomain::sweep();
+		\BeltoftServices\Background::watchdog();
 		$this->assertSame( 0, $this->pending( $done->id(), AppOwnDomain::HOOK ), 'A live name is left alone.' );
 	}
 

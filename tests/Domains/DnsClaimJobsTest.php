@@ -266,6 +266,47 @@ class DnsClaimJobsTest extends TestCase {
 		$this->assertSame( 'release_pending', DnsAssignments::get( 'leaving.example.com' )['status'] );
 	}
 
+	public function test_the_check_is_a_background_job_the_shared_code_keeps_alive(): void {
+		$claim = $this->claim( 'checking' );
+		$args  = array( (int) $claim['id'] );
+		as_unschedule_all_actions( DnsClaimJobs::CHECK );
+
+		// A claim that is being checked and has no job: the watchdog queues it once.
+		$this->assertSame( array( $args ), DnsClaimJobs::checks_due() );
+		$this->assertSame( 1, \BeltoftServices\Background::watchdog() );
+		$this->assertTrue( Jobs::pending_action( DnsClaimJobs::CHECK, $args ) );
+		$this->assertSame( 0, \BeltoftServices\Background::watchdog() );
+
+		// Not a claim that waits for the customer, nor one past its time.
+		$pending = $this->claim( 'pending', 'other.example.com' );
+		$this->assertNotContains( array( (int) $pending['id'] ), DnsClaimJobs::checks_due() );
+		$this->expire( (int) $claim['id'] );
+		$this->assertSame( array(), DnsClaimJobs::checks_due() );
+	}
+
+	public function test_enqueue_keeps_one_job_and_a_crashed_check_is_queued_again(): void {
+		$claim = $this->claim( 'checking' );
+		$args  = array( (int) $claim['id'] );
+		as_unschedule_all_actions( DnsClaimJobs::CHECK );
+
+		DnsClaimJobs::enqueue( DnsClaimJobs::CHECK, (int) $claim['id'] );
+		DnsClaimJobs::enqueue( DnsClaimJobs::CHECK, (int) $claim['id'] );
+		$this->assertCount( 1, as_get_scheduled_actions( array( 'hook' => DnsClaimJobs::CHECK, 'args' => $args, 'status' => \ActionScheduler_Store::STATUS_PENDING ) ) );
+
+		// The polling page runs it now.
+		add_filter( 'beltoft_services_dns_claim_run_after', '__return_zero' );
+		$this->proof['delegation'] = $this->delegation();
+		$this->proof['check_txt']  = array( 'status' => 'found', 'reason' => 'found', 'servers' => array() );
+		DnsClaimJobs::run_waiting( (int) $claim['id'] );
+		$this->assertFalse( Jobs::pending_action( DnsClaimJobs::CHECK, $args ) );
+
+		// A crash of the job: queued again, no private counter.
+		$id = as_schedule_single_action( time() - 5, DnsClaimJobs::CHECK, $args, Jobs::GROUP );
+		\ActionScheduler::store()->mark_failure( $id );
+		Jobs::job_failed( $id, new \Error( 'boom' ) );
+		$this->assertTrue( Jobs::pending_action( DnsClaimJobs::CHECK, $args ) );
+	}
+
 	public function test_hooks_and_the_daily_schedule(): void {
 		$this->assertNotFalse( has_action( DnsClaimJobs::CHECK, array( DnsClaimJobs::class, 'check' ) ) );
 		$this->assertNotFalse( has_action( DnsClaimJobs::SCAN, array( DnsClaimJobs::class, 'scan' ) ) );

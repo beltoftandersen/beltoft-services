@@ -3,6 +3,7 @@
 
 namespace BeltoftServices\Apps;
 
+use BeltoftServices\Background;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Network\IpPool;
@@ -23,33 +24,31 @@ final class AppInstall {
 	public const RETRY = 'app_retry';
 
 	public static function register(): void {
-		add_filter( 'beltoft_services_job_hooks', array( __CLASS__, 'job_hooks' ) );
 		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'state_changed' ), 10, 3 );
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
-		add_action( Jobs::SWEEP, array( __CLASS__, 'sweep' ) );
+		Background::declare(
+			self::HOOK,
+			array(
+				'due'   => array( __CLASS__, 'due' ),
+				'label' => 'App install',
+			)
+		);
 	}
 
 	/**
-	 * Adds the install job to the hooks the site runner claims.
+	 * The watchdog's list (Background): an install lost after the server became ready.
 	 *
-	 * @param mixed $hooks Hook names.
-	 * @return array<int, string>
+	 * @return array<int, array<int, int>>
 	 */
-	public static function job_hooks( $hooks ): array {
-		$hooks   = is_array( $hooks ) ? $hooks : array();
-		$hooks[] = self::HOOK;
-
-		return $hooks;
-	}
-
-	/** Recover an install action lost after the server became ready. */
-	public static function sweep(): void {
+	public static function due(): array {
+		$sets = array();
 		foreach ( Resource::find_by_meta( 'vm', 'app_state', 'pending' ) as $id ) {
 			$r = Resource::find( (int) $id );
 			if ( $r && 'ready' === $r->get( 'state' ) && 'pending' === $r->get( 'app_state' ) ) {
-				self::schedule( (int) $id );
+				$sets[] = array( (int) $id );
 			}
 		}
+		return $sets;
 	}
 
 	/** Is "Try again" offered: a ready server whose app failed or never reported back. */

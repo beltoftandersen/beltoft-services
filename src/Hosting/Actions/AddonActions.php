@@ -83,7 +83,7 @@ final class AddonActions {
 
 		// Nothing is bought unless the customer accepted this very amount: a price that changed since is shown again.
 		if ( $confirm_cents <= 0 || $confirm_cents !== (int) round( $quote['now'] * 100 ) ) {
-			return new \WP_Error( 'confirm', Addons::confirm_text( $kind, $quote ), array( 'kind' => $kind, 'target' => $target, 'amount_cents' => (int) round( $quote['now'] * 100 ) ) );
+			return new \WP_Error( 'confirm', Addons::confirm_text( $kind, $quote, Addons::KIND_DOMAIN === $kind ? $target : '' ), array( 'kind' => $kind, 'target' => $target, 'amount_cents' => (int) round( $quote['now'] * 100 ) ) );
 		}
 
 		$connect = array();

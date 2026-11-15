@@ -3,8 +3,10 @@
 
 namespace BeltoftServices\Apps;
 
+use BeltoftServices\Background;
 use BeltoftServices\Domains\Records;
 use BeltoftServices\Jobs;
+use BeltoftServices\Reconciler;
 use BeltoftServices\Resource;
 use BeltoftServices\Domains\ZoneAccess;
 
@@ -12,12 +14,17 @@ defined( 'ABSPATH' ) || exit;
 
 final class AppDomainRelease {
 	public const HOOK = 'beltoft_services_app_domain_release';
-	private const DELAYS = array( 60, 300, 900, 3600 );
 
 	public static function register(): void {
 		add_action( 'beltoft_services_reinstall_started', array( __CLASS__, 'started' ), 10, 2 );
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
-		add_action( Jobs::SWEEP, array( __CLASS__, 'sweep' ) );
+		Background::declare(
+			self::HOOK,
+			array(
+				'due'   => array( __CLASS__, 'due' ),
+				'label' => 'App domain record release',
+			)
+		);
 	}
 
 	/** The action fires after reinstall metadata is stored. No DNS work runs inside the server job. */
@@ -31,15 +38,21 @@ final class AppDomainRelease {
 		Jobs::schedule_once( time() + $delay, self::HOOK, array( $id ) );
 	}
 
-	/** Recover an old pending request if its scheduled action was lost. */
-	public static function sweep(): void {
+	/**
+	 * The watchdog's list (Background): an old pending request whose scheduled action was lost.
+	 *
+	 * @return array<int, array<int, int>>
+	 */
+	public static function due(): array {
+		$sets = array();
 		foreach ( Resource::find_with_list( 'vm', 'app_domain_old' ) as $id ) {
-			$r = Resource::find( (int) $id );
+			$r   = Resource::find( (int) $id );
 			$old = $r ? (array) $r->get( 'app_domain_old' ) : array();
 			if ( $r && $r->is_live() && $old && time() - (int) ( $old[0]['at'] ?? 0 ) >= ( empty( $old[0]['in_progress'] ) ? MINUTE_IN_SECONDS : 10 * MINUTE_IN_SECONDS ) ) {
-				self::schedule( $r->id() );
+				$sets[] = array( $r->id() );
 			}
 		}
+		return $sets;
 	}
 
 	/** One bounded attempt. The resource and zone locks are held on separate turns. */
@@ -100,12 +113,12 @@ final class AppDomainRelease {
 			$meta = array();
 			if ( is_wp_error( $done ) ) {
 				$tries = (int) ( $entry['tries'] ?? 0 );
-				if ( $tries < count( self::DELAYS ) ) {
+				if ( $tries < count( Reconciler::BACKOFF ) ) {
 					$entry['tries'] = $tries + 1;
 					unset( $entry['in_progress'] );
 					$entry['at'] = time();
 					array_unshift( $old, $entry );
-					$next = self::DELAYS[ $tries ];
+					$next = Reconciler::BACKOFF[ $tries ];
 				} elseif ( ! $r->get( 'app_domain_release_alerted' ) ) {
 					$meta['app_domain_release_alerted'] = true;
 					$alert = true;

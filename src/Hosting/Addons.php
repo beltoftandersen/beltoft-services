@@ -43,6 +43,7 @@ final class Addons {
 	public const I_RESOURCE  = '_beltoft_services_addon_resource';
 	public const I_TARGET    = '_beltoft_services_addon_target';
 	public const I_ENDING    = '_beltoft_services_addon_ending';
+	public const I_INCLUDED  = '_beltoft_services_addon_included';
 	public const I_ORDER     = '_beltoft_services_addon_order_id';
 
 	/** An unpaid add-on order is cancelled after this many seconds. */
@@ -185,9 +186,10 @@ final class Addons {
 	 *
 	 * @param string               $kind  Kind.
 	 * @param array<string, mixed> $quote From quote().
+	 * @param string               $target The registrable domain of a domain add-on, '' otherwise.
 	 */
-	public static function confirm_text( string $kind, array $quote ): string {
-		return AddonBilling::confirm_text( $kind, $quote );
+	public static function confirm_text( string $kind, array $quote, string $target = '' ): string {
+		return AddonBilling::confirm_text( $kind, $quote, $target );
 	}
 
 	/**
@@ -343,6 +345,36 @@ final class Addons {
 	 */
 	public static function resync_prices( \WC_Subscription $sub ): void {
 		AddonBilling::resync_prices( $sub );
+	}
+
+	/**
+	 * The account's free domain has gone: the oldest paid extra domain that is still on a website becomes the free one.
+	 *
+	 * @param Resource $r Hosting resource.
+	 * @return string The registrable domain whose line now ends, '' when none.
+	 */
+	public static function free_domain_replaced( Resource $r ): string {
+		return AddonBilling::free_domain_replaced( $r );
+	}
+
+	/**
+	 * Registrable domains whose add-on line was ended because the domain became the included one.
+	 *
+	 * @param Resource $r Hosting resource.
+	 * @return array<int, string>
+	 */
+	public static function included_domains( Resource $r ): array {
+		return AddonEffects::included_domains( $r );
+	}
+
+	/**
+	 * Registrable domains of the account's names that are on a website.
+	 *
+	 * @param Resource $r Hosting resource.
+	 * @return array<int, string>
+	 */
+	public static function connected_domains( Resource $r ): array {
+		return AddonEffects::connected_domains( $r );
 	}
 
 	/**

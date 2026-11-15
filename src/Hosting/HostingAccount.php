@@ -411,6 +411,49 @@ final class HostingAccount {
 	}
 
 	/**
+	 * What the plan includes in domains, the price of each further one, and which domain is the included one.
+	 *
+	 * @param Resource $r Hosting resource.
+	 */
+	private static function domain_allowance( Resource $r ): string {
+		$paid = array();
+
+		foreach ( Addons::lines( $r, Addons::KIND_DOMAIN ) as $item ) {
+			if ( 'yes' !== (string) $item->get_meta( Addons::I_INCLUDED ) ) {
+				$paid[] = (string) $item->get_meta( Addons::I_TARGET );
+			}
+		}
+
+		$free = '';
+
+		foreach ( Addons::connected_domains( $r ) as $reg ) {
+			if ( ! in_array( $reg, $paid, true ) ) {
+				$free = $reg;
+				break;
+			}
+		}
+
+		$quote = Addons::quote( $r, Addons::KIND_DOMAIN );
+		$text  = __( 'Your plan includes one domain and all its subdomains.', 'beltoft-services' );
+
+		if ( null !== $quote ) {
+			$text .= ' ' . sprintf(
+				/* translators: 1: price per month, 2: "incl. VAT" or "excl. VAT". */
+				__( 'Each further domain costs %1$s a month, %2$s.', 'beltoft-services' ),
+				Addons::shown( (float) $quote['unit'], (string) ( $quote['currency'] ?? '' ) ),
+				\BeltoftServices\Billing\TaxNote::label()
+			);
+		}
+
+		if ( '' !== $free ) {
+			/* translators: %s: domain name. */
+			$text .= ' ' . sprintf( __( 'Included: %s.', 'beltoft-services' ), \BeltoftServices\Domains\HostName::display( $free ) );
+		}
+
+		return $text;
+	}
+
+	/**
 	 * The notices that belong to no website: a hint, a paid domain that is being connected, an unsupported PHP version
 	 * and a refused loader file.
 	 *
@@ -431,6 +474,19 @@ final class HostingAccount {
 						/* translators: %s: domain name. */
 						__( 'Your extra domain %s is paid. It is being connected.', 'beltoft-services' ),
 						\BeltoftServices\Domains\HostName::display( $paid )
+					)
+				)
+			);
+		}
+
+		foreach ( Addons::included_domains( $r ) as $included ) {
+			printf(
+				'<p class="beltoft-hosting-notice">%s</p>',
+				esc_html(
+					sprintf(
+						/* translators: %s: domain name. */
+						__( '%s is now your included domain. Its extra domain charge ends at the next renewal.', 'beltoft-services' ),
+						\BeltoftServices\Domains\HostName::display( $included )
 					)
 				)
 			);
@@ -589,7 +645,7 @@ final class HostingAccount {
 
 		if ( $ready ) {
 			self::action(
-				'<label for="beltoft-connect-' . esc_attr( $slug ) . '"><strong class="bsh-action__title">' . esc_html__( 'Connect a domain', 'beltoft-services' ) . '</strong></label> ' . esc_html__( 'A domain is connected with and without www. A subdomain is connected only as typed.', 'beltoft-services' ),
+				'<label for="beltoft-connect-' . esc_attr( $slug ) . '"><strong class="bsh-action__title">' . esc_html__( 'Connect a domain', 'beltoft-services' ) . '</strong></label> ' . esc_html__( 'A domain is connected with and without www. A subdomain is connected only as typed.', 'beltoft-services' ) . ' ' . esc_html( self::domain_allowance( $r ) ),
 				'<span class="beltoft-hosting-inline"><input type="text" id="beltoft-connect-' . esc_attr( $slug ) . '" data-hosting-field="host" placeholder="example.com" autocomplete="off" autocapitalize="off" spellcheck="false"><button type="button" class="beltoft-hosting-btn" data-hosting-action="add_domain" data-slug="' . esc_attr( $slug ) . '">' . esc_html__( 'Connect', 'beltoft-services' ) . '</button></span>',
 				' data-hosting-scope id="beltoft-site-' . esc_attr( $slug ) . '-connect"'
 			);

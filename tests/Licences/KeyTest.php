@@ -385,6 +385,21 @@ final class KeyTest extends TestCase {
 		$this->assertSame( '1231-2b48feedabcdef', KeyOrder::key_text( $r ) );
 	}
 
+	public function test_a_licence_that_waits_for_its_key_is_found_by_the_watchdog_until_the_asks_run_out(): void {
+		$this->op->reply( 'GET', '/licenses/plesk/key/1001', array() );
+		$r = $this->licence( array( 'kind' => 'addon', 'tier' => 'cloudlinux-solo', 'total' => 7.0 ) );
+		$this->build( $r );
+		as_unschedule_all_actions( KeyOrder::KEY_HOOK );
+
+		$this->assertSame( array( array( $r->id() ) ), KeyOrder::key_due() );
+		$this->assertSame( 1, \BeltoftServices\Background::watchdog() );
+		$this->assertSame( 0, \BeltoftServices\Background::watchdog(), 'Never queued twice.' );
+
+		// The business limit (three times the asks) stays the owner of giving up.
+		Resource::find( $r->id() )->set( array( 'lic_tries' => 36 ) );
+		$this->assertSame( array(), KeyOrder::key_due() );
+	}
+
 	// -- Change and end --------------------------------------------------------------------------
 
 	public function test_a_plan_change_switches_the_item_and_fetches_the_key_again(): void {

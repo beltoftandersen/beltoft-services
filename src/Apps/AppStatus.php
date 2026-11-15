@@ -3,6 +3,7 @@
 
 namespace BeltoftServices\Apps;
 
+use BeltoftServices\Background;
 use BeltoftServices\Crypto;
 use BeltoftServices\Proxmox\Pve\Client;
 use BeltoftServices\Proxmox\Pve\Clients;
@@ -20,36 +21,34 @@ final class AppStatus {
 	public const CREDENTIALS_WAIT = 600;
 
 	public static function register(): void {
-		add_filter( 'beltoft_services_job_hooks', array( __CLASS__, 'job_hooks' ) );
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
-		add_action( \BeltoftServices\Jobs::SWEEP, array( __CLASS__, 'sweep' ) );
-	}
-
-	/**
-	 * Adds the status job to the hooks the site runner claims.
-	 *
-	 * @param mixed $hooks Hook names.
-	 * @return array<int, string>
-	 */
-	public static function job_hooks( $hooks ): array {
-		$hooks   = is_array( $hooks ) ? $hooks : array();
-		$hooks[] = self::HOOK;
-
-		return $hooks;
+		Background::declare(
+			self::HOOK,
+			array(
+				'due'   => array( __CLASS__, 'due' ),
+				'label' => 'App status read',
+			)
+		);
 	}
 
 	public static function schedule( int $id, int $delay ): void {
 		\BeltoftServices\Jobs::schedule_once( time() + $delay, self::HOOK, array( $id ) );
 	}
 
-	/** Recover a lost poll after an interrupted worker. */
-	public static function sweep(): void {
+	/**
+	 * The watchdog's list (Background): a poll lost after an interrupted worker.
+	 *
+	 * @return array<int, array<int, int>>
+	 */
+	public static function due(): array {
+		$sets = array();
 		foreach ( self::candidates() as $id ) {
 			$r = Resource::find( $id );
 			if ( $r && in_array( $r->get( 'app_state' ), array( 'installing', 'unknown' ), true ) && time() - (int) $r->get( 'app_started_at' ) < self::LIMIT ) {
-				self::schedule( $id, 15 );
+				$sets[] = array( (int) $id );
 			}
 		}
+		return $sets;
 	}
 
 	/** Narrow the sweep in SQL before loading resources. Verify each match after reading it. */

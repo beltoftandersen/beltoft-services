@@ -3,6 +3,7 @@
 
 namespace BeltoftServices\Apps;
 
+use BeltoftServices\Background;
 use BeltoftServices\Domains\DnsQuery;
 use BeltoftServices\Domains\PublicSuffix;
 use BeltoftServices\Jobs;
@@ -46,7 +47,13 @@ final class AppWww {
 
 	public static function register(): void {
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
-		add_action( Jobs::SWEEP, array( __CLASS__, 'sweep' ) );
+		Background::declare(
+			self::HOOK,
+			array(
+				'due'   => array( __CLASS__, 'due' ),
+				'label' => 'App www look',
+			)
+		);
 	}
 
 	// -- Which names ---------------------------------------------------------------------------
@@ -150,14 +157,20 @@ final class AppWww {
 		Jobs::schedule_once( time() + $delay, self::HOOK, array( $id ) );
 	}
 
-	/** Recovers a look that was lost (a worker stopped, an action removed). */
-	public static function sweep(): void {
+	/**
+	 * The watchdog's list (Background): a look lost (a worker stopped, an action removed).
+	 *
+	 * @return array<int, array<int, int>>
+	 */
+	public static function due(): array {
+		$sets = array();
 		foreach ( Resource::find_by_meta( 'vm', 'app_www', array( 'waiting', 'applying' ) ) as $id ) {
 			$r = Resource::find( (int) $id );
 			if ( $r && 'ready' === $r->get( 'state' ) && 'ready' === $r->get( 'app_state' ) ) {
-				self::schedule( (int) $id, 0 );
+				$sets[] = array( (int) $id );
 			}
 		}
+		return $sets;
 	}
 
 	/** One bounded look at one server: confirm what the guest was asked, or read public DNS and ask it. */

@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Mail;
 
+use BeltoftServices\Background;
 use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 
@@ -33,6 +34,33 @@ final class MailHold {
 
 	public static function register(): void {
 		add_action( self::HOOK, array( __CLASS__, 'retry' ) );
+		Background::declare(
+			self::HOOK,
+			array(
+				'due'   => array( __CLASS__, 'due' ),
+				'label' => 'Email sending hold',
+			)
+		);
+	}
+
+	/**
+	 * The watchdog's list: a domain hosted elsewhere whose mailboxes are not as the rule says (the retry after a failed call
+	 * was lost). Reads stored meta only.
+	 *
+	 * @return array<int, array<int, int>>
+	 */
+	public static function due(): array {
+		$sets = array();
+
+		foreach ( Resource::find_by_meta( MailDriver::KIND, 'mail_mode', 'external' ) as $id ) {
+			$r = Resource::find( (int) $id );
+
+			if ( $r && $r->is_live() && self::held( $r ) !== ( 'held' === (string) $r->get( self::META ) ) ) {
+				$sets[] = array( (int) $id );
+			}
+		}
+
+		return $sets;
 	}
 
 	/**
