@@ -1,5 +1,5 @@
 <?php
-/** Customer email for server down, disk nearly full or CPU high, and for a database that does not answer or whose disk is nearly full. @package BeltoftServices */
+/** Customer email for server down, disk nearly full, CPU high or memory high, and for a database that does not answer or whose disk is nearly full. @package BeltoftServices */
 namespace BeltoftServices\Emails;
 
 defined( 'ABSPATH' ) || exit;
@@ -22,6 +22,9 @@ final class MonitorAlert extends ServiceEmail {
 		if ( 'cpu' === $reason ) {
 			/* translators: %d: number of hours. */
 			return sprintf( _n( 'Your server has used almost all of its CPU for %d hour', 'Your server has used almost all of its CPU for %d hours', (int) ( $this->values['monitor_cpu_hours'] ?? 0 ), 'beltoft-services' ), (int) ( $this->values['monitor_cpu_hours'] ?? 0 ) );
+		}
+		if ( 'memory' === $reason ) {
+			return __( 'Your server is using most of its memory', 'beltoft-services' );
 		}
 		if ( 'db_disk' === $reason ) {
 			/* translators: %d: percent of the disk in use. */

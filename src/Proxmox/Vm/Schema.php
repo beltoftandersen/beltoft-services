@@ -23,7 +23,7 @@ final class Schema {
 
 	use VersionedSchema;
 
-	public const DB_VERSION        = '7';
+	public const DB_VERSION        = '8';
 	public const OPTION_DB_VERSION = 'beltoft_services_db_version';
 	public const RETRY_TRANSIENT   = 'beltoft_services_proxmox_schema_retry';
 
@@ -53,12 +53,16 @@ final class Schema {
 		'usage' => array(
 			'resource_item_hour' => array( 'resource_id', 'item', 'hour_bucket' ),
 		),
+		'guest_memory' => array(
+			'PRIMARY' => array( 'resource_id', 'span', 'bucket' ),
+		),
 	);
 
 	/**
 	 * Columns that the code writes and that a version may be stored only once they exist, per table.
 	 * Version 6: the currency of a ledger row. An empty value reads as the shop's currency (Currency::of_row()).
 	 * Version 7: the name of a customer private network (empty reads as "Network N").
+	 * Version 8: the guest memory table (bs_guest_memory, Network\GuestMemory).
 	 */
 	private const REQUIRED_COLUMNS = array(
 		'usage'        => array( 'currency' ),
@@ -84,6 +88,7 @@ final class Schema {
 			'private_ips' => $wpdb->prefix . 'beltoft_services_private_ips',
 			'usage' => $wpdb->prefix . 'bs_usage',
 			'ip_log' => $wpdb->prefix . 'beltoft_services_ip_log',
+			'guest_memory' => $wpdb->prefix . 'bs_guest_memory',
 		);
 	}
 
@@ -360,6 +365,20 @@ final class Schema {
 				UNIQUE KEY resource_item_hour (resource_id,item,hour_bucket),
 				KEY user_open (user_id,order_id,hour_bucket),
 				KEY order_id (order_id)
+			) $collate;"
+		);
+
+		// Version 8: the guest's memory in use, one row per server and time slot (span 300 = five minutes, 3600 = an hour).
+		// Operational numbers only (used and total MB); retention is in Network\GuestMemory.
+		dbDelta(
+			"CREATE TABLE {$t['guest_memory']} (
+				resource_id bigint(20) unsigned NOT NULL,
+				span smallint(5) unsigned NOT NULL,
+				bucket int(10) unsigned NOT NULL,
+				used_mb int(10) unsigned NOT NULL,
+				total_mb int(10) unsigned NOT NULL,
+				used_max_mb int(10) unsigned NOT NULL,
+				PRIMARY KEY  (resource_id,span,bucket)
 			) $collate;"
 		);
 

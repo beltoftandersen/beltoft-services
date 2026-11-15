@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.27.11
+Stable tag: 0.28.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -258,6 +258,12 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 == Changelog ==
 
+= 0.28.0 =
+* Guest memory: the server list and Overview always show a memory bar for a running server (the newest reading at once, "..." while the first one is on its way, "-" and a hint when the guest agent does not answer). Under the bar: used and total GB and how old the reading is. The figure is the memory in use without the file cache, as the guest reports it; no Proxmox figure is shown.
+* Readings every 10 seconds while a page with servers is open (once a minute after 10 minutes without a page interaction); a background job reads every running server every 5 minutes.
+* New table bs_guest_memory (database version 8): used and total MB per server, 5-minute points kept 2 days, then hourly average and peak kept 30 days; removed with the server.
+* The monitoring tab has a memory graph in GB with the total as a line and the peak; the metrics route, the MCP tool server_usage and the API reference return it.
+* Memory email: one email per episode when memory in use stays at or above the threshold (settings Memory alert threshold, default 90 percent, and Memory alert after this many minutes, default 15) for 3 readings in a row; not for database servers, not in the first 15 minutes after a start or reinstall.
 = 0.27.11 =
 * Adding a website: the WordPress install step waits up to 60 seconds (an install takes about 12); other steps keep 8. Before, the install was cut off at 8 seconds and the new website was removed again.
 

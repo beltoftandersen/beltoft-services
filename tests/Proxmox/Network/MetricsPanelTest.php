@@ -13,11 +13,13 @@ class MetricsPanelTest extends MonitoringTestCase {
 		return (string) ob_get_clean();
 	}
 
-	public function test_ready_vm_shows_three_usage_charts_and_range_buttons(): void {
+	public function test_ready_vm_shows_four_usage_charts_and_range_buttons(): void {
 		$html = $this->output( $this->ready_vm() );
 		$this->assertStringContainsString( 'data-vm-metrics', $html );
-		$this->assertSame( 3, substr_count( $html, 'data-chart=' ) );
-		$this->assertStringNotContainsString( 'data-chart="mem"', $html );
+		$this->assertSame( 4, substr_count( $html, 'data-chart=' ) );
+		$this->assertStringContainsString( 'data-chart="mem"', $html, 'The memory chart comes from our own history.' );
+		$this->assertStringContainsString( 'Memory in use (excluding cache)', $html );
+		$this->assertStringContainsString( 'gives it back when programs need it', $html );
 		$this->assertStringContainsString( 'data-range="month"', $html );
 		$this->assertStringContainsString( '>30 GB<', preg_replace( '#>\s+#', '>', preg_replace( '#\s+<#', '<', $html ) ) );
 		$this->assertStringNotContainsString( 'Proxmox', $html );

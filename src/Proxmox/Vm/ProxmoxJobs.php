@@ -12,6 +12,7 @@ use BeltoftServices\Proxmox\Backup\BackupJobs;
 use BeltoftServices\Proxmox\Pve\CapacityCheck;
 use BeltoftServices\Proxmox\Pve\CapacityJobs;
 use BeltoftServices\Proxmox\Snapshot\SnapshotJobs;
+use BeltoftServices\Proxmox\Network\GuestMemory;
 use BeltoftServices\Proxmox\Network\PrivateNets;
 
 defined( 'ABSPATH' ) || exit;
@@ -50,6 +51,8 @@ final class ProxmoxJobs {
 	public const ABUSE_BATCH  = 'beltoft_services_proxmox_abuse_batch';
 	public const DISK         = 'beltoft_services_proxmox_disk';
 	public const DISK_BATCH   = 'beltoft_services_proxmox_disk_batch';
+	public const MEMORY       = 'beltoft_services_proxmox_memory';
+	public const MEMORY_CLEAN = 'beltoft_services_proxmox_memory_clean';
 	public const BACKUP       = 'beltoft_services_proxmox_backup';
 	public const BACKUP_NEXT  = 'beltoft_services_proxmox_backup_next';
 	public const BACKUP_RUN   = 'beltoft_services_proxmox_backup_run';
@@ -92,6 +95,8 @@ final class ProxmoxJobs {
 		self::DISK     => '10 * * * *',
 		self::BACKUP   => '30 3 * * *',
 		self::SNAPSHOTS => '40 * * * *',
+		self::MEMORY   => '*/5 * * * *',
+		self::MEMORY_CLEAN => '25 3 * * *',
 	);
 
 	/**
@@ -112,6 +117,8 @@ final class ProxmoxJobs {
 		add_action( self::ABUSE_BATCH, array( AbuseJobs::class, 'abuse_batch' ) );
 		add_action( self::DISK, array( DiskJobs::class, 'disk' ) );
 		add_action( self::DISK_BATCH, array( DiskJobs::class, 'disk_batch' ) );
+		add_action( self::MEMORY, array( GuestMemory::class, 'run' ) );
+		add_action( self::MEMORY_CLEAN, array( GuestMemory::class, 'cleanup' ) );
 		add_action( self::BACKUP, array( BackupJobs::class, 'backup' ) );
 		add_action( self::BACKUP_NEXT, array( BackupJobs::class, 'backup_next' ) );
 		add_action( self::SNAPSHOTS, array( SnapshotJobs::class, 'snapshots' ) );

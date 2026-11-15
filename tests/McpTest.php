@@ -262,7 +262,7 @@ final class McpTest extends McpTestCase {
 		$this->assertArrayHasKey( 'memory_percent', $details );
 		$this->assertNull( $details['memory_percent'], 'No agent reading: no figure, not the Proxmox one.' );
 
-		set_transient( \BeltoftServices\Proxmox\Network\LiveUsage::MEM_PREFIX . $server->id(), array( 'percent' => 41 ), 60 );
+		\BeltoftServices\Proxmox\Network\GuestMemory::store( $server->id(), array( 'used_mb' => 840, 'total_mb' => 2048 ) );
 		$this->assertSame( 41, \BeltoftServices\Mcp\Details::vm( $server )['memory_percent'] );
 	}
 

@@ -107,7 +107,7 @@ final class Definitions {
 			),
 			'beltoft_services_monitor_alert' => array(
 				'title'       => __( 'Server monitoring alert', 'beltoft-services' ),
-				'description' => __( 'Sent when a server is down unexpectedly, its disk is nearly full or its CPU stays high, or when a database does not answer or its disk is nearly full.', 'beltoft-services' ),
+				'description' => __( 'Sent when a server is down unexpectedly, its disk is nearly full, or its CPU or memory stays high, or when a database does not answer or its disk is nearly full.', 'beltoft-services' ),
 				'subject'     => __( 'Check your server', 'beltoft-services' ),
 				'heading'     => __( 'Your server needs attention', 'beltoft-services' ),
 			),

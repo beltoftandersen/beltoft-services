@@ -410,6 +410,24 @@
         "min": 1,
         "label": "Days between two CPU emails for one server"
     },
+    "monitor_mem_percent": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 90,
+        "min": 50,
+        "label": "Memory alert threshold, percent",
+        "desc": "Memory in use without the file cache, as the guest reports it. Not sent for database servers, which reserve memory on purpose. Re-arms when a reading is 10 points lower. The days between two emails are the same as for CPU."
+    },
+    "monitor_mem_minutes": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 15,
+        "min": 5,
+        "label": "Memory alert after this many minutes",
+        "desc": "Counted in readings of 5 minutes: 15 minutes is 3 readings in a row. Nothing is sent in the first 15 minutes after the server starts."
+    },
     "traffic_alerts": {
         "tab": "proxmox",
         "section": "proxmox",

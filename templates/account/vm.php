@@ -212,7 +212,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 					<?php if ( ! empty( $usage_alerts_shown ) ) : ?>
 						<label class="beltoft-vm-usage__switch">
 							<input type="checkbox" data-usage-alerts<?php echo ! empty( $usage_alerts_on ) ? ' checked' : ''; ?>>
-							<span><?php esc_html_e( 'Email me when this server is short of disk or CPU', 'beltoft-services' ); ?></span>
+							<span><?php esc_html_e( 'Email me when this server is short of disk, CPU or memory', 'beltoft-services' ); ?></span>
 						</label>
 						<p class="beltoft-vm-usage__switch-note" data-usage-alerts-note role="status" aria-live="polite"></p>
 					<?php endif; ?>
@@ -227,6 +227,15 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 						<p class="beltoft-vm-usage__readout" data-readout></p>
 					</div>
 				<?php endforeach; ?>
+				<?php // Memory is the guest's own figure from our history (never Proxmox's), so the cache Linux holds is not counted. ?>
+				<div class="beltoft-vm-usage__chart" data-chart="mem">
+					<div class="beltoft-vm-usage__top"><h5><?php esc_html_e( 'Memory in use (excluding cache)', 'beltoft-services' ); ?></h5><span class="beltoft-vm-usage__now" data-now></span></div>
+					<div class="beltoft-vm-usage__plot" aria-label="<?php esc_attr_e( 'Memory in use (excluding cache)', 'beltoft-services' ); ?>"></div>
+					<p class="beltoft-vm-usage__axis" data-axis></p>
+					<p class="beltoft-vm-usage__readout" data-readout></p>
+					<p class="beltoft-vm-usage__axis" data-mem-hint role="status"></p>
+					<p class="beltoft-vm-usage__axis"><?php esc_html_e( 'Linux uses free memory as a file cache and gives it back when programs need it; that part is not counted.', 'beltoft-services' ); ?></p>
+				</div>
 				<?php
 				// The disk has no history: one reading from the server's guest agent every six hours, drawn as a bar.
 				$beltoft_services_disk_pct = is_numeric( $disk_used ) && is_numeric( $disk_total ) && (int) $disk_total > 0 ? max( 0, min( 100, (int) round( (int) $disk_used / (int) $disk_total * 100 ) ) ) : null;

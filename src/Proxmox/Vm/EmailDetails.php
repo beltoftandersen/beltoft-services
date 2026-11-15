@@ -67,10 +67,14 @@ final class EmailDetails {
 		$values['extra_disks']      = self::extra_disks( $r );
 		$values['disk_server_url']  = DiskDriver::ID === $driver ? DiskGuide::server_url( $r ) : '';
 		$values['disk_guide_url']   = DiskDriver::ID === $driver ? DiskGuide::guide_url( $r ) : '';
-		$values['monitor_reason']   = in_array( $data['reason'] ?? '', array( 'down', 'disk', 'disk_urgent', 'cpu', 'db_down', 'db_disk' ), true ) ? $data['reason'] : 'down';
+		$values['monitor_reason']   = in_array( $data['reason'] ?? '', array( 'down', 'disk', 'disk_urgent', 'cpu', 'memory', 'db_down', 'db_disk' ), true ) ? $data['reason'] : 'down';
 		$values['monitor_disk_percent'] = max( 0, min( 100, (int) ( $data['disk_percent'] ?? 0 ) ) );
 		$values['monitor_cpu_percent']  = max( 0, min( 100, (int) ( $data['cpu_percent'] ?? 0 ) ) );
 		$values['monitor_cpu_hours']    = max( 0, (int) ( $data['cpu_hours'] ?? 0 ) );
+		$values['monitor_mem_percent']  = max( 0, min( 100, (int) ( $data['mem_percent'] ?? 0 ) ) );
+		$values['monitor_mem_minutes']  = max( 0, (int) ( $data['mem_minutes'] ?? 0 ) );
+		$values['monitor_mem_used_mb']  = max( 0, (int) ( $data['mem_used_mb'] ?? 0 ) );
+		$values['monitor_mem_total_mb'] = max( 0, (int) ( $data['mem_total_mb'] ?? 0 ) );
 		$values['monitor_upgrade_url']  = ProxmoxDriver::ID === $driver ? self::upgrade_link( $r, (string) ( $data['reason'] ?? '' ) ) : '';
 		$values['monitor_grow_url']     = DbDriver::ID === $driver && 'db_disk' === ( $data['reason'] ?? '' ) ? DbDisk::grow_url( $r ) : '';
 		$values['monitor_disks_url']    = ProxmoxDriver::ID === $driver ? DiskGuide::card_url( $r ) : '';
@@ -133,7 +137,7 @@ final class EmailDetails {
 	 * @param string   $reason Monitoring reason.
 	 */
 	private static function upgrade_link( Resource $r, string $reason ): string {
-		$need = array( 'disk' => 'disk', 'disk_urgent' => 'disk', 'cpu' => 'cpu' )[ $reason ] ?? '';
+		$need = array( 'disk' => 'disk', 'disk_urgent' => 'disk', 'cpu' => 'cpu', 'memory' => 'memory' )[ $reason ] ?? '';
 
 		return '' === $need ? '' : Upgrades::link( $r, $need );
 	}

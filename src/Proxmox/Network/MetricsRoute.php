@@ -81,6 +81,10 @@ final class MetricsRoute {
 			set_transient( $key, $series, null === $rows ? 20 : MINUTE_IN_SECONDS );
 		}
 		$series['disk'] = GuestDisk::cached( $resource );
+		// Memory is our own history of the guest's reading, never Proxmox's figure (which counts the file cache); not cached here.
+		$memory = GuestMemory::series( $resource->id(), $range );
+		$memory['state'] = GuestMemory::view( $resource->id() )['state'];
+		$series['memory'] = $memory;
 		$series['available'] = ! empty( $series['points'] );
 		$response = new \WP_REST_Response( $series, 200 );
 		$response->header( 'Cache-Control', 'private, no-store' );

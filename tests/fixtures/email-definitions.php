@@ -76,7 +76,7 @@ return array (
   'beltoft_services_monitor_alert' => 
   array (
     'title' => 'Server monitoring alert',
-    'description' => 'Sent when a server is down unexpectedly, its disk is nearly full or its CPU stays high, or when a database does not answer or its disk is nearly full.',
+    'description' => 'Sent when a server is down unexpectedly, its disk is nearly full, or its CPU or memory stays high, or when a database does not answer or its disk is nearly full.',
     'subject' => 'Check your server',
     'heading' => 'Your server needs attention',
     'html' => 'emails/beltoft-services-monitor-alert.php',

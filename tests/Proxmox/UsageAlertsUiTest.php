@@ -141,7 +141,7 @@ class UsageAlertsUiTest extends BackupTestCase {
 		$this->assertStringContainsString( 'data-usage-alerts', $html );
 		$this->assertMatchesRegularExpression( '#data-usage-alerts checked#', $html );
 		$this->assertStringContainsString( 'Disk 91 percent full since', $html );
-		$this->assertStringContainsString( 'Email me when this server is short of disk or CPU', $html );
+		$this->assertStringContainsString( 'Email me when this server is short of disk, CPU or memory', $html );
 		$r->set( array( 'usage_alerts' => 'off' ) );
 		ob_start();
 		Panel::render( Resource::find( $r->id() )->license() );

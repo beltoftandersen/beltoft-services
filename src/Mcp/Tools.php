@@ -512,7 +512,7 @@ final class Tools {
 			'range'     => (string) $series['range'],
 			'available' => ! empty( $series['available'] ),
 			'samples'   => count( (array) $series['points'] ),
-			'units'     => array( 'cpu' => 'percent', 'netin' => 'bytes per second', 'netout' => 'bytes per second', 'diskread' => 'bytes per second', 'diskwrite' => 'bytes per second' ),
+			'units'     => array( 'cpu' => 'percent', 'mem_percent' => 'percent of memory in use, without the file cache', 'netin' => 'bytes per second', 'netout' => 'bytes per second', 'diskread' => 'bytes per second', 'diskwrite' => 'bytes per second' ),
 		);
 
 		foreach ( array( 'cpu', 'netin', 'netout', 'diskread', 'diskwrite' ) as $field ) {
@@ -530,6 +530,23 @@ final class Tools {
 				'latest'  => round( (float) end( $values ), 1 ),
 			) : null;
 		}
+
+		// Memory comes from the guest's own readings kept by the plugin (never the hypervisor's figure).
+		$mem  = array();
+		$peak = array();
+
+		foreach ( (array) ( $series['memory']['points'] ?? array() ) as $point ) {
+			if ( isset( $point['percent'] ) && is_numeric( $point['percent'] ) ) {
+				$mem[]  = (float) $point['percent'];
+				$peak[] = (float) ( $point['peak_percent'] ?? $point['percent'] );
+			}
+		}
+
+		$out['mem_percent'] = $mem ? array(
+			'average' => round( array_sum( $mem ) / count( $mem ), 1 ),
+			'highest' => round( max( $peak ), 1 ),
+			'latest'  => round( (float) end( $mem ), 1 ),
+		) : null;
 
 		if ( isset( $series['disk']['used'], $series['disk']['total'] ) && $series['disk']['total'] > 0 ) {
 			$out['disk_percent'] = (int) round( $series['disk']['used'] / $series['disk']['total'] * 100 );

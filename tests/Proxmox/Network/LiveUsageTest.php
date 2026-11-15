@@ -3,6 +3,7 @@
 namespace BeltoftServices\Tests\Proxmox\Network;
 
 use BeltoftServices\Account\Servers;
+use BeltoftServices\Proxmox\Network\GuestMemory;
 use BeltoftServices\Proxmox\Network\LiveUsage;
 use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftLicenses\Account\View;
@@ -113,7 +114,7 @@ class LiveUsageTest extends MonitoringTestCase {
 		$this->owner( $r );
 		$this->fake->request( 'POST', '/nodes/node-a/qemu/5000/status/stop' );
 		$entry = ( (array) $this->route()->get_data()['resources'] )[ $r->id() ];
-		$this->assertSame( array( 'power' => 'stopped', 'cpu' => null, 'mem' => null, 'disk' => null ), $entry );
+		$this->assertSame( array( 'power' => 'stopped', 'cpu' => null, 'mem' => null, 'disk' => null, 'memory' => array( 'state' => 'stopped' ) ), $entry );
 	}
 
 	public function test_rate_limit(): void {
@@ -131,13 +132,15 @@ class LiveUsageTest extends MonitoringTestCase {
 		$view = View::license( $r->license() );
 		$bars = array_column( Servers::rows( array( $view ) )[0]['bars'], 'percent', 'key' );
 		$this->assertArrayHasKey( 'mem', $bars, 'The memory bar is always printed, so the live refresh can fill it.' );
-		$this->assertNull( $bars['mem'], 'No agent reading: no figure (never the Proxmox one); the bar is printed hidden.' );
+		$this->assertSame( 0, $bars['mem'], 'No agent reading: no figure (never the Proxmox one); the bar is shown empty.' );
 		$rows = Servers::rows( array( $view ) );
 		ob_start();
 		include BELTOFT_SERVICES_PATH . 'templates/account/servers-list.php';
 		$html = (string) ob_get_clean();
-		$this->assertMatchesRegularExpression( '/data-usage-bar="mem" hidden/', $html );
-		set_transient( LiveUsage::MEM_PREFIX . $r->id(), array( 'percent' => 40 ), 60 );
+		$this->assertMatchesRegularExpression( '/data-usage-bar="mem" data-mem-state="waiting"[^>]*>/', $html );
+		$this->assertDoesNotMatchRegularExpression( '/data-usage-bar="mem"[^>]* hidden/', $html, 'The memory bar is shown while the first reading is on its way.' );
+		$this->assertStringContainsString( "\u{2026}", $html );
+		GuestMemory::store( $r->id(), array( 'used_mb' => 1638, 'total_mb' => 4096 ) );
 		$bars = array_column( Servers::rows( array( $view ) )[0]['bars'], 'percent', 'key' );
 		$this->assertSame( 40, $bars['mem'] );
 		$this->assertSame( 25, $bars['cpu'] );

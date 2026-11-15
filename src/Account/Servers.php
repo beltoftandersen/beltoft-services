@@ -503,15 +503,18 @@ final class Servers {
 				'percent' => max( 0, min( 100, (int) round( (float) $status['cpu'] * 100 ) ) ),
 			);
 
-			// Only the guest's own figure (MemAvailable); PVE counts page cache as used, so there is no fallback.
-			$guest = \BeltoftServices\Proxmox\Network\LiveUsage::cached_memory( $resource->id() );
+			// Only the guest's own figure (MemAvailable); PVE counts page cache as used, so there is no fallback. The bar is always
+			// there for a running server: the newest reading, "…" while the first one is on its way, "–" and a hint without the agent.
+			$memory = \BeltoftServices\Proxmox\Network\GuestMemory::view( $resource->id() );
 
-			// The memory and disk bars are always printed; without a cached guest reading they stay hidden until the live
-			// refresh (assets/usage-live.js) brings one, so a reading that arrives after the page load still shows.
 			$bars[] = array(
 				'key'     => 'mem',
 				'label'   => __( 'Memory', 'beltoft-services' ),
-				'percent' => $guest,
+				'title'   => __( 'Memory in use (excluding cache)', 'beltoft-services' ),
+				'percent' => (int) $memory['percent'],
+				'state'   => $memory['state'],
+				'text'    => 'ok' === $memory['state'] ? '' : ( 'no_agent' === $memory['state'] ? "\u{2013}" : "\u{2026}" ),
+				'sub'     => 'ok' === $memory['state'] ? \BeltoftServices\Proxmox\Network\GuestMemory::line( $memory ) : ( 'no_agent' === $memory['state'] ? \BeltoftServices\Proxmox\Network\GuestMemory::agent_hint() : '' ),
 			);
 
 			$disk = GuestDisk::cached( $resource );

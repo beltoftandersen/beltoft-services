@@ -3,9 +3,9 @@
  * Live CPU, memory and disk of a customer's servers, for the bars on the Servers list and the Overview.
  *
  * Power and CPU come from one /cluster/resources call per cluster, kept 15 seconds. Memory is the guest's own
- * MemAvailable (PVE counts page cache as used), read through the guest agent and kept 60 seconds per VM; without
- * an agent answer PVE's figure is used. Disk is the guest agent's filesystem reading, refreshed here at most once
- * in ten minutes per VM.
+ * MemAvailable (PVE counts page cache as used), read through the guest agent and kept 10 seconds per VM; without
+ * an agent answer there is no figure (PVE's is never shown). Every fresh reading goes to GuestMemory (latest reading and
+ * history). Disk is the guest agent's filesystem reading, refreshed here at most once in ten minutes per VM.
  *
  * @package BeltoftServices
  */
@@ -17,8 +17,6 @@ use BeltoftServices\Api\Routes;
 use BeltoftServices\Proxmox\Pve\Client;
 use BeltoftServices\Proxmox\Pve\Clients;
 use BeltoftServices\Proxmox\Pve\Clusters;
-use BeltoftServices\Proxmox\Pve\LiveClient;
-use BeltoftServices\Proxmox\Pve\Ownership;
 use BeltoftServices\Proxmox\Vm\GuestDisk;
 use BeltoftServices\Proxmox\Vm\PowerJobs;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
@@ -35,10 +33,12 @@ final class LiveUsage {
 	/** Transient that holds a VM's next allowed disk refresh. */
 	public const DISK_PREFIX = 'beltoft_services_proxmox_diskpoll_';
 	public const ROWS_TTL    = 15;
-	public const MEM_TTL     = 60;
+	public const MEM_TTL     = 10;
 	public const DISK_TTL    = 10 * MINUTE_IN_SECONDS;
-	/** Seconds between two refreshes in the browser. */
-	public const INTERVAL = 30;
+	/** Seconds between two refreshes in the browser, the slower refresh after ten minutes without a page interaction, and that idle time. */
+	public const INTERVAL      = 10;
+	public const SLOW_INTERVAL = 60;
+	public const IDLE_AFTER    = 10 * MINUTE_IN_SECONDS;
 	public const HANDLE   = 'beltoft-services-usage-live';
 
 	public static function register(): void {
@@ -53,6 +53,13 @@ final class LiveUsage {
 				'methods'             => \WP_REST_Server::READABLE,
 				'callback'            => array( __CLASS__, 'get' ),
 				'permission_callback' => 'is_user_logged_in',
+				'args'                => array(
+					'ids' => array(
+						'type'        => 'string',
+						'required'    => false,
+						'description' => 'Only these service ids (comma separated). The page asks for the servers on screen.',
+					),
+				),
 			)
 		);
 	}
@@ -73,12 +80,21 @@ final class LiveUsage {
 				'url'      => esc_url_raw( rest_url( Routes::NAMESPACE . '/usage' ) ),
 				'nonce'    => wp_create_nonce( 'wp_rest' ),
 				'interval' => self::INTERVAL * 1000,
+				'slow'     => self::SLOW_INTERVAL * 1000,
+				'idle'     => self::IDLE_AFTER * 1000,
+				'strings'  => array(
+					'secondsAgo' => __( '%d s ago', 'beltoft-services' ),
+					'minutesAgo' => __( '%d min ago', 'beltoft-services' ),
+					/* translators: 1: memory in use in GB, 2: total memory in GB, 3: how long ago the reading was taken, such as "8 s ago". */
+					'line'       => __( '%1$s of %2$s GB, updated %3$s', 'beltoft-services' ),
+					'hint'       => GuestMemory::agent_hint(),
+				),
 			)
 		);
 	}
 
 	/**
-	 * GET usage: { resources: { <id>: { power, cpu, mem, disk } } } for the current user's ready servers.
+	 * GET usage: { resources: { <id>: { power, cpu, mem, disk, memory } } } for the current user's ready servers. With ids only those.
 	 *
 	 * @param \WP_REST_Request $request Request.
 	 */
@@ -90,7 +106,9 @@ final class LiveUsage {
 		}
 
 		$user_id = get_current_user_id();
-		$out     = $user_id > 0 ? self::for_user( $user_id ) : array();
+		$ids     = (string) $request->get_param( 'ids' );
+		$only    = '' === $ids ? null : array_slice( array_values( array_filter( array_map( 'absint', explode( ',', $ids ) ) ) ), 0, 100 );
+		$out     = $user_id > 0 ? self::for_user( $user_id, $only ) : array();
 		$response = new \WP_REST_Response( array( 'resources' => (object) $out ), 200 );
 		$response->header( 'Cache-Control', 'private, no-store' );
 
@@ -98,12 +116,14 @@ final class LiveUsage {
 	}
 
 	/**
-	 * The readings of a user's ready, running or stopped proxmox servers (license owner only).
+	 * The readings of a user's ready, running or stopped proxmox servers (license owner only). Only the servers in $only
+	 * when it is given (the ones on screen: the guest agent is asked for those only).
 	 *
-	 * @param int $user_id User id.
-	 * @return array<int, array{power: string, cpu: ?int, mem: ?int, disk: ?int}>
+	 * @param int                $user_id User id.
+	 * @param array<int, int>|null $only  Resource ids, or null for all.
+	 * @return array<int, array{power: string, cpu: ?int, mem: ?int, disk: ?int, memory: array<string, mixed>}>
 	 */
-	public static function for_user( int $user_id ): array {
+	public static function for_user( int $user_id, ?array $only = null ): array {
 		if ( \BeltoftServices\Settings::get( 'pause_all' ) || ! class_exists( Endpoint::class ) ) {
 			return array();
 		}
@@ -118,6 +138,10 @@ final class LiveUsage {
 			$resource = Resource::for_license( (int) $license['id'] );
 
 			if ( ! $resource || ProxmoxDriver::ID !== $resource->get( 'driver' ) || 'ready' !== $resource->get( 'state' ) || ! $resource->shows_status() || $resource->on_hold() ) {
+				continue;
+			}
+
+			if ( null !== $only && ! in_array( $resource->id(), $only, true ) ) {
 				continue;
 			}
 
@@ -148,12 +172,13 @@ final class LiveUsage {
 				}
 
 				$power   = (string) $vm['status'];
-				$entry   = array( 'power' => $power, 'cpu' => null, 'mem' => null, 'disk' => null );
+				$entry   = array( 'power' => $power, 'cpu' => null, 'mem' => null, 'disk' => null, 'memory' => array( 'state' => 'stopped' ) );
 
 				if ( 'running' === $power ) {
-					$entry['cpu']  = self::percent( (float) ( $vm['cpu'] ?? 0 ) * 100 );
-					$entry['mem']  = self::memory( $resource, $client, $vm );
-					$entry['disk'] = self::disk( $resource );
+					$entry['cpu']    = self::percent( (float) ( $vm['cpu'] ?? 0 ) * 100 );
+					$entry['mem']    = self::memory( $resource, $client, $vm );
+					$entry['disk']   = self::disk( $resource );
+					$entry['memory'] = GuestMemory::view( $resource->id() );
 				}
 
 				$out[ $resource->id() ] = $entry;
@@ -164,14 +189,14 @@ final class LiveUsage {
 	}
 
 	/**
-	 * The memory percent kept for a server, while the reading is fresh; null otherwise. No Proxmox call.
+	 * The memory percent of a server's newest reading (up to 15 minutes old); null otherwise. No Proxmox call.
 	 *
 	 * @param int $resource_id Resource id.
 	 */
 	public static function cached_memory( int $resource_id ): ?int {
-		$kept = get_transient( self::MEM_PREFIX . $resource_id );
+		$latest = GuestMemory::latest( $resource_id );
 
-		return is_array( $kept ) && isset( $kept['percent'] ) ? (int) $kept['percent'] : null;
+		return null === $latest ? null : $latest['percent'];
 	}
 
 	/**
@@ -221,8 +246,9 @@ final class LiveUsage {
 	}
 
 	/**
-	 * Memory percent of a running VM: the guest's (MemTotal - MemAvailable) / MemTotal, kept 60 seconds;
-	 * null when the agent does not answer (PVE's own mem counts the guest's file cache, so it is never shown).
+	 * Memory percent of a running VM: the guest's (MemTotal - MemAvailable) / MemTotal, kept 10 seconds, so several tabs
+	 * share one reading; null when the agent does not answer (PVE's own mem counts the guest's file cache, so it is never
+	 * shown). A fresh reading is kept by GuestMemory (latest value, and a history row once in five minutes).
 	 *
 	 * @param Resource             $resource Resource.
 	 * @param Client               $client   Client.
@@ -236,45 +262,20 @@ final class LiveUsage {
 			return isset( $kept['percent'] ) ? (int) $kept['percent'] : null;
 		}
 
-		$node    = (string) ( $vm['node'] ?? '' );
+		$reading = GuestMemory::fetch( $resource, $client, (string) ( $vm['node'] ?? '' ), (int) $vm['vmid'] );
 		$percent = null;
 
-		// The agent is only asked on a VM that carries this resource's tag (the same proof as every other VM access).
-		if ( '' !== $node ) {
-			$config = Ownership::config( $client, $node, (int) $vm['vmid'] );
-
-			if ( ! is_wp_error( $config ) && Ownership::has_tag( (string) ( $config['description'] ?? '' ), Ownership::tag( $resource ) ) ) {
-				$percent = self::guest_memory( $client, $node, (int) $vm['vmid'] );
-			}
+		if ( null === $reading ) {
+			GuestMemory::failed( $resource->id() );
+		} else {
+			GuestMemory::store( $resource->id(), $reading );
+			$percent = GuestMemory::percent( $reading['used_mb'], $reading['total_mb'] );
 		}
 
-		// A failed read or a missing tag is kept as well, so an absent agent is asked once a minute, not every poll.
+		// A failed read or a missing tag is kept as well, so an absent agent is asked once per window, not every poll.
 		set_transient( $key, null === $percent ? array( 'failed' => true ) : array( 'percent' => $percent ), self::MEM_TTL );
 
 		return $percent;
-	}
-
-	/**
-	 * Reads /proc/meminfo through the guest agent.
-	 *
-	 * @param Client $client Client.
-	 * @param string $node   Node.
-	 * @param int    $vmid   VMID.
-	 */
-	private static function guest_memory( Client $client, string $node, int $vmid ): ?int {
-		if ( '' === $node ) {
-			return null;
-		}
-
-		$path   = '/nodes/' . rawurlencode( $node ) . '/qemu/' . $vmid . '/agent/file-read';
-		$params = array( 'file' => '/proc/meminfo' );
-		$reply  = $client instanceof LiveClient ? $client->request_with_timeout( 'GET', $path, $params, 5 ) : $client->request( 'GET', $path, $params );
-
-		if ( is_wp_error( $reply ) || ! is_array( $reply ) || ! is_string( $reply['content'] ?? null ) ) {
-			return null;
-		}
-
-		return self::meminfo( $reply['content'] );
 	}
 
 	/**
@@ -283,14 +284,9 @@ final class LiveUsage {
 	 * @param string $text File content.
 	 */
 	public static function meminfo( string $text ): ?int {
-		if ( ! preg_match( '/^MemTotal:\s+(\d+)\s*kB/mi', $text, $total ) || ! preg_match( '/^MemAvailable:\s+(\d+)\s*kB/mi', $text, $available ) ) {
-			return null;
-		}
+		$reading = GuestMemory::parse( $text );
 
-		$total     = (int) $total[1];
-		$available = (int) $available[1];
-
-		return $total > 0 && $available <= $total ? self::percent( ( $total - $available ) / $total * 100 ) : null;
+		return null === $reading ? null : GuestMemory::percent( $reading['used_mb'], $reading['total_mb'] );
 	}
 
 	/**

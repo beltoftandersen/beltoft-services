@@ -132,6 +132,11 @@ final class Panels {
 			/* translators: %s: the highest value in the period, such as 31% */
 			'peak' => __( 'peak %s', 'beltoft-services' ),
 			'noReading' => __( 'No reading', 'beltoft-services' ),
+			'memory' => __( 'Memory in use (excluding cache)', 'beltoft-services' ),
+			/* translators: 1: memory in use in GB, 2: total memory in GB, 3: percent in use. */
+			'memNow' => __( '%1$s of %2$s GB (%3$s%)', 'beltoft-services' ),
+			'total' => __( 'Total', 'beltoft-services' ),
+			'agentHint' => \BeltoftServices\Proxmox\Network\GuestMemory::agent_hint(),
 			'alertsOn' => __( 'Usage emails are on for this server.', 'beltoft-services' ),
 			'alertsOff' => __( 'Usage emails are off for this server.', 'beltoft-services' ),
 			'alertsSaving' => __( 'Saving the usage email setting…', 'beltoft-services' ),
@@ -209,7 +214,7 @@ final class Panels {
 	}
 
 	/**
-	 * Plain lines for what the usage emails told the customer and is still the case: disk and CPU. Cleared when
+	 * Plain lines for what the usage emails told the customer and is still the case: disk, CPU and memory. Cleared when
 	 * the alert re-arms.
 	 *
 	 * @param Resource $r Resource.
@@ -228,6 +233,11 @@ final class Panels {
 		if ( $r->get( 'monitor_cpu_notified' ) && $r->get( 'monitor_cpu_since' ) ) {
 			/* translators: %s: date and time. */
 			$lines[] = sprintf( __( 'CPU high since %s', 'beltoft-services' ), wp_date( $date . ' ' . get_option( 'time_format' ), (int) $r->get( 'monitor_cpu_since' ) ) );
+		}
+
+		if ( $r->get( 'monitor_mem_notified' ) && $r->get( 'monitor_mem_since' ) ) {
+			/* translators: %s: date and time. */
+			$lines[] = sprintf( __( 'Memory high since %s', 'beltoft-services' ), wp_date( $date . ' ' . get_option( 'time_format' ), (int) $r->get( 'monitor_mem_since' ) ) );
 		}
 
 		return $lines;
@@ -609,6 +619,7 @@ final class Panels {
 			__( 'Disk alert sent', 'beltoft-services' ) => $r->get( 'monitor_disk_notified' ) ? __( 'Yes', 'beltoft-services' ) : __( 'No', 'beltoft-services' ),
 			__( 'Urgent disk alert sent', 'beltoft-services' ) => $r->get( 'monitor_disk_urgent_notified' ) ? __( 'Yes', 'beltoft-services' ) : __( 'No', 'beltoft-services' ),
 			__( 'CPU alert', 'beltoft-services' ) => $r->get( 'monitor_cpu_notified' ) ? sprintf( /* translators: %s: date and time. */ __( 'Sent, high since %s', 'beltoft-services' ), wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $r->get( 'monitor_cpu_since' ) ) ) : __( 'No', 'beltoft-services' ),
+			__( 'Memory alert', 'beltoft-services' ) => $r->get( 'monitor_mem_notified' ) ? sprintf( /* translators: %s: date and time. */ __( 'Sent, high since %s', 'beltoft-services' ), wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $r->get( 'monitor_mem_since' ) ) ) : __( 'No', 'beltoft-services' ),
 			__( 'Usage emails', 'beltoft-services' ) => Monitor::usage_wanted( $r ) ? __( 'On', 'beltoft-services' ) : __( 'Turned off by the customer', 'beltoft-services' ),
 			__( 'Waiting', 'beltoft-services' )       => '' !== (string) $r->get( 'waiting' ) ? sprintf( /* translators: %s: what the server waits for. */ __( 'Waiting: %s', 'beltoft-services' ), (string) $r->get( 'waiting' ) ) : '',
 			__( 'Last error', 'beltoft-services' )    => (string) ( $problems[ $r->id() ]['message'] ?? $r->get( 'last_error' ) ),

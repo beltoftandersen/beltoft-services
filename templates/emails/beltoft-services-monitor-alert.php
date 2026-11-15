@@ -15,7 +15,7 @@ if ( '' !== (string) ( $customer_name ?? '' ) ) {
 </p>
 <?php
 $beltoft_services_name = '' !== (string) $product_name ? (string) $product_name : __( 'Your server', 'beltoft-services' );
-$beltoft_services_usage = in_array( $monitor_reason, array( 'disk', 'disk_urgent', 'cpu' ), true );
+$beltoft_services_usage = in_array( $monitor_reason, array( 'disk', 'disk_urgent', 'cpu', 'memory' ), true );
 ?>
 <?php if ( 'db_disk' === $monitor_reason ) : ?>
 	<p><?php
@@ -53,6 +53,17 @@ $beltoft_services_usage = in_array( $monitor_reason, array( 'disk', 'disk_urgent
 		<li><?php esc_html_e( 'Check what is running (top or htop).', 'beltoft-services' ); ?></li>
 		<li><?php esc_html_e( 'Restart the server from your account.', 'beltoft-services' ); ?></li>
 		<?php if ( '' !== (string) $monitor_upgrade_url ) : ?><li><a href="<?php echo esc_url( $monitor_upgrade_url ); ?>"><?php esc_html_e( 'Move to a plan with more cores', 'beltoft-services' ); ?></a></li><?php endif; ?>
+	</ul>
+<?php elseif ( 'memory' === $monitor_reason ) : ?>
+	<p><?php
+	/* translators: 1: server name, 2: memory in use in GB, 3: total memory in GB, 4: percent, 5: minutes. */
+	echo esc_html( sprintf( __( '%1$s has used %2$s of %3$s GB of its memory (%4$d percent or more) for %5$d minutes.', 'beltoft-services' ), $beltoft_services_name, number_format_i18n( $monitor_mem_used_mb / 1024, 1 ), number_format_i18n( $monitor_mem_total_mb / 1024, 1 ), $monitor_mem_percent, $monitor_mem_minutes ) );
+	?> <?php esc_html_e( 'This does not count the file cache, which Linux gives back when programs need it.', 'beltoft-services' ); ?></p>
+	<p><?php esc_html_e( 'What you can do:', 'beltoft-services' ); ?></p>
+	<ul>
+		<li><?php esc_html_e( 'See what uses the memory: run free -h, and top sorted by memory (press Shift+M).', 'beltoft-services' ); ?></li>
+		<li><?php esc_html_e( 'Restart the program that uses the most, or restart the server from your account.', 'beltoft-services' ); ?></li>
+		<?php if ( '' !== (string) $monitor_upgrade_url ) : ?><li><a href="<?php echo esc_url( $monitor_upgrade_url ); ?>"><?php esc_html_e( 'Move to a plan with more memory', 'beltoft-services' ); ?></a></li><?php endif; ?>
 	</ul>
 <?php else : ?>
 	<p><?php esc_html_e( 'Your server has not been running for about 30 minutes. This alert was sent only if you did not shut it down from your account.', 'beltoft-services' ); ?></p>

@@ -36,6 +36,8 @@ final class ProxmoxSettings {
 		'monitor_cpu_percent' => array( 50, 100 ),
 		'monitor_cpu_hours' => array( 1, 24 ),
 		'monitor_cooldown_days' => array( 1, 90 ),
+		'monitor_mem_percent' => array( 50, 99 ),
+		'monitor_mem_minutes' => array( 5, 120 ),
 		'traffic_alert_percent' => array( 1, 100 ),
 		'traffic_alert_mbit' => array( 1, 100000 ),
 		'traffic_jump_factor' => array( 2, 1000 ),
@@ -357,6 +359,20 @@ final class ProxmoxSettings {
 			'default' => 7,
 			'min' => self::RANGES['monitor_cooldown_days'][0],
 			'label' => __( 'Days between two CPU emails for one server', 'beltoft-services' ),
+		);
+		$fields['monitor_mem_percent'] = $base + array(
+			'type' => 'number',
+			'default' => 90,
+			'min' => self::RANGES['monitor_mem_percent'][0],
+			'label' => __( 'Memory alert threshold, percent', 'beltoft-services' ),
+			'desc' => __( 'Memory in use without the file cache, as the guest reports it. Not sent for database servers, which reserve memory on purpose. Re-arms when a reading is 10 points lower. The days between two emails are the same as for CPU.', 'beltoft-services' ),
+		);
+		$fields['monitor_mem_minutes'] = $base + array(
+			'type' => 'number',
+			'default' => 15,
+			'min' => self::RANGES['monitor_mem_minutes'][0],
+			'label' => __( 'Memory alert after this many minutes', 'beltoft-services' ),
+			'desc' => __( 'Counted in readings of 5 minutes: 15 minutes is 3 readings in a row. Nothing is sent in the first 15 minutes after the server starts.', 'beltoft-services' ),
 		);
 		$fields['traffic_alerts'] = $base + array(
 			'type' => 'select',

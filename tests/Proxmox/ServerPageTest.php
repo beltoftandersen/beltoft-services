@@ -166,9 +166,10 @@ class ServerPageTest extends MonitoringTestCase {
 		$html = $this->page( $r, '' );
 		$this->assertSame( $before, count( $this->fake->calls() ), 'The list makes no Proxmox call.' );
 		$rows = Servers::rows( array( View::license( $r->license() ) ) );
-		// The Proxmox 'mem' (1 GB above) is never used: without a guest reading the memory bar has no figure and is printed hidden.
-		$this->assertSame( array( 'CPU' => 25, 'Memory' => null, 'Disk' => 50 ), array_column( $rows[0]['bars'], 'percent', 'label' ) );
-		set_transient( \BeltoftServices\Proxmox\Network\LiveUsage::MEM_PREFIX . $r->id(), array( 'percent' => 33 ), 60 );
+		// The Proxmox 'mem' (1 GB above) is never used: without a guest reading the memory bar is empty ("...") and still shown.
+		$this->assertSame( array( 'CPU' => 25, 'Memory' => 0, 'Disk' => 50 ), array_column( $rows[0]['bars'], 'percent', 'label' ) );
+		$this->assertSame( 'waiting', array_column( $rows[0]['bars'], 'state', 'label' )['Memory'] );
+		\BeltoftServices\Proxmox\Network\GuestMemory::store( $r->id(), array( 'used_mb' => 1352, 'total_mb' => 4096 ) );
 		$rows = Servers::rows( array( View::license( $r->license() ) ) );
 		$this->assertSame( array( 'CPU' => 25, 'Memory' => 33, 'Disk' => 50 ), array_column( $rows[0]['bars'], 'percent', 'label' ) );
 		$this->assertStringContainsString( 'Running', $html );

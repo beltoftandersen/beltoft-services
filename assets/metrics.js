@@ -10,7 +10,9 @@
 	var specs = {
 		cpu: { keys: [ 'cpu' ], names: [ labels.cpu ], unit: '%' },
 		net: { keys: [ 'netin', 'netout' ], names: [ labels.in, labels.out ], unit: 'MB/s', divisor: 1048576 },
-		io: { keys: [ 'diskread', 'diskwrite' ], names: [ labels.read, labels.write ], unit: 'MB/s', divisor: 1048576 }
+		io: { keys: [ 'diskread', 'diskwrite' ], names: [ labels.read, labels.write ], unit: 'MB/s', divisor: 1048576 },
+		// Memory is our own data (the guest's reading, not Proxmox's): used and total in GB, the peak as a percent.
+		mem: { keys: [ 'used_gb', 'total_gb' ], names: [ labels.memory, labels.total ], unit: 'GB', memory: true }
 	};
 	var top = 8;
 	var bottom = 154;
@@ -36,6 +38,12 @@
 
 	function fill( text, part ) {
 		return String( text || '%s' ).replace( '%s', function () { return part; } );
+	}
+
+	// Several placeholders (%1$s, %2$s, %3$s) in order.
+	function fillAll( text, parts ) {
+		var n = 0;
+		return String( text || '' ).replace( /%(\d\$)?s/g, function () { var part = parts[ n ]; n += 1; return undefined === part ? '' : part; } );
 	}
 
 	function clock( seconds, range ) {
@@ -72,6 +80,11 @@
 		function xOf( index ) { return points.length === 1 ? 300 : index * 600 / ( points.length - 1 ); }
 		function yOf( n ) { return bottom - Math.max( 0, n ) / max * ( bottom - top ); }
 		var peakText = withUnit( peak, spec.unit );
+		if ( spec.memory ) {
+			var peakPercent = 0;
+			points.forEach( function ( point ) { if ( 'number' === typeof point.peak_percent ) { peakPercent = Math.max( peakPercent, point.peak_percent ); } } );
+			peakText = format( peakPercent ) + '%';
+		}
 		var svg = svgNode( 'svg', { viewBox: '0 0 600 160', preserveAspectRatio: 'none', role: 'img', 'aria-label': chart.querySelector( 'h5' ).textContent + ' ' + labels.graph + ', ' + fill( labels.peak, peakText ) } );
 		[ 1 / 3, 2 / 3 ].forEach( function ( step ) {
 			var y = bottom - step * ( bottom - top );
@@ -110,6 +123,7 @@
 				var n = value( point, spec, key );
 				return spec.names[ series ] + ': ' + ( null === n ? labels.noReading : withUnit( n, spec.unit ) );
 			} );
+			if ( spec.memory && 'number' === typeof point.peak_percent ) { parts.push( fill( labels.peak, format( point.peak_percent ) + '%' ) ); }
 			readout.textContent = date + '   ' + parts.join( '   ' );
 		}
 		svg.addEventListener( 'pointermove', function ( event ) {
@@ -126,8 +140,12 @@
 			var lastIndex = points.indexOf( last );
 			var marker = document.createElement( 'i' );
 			var kind = chart.getAttribute( 'data-chart' );
-			big.textContent = 'cpu' === kind ? withUnit( current, spec.unit ) : format( current );
-			small.textContent = 'cpu' === kind ? '' : spec.unit + ' ' + spec.names[ 0 ];
+			if ( spec.memory ) {
+				big.textContent = fillAll( labels.memNow, [ format( current ), format( last.total_gb ), format( last.percent ) ] );
+			} else {
+				big.textContent = 'cpu' === kind ? withUnit( current, spec.unit ) : format( current );
+			}
+			small.textContent = 'cpu' === kind || spec.memory ? '' : spec.unit + ' ' + spec.names[ 0 ];
 			now.appendChild( big );
 			if ( small.textContent ) { now.appendChild( small ); }
 			marker.className = 'beltoft-vm-usage__point';
@@ -192,7 +210,23 @@
 				var points = body && Array.isArray( body.points ) ? body.points : [];
 				notice.textContent = points.length ? '' : labels.empty;
 				block.classList.toggle( 'is-empty', ! points.length );
-				block.querySelectorAll( '[data-chart]' ).forEach( function ( chart ) { render( chart, points, specs[ chart.getAttribute( 'data-chart' ) ], asked ); } );
+				var memory = body && body.memory ? body.memory : { state: '', points: [] };
+				var memPoints = ( memory.points || [] ).map( function ( point ) {
+					return {
+						t: point.t,
+						used_gb: 'number' === typeof point.used_mb ? point.used_mb / 1024 : null,
+						total_gb: 'number' === typeof point.total_mb ? point.total_mb / 1024 : null,
+						percent: point.percent,
+						peak_percent: point.peak_percent
+					};
+				} );
+				if ( ! memPoints.some( function ( point ) { return null !== point.used_gb; } ) ) { memPoints = []; }
+				block.querySelectorAll( '[data-chart]' ).forEach( function ( chart ) {
+					var kind = chart.getAttribute( 'data-chart' );
+					render( chart, 'mem' === kind ? memPoints : points, specs[ kind ], asked );
+					var hint = chart.querySelector( '[data-mem-hint]' );
+					if ( hint ) { hint.textContent = ! memPoints.length && 'no_agent' === memory.state ? labels.agentHint : ''; }
+				} );
 			} ).catch( function () {
 				if ( current !== serial ) { return; }
 				inflight = false;

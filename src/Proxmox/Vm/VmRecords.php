@@ -306,7 +306,7 @@ final class VmRecords {
 	}
 
 	/**
-	 * Deletes a resource's record, which frees its VMID.
+	 * Deletes a resource's record, which frees its VMID, and its guest memory history.
 	 *
 	 * @param int $resource_id Activation id.
 	 * @return bool Whether a record was removed.
@@ -315,6 +315,11 @@ final class VmRecords {
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- the plugin's own table.
-		return (int) $wpdb->delete( Schema::tables()['vms'], array( 'resource_id' => $resource_id ), array( '%d' ) ) > 0;
+		$removed = (int) $wpdb->delete( Schema::tables()['vms'], array( 'resource_id' => $resource_id ), array( '%d' ) ) > 0;
+
+		// The server's memory history goes with it (the daily job also removes rows of servers without a record).
+		\BeltoftServices\Proxmox\Network\GuestMemory::purge( $resource_id );
+
+		return $removed;
 	}
 }

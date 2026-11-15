@@ -5,6 +5,7 @@ namespace BeltoftServices\Proxmox\Network;
 use BeltoftLicenses\Events;
 use BeltoftServices\Emails\Emails;
 use BeltoftServices\Proxmox\Vm\AbuseJobs;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Proxmox\Vm\Usage;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
@@ -85,6 +86,70 @@ final class Monitor {
 				? array( 'monitor_disk_urgent_notified' => $now, 'monitor_disk_notified' => $r->get( 'monitor_disk_notified' ) ?: $now )
 				: array( 'monitor_disk_notified' => $now ) );
 			if ( $stored ) { Events::add( (int) ( $r->license()['id'] ?? 0 ), 'service', $is_urgent ? 'Monitoring email: disk almost completely full' : 'Monitoring email: disk nearly full' ); }
+			return $stored;
+		} );
+	}
+
+	/** Seconds after a boot or reinstall in which memory is still settling: no memory email. */
+	public const MEM_SETTLE = 900;
+
+	/**
+	 * Sustained high memory in use (without the file cache), judged on the stored 5-minute readings of the guest: the
+	 * newest readings in a row, at least monitor_mem_minutes long, all at or above monitor_mem_percent. One email per episode
+	 * (it re-arms when a reading is 10 points under the threshold), the same cool-down as CPU between two emails for one server.
+	 * Never for database servers (they reserve memory on purpose), adopted machines, a stopped server, or in the first 15
+	 * minutes after the server started (a boot or a reinstall; readings from before the boot do not count).
+	 *
+	 * @param Resource $r      Resource.
+	 * @param int|null $uptime Seconds the VM has run, when Proxmox says; null when unknown.
+	 * @param int|null $now    Timestamp.
+	 */
+	public static function memory( Resource $r, ?int $uptime = null, ?int $now = null ): void {
+		$now = $now ?? time();
+		if ( 'on' !== Settings::get( 'monitor_alerts' ) || true === $r->get( 'linked' ) || ProxmoxDriver::ID !== $r->get( 'driver' ) ) { return; }
+		$threshold = (int) Settings::get( 'monitor_mem_percent' );
+		$threshold = $threshold >= 50 && $threshold <= 99 ? $threshold : 90;
+		$minutes = (int) Settings::get( 'monitor_mem_minutes' );
+		$minutes = $minutes >= 5 && $minutes <= 120 ? $minutes : 15;
+		$days = (int) Settings::get( 'monitor_cooldown_days' );
+		$days = $days >= 1 && $days <= 90 ? $days : 7;
+		$count = max( 1, intdiv( $minutes, 5 ) );
+		$since = null !== $uptime ? $now - max( 0, $uptime ) : 0;
+		$recent = GuestMemory::recent( $r->id(), $count, max( $since, $now - ( $count + 3 ) * GuestMemory::SPAN_RAW ) );
+		if ( ! $recent ) { return; }
+		$cleared = $recent[0]['percent'] <= $threshold - 10;
+		// The newest readings must be a run: each next one at most two slots (10 minutes) before the one after it.
+		$high = count( $recent ) >= $count && $now - $recent[0]['bucket'] <= 2 * GuestMemory::SPAN_RAW + GuestMemory::SPAN_RAW;
+		$oldest = $recent[0]['bucket'];
+		foreach ( $recent as $i => $reading ) {
+			if ( $reading['percent'] < $threshold || ( $i > 0 && $recent[ $i - 1 ]['bucket'] - $reading['bucket'] > 2 * GuestMemory::SPAN_RAW ) ) { $high = false; }
+			$oldest = $reading['bucket'];
+		}
+		if ( null !== $uptime && $uptime < self::MEM_SETTLE ) { $high = false; }
+		$r->locked( static function () use ( $r, $now, $days, $threshold, $cleared, $high, $oldest, $recent ): bool {
+			if ( $cleared && $r->get( 'monitor_mem_notified' ) ) {
+				return $r->set( array( 'monitor_mem_notified' => null, 'monitor_mem_since' => null ) );
+			}
+			if ( ! $high || $r->get( 'monitor_mem_notified' ) || 'ready' !== $r->get( 'state' ) || 'ready' !== $r->get( 'desired' ) || $r->get( 'task' ) || ! self::usage_wanted( $r ) ) {
+				return false;
+			}
+			$last = (int) $r->get( 'monitor_mem_sent_at' );
+			if ( $last > 0 && $now - $last < $days * DAY_IN_SECONDS ) {
+				return false;
+			}
+			$data = array(
+				'reason'       => 'memory',
+				'mem_percent'  => $threshold,
+				'mem_minutes'  => count( $recent ) * 5,
+				'mem_used_mb'  => $recent[0]['used_mb'],
+				'mem_total_mb' => $recent[0]['total_mb'],
+				'mem_since'    => $oldest,
+			);
+			if ( ! Emails::send( self::EMAIL_ID, $r, $data ) ) {
+				return false;
+			}
+			$stored = $r->set( array( 'monitor_mem_notified' => $now, 'monitor_mem_sent_at' => $now, 'monitor_mem_since' => $oldest ) );
+			if ( $stored ) { Events::add( (int) ( $r->license()['id'] ?? 0 ), 'service', 'Monitoring email: memory high' ); }
 			return $stored;
 		} );
 	}
