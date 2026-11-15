@@ -168,8 +168,10 @@
 	}
 
 	document.querySelectorAll( '[data-vm-metrics]' ).forEach( function ( block ) {
-		var panel = block.closest( '.beltoft-services-panel[data-resource]' );
+		var panel = block.closest( '.beltoft-services-panel[data-resource], [data-hosting-resource]' );
 		if ( ! panel ) { return; }
+		// A server panel carries data-resource, a hosting account data-hosting-resource: the same route answers for both.
+		var resourceId = panel.getAttribute( 'data-resource' ) || panel.getAttribute( 'data-hosting-resource' );
 		var notice = block.querySelector( '[data-metrics-notice]' );
 		var alerts = block.querySelector( '[data-usage-alerts]' );
 		var alertsNote = block.querySelector( '[data-usage-alerts-note]' );
@@ -177,7 +179,7 @@
 			alerts.addEventListener( 'change', function () {
 				var wanted = alerts.checked;
 				var bs = window.beltoftStatus;
-				var id = panel.getAttribute( 'data-resource' );
+				var id = resourceId;
 				var handle;
 				// One request per click: the switch is busy until the answer is in.
 				if ( bs.locked( id ) ) { alerts.checked = ! wanted; return; }
@@ -208,7 +210,7 @@
 			var asked = range;
 			inflight = true;
 			if ( ! background ) { notice.textContent = labels.loading; }
-			window.beltoftApi.call( account.root + encodeURIComponent( panel.getAttribute( 'data-resource' ) ) + '/metrics?range=' + encodeURIComponent( asked ), { holder: account } ).then( function ( reply ) {
+			window.beltoftApi.call( account.root + encodeURIComponent( resourceId ) + '/metrics?range=' + encodeURIComponent( asked ), { holder: account } ).then( function ( reply ) {
 				if ( ! reply.ok || ! reply.parsed ) { throw new Error( 'metrics' ); }
 				return reply.data;
 			} ).then( function ( body ) {

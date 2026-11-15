@@ -10,6 +10,7 @@ namespace BeltoftServices\Hosting;
 use BeltoftServices\Children;
 use BeltoftServices\Mail\MailDriver;
 use BeltoftServices\Resource;
+use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -235,6 +236,7 @@ final class HostingAccount {
 		}
 
 		self::enqueue();
+		self::enqueue_monitoring();
 
 		$actions = new HostingActions( $r );
 		$limits  = $actions->limits();
@@ -250,6 +252,7 @@ final class HostingAccount {
 		self::print_task_line( $state );
 		self::print_notices( $r );
 		self::print_overview( $r, $limits );
+		self::print_monitoring( $r, $ready );
 		self::print_websites( $r, $limits, $sites, $ready, $pending );
 
 		if ( self::checklist_visible( $r ) ) {
@@ -278,13 +281,17 @@ final class HostingAccount {
 	private static function print_overview( Resource $r, array $limits ): void {
 		$storage = HostingUsage::storage_percent( $r );
 
-		echo '<section class="bsh-overview" aria-label="' . esc_attr__( 'Overview', 'beltoft-services' ) . '"><dl class="bsh-overview__facts">';
+		echo '<section class="bsh-overview" aria-label="' . esc_attr__( 'Overview', 'beltoft-services' ) . '"><dl class="bsh-overview__facts"' . ( 'ready' === $r->get( 'state' ) ? ' data-usage-resource="' . (int) $r->id() . '"' : '' ) . '>';
 		echo '<div><dt>' . esc_html__( 'Websites', 'beltoft-services' ) . '</dt><dd>' . esc_html(
 			0 === (int) $limits['sites']
 				? (string) (int) $limits['sites_used']
 				/* translators: 1: websites used, 2: websites allowed. */
 				: sprintf( __( '%1$d of %2$d', 'beltoft-services' ), (int) $limits['sites_used'], (int) $limits['sites'] )
 		) . '</dd></div>';
+
+		if ( 'ready' === $r->get( 'state' ) ) {
+			self::print_live_bars( $r );
+		}
 
 		if ( null !== $storage ) {
 			$percent = (int) round( max( 0.0, min( 100.0, (float) $storage ) ) );
@@ -294,6 +301,7 @@ final class HostingAccount {
 
 		echo '</dl><nav class="bsh-jump" aria-label="' . esc_attr__( 'On this page', 'beltoft-services' ) . '">';
 		echo '<a href="#beltoft-hosting-sites">' . esc_html__( 'Websites', 'beltoft-services' ) . '</a>';
+		echo '<a href="#beltoft-hosting-monitoring">' . esc_html__( 'Monitoring', 'beltoft-services' ) . '</a>';
 		echo '<a href="#beltoft-hosting-files">' . esc_html__( 'Files (SFTP)', 'beltoft-services' ) . '</a>';
 		if ( HostingBackups::enabled( $r ) ) {
 			echo '<a href="#beltoft-hosting-backups">' . esc_html__( 'Backups', 'beltoft-services' ) . '</a>';
@@ -301,6 +309,85 @@ final class HostingAccount {
 
 		echo '<a href="#beltoft-hosting-email">' . esc_html__( 'Email', 'beltoft-services' ) . '</a>';
 		echo '</nav></section>';
+	}
+
+	/**
+	 * The scripts of the monitoring: the charts (the shared script of the server page) and the live bars, with the words of a
+	 * hosting account (memory is read by the node agent, not a guest agent).
+	 */
+	private static function enqueue_monitoring(): void {
+		$hint = __( 'Memory could not be read just now. It is tried again every few minutes.', 'beltoft-services' );
+
+		\BeltoftServices\Monitoring\Charts::enqueue(
+			\BeltoftServices\Account\Panel::HANDLE,
+			array(
+				'agentHint' => $hint,
+				'alertsOn'  => __( 'Usage emails are on for this hosting.', 'beltoft-services' ),
+				'alertsOff' => __( 'Usage emails are off for this hosting.', 'beltoft-services' ),
+			)
+		);
+		\BeltoftServices\Monitoring\LiveUsage::enqueue( $hint );
+	}
+
+	/**
+	 * The live CPU and memory next to the storage in the overview (assets/usage-live.js fills them every 10 seconds while the
+	 * page is visible). Memory is the newest reading of the container without its file cache; CPU waits for the first poll.
+	 *
+	 * @param Resource $r Hosting resource.
+	 */
+	private static function print_live_bars( Resource $r ): void {
+		$memory = \BeltoftServices\Monitoring\GuestMemory::view( $r->id() );
+		$text   = 'ok' === $memory['state'] ? (int) $memory['percent'] . '%' : ( 'no_agent' === $memory['state'] ? "\u{2013}" : "\u{2026}" );
+
+		echo '<div data-usage-bar="cpu" hidden><dt>' . esc_html__( 'CPU', 'beltoft-services' ) . '</dt><dd><span class="bs-meter" aria-hidden="true"><span class="bs-meter__fill" data-usage-fill style="width: 0%"></span></span><span class="bsh-overview__small" data-usage-text></span></dd></div>';
+		echo '<div data-usage-bar="mem" data-mem-state="' . esc_attr( (string) $memory['state'] ) . '" title="' . esc_attr__( 'Memory in use (excluding cache)', 'beltoft-services' ) . '"><dt>' . esc_html__( 'Memory', 'beltoft-services' ) . '</dt><dd><span class="bs-meter" aria-hidden="true"><span class="bs-meter__fill" data-usage-fill style="width: ' . (int) ( $memory['percent'] ?? 0 ) . '%"></span></span><span class="bsh-overview__small" data-usage-text>' . esc_html( $text ) . '</span><small class="bsh-overview__small" data-usage-sub></small></dd></div>';
+	}
+
+	/**
+	 * The monitoring panel: the same charts as a server's page (CPU, memory in use without the file cache, network and disk
+	 * activity, 1 hour, 1 day and 30 days) and the storage as one bar, with the usage email switch.
+	 *
+	 * @param Resource $r     Hosting resource.
+	 * @param bool     $ready Whether the account is ready.
+	 */
+	private static function print_monitoring( Resource $r, bool $ready ): void {
+		if ( ! $ready ) {
+			return;
+		}
+
+		$plan    = Plan::typed( (array) $r->get( 'plan' ) );
+		$disk    = ( new HostingGuest() )->disk( $r );
+		$pct     = null === $disk ? null : max( 0, min( 100, (int) round( $disk['used'] / $disk['total'] * 100 ) ) );
+		$states  = \BeltoftServices\Monitoring\UsageRules::states( $r );
+		$storage = (array) $r->get( 'storage' );
+
+		if ( ! empty( $storage['warned'] ) && null !== $pct ) {
+			/* translators: 1: percent of the storage in use, 2: date. */
+			array_unshift( $states, sprintf( __( 'Storage %1$d percent full since %2$s', 'beltoft-services' ), $pct, wp_date( (string) get_option( 'date_format' ), (int) $storage['warned'] ) ) );
+		}
+
+		echo '<div class="beltoft-hosting-panel" id="beltoft-hosting-monitoring">';
+		\BeltoftServices\Monitoring\Charts::panel(
+			array(
+				'states'       => $states,
+				'alerts_shown' => 'on' === Settings::get( 'monitor_alerts' ),
+				'alerts_on'    => \BeltoftServices\Monitoring\UsageRules::wanted( $r ),
+				'alerts_label' => __( 'Email me when this hosting is short of CPU, memory or storage', 'beltoft-services' ),
+				'disk'         => array(
+					'title' => __( 'Storage', 'beltoft-services' ),
+					'pct'   => $pct,
+					/* translators: %d: percent of the storage in use */
+					'aria'  => sprintf( __( 'Storage, %d percent used', 'beltoft-services' ), (int) $pct ),
+					'line'  => null !== $disk
+						/* translators: 1: used storage in GB (files and databases), 2: storage of the plan in GB. */
+						? sprintf( __( 'Storage used: %1$s of %2$s GB', 'beltoft-services' ), number_format_i18n( $disk['used'] / 1073741824, 1 ), number_format_i18n( $disk['total'] / 1073741824, 1 ) )
+						/* translators: %d: the plan's storage in GB. */
+						: sprintf( __( '%d GB', 'beltoft-services' ), (int) $plan['disk_gb'] ),
+					'note'  => __( 'Files and databases, read every hour', 'beltoft-services' ),
+				),
+			)
+		);
+		echo '</div>';
 	}
 
 	/**

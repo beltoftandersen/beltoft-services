@@ -47,7 +47,7 @@ defined( 'ABSPATH' ) || exit;
  * - POST   hosting/files/keys              code (emailed), key: adds a public SSH key
  * - DELETE hosting/files/keys              fingerprint: removes one
  * - POST   hosting/mail                    domain (optional, must be the account's own domain): sets up Email lite
- * - GET    hosting/usage                   stats, database size, storage share
+ * - GET    hosting/usage                   stats, memory in use (newest stored reading, without the file cache), database size, storage share
  * - GET    hosting/backups                 the backups, the safety point
  * - POST   hosting/backups                 back up now (3 a day)
  * - POST   hosting/backups/restore         scope (account, files, database), volid, slug
@@ -545,9 +545,13 @@ final class HostingRoutes {
 
 		$usage   = (array) $r->get( 'usage' );
 		$percent = HostingUsage::storage_percent( $r );
+		$memory  = \BeltoftServices\Monitoring\GuestMemory::latest( $r->id() ); // The newest stored reading (no node call): memory in use without the file cache.
 
 		return self::ok(
 			array(
+				'memory_percent'    => null === $memory ? null : $memory['percent'],
+				'memory_used_mb'    => null === $memory ? null : $memory['used_mb'],
+				'memory_total_mb'   => null === $memory ? null : $memory['total_mb'],
 				'at'                => (int) ( $usage['at'] ?? 0 ),
 				'status'            => (string) ( $usage['status'] ?? '' ),
 				'cpu'               => (float) ( $usage['cpu'] ?? 0 ),

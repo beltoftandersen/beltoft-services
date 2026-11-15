@@ -743,6 +743,7 @@ final class EmailsTest extends TestCase {
 			'monitor_disk_used',
 			'monitor_disks_url',
 			'monitor_grow_url',
+			'monitor_hosting',
 			'monitor_mem_minutes',
 			'monitor_mem_percent',
 			'monitor_mem_total_mb',

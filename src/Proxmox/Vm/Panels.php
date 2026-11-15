@@ -117,31 +117,7 @@ final class Panels {
 		}
 
 		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/vm.js', BELTOFT_SERVICES_FILE ), array( is_string( $parent ) ? $parent : '', 'beltoft-services-status', \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/vm.js' ), true );
-		wp_enqueue_script( 'beltoft-services-metrics', plugins_url( 'assets/metrics.js', BELTOFT_SERVICES_FILE ), array( is_string( $parent ) ? $parent : '', 'beltoft-services-status', \BeltoftServices\Status::API_HANDLE ), (string) filemtime( BELTOFT_SERVICES_PATH . 'assets/metrics.js' ), true );
-		wp_enqueue_style( 'beltoft-services-metrics', plugins_url( 'assets/metrics.css', BELTOFT_SERVICES_FILE ), array(), (string) filemtime( BELTOFT_SERVICES_PATH . 'assets/metrics.css' ) );
-		wp_localize_script( 'beltoft-services-metrics', 'beltoftServicesMetrics', array( 'strings' => array(
-			'loading' => __( 'Loading usage…', 'beltoft-services' ),
-			'empty' => __( 'No data yet.', 'beltoft-services' ),
-			'unavailable' => __( 'Usage is unavailable. Please try again later.', 'beltoft-services' ),
-			'cpu' => __( 'CPU', 'beltoft-services' ),
-			'in' => __( 'In', 'beltoft-services' ),
-			'out' => __( 'Out', 'beltoft-services' ),
-			'read' => __( 'Read', 'beltoft-services' ),
-			'write' => __( 'Write', 'beltoft-services' ),
-			'graph' => __( 'usage graph', 'beltoft-services' ),
-			/* translators: %s: the highest value in the period, such as 31% */
-			'peak' => __( 'peak %s', 'beltoft-services' ),
-			'noReading' => __( 'No reading', 'beltoft-services' ),
-			'memory' => __( 'Memory in use (excluding cache)', 'beltoft-services' ),
-			/* translators: 1: memory in use in GB, 2: total memory in GB, 3: percent in use. */
-			'memNow' => __( '%1$s of %2$s GB (%3$s%)', 'beltoft-services' ),
-			'total' => __( 'Total', 'beltoft-services' ),
-			'agentHint' => \BeltoftServices\Monitoring\GuestMemory::agent_hint(),
-			'alertsOn' => __( 'Usage emails are on for this server.', 'beltoft-services' ),
-			'alertsOff' => __( 'Usage emails are off for this server.', 'beltoft-services' ),
-			'alertsSaving' => __( 'Saving the usage email setting…', 'beltoft-services' ),
-			'alertsFailed' => __( 'Could not save. Please try again.', 'beltoft-services' ),
-		) ) );
+		\BeltoftServices\Monitoring\Charts::enqueue( is_string( $parent ) ? $parent : '' );
 		wp_localize_script(
 			self::HANDLE,
 			'beltoftServicesVm',

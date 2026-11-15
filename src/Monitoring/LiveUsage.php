@@ -52,8 +52,10 @@ final class LiveUsage {
 
 	/**
 	 * Loads the script that keeps the bars current. Called where the bars are printed.
+	 *
+	 * @param string|null $hint What the memory bar says when the guest cannot be read (default: the guest agent text of a server).
 	 */
-	public static function enqueue(): void {
+	public static function enqueue( ?string $hint = null ): void {
 		if ( wp_script_is( self::HANDLE, 'enqueued' ) ) {
 			return;
 		}
@@ -75,7 +77,7 @@ final class LiveUsage {
 					'minutesAgo' => __( '%d min ago', 'beltoft-services' ),
 					/* translators: 1: memory in use in GB, 2: total memory in GB, 3: how long ago the reading was taken, such as "8 s ago". */
 					'line'       => __( '%1$s of %2$s GB, updated %3$s', 'beltoft-services' ),
-					'hint'       => GuestMemory::agent_hint(),
+					'hint'       => $hint ?? GuestMemory::agent_hint(),
 				),
 			)
 		);

@@ -258,6 +258,13 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 == Changelog ==
 
+= 0.32.0 =
+* WordPress hosting accounts have the same monitoring as a server: CPU, memory, network and disk activity graphs (1 hour, 1 day, 30 days), live CPU and memory bars on the hosting page (every 10 seconds while it is visible), the storage as a bar, and the usage emails (CPU sustained, memory high, storage at 90 percent) with the same "Usage emails" switch and settings. There is no PHP workers metric.
+* Memory is memory in use without the file cache, read inside the container by the node agent (new operation `ct.memory`, needs the agent branch `hosting-memory`); the Proxmox figure is never used. Readings go to the same history table as a server's (`bs_guest_memory`), same retention.
+* No usage email about memory in the first 15 minutes after a container started. The storage notices over the plan (110 percent) and the write restriction are always sent; only the 90 percent warning follows the switch.
+* Shared code: the guest memory history, live bars, charts route and usage rules moved from `Proxmox\Network` to a neutral `Monitoring` folder; a server and a hosting account each plug in with a small `Monitoring\Guest` adapter added on the filter `beltoft_services_monitoring_guests`. The monitoring panel markup is one shared partial.
+* REST: `GET /resources/{id}/metrics`, `GET /usage` and `POST /resources/{id}/usage-alerts` answer for hosting accounts too (`disk` is files plus databases against the plan storage, in bytes). `GET /resources/{id}/hosting/usage` also gives `memory_percent`, `memory_used_mb` and `memory_total_mb` (the newest stored reading). The MCP tool `server_usage` also takes a hosting account id, and `hosting_usage` shows the memory.
+
 = 0.31.3 =
 * A code check that a site refuses for another reason (for example an unconfirmed email address) can now say so: the message goes through the filter `beltoft_services_step_up_refusal( $message, $user_id, $purpose )`.
 * The hosting page follows a running change until the account has no task left, through the shared script helper, instead of its own polling.

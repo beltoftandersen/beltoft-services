@@ -193,92 +193,31 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 	<?php endif; ?>
 	<?php if ( '' !== (string) ( $cost ?? '' ) ) : ?><p class="beltoft-services-cost"><?php echo esc_html( $cost ); ?></p><?php endif; ?>
 
-	<?php if ( $metrics ) : ?>
-		<section class="beltoft-vm-usage" data-vm-metrics>
-			<div class="beltoft-vm-usage__head">
-				<h4><?php esc_html_e( 'Monitoring', 'beltoft-services' ); ?></h4>
-				<div class="beltoft-vm-usage__ranges" role="group" aria-label="<?php esc_attr_e( 'Time range', 'beltoft-services' ); ?>">
-					<button type="button" data-range="hour" aria-pressed="true"><?php esc_html_e( '1 hour', 'beltoft-services' ); ?></button>
-					<button type="button" data-range="day" aria-pressed="false"><?php esc_html_e( '1 day', 'beltoft-services' ); ?></button>
-					<button type="button" data-range="month" aria-pressed="false"><?php esc_html_e( '30 days', 'beltoft-services' ); ?></button>
-				</div>
-			</div>
-			<p class="beltoft-vm-usage__notice" data-metrics-notice role="status" aria-live="polite"><?php esc_html_e( 'Loading usage…', 'beltoft-services' ); ?></p>
-			<?php if ( ! empty( $usage_states ) || ! empty( $usage_alerts_shown ) ) : ?>
-				<div class="beltoft-vm-usage__alerts">
-					<?php foreach ( (array) ( $usage_states ?? array() ) as $beltoft_services_state ) : ?>
-						<p class="beltoft-vm-usage__state"><?php echo esc_html( (string) $beltoft_services_state ); ?></p>
-					<?php endforeach; ?>
-					<?php if ( ! empty( $usage_alerts_shown ) ) : ?>
-						<label class="beltoft-vm-usage__switch">
-							<input type="checkbox" data-usage-alerts<?php echo ! empty( $usage_alerts_on ) ? ' checked' : ''; ?>>
-							<span><?php esc_html_e( 'Email me when this server is short of disk, CPU or memory', 'beltoft-services' ); ?></span>
-						</label>
-						<p class="beltoft-vm-usage__switch-note" data-usage-alerts-note role="status" aria-live="polite"></p>
-					<?php endif; ?>
-				</div>
-			<?php endif; ?>
-			<div class="beltoft-vm-usage__grid">
-				<?php foreach ( array( 'cpu' => __( 'CPU', 'beltoft-services' ) ) as $beltoft_metric => $beltoft_title ) : ?>
-					<div class="beltoft-vm-usage__chart" data-chart="<?php echo esc_attr( $beltoft_metric ); ?>">
-						<div class="beltoft-vm-usage__top"><h5><?php echo esc_html( $beltoft_title ); ?></h5><span class="beltoft-vm-usage__now" data-now></span></div>
-						<div class="beltoft-vm-usage__plot" aria-label="<?php echo esc_attr( $beltoft_title ); ?>"></div>
-						<p class="beltoft-vm-usage__axis" data-axis></p>
-						<p class="beltoft-vm-usage__readout" data-readout></p>
-					</div>
-				<?php endforeach; ?>
-				<?php // Memory is the guest's own figure from our history (never Proxmox's), so the cache Linux holds is not counted. ?>
-				<div class="beltoft-vm-usage__chart" data-chart="mem">
-					<div class="beltoft-vm-usage__top"><h5><?php esc_html_e( 'Memory in use (excluding cache)', 'beltoft-services' ); ?></h5><span class="beltoft-vm-usage__now" data-now></span></div>
-					<div class="beltoft-vm-usage__plot" aria-label="<?php esc_attr_e( 'Memory in use (excluding cache)', 'beltoft-services' ); ?>"></div>
-					<p class="beltoft-vm-usage__axis" data-axis></p>
-					<p class="beltoft-vm-usage__readout" data-readout></p>
-					<p class="beltoft-vm-usage__axis" data-mem-hint role="status"></p>
-					<p class="beltoft-vm-usage__axis"><?php esc_html_e( 'Linux uses free memory as a file cache and gives it back when programs need it; that part is not counted.', 'beltoft-services' ); ?></p>
-				</div>
-				<?php
-				// The disk has no history: one reading from the server's guest agent every six hours, drawn as a bar.
-				$beltoft_services_disk_pct = is_numeric( $disk_used ) && is_numeric( $disk_total ) && (int) $disk_total > 0 ? max( 0, min( 100, (int) round( (int) $disk_used / (int) $disk_total * 100 ) ) ) : null;
-				?>
-				<div class="beltoft-vm-usage__chart beltoft-vm-usage__chart--disk">
-					<div class="beltoft-vm-usage__top">
-						<h5><?php esc_html_e( 'Disk', 'beltoft-services' ); ?></h5>
-						<?php if ( null !== $beltoft_services_disk_pct ) : ?><span class="beltoft-vm-usage__now"><b><?php echo (int) $beltoft_services_disk_pct; ?>%</b></span><?php endif; ?>
-					</div>
-					<?php if ( null !== $beltoft_services_disk_pct ) : ?>
-						<div class="beltoft-vm-usage__bar" role="img" aria-label="<?php /* translators: %d: percent of the disk in use */ echo esc_attr( sprintf( __( 'Disk, %d percent used', 'beltoft-services' ), (int) $beltoft_services_disk_pct ) ); ?>"><i style="width:<?php echo (int) $beltoft_services_disk_pct; ?>%"></i></div>
-					<?php endif; ?>
-					<p class="beltoft-vm-usage__disk" data-disk-line>
-						<?php if ( null !== $beltoft_services_disk_pct ) : ?>
-							<?php
-							/* translators: 1: used disk space in GB, 2: total disk space in GB. */
-							echo esc_html( sprintf( __( 'Disk used: %1$s of %2$s GB', 'beltoft-services' ), number_format_i18n( (int) $disk_used / 1073741824, 1 ), number_format_i18n( (int) $disk_total / 1073741824, 1 ) ) );
-							?>
-						<?php else : ?>
-							<?php
-							/* translators: %d: the plan's disk size in GB (the card's label already says Disk). */
-							echo esc_html( sprintf( __( '%d GB', 'beltoft-services' ), (int) $plan['disk_gb'] ) );
-							?>
-						<?php endif; ?>
-					</p>
-					<?php if ( null !== $beltoft_services_disk_pct ) : ?><p class="beltoft-vm-usage__axis"><?php esc_html_e( 'Read every 6 hours', 'beltoft-services' ); ?></p><?php endif; ?>
-				</div>
-			</div>
-			<details class="beltoft-vm-usage__more">
-				<summary><?php esc_html_e( 'Network and disk activity', 'beltoft-services' ); ?></summary>
-				<div class="beltoft-vm-usage__grid">
-					<?php foreach ( array( 'net' => __( 'Network', 'beltoft-services' ), 'io' => __( 'Disk activity', 'beltoft-services' ) ) as $beltoft_metric => $beltoft_title ) : ?>
-						<div class="beltoft-vm-usage__chart" data-chart="<?php echo esc_attr( $beltoft_metric ); ?>">
-							<div class="beltoft-vm-usage__top"><h5><?php echo esc_html( $beltoft_title ); ?></h5><span class="beltoft-vm-usage__now" data-now></span></div>
-							<div class="beltoft-vm-usage__plot" aria-label="<?php echo esc_attr( $beltoft_title ); ?>"></div>
-							<p class="beltoft-vm-usage__axis" data-axis></p>
-							<p class="beltoft-vm-usage__readout" data-readout></p>
-						</div>
-					<?php endforeach; ?>
-				</div>
-			</details>
-		</section>
-	<?php endif; ?>
+	<?php
+	if ( $metrics ) :
+		// The disk has no history: one reading from the server's guest agent every six hours, drawn as a bar.
+		$beltoft_services_disk_pct = is_numeric( $disk_used ) && is_numeric( $disk_total ) && (int) $disk_total > 0 ? max( 0, min( 100, (int) round( (int) $disk_used / (int) $disk_total * 100 ) ) ) : null;
+		$monitoring                = array(
+			'states'       => (array) ( $usage_states ?? array() ),
+			'alerts_shown' => ! empty( $usage_alerts_shown ),
+			'alerts_on'    => ! empty( $usage_alerts_on ),
+			'alerts_label' => __( 'Email me when this server is short of disk, CPU or memory', 'beltoft-services' ),
+			'disk'         => array(
+				'title' => __( 'Disk', 'beltoft-services' ),
+				'pct'   => $beltoft_services_disk_pct,
+				/* translators: %d: percent of the disk in use */
+				'aria'  => sprintf( __( 'Disk, %d percent used', 'beltoft-services' ), (int) $beltoft_services_disk_pct ),
+				'line'  => null !== $beltoft_services_disk_pct
+					/* translators: 1: used disk space in GB, 2: total disk space in GB. */
+					? sprintf( __( 'Disk used: %1$s of %2$s GB', 'beltoft-services' ), number_format_i18n( (int) $disk_used / 1073741824, 1 ), number_format_i18n( (int) $disk_total / 1073741824, 1 ) )
+					/* translators: %d: the plan's disk size in GB (the card's label already says Disk). */
+					: sprintf( __( '%d GB', 'beltoft-services' ), (int) $plan['disk_gb'] ),
+				'note'  => __( 'Read every 6 hours', 'beltoft-services' ),
+			),
+		);
+		include BELTOFT_SERVICES_PATH . 'templates/account/monitoring.php';
+	endif;
+	?>
 
 	<?php if ( null !== $beltoft_services_page && count( $beltoft_services_tabs ) > 1 ) : ?>
 		<div class="beltoft-services-glance">

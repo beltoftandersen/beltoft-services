@@ -149,6 +149,9 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting a.belto
 .beltoft-hosting .bsh-overview__facts dt { margin: 0; color: var(--bsh-soft); font-size: var(--bs-fs-caption, 13px); font-weight: var(--bs-fw-medium, 500); }
 .beltoft-hosting .bsh-overview__facts dd { display: flex; flex-direction: column; gap: 6px; margin: 0; color: var(--bsh-ink); font-size: var(--bs-fs-heading, 18px); font-weight: var(--bs-fw-strong, 600); line-height: 1.2; }
 .beltoft-hosting .bsh-overview__facts .bs-meter { width: 140px; }
+.beltoft-hosting .bsh-overview__facts > div[hidden] { display: none; }
+.beltoft-hosting .bsh-overview__facts [data-usage-sub]:empty { display: none; }
+.beltoft-hosting #beltoft-hosting-monitoring { padding: var(--bs-space-5, 24px); }
 .beltoft-hosting .bsh-overview__small { color: var(--bsh-soft); font-size: var(--bs-fs-small, 14px); font-weight: var(--bs-fw-regular, 400); }
 .beltoft-hosting .bsh-jump { display: flex; flex-wrap: wrap; gap: var(--bs-space-2, 8px) var(--bs-space-4, 16px); font-size: var(--bs-fs-small, 14px); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-jump a { color: var(--bsh-ink); font-weight: var(--bs-fw-medium, 500); text-decoration: none; border-bottom: 1px solid var(--bsh-rule); padding-bottom: 2px; }

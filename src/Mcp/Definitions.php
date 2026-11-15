@@ -72,7 +72,7 @@ final class Definitions {
 			'list_services'    => self::read( 'Lists the services of the customer: servers, databases, domains, DNS hosting, email domains, apps and add-ons, each with its id, name, state, renewal date, license id and subscription. Optional: only one type.' . self::DATA, self::obj( array( 'type' => array( 'type' => 'string', 'maxLength' => 20, 'description' => 'Only this type: vm, db, domain, dns or mail.' ) ) ), 30 ),
 			'server_status'    => self::read( 'Shows one server: whether it is running, CPU, memory and disk use as percent, its IP address, system and size, and what it is doing now.' . self::DATA, $by_id ),
 			'server_usage'     => self::read(
-				'Shows the load of one server over the last hour, day or month: average, highest and latest CPU, memory (in use without the file cache, in percent) and network figures.',
+				'Shows the load of one server or hosting account over the last hour, day or month: average, highest and latest CPU, memory (in use without the file cache, in percent) and network figures.',
 				self::obj(
 					array(
 						'id'    => $id,
@@ -101,7 +101,7 @@ final class Definitions {
 			'list_dns_claims'  => self::read( 'Lists the domains the customer has asked us to host DNS for while the domain is registered elsewhere, with the state of each. Only when the site offers it.' . self::DATA, $none, 30 ),
 			'console_link'     => self::read( 'Gives the address of the console page of one server in the customer\'s dashboard. The customer opens it in the browser and logs in there. No console session is made here.', $by_id, 30 ),
 			'hosting_info'     => self::read( 'Shows one WordPress hosting account: its websites (name, PHP version, workers, addresses with their state), the plan ceilings (websites, PHP workers, PHP memory, upload size, offered PHP versions) and what an external domain must point at, and the task the account is busy with now (task: a change runs in the background, one at a time) and the last change that failed (last).' . self::DATA, $by_id, 30 ),
-			'hosting_usage'    => self::read( 'Shows the usage of one WordPress hosting account: CPU, memory, disk and database size, and how full the storage is of the plan. Files and databases count together.' . self::DATA, $by_id, 30 ),
+			'hosting_usage'    => self::read( 'Shows the usage of one WordPress hosting account: CPU, memory in use (without the file cache, in percent), disk and database size, and how full the storage is of the plan. Files and databases count together.' . self::DATA, $by_id, 30 ),
 			'list_hosting_backups' => self::read( 'Lists the backups of one WordPress hosting account (nightly and manual, with date, size and the volume id that restore_hosting_backup takes) and the safety copy of the last restore, if there is one.' . self::DATA, $by_id, 30 ),
 			'email_domain_info' => self::read( 'Shows one email domain: its state, the plan limits (mailboxes, size of each, aliases), every mailbox with its storage use and whether a password can still be shown, every alias with where it delivers, the DNS records with ok, missing or conflict for each, and the settings for a mail program. No password is shown here.' . self::DATA, $by_id, 30 ),
 			'ssl_info'         => self::read( 'Shows one SSL certificate: its name, state, when it is valid and when the yearly service ends, how the domain is validated and what validation still waits for (a DNS record, a file or an approval email, with the exact values). No key and no certificate text is shown here.' . self::DATA, $by_id, 30 ),

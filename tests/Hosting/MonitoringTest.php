@@ -352,4 +352,60 @@ class MonitoringTest extends HostingCase {
 		( new HostingUsage( Resource::find( $r->id() ) ) )->sample();
 		$this->assertCount( 1, $this->mails, 'Over the plan, the customer is told whatever the switch says.' );
 	}
+
+	private function page( Resource $r ): string {
+		ob_start();
+		\BeltoftServices\Hosting\HostingAccount::render( Resource::find( $r->id() ) );
+
+		return (string) ob_get_clean();
+	}
+
+	public function test_the_page_has_the_same_monitoring_panel_as_a_server_and_live_bars(): void {
+		$r = $this->account();
+		$r->set( array( 'usage' => array( 'disk_mb' => 3072, 'db_mb' => 1024, 'status' => 'running', 'at' => time() ) ) );
+		GuestMemory::store( $r->id(), array( 'used_mb' => 512, 'total_mb' => 2048 ) );
+
+		$html = $this->page( $r );
+
+		$this->assertStringContainsString( 'data-vm-metrics', $html );
+		foreach ( array( 'data-chart="cpu"', 'data-chart="mem"', 'data-chart="net"', 'data-chart="io"', 'data-range="hour"', 'data-range="day"', 'data-range="month"', 'Memory in use (excluding cache)', 'Network and disk activity', 'Storage used: 4.0 of 10.0 GB', 'data-usage-alerts' ) as $needle ) {
+			$this->assertStringContainsString( $needle, $html, $needle );
+		}
+		$this->assertStringContainsString( 'data-usage-resource="' . $r->id() . '"', $html );
+		$this->assertStringContainsString( 'data-usage-bar="cpu"', $html );
+		$this->assertStringContainsString( 'data-usage-bar="mem"', $html );
+		$this->assertStringContainsString( '25%', $html, 'The newest memory reading is the first value of the memory bar.' );
+		$this->assertStringNotContainsString( 'PHP workers', strtolower( substr( $html, (int) strpos( $html, 'data-vm-metrics' ), 4000 ) ), 'No PHP-workers metric.' );
+		$this->assertStringNotContainsString( "\u{2014}", $html );
+		$this->assertStringNotContainsString( "\u{00B7}", $html );
+		$this->assertTrue( wp_script_is( 'beltoft-services-metrics', 'enqueued' ) );
+		$this->assertTrue( wp_script_is( 'beltoft-services-usage-live', 'enqueued' ) );
+	}
+
+	public function test_the_switch_is_hidden_when_the_site_has_the_usage_emails_off(): void {
+		$r = $this->account();
+		$this->settings( array( 'monitor_alerts' => 'off' ) );
+
+		$this->assertStringNotContainsString( 'data-usage-alerts', $this->page( $r ) );
+	}
+
+	public function test_a_hosting_account_that_is_not_ready_shows_no_monitoring(): void {
+		$r = $this->resource();
+
+		$this->assertStringNotContainsString( 'data-vm-metrics', $this->page( $r ) );
+	}
+
+	public function test_the_hosting_usage_route_gives_the_memory_in_use_without_the_cache(): void {
+		$r = $this->account();
+		GuestMemory::store( $r->id(), array( 'used_mb' => 512, 'total_mb' => 2048 ) );
+		$this->owner( $r );
+		$request = new \WP_REST_Request( 'GET', '/beltoft-services/v1/resources/' . $r->id() . '/hosting/usage' );
+		$request->set_param( 'id', $r->id() );
+
+		$data = \BeltoftServices\Hosting\HostingRoutes::usage( $request )->get_data();
+
+		$this->assertSame( 25, $data['memory_percent'] );
+		$this->assertSame( 512, $data['memory_used_mb'] );
+		$this->assertSame( 2048, $data['memory_total_mb'] );
+	}
 }

@@ -24,6 +24,7 @@ class AgentContractTest extends TestCase {
 	 */
 	private const PLUGIN_ADDITIONS = array(
 		'ct.prepare'        => array( 'ssh' ),
+		'ct.memory'         => array(),
 		'site.wp_install'   => array( 'woocommerce' ),
 		'site.wp_address'   => array(),
 		'site.tool_link'    => array(),
