@@ -264,6 +264,8 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 * The hosting routes that make a change answer 202 with status pending and the task (before: 200 or 201 with the result); GET hosting returns the task of the account and of each website, and the last failure. The MCP tools for these changes say that the change was queued and where to read it (hosting_info).
 * The 60 second wait of the WordPress install in 0.27.11 is gone.
 * Backup list: sizes in GB with one decimal, the column is "Data in backup", and one line says what a backup holds and that it does not use the disk.
+* Shared action controller (servers, databases, hosting): a customer action that no job works on for 15 minutes now ends with a failed result and one staff mail (before: the marker lapsed silently); new filter `beltoft_services_action_resumable` and action `beltoft_services_action_failed`.
+
 = 0.28.2 =
 * The hover line round rows and tiles is a soft grey instead of black.
 
