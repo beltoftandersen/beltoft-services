@@ -235,12 +235,20 @@ final class DnsAdopt {
 		$no   = static fn( string $key ): array => $said( $key, array( Jobs::EXPECTED => true ) );
 
 		if ( ! self::eligible( $r ) ) {
-			// A replay after the work was stored: the domain uses our name servers and nothing is left to do.
-			if ( 'domain' === $r->get( 'driver' ) && 'ours' === $r->get( 'ns_mode' ) && ! $r->get( 'dns_external' ) ) {
+			$ours = 'domain' === $r->get( 'driver' ) && 'ours' === $r->get( 'ns_mode' );
+
+			// A replay after the work was stored: the final step's data (adopted_at, or the DS keys) is there, nothing is left to do.
+			if ( $ours && ! $r->get( 'dns_external' ) && ( (int) $r->get( 'adopted_at' ) > 0 || (array) $r->get( 'dnssec_keys' ) ) ) {
 				return StepResult::done( $said( 'done' ) );
 			}
 
-			return StepResult::fail( 'The switch is not available for this domain.', $no( 'gone' ) );
+			// A half switch: the name servers are ours at the registrar but the DS step failed and asked for a retry (ns_mode was stored
+			// by that retry). The reviewed state is still there, so the job goes on with the DS and the finishing steps.
+			$half = $ours && 'ready' === $r->get( 'state' ) && ! $r->get( 'records_off' ) && is_array( $r->get( 'dns_adopt' ) );
+
+			if ( ! $half ) {
+				return StepResult::fail( 'The switch is not available for this domain.', $no( 'gone' ) );
+			}
 		}
 
 		$state = $r->get( 'dns_adopt' );

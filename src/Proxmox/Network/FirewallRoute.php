@@ -9,7 +9,6 @@ namespace BeltoftServices\Proxmox\Network;
 
 use BeltoftServices\Api\Routes;
 use BeltoftServices\Jobs;
-use BeltoftServices\Progress;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
 
@@ -200,26 +199,40 @@ final class FirewallRoute {
 			return self::error( 'beltoft_services_rate_limited', __( 'Too many requests. Please wait a while and try again.', 'beltoft-services' ), 429 );
 		}
 
-		$rev   = 0;
-		$stored = $resource->locked(
-			static function () use ( $resource, $on, $rules, $ack, &$rev ): bool {
-				$rev = FirewallRules::store( $resource, $on, $rules, $ack, get_current_user_id() );
+		// The shared start (Jobs::start_action): refused while another change of the server is pending; the rules are stored
+		// under the resource lock just before the marker is set, and the job's argument is the revision that was stored.
+		$rev     = 0;
+		$started = Jobs::start_action(
+			$resource,
+			'fw_apply',
+			__( 'Apply firewall changes', 'beltoft-services' ),
+			array(),
+			static function () use ( $resource, $on, $rules, $ack, &$rev ) {
+				$stored = $resource->locked(
+					static function () use ( $resource, $on, $rules, $ack, &$rev ): bool {
+						$rev = FirewallRules::store( $resource, $on, $rules, $ack, get_current_user_id() );
 
-				return $rev > 0;
+						return $rev > 0;
+					}
+				);
+
+				if ( null === $stored ) {
+					return new \WP_Error( 'busy', __( 'Your server is busy with another change. Please try again in a minute.', 'beltoft-services' ), array( 'status' => 409 ) );
+				}
+
+				if ( ! $stored ) {
+					return new \WP_Error( 'failed', __( 'This was not done. Your server was not changed.', 'beltoft-services' ), array( 'status' => 500 ) );
+				}
+
+				delete_transient( 'beltoft_services_fw_live_' . $resource->id() );
+
+				return array( 'rev' => $rev );
 			}
 		);
 
-		if ( null === $stored ) {
-			return self::error( 'beltoft_services_busy', __( 'Your server is busy with another change. Please try again in a minute.', 'beltoft-services' ), 409 );
+		if ( is_wp_error( $started ) ) {
+			return Routes::not_queued( $started );
 		}
-
-		if ( ! $stored ) {
-			return self::error( 'beltoft_services_failed', __( 'This was not done. Your server was not changed.', 'beltoft-services' ), 500 );
-		}
-
-		delete_transient( 'beltoft_services_fw_live_' . $resource->id() );
-		Progress::mark( $resource, 'fw_apply', __( 'Apply firewall changes', 'beltoft-services' ) );
-		Jobs::queue_act( $resource->id(), 'fw_apply', array( 'rev' => $rev ) );
 
 		$response = new \WP_REST_Response( array( 'queued' => true, 'rev' => $rev ), 202 );
 		$response->header( 'Cache-Control', 'private, no-store' );

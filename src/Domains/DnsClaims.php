@@ -308,7 +308,8 @@ final class DnsClaims {
 	}
 
 	/**
-	 * Ids of the claims that are being checked and not past their time: each should have a check job (the watchdog).
+	 * Ids of the claims that are being checked and not past their time: each should have a check job (the watchdog). The claim checked
+	 * longest ago (never checked first) comes first, so every claim is reached over the sweeps, however many there are.
 	 *
 	 * @param int $limit Most ids.
 	 * @return int[]
@@ -317,7 +318,7 @@ final class DnsClaims {
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- own table, always fresh.
-		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM %i WHERE status = 'checking' AND expires_at > %s ORDER BY id ASC LIMIT %d", self::table(), self::now(), max( 1, $limit ) ) );
+		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM %i WHERE status = 'checking' AND expires_at > %s ORDER BY checked_at ASC, id ASC LIMIT %d", self::table(), self::now(), max( 1, $limit ) ) );
 
 		return array_map( 'intval', (array) $ids );
 	}

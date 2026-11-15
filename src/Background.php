@@ -51,7 +51,7 @@ final class Background {
 	public static function register(): void {
 		add_filter( 'beltoft_services_job_hooks', array( __CLASS__, 'runner_hooks' ) );
 		add_action( Jobs::SWEEP, array( __CLASS__, 'watchdog' ), 30 );
-		add_action( 'action_scheduler_completed_action', array( __CLASS__, 'completed' ) );
+		add_action( 'action_scheduler_after_execute', array( __CLASS__, 'completed' ), 10, 2 );
 	}
 
 	/**
@@ -60,7 +60,7 @@ final class Background {
 	 * Options:
 	 * - due (callable): returns the argument lists ( array of arrays ) that should have a job now, for the watchdog.
 	 *   Cheap and read only; the job itself checks again. Without it there is no watchdog for the hook.
-	 * - resource (bool): the first argument is a resource id, so the staff alert is about that resource.
+	 * - resource (bool): the first argument is a resource id, so the staff alert is about that resource (default false: say true).
 	 * - label (string): what the job does, for the alert, in English.
 	 * - requeue (bool): queue a crashed job again (default true).
 	 *
@@ -98,7 +98,7 @@ final class Background {
 				$out[ $hook ] = array_merge(
 					array(
 						'due'      => null,
-						'resource' => true,
+						'resource' => false,
 						'label'    => '',
 						'requeue'  => true,
 					),
@@ -165,6 +165,7 @@ final class Background {
 		}
 
 		$why     = self::why( $error );
+		$args    = self::args( $args );
 		$key     = self::key( $hook, $args );
 		$records = self::records();
 		$n       = (int) ( $records[ $key ]['n'] ?? 0 ) + 1;
@@ -210,25 +211,39 @@ final class Background {
 	}
 
 	/**
-	 * Action Scheduler finished a job: a declared one starts its crash count again.
+	 * Action Scheduler finished a job: a declared one starts its crash count again. Runs after every job of the site, so it
+	 * returns at once for a hook that is not declared (no store read, no option read).
 	 *
 	 * @param mixed $action_id Action id.
+	 * @param mixed $action    The action object (action_scheduler_after_execute passes it); read from the store when missing.
 	 */
-	public static function completed( $action_id ): void {
-		if ( ! class_exists( '\ActionScheduler' ) || array() === self::records() ) {
-			return;
-		}
+	public static function completed( $action_id, $action = null ): void {
+		if ( ! is_object( $action ) ) {
+			if ( ! class_exists( '\ActionScheduler' ) ) {
+				return;
+			}
 
-		try {
-			$action = \ActionScheduler::store()->fetch_action( (string) (int) $action_id );
-		} catch ( \Throwable $e ) {
-			return;
+			try {
+				$action = \ActionScheduler::store()->fetch_action( (string) (int) $action_id );
+			} catch ( \Throwable $e ) {
+				return;
+			}
 		}
 
 		$hook = method_exists( $action, 'get_hook' ) ? (string) $action->get_hook() : '';
+
+		if ( '' === $hook || ! self::registered( $hook ) ) {
+			return;
+		}
+
+		$all = self::records();
+
+		if ( array() === $all ) {
+			return;
+		}
+
 		$args = method_exists( $action, 'get_args' ) ? (array) $action->get_args() : array();
 		$key  = self::key( $hook, $args );
-		$all  = self::records();
 
 		if ( isset( $all[ $key ] ) ) {
 			unset( $all[ $key ] );
@@ -259,7 +274,7 @@ final class Background {
 			}
 
 			foreach ( $sets as $args ) {
-				$args = is_array( $args ) ? array_values( $args ) : array( $args );
+				$args = self::args( is_array( $args ) ? $args : array( $args ) );
 				$last = $records[ self::key( $hook, $args ) ] ?? null;
 
 				if ( $last && ! empty( $last['over'] ) && time() - (int) $last['at'] < self::COOL_OFF ) {
@@ -292,6 +307,8 @@ final class Background {
 	 * @param int               $waited Seconds the job must have been due.
 	 */
 	public static function run_waiting( string $hook, array $args, int $waited = 2 ): void {
+		$args = self::args( $args );
+
 		if ( ! class_exists( '\ActionScheduler' ) || ! function_exists( 'as_get_scheduled_actions' ) ) {
 			return;
 		}
@@ -352,7 +369,25 @@ final class Background {
 	 * @param array<int, mixed> $args Arguments.
 	 */
 	private static function key( string $hook, array $args ): string {
-		return md5( $hook . '|' . wp_json_encode( array_values( $args ) ) );
+		return md5( $hook . '|' . wp_json_encode( self::args( $args ) ) );
+	}
+
+	/**
+	 * The arguments of a job in one shape: a list, whole numbers as integers. A `due` list may give ids as strings (database
+	 * rows) while a job was scheduled with integers; Action Scheduler compares arguments as JSON, so without this a job
+	 * that waits is not seen and another is queued at every sweep.
+	 *
+	 * @param array<int|string, mixed> $args Arguments.
+	 * @return array<int, mixed>
+	 */
+	public static function args( array $args ): array {
+		$out = array();
+
+		foreach ( array_values( $args ) as $value ) {
+			$out[] = is_string( $value ) && 1 === preg_match( '/^(0|[1-9][0-9]{0,17})$/', $value ) ? (int) $value : $value;
+		}
+
+		return $out;
 	}
 
 	/**

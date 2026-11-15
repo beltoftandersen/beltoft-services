@@ -42,8 +42,9 @@ final class AppOwnDomain {
 		Background::declare(
 			self::HOOK,
 			array(
-				'due'   => array( __CLASS__, 'due' ),
-				'label' => 'App own domain look',
+				'due'      => array( __CLASS__, 'due' ),
+				'resource' => true,
+				'label'    => 'App own domain look',
 			)
 		);
 	}
@@ -138,15 +139,19 @@ final class AppOwnDomain {
 		if ( ! self::waiting( $r ) ) {
 			return;
 		}
+		$delay = 0;
 		if ( 0 === (int) $r->get( 'app_domain_dns_since' ) ) {
-			$r->locked(
+			$stored = $r->locked(
 				static function () use ( $r ): bool {
 					$fresh = Resource::find( $r->id() );
 					return $fresh && 0 === (int) $fresh->get( 'app_domain_dns_since' ) ? $fresh->set( array( 'app_domain_dns_since' => time() ) ) : true;
 				}
 			);
+			// The clock could not be written (the lock was busy or the write failed): look again later, not at once, so a store that
+			// keeps failing is not a tight loop.
+			$delay = true === $stored ? 0 : 60;
 		}
-		self::schedule( $r->id(), 0 );
+		self::schedule( $r->id(), $delay );
 	}
 
 	public static function schedule( int $id, int $delay ): void {

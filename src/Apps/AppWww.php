@@ -50,8 +50,9 @@ final class AppWww {
 		Background::declare(
 			self::HOOK,
 			array(
-				'due'   => array( __CLASS__, 'due' ),
-				'label' => 'App www look',
+				'due'      => array( __CLASS__, 'due' ),
+				'resource' => true,
+				'label'    => 'App www look',
 			)
 		);
 	}

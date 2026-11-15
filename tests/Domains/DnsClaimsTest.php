@@ -115,4 +115,20 @@ class DnsClaimsTest extends TestCase {
 		$ids = array_column( DnsClaims::for_user( 1 ), 'id' );
 		$this->assertSame( array( $b['id'], $a['id'] ), $ids );
 	}
+
+	public function test_the_watchdog_list_reaches_the_claim_checked_longest_ago_first(): void {
+		$old   = DnsClaims::create( 1, 'old.example' );
+		$fresh = DnsClaims::create( 2, 'fresh.example' );
+		$never = DnsClaims::create( 3, 'never.example' );
+
+		foreach ( array( $old, $fresh, $never ) as $claim ) {
+			DnsClaims::set_status( $claim['id'], 'checking' );
+		}
+
+		$this->age( $old['id'], 'checked_at', 3600 );
+		$this->age( $fresh['id'], 'checked_at', 5 );
+
+		$this->assertSame( array( $never['id'], $old['id'] ), DnsClaims::checking_ids( 2 ), 'Never checked, then the oldest check: newer ids beyond the limit are reached on the next sweeps.' );
+		$this->assertSame( array( $never['id'], $old['id'], $fresh['id'] ), DnsClaims::checking_ids() );
+	}
 }

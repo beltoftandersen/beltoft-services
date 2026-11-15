@@ -37,8 +37,9 @@ final class MailHold {
 		Background::declare(
 			self::HOOK,
 			array(
-				'due'   => array( __CLASS__, 'due' ),
-				'label' => 'Email sending hold',
+				'due'      => array( __CLASS__, 'due' ),
+				'resource' => true,
+				'label'    => 'Email sending hold',
 			)
 		);
 	}
@@ -52,10 +53,9 @@ final class MailHold {
 	public static function due(): array {
 		$sets = array();
 
-		foreach ( Resource::find_by_meta( MailDriver::KIND, 'mail_mode', 'external' ) as $id ) {
-			$r = Resource::find( (int) $id );
-
-			if ( $r && $r->is_live() && self::held( $r ) !== ( 'held' === (string) $r->get( self::META ) ) ) {
+		// External mail domains only (SQL), read in one query.
+		foreach ( Resource::find_many( Resource::find_by_meta( MailDriver::KIND, 'mail_mode', 'external' ) ) as $id => $r ) {
+			if ( $r->is_live() && self::held( $r ) !== ( 'held' === (string) $r->get( self::META ) ) ) {
 				$sets[] = array( (int) $id );
 			}
 		}

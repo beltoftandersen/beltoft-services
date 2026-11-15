@@ -102,7 +102,9 @@ final class JobsTest extends TestCase {
 		$fresh = Resource::find( $r->id() );
 		$this->assertNotNull( Progress::pending( $fresh ), 'Still in progress.' );
 		$this->assertNull( $fresh->get( Jobs::RESULT ) );
-		$this->assertTrue( as_has_scheduled_action( Jobs::ACT, array( $r->id(), 'resumable', array( 'x' ) ), Jobs::GROUP ), 'Queued again with its arguments.' );
+		// The repeat carries the click time of the marker it repeats (a fourth job argument), so it is dropped when the first run finished.
+		$at = Resource::find( $r->id() )->get( Progress::MARKER )['at'];
+		$this->assertTrue( as_has_scheduled_action( Jobs::ACT, array( $r->id(), 'resumable', array( 'x' ), $at ), Jobs::GROUP ), 'Queued again with its arguments.' );
 		$this->assertSame( array(), $failed );
 
 		// Lost again: that is a failure.

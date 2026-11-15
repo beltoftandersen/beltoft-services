@@ -103,15 +103,17 @@ final class PleskLicence {
 		Background::declare(
 			self::KEY_HOOK,
 			array(
-				'due'   => array( __CLASS__, 'key_due' ),
-				'label' => 'Plesk key fetch and install',
+				'due'      => array( __CLASS__, 'key_due' ),
+				'resource' => true,
+				'label'    => 'Plesk key fetch and install',
 			)
 		);
 		Background::declare(
 			self::SYNC_HOOK,
 			array(
-				'due'   => array( __CLASS__, 'sync_due' ),
-				'label' => 'Plesk licence change at the vendor',
+				'due'      => array( __CLASS__, 'sync_due' ),
+				'resource' => true,
+				'label'    => 'Plesk licence change at the vendor',
 			)
 		);
 		add_filter( 'beltoft_services_settings_fields', array( __CLASS__, 'fields' ) );
@@ -662,10 +664,9 @@ final class PleskLicence {
 	public static function key_due(): array {
 		$sets = array();
 
-		foreach ( Resource::ids_with_meta_value( 'plesk_key_id' ) as $id ) {
-			$licence = Resource::find( (int) $id );
-
-			if ( $licence && $licence->is_live() && self::is_plesk( $licence ) && (int) $licence->get( 'plesk_key_id' ) > 0 && '' === (string) $licence->get( 'plesk_key' ) && 'ended' !== AppLicence::state( $licence ) && (int) $licence->get( 'plesk_sync_tries' ) < 3 * self::TRIES ) {
+		// Every licence with a vendor key id, in one query; only the ones still without a key pass.
+		foreach ( Resource::find_many( Resource::ids_with_meta_value( 'plesk_key_id' ) ) as $id => $licence ) {
+			if ( $licence->is_live() && self::is_plesk( $licence ) && (int) $licence->get( 'plesk_key_id' ) > 0 && '' === (string) $licence->get( 'plesk_key' ) && 'ended' !== AppLicence::state( $licence ) && (int) $licence->get( 'plesk_sync_tries' ) < 3 * self::TRIES ) {
 				$sets[] = array( (int) $id );
 			}
 		}
@@ -674,17 +675,16 @@ final class PleskLicence {
 	}
 
 	/**
-	 * The watchdog's list (Background): an ended licence whose deletion at Openprovider has not gone through.
+	 * The watchdog's list (Background): an ended licence whose deletion at Openprovider has not gone through. Narrowed in SQL to
+	 * licences that still hold a vendor key id (a finished deletion clears it) and are ended by their own state or the ended mark.
 	 *
 	 * @return array<int, array<int, int>>
 	 */
 	public static function sync_due(): array {
 		$sets = array();
 
-		foreach ( Resource::ids_with_meta_value( 'plesk_key_id' ) as $id ) {
-			$licence = Resource::find( (int) $id );
-
-			if ( $licence && self::is_plesk( $licence ) && (int) $licence->get( 'plesk_key_id' ) > 0 && 'ended' === AppLicence::state( $licence ) && (int) $licence->get( 'plesk_sync_tries' ) < 3 * self::TRIES ) {
+		foreach ( Resource::find_many( Resource::ids_with_meta_value( 'plesk_key_id', array_merge( Resource::ended_state_fragments(), array( wp_json_encode( AppLicence::ENDED ) . ':"' ) ) ) ) as $id => $licence ) {
+			if ( self::is_plesk( $licence ) && (int) $licence->get( 'plesk_key_id' ) > 0 && 'ended' === AppLicence::state( $licence ) && (int) $licence->get( 'plesk_sync_tries' ) < 3 * self::TRIES ) {
 				$sets[] = array( (int) $id );
 			}
 		}

@@ -30,6 +30,7 @@ class DeleteGuardTest extends UsageTestCase {
 		$wpdb->query( "DELETE FROM {$wpdb->prefix}woocommerce_payment_tokens" );
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery
 		wp_cache_flush();
+		DeleteGuard::forget();
 		update_option( 'woocommerce_currency', 'EUR' );
 		$gateway           = new UsageCardGateway( 'stripe_cc' );
 		$gateway->supports = array_merge( $gateway->supports, array( 'add_payment_method', 'tokenization' ) );
@@ -404,5 +405,78 @@ class DeleteGuardTest extends UsageTestCase {
 
 			$this->assertDoesNotMatchRegularExpression( '/WC_Payment_Tokens::delete\(/', (string) file_get_contents( $file->getPathname() ), $file->getPathname() );
 		}
+	}
+
+	// ------------------------------------------------------------------ review fixes (0.31.1).
+
+	private function dated( \WC_Order $order, int $days_ago ): void {
+		$order->set_date_created( time() - $days_ago * DAY_IN_SECONDS );
+		$order->save();
+	}
+
+	public function test_an_old_abandoned_checkout_does_not_block_the_last_card_but_a_recent_one_does(): void {
+		$user  = $this->new_user();
+		$token = $this->card( $user );
+		$old   = $this->order( $user, 12.5 );
+		$this->dated( $old, DeleteGuard::ORDER_DAYS + 5 );
+		$this->assertNull( DeleteGuard::needed( $user, $token ), 'Abandoned long ago: charges nothing.' );
+
+		$this->dated( $this->order( $user, 8.0 ), 2 );
+		$this->assertStringContainsString( 'unpaid order', (string) DeleteGuard::needed( $user, $token ) );
+	}
+
+	public function test_a_renewal_order_that_waits_counts_whatever_its_age_and_an_order_of_another_payment_method_does_not(): void {
+		$user  = $this->new_user();
+		$token = $this->card( $user );
+
+		$other = $this->order( $user, 9.0 );
+		$other->set_payment_method( 'bacs' );
+		$this->dated( $other, 1 );
+		$this->assertNull( DeleteGuard::needed( $user, $token ), 'It would not charge this card.' );
+
+		$sub     = $this->subscription( $user, $token, 0.0 );
+		$renewal = wcs_create_renewal_order( $sub );
+		$this->assertNotWPError( $renewal );
+		$renewal->set_total( 9.0 );
+		$renewal->set_status( 'pending' );
+		$renewal->save();
+		$this->dated( $renewal, 40 );
+
+		$this->assertStringContainsString( 'unpaid order', (string) DeleteGuard::needed( $user, $token ), 'A renewal is charged to the saved card.' );
+	}
+
+	public function test_the_list_asks_the_per_customer_questions_once_however_many_cards(): void {
+		$user = $this->new_user();
+		$a    = $this->card( $user, 'pm_a' );
+		$b    = $this->card( $user, 'pm_b', '2000' );
+		$c    = $this->card( $user, 'pm_c', '2000' );
+		$this->dated( $this->order( $user, 5.0 ), 1 );
+
+		$queries = 0;
+		add_filter(
+			'woocommerce_order_query_args',
+			static function ( $args ) use ( &$queries ) {
+				++$queries;
+				return $args;
+			}
+		);
+
+		$row = array( 'actions' => array( 'delete' => array( 'url' => '#', 'name' => 'Delete' ) ) );
+		DeleteGuard::list_item( $row, $a );
+		$one = $queries;
+		$this->assertGreaterThan( 0, $one );
+		DeleteGuard::list_item( $row, $b );
+		DeleteGuard::list_item( $row, $c );
+		$this->assertSame( $one, $queries, 'The second and third card ask nothing more.' );
+
+		ob_start();
+		DeleteGuard::print_reason();
+		ob_end_clean();
+
+		// After the list is drawn the rule is asked fresh again.
+		$before = $queries;
+		DeleteGuard::needed( $user, $a );
+		DeleteGuard::needed( $user, $a );
+		$this->assertGreaterThanOrEqual( $before + 2, $queries, "Not remembered: each call asks again." );
 	}
 }

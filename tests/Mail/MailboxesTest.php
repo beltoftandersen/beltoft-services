@@ -402,4 +402,57 @@ final class MailboxesTest extends MailTestCase {
 		$this->assertWPError( $this->create_box( $gone, 'late' ) );
 		$this->assertWPError( \BeltoftServices\Mail\Aliases::create( $gone, 'late', array( 'x@rm-root.example' ) ) );
 	}
+
+	public function test_a_mailbox_made_by_someone_else_in_the_gap_is_never_deleted_when_the_add_says_it_exists(): void {
+		$r   = $this->ready_mail( 'gap.example' );
+		$spy = new class() extends \BeltoftServices\Mail\FakeMailcowClient {
+			public int $adds = 0;
+			public function add_mailbox( array $attr ) {
+				if ( 0 === $this->adds++ ) {
+					parent::add_mailbox( $attr ); // Someone else made it between our check and our add.
+				}
+				return parent::add_mailbox( $attr );
+			}
+		};
+		$spy->add_domain( array( 'domain' => 'gap.example', 'mailboxes' => '5', 'maxquota' => '10240' ) );
+		remove_all_filters( 'beltoft_services_mail_client' );
+		add_filter( 'beltoft_services_mail_client', static fn() => $spy );
+
+		$res = $this->create_box( $r, 'anna' );
+
+		$this->assertWPError( $res );
+		$this->assertSame( 'That address is already in use.', $res->get_error_message() );
+		$this->assertNotNull( $spy->mailbox( 'anna@gap.example' ), 'The other mailbox is still there.' );
+		$this->assertSame( array(), $spy->calls_of( 'delete_mailbox' ), 'Nothing was deleted.' );
+		$this->assertArrayNotHasKey( 'anna@gap.example', (array) Resource::find( $r->id() )->get( MailAccess::META ), 'Our pending password is gone.' );
+	}
+
+	public function test_a_lapsed_create_takes_back_the_mailbox_it_made_and_a_replay_after_the_reveal_is_done(): void {
+		$r    = $this->ready_mail( 'lapse.example' );
+		$plan = \BeltoftServices\Mail\Mailboxes::plan_create( $r, 'a' );
+		\BeltoftServices\Mail\Mailboxes::reserve( $r, $plan['email'] );
+		MailAccess::mark_sent( Resource::find( $r->id() ), $plan['email'] );
+		$this->mailcow->add_mailbox( array( 'local_part' => 'a', 'domain' => 'lapse.example', 'quota' => '100' ) );
+
+		// A lapsed action (nothing worked on it) tells the feature through its marker's arguments.
+		do_action( 'beltoft_services_action_failed', Resource::find( $r->id() ), \BeltoftServices\Mail\Mailboxes::CREATE, $plan, 'lapsed' );
+		$this->assertNull( $this->mailcow->mailbox( 'a@lapse.example' ) );
+		$this->assertArrayNotHasKey( 'a@lapse.example', (array) Resource::find( $r->id() )->get( MailAccess::META ) );
+
+		// A finished create whose password was revealed: the replay is done, not a failure.
+		$this->assertIsArray( $this->create_box( $r, 'b' ) );
+		$this->assertNotNull( MailAccess::take( Resource::find( $r->id() ), 'b@lapse.example', $this->user_of( $r ) ) );
+		$again = \BeltoftServices\Mail\Mailboxes::run_create( Resource::find( $r->id() ), array( 'email' => 'b@lapse.example', 'name' => 'b', 'quota' => 100 ) );
+		$this->assertTrue( $again->is_done() );
+
+		// The same for a new password.
+		$this->assertTrue( $this->reset_box( $r, 'b@lapse.example' ) );
+		$this->assertNotNull( MailAccess::take( Resource::find( $r->id() ), 'b@lapse.example', $this->user_of( $r ) ) );
+		$replay = \BeltoftServices\Mail\Mailboxes::run_password( Resource::find( $r->id() ), array( 'email' => 'b@lapse.example' ) );
+		$this->assertTrue( $replay->is_done() );
+
+		// A mailbox that is not there and has no kept password is still a failure.
+		$none = \BeltoftServices\Mail\Mailboxes::run_create( Resource::find( $r->id() ), array( 'email' => 'zz@lapse.example', 'name' => 'z', 'quota' => 100 ) );
+		$this->assertTrue( $none->is_failed() );
+	}
 }

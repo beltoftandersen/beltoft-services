@@ -25,8 +25,9 @@ final class AppStatus {
 		Background::declare(
 			self::HOOK,
 			array(
-				'due'   => array( __CLASS__, 'due' ),
-				'label' => 'App status read',
+				'due'      => array( __CLASS__, 'due' ),
+				'resource' => true,
+				'label'    => 'App status read',
 			)
 		);
 	}

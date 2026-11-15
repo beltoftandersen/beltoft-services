@@ -489,4 +489,27 @@ class DbMssqlTest extends TestCase {
 		$this->assertStringContainsString( 'updated_checkout', $inline );
 		$this->assertStringContainsString( DbTermsField::POST_KEY, $inline );
 	}
+
+	public function test_a_second_access_change_while_one_is_pending_is_refused_with_409(): void {
+		IpPool::add( '192.0.2.10', '192.0.2.1' );
+		$r = $this->ready_db( array( 'public_ip' => 1 ) );
+		wp_set_current_user( (int) $r->license()['user_id'] );
+
+		$post = function ( string $cidr ) use ( $r ) {
+			$request = new \WP_REST_Request( 'POST', '/' . Routes::NAMESPACE . '/resources/' . $r->id() . '/db-access' );
+			$request->set_header( 'content-type', 'application/json' );
+			$request->set_body( wp_json_encode( array( 'op' => 'add', 'cidr' => $cidr, 'label' => 'Office' ) ) );
+
+			return rest_do_request( $request );
+		};
+
+		$this->assertSame( 202, $post( '203.0.113.7' )->get_status() );
+		$this->assertSame( DbAccess::APPLY, \BeltoftServices\Progress::pending( Resource::find( $r->id() ) )['action'], 'Started through the shared path.' );
+		$before = Resource::find( $r->id() )->get( DbAccess::REV );
+
+		$second = $post( '203.0.113.8' );
+		$this->assertSame( 409, $second->get_status() );
+		$this->assertSame( 'beltoft_services_busy', $second->get_data()['code'] );
+		$this->assertSame( $before, Resource::find( $r->id() )->get( DbAccess::REV ), 'The refused change was not stored.' );
+	}
 }

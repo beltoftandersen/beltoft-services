@@ -368,6 +368,9 @@ class DbPhase4Test extends TestCase {
 	 * @param array<string, mixed> $body Body.
 	 */
 	private function post( Resource $r, array $body, ?int $user = null ): \WP_REST_Response {
+		// These tests drive the driver's act() by hand, so the marker of the earlier request would stay: the route refuses a second change
+		// while one is pending (Jobs::start_action), which DbMssqlTest covers.
+		\BeltoftServices\Progress::clear( Resource::find( $r->id() ) ?? $r );
 		wp_set_current_user( null === $user ? (int) Resource::find( $r->id() )->license()['user_id'] : $user );
 		$request = new \WP_REST_Request( 'POST', '/' . Routes::NAMESPACE . '/resources/' . $r->id() . '/db-access' );
 		$request->set_header( 'content-type', 'application/json' );

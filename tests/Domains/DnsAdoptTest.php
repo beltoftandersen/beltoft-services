@@ -254,4 +254,32 @@ class DnsAdoptTest extends TestCase {
 		}
 		$this->assertContains( 429, $status, 'At most 10 calls a minute.' );
 	}
+
+	public function test_a_half_switch_with_no_external_flag_is_not_reported_done_and_goes_on_with_the_ds(): void {
+		// A domain on custom name servers (dns_external false): after the name servers were set and the DS failed, ns_mode is ours.
+		$r = $this->domain( array( 'dns_external' => false, 'ns_mode' => 'custom' ) );
+		$this->call( $r, array( 'step' => 'start' ) );
+		$this->call( $r, array( 'step' => 'confirm', 'ack' => true ) );
+		$this->registrar->reply( 'PUT', '/domains/123', array( 'success' => true ) );
+		$this->registrar->reply( 'PUT', '/domains/123', new \WP_Error( 'http_timeout', 'slow' ) );
+		$this->assertSame( 202, $this->call( $r, array( 'step' => 'switch' ) )->get_status() );
+		$this->run_jobs();
+
+		$mid = Resource::find( $r->id() );
+		$this->assertSame( 'ours', $mid->get( 'ns_mode' ) );
+		$this->assertSame( 0, (int) $mid->get( 'adopted_at' ), 'The finishing data is not stored.' );
+
+		// The replay is not "done": it goes on with the DS and then finishes.
+		$this->registrar->reply( 'PUT', '/domains/123', new \WP_Error( 'http_timeout', 'slow' ) );
+		$again = \BeltoftServices\Domains\DnsAdopt::run_switch( Resource::find( $r->id() ) );
+		$this->assertFalse( $again->is_done(), 'A half switch is never reported done.' );
+
+		$this->registrar->reply( 'PUT', '/domains/123', array( 'success' => true ) );
+		$this->registrar->reply( 'PUT', '/domains/123', array( 'success' => true ) );
+		Jobs::act( $r->id(), 'adopt_switch', array() );
+		$fresh = Resource::find( $r->id() );
+		$this->assertGreaterThan( 0, (int) $fresh->get( 'adopted_at' ) );
+		$this->assertNull( $fresh->get( 'dns_adopt' ) );
+		$this->assertTrue( $fresh->get( 'last_result' )['ok'] );
+	}
 }

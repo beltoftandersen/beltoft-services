@@ -139,6 +139,7 @@ class FirewallRouteTest extends FirewallTestCase {
 
 		$this->assertSame( 409, $this->put( $r, $user, array( $this->rule( 'tcp', 22, 22, array( '198.51.100.7' ) ) ) )->get_status(), 'SSH limited to another address.' );
 		$this->assertSame( 202, $this->put( $r, $user, array( $this->rule( 'tcp', 22, 22, array( '203.0.113.0/24' ) ) ) )->get_status(), 'SSH limited to a network that has the customer.' );
+		$this->run_jobs();
 		$this->assertSame( 202, $this->put( $r, $user, array( $this->rule( 'tcp', 80 ) ), array( 'ack_no_ssh' => true ) )->get_status() );
 		$this->assertTrue( Resource::find( $r->id() )->get( 'fw_ssh_ack' ) );
 	}
@@ -317,5 +318,21 @@ class FirewallRouteTest extends FirewallTestCase {
 		$this->assertFalse( \BeltoftServices\Proxmox\Network\FirewallRules::editable( Resource::find( $other->id() ) ) );
 		$this->assertSame( 200, $this->route( 'GET', $pilot->id(), $user )->get_status() );
 		$this->assertNotSame( 200, $this->route( 'GET', $other->id(), $them )->get_status() );
+	}
+
+	public function test_a_second_firewall_change_while_one_is_pending_is_refused_with_409_and_stores_nothing(): void {
+		list( $r, $user ) = $this->on();
+
+		$this->assertSame( 202, $this->put( $r, $user, array( $this->rule( 'tcp', 22 ) ) )->get_status() );
+		$this->assertSame( 'fw_apply', \BeltoftServices\Progress::pending( Resource::find( $r->id() ) )['action'], 'The route started it through the shared path.' );
+		$first = FirewallRules::rules_of( Resource::find( $r->id() ) );
+
+		$second = $this->put( $r, $user, array( $this->rule( 'tcp', 22 ), $this->rule( 'tcp', 8080 ) ) );
+		$this->assertSame( 409, $second->get_status() );
+		$this->assertSame( 'beltoft_services_busy', $second->get_data()['code'] );
+		$this->assertSame( $first, FirewallRules::rules_of( Resource::find( $r->id() ) ), 'The refused change was not stored.' );
+
+		$job = array_values( as_get_scheduled_actions( array( 'hook' => \BeltoftServices\Jobs::ACT, 'args' => array( $r->id(), 'fw_apply', array( 'rev' => (int) Resource::find( $r->id() )->get( 'fw_rev' ) ) ), 'status' => \ActionScheduler_Store::STATUS_PENDING ), 'ids' ) );
+		$this->assertCount( 1, $job, 'One job, its argument the stored revision.' );
 	}
 }

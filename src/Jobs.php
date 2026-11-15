@@ -42,6 +42,11 @@ final class Jobs {
 	 * Never stored as meta (Reconciler::RESERVED).
 	 */
 	public const EXPECTED = 'expected_refusal';
+
+	/**
+	 * Characters of a driver's own sentence (TEXT) kept in last_result.
+	 */
+	public const TEXT_MAX = 300;
 	public const USAGE = 'beltoft_services_usage_refresh';
 	public const GROUP = 'beltoft-services';
 	public const CRON  = '*/15 * * * *';
@@ -96,6 +101,11 @@ final class Jobs {
 	public const LOCKED_DELAY = 5;
 
 	/**
+	 * Seconds start_action() waits for the resource lock before it answers busy.
+	 */
+	public const START_LOCK_WAIT = 3;
+
+	/**
 	 * Seconds one run (the work of one job while it holds the resource lock) may last: in a cron or
 	 * WP-CLI run, and in a web request.
 	 */
@@ -115,7 +125,7 @@ final class Jobs {
 	public static function register(): void {
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
 		add_action( self::SWEEP, array( __CLASS__, 'sweep' ) );
-		add_action( self::ACT, array( __CLASS__, 'act' ), 10, 3 );
+		add_action( self::ACT, array( __CLASS__, 'act' ), 10, 4 );
 		// A job that throws, or a PHP process that dies in one, must not leave the customer waiting or the service unbuilt.
 		add_action( 'action_scheduler_failed_execution', array( __CLASS__, 'job_failed' ), 10, 2 );
 		add_action( 'action_scheduler_unexpected_shutdown', array( __CLASS__, 'job_failed' ), 10, 2 );
@@ -715,10 +725,12 @@ final class Jobs {
 		$marker = $resource->get( Progress::MARKER );
 		$at     = is_array( $marker ) ? (int) ( $marker['at'] ?? 0 ) : 0;
 
-		// Once per marker, and only while it is young: the repeat that is lost again is a failure.
-		if ( self::resumable( $resource, $name ) && $at > time() - Progress::MARKER_TTL && (string) ( $marker['action'] ?? '' ) === $name && (int) $resource->get( 'act_resumed_at' ) !== $at ) {
+		// Once per marker, and only while something worked on it lately (its last run, not the click: a restore of 40 minutes
+		// whose process dies late is still resumed). The repeat that is lost again is a failure. The queued job carries the marker's
+		// click time, so it is dropped when the first run finished the action meanwhile (act()).
+		if ( self::resumable( $resource, $name ) && Progress::alive( $marker ) > time() - Progress::MARKER_TTL && (string) ( $marker['action'] ?? '' ) === $name && (int) $resource->get( 'act_resumed_at' ) !== $at ) {
 			$resource->set( array( 'act_resumed_at' => $at ) );
-			self::queue_act( $id, $name, (array) ( $args[2] ?? array() ), 5 );
+			self::queue_act( $id, $name, (array) ( $args[2] ?? array() ), 5, $at );
 			Alerts::admin( $resource, sprintf( 'Customer action "%s" stopped with an error and is queued again: %s', $name, '' !== $why ? $why : 'no message' ) );
 			return;
 		}
@@ -754,7 +766,7 @@ final class Jobs {
 	 *
 	 * @param Resource             $r      Resource.
 	 * @param string               $action Action name.
-	 * @param array<string, mixed> $args   Its arguments, when known (empty for a lapsed one).
+	 * @param array<string, mixed> $args   Its arguments, when known (a lapsed one has those its marker kept).
 	 * @param string               $why    failed, stopped or lapsed.
 	 */
 	private static function failed( Resource $r, string $action, array $args, string $why ): void {
@@ -775,11 +787,22 @@ final class Jobs {
 	 *
 	 * @param Resource $r      Resource.
 	 * @param string   $action Action name from the marker.
+	 * @param int|null $at     The marker's click time as the caller read it; the marker is read again and left alone when it is gone, another
+	 *                         one, or was worked on since (the caller's Resource may be stale), so this is safe to call twice.
 	 */
-	public static function lapsed( Resource $r, string $action ): void {
+	public static function lapsed( Resource $r, string $action, ?int $at = null ): void {
+		$fresh  = Resource::find( $r->id() ) ?? $r;
+		$marker = $fresh->get( Progress::MARKER );
+
+		if ( ! is_array( $marker ) || (string) ( $marker['action'] ?? '' ) !== $action || ( null !== $at && (int) ( $marker['at'] ?? 0 ) !== $at ) || Progress::alive( $marker ) >= time() - Progress::MARKER_TTL ) {
+			return;
+		}
+
+		$r    = $fresh;
+		$args = is_array( $marker['args'] ?? null ) ? $marker['args'] : array();
 		$r->set( array( Progress::MARKER => null, self::RESULT => self::result( $action, false, true ) ) );
 		Alerts::admin( $r, sprintf( 'Customer action "%s" was given up: no job worked on it for %d minutes', $action, (int) ( Progress::MARKER_TTL / 60 ) ) );
-		self::failed( $r, $action, array(), 'lapsed' );
+		self::failed( $r, $action, $args, 'lapsed' );
 	}
 
 	/**
@@ -858,13 +881,19 @@ final class Jobs {
 	 * @param string               $action        Action name.
 	 * @param array<string, mixed> $args          Arguments.
 	 * @param int                  $delay         Seconds from now.
+	 * @param int                  $resumed       Click time of the Progress marker this job repeats after a lost job (a fourth job argument, only
+	 *                                            when above 0): act() drops it when that marker is gone or another, so the action is never run twice.
 	 */
-	public static function queue_act( int $activation_id, string $action, array $args = array(), int $delay = 0 ): void {
+	public static function queue_act( int $activation_id, string $action, array $args = array(), int $delay = 0, int $resumed = 0 ): void {
 		if ( ! function_exists( 'as_schedule_single_action' ) ) {
 			return;
 		}
 
 		$job = array( $activation_id, $action, $args );
+
+		if ( $resumed > 0 ) {
+			$job[] = $resumed;
+		}
 
 		$waiting = as_get_scheduled_actions(
 			array(
@@ -918,29 +947,47 @@ final class Jobs {
 	 * @param string               $label  The action's label for the customer.
 	 * @param array<string, mixed> $args   Arguments of the job (never a secret).
 	 * @param callable|null        $prepare Stores what the job reads (a previewed list, an encrypted secret) once the service is known
-	 *                                     to be free and before the job is queued: returns true, or an error that refuses the action.
+	 *                                     to be free and before the job is queued: returns true, an array (the job's arguments, in place of
+	 *                                     $args, for a revision known only after the store) or an error that refuses the action.
 	 * @return true|\WP_Error True when queued; error code busy when another action is pending, or the error of $prepare.
 	 */
 	public static function start_action( Resource $r, string $action, string $label, array $args = array(), ?callable $prepare = null ) {
-		$fresh = Resource::find( $r->id() ) ?? $r;
-		$busy  = self::busy( $fresh );
+		// The busy check, the preparation, the marker and the queue are one step under the resource lock (a named lock is
+		// re-entered by the same connection, so a prepare that takes the lock itself, or a start from inside a job, works).
+		$lock = Locks::name( 'resource', $r->id() );
 
-		if ( null !== $busy ) {
-			return $busy;
+		if ( ! Locks::acquire( $lock, self::START_LOCK_WAIT ) ) {
+			return new \WP_Error( 'busy', __( 'The service is busy with another change. Please try again in a minute.', 'beltoft-services' ), array( 'status' => 409 ) );
 		}
 
-		if ( null !== $prepare ) {
-			$prepared = $prepare();
+		try {
+			$fresh = Resource::find( $r->id() ) ?? $r;
+			$busy  = self::busy( $fresh );
 
-			if ( is_wp_error( $prepared ) ) {
-				return $prepared;
+			if ( null !== $busy ) {
+				return $busy;
 			}
 
-			$fresh = Resource::find( $r->id() ) ?? $fresh;
-		}
+			if ( null !== $prepare ) {
+				$prepared = $prepare();
 
-		Progress::mark( $fresh, $action, $label );
-		self::queue_act( $r->id(), $action, $args );
+				if ( is_wp_error( $prepared ) ) {
+					return $prepared;
+				}
+
+				// A preparation may answer the job's arguments (a stored revision), which then replace $args.
+				if ( is_array( $prepared ) ) {
+					$args = $prepared;
+				}
+
+				$fresh = Resource::find( $r->id() ) ?? $fresh;
+			}
+
+			Progress::mark( $fresh, $action, $label, $args );
+			self::queue_act( $r->id(), $action, $args );
+		} finally {
+			Locks::release( $lock );
+		}
 
 		return true;
 	}
@@ -957,26 +1004,40 @@ final class Jobs {
 	 * @param string               $action        Action name.
 	 * @param array<string, mixed> $args          Arguments.
 	 */
-	public static function act( int $activation_id, string $action, $args = array() ): void {
-		$args = is_array( $args ) ? $args : array();
+	public static function act( int $activation_id, string $action, $args = array(), $resumed = 0 ): void {
+		$args    = is_array( $args ) ? $args : array();
+		$resumed = (int) $resumed;
 
 		if ( self::on_hold() ) {
-			self::queue_act( $activation_id, $action, $args, self::PAUSED_DELAY );
+			self::queue_act( $activation_id, $action, $args, self::PAUSED_DELAY, $resumed );
 			return;
 		}
 
 		$lock = Locks::name( 'resource', $activation_id );
 
 		if ( ! Locks::acquire( $lock, 0 ) ) {
-			self::queue_act( $activation_id, $action, $args, self::LOCKED_DELAY );
+			self::queue_act( $activation_id, $action, $args, self::LOCKED_DELAY, $resumed );
 			return;
 		}
 
 		$outer             = self::$run_started;
+		$outer_resumed     = self::$resumed;
 		self::$run_started = time();
+		self::$resumed     = $resumed;
 
 		try {
 			$resource = Resource::find( $activation_id );
+
+			// A job queued again after a lost one (handle_failed) runs only while the marker it repeats is still there: when the first
+			// run went on and finished (the cleaner had marked it failed too early), or another action took over, the repeat is dropped.
+			if ( $resumed > 0 && $resource ) {
+				$marker = $resource->get( Progress::MARKER );
+
+				if ( ! is_array( $marker ) || (string) ( $marker['action'] ?? '' ) !== $action || (int) ( $marker['at'] ?? 0 ) !== $resumed ) {
+					return;
+				}
+			}
+
 			$driver   = $resource ? Registry::get( $resource->get( 'driver' ) ) : null;
 			$internal = $driver instanceof InternalActions && in_array( $action, $driver->internal_actions(), true );
 			$allowed = $resource && $driver && ( $internal ? $resource->is_live() && 'deleted' !== $resource->get( 'desired' ) : $resource->accepts_actions() && array_key_exists( $action, $driver->customer_actions( $resource ) ) );
@@ -1000,14 +1061,25 @@ final class Jobs {
 				$resource->set( array( 'act_parked_since' => null, 'act_parked_alerted' => null ) );
 			}
 
+			// Something works on the action now: the marker is believed (and resumed after a crash) from here for MARKER_TTL again.
+			Progress::touch( $resource, $action );
+
 			$result = Reconciler::call( static fn() => $driver->act( $resource, $action, $args ) );
 
 			self::acted( Resource::find( $activation_id ) ?? $resource, $action, $args, $result );
 		} finally {
 			self::$run_started = $outer;
+			self::$resumed     = $outer_resumed;
 			Locks::release( $lock );
 		}
 	}
+
+	/**
+	 * Click time of the marker the running act job repeats (0: not a repeat); the job's own re-queues (retry, poll, park) keep it.
+	 *
+	 * @var int
+	 */
+	private static $resumed = 0;
 
 	/** Seconds between looks at a parked action. */
 	private const PARK_DELAY = 300;
@@ -1052,9 +1124,10 @@ final class Jobs {
 		$age = self::now() - $since;
 
 		if ( $age > self::PARK_MAX ) {
-			$r->set( array( 'act_parked_since' => null, 'act_parked_alerted' => null, self::RESULT => self::result( $action, false, true ) ) );
+			$r->set( array( 'act_parked_since' => null, 'act_parked_alerted' => null, Progress::MARKER => null, self::RESULT => self::result( $action, false, true ) ) );
 			Events::add( (int) ( $r->license()['id'] ?? 0 ), 'service', sprintf( 'Customer action "%s" gave up after waiting a day with its work half done', $action ) );
 			Alerts::admin( $r, sprintf( 'Customer action "%s" was dropped with its work half done', $action ) );
+			self::failed( Resource::find( $r->id() ) ?? $r, $action, $args, 'stopped' );
 			return true;
 		}
 
@@ -1063,7 +1136,7 @@ final class Jobs {
 			Alerts::admin( $r, sprintf( 'Customer action "%s" is waiting with its work half done; the service does not accept actions', $action ) );
 		}
 
-		self::queue_act( $r->id(), $action, $args, self::PARK_DELAY );
+		self::queue_act( $r->id(), $action, $args, self::PARK_DELAY, self::$resumed );
 
 		return true;
 	}
@@ -1093,7 +1166,7 @@ final class Jobs {
 			}
 
 			$delay = Reconciler::clamp_delay( $result->delay(), $attempts );
-			self::queue_act( $r->id(), $action, $args, $delay );
+			self::queue_act( $r->id(), $action, $args, $delay, self::$resumed );
 			return;
 		}
 
@@ -1103,7 +1176,8 @@ final class Jobs {
 		$episodes = (array) $r->get( 'act_wait_since' );
 		unset( $episodes[ $action ] );
 
-		// What the customer is told about the outcome: success only for a done action that did not refuse. Fixed texts, never the driver's.
+		// What the customer is told about the outcome: success only for a done action that did not refuse. The sentence is the driver's
+		// own (Jobs::TEXT, also on an unexpected failure): result() cleans and caps it, a fixed text stands in when there is none.
 		$refused = 1 === preg_match( '/\brefused\b/i', $result->event() . ' ' . $result->error() );
 		$ok      = $result->is_done() && ! $refused;
 		$said    = isset( $result->meta()[ self::TEXT ] ) ? (string) $result->meta()[ self::TEXT ] : '';
@@ -1128,13 +1202,15 @@ final class Jobs {
 			/**
 			 * A customer action ended well. Fired after its result is stored and its marker is gone, so a feature may queue a
 			 * follow-up action of the service through Jobs::start_action() (the hosting address change looks at WordPress's
-			 * address afterwards). Not fired for an expected refusal or a failure (see beltoft_services_action_failed).
+			 * address afterwards). Not fired for a refusal a driver reported as done (a `refused` answer) or a failure (see beltoft_services_action_failed).
 			 *
 			 * @param Resource             $r      Resource.
 			 * @param string               $action Action name.
 			 * @param array<string, mixed> $args   Its arguments.
 			 */
-			do_action( 'beltoft_services_action_done', Resource::find( $r->id() ) ?? $r, $action, $args );
+			if ( $ok ) {
+				do_action( 'beltoft_services_action_done', Resource::find( $r->id() ) ?? $r, $action, $args );
+			}
 
 			return;
 		}
@@ -1160,7 +1236,9 @@ final class Jobs {
 	 * @return array{action: string, ok: bool, at: int, text: string}
 	 */
 	private static function result( string $action, bool $ok, bool $failed = false, string $said = '' ): array {
-		$text = $said;
+		// A driver's sentence is plain text of at most TEXT_MAX characters, whatever it was built from.
+		$text = '' === $said ? '' : mb_substr( sanitize_text_field( $said ), 0, self::TEXT_MAX );
+		$said = $text;
 
 		if ( '' === $said && ! $ok ) {
 			$text = $failed
@@ -1203,7 +1281,7 @@ final class Jobs {
 			return true;
 		}
 
-		self::queue_act( $r->id(), $action, $args, $result->poll_seconds() );
+		self::queue_act( $r->id(), $action, $args, $result->poll_seconds(), self::$resumed );
 
 		return true;
 	}

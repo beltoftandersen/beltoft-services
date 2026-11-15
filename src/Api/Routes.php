@@ -310,14 +310,16 @@ final class Routes {
 	}
 
 	/**
-	 * The refusal of a route whose action could not be started: another change is pending (409), or the job could not be queued.
+	 * The refusal of a route whose action could not be started: another change is pending (code busy, 409), else the error's own status, or 422 when it names none.
 	 *
 	 * @param \WP_Error $error Error from Jobs::start_action().
 	 */
 	public static function not_queued( \WP_Error $error ): \WP_REST_Response {
-		$data = $error->get_error_data();
+		$data   = $error->get_error_data();
+		$code   = (string) $error->get_error_code();
+		$status = is_array( $data ) && isset( $data['status'] ) ? (int) $data['status'] : ( 'busy' === $code ? 409 : 422 );
 
-		return self::error( 'beltoft_services_' . $error->get_error_code(), $error->get_error_message(), is_array( $data ) && isset( $data['status'] ) ? (int) $data['status'] : 409 );
+		return self::error( 0 === strpos( $code, 'beltoft_services_' ) ? $code : 'beltoft_services_' . $code, $error->get_error_message(), $status );
 	}
 
 	/**
