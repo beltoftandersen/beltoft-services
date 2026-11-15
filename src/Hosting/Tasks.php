@@ -41,6 +41,46 @@ final class Tasks {
 	/** Seconds the last outcome is shown on the page. */
 	public const LAST_SHOWN = 3600;
 
+	/** Cron hook and schedule of the sweep that gives up tasks nobody works on. */
+	public const SWEEP = 'beltoft_services_hosting_tasks';
+	public const CRON  = '*/10 * * * *';
+
+	/**
+	 * Hooks the watchdog's sweep.
+	 */
+	public static function register(): void {
+		add_action( self::SWEEP, array( __CLASS__, 'sweep' ) );
+		Jobs::recurring( array( __CLASS__, 'schedule' ) );
+	}
+
+	/**
+	 * Schedules the sweep once.
+	 */
+	public static function schedule(): void {
+		Jobs::ensure_cron( self::SWEEP, self::CRON );
+	}
+
+	/**
+	 * The watchdog for every account that has a task, also when its customer never opens the page.
+	 *
+	 * @return int Tasks given up.
+	 */
+	public static function sweep(): int {
+		$given = 0;
+
+		foreach ( array_keys( Nodes::all() ) as $node ) {
+			foreach ( Records::resource_ids( (string) $node ) as $id ) {
+				$r = Resource::find( $id );
+
+				if ( $r && null !== self::get( $r ) && self::watchdog( $r ) ) {
+					++$given;
+				}
+			}
+		}
+
+		return $given;
+	}
+
 	/**
 	 * What each change of the facade does as a task: the job's action and the label the customer reads while it runs.
 	 * The labels read after "Wait until ... is done" in lower case, so they are phrases, not titles.

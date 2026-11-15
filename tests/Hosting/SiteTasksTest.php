@@ -549,4 +549,32 @@ class SiteTasksTest extends HostingCase {
 		$this->assertStringContainsString( '<td>1.4 GB</td>', $html );
 		$this->assertStringContainsString( 'Each backup holds your whole hosting as it was that night. Backups are kept apart from your disk and do not use its space.', $html );
 	}
+
+	public function test_the_sweep_gives_up_old_tasks_of_accounts_whose_customer_never_opens_the_page(): void {
+		$r = $this->account();
+		( new HostingActions( $r ) )->queue( 'purge_cache', array( 'w' . $r->id() ) );
+		$this->lose_the_job( $r, 'purge_cache' );
+
+		$this->assertSame( 0, Tasks::sweep(), 'Not old enough.' );
+
+		$fresh           = $this->fresh( $r );
+		$task            = Tasks::get( $fresh );
+		$task['started'] = Jobs::now() - Tasks::STALE - 10;
+		$fresh->set( array( Tasks::META => $task ) );
+
+		$this->assertSame( 1, Tasks::sweep() );
+		$this->assertNull( Tasks::get( $this->fresh( $r ) ) );
+		$this->assertFalse( $this->fresh( $r )->get( Tasks::LAST )['ok'] );
+		$this->assertContains( Tasks::SWEEP, array_column( Jobs::declared(), 'hook' ), 'The sweep is a recurring job.' );
+	}
+
+	public function test_the_hosting_driver_offers_no_customer_action_and_runs_the_tasks_as_internal_ones(): void {
+		$r      = $this->account();
+		$driver = $this->driver;
+
+		$this->assertSame( array(), $driver->customer_actions( $r ), 'The generic action route and buttons never reach a hosting change.' );
+		$this->assertInstanceOf( \BeltoftServices\Drivers\InternalActions::class, $driver );
+		$this->assertEqualsCanonicalizing( array( 'add_site', 'remove_site', 'set_php', 'php_rollback', 'set_workers', 'purge_cache', 'set_country_block', 'names', 'set_sftp_password', 'add_ssh_key', 'remove_ssh_key', 'abandon_site' ), $driver->internal_actions() );
+		$this->assertTrue( $driver->act( $r, 'bogus', array() )->is_failed() );
+	}
 }

@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.28.2
+Stable tag: 0.29.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -258,6 +258,12 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 == Changelog ==
 
+= 0.29.0 =
+* Hosting changes run in the background. Adding or removing a website, a PHP version, PHP workers, the cache purge, the country block, an address (added, removed, main address) and the SFTP password and SSH keys are checked at once, then done by a job: one step at a time, so a slow agent never cuts a change off. A new website shows at once as "Being set up" with its step (making the database, making the website, installing WordPress, setting up the address). A website is only removed again after the agent says it really failed, never because it was slow; the clean-up runs as steps too.
+* One change of a hosting account at a time: a second change is refused with "Wait until ... is done" and its buttons are greyed. A change that nothing works on for 30 minutes is given up, the customer is told and staff are mailed.
+* The hosting routes that make a change answer 202 with status pending and the task (before: 200 or 201 with the result); GET hosting returns the task of the account and of each website, and the last failure. The MCP tools for these changes say that the change was queued and where to read it (hosting_info).
+* The 60 second wait of the WordPress install in 0.27.11 is gone.
+* Backup list: sizes in GB with one decimal, the column is "Data in backup", and one line says what a backup holds and that it does not use the disk.
 = 0.28.2 =
 * The hover line round rows and tiles is a soft grey instead of black.
 
