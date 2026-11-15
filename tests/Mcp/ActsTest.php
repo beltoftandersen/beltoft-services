@@ -196,6 +196,8 @@ final class ActsTest extends McpTestCase {
 
 		$this->assertFalse( $this->json( $this->tool( 'get_database_access', array( 'id' => $db->id() ), $token ) )['open_to_everyone'] );
 
+		// The add above is still pending (no job ran here): a second change is refused until it is done.
+		\BeltoftServices\Progress::clear( Resource::find( $db->id() ) );
 		$gone = $this->tool( 'set_database_access', array( 'id' => $db->id(), 'op' => 'remove', 'address' => '203.0.113.7' ), $token );
 		$this->assertFalse( $gone['isError'], $this->text( $gone ) );
 	}

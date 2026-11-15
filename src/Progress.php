@@ -44,10 +44,37 @@ final class Progress {
 	 * @param Resource $r      Resource.
 	 * @param string   $action Action name.
 	 * @param string   $label  The action's label for the customer (what the card calls it).
+	 * @param array<string, mixed> $args The job's arguments (never a secret), kept so a lapsed action can still tell features what it was about.
 	 */
-	public static function mark( Resource $r, string $action, string $label = '' ): void {
+	public static function mark( Resource $r, string $action, string $label = '', array $args = array() ): void {
 		if ( '' !== $action ) {
-			$r->set( array( self::MARKER => array( 'action' => $action, 'at' => time(), 'label' => $label ) ) );
+			$r->set( array( self::MARKER => array( 'action' => $action, 'at' => time(), 'label' => $label ) + ( $args ? array( 'args' => $args ) : array() ) ) );
+		}
+	}
+
+	/**
+	 * The last time something worked on the marker's action: the larger of the click (`at`) and the last run of its job (`seen`,
+	 * set by touch()). Liveness only; `at` stays the click time the page may show.
+	 *
+	 * @param mixed $marker A marker as stored.
+	 */
+	public static function alive( $marker ): int {
+		return is_array( $marker ) ? max( (int) ( $marker['at'] ?? 0 ), (int) ( $marker['seen'] ?? 0 ) ) : 0;
+	}
+
+	/**
+	 * Notes that the job of the marker's action runs now (each run of a long action, each poll, refreshes it), so a
+	 * long action is not given up while it is worked on. Never changes `at`.
+	 *
+	 * @param Resource $r      Resource.
+	 * @param string   $action Action the job runs.
+	 */
+	public static function touch( Resource $r, string $action ): void {
+		$marker = $r->get( self::MARKER );
+
+		if ( is_array( $marker ) && (string) ( $marker['action'] ?? '' ) === $action && self::alive( $marker ) < time() ) {
+			$marker['seen'] = time();
+			$r->set( array( self::MARKER => $marker ) );
 		}
 	}
 
@@ -63,7 +90,7 @@ final class Progress {
 	}
 
 	/**
-	 * The marker, unless it is older than MARKER_TTL and no job of the service is waiting or
+	 * The marker, unless nothing worked on it for MARKER_TTL (its click or its last job run, see alive()) and no job of the service is waiting or
 	 * running (a job that waits or retries keeps it alive; only a vanished job lets it lapse). A marker that lapses ends
 	 * the action: Jobs::lapsed() writes a failed result, tells staff once and lets features clean up.
 	 *
@@ -77,8 +104,8 @@ final class Progress {
 			return null;
 		}
 
-		if ( (int) $marker['at'] < time() - self::MARKER_TTL && ! Jobs::acting( $r->id() ) ) {
-			Jobs::lapsed( $r, (string) $marker['action'] );
+		if ( self::alive( $marker ) < time() - self::MARKER_TTL && ! Jobs::acting( $r->id() ) ) {
+			Jobs::lapsed( $r, (string) $marker['action'], (int) $marker['at'] );
 
 			return null;
 		}

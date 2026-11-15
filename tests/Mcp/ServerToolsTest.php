@@ -97,6 +97,8 @@ final class ServerToolsTest extends FirewallTestCase {
 
 		// The customer set it up in the dashboard: SSH only from one address.
 		$this->put_in_dashboard( $r, array( $ssh_ip ) );
+		// Its apply job has not run here: a second change is refused while one is pending.
+		\BeltoftServices\Progress::clear( Resource::find( $r->id() ) );
 
 		$same = $this->tool( 'set_firewall', array( 'id' => $r->id(), 'on' => true, 'rules' => array( $ssh_ip, $web ) ), $token );
 		$this->assertFalse( $same['isError'], $this->text( $same ) );

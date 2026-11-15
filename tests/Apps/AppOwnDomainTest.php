@@ -403,4 +403,28 @@ final class AppOwnDomainTest extends MonitoringTestCase {
 		$r = $this->waiting( array( 'app_id' => 'docker', 'app_version' => '29', 'app_domain_own' => null, 'app_domain_dns' => null ) );
 		$this->assertSame( 'This app does not use a domain at install. You can add one later.', AppReinstall::check( null, $r, array( 'app_version' => 'keep', 'app_domain_mode' => 'own', 'app_own' => self::NAME ) ) );
 	}
+
+	public function test_a_clock_that_cannot_be_written_backs_off_instead_of_looping(): void {
+		global $wpdb;
+		$r = $this->waiting( array( 'app_domain_dns_since' => 0 ) );
+		as_unschedule_all_actions( AppOwnDomain::HOOK, array( $r->id() ), Jobs::GROUP );
+		add_filter( 'beltoft_services_desire_lock_wait', '__return_zero' );
+
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection holds the lock.
+		$other->query( $wpdb->prepare( 'SELECT GET_LOCK( %s, 1 )', \BeltoftServices\Locks::name( 'resource', $r->id() ) ) );
+		AppOwnDomain::start( $r );
+		$other->close();
+		remove_filter( 'beltoft_services_desire_lock_wait', '__return_zero' );
+
+		$when = as_next_scheduled_action( AppOwnDomain::HOOK, array( $r->id() ), Jobs::GROUP );
+		$this->assertNotFalse( $when );
+		$this->assertGreaterThanOrEqual( time() + 50, $when, 'Not at once.' );
+		$this->assertSame( 0, (int) Resource::find( $r->id() )->get( 'app_domain_dns_since' ) );
+
+		// A clock that is written starts the first read at once.
+		as_unschedule_all_actions( AppOwnDomain::HOOK, array( $r->id() ), Jobs::GROUP );
+		AppOwnDomain::start( Resource::find( $r->id() ) );
+		$this->assertGreaterThan( 0, (int) Resource::find( $r->id() )->get( 'app_domain_dns_since' ) );
+		$this->assertLessThanOrEqual( time() + 2, (int) as_next_scheduled_action( AppOwnDomain::HOOK, array( $r->id() ), Jobs::GROUP ) );
+	}
 }

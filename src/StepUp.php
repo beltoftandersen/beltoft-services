@@ -208,6 +208,9 @@ final class StepUp {
 		$ok = apply_filters( 'beltoft_services_step_up_verify', null, $user_id, $secret, $ask['kind'], $purpose );
 
 		if ( null !== $ok ) {
+			// A site's own check decided: there is no emailed code to use up.
+			unset( self::$matched[ $user_id . '|' . $purpose ] );
+
 			return true === $ok;
 		}
 
@@ -240,21 +243,41 @@ final class StepUp {
 		}
 
 		// Single use, once consume() is called when the caller asked to keep it until its work is done.
+		self::$matched[ $user_id . '|' . $purpose ] = true;
+
 		if ( $consume ) {
-			self::consume( $user_id, $purpose );
+			// Of two requests with the same code only the one whose delete took the row wins.
+			return self::consume( $user_id, $purpose );
 		}
 
 		return true;
 	}
 
 	/**
-	 * Uses up the emailed code of a purpose after verify( ..., false ) accepted it.
+	 * Emailed codes verify() accepted and nobody consumed yet, key user|purpose (this request only).
+	 *
+	 * @var array<string, bool>
+	 */
+	private static $matched = array();
+
+	/**
+	 * Uses up the emailed code of a purpose after verify( ..., false ) accepted it. Atomic: the code is gone in one delete, and
+	 * only the call whose delete removed it gets true. Two requests that sent the same right code both pass verify(), one wins
+	 * here; the loser must not show or do what the code allows. A purpose a site's own check decided (no emailed code was
+	 * matched) has nothing to use up and answers true.
 	 *
 	 * @param int    $user_id Customer.
 	 * @param string $purpose One of purposes().
+	 * @return bool True when this call used the code up (or no emailed code was in play).
 	 */
-	public static function consume( int $user_id, string $purpose ): void {
-		delete_user_meta( $user_id, self::META . $purpose );
+	public static function consume( int $user_id, string $purpose ): bool {
+		$key = $user_id . '|' . $purpose;
+
+		if ( empty( self::$matched[ $key ] ) ) {
+			return true;
+		}
+
+		return (bool) delete_user_meta( $user_id, self::META . $purpose );
 	}
 
 	/**

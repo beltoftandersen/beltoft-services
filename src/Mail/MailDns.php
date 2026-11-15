@@ -64,8 +64,9 @@ final class MailDns {
 		Background::declare(
 			self::HOOK,
 			array(
-				'due'   => array( __CLASS__, 'due' ),
-				'label' => 'Email DNS look',
+				'due'      => array( __CLASS__, 'due' ),
+				'resource' => true,
+				'label'    => 'Email DNS look',
 			)
 		);
 		self::register_recheck();
@@ -705,7 +706,7 @@ final class MailDns {
 		add_action( self::RECHECK_ALL, array( __CLASS__, 'recheck_all' ) );
 		add_action( self::RECHECK, array( __CLASS__, 'recheck' ) );
 		// One look a day per domain, queued by the daily sweep: claimed by the runners and covered when it crashes. No watchdog.
-		Background::declare( self::RECHECK, array( 'label' => 'Email DNS daily look' ) );
+		Background::declare( self::RECHECK, array( 'resource' => true, 'label' => 'Email DNS daily look' ) );
 		Jobs::recurring( array( __CLASS__, 'schedule_recheck' ) );
 	}
 

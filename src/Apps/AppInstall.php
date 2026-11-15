@@ -29,8 +29,9 @@ final class AppInstall {
 		Background::declare(
 			self::HOOK,
 			array(
-				'due'   => array( __CLASS__, 'due' ),
-				'label' => 'App install',
+				'due'      => array( __CLASS__, 'due' ),
+				'resource' => true,
+				'label'    => 'App install',
 			)
 		);
 	}

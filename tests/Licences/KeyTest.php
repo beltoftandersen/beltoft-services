@@ -577,4 +577,20 @@ final class KeyTest extends TestCase {
 		$this->assertCount( 1, $this->calls( 'POST', '/licenses/plesk' ) );
 		remove_filter( 'pre_wp_mail', '__return_true' );
 	}
+
+	public function test_the_deletion_list_holds_only_ended_licences_that_still_have_a_vendor_key(): void {
+		$live = $this->licence();
+		$this->build( $live );
+		$gone = $this->licence( array( 'ip' => '203.0.113.20' ) );
+		$this->build( $gone );
+		$this->assertSame( array(), KeyOrder::sync_due(), 'A live licence is not listed (and not read).' );
+
+		$gone = Resource::find( $gone->id() );
+		$gone->set( array( 'state' => 'deleting', 'desired' => 'deleted' ) );
+		$this->assertSame( array( array( $gone->id() ) ), KeyOrder::sync_due() );
+
+		// The vendor deleted it: the key id is cleared, the licence is finished and no longer listed.
+		$this->assertTrue( KeyOrder::release( Resource::find( $gone->id() ) ) );
+		$this->assertSame( array(), KeyOrder::sync_due() );
+	}
 }

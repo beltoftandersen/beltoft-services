@@ -302,16 +302,36 @@ final class Resource {
 	 * Ids of the resources of any kind but site, live or closed, whose meta holds a value under a key (a cleared null does not count).
 	 * Unlike find_by_meta() this includes closed resources: what a closed resource is still owed is found through it.
 	 *
-	 * @param string $key Meta key.
+	 * @param string   $key    Meta key.
+	 * @param string[] $any_of Narrowing: JSON fragments as stored (for example '"state":"deleted"'); when given, only rows whose meta holds
+	 *                         at least one of them. Narrows in SQL, so a list of what is left to do never reads every row.
+	 * @param string   $kind   Narrowing: only this activation kind, or empty for any.
 	 * @return int[]
 	 */
-	public static function ids_with_meta_value( string $key ): array {
+	public static function ids_with_meta_value( string $key, array $any_of = array(), string $kind = '' ): array {
 		global $wpdb;
 
 		$prefix = wp_json_encode( $key ) . ':';
+		$sql    = "SELECT id FROM %i WHERE kind <> 'site' AND meta LIKE %s AND meta NOT LIKE %s";
+		$args   = array( Install::tables()['activations'], '%' . $wpdb->esc_like( $prefix ) . '%', '%' . $wpdb->esc_like( $prefix . 'null' ) . '%' );
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- the licenses table, always fresh.
-		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT id, meta FROM %i WHERE kind <> 'site' AND meta LIKE %s AND meta NOT LIKE %s", Install::tables()['activations'], '%' . $wpdb->esc_like( $prefix ) . '%', '%' . $wpdb->esc_like( $prefix . 'null' ) . '%' ), ARRAY_A );
+		if ( '' !== $kind ) {
+			$sql   .= ' AND kind = %s';
+			$args[] = $kind;
+		}
+
+		$any_of = array_values( array_filter( array_map( 'strval', $any_of ), 'strlen' ) );
+
+		if ( $any_of ) {
+			$sql .= ' AND ( ' . implode( ' OR ', array_fill( 0, count( $any_of ), 'meta LIKE %s' ) ) . ' )';
+
+			foreach ( $any_of as $fragment ) {
+				$args[] = '%' . $wpdb->esc_like( $fragment ) . '%';
+			}
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- the licenses table, always fresh; fixed fragments, every value a placeholder.
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, $args ), ARRAY_A );
 		$ids  = array();
 
 		foreach ( (array) $rows as $row ) {
@@ -319,6 +339,15 @@ final class Resource {
 		}
 
 		return $ids;
+	}
+
+	/**
+	 * The fragments that mark a resource as ended by its own state, for ids_with_meta_value( ..., $any_of ).
+	 *
+	 * @return string[]
+	 */
+	public static function ended_state_fragments(): array {
+		return array( '"state":"failed"', '"state":"deleting"', '"state":"deleted"' );
 	}
 
 	/**

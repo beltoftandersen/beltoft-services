@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
  * The one rule: needed( $user_id, $token ) gives the reason a card must stay, or null when it may go.
  *
  * A card is needed when the customer has no other usable saved card AND one of these holds: an unpaid order
- * with a total above 0; an active subscription with a price above 0 that pays with this token (WooCommerce
+ * with a total above 0 (a renewal order, or any other order of the last 14 days, that would charge this card); an active subscription with a price above 0 that pays with this token (WooCommerce
  * Subscriptions asks for another card of the same payment method then); the pay as you go account has a running
  * service, or unbilled usage that reaches the usage minimum. Deleting one of two cards stays allowed.
  *
@@ -39,6 +39,19 @@ final class DeleteGuard {
 	 * @var string[]
 	 */
 	private static $shown = array();
+
+	/**
+	 * Answers of the per customer questions while the list of saved methods is drawn (one per customer, however many cards),
+	 * key kind|user|gateway. Filled only by list_item(), emptied by print_reason(), so a rule asked by code is always fresh.
+	 *
+	 * @var array<string, bool>|null
+	 */
+	private static $memo = null;
+
+	/**
+	 * Days an order that is not a subscription renewal counts as unpaid for the rule (an older abandoned checkout charges nothing).
+	 */
+	public const ORDER_DAYS = 14;
 
 	/**
 	 * Hooks. The list item filter runs after WooCommerce Subscriptions' own (priority 10).
@@ -65,11 +78,11 @@ final class DeleteGuard {
 		$same   = self::has_other( $user_id, $token, true );
 		$reason = null;
 
-		if ( ! $any && self::unpaid_order( $user_id ) ) {
+		if ( ! $any && self::remember( 'unpaid', $user_id, $token->get_gateway_id(), static fn() => self::unpaid_order( $user_id, $token ) ) ) {
 			$reason = __( 'This card is needed to pay an unpaid order. Pay or cancel the order, or add another card first, then you can delete this one.', 'beltoft-services' );
 		} elseif ( ! $same && self::pays_subscription( $token ) ) {
 			$reason = __( 'This card pays for your active services. Add another card first, then you can delete this one.', 'beltoft-services' );
-		} elseif ( ! $any && self::usage_running( $user_id ) ) {
+		} elseif ( ! $any && self::remember( 'usage', $user_id, '', static fn() => self::usage_running( $user_id ) ) ) {
 			$reason = __( 'This card pays for your pay as you go services. Add another card first, then you can delete this one.', 'beltoft-services' );
 		}
 
@@ -83,6 +96,35 @@ final class DeleteGuard {
 		$reason = apply_filters( 'beltoft_services_card_delete_needed', $reason, $user_id, $token );
 
 		return is_string( $reason ) && '' !== $reason ? $reason : null;
+	}
+
+	/**
+	 * Forgets the answers kept while a list is drawn (the list ends with print_reason(); a test or a long job may end it here).
+	 */
+	public static function forget(): void {
+		self::$memo = null;
+	}
+
+	/**
+	 * The answer of a per customer question: asked once while the list is drawn, always fresh otherwise.
+	 *
+	 * @param string   $kind    Question.
+	 * @param int      $user_id Customer.
+	 * @param string   $gateway Gateway id the answer depends on, or empty.
+	 * @param callable $ask     Asks it.
+	 */
+	private static function remember( string $kind, int $user_id, string $gateway, callable $ask ): bool {
+		if ( null === self::$memo ) {
+			return (bool) $ask();
+		}
+
+		$key = $kind . '|' . $user_id . '|' . $gateway;
+
+		if ( ! array_key_exists( $key, self::$memo ) ) {
+			self::$memo[ $key ] = (bool) $ask();
+		}
+
+		return self::$memo[ $key ];
 	}
 
 	/**
@@ -111,17 +153,35 @@ final class DeleteGuard {
 	}
 
 	/**
-	 * Has the customer an order that waits for payment, with a total above 0?
+	 * Has the customer an order that would charge this card or a card: a subscription renewal order that waits for payment or
+	 * failed (WooCommerce Subscriptions takes it with the saved card), or another unpaid order made in the last ORDER_DAYS days, with a
+	 * total above 0? An order that names another payment method is not counted. An old abandoned checkout does not block a card for ever.
 	 *
-	 * @param int $user_id Customer.
+	 * @param int                    $user_id Customer.
+	 * @param \WC_Payment_Token|null $token   The card, for its payment method.
 	 */
-	private static function unpaid_order( int $user_id ): bool {
+	private static function unpaid_order( int $user_id, ?\WC_Payment_Token $token = null ): bool {
 		if ( ! function_exists( 'wc_get_orders' ) ) {
 			return false;
 		}
 
+		$since = time() - self::ORDER_DAYS * DAY_IN_SECONDS;
+
 		foreach ( wc_get_orders( array( 'customer_id' => $user_id, 'status' => array( 'pending', 'failed' ), 'type' => 'shop_order', 'limit' => 50 ) ) as $order ) {
-			if ( $order instanceof \WC_Order && (float) $order->get_total() > 0 ) {
+			if ( ! $order instanceof \WC_Order || (float) $order->get_total() <= 0 ) {
+				continue;
+			}
+
+			$method = (string) $order->get_payment_method();
+
+			if ( null !== $token && '' !== $method && $method !== $token->get_gateway_id() ) {
+				continue;
+			}
+
+			$renewal = function_exists( 'wcs_order_contains_renewal' ) && wcs_order_contains_renewal( $order );
+			$created = $order->get_date_created();
+
+			if ( $renewal || ( $created && $created->getTimestamp() >= $since ) ) {
 				return true;
 			}
 		}
@@ -182,7 +242,8 @@ final class DeleteGuard {
 			return $item;
 		}
 
-		$reason = self::needed( (int) $token->get_user_id(), $token );
+		self::$memo = self::$memo ?? array();
+		$reason     = self::needed( (int) $token->get_user_id(), $token );
 
 		if ( null === $reason ) {
 			return $item;
@@ -221,6 +282,7 @@ final class DeleteGuard {
 		}
 
 		self::$shown = array();
+		self::$memo  = null;
 	}
 
 	/**

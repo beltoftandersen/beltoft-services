@@ -318,4 +318,20 @@ final class PaidAppReinstallTest extends PaidAppCase {
 		$this->assertSame( 'cancelled', wcs_get_subscription( $subscription )->get_status() );
 		$this->assertSame( 'ended', AppLicence::state( $this->fresh( $o['licence'] ) ) );
 	}
+
+	public function test_a_server_busy_with_another_change_keeps_the_reinstall_request_and_marks_nothing(): void {
+		$s = $this->plain_server();
+		wp_set_current_user( $s['user'] );
+		AppReinstallPaid::redirect( '', $s['server'], 'reinstall', $this->args( 'pro' ) );
+		$licence = $this->bought( $this->fresh( $s['server'] ), $s['user'], $this->tiers['pro'] );
+
+		\BeltoftServices\Progress::mark( $this->fresh( $s['server'] ), 'reboot', 'Reboot' );
+		Jobs::run( $licence->id() );
+
+		$server = $this->fresh( $s['server'] );
+		$this->assertNotNull( AppReinstallPaid::pending( $server ), 'The request waits.' );
+		$this->assertSame( 'reboot', \BeltoftServices\Progress::pending( $server )['action'], 'The other change keeps its marker.' );
+		$this->assertSame( array(), $this->queued_reinstall( $s['server'] ) );
+		$this->assertNotSame( 'ready', $this->fresh( $licence )->get( 'state' ) );
+	}
 }

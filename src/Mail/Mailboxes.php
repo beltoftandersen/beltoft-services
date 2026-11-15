@@ -47,7 +47,8 @@ final class Mailboxes {
 	}
 
 	/**
-	 * Action beltoft_services_action_failed: a new mailbox whose job ended for good is removed again and its password forgotten.
+	 * Action beltoft_services_action_failed: a new mailbox whose job ended for good (it failed, stopped or lapsed: nothing worked on it any more) is
+	 * removed again when this job made it, and its password forgotten. The arguments of a lapsed action come from its marker.
 	 *
 	 * @param mixed  $r      Resource.
 	 * @param string $action Action name.
@@ -55,7 +56,7 @@ final class Mailboxes {
 	 * @param string $why    failed, stopped or lapsed.
 	 */
 	public static function failed( $r, $action, $args, $why ): void {
-		if ( self::CREATE !== $action || ! $r instanceof Resource || ! in_array( $why, array( 'failed', 'stopped' ), true ) || ! is_array( $args ) ) {
+		if ( self::CREATE !== $action || ! $r instanceof Resource || ! in_array( $why, array( 'failed', 'stopped', 'lapsed' ), true ) || ! is_array( $args ) ) {
 			return;
 		}
 
@@ -227,6 +228,17 @@ final class Mailboxes {
 		}
 
 		if ( null === $state ) {
+			// A replay after the customer revealed the password (it is wiped then): when the mailbox is there, an earlier run finished.
+			$box = MailClients::for()->get_mailbox( $email );
+
+			if ( is_wp_error( $box ) ) {
+				return StepResult::retry( 60, 'The mail server could not be reached.' );
+			}
+
+			if ( null !== $box ) {
+				return StepResult::done( self::said( self::created_text() ) );
+			}
+
 			return StepResult::fail( 'The password was not kept.', self::said( __( 'The password could not be stored. Try again later.', 'beltoft-services' ) ) );
 		}
 
@@ -356,7 +368,9 @@ final class Mailboxes {
 			return StepResult::retry( 60, 'The mail server could not be reached.' );
 		}
 
-		if ( $ours ) {
+		// "Exists" is the answer to our add call: a mailbox made by someone else in the gap since the check. It is never deleted
+		// (undo() would remove it): only our reserved password is dropped.
+		if ( $ours && 'exists' !== $code ) {
 			self::undo( $r, $email );
 		} else {
 			MailAccess::abort( $r, $email );
@@ -483,13 +497,20 @@ final class Mailboxes {
 		}
 
 		$password = MailAccess::pending_password( $r, $email );
+		$client   = MailClients::for();
+		$box      = $client->get_mailbox( $email );
 
 		if ( null === $password ) {
+			// A replay after the customer revealed the new password (it is wiped then): an earlier run finished, which the stored
+			// result says, or the mailbox is there and no password is kept for it.
+			$result = (array) $r->get( Jobs::RESULT );
+
+			if ( ( self::PASSWORD === ( $result['action'] ?? '' ) && ! empty( $result['ok'] ) ) || ( null !== $box && ! is_wp_error( $box ) ) ) {
+				return StepResult::done( self::said( self::password_text() ) );
+			}
+
 			return StepResult::fail( 'The password was not kept.', self::said( __( 'The password could not be stored. Try again later.', 'beltoft-services' ) ) );
 		}
-
-		$client = MailClients::for();
-		$box    = $client->get_mailbox( $email );
 
 		if ( is_wp_error( $box ) ) {
 			return StepResult::retry( 60, 'The mail server could not be reached.' );

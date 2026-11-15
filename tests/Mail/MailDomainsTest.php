@@ -446,4 +446,18 @@ final class MailDomainsTest extends MailTestCase {
 		);
 		unset( $wpdb );
 	}
+
+	public function test_a_join_that_finished_leaves_the_retry_list(): void {
+		$user = self::factory()->user->create();
+		$root = $this->ready_mail( 'root.example', array(), $user );
+		list( $r ) = $this->bought_domain( $user, 'listed.example', 'register', $root->id() );
+		$r->set( array( MailDomains::ATTACH_UNTIL => time() + HOUR_IN_SECONDS ) );
+		$this->assertSame( array( array( $r->id() ) ), MailDomains::retry_due(), 'Waiting for its plan: listed.' );
+
+		$this->ready_event( Resource::find( $r->id() ) );
+
+		$this->assertSame( 'joined', Resource::find( $r->id() )->get( MailDomains::ATTACH_DONE ) );
+		$this->assertNull( Resource::find( $r->id() )->get( MailDomains::ATTACH_UNTIL ), 'The clock is cleared when the join is over.' );
+		$this->assertSame( array(), MailDomains::retry_due() );
+	}
 }

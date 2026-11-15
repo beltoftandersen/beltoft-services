@@ -7,7 +7,6 @@ use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
-use BeltoftServices\Progress;
 use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
@@ -287,12 +286,18 @@ final class AppReinstallPaid {
 			return time() < $until ? StepResult::wait( 60, 'Waiting for the server to take the reinstall.', $until ) : StepResult::fail( 'The server could not take the reinstall of the paid app. Review the order and refund it if needed.' );
 		}
 
-		if ( ! $server->set( array( self::PENDING => null ) ) ) {
-			return StepResult::retry( 60, 'The reinstall request could not be cleared.' );
-		}
+		// The shared start: another change of the server in flight makes this wait (the request is kept until it is free).
+		$started = Jobs::start_action(
+			$server,
+			'reinstall',
+			__( 'Reinstall', 'beltoft-services' ),
+			$pending['args'],
+			static fn() => $server->set( array( self::PENDING => null ) ) ? true : new \WP_Error( 'failed', 'The reinstall request could not be cleared.' )
+		);
 
-		Progress::mark( $server, 'reinstall', __( 'Reinstall', 'beltoft-services' ) );
-		Jobs::queue_act( $server->id(), 'reinstall', $pending['args'] );
+		if ( is_wp_error( $started ) ) {
+			return StepResult::retry( 60, 'busy' === $started->get_error_code() ? 'The server is busy with another change.' : $started->get_error_message() );
+		}
 
 		return StepResult::done( array( 'steps' => array( 'ready' ), 'applic_tier' => $pending['tier'] ) );
 	}

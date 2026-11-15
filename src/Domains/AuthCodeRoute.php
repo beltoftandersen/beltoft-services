@@ -70,7 +70,12 @@ final class AuthCodeRoute {
 				if ( '' === $code ) {
 					$response = rest_convert_error_to_response( new \WP_Error( 'unavailable', __( 'The transfer code is not available yet. Your code is still valid, try again in a minute.', 'beltoft-services' ), array( 'status' => 503 ) ) );
 				} else {
-					StepUp::consume( get_current_user_id(), self::PURPOSE );
+					// Two requests with one code both pass the check; only the one that uses the code up is shown it.
+					if ( ! StepUp::consume( get_current_user_id(), self::PURPOSE ) ) {
+						$response = rest_convert_error_to_response( new \WP_Error( 'step_up', __( 'That code is not right or has expired. Send a new code.', 'beltoft-services' ), array( 'status' => 403 ) ) );
+						$response->header( 'Cache-Control', 'no-store' );
+						return $response;
+					}
 					// Asking for the code means a transfer may be starting: the re-lock clock restarts, once a code was given.
 					if ( ! $r->get( 'is_locked' ) ) { $r->set( array( 'unlocked_at' => time() ) ); }
 					// The customer is told it was shown, never the code.

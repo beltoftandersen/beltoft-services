@@ -21,8 +21,9 @@ final class AppDomainRelease {
 		Background::declare(
 			self::HOOK,
 			array(
-				'due'   => array( __CLASS__, 'due' ),
-				'label' => 'App domain record release',
+				'due'      => array( __CLASS__, 'due' ),
+				'resource' => true,
+				'label'    => 'App domain record release',
 			)
 		);
 	}

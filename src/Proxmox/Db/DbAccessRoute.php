@@ -9,7 +9,6 @@ namespace BeltoftServices\Proxmox\Db;
 
 use BeltoftServices\Api\Routes;
 use BeltoftServices\Jobs;
-use BeltoftServices\Progress;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -141,39 +140,50 @@ final class DbAccessRoute {
 		$why  = null;
 		$op   = (string) ( $body['op'] ?? '' );
 
-		$stored = $resource->locked(
-			static function () use ( $resource, $body, &$meta, &$why ): bool {
-				// Read again under the lock: a change that was stored a moment ago counts.
-				$fresh = Resource::find( $resource->id() ) ?? $resource;
-				$meta  = DbAccess::change( $fresh, $body );
+		$started = Jobs::start_action(
+			$resource,
+			DbAccess::APPLY,
+			__( 'Apply access changes', 'beltoft-services' ),
+			array(),
+			static function () use ( $resource, $body, &$meta ) {
+				$why    = null;
+				$stored = $resource->locked(
+					static function () use ( $resource, $body, &$meta, &$why ): bool {
+						// Read again under the lock: a change that was stored a moment ago counts.
+						$fresh = Resource::find( $resource->id() ) ?? $resource;
+						$meta  = DbAccess::change( $fresh, $body );
 
-				if ( $meta instanceof \WP_Error ) {
-					$why = $meta;
+						if ( $meta instanceof \WP_Error ) {
+							$why = $meta;
 
-					return false;
+							return false;
+						}
+
+						return $resource->set( $meta );
+					}
+				);
+
+				if ( null === $stored ) {
+					return new \WP_Error( 'busy', __( 'Your database is busy with another change. Please try again in a minute.', 'beltoft-services' ), array( 'status' => 409 ) );
 				}
 
-				return $resource->set( $meta );
+				if ( $why instanceof \WP_Error ) {
+					$data = $why->get_error_data();
+
+					return new \WP_Error( $why->get_error_code(), $why->get_error_message(), array( 'status' => is_array( $data ) && isset( $data['status'] ) ? (int) $data['status'] : 422 ) );
+				}
+
+				if ( ! $stored ) {
+					return new \WP_Error( 'failed', __( 'This was not done. Your database was not changed.', 'beltoft-services' ), array( 'status' => 500 ) );
+				}
+
+				return array( 'rev' => (string) ( is_array( $meta ) ? $meta[ DbAccess::REV ] : 0 ) );
 			}
 		);
 
-		if ( null === $stored ) {
-			return self::error( 'beltoft_services_busy', __( 'Your database is busy with another change. Please try again in a minute.', 'beltoft-services' ), 409 );
+		if ( is_wp_error( $started ) ) {
+			return Routes::not_queued( $started );
 		}
-
-		if ( $why instanceof \WP_Error ) {
-			$data   = $why->get_error_data();
-			$status = is_array( $data ) && isset( $data['status'] ) ? (int) $data['status'] : 422;
-
-			return self::error( $why->get_error_code(), $why->get_error_message(), $status );
-		}
-
-		if ( ! $stored ) {
-			return self::error( 'beltoft_services_failed', __( 'This was not done. Your database was not changed.', 'beltoft-services' ), 500 );
-		}
-
-		Progress::mark( $resource, DbAccess::APPLY, __( 'Apply access changes', 'beltoft-services' ) );
-		Jobs::queue_act( $resource->id(), DbAccess::APPLY, array( 'rev' => (string) ( is_array( $meta ) ? $meta[ DbAccess::REV ] : 0 ) ) );
 
 		if ( in_array( $op, array( 'world_on', 'add', 'remove' ), true ) ) {
 			DbAccess::notify( $resource, $op );

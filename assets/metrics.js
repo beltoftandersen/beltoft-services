@@ -3,6 +3,8 @@
 	'use strict';
 	// Dates and times follow the page's language (da: 20:43), not the browser's own (which may print 08:43 PM).
 	var LANG = ( document.documentElement.lang || '' ).trim() || undefined;
+	// A language tag the browser does not know (en_US) throws a RangeError in toLocale*String: fall back to the browser's own.
+	try { ( 0 ).toLocaleString( LANG ); } catch ( e ) { LANG = undefined; }
 	var account = window.beltoftServicesAccount;
 	var labels = window.beltoftServicesMetrics && window.beltoftServicesMetrics.strings;
 	if ( ! account || ! labels || ! window.fetch || ! window.beltoftApi ) { return; }

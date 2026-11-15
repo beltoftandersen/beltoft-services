@@ -42,8 +42,9 @@ final class MailDomains {
 		Background::declare(
 			self::RETRY_HOOK,
 			array(
-				'due'   => array( __CLASS__, 'retry_due' ),
-				'label' => 'Email domain joins its plan',
+				'due'      => array( __CLASS__, 'retry_due' ),
+				'resource' => true,
+				'label'    => 'Email domain joins its plan',
 			)
 		);
 		add_filter( 'beltoft_services_domain_cart_attach', array( __CLASS__, 'cart_attach' ), 10, 3 );
@@ -150,10 +151,9 @@ final class MailDomains {
 	public static function retry_due(): array {
 		$sets = array();
 
-		foreach ( Resource::ids_with_meta_value( self::ATTACH_UNTIL ) as $id ) {
-			$r = Resource::find( (int) $id );
-
-			if ( $r && 'domain' === $r->get( 'driver' ) && $r->is_live() && 'ready' === (string) $r->get( 'state' ) && ! $r->get( self::ATTACH_DONE ) && (int) $r->get( self::ATTACH_UNTIL ) > time() ) {
+		// The clock is cleared when the join is finished (attempt()), so only a join still waiting is listed; one query for all.
+		foreach ( Resource::find_many( Resource::ids_with_meta_value( self::ATTACH_UNTIL ) ) as $id => $r ) {
+			if ( 'domain' === $r->get( 'driver' ) && $r->is_live() && 'ready' === (string) $r->get( 'state' ) && ! $r->get( self::ATTACH_DONE ) && (int) $r->get( self::ATTACH_UNTIL ) > time() ) {
 				$sets[] = array( (int) $id );
 			}
 		}
@@ -191,7 +191,7 @@ final class MailDomains {
 		$already = is_wp_error( $added ) && 'bad_domain' === $added->get_error_code() && self::in_plan( $root, $name );
 
 		if ( $added instanceof Resource || $already ) {
-			$r->set( array( self::ATTACH_DONE => 'joined' ) );
+			$r->set( array( self::ATTACH_DONE => 'joined', self::ATTACH_UNTIL => null ) );
 
 			return;
 		}
@@ -213,11 +213,11 @@ final class MailDomains {
 			if ( time() + self::RETRY_AFTER <= $until && function_exists( 'as_schedule_single_action' ) ) {
 				\BeltoftServices\Jobs::schedule_once( time() + self::RETRY_AFTER, self::RETRY_HOOK, array( $r->id() ) );
 			} else {
-				$r->set( array( self::ATTACH_DONE => 'refused' ) );
+				$r->set( array( self::ATTACH_DONE => 'refused', self::ATTACH_UNTIL => null ) );
 				$first = true;
 			}
 		} else {
-			$r->set( array( self::ATTACH_DONE => 'refused' ) );
+			$r->set( array( self::ATTACH_DONE => 'refused', self::ATTACH_UNTIL => null ) );
 		}
 
 		$order = $first ? wc_get_order( (int) ( $r->license()['order_id'] ?? 0 ) ) : null;

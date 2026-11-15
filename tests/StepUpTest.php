@@ -385,4 +385,26 @@ final class StepUpTest extends TestCase {
 		$this->assertFalse( $sent['ok'] );
 		$this->assertSame( array(), $this->mails );
 	}
+
+	public function test_two_requests_with_one_right_code_both_verify_but_only_one_consumes_it(): void {
+		$user = $this->customer();
+		StepUp::send( $user, AuthCodeRoute::PURPOSE );
+		$code = $this->code();
+
+		// Both requests passed the check before either used the code up.
+		$this->assertTrue( StepUp::verify( $user, $code, AuthCodeRoute::PURPOSE, false ) );
+		$this->assertTrue( StepUp::verify( $user, $code, AuthCodeRoute::PURPOSE, false ) );
+
+		$this->assertTrue( StepUp::consume( $user, AuthCodeRoute::PURPOSE ), 'The first wins.' );
+		$this->assertFalse( StepUp::consume( $user, AuthCodeRoute::PURPOSE ), 'The second does not get the code.' );
+		$this->assertFalse( StepUp::verify( $user, $code, AuthCodeRoute::PURPOSE, false ) );
+	}
+
+	public function test_a_site_check_that_decided_has_no_emailed_code_to_use_up(): void {
+		$user = $this->customer();
+		add_filter( 'beltoft_services_step_up_verify', static fn() => true );
+
+		$this->assertTrue( StepUp::verify( $user, '123456', AuthCodeRoute::PURPOSE, false ) );
+		$this->assertTrue( StepUp::consume( $user, AuthCodeRoute::PURPOSE ) );
+	}
 }
