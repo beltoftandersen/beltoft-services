@@ -29,6 +29,19 @@ final class Jobs {
 	 * Meta key of the outcome of the last customer action, for the card.
 	 */
 	public const RESULT = 'last_result';
+
+	/**
+	 * Meta key of a StepResult in which a driver gives the customer its own sentence for the outcome (the text of last_result).
+	 * It is never stored as meta (Reconciler::RESERVED). It is only what the customer reads: whether staff are mailed is EXPECTED's call.
+	 */
+	public const TEXT = 'customer_text';
+
+	/**
+	 * Meta key of a failed StepResult that marks an expected refusal (a plan with no room, a name that is taken, a mailbox that does
+	 * not exist): the customer reads the sentence and staff are not mailed. Every other failure, with a sentence or not, mails staff once.
+	 * Never stored as meta (Reconciler::RESERVED).
+	 */
+	public const EXPECTED = 'expected_refusal';
 	public const USAGE = 'beltoft_services_usage_refresh';
 	public const GROUP = 'beltoft-services';
 	public const CRON  = '*/15 * * * *';
@@ -871,6 +884,63 @@ final class Jobs {
 	}
 
 	/**
+	 * The refusal of a second action while one of the service is pending: "Wait until <what it is doing> is done." The one busy check:
+	 * start_action() asks it, and a caller that must ask again under its own lock before local work calls it too.
+	 *
+	 * @param Resource $r Resource.
+	 * @return \WP_Error|null Error code busy, or null when nothing is pending.
+	 */
+	public static function busy( Resource $r ): ?\WP_Error {
+		$marker = Progress::pending( $r );
+
+		if ( null === $marker ) {
+			return null;
+		}
+
+		$label = (string) $marker['label'];
+		$label = '' !== $label ? mb_strtolower( mb_substr( $label, 0, 1 ) ) . mb_substr( $label, 1 ) : __( 'the other change', 'beltoft-services' );
+
+		/* translators: %s: what the service is doing now, for example "adding a website". */
+		return new \WP_Error( 'busy', sprintf( __( 'Wait until %s is done.', 'beltoft-services' ), $label ), array( 'status' => 409 ) );
+	}
+
+	/**
+	 * The one way a route starts a customer action that a driver carries out in a job: refused while another action of the
+	 * service is pending (one at a time), else the Progress marker is set and the job queued. A route checks its input first.
+	 *
+	 * @param Resource             $r      Resource.
+	 * @param string               $action Action name (offered by the driver's customer_actions() or internal_actions()).
+	 * @param string               $label  The action's label for the customer.
+	 * @param array<string, mixed> $args   Arguments of the job (never a secret).
+	 * @param callable|null        $prepare Stores what the job reads (a previewed list, an encrypted secret) once the service is known
+	 *                                     to be free and before the job is queued: returns true, or an error that refuses the action.
+	 * @return true|\WP_Error True when queued; error code busy when another action is pending, or the error of $prepare.
+	 */
+	public static function start_action( Resource $r, string $action, string $label, array $args = array(), ?callable $prepare = null ) {
+		$fresh = Resource::find( $r->id() ) ?? $r;
+		$busy  = self::busy( $fresh );
+
+		if ( null !== $busy ) {
+			return $busy;
+		}
+
+		if ( null !== $prepare ) {
+			$prepared = $prepare();
+
+			if ( is_wp_error( $prepared ) ) {
+				return $prepared;
+			}
+
+			$fresh = Resource::find( $r->id() ) ?? $fresh;
+		}
+
+		Progress::mark( $fresh, $action, $label );
+		self::queue_act( $r->id(), $action, $args );
+
+		return true;
+	}
+
+	/**
 	 * The customer action job: runs Driver::act() under the resource lock, and not while the
 	 * kill switch is on (the job waits and keeps its place). The resource must still accept
 	 * actions and the driver must still offer the action; otherwise the job is dropped. The
@@ -1031,8 +1101,16 @@ final class Jobs {
 		// What the customer is told about the outcome: success only for a done action that did not refuse. Fixed texts, never the driver's.
 		$refused = 1 === preg_match( '/\brefused\b/i', $result->event() . ' ' . $result->error() );
 		$ok      = $result->is_done() && ! $refused;
+		$said    = isset( $result->meta()[ self::TEXT ] ) ? (string) $result->meta()[ self::TEXT ] : '';
 
-		if ( ! $r->set( array_merge( $meta, array( 'act_attempts' => 0, 'waiting' => '', 'act_wait_since' => $episodes ? $episodes : null, Progress::MARKER => null, self::RESULT => self::result( $action, $ok, $result->is_failed() && ! $refused ) ) ) ) ) {
+		// An expected refusal (the driver says so) is not a failure for staff; a sentence alone does not make it one.
+		$expected = ! $result->is_done() && ! empty( $result->meta()[ self::EXPECTED ] );
+
+		if ( $expected ) {
+			$refused = true;
+		}
+
+		if ( ! $r->set( array_merge( $meta, array( 'act_attempts' => 0, 'waiting' => '', 'act_wait_since' => $episodes ? $episodes : null, Progress::MARKER => null, self::RESULT => self::result( $action, $ok, $result->is_failed() && ! $refused, $said ) ) ) ) ) {
 			Alerts::write_failed( $r, 'Resource could not be updated' );
 		}
 
@@ -1047,7 +1125,11 @@ final class Jobs {
 		$error = sprintf( 'Customer action "%s" failed: %s', $action, '' !== $result->error() ? $result->error() : 'Unknown error' );
 
 		Events::add( $license_id, 'service', $error );
-		Alerts::admin( $r, $error );
+
+		if ( ! $expected ) {
+			Alerts::admin( $r, $error );
+		}
+
 		self::failed( Resource::find( $r->id() ) ?? $r, $action, $args, 'failed' );
 	}
 
@@ -1057,12 +1139,13 @@ final class Jobs {
 	 * @param string $action Action name.
 	 * @param bool   $ok     Whether it was done.
 	 * @param bool   $failed Whether it failed part way (not just refused).
+	 * @param string $said   The driver's own sentence (Jobs::TEXT), for a done or a refused action.
 	 * @return array{action: string, ok: bool, at: int, text: string}
 	 */
-	private static function result( string $action, bool $ok, bool $failed = false ): array {
-		$text = '';
+	private static function result( string $action, bool $ok, bool $failed = false, string $said = '' ): array {
+		$text = $said;
 
-		if ( ! $ok ) {
+		if ( '' === $said && ! $ok ) {
 			$text = $failed
 				? __( 'This did not finish. We have been told and will look into it.', 'beltoft-services' )
 				: __( 'This was not done. Your server was not changed.', 'beltoft-services' );

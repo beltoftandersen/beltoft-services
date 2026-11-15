@@ -164,19 +164,6 @@ final class Steps {
 	}
 
 	/**
-	 * The refusal of a second change.
-	 *
-	 * @param array{action: string, at: int, label: string} $marker The Progress marker of the change in progress.
-	 */
-	public static function refusal( array $marker ): \WP_Error {
-		$label = (string) $marker['label'];
-		$first = mb_strtolower( mb_substr( $label, 0, 1 ) ) . mb_substr( $label, 1 );
-
-		/* translators: %s: what the account is doing now, for example "adding a website". */
-		return new \WP_Error( 'busy', sprintf( __( 'Wait until %s is done.', 'beltoft-services' ), $first ) );
-	}
-
-	/**
 	 * Queues a change through the shared controller: the Progress marker (one change at a time, the status bar), the steps, the
 	 * job. The caller holds the account's site lock and has checked that no change is in progress.
 	 *
@@ -197,7 +184,6 @@ final class Steps {
 			$args[0] = ''; // The secret is kept encrypted, never in the arguments.
 		}
 
-		$fresh = Resource::find( $r->id() ) ?? $r;
 		$state = array(
 			'action'     => $row[0],
 			'slug'       => self::about_site( $method ) ? (string) ( $args[0] ?? '' ) : '',
@@ -208,12 +194,18 @@ final class Steps {
 			'fail'       => null,
 		);
 
-		if ( ! $fresh->set( array( self::META => $state ) ) ) {
-			return new \WP_Error( 'failed', __( 'That cannot be done right now.', 'beltoft-services' ) );
-		}
+		// The one entry point: the busy check, then the step memory as the preparation, the marker and the job.
+		$started = Jobs::start_action(
+			$r,
+			$row[0],
+			$row[1],
+			array_values( $args ),
+			static fn() => ( Resource::find( $r->id() ) ?? $r )->set( array( self::META => $state ) ) ? true : new \WP_Error( 'failed', __( 'That cannot be done right now.', 'beltoft-services' ) )
+		);
 
-		Progress::mark( $fresh, $row[0], $row[1] );
-		Jobs::queue_act( $r->id(), $row[0], array_values( $args ) );
+		if ( is_wp_error( $started ) ) {
+			return $started;
+		}
 
 		return array(
 			'action'     => $row[0],

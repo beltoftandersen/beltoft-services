@@ -8,6 +8,8 @@ use BeltoftServices\Account\Overview;
 use BeltoftServices\Domains\DomainDriver;
 use BeltoftServices\Domains\FakeClient;
 use BeltoftServices\Domains\FakeDns;
+use BeltoftServices\Jobs;
+use BeltoftServices\Progress;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
 
@@ -91,7 +93,8 @@ class DnsAdoptTest extends TestCase {
 		$request = new \WP_REST_Request( 'POST', '/beltoft-services/v1/resources/' . $r->id() . '/dns-import' );
 		$request->set_header( 'Content-Type', 'application/json' );
 		$request->set_body( (string) wp_json_encode( array( 'text' => '$ORIGIN ' . $r->get( 'domain' ) . ".\n@ 300 IN A 192.0.2.77\n", 'apply' => true ) ) );
-		$this->assertSame( 200, rest_get_server()->dispatch( $request )->get_status() );
+		$this->assertSame( 202, rest_get_server()->dispatch( $request )->get_status() );
+		$this->run_jobs();
 	}
 
 	public function test_the_option_is_a_quiet_section_with_one_sentence_why(): void {
@@ -140,27 +143,104 @@ class DnsAdoptTest extends TestCase {
 		$this->assertSame( 'imported', Resource::find( $r->id() )->get( 'dns_adopt' )['path'] );
 	}
 
-	public function test_the_switch_is_refused_until_the_zone_answers_on_both_name_servers_then_sets_ours(): void {
+	public function test_the_switch_is_queued_and_waits_until_the_zone_answers_on_both_name_servers_then_sets_ours(): void {
 		$this->registrar->reply( 'PUT', '/domains/123', array( 'success' => true ) );
 		$this->registrar->reply( 'PUT', '/domains/123', array( 'success' => true ) );
 		$r = $this->domain();
 		$this->call( $r, array( 'step' => 'start' ) );
 		$this->call( $r, array( 'step' => 'confirm', 'ack' => true ) );
 		$this->answers = false;
-		$refused       = $this->call( $r, array( 'step' => 'switch' ) );
-		$this->assertSame( 409, $refused->get_status() );
-		$this->assertSame( 'Our name servers do not answer for your zone yet. Try again in a minute.', $refused->get_data()['message'] );
+		$queued        = $this->call( $r, array( 'step' => 'switch' ) );
+		$this->assertSame( 202, $queued->get_status(), (string) wp_json_encode( $queued->get_data() ) );
+		$this->assertTrue( $queued->get_data()['queued'] );
+		$this->assertSame( 'adopt_switch', $queued->get_data()['action'] );
+		$this->assertSame( '/resources/' . $r->id(), $queued->get_data()['status'] );
+		$this->assertSame( 'We are switching your domain to Beltoft DNS. This can take a minute.', $queued->get_data()['message'] );
+		$this->assertSame( array(), array_filter( $this->registrar->calls(), static fn( $c ) => 'PUT' === $c['method'] ), 'Nothing is sent to the registrar in the request.' );
+
+		// The zone does not answer yet: the job waits on its backoff, the registrar is not touched and the page says it is working.
+		$this->run_jobs();
 		$this->assertSame( array(), array_filter( $this->registrar->calls(), static fn( $c ) => 'PUT' === $c['method'] ), 'The registrar is not touched.' );
+		$mid = Resource::find( $r->id() );
+		$this->assertNull( $mid->get( 'last_result' ) );
+		$this->assertNotNull( Progress::pending( $mid ) );
+		$this->assertTrue( (bool) $mid->get( 'dns_external' ) );
+
 		$this->answers = true;
-		$done          = $this->call( $r, array( 'step' => 'switch' ) );
-		$this->assertSame( 200, $done->get_status(), (string) wp_json_encode( $done->get_data() ) );
-		$this->assertSame( 'Your domain now uses Beltoft DNS. You can switch back in Name servers.', $done->get_data()['message'] );
+		Jobs::act( $r->id(), 'adopt_switch', array() );
 		$put = array_values( array_filter( $this->registrar->calls(), static fn( $c ) => 'PUT' === $c['method'] ) );
 		$this->assertSame( array( array( 'name' => 'ns1.example.net' ), array( 'name' => 'ns2.example.net' ) ), $put[0]['body']['name_servers'] );
 		$fresh = Resource::find( $r->id() );
 		$this->assertSame( 'ours', $fresh->get( 'ns_mode' ) );
 		$this->assertFalse( (bool) $fresh->get( 'dns_external' ) );
+		$this->assertNull( $fresh->get( 'dns_adopt' ) );
+		$this->assertGreaterThan( 0, (int) $fresh->get( 'adopted_at' ) );
+		$this->assertNull( Progress::pending( $fresh ) );
+		$last = $fresh->get( 'last_result' );
+		$this->assertTrue( $last['ok'] );
+		$this->assertSame( 'adopt_switch', $last['action'] );
+		$this->assertSame( 'Your domain now uses Beltoft DNS. You can switch back in Name servers.', $last['text'] );
 		$this->assertStringNotContainsString( 'data-dns-adopt', $this->page( $fresh ) );
+	}
+
+	public function test_a_registrar_that_fails_after_the_name_servers_were_set_leaves_nothing_half_stored_and_the_replay_finishes(): void {
+		$r = $this->domain();
+		$this->call( $r, array( 'step' => 'start' ) );
+		$this->call( $r, array( 'step' => 'confirm', 'ack' => true ) );
+		// The name servers are set; the DS call fails.
+		$this->registrar->reply( 'PUT', '/domains/123', array( 'success' => true ) );
+		$this->registrar->reply( 'PUT', '/domains/123', new \WP_Error( 'http_timeout', 'slow' ) );
+		$this->assertSame( 202, $this->call( $r, array( 'step' => 'switch' ) )->get_status() );
+		$this->run_jobs();
+
+		$mid = Resource::find( $r->id() );
+		$this->assertSame( 'ours', $mid->get( 'ns_mode' ), 'The registrar has our name servers, and the page knows.' );
+		$this->assertTrue( (bool) $mid->get( 'dns_external' ), 'Not finished: the move is still open.' );
+		$this->assertNotNull( $mid->get( 'dns_adopt' ), 'The state of the move is kept.' );
+		$this->assertNull( $mid->get( 'last_result' ), 'No outcome until it ends.' );
+		$this->assertNotNull( Progress::pending( $mid ) );
+
+		// The retry sets the name servers again (harmless) and publishes the DS.
+		$this->registrar->reply( 'PUT', '/domains/123', array( 'success' => true ) );
+		$this->registrar->reply( 'PUT', '/domains/123', array( 'success' => true ) );
+		Jobs::act( $r->id(), 'adopt_switch', array() );
+		$fresh = Resource::find( $r->id() );
+		$this->assertFalse( (bool) $fresh->get( 'dns_external' ) );
+		$this->assertNull( $fresh->get( 'dns_adopt' ) );
+		$this->assertTrue( $fresh->get( 'last_result' )['ok'] );
+		$this->assertNull( Progress::pending( $fresh ) );
+
+		// A replay after it all finished does nothing more at the registrar and says done.
+		$puts = count( array_filter( $this->registrar->calls(), static fn( $c ) => 'PUT' === $c['method'] ) );
+		$again = \BeltoftServices\Domains\DnsAdopt::run_switch( Resource::find( $r->id() ) );
+		$this->assertTrue( $again->is_done() );
+		$this->assertCount( $puts, array_filter( $this->registrar->calls(), static fn( $c ) => 'PUT' === $c['method'] ) );
+	}
+
+	public function test_a_second_switch_while_one_is_pending_is_refused_and_an_unconfirmed_one_never_queues(): void {
+		$r = $this->domain();
+		$this->call( $r, array( 'step' => 'start' ) );
+		$this->assertSame( 422, $this->call( $r, array( 'step' => 'switch' ) )->get_status(), 'Not before the records are confirmed.' );
+		$this->assertSame( array(), as_get_scheduled_actions( array( 'hook' => Jobs::ACT, 'status' => \ActionScheduler_Store::STATUS_PENDING ) ), 'Nothing was queued.' );
+		$this->call( $r, array( 'step' => 'confirm', 'ack' => true ) );
+		$this->assertSame( 202, $this->call( $r, array( 'step' => 'switch' ) )->get_status() );
+		$second = $this->call( $r, array( 'step' => 'switch' ) );
+		$this->assertSame( 409, $second->get_status() );
+		$this->assertSame( 'Wait until switching to Beltoft DNS is done.', $second->get_data()['message'] );
+		$this->assertCount( 1, as_get_scheduled_actions( array( 'hook' => Jobs::ACT, 'status' => \ActionScheduler_Store::STATUS_PENDING ) ) );
+	}
+
+	public function test_the_job_refuses_a_move_that_was_not_confirmed_or_is_not_offered_any_more(): void {
+		$r   = $this->domain();
+		$res = \BeltoftServices\Domains\DnsAdopt::run_switch( $r );
+		$this->assertTrue( $res->is_failed() );
+		$this->assertStringContainsString( 'Import a zone file', $res->meta()[ Jobs::TEXT ] );
+
+		$other = $this->domain( array( 'dns_external' => false, 'ns_mode' => 'default' ) );
+		$gone  = \BeltoftServices\Domains\DnsAdopt::run_switch( $other );
+		$this->assertTrue( $gone->is_failed() );
+		$this->assertSame( 'This is not available for this domain.', $gone->meta()[ Jobs::TEXT ] );
+		$this->assertSame( array(), array_filter( $this->registrar->calls(), static fn( $c ) => 'PUT' === $c['method'] ), 'No call to the registrar.' );
 	}
 
 	public function test_only_the_owner_may_use_it_and_it_is_rate_limited(): void {

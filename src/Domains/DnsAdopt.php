@@ -8,6 +8,8 @@
 namespace BeltoftServices\Domains;
 
 use BeltoftServices\Api\Routes;
+use BeltoftServices\Drivers\StepResult;
+use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -98,7 +100,7 @@ final class DnsAdopt {
 			'confirmed' => __( 'Thank you. You can switch now.', 'beltoft-services' ),
 			'order'    => __( 'Start with Use Beltoft DNS, then check your records.', 'beltoft-services' ),
 			'done'     => __( 'Your domain now uses Beltoft DNS. You can switch back in Name servers.', 'beltoft-services' ),
-			'retry'    => __( 'The name servers could not be changed just now. Try again in a minute.', 'beltoft-services' ),
+			'queued'   => __( 'We are switching your domain to Beltoft DNS. This can take a minute.', 'beltoft-services' ),
 			'gone'     => __( 'This is not available for this domain.', 'beltoft-services' ),
 		);
 
@@ -117,7 +119,8 @@ final class DnsAdopt {
 	}
 
 	/**
-	 * POST resources/<id>/dns-adopt with step start, confirm (and ack) or switch.
+	 * POST resources/<id>/dns-adopt with step start, confirm (and ack) or switch. Start and confirm answer 200 at once; switch answers
+	 * 202 queued (the shared action adopt_switch, outcome in the resource's last_result).
 	 *
 	 * @param \WP_REST_Request $request Request.
 	 */
@@ -201,7 +204,8 @@ final class DnsAdopt {
 	}
 
 	/**
-	 * Sets our name servers at the registrar, only when the records were confirmed and our zone answers on every name server.
+	 * Queues the switch: the checks of the page, then the shared action `adopt_switch` (Jobs::start_action). The zone check, the
+	 * name server change, the DS keys and the stored state all happen in the job (run_switch), with the usual retries.
 	 *
 	 * @param Resource             $r    Resource.
 	 * @param array<string, mixed> $view View.
@@ -211,19 +215,53 @@ final class DnsAdopt {
 			return self::fail( 'beltoft_services_ack_needed', 'ack', 422 );
 		}
 
+		$queued = Jobs::start_action( $r, 'adopt_switch', __( 'Switching to Beltoft DNS', 'beltoft-services' ) );
+
+		if ( is_wp_error( $queued ) ) {
+			return Routes::not_queued( $queued );
+		}
+
+		return Routes::queued( $r, 'adopt_switch', array(), self::text( 'queued' ) );
+	}
+
+	/**
+	 * The job of `adopt_switch` (Actions::run). Safe to run again: a switch that is already over is done, and every step that
+	 * changed something at the registrar can be repeated.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function run_switch( Resource $r ): StepResult {
+		$said = static fn( string $key, array $meta = array() ): array => array_merge( $meta, array( Jobs::TEXT => self::text( $key ) ) );
+		$no   = static fn( string $key ): array => $said( $key, array( Jobs::EXPECTED => true ) );
+
+		if ( ! self::eligible( $r ) ) {
+			// A replay after the work was stored: the domain uses our name servers and nothing is left to do.
+			if ( 'domain' === $r->get( 'driver' ) && 'ours' === $r->get( 'ns_mode' ) && ! $r->get( 'dns_external' ) ) {
+				return StepResult::done( $said( 'done' ) );
+			}
+
+			return StepResult::fail( 'The switch is not available for this domain.', $no( 'gone' ) );
+		}
+
+		$state = $r->get( 'dns_adopt' );
+
+		if ( ! is_array( $state ) || (int) ( $state['reviewed_at'] ?? 0 ) <= 0 ) {
+			return StepResult::fail( 'The records were not confirmed.', $no( 'ack' ) );
+		}
+
 		// The zone answers on both name servers before the registrar is touched.
-		if ( ! Zone::prepare( $r )->is_done() ) {
-			return self::fail( 'beltoft_services_preparing', 'preparing', 409 );
+		$zone = Zone::prepare( $r );
+
+		if ( ! $zone->is_done() ) {
+			return $zone->is_failed() ? StepResult::fail( $zone->error(), $said( 'gone' ) ) : $zone;
 		}
 
 		$done = Actions::switch_to_ours( $r );
 
 		if ( ! $done->is_done() ) {
-			return self::fail( 'beltoft_services_retry', 'retry', 503 );
+			return $done->is_failed() ? StepResult::fail( $done->error(), $said( 'gone' ) ) : $done;
 		}
 
-		$r->set( array_merge( $done->meta(), array( 'dns_external' => false, 'dns_adopt' => null, 'adopted_at' => time() ) ) );
-
-		return new \WP_REST_Response( array( 'status' => 'done', 'message' => self::text( 'done' ) ), 200 );
+		return StepResult::done( $said( 'done', array_merge( $done->meta(), array( 'dns_external' => false, 'dns_adopt' => null, 'adopted_at' => time() ) ) ) );
 	}
 }

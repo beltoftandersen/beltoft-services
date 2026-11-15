@@ -101,6 +101,16 @@
 		} );
 	}
 
+	// A change that runs in the background: follows it to its outcome ({ok, text}); null when it is still going after a while.
+	function followed( result ) {
+		return window.beltoftApi.follow( result.data, { holder: account } );
+	}
+
+	// The end of a followed change that did not succeed: the server's own sentence, or the slow notice.
+	function stopped( h, outcome ) {
+		S.fail( h, outcome ? ( outcome.text || strings.failed ) : strings.slow );
+	}
+
 	function fresh( box ) {
 		window.location.reload();
 	}
@@ -178,7 +188,15 @@
 						return null;
 					}
 
-					return reveal( box, who, strings.reset.replace( '%s', who ), null, h );
+					return followed( result ).then( function ( outcome ) {
+						if ( ! outcome || ! outcome.ok ) {
+							stopped( h, outcome );
+
+							return null;
+						}
+
+						return reveal( box, who, strings.reset.replace( '%s', who ), null, h );
+					} );
 				} );
 			} );
 
@@ -212,8 +230,16 @@
 						return null;
 					}
 
-					return redraw( box ).then( function () {
-						return reveal( box, result.data.email, strings.created.replace( '%s', result.data.email ), null, h );
+					return followed( result ).then( function ( outcome ) {
+						if ( ! outcome || ! outcome.ok ) {
+							stopped( h, outcome );
+
+							return redraw( box );
+						}
+
+						return redraw( box ).then( function () {
+							return reveal( box, result.data.email, strings.created.replace( '%s', result.data.email ), null, h );
+						} );
 					} );
 				} );
 			} );
@@ -357,11 +383,19 @@
 		if ( target.hasAttribute( 'data-mail-dns-check' ) ) {
 			guarded( box, target, strings.checking, function ( h ) {
 				return call( box, 'POST', '/mail/dns/check' ).then( function ( result ) {
-					if ( result.ok ) {
-						fresh( box );
-					} else {
+					if ( ! result.ok ) {
 						S.fail( h, problem( result ) );
+
+						return null;
 					}
+
+					return followed( result ).then( function ( outcome ) {
+						if ( outcome && outcome.ok ) {
+							fresh( box );
+						} else {
+							stopped( h, outcome );
+						}
+					} );
 				} );
 			} );
 		}

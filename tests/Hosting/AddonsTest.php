@@ -138,7 +138,7 @@ class AddonsTest extends HostingCase {
 		$this->assertTrue( $result->is_done(), $result->error() );
 		$child->set( array_merge( $result->meta(), array( 'state' => 'ready', 'desired' => 'ready' ) ) );
 		$child = Resource::find( $child->id() );
-		$made  = Mailboxes::create( $child, 'info', 'Info', 0 );
+		$made  = $this->create_box( $child, 'info', 'Info', 0 );
 		$this->assertFalse( is_wp_error( $made ), is_wp_error( $made ) ? $made->get_error_message() : '' );
 
 		return $child;
@@ -161,7 +161,7 @@ class AddonsTest extends HostingCase {
 		$this->assertStringContainsString( 'Open the DNS records guide', $html );
 		$this->assertStringNotContainsString( 'data-hosting-action="add_pack"', $html );
 
-		Mailboxes::create( Resource::find( $child->id() ), 'info', 'Info', 0 );
+		$this->create_box( Resource::find( $child->id() ), 'info', 'Info', 0 );
 		ob_start();
 		HostingAccount::render( Resource::find( $r->id() ) );
 		$html = (string) ob_get_clean();

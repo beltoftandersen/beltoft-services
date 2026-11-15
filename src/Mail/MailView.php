@@ -10,6 +10,8 @@ namespace BeltoftServices\Mail;
 use BeltoftServices\Domains\DnsRecordsGuide;
 use BeltoftServices\Domains\HostName;
 use BeltoftServices\Domains\Ownership;
+use BeltoftServices\Jobs;
+use BeltoftServices\Progress;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
@@ -61,6 +63,7 @@ final class MailView {
 			'plan'      => self::plan( $r ),
 			'counts'    => array( 'mailboxes' => (int) $r->get( 'mail_boxes' ), 'aliases' => 0 ),
 			'delete_word' => MailRoutes::CONFIRM_DELETE,
+			'task'      => self::task( $r ),
 		);
 
 		if ( ! $ready ) {
@@ -98,6 +101,25 @@ final class MailView {
 		}
 
 		return $out;
+	}
+
+	/**
+	 * The change of the domain that runs in the background (a new mailbox, a new password, the DNS check): whether one is pending and
+	 * how the last one ended. The outcome is the shared last_result of the resource.
+	 *
+	 * @param Resource $r Resource.
+	 * @return array{working: bool, action: string, label: string, last_result: array<string, mixed>|null}
+	 */
+	private static function task( Resource $r ): array {
+		$marker = Progress::pending( $r );
+		$last   = $r->get( Jobs::RESULT );
+
+		return array(
+			'working'     => null !== $marker,
+			'action'      => $marker ? $marker['action'] : '',
+			'label'       => $marker ? $marker['label'] : '',
+			'last_result' => is_array( $last ) && in_array( $last['action'] ?? '', Mailboxes::ACTIONS, true ) ? $last : null,
+		);
 	}
 
 	/**

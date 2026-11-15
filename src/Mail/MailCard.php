@@ -58,6 +58,7 @@ final class MailCard {
 					'removing'  => __( 'Removing the domain…', 'beltoft-services' ),
 					'removeAsk' => __( 'Remove this domain from your plan?', 'beltoft-services' ),
 					'checking'  => __( 'Looking at your DNS. This can take a few seconds.', 'beltoft-services' ),
+					'slow'      => __( 'This is taking longer than usual. It goes on in the background: reload the page in a minute to see the result.', 'beltoft-services' ),
 				),
 			)
 		);

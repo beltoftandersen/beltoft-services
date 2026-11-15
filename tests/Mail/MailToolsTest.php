@@ -83,10 +83,12 @@ final class MailToolsTest extends MailTestCase {
 		$this->assertSame( 403, $this->dispatch( 'POST', $id . '/mail/mailboxes', $user, $read, array( 'local' => 'a' ) )->get_status(), 'Read cannot make one.' );
 
 		$made = $this->dispatch( 'POST', $id . '/mail/mailboxes', $user, $actions, array( 'local' => 'a' ) );
-		$this->assertSame( 201, $made->get_status() );
+		$this->assertSame( 202, $made->get_status() );
+		$this->run_jobs();
 		$this->assertArrayNotHasKey( 'password', $made->get_data() );
 		$this->assertSame( 201, $this->dispatch( 'POST', $id . '/mail/aliases', $user, $actions, array( 'address' => 'x', 'goto' => array( 'a@tool.example' ) ) )->get_status() );
-		$this->assertSame( 200, $this->dispatch( 'POST', $id . '/mail/dns/check', $user, $actions )->get_status() );
+		$this->assertSame( 202, $this->dispatch( 'POST', $id . '/mail/dns/check', $user, $actions )->get_status() );
+		$this->run_jobs();
 		$this->assertSame( 200, $this->dispatch( 'DELETE', $id . '/mail/aliases/x%40tool.example', $user, $actions )->get_status() );
 
 		$this->assertSame( 403, $this->dispatch( 'DELETE', $id . '/mail/mailboxes/a%40tool.example', $user, $actions, array( 'confirm' => 'DELETE' ) )->get_status() );
@@ -174,6 +176,7 @@ final class MailToolsTest extends MailTestCase {
 		$actions          = $this->oauth( $user, Tokens::ACTIONS );
 
 		$this->tool( 'create_mailbox', array( 'id' => $r->id(), 'name' => 'info', 'display_name' => 'Info' ), $actions );
+		$this->run_jobs();
 
 		$data = $this->json( $this->tool( 'email_domain_info', array( 'id' => $r->id() ), $read ) );
 
@@ -199,8 +202,13 @@ final class MailToolsTest extends MailTestCase {
 		$this->assertTrue( $this->tool( 'create_mailbox', array( 'id' => $id, 'name' => 'a' ), $read )['isError'], 'Read cannot.' );
 
 		$made = $this->json( $this->tool( 'create_mailbox', array( 'id' => $id, 'name' => 'A' ), $actions ) );
-		$this->assertSame( 'a@tool.example', $made['created'] );
+		$this->assertSame( 'a@tool.example', $made['address'] );
+		$this->assertTrue( $made['queued'] );
+		$this->assertStringContainsString( 'Accepted and queued', $made['message'] );
+		$this->assertStringContainsString( 'email_domain_info', $made['message'] );
 		$this->assertStringContainsString( 'not shown here', $made['message'] );
+		$this->assertNull( $this->mailcow->mailbox( 'a@tool.example' ), 'Not made in the request.' );
+		$this->run_jobs();
 		$this->assertNotNull( $this->mailcow->mailbox( 'a@tool.example' ) );
 		$this->assertTrue( $this->tool( 'create_mailbox', array( 'id' => $id, 'name' => 'a' ), $actions )['isError'], 'Taken.' );
 		$this->assertTrue( $this->tool( 'create_mailbox', array( 'id' => $id, 'name' => 'bad name' ), $actions )['isError'] );
@@ -212,10 +220,13 @@ final class MailToolsTest extends MailTestCase {
 		$this->assertSame( 'sales@tool.example', $this->json( $this->tool( 'remove_email_alias', array( 'id' => $id, 'address' => 'sales@tool.example' ), $actions ) )['deleted'] );
 
 		$dns = $this->json( $this->tool( 'email_dns_check', array( 'id' => $id ), $actions ) );
-		$this->assertArrayHasKey( 'rows', $dns );
+		$this->assertTrue( $dns['queued'] );
+		$this->assertArrayHasKey( 'rows', $dns['dns'] );
+		$this->assertStringContainsString( 'email_domain_info', $dns['message'] );
+		$this->run_jobs();
 
 		$history = $this->history( $r );
-		foreach ( array( 'Claude: mailbox created', 'Claude: alias created', 'Claude: alias deleted', 'Claude: email DNS checked' ) as $line ) {
+		foreach ( array( 'Claude: mailbox created', 'Claude: alias created', 'Claude: alias deleted', 'Claude: email DNS check requested' ) as $line ) {
 			$this->assertContains( $line, $history, $line );
 		}
 
@@ -234,6 +245,7 @@ final class MailToolsTest extends MailTestCase {
 		$actions          = $this->oauth( $user, Tokens::ACTIONS );
 		$full             = $this->oauth( $user, Tokens::FULL );
 		$this->tool( 'create_mailbox', array( 'id' => $id, 'name' => 'a' ), $actions );
+		$this->run_jobs();
 		$args = array( 'id' => $id, 'email' => 'a@tool.example' );
 
 		$this->assertTrue( $this->tool( 'delete_mailbox', $args, $actions )['isError'], 'Everyday level cannot.' );
@@ -263,6 +275,7 @@ final class MailToolsTest extends MailTestCase {
 		$actions          = $this->oauth( $user, Tokens::ACTIONS );
 		$full             = $this->oauth( $user, Tokens::FULL );
 		$this->tool( 'create_mailbox', array( 'id' => $id, 'name' => 'a' ), $actions );
+		$this->run_jobs();
 		$args = array( 'id' => $id, 'email' => 'a@tool.example' );
 
 		$first = $this->json( $this->tool( 'reset_mailbox_password', $args, $full ) );
@@ -271,8 +284,11 @@ final class MailToolsTest extends MailTestCase {
 		$this->assertStringNotContainsString( '—', $first['summary'] );
 
 		$done = $this->json( $this->tool( 'reset_mailbox_password', $args + array( 'confirm' => $first['confirm'] ), $full ) );
-		$this->assertTrue( $done['done'] );
+		$this->assertTrue( $done['queued'] );
 		$this->assertStringContainsString( 'not shown here', $done['message'] );
+		$this->assertStringContainsString( 'email_domain_info', $done['message'] );
+		$this->assertFalse( MailAccess::revealable( Resource::find( $id ), 'a@tool.example' ), 'Not before the job has set it.' );
+		$this->run_jobs();
 		$this->assertContains( 'Claude: new mailbox password made', $this->history( $r ) );
 		$this->assertTrue( MailAccess::revealable( Resource::find( $id ), 'a@tool.example' ) );
 		$this->assertTrue( $this->tool( 'reset_mailbox_password', $args + array( 'confirm' => $first['confirm'] ), $full )['isError'], 'A confirmation is used once.' );
@@ -304,6 +320,7 @@ final class MailToolsTest extends MailTestCase {
 		$actions          = $this->oauth( $user, Tokens::ACTIONS );
 		$full             = $this->oauth( $user, Tokens::FULL );
 		$this->tool( 'create_mailbox', array( 'id' => $id, 'name' => 'a' ), $actions );
+		$this->run_jobs();
 		$args  = array( 'id' => $id, 'email' => 'a@tool.example' );
 		$stored = (array) Resource::find( $id )->get( MailAccess::META );
 		$plain  = (string) \BeltoftServices\Crypto::decrypt( (string) $stored['a@tool.example']['pw'] );
@@ -333,6 +350,7 @@ final class MailToolsTest extends MailTestCase {
 		list( $r, $user ) = $this->domain();
 		$id               = $r->id();
 		$this->tool( 'create_mailbox', array( 'id' => $id, 'name' => 'a' ), $this->oauth( $user, Tokens::ACTIONS ) );
+		$this->run_jobs();
 
 		$thief = $this->oauth( self::factory()->user->create(), Tokens::FULL );
 		$this->assertTrue( $this->tool( 'reveal_mailbox_password', array( 'id' => $id, 'email' => 'a@tool.example' ), $thief )['isError'] );
@@ -349,6 +367,7 @@ final class MailToolsTest extends MailTestCase {
 		$results          = array(
 			$this->text( $this->tool( 'create_mailbox', array( 'id' => $id, 'name' => 'a' ), $actions ) ),
 		);
+		$this->run_jobs();
 		$stored  = (array) Resource::find( $id )->get( MailAccess::META );
 		$plain   = (string) \BeltoftServices\Crypto::decrypt( (string) $stored['a@tool.example']['pw'] );
 		$results[] = $this->text( $this->tool( 'email_domain_info', array( 'id' => $id ), $actions ) );
@@ -363,6 +382,7 @@ final class MailToolsTest extends MailTestCase {
 		$first = $this->json( $this->tool( 'reset_mailbox_password', $args, $full ) );
 		$this->assertStringNotContainsString( $plain, wp_json_encode( $first ) );
 		$done   = $this->text( $this->tool( 'reset_mailbox_password', $args + array( 'confirm' => $first['confirm'] ), $full ) );
+		$this->run_jobs();
 		$stored = (array) Resource::find( $id )->get( MailAccess::META );
 		$plain3 = (string) \BeltoftServices\Crypto::decrypt( (string) $stored['a@tool.example']['pw'] );
 		$this->assertStringNotContainsString( $plain3, $done );

@@ -36,6 +36,7 @@ final class LevelsTest extends McpTestCase {
 			// A tool above the level is refused when it is guessed, whatever the arguments.
 			$result = $this->tool( 'reboot', array( 'id' => $server->id() ), $token );
 			$this->assertSame( Tokens::READ === $level, $result['isError'], $label );
+			\BeltoftServices\Progress::clear( \BeltoftServices\Resource::find( $server->id() ) ); // One action at a time: the next starts when this one is done.
 		}
 	}
 

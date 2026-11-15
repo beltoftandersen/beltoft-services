@@ -258,6 +258,15 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 == Changelog ==
 
+= 0.30.0 =
+* "Use Beltoft DNS": the switch of the name servers is checked at once and then done by a job (zone check, name servers, DS keys, the stored state), with the usual retries. The page shows that it is working and then the outcome. A registrar that answers late, or fails after the name servers were set, leaves nothing half stored: the page already shows our name servers while only the DS is missing, and the retry finishes it.
+* Show transfer code: the emailed one-time code is used up only after the registrar has returned the code, and the re-lock clock restarts only then. A registrar that fails costs the customer no new code ("Your code is still valid, try again in a minute").
+* New mailbox and new mailbox password: checked at once, then done by a job. The password is made at once and kept encrypted until the job has set it on the mail server (never in a job argument); it can be shown once when the job says done. A mailbox that the mail server already made for an earlier try of the job counts as made, one that was there before is refused and never touched, a mailbox that cannot be finished is removed again and the removal is checked (staff are mailed when it fails). The mail routes answer 202 with queued, the action and how to read the outcome (before: 201 or 200 with the result); GET mail has a `task` (working, last_result).
+* Zone file import, Add these records: the previewed sets are stored and one job writes them one set at a time through the zone owner, keeping its place, so a stopped job goes on where it was. The report (added, replaced, not added with the reason) is the outcome shown on the page. The route answers 202 (before: 200 with the result).
+* Mail "Check DNS now": the look publishes records into the customer's zone and changes the sending hold, so it is a job; the route answers 202. Every record is stored as it is published, also for the background look.
+* The MCP tools create_mailbox, reset_mailbox_password and email_dns_check say that the change is queued and that email_domain_info shows the task. OpenAPI: the mailbox and DNS check routes answer 202.
+* Shared action controller: `Jobs::start_action()` (busy check, preparation, marker, job) is the one way a route starts an action; a driver may give the customer its own sentence for an outcome (`Jobs::TEXT` in the result meta), and a refusal with a sentence is not mailed to staff; `StepUp::verify()` can keep a right code until `StepUp::consume()`; `Routes::queued()` is the 202 answer; the browser helper `beltoftApi.follow()` follows a queued action to its outcome.
+
 = 0.29.1 =
 * Fix: the guest memory history no longer misses a 5-minute point for a server a customer had open; the background read skips a server only when the current slot already has a reading.
 * Fix: the monitoring chart shows numbers with the decimal sign of the page language, and memory in GB with one decimal.

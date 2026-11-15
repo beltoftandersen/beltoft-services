@@ -4,6 +4,7 @@ namespace BeltoftServices\Domains;
 
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\Driver;
+use BeltoftServices\Drivers\InternalActions;
 use BeltoftServices\Drivers\ProvisionSteps;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Drivers\StopsOnDelete;
@@ -11,7 +12,7 @@ use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
 
-final class DnsDriver implements Driver, StopsOnDelete, ProvisionSteps {
+final class DnsDriver implements Driver, StopsOnDelete, ProvisionSteps, InternalActions {
 	public function id(): string { return 'dns'; }
 
 	/**
@@ -142,6 +143,7 @@ final class DnsDriver implements Driver, StopsOnDelete, ProvisionSteps {
 		return $removed;
 	}
 	public function status( Resource $r ): ?array { return array( 'domain' => $r->get( 'domain' ), 'delegation' => $r->get( 'delegation' ) ); }
+	public function internal_actions(): array { return array( 'dns_import' ); }
 	public function customer_actions( Resource $r ): array { return Actions::offered( $r ); }
 	public function act( Resource $r, string $action, array $args ): StepResult { return Actions::run( $r, $action, $args ); }
 	public function render_account( Resource $r ): void { Panels::account( $r ); }

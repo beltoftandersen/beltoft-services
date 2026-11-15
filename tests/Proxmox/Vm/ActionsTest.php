@@ -748,6 +748,7 @@ class ActionsTest extends TestCase {
 
 		for ( $i = 0; $i < 12; $i++ ) {
 			$statuses[] = $this->route( $r->id(), $owner, 'reset_password' )->get_status();
+			\BeltoftServices\Progress::clear( \BeltoftServices\Resource::find( $r->id() ) ); // One action at a time: the next starts when this one is done.
 		}
 
 		$this->assertSame( 202, $statuses[0] );
@@ -761,6 +762,7 @@ class ActionsTest extends TestCase {
 
 		for ( $i = 0; $i < 7; $i++ ) {
 			$statuses[] = $this->route( $r->id(), $owner, 'reset_password' )->get_status();
+			\BeltoftServices\Progress::clear( \BeltoftServices\Resource::find( $r->id() ) ); // One action at a time: the next starts when this one is done.
 		}
 
 		remove_filter( 'beltoft_services_rest_rate_limit', '__return_zero' );
@@ -1306,6 +1308,7 @@ class ActionsTest extends TestCase {
 
 		foreach ( range( 1, 3 ) as $n ) {
 			$this->assertSame( 202, $this->route( $r->id(), $owner, 'restore', $args )->get_status(), 'Request ' . $n );
+			\BeltoftServices\Progress::clear( \BeltoftServices\Resource::find( $r->id() ) ); // One action at a time: the next starts when this one is done.
 		}
 
 		$this->assertSame( 429, $this->route( $r->id(), $owner, 'restore', $args )->get_status() );

@@ -58,7 +58,7 @@ final class AliasesTest extends MailTestCase {
 
 	public function test_the_plan_limit_counts_aliases_but_not_the_entries_mailcow_keeps_for_mailboxes(): void {
 		$r = $this->ready_mail( 'cnt.example', array( 'aliases' => 2 ) );
-		Mailboxes::create( $r, 'anna' );
+		$this->create_box( $r, 'anna' );
 		// Mailcow lists a mailbox's own address as an alias that goes to itself.
 		$this->mailcow->add_alias( 'anna@cnt.example', 'anna@cnt.example' );
 
@@ -84,7 +84,7 @@ final class AliasesTest extends MailTestCase {
 
 	public function test_an_address_that_is_taken_is_reported(): void {
 		$r = $this->ready_mail( 'tk.example' );
-		Mailboxes::create( $r, 'anna' );
+		$this->create_box( $r, 'anna' );
 		$this->assertSame( 'exists', Aliases::create( $r, 'anna', 'x@tk.example' )->get_error_code() );
 		Aliases::create( $r, 'a', 'x@tk.example' );
 		$this->assertSame( 'exists', Aliases::create( $r, 'a', 'y@tk.example' )->get_error_code() );

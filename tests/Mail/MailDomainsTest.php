@@ -103,7 +103,7 @@ final class MailDomainsTest extends MailTestCase {
 	public function test_removing_a_domain_with_mailboxes_is_refused(): void {
 		$root  = $this->ready_mail( 'root.example' );
 		$child = $this->add_ready( $root, 'child.example' );
-		$this->assertIsArray( Mailboxes::create( $child, 'anna' ) );
+		$this->assertIsArray( $this->create_box( $child, 'anna' ) );
 
 		$res = MailDomains::remove( $child );
 		$this->assertWPError( $res );
@@ -119,7 +119,7 @@ final class MailDomainsTest extends MailTestCase {
 	public function test_removing_a_domain_is_refused_when_the_mail_server_cannot_be_asked(): void {
 		$root  = $this->ready_mail( 'root.example' );
 		$child = $this->add_ready( $root, 'child.example' );
-		$this->assertIsArray( Mailboxes::create( $child, 'anna' ) );
+		$this->assertIsArray( $this->create_box( $child, 'anna' ) );
 		$this->mailcow->fail_next( 'list_mailboxes', new \WP_Error( 'mailcow_transport', 'down' ) );
 
 		$res = MailDomains::remove( Resource::find( $child->id() ) );
@@ -210,7 +210,7 @@ final class MailDomainsTest extends MailTestCase {
 		$this->assertInstanceOf( Resource::class, $child );
 		$this->assertNotContains( 'domain', (array) Resource::find( $child->id() )->get( 'steps' ) );
 
-		$res = Mailboxes::create( $root, 'anna' );
+		$res = $this->create_box( $root, 'anna' );
 		$this->assertIsArray( $res );
 		$this->assertSame( array( 'mailboxes' => 1, 'aliases' => 0, 'domains' => 2 ), MailPlan::used( $root ) );
 	}

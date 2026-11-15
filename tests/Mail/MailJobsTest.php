@@ -17,8 +17,8 @@ final class MailJobsTest extends MailTestCase {
 
 	public function test_a_mailbox_that_is_nearly_full_is_reported_once_until_it_drops_again(): void {
 		$r = $this->ready_mail( 'use.example' );
-		Mailboxes::create( $r, 'a' );
-		Mailboxes::create( $r, 'b' );
+		$this->create_box( $r, 'a' );
+		$this->create_box( $r, 'b' );
 		$this->mailcow->set_usage( 'a@use.example', (int) ( 10240 * 1048576 * 0.95 ) );
 		$this->mailcow->set_usage( 'b@use.example', 1048576 );
 
@@ -40,7 +40,7 @@ final class MailJobsTest extends MailTestCase {
 
 	public function test_the_threshold_is_a_setting_and_a_server_that_is_down_is_skipped(): void {
 		$r = $this->ready_mail( 'thr.example' );
-		Mailboxes::create( $r, 'a' );
+		$this->create_box( $r, 'a' );
 		$this->mailcow->set_usage( 'a@thr.example', (int) ( 10240 * 1048576 * 0.5 ) );
 		$this->assertSame( array(), MailJobs::check( Resource::find( $r->id() ) ) );
 
@@ -83,7 +83,7 @@ final class MailJobsTest extends MailTestCase {
 
 	public function test_nothing_is_paused_at_the_cap_the_mail_server_blocks_sending_itself(): void {
 		$r = $this->ready_mail( 'cap.example' );
-		Mailboxes::create( $r, 'a' );
+		$this->create_box( $r, 'a' );
 		$this->mailcow->set_usage( 'a@cap.example', 10240 * 1048576 );
 
 		MailJobs::check( Resource::find( $r->id() ) );

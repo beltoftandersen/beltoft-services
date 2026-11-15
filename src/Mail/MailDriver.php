@@ -10,6 +10,7 @@ namespace BeltoftServices\Mail;
 use BeltoftServices\Alerts;
 use BeltoftServices\Domains\Ownership;
 use BeltoftServices\Drivers\Driver;
+use BeltoftServices\Drivers\InternalActions;
 use BeltoftServices\Drivers\NeedsBilling;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
@@ -23,9 +24,11 @@ defined( 'ABSPATH' ) || exit;
  * records (MailDns). Pause and resume switch the domain and its mailboxes off and on. A plan change raises the limits
  * and never lowers them. Delete removes mailboxes, aliases and the domain, and runs only when Retention or an admin
  * asks for it (deletion_mode is off by default). Mailboxes and aliases are Mailboxes and Aliases, reached through MailRoutes and the account
- * page (MailCard); the driver has no queued customer actions.
+ * page (MailCard). The changes that call the mail server (a new mailbox, a new password, the DNS check) run as the driver's
+ * internal actions on the shared customer-action path (`act()`, queued by MailRoutes through Jobs::start_action); the driver offers none
+ * in a customer list.
  */
-final class MailDriver implements Driver, NeedsBilling {
+final class MailDriver implements Driver, NeedsBilling, InternalActions {
 
 	public const ID   = 'mail';
 	public const KIND = 'mail';
@@ -630,7 +633,22 @@ final class MailDriver implements Driver, NeedsBilling {
 		return array();
 	}
 
+	public function internal_actions(): array {
+		return Mailboxes::ACTIONS;
+	}
+
 	public function act( Resource $r, string $action, array $args ): StepResult {
+		switch ( $action ) {
+			case Mailboxes::CREATE:
+				return Mailboxes::run_create( $r, $args );
+
+			case Mailboxes::PASSWORD:
+				return Mailboxes::run_password( $r, $args );
+
+			case Mailboxes::DNS_CHECK:
+				return MailDns::run_check( $r );
+		}
+
 		return StepResult::fail( 'This email action is not available.' );
 	}
 

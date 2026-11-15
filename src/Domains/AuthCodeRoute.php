@@ -58,19 +58,21 @@ final class AuthCodeRoute {
 		} else {
 			$r = Routes::guard( $request, true, 5 );
 			if ( ! $r instanceof Resource ) { $response = $r; }
-			elseif ( ! StepUp::verify( get_current_user_id(), (string) $request->get_param( 'secret' ), self::PURPOSE ) ) {
+			elseif ( ! StepUp::verify( get_current_user_id(), (string) $request->get_param( 'secret' ), self::PURPOSE, false ) ) {
 				$response = rest_convert_error_to_response( new \WP_Error( 'step_up', __( 'That code is not right or has expired. Send a new code.', 'beltoft-services' ), array( 'status' => 403 ) ) );
 			}
 			elseif ( 'domain' !== $r->get( 'driver' ) || ! ctype_digit( (string) $r->get( 'remote_id' ) ) ) {
 				$response = rest_convert_error_to_response( new \WP_Error( 'unavailable', __( 'This code is unavailable.', 'beltoft-services' ), array( 'status' => 403 ) ) );
 			} else {
-				// Asking for the code means a transfer may be starting: the re-lock clock restarts.
-				if ( ! $r->get( 'is_locked' ) ) { $r->set( array( 'unlocked_at' => time() ) ); }
+				// The emailed code stays valid until the registrar has answered: a slow or failing registrar costs the customer nothing.
 				$reply = Clients::registrar()->request( 'GET', '/domains/' . $r->get( 'remote_id' ) . '/authcode' );
 				$code = is_wp_error( $reply ) ? '' : (string) ( $reply['auth_code'] ?? '' );
 				if ( '' === $code ) {
-					$response = rest_convert_error_to_response( new \WP_Error( 'unavailable', __( 'The transfer code is not available yet.', 'beltoft-services' ), array( 'status' => 503 ) ) );
+					$response = rest_convert_error_to_response( new \WP_Error( 'unavailable', __( 'The transfer code is not available yet. Your code is still valid, try again in a minute.', 'beltoft-services' ), array( 'status' => 503 ) ) );
 				} else {
+					StepUp::consume( get_current_user_id(), self::PURPOSE );
+					// Asking for the code means a transfer may be starting: the re-lock clock restarts, once a code was given.
+					if ( ! $r->get( 'is_locked' ) ) { $r->set( array( 'unlocked_at' => time() ) ); }
 					// The customer is told it was shown, never the code.
 					Security::notify( $r, 'code_viewed' );
 					$response = new \WP_REST_Response( array( 'auth_code' => $code ), 200 );

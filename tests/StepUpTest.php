@@ -97,6 +97,34 @@ final class StepUpTest extends TestCase {
 		$this->assertFalse( StepUp::verify( $user, $code, ApiTokens::PURPOSE ), 'Single use.' );
 	}
 
+	public function test_a_code_that_is_kept_until_consume_works_again_and_is_then_used_up(): void {
+		$user = $this->customer();
+		StepUp::send( $user, ApiTokens::PURPOSE );
+		$code = $this->code();
+
+		// verify() without consuming: the caller's work can still fail, and the same code serves the next try.
+		$this->assertTrue( StepUp::verify( $user, $code, ApiTokens::PURPOSE, false ) );
+		$this->assertTrue( StepUp::verify( $user, $code, ApiTokens::PURPOSE, false ) );
+		$this->assertFalse( StepUp::verify( $user, $this->wrong( $code ), ApiTokens::PURPOSE, false ), 'A wrong try is still counted.' );
+
+		StepUp::consume( $user, ApiTokens::PURPOSE );
+		$this->assertFalse( StepUp::verify( $user, $code, ApiTokens::PURPOSE, false ), 'Used up.' );
+		$this->assertFalse( StepUp::verify( $user, $code, ApiTokens::PURPOSE ) );
+	}
+
+	public function test_five_wrong_tries_burn_a_kept_code_too(): void {
+		$user = $this->customer();
+		StepUp::send( $user, ApiTokens::PURPOSE );
+		$code = $this->code();
+		$this->assertTrue( StepUp::verify( $user, $code, ApiTokens::PURPOSE, false ) );
+
+		for ( $i = 0; $i < StepUp::MAX_TRIES; $i++ ) {
+			StepUp::verify( $user, $this->wrong( $code ), ApiTokens::PURPOSE, false );
+		}
+
+		$this->assertFalse( StepUp::verify( $user, $code, ApiTokens::PURPOSE, false ) );
+	}
+
 	public function test_spaces_in_the_typed_code_are_ignored(): void {
 		$user = $this->customer();
 		StepUp::send( $user, ApiTokens::PURPOSE );

@@ -184,8 +184,10 @@ final class StepUp {
 	 * @param int    $user_id Customer.
 	 * @param string $secret  What was typed.
 	 * @param string $purpose One of purposes().
+	 * @param bool   $consume False to leave a right emailed code valid until consume() (a caller whose work can fail afterwards and
+	 *                        should not cost the customer a new code). Wrong tries are counted either way.
 	 */
-	public static function verify( int $user_id, string $secret, string $purpose ): bool {
+	public static function verify( int $user_id, string $secret, string $purpose, bool $consume = true ): bool {
 		$secret = preg_replace( '/\s+/', '', $secret ) ?? '';
 
 		if ( ! get_userdata( $user_id ) || '' === $secret || strlen( $secret ) > 200 || ! in_array( $purpose, self::purposes(), true ) ) {
@@ -237,10 +239,22 @@ final class StepUp {
 			return false;
 		}
 
-		// Single use.
-		delete_user_meta( $user_id, self::META . $purpose );
+		// Single use, once consume() is called when the caller asked to keep it until its work is done.
+		if ( $consume ) {
+			self::consume( $user_id, $purpose );
+		}
 
 		return true;
+	}
+
+	/**
+	 * Uses up the emailed code of a purpose after verify( ..., false ) accepted it.
+	 *
+	 * @param int    $user_id Customer.
+	 * @param string $purpose One of purposes().
+	 */
+	public static function consume( int $user_id, string $purpose ): void {
+		delete_user_meta( $user_id, self::META . $purpose );
 	}
 
 	/**

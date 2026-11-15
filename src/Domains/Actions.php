@@ -12,6 +12,18 @@ defined( 'ABSPATH' ) || exit;
 final class Actions {
 	public static function register(): void {
 		add_filter( 'beltoft_services_action_refusal', array( __CLASS__, 'refusal' ), 10, 4 );
+		add_filter( 'beltoft_services_action_resumable', array( __CLASS__, 'resumable' ), 10, 3 );
+	}
+
+	/**
+	 * A lost job of an internal domain action is queued again once: each keeps its own state and starts nothing twice.
+	 *
+	 * @param bool   $yes    Answer so far.
+	 * @param string $driver Driver id.
+	 * @param string $action Action name.
+	 */
+	public static function resumable( $yes, $driver, $action ): bool {
+		return (bool) $yes || ( in_array( $driver, array( 'domain', 'dns' ), true ) && in_array( $action, self::INTERNAL, true ) );
 	}
 
 	public static function offered( Resource $r ): array {
@@ -61,7 +73,15 @@ final class Actions {
 		return $hosts;
 	}
 
+	/**
+	 * The actions the plugin queues itself for a domain (Drivers\InternalActions), never offered in the customer's list: the switch of
+	 * "Use Beltoft DNS" (DnsAdopt) and the zone file import (RecordImport). Both keep their own state so a replay is safe.
+	 */
+	public const INTERNAL = array( 'adopt_switch', 'dns_import' );
+
 	public static function run( Resource $r, string $action, array $args ): StepResult {
+		if ( 'adopt_switch' === $action ) { return DnsAdopt::run_switch( $r ); }
+		if ( 'dns_import' === $action ) { return RecordImport::run_job( $r ); }
 		$valid = self::validate( $r, $action, $args );
 		if ( is_wp_error( $valid ) ) { return StepResult::fail( $valid->get_error_message() ); }
 		$name = (string) $r->get( 'domain' );
@@ -126,7 +146,8 @@ final class Actions {
 		$reply = Clients::registrar()->request( 'PUT', '/domains/' . $id, array( 'ns_group' => '', 'name_servers' => array_map( static fn( $host ) => array( 'name' => $host ), $hosts ) ) );
 		if ( is_wp_error( $reply ) ) { return StepResult::retry( 60, 'Name servers could not be changed.' ); }
 		$ds = Clients::registrar()->request( 'PUT', '/domains/' . $id, array( 'dnssec_keys' => $keys, 'is_dnssec_enabled' => true ) );
-		if ( is_wp_error( $ds ) ) { return StepResult::retry( 60, 'DNSSEC could not be published.' ); }
+		// The registrar has our name servers already: the retry records that, so the page never shows the old ones while only the DS is missing.
+		if ( is_wp_error( $ds ) ) { return StepResult::retry( 60, 'DNSSEC could not be published.', array( 'ns_mode' => 'ours', 'nameservers' => $hosts ) ); }
 		if ( $notify ) { Security::notify( $r, 'ns_changed' ); }
 		return StepResult::done( array( 'ns_mode' => 'ours', 'nameservers' => $hosts, 'dnssec_keys' => $keys ) + ( $made ? array( 'zone_claimed' => true ) : array() ) );
 	}

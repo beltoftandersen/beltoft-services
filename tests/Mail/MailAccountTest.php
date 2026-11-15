@@ -88,8 +88,8 @@ final class MailAccountTest extends MailTestCase {
 
 	public function test_the_row_names_the_domain_and_counts_mailboxes_of_the_plan(): void {
 		$r = $this->ready_mail( 'rows.example', array(), $this->user );
-		Mailboxes::create( $r, 'a' );
-		Mailboxes::create( Resource::find( $r->id() ), 'b' );
+		$this->create_box( $r, 'a' );
+		$this->create_box( Resource::find( $r->id() ), 'b' );
 		ob_start();
 		$this->page( Resource::find( $r->id() ) );
 		ob_end_clean();
@@ -177,7 +177,7 @@ final class MailAccountTest extends MailTestCase {
 
 	public function test_mailboxes_show_storage_and_buttons_but_never_a_password(): void {
 		$r = $this->ready_mail( 'boxes.example', array(), $this->user );
-		Mailboxes::create( $r, 'info', 'Info desk' );
+		$this->create_box( $r, 'info', 'Info desk' );
 		$this->mailcow->set_usage( 'info@boxes.example', 2560 * 1048576 );
 		$secret = (string) \BeltoftServices\Crypto::decrypt( (string) ( (array) Resource::find( $r->id() )->get( MailAccess::META ) )['info@boxes.example']['pw'] );
 
@@ -212,7 +212,7 @@ final class MailAccountTest extends MailTestCase {
 
 	public function test_a_full_plan_has_no_create_form(): void {
 		$r = $this->ready_mail( 'full.example', array( 'mailboxes' => 1 ), $this->user );
-		Mailboxes::create( $r, 'a' );
+		$this->create_box( $r, 'a' );
 
 		$html = $this->page( Resource::find( $r->id() ) );
 
@@ -325,7 +325,7 @@ final class MailAccountTest extends MailTestCase {
 		$this->assertStringContainsString( 'data-mail-alias-goto', $html );
 
 		// With mailboxes: they are offered to tick, and the field stays for other addresses (outside forwarding is allowed).
-		\BeltoftServices\Mail\Mailboxes::create( Resource::find( $r->id() ), 'info', 'Info Shop', 1024 );
+		$this->create_box( Resource::find( $r->id() ), 'info', 'Info Shop', 1024 );
 		$html = $this->page( Resource::find( $r->id() ), 'aliases' );
 		$this->assertStringContainsString( '<input type="checkbox" value="info@al.example" data-mail-alias-box>', $html );
 		$this->assertStringContainsString( 'Info Shop', $html );
@@ -370,7 +370,7 @@ final class MailAccountTest extends MailTestCase {
 
 	public function test_the_page_says_sending_is_held_on_the_overview_each_mailbox_and_the_form_until_it_is_lifted(): void {
 		$r = $this->ready_mail( 'held.example', array(), $this->user );
-		\BeltoftServices\Mail\Mailboxes::create( $r, 'anna' );
+		$this->create_box( $r, 'anna' );
 		$line = 'Sending is held until the SPF and DKIM records are found. Receiving works once the MX record points here.';
 
 		$html = $this->page( Resource::find( $r->id() ) );
@@ -524,9 +524,9 @@ final class MailAccountTest extends MailTestCase {
 	public function test_the_counts_follow_create_and_delete_not_only_the_routes(): void {
 		$r = $this->ready_mail( 'count.example', array(), $this->user );
 
-		Mailboxes::create( $r, 'a' );
-		Mailboxes::create( Resource::find( $r->id() ), 'b' );
-		Mailboxes::create( Resource::find( $r->id() ), 'c' );
+		$this->create_box( $r, 'a' );
+		$this->create_box( Resource::find( $r->id() ), 'b' );
+		$this->create_box( Resource::find( $r->id() ), 'c' );
 		$this->assertSame( 3, (int) Resource::find( $r->id() )->get( 'mail_boxes' ) );
 		$this->assertSame( '3 of 5 mailboxes', $this->area()->row( $this->views( Resource::find( $r->id() ) )[0], Resource::find( $r->id() ) )['details'] );
 
@@ -622,9 +622,9 @@ final class MailAccountTest extends MailTestCase {
 	public function test_the_mailbox_counter_is_plan_wide_and_the_form_follows_the_plan_not_the_domain(): void {
 		$root = $this->ready_mail( 'wide.example', array( 'mailboxes' => 3 ), $this->user );
 		$kid  = $this->child_of( $root, 'wide-two.example' );
-		Mailboxes::create( Resource::find( $root->id() ), 'a' );
-		Mailboxes::create( Resource::find( $root->id() ), 'b' );
-		Mailboxes::create( Resource::find( $kid->id() ), 'c' );
+		$this->create_box( Resource::find( $root->id() ), 'a' );
+		$this->create_box( Resource::find( $root->id() ), 'b' );
+		$this->create_box( Resource::find( $kid->id() ), 'c' );
 
 		$html = $this->page( Resource::find( $kid->id() ) );
 		$this->assertStringContainsString( '3 of 3 mailboxes in your plan', $html );
@@ -675,7 +675,7 @@ final class MailAccountTest extends MailTestCase {
 		$this->assertStringContainsString( 'data-mail-domain-remove="kid.example"', $html );
 		$this->assertStringNotContainsString( 'data-mail-domain-add', $html, 'The add form is on the first domain.' );
 
-		Mailboxes::create( Resource::find( $child->id() ), 'info' );
+		$this->create_box( Resource::find( $child->id() ), 'info' );
 		$html = $this->page( Resource::find( $child->id() ) );
 		$this->assertStringNotContainsString( 'data-mail-domain-remove', $html );
 		$this->assertStringContainsString( 'Delete the mailboxes on this domain first.', $html );

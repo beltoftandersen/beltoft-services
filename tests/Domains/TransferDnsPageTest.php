@@ -368,7 +368,14 @@ class TransferDnsPageTest extends TestCase {
 	}
 
 	private function import( Resource $r, bool $apply ): \WP_REST_Response {
-		return $this->call( 'POST', $r->id() . '/dns-import', array( 'text' => $this->zone_text( (string) $r->get( 'domain' ) ), 'apply' => $apply ) );
+		$response = $this->call( 'POST', $r->id() . '/dns-import', array( 'text' => $this->zone_text( (string) $r->get( 'domain' ) ), 'apply' => $apply ) );
+
+		// Apply is queued (the shared action dns_import): the jobs write the records.
+		if ( $apply && 202 === $response->get_status() ) {
+			$this->run_jobs();
+		}
+
+		return $response;
 	}
 
 	public function test_a_zone_file_preview_says_what_is_added_replaced_and_skipped(): void {
@@ -390,10 +397,15 @@ class TransferDnsPageTest extends TestCase {
 		$r    = $this->transfer( 'first' );
 		$name = (string) $r->get( 'domain' );
 		$out  = $this->import( $r, true );
-		$this->assertSame( 200, $out->get_status(), (string) wp_json_encode( $out->get_data() ) );
-		$this->assertSame( array(), $out->get_data()['result']['failed'] );
-		$this->assertGreaterThanOrEqual( 1, $out->get_data()['result']['replaced'] );
-		$this->assertGreaterThanOrEqual( 1, $out->get_data()['result']['added'] );
+		$this->assertSame( 202, $out->get_status(), (string) wp_json_encode( $out->get_data() ) );
+		$this->assertSame( 'dns_import', $out->get_data()['action'] );
+		$this->assertSame( '/resources/' . $r->id(), $out->get_data()['status'] );
+		$last = Resource::find( $r->id() )->get( 'last_result' );
+		$this->assertTrue( $last['ok'] );
+		$this->assertSame( 'dns_import', $last['action'] );
+		$this->assertSame( 'The records were imported: 3 added, 1 replaced.', $last['text'] );
+		$this->assertNull( Resource::find( $r->id() )->get( 'dns_import_job' ), 'The stored sets are gone when it ends.' );
+		$this->assertGreaterThan( 0, (int) Resource::find( $r->id() )->get( 'dns_imported_at' ) );
 		$zone = (string) wp_json_encode( $this->dns->zone( $name ) );
 		$this->assertStringContainsString( '192.0.2.99', $zone );
 		$this->assertStringNotContainsString( '192.0.2.10', $zone, 'The set in the file replaced the old set.' );
@@ -410,7 +422,7 @@ class TransferDnsPageTest extends TestCase {
 		$this->assertSame( 403, $this->import( $r, true )->get_status() );
 		wp_set_current_user( $this->user );
 		add_filter( 'beltoft_services_dns_write_limit', static fn() => 1 );
-		$this->assertSame( 200, $this->import( $r, true )->get_status() );
+		$this->assertSame( 202, $this->import( $r, true )->get_status() );
 		$this->assertSame( 429, $this->import( $r, true )->get_status() );
 	}
 
@@ -478,7 +490,7 @@ class TransferDnsPageTest extends TestCase {
 		$this->assertStringContainsString( 'Acknowledged that records we could not find are missing', (string) ob_get_clean() );
 
 		$other = $this->transfer( 'first' );
-		$this->assertSame( 200, $this->import( $other, true )->get_status() );
+		$this->assertSame( 202, $this->import( $other, true )->get_status() );
 		$done = $this->call( 'POST', $other->id() . '/transfer-dns-confirm' );
 		$this->assertSame( 200, $done->get_status(), (string) wp_json_encode( $done->get_data() ) );
 		$this->assertSame( 'imported', Resource::find( $other->id() )->get( 'dns_reviewed_path' ) );

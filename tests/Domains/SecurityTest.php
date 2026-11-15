@@ -221,13 +221,37 @@ class SecurityTest extends TestCase {
 		$this->assertSame( array(), $this->mails );
 	}
 
-	public function test_a_failed_code_request_also_restarts_the_clock(): void {
+	public function test_a_failed_code_request_keeps_the_clock_and_the_emailed_code_so_the_customer_can_try_again(): void {
 		$r  = $this->domain( array( 'is_locked' => false, 'unlocked_at' => time() - 20 * DAY_IN_SECONDS ) );
 		$op = $this->registrar();
 		$op->reply( 'GET', '/domains/321/authcode', new \WP_Error( 'http_404', 'No.' ) );
+		$op->reply( 'GET', '/domains/321/authcode', array( 'auth_code' => 'REGISTRAR-SECRET-CODE' ) );
 		wp_set_current_user( (int) $r->license()['user_id'] );
-		$this->code_request( $r );
-		$this->assertEqualsWithDelta( time(), (int) Resource::find( $r->id() )->get( 'unlocked_at' ), 5 );
+		$secret      = $this->emailed_code( $r );
+		$this->mails = array();
+
+		$failed = $this->code_request( $r, $secret );
+		$this->assertSame( 503, $failed->get_status() );
+		$this->assertStringContainsString( 'still valid', $failed->get_data()['message'] );
+		$this->assertEqualsWithDelta( time() - 20 * DAY_IN_SECONDS, (int) Resource::find( $r->id() )->get( 'unlocked_at' ), 5, 'No code was given: the clock is not restarted.' );
+		$this->assertSame( array(), $this->mails, 'Nothing was told to the customer: no code was shown.' );
+
+		$again = $this->code_request( $r, $secret );
+		$this->assertSame( 200, $again->get_status(), 'The same emailed code still works.' );
+		$this->assertSame( 'REGISTRAR-SECRET-CODE', $again->get_data()['auth_code'] );
+		$this->assertEqualsWithDelta( time(), (int) Resource::find( $r->id() )->get( 'unlocked_at' ), 5, 'The code was given: the clock restarts.' );
+
+		$this->assertSame( 403, $this->code_request( $r, $secret )->get_status(), 'Once the code was shown, the emailed code is used up.' );
+	}
+
+	public function test_a_wrong_code_is_counted_and_never_reaches_the_registrar(): void {
+		$r  = $this->domain( array( 'is_locked' => false ) );
+		$op = $this->registrar();
+		wp_set_current_user( (int) $r->license()['user_id'] );
+		$this->emailed_code( $r );
+
+		$this->assertSame( 403, $this->code_request( $r, '000000' )->get_status() );
+		$this->assertSame( array(), $op->calls() );
 	}
 
 	/** The transfer code route as the page calls it: a POST with the code in the body. */

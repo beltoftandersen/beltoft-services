@@ -319,7 +319,7 @@ class LiteMailTest extends HostingCase {
 		$child->set( array( \BeltoftServices\Mail\MailMeta::RATE_LIMIT => array( 'minute' => 60, 'day' => 250 ) ) );
 		$child = $this->make_ready( Resource::find( $child->id() ) );
 
-		$made = Mailboxes::create( $child, 'info', 'Info', 0 );
+		$made = $this->create_box( $child, 'info', 'Info', 0 );
 		$this->assertFalse( is_wp_error( $made ), is_wp_error( $made ) ? $made->get_error_message() : '' );
 
 		$this->assertSame( array( 'value' => 250, 'frame' => 'd' ), $this->mailcow->mailbox( 'info@boxes.example' )['rl'], 'The child day limit, not the global 500.' );

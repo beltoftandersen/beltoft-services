@@ -33,6 +33,9 @@ final class Acts {
 	/**
 	 * The tools this class runs.
 	 */
+	/** What an email change that is queued answers: accepted, not done; the domain's task says how it ended. */
+	public const EMAIL_QUEUED = 'Accepted and queued: it runs in the background, one change of the domain at a time (another change is refused until it is done). email_domain_info shows the task of the domain: working while it runs, then last_result with ok and the outcome text.';
+
 	public const NAMES = array( 'rename_server', 'set_firewall', 'set_database_access', 'private_network', 'set_usage_alerts', 'retry_app_install', 'domain_settings', 'set_auto_renew', 'reactivate_subscription', 'free_license_site', 'cancel_unpaid_order', 'update_billing_address', 'create_mailbox', 'add_email_alias', 'remove_email_alias', 'email_dns_check', 'add_site_domain', 'set_php_version', 'clear_site_cache', 'create_hosting_backup', 'ssl_resend_email' );
 
 	/**
@@ -151,7 +154,7 @@ final class Acts {
 
 				$done = Tools::route( 'POST', $base . '/mailboxes', array(), $body, $id, 'mailbox created' );
 
-				return $done instanceof \WP_Error ? $done : array( 'created' => (string) $done['email'], 'quota_mb' => (int) $done['quota_mb'], 'message' => 'The mailbox is ready. Its password is not shown here. The customer shows it once in the dashboard, or reveal_mailbox_password shows it after the customer says yes.' );
+				return $done instanceof \WP_Error ? $done : array( 'queued' => true, 'address' => (string) $done['email'], 'quota_mb' => (int) $done['quota_mb'], 'message' => self::EMAIL_QUEUED . ' When it is done the mailbox is in the list with reveal true. Its password is not shown here: the customer shows it once in the dashboard, or reveal_mailbox_password shows it after the customer says yes.' );
 
 			case 'add_email_alias':
 				$done = Tools::route( 'POST', $base . '/aliases', array(), array( 'address' => (string) $args['name'], 'goto' => array_values( array_map( 'strval', (array) $args['deliver_to'] ) ) ), $id, 'alias created' );
@@ -164,9 +167,9 @@ final class Acts {
 				return $done instanceof \WP_Error ? $done : array( 'deleted' => (string) $done['deleted'] );
 		}
 
-		$done = Tools::route( 'POST', $base . '/dns/check', array(), array(), $id, 'email DNS checked' );
+		$done = Tools::route( 'POST', $base . '/dns/check', array(), array(), $id, 'email DNS check requested' );
 
-		return $done instanceof \WP_Error ? $done : (array) $done['dns'];
+		return $done instanceof \WP_Error ? $done : array( 'queued' => true, 'message' => self::EMAIL_QUEUED . ' The records below are as they were when you asked.', 'dns' => (array) $done['dns'] );
 	}
 
 	/**

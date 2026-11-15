@@ -16,7 +16,6 @@ use BeltoftServices\Hosting\Runs;
 use BeltoftServices\Hosting\SiteDns;
 use BeltoftServices\Hosting\Sites;
 use BeltoftServices\Jobs;
-use BeltoftServices\Progress;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
@@ -107,10 +106,10 @@ trait Base {
 	 */
 	public function queue( string $method, array $args, ?string $secret = null ) {
 		// One change at a time, as for servers: the Progress marker. Asked again under the account's lock (locked()).
-		$busy = Progress::pending( Resource::find( $this->r->id() ) ?? $this->r );
+		$busy = Jobs::busy( Resource::find( $this->r->id() ) ?? $this->r );
 
 		if ( null !== $busy ) {
-			return Steps::refusal( $busy );
+			return $busy;
 		}
 
 		$this->mode       = 'request';
@@ -137,9 +136,9 @@ trait Base {
 	private function locked( callable $change ) {
 		$guarded = function () use ( $change ) {
 			// A request that makes a change asks again under the lock, so two clicks at once cannot both do their local work.
-			$busy = 'request' === $this->mode ? Progress::pending( Resource::find( $this->r->id() ) ?? $this->r ) : null;
+			$busy = 'request' === $this->mode ? Jobs::busy( Resource::find( $this->r->id() ) ?? $this->r ) : null;
 
-			return null !== $busy ? Steps::refusal( $busy ) : $change();
+			return null !== $busy ? $busy : $change();
 		};
 
 		list( $taken, $result ) = \BeltoftServices\Locks::with( \BeltoftServices\Locks::name( 'hosting-site', $this->r->id() ), $this->in_job() ? 0 : (int) apply_filters( 'beltoft_services_hosting_lock_wait', 10 ), $guarded );

@@ -191,17 +191,17 @@ class SiteMailTest extends HostingCase {
 		$this->assertSame( '3', (string) $this->mailcow->domain( 'shop.example' )['mailboxes'], 'The domain has room for the plan and the system mailbox.' );
 
 		$this->assertSame( array(), Mailboxes::all( $child ), 'Not listed.' );
-		$this->assertFalse( is_wp_error( Mailboxes::create( $child, 'info', 'Info' ) ) );
-		$this->assertFalse( is_wp_error( Mailboxes::create( $child, 'sales', 'Sales' ) ), 'The plan has 2 mailboxes: both fit next to the system one.' );
-		$third = Mailboxes::create( $child, 'third', 'Third' );
+		$this->assertFalse( is_wp_error( $this->create_box( $child, 'info', 'Info' ) ) );
+		$this->assertFalse( is_wp_error( $this->create_box( $child, 'sales', 'Sales' ) ), 'The plan has 2 mailboxes: both fit next to the system one.' );
+		$third = $this->create_box( $child, 'third', 'Third' );
 		$this->assertWPError( $third );
-		$this->assertSame( 'limit', $third->get_error_code() );
+		$this->assertSame( 'Your plan has no room for more mailboxes.', $third->get_error_message() );
 
 		$this->assertSame( array( 'info@shop.example', 'sales@shop.example' ), array_column( Mailboxes::all( $child ), 'email' ) );
 		$this->assertSame( 2, MailView::data( $child )['counts']['mailboxes'] );
 
 		$this->assertSame( 'invalid', Mailboxes::delete( $child, 'wordpress@shop.example' )->get_error_code() );
-		$this->assertSame( 'invalid', Mailboxes::reset_password( $child, 'wordpress@shop.example' )->get_error_code() );
+		$this->assertSame( 'invalid', $this->reset_box( $child, 'wordpress@shop.example' )->get_error_code() );
 		$this->assertNotNull( $this->mailcow->mailbox( 'wordpress@shop.example' ), 'Still there.' );
 
 		$this->assertTrue( Mailboxes::delete( $child, 'info@shop.example' ) );

@@ -126,7 +126,8 @@ final class RecordRoutes {
 
 	/**
 	 * POST dns-import: a zone file's text. Without apply the answer is a preview (what is added, replaced, left as it is and
-	 * skipped); with apply the sets that are new or different are written. The text is parsed again on the server.
+	 * skipped); with apply the sets that are new or different are queued as the shared action dns_import (202; the report is the
+	 * action's last_result). The text is parsed again on the server.
 	 *
 	 * @param \WP_REST_Request $request Request.
 	 */
@@ -153,15 +154,20 @@ final class RecordRoutes {
 			return self::failure( $plan, 400 );
 		}
 
-		$result = $apply ? RecordImport::apply( $zone, $plan['sets'] ) : null;
+		$sets = array_map( static fn( $set ) => array_diff_key( $set, array( 'rows' => 1 ) ), $plan['sets'] );
 
-		// A zone made for a transfer (or for the move to our DNS) notes that the customer brought their records.
-		if ( $apply && ! $result['failed'] && ( $result['added'] + $result['replaced'] + $result['unchanged'] ) > 0 ) {
-			$r->set( array( 'dns_imported_at' => time() ) );
+		// Apply is the shared action dns_import: the sets are stored and a job writes them one at a time (RecordImport::run_job).
+		if ( $apply ) {
+			$queued = RecordImport::queue( $r, $plan['sets'] );
+
+			if ( is_wp_error( $queued ) ) {
+				return self::reply( Routes::not_queued( $queued ) );
+			}
+
+			return self::reply( Routes::queued( $r, 'dns_import', array( 'applied' => true, 'sets' => $sets, 'skipped' => $plan['skipped'] ), __( 'We are adding your records. This can take a minute.', 'beltoft-services' ) ) );
 		}
-		$sets   = array_map( static fn( $set ) => array_diff_key( $set, array( 'rows' => 1 ) ), $plan['sets'] );
 
-		return self::reply( new \WP_REST_Response( array( 'applied' => $apply, 'sets' => $sets, 'skipped' => $plan['skipped'], 'result' => $result ), 200 ) );
+		return self::reply( new \WP_REST_Response( array( 'applied' => $apply, 'sets' => $sets, 'skipped' => $plan['skipped'], 'result' => null ), 200 ) );
 	}
 
 	/**

@@ -48,7 +48,7 @@ final class MailDnsRecheckTest extends MailTestCase {
 	private function found_once( string $domain ): Resource {
 		$r = $this->ready_mail( $domain );
 		\BeltoftLicenses\Licenses::update( (int) $r->license()['id'], array( 'email' => 'christian.beltoft@gmail.com' ) );
-		$this->assertIsArray( Mailboxes::create( Resource::find( $r->id() ), 'anna' ) );
+		$this->assertIsArray( $this->create_box( Resource::find( $r->id() ), 'anna' ) );
 
 		$this->found( $r, array( 'mx', 'spf', 'dkim' ) );
 		$r->set( array( 'mail_dns_checked' => time() - 2 * MailDns::INTERVAL ) );

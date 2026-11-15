@@ -55,4 +55,16 @@ final class ApiScriptTest extends TestCase {
 
 		$this->assertGreaterThanOrEqual( 14, $checked );
 	}
+
+	public function test_queued_actions_are_followed_with_the_one_shared_helper(): void {
+		$dir = dirname( __DIR__ ) . '/assets/';
+		$api = (string) file_get_contents( $dir . 'api.js' );
+
+		$this->assertStringContainsString( 'follow: follow', $api );
+		$this->assertStringContainsString( 'last_result', $api );
+
+		foreach ( array( 'domain.js', 'mail.js' ) as $name ) {
+			$this->assertStringContainsString( 'beltoftApi.follow(', (string) file_get_contents( $dir . $name ), $name . ' follows its queued actions with the shared helper.' );
+		}
+	}
 }
