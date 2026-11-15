@@ -227,7 +227,7 @@ final class ApiTokens {
 
 				return array(
 					'ok'       => false,
-					'message'  => __( 'That code is not right or has expired. Send a new code.', 'beltoft-services' ),
+					'message'  => \BeltoftServices\StepUp::refusal( $user_id, self::PURPOSE ),
 					'password' => '',
 				);
 			}

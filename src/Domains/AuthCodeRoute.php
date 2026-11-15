@@ -59,7 +59,7 @@ final class AuthCodeRoute {
 			$r = Routes::guard( $request, true, 5 );
 			if ( ! $r instanceof Resource ) { $response = $r; }
 			elseif ( ! StepUp::verify( get_current_user_id(), (string) $request->get_param( 'secret' ), self::PURPOSE, false ) ) {
-				$response = rest_convert_error_to_response( new \WP_Error( 'step_up', __( 'That code is not right or has expired. Send a new code.', 'beltoft-services' ), array( 'status' => 403 ) ) );
+				$response = rest_convert_error_to_response( new \WP_Error( 'step_up', \BeltoftServices\StepUp::refusal( get_current_user_id(), self::PURPOSE ), array( 'status' => 403 ) ) );
 			}
 			elseif ( 'domain' !== $r->get( 'driver' ) || ! ctype_digit( (string) $r->get( 'remote_id' ) ) ) {
 				$response = rest_convert_error_to_response( new \WP_Error( 'unavailable', __( 'This code is unavailable.', 'beltoft-services' ), array( 'status' => 403 ) ) );
@@ -72,7 +72,7 @@ final class AuthCodeRoute {
 				} else {
 					// Two requests with one code both pass the check; only the one that uses the code up is shown it.
 					if ( ! StepUp::consume( get_current_user_id(), self::PURPOSE ) ) {
-						$response = rest_convert_error_to_response( new \WP_Error( 'step_up', __( 'That code is not right or has expired. Send a new code.', 'beltoft-services' ), array( 'status' => 403 ) ) );
+						$response = rest_convert_error_to_response( new \WP_Error( 'step_up', \BeltoftServices\StepUp::refusal( get_current_user_id(), self::PURPOSE ), array( 'status' => 403 ) ) );
 						$response->header( 'Cache-Control', 'no-store' );
 						return $response;
 					}

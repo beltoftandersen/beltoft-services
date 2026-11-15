@@ -48,7 +48,7 @@ final class SubscriptionNames {
 		$names = array();
 
 		foreach ( $subscription->get_items() as $item ) {
-			$name = trim( wp_strip_all_tags( (string) $item->get_name() ) );
+			$name = trim( wp_strip_all_tags( \BeltoftServices\LineNames::display_name( $item ) ) );
 
 			if ( '' !== $name ) {
 				$names[] = $name;

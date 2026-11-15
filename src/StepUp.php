@@ -178,6 +178,28 @@ final class StepUp {
 	}
 
 	/**
+	 * The sentence a customer is told when verify() said no.
+	 *
+	 * @param int    $user_id Customer.
+	 * @param string $purpose One of purposes().
+	 */
+	public static function refusal( int $user_id, string $purpose ): string {
+		$default = __( 'That code is not right or has expired. Send a new code.', 'beltoft-services' );
+
+		/**
+		 * The message shown when a step-up check refused. A site whose own check (beltoft_services_step_up_verify) refused for
+		 * another reason, for example an unconfirmed email address, says so here instead of "not right or has expired".
+		 *
+		 * @param string $message Customer text (already translated); default: the code is not right or has expired.
+		 * @param int    $user_id Customer.
+		 * @param string $purpose api_token, transfer_code or another registered purpose.
+		 */
+		$message = apply_filters( 'beltoft_services_step_up_refusal', $default, $user_id, $purpose );
+
+		return is_string( $message ) && '' !== $message ? $message : $default;
+	}
+
+	/**
 	 * Is the secret right for this customer and purpose? A site's filter decides first; without one the emailed code does.
 	 * A code works once, for the purpose it was sent for, for ten minutes and for five wrong tries.
 	 *

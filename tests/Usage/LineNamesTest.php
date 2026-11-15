@@ -85,6 +85,26 @@ class LineNamesTest extends UsageTestCase {
 		$this->assertSame( Account::product_id(), (int) $item->get_product_id() );
 	}
 
+	public function test_the_usage_account_shows_a_translated_name_where_the_stored_name_is_read(): void {
+		$user  = $this->new_user();
+		$sub   = $this->usage_account( $user );
+		$items = array_values( $sub->get_items() );
+		$other = new \WC_Order_Item_Product();
+		$other->set_name( 'Backup' );
+
+		$this->assertSame( 'Usage account', LineNames::display_name( $items[0] ) );
+		$this->assertSame( 'Backup', LineNames::display_name( $other ) );
+		$this->assertSame( '', LineNames::display_name( null ) );
+
+		$da = static fn( $translated, $text, $domain ) => 'beltoft-services' === $domain && 'Usage account' === $text ? 'Forbrugskonto' : $translated;
+		add_filter( 'gettext', $da, 10, 3 );
+		$this->assertSame( 'Forbrugskonto', LineNames::display_name( $items[0] ) );
+		$this->assertSame( 'Forbrugskonto', \BeltoftServices\Billing\SubscriptionNames::names( $sub ) );
+		remove_filter( 'gettext', $da, 10 );
+
+		$this->assertSame( 'Usage account', $items[0]->get_name(), 'The stored name is untouched.' );
+	}
+
 	public function test_the_cart_line_gets_the_same_name_and_no_repeated_attribute_rows(): void {
 		$v = $this->usage_product();
 		WC()->cart->empty_cart();

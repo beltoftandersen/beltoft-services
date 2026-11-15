@@ -17,6 +17,11 @@
  * {action, ok, at, text} (the resource's last_result) or, when the job is still going after options.rounds looks (default 30),
  * to null. Options: holder (as for call), interval (milliseconds, default 4000), rounds, onTick( data ) with every status read.
  * Nothing is rejected for a failed job: the outcome has ok false and the server's own text.
+ * With options.until = 'idle' it follows the service instead of one action: it resolves to { idle: true, data } when the status
+ * shows no running task (`task` empty on the hosting overview, else no `working` and no `progress.active`), whatever the last
+ * action was; options.path is the status path to read (default: the queued answer's status), the look is every 5 seconds (15
+ * after ten minutes), and options.timeout (milliseconds, default seven hours) ends it with null, never with success. A 429 waits
+ * for Retry-After in both modes.
  *
  * window.beltoftApi.copy( text, button ) copies text (the clipboard, or a hidden textarea and the old copy command) and
  * resolves when it worked; with a button, its label shows the button's data-copied text for two seconds. No dependencies.
@@ -86,43 +91,88 @@
 		} );
 	}
 
+	function retryAfter( reply ) {
+		var seconds = parseInt( reply.response && reply.response.headers ? reply.response.headers.get( 'Retry-After' ) : '', 10 );
+
+		return ( isNaN( seconds ) ? 30 : Math.min( 120, Math.max( 5, seconds ) ) ) * 1000;
+	}
+
+	// Is the service idle in this status answer? The hosting overview says it with `task` (null when none); any other
+	// resource has no job (`working` false) and no `progress.active` marker.
+	function isIdle( data ) {
+		if ( Object.prototype.hasOwnProperty.call( data, 'task' ) ) {
+			return ! data.task;
+		}
+
+		return ! data.working && ! ( data.progress && data.progress.active );
+	}
+
 	function follow( queued, options ) {
 		var settings = options || {};
 		var holder = settings.holder || window.beltoftServicesAccount || {};
+		var untilIdle = 'idle' === settings.until;
 		var rounds = settings.rounds || 30;
-		var interval = settings.interval || 4000;
+		var interval = settings.interval || ( untilIdle ? 5000 : 4000 );
+		var started = Date.now();
+		var limit = settings.timeout || 25200000;
 		var since = ( queued && queued.at ? queued.at : 0 ) - 1;
 		var action = queued ? queued.action : '';
-		var path = queued && queued.status ? queued.status : '';
+		var path = settings.path || ( queued && queued.status ? queued.status.replace( /^\/?resources\//, '' ) : '' );
 
 		return new Promise( function ( resolve ) {
 			function look() {
-				call( path.replace( /^\/?resources\//, '' ), { holder: holder } ).then( function ( reply ) {
+				call( path, { holder: holder } ).then( function ( reply ) {
 					var data = reply.data || {};
 					var result = data.last_result;
 
-					if ( settings.onTick ) {
+					if ( 429 === reply.status ) {
+						next( retryAfter( reply ), true );
+						return;
+					}
+
+					if ( reply.ok && settings.onTick ) {
 						settings.onTick( data );
 					}
 
-					if ( reply.ok && ! data.working && result && result.action === action && result.at >= since ) {
+					if ( untilIdle ) {
+						if ( reply.ok && isIdle( data ) ) {
+							resolve( { idle: true, data: data } );
+							return;
+						}
+					} else if ( reply.ok && ! data.working && result && result.action === action && result.at >= since ) {
 						resolve( result );
 						return;
 					}
 
 					next();
-				}, next );
+				}, function () {
+					next();
+				} );
 			}
 
-			function next() {
-				rounds -= 1;
+			// A timeout is never an answer: the caller gets null and must not claim the work succeeded.
+			function next( wait, keepRound ) {
+				if ( untilIdle ) {
+					if ( Date.now() - started > limit ) {
+						resolve( null );
+						return;
+					}
+
+					// After ten minutes the look is slower (a restore may take hours).
+					window.setTimeout( look, wait || ( Date.now() - started > 600000 ? 3 * interval : interval ) );
+					return;
+				}
+
+				if ( ! keepRound ) {
+					rounds -= 1;
+				}
 
 				if ( rounds < 1 ) {
 					resolve( null );
 					return;
 				}
 
-				window.setTimeout( look, interval );
+				window.setTimeout( look, wait || interval );
 			}
 
 			look();

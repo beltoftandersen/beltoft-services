@@ -325,6 +325,37 @@ final class StepUpTest extends TestCase {
 		$this->assertSame( 429, $status );
 	}
 
+	public function test_a_site_can_say_why_it_refused(): void {
+		$user = $this->customer();
+		$seen = array();
+
+		$this->assertSame( 'That code is not right or has expired. Send a new code.', StepUp::refusal( $user, ApiTokens::PURPOSE ), 'The default is today\'s message.' );
+
+		$why = static function ( $message, $user_id, $purpose ) use ( &$seen ) {
+			$seen = array( $message, $user_id, $purpose );
+
+			return 'Confirm your email address first.';
+		};
+		add_filter( 'beltoft_services_step_up_refusal', $why, 10, 3 );
+
+		$this->assertSame( 'Confirm your email address first.', StepUp::refusal( $user, ApiTokens::PURPOSE ) );
+		$this->assertSame( array( 'That code is not right or has expired. Send a new code.', $user, ApiTokens::PURPOSE ), $seen );
+
+		// The api token form says it too, when the site's own check refused.
+		wp_set_current_user( $user );
+		add_filter( 'beltoft_services_step_up_verify', '__return_false' );
+		$refused = ApiTokens::process( $user, array( 'action' => 'create', 'name' => 'Claude', 'scope' => 'full', 'secret' => '123456', 'nonce' => wp_create_nonce( ApiTokens::NONCE ) ) );
+		remove_filter( 'beltoft_services_step_up_verify', '__return_false' );
+		$this->assertFalse( $refused['ok'] );
+		$this->assertSame( 'Confirm your email address first.', $refused['message'] );
+
+		// An empty or odd answer falls back to the default.
+		remove_filter( 'beltoft_services_step_up_refusal', $why, 10 );
+		add_filter( 'beltoft_services_step_up_refusal', static fn() => '' );
+		$this->assertSame( 'That code is not right or has expired. Send a new code.', StepUp::refusal( $user, ApiTokens::PURPOSE ) );
+		remove_all_filters( 'beltoft_services_step_up_refusal' );
+	}
+
 	public function test_the_api_token_form_sends_a_code_and_a_full_token_needs_it(): void {
 		$user  = $this->customer();
 		wp_set_current_user( $user );

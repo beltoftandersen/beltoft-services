@@ -407,7 +407,7 @@ final class OverviewData {
 
 		if ( ! $names ) {
 			foreach ( $subscription->get_items() as $item ) {
-				$names[] = (string) $item->get_name();
+				$names[] = \BeltoftServices\LineNames::display_name( $item );
 			}
 		}
 

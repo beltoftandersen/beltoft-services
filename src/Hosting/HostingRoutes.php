@@ -615,7 +615,7 @@ final class HostingRoutes {
 		}
 
 		if ( ! \BeltoftServices\StepUp::verify( get_current_user_id(), (string) $request['code'], self::STEP_PURPOSE ) ) {
-			return self::error( 'step_up', __( 'That code is not right or has expired. Send a new code.', 'beltoft-services' ) );
+			return self::error( 'step_up', \BeltoftServices\StepUp::refusal( get_current_user_id(), self::STEP_PURPOSE ) );
 		}
 
 		return self::reply( $do( new HostingActions( $r ) ) );

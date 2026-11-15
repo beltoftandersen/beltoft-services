@@ -132,6 +132,25 @@ final class LineNames {
 	}
 
 	/**
+	 * The name a line item is shown with where a page reads the item's stored name itself (the subscription list, the overview).
+	 * The stored name of the pay-as-you-go account's line stays "Usage account" in the language the site had when it was made,
+	 * so it is shown through a translation instead; every other line keeps its stored name.
+	 *
+	 * @param mixed $item Order or subscription item.
+	 */
+	public static function display_name( $item ): string {
+		if ( ! $item instanceof \WC_Order_Item ) {
+			return '';
+		}
+
+		if ( $item instanceof \WC_Order_Item_Product && self::is_account_product( (int) $item->get_product_id() ) ) {
+			return __( 'Usage account', 'beltoft-services' );
+		}
+
+		return (string) $item->get_name();
+	}
+
+	/**
 	 * The name of a line.
 	 *
 	 * @param mixed $product        Product (variation) of the line.

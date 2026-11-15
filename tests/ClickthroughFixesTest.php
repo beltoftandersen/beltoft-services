@@ -48,10 +48,13 @@ final class ClickthroughFixesTest extends TestCase {
 	public function test_the_hosting_watcher_polls_slowly_backs_off_and_clears_the_rows_when_the_task_is_gone(): void {
 		$js = $this->js( 'hosting.js' );
 
-		$this->assertStringContainsString( '5000', $js );
-		$this->assertStringNotContainsString( 'slow ? 10000 : 3000', $js );
-		$this->assertStringContainsString( '429 === reply.status', $js );
-		$this->assertStringContainsString( 'Retry-After', $js );
+		$api = $this->js( 'api.js' );
+
+		// The pace and the back-off live in the shared follow() (until: 'idle'), which the watcher uses.
+		$this->assertStringContainsString( "until: 'idle'", $js );
+		$this->assertStringContainsString( '5000', $api );
+		$this->assertStringContainsString( '429 === reply.status', $api );
+		$this->assertStringContainsString( 'Retry-After', $api );
 		$this->assertStringContainsString( 'data-idle-text', $js, 'A row goes back to what it said before the task.' );
 		$this->assertStringContainsString( 'cacheFacts();', $js );
 	}

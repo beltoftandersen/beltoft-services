@@ -656,7 +656,21 @@
 				return;
 			}
 
-			call( 'GET', panel.getAttribute( 'data-hosting-resource' ) + '/hosting/sites/' + encodeURIComponent( slug ) + '/cache' ).then( function ( result ) {
+			var factsPath = panel.getAttribute( 'data-hosting-resource' ) + '/hosting/sites/' + encodeURIComponent( slug ) + '/cache';
+
+			// A page that loads just after a job ended can get one 409 (the resource is not ready yet): that is "not yet", asked once
+			// more after a short wait, quietly. Any other answer, or a second 409, ends it (no loop, the line stays hidden).
+			call( 'GET', factsPath ).then( function ( first ) {
+				if ( 409 !== first.status ) {
+					return first;
+				}
+
+				return new Promise( function ( resolve ) {
+					window.setTimeout( resolve, 4000 );
+				} ).then( function () {
+					return call( 'GET', factsPath );
+				} );
+			} ).then( function ( result ) {
 				if ( ! result.ok || ! result.data ) {
 					return;
 				}
@@ -830,58 +844,27 @@
 
 		watching = true;
 
-		var path = root.getAttribute( 'data-hosting-resource' ) + '/hosting';
-		var started = Date.now();
+		window.beltoftApi.follow( task, {
+			holder: account,
+			until: 'idle',
+			path: root.getAttribute( 'data-hosting-resource' ) + '/hosting',
+			onTick: function ( data ) {
+				var progress = data.progress;
 
-		// The overview route allows 20 reads a minute: one every 5 seconds (every 15 after ten minutes) stays well below it, and a
-		// 429 waits for as long as the server asks.
-		function again( wait ) {
-			var slow = Date.now() - started > 600000;
-
-			if ( Date.now() - started > 25200000 ) {
+				if ( data.task && progress && progress.active && progress.text ) {
+					task.step_label = progress.text;
+					lock( task );
+				}
+			}
+		} ).then( function ( outcome ) {
+			if ( ! outcome ) {
 				watching = false;
 				say( null, text.taskLong || '' );
 				return;
 			}
 
-			window.setTimeout( look, wait || ( slow ? 15000 : 5000 ) );
-		}
-
-		function look() {
-			window.beltoftApi.call( path, { holder: account } ).then( function ( reply ) {
-				var data = reply.data || {};
-
-				if ( 429 === reply.status ) {
-					var seconds = parseInt( reply.response && reply.response.headers ? reply.response.headers.get( 'Retry-After' ) : '', 10 );
-
-					again( ( isNaN( seconds ) ? 30 : Math.min( 120, Math.max( 5, seconds ) ) ) * 1000 );
-					return;
-				}
-
-				if ( ! reply.ok ) {
-					again();
-					return;
-				}
-
-				if ( data.task ) {
-					var progress = data.progress;
-
-					if ( progress && progress.active && progress.text ) {
-						task.step_label = progress.text;
-						lock( task );
-					}
-
-					again();
-					return;
-				}
-
-				finish( data.last ? { ok: false } : { ok: true } );
-			}, function () {
-				again();
-			} );
-		}
-
-		look();
+			finish( outcome.data && outcome.data.last ? { ok: false } : { ok: true } );
+		} );
 	}
 
 	// A change was queued: the buttons wait for it. A change whose new state is drawn by the page reloads at once, and the page
