@@ -246,7 +246,8 @@ final class SiteActions {
 					'admin_user'  => Config::admin_user(),
 					'admin_email' => sanitize_email( (string) ( $license['email'] ?? '' ) ),
 					'woocommerce' => false,
-				)
+				),
+				60
 			);
 
 			if ( is_wp_error( $done ) ) {

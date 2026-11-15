@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.27.10
+Stable tag: 0.27.11
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.27.11 =
+* Adding a website: the WordPress install step waits up to 60 seconds (an install takes about 12); other steps keep 8. Before, the install was cut off at 8 seconds and the new website was removed again.
 
 = 0.27.10 =
 * The memory and disk bars of the server list are always printed and stay hidden until a guest reading exists, so a reading that arrives after the page load shows (they were missing when the first render had no cached reading).

@@ -62,18 +62,21 @@ trait Base {
 	 * @param string               $name Job name.
 	 * @param string               $op   Operation.
 	 * @param array<string, mixed> $args Arguments.
+	 * @param int                  $wait Seconds to wait for the job; 0 = the default (8, filter). A WordPress install takes
+	 *                                   about 12 seconds, so the add-website install waits longer.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	private function call( string $name, string $op, array $args ) {
+	private function call( string $name, string $op, array $args, int $wait = 0 ) {
 		$done = $this->agent_call( $name, $op, $args );
 
 		// A live agent answers queued first and finishes in a second or two: look again (same job id) for a few seconds before asking the customer to retry.
 		/**
 		 * Seconds a customer action waits for the agent's job.
 		 *
-		 * @param int $seconds Seconds.
+		 * @param int    $seconds Seconds.
+		 * @param string $name    The job's name (for example site_install_<slug>).
 		 */
-		$until = microtime( true ) + (int) apply_filters( 'beltoft_services_hosting_action_wait', 8 );
+		$until = microtime( true ) + (int) apply_filters( 'beltoft_services_hosting_action_wait', $wait > 0 ? $wait : 8, $name );
 
 		while ( $done instanceof StepResult && $done->is_poll() && microtime( true ) < $until ) {
 			usleep( 400000 );

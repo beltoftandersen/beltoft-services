@@ -172,6 +172,24 @@ class AccountTest extends HostingCase {
 		$this->assertSame( 'busy', $busy->get_error_code() );
 	}
 
+	public function test_the_add_website_install_waits_longer_than_other_steps(): void {
+		$seen = array();
+		add_filter(
+			'beltoft_services_hosting_action_wait',
+			static function ( $seconds, $name ) use ( &$seen ) {
+				$seen[ (string) $name ] = (int) $seconds;
+				return $seconds;
+			},
+			10,
+			2
+		);
+		$r = $this->account();
+		( new HostingActions( $r ) )->add_site( 'second', '', '', true );
+		remove_all_filters( 'beltoft_services_hosting_action_wait' );
+		$this->assertSame( 60, $seen['site_install_second'] ?? null, 'A WordPress install takes about 12 seconds: the install waits up to 60.' );
+		$this->assertSame( 8, $seen['site_add_second'] ?? null, 'Other steps keep the 8 seconds.' );
+	}
+
 	public function test_add_a_site_within_the_plan_and_refusals(): void {
 		$r = $this->account();
 		$a = new HostingActions( $r );
