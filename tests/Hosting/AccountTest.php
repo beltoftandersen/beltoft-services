@@ -172,24 +172,6 @@ class AccountTest extends HostingCase {
 		$this->assertSame( 'busy', $busy->get_error_code() );
 	}
 
-	public function test_the_add_website_install_waits_longer_than_other_steps(): void {
-		$seen = array();
-		add_filter(
-			'beltoft_services_hosting_action_wait',
-			static function ( $seconds, $name ) use ( &$seen ) {
-				$seen[ (string) $name ] = (int) $seconds;
-				return $seconds;
-			},
-			10,
-			2
-		);
-		$r = $this->account();
-		( new HostingActions( $r ) )->add_site( 'second', '', '', true );
-		remove_all_filters( 'beltoft_services_hosting_action_wait' );
-		$this->assertSame( 60, $seen['site_install_second'] ?? null, 'A WordPress install takes about 12 seconds: the install waits up to 60.' );
-		$this->assertSame( 8, $seen['site_add_second'] ?? null, 'Other steps keep the 8 seconds.' );
-	}
-
 	public function test_add_a_site_within_the_plan_and_refusals(): void {
 		$r = $this->account();
 		$a = new HostingActions( $r );
@@ -497,24 +479,38 @@ class AccountTest extends HostingCase {
 		$this->assertSame( '198.51.100.7', $overview->get_data()['point_at'][0]['value'] );
 		$this->assertStringNotContainsString( self::NODE_SECRET, (string) wp_json_encode( $overview->get_data() ) );
 
+		// A change is checked at once and done in the background: 202 with the task, and a second change waits for it.
 		$created = $this->call( 'POST', $id . '/hosting/sites', $user, array( 'slug' => 'blog', 'label' => 'Blog', 'php' => '8.4', 'install' => false ) );
-		$this->assertSame( 201, $created->get_status(), (string) wp_json_encode( $created->get_data() ) );
+		$this->assertSame( 202, $created->get_status(), (string) wp_json_encode( $created->get_data() ) );
+		$this->assertSame( 'pending', $created->get_data()['status'] );
+		$this->assertSame( 'add_site', $created->get_data()['task']['action'] );
+		$this->assertSame( 409, $this->call( 'POST', $id . '/hosting/sites/blog/cache', $user )->get_status(), 'Wait until the website is added.' );
+		$this->run_jobs();
 		$this->assertSame( 422, $this->call( 'POST', $id . '/hosting/sites', $user, array( 'slug' => 'Bad Slug' ) )->get_status() );
 		$this->assertSame( 409, $this->call( 'POST', $id . '/hosting/sites', $user, array( 'slug' => 'blog' ) )->get_status() );
 
-		$this->assertSame( 200, $this->call( 'POST', $id . '/hosting/sites/blog/php', $user, array( 'php' => '8.5', 'memory_mb' => 128 ) )->get_status() );
+		$this->assertSame( 202, $this->call( 'POST', $id . '/hosting/sites/blog/php', $user, array( 'php' => '8.5', 'memory_mb' => 128 ) )->get_status() );
+		$this->run_jobs();
+		$this->assertSame( '8.5', Sites::find( $id, 'blog' )['php'] );
 		$this->assertSame( 409, $this->call( 'POST', $id . '/hosting/sites/blog/php', $user, array( 'php' => '8.5', 'memory_mb' => 4096 ) )->get_status() );
-		$this->assertSame( 200, $this->call( 'POST', $id . '/hosting/sites/blog/workers', $user, array( 'workers' => 2 ) )->get_status() );
-		$this->assertSame( 200, $this->call( 'POST', $id . '/hosting/sites/blog/cache', $user )->get_status() );
+		$this->assertSame( 202, $this->call( 'POST', $id . '/hosting/sites/blog/workers', $user, array( 'workers' => 2 ) )->get_status() );
+		$this->run_jobs();
+		$this->assertSame( 202, $this->call( 'POST', $id . '/hosting/sites/blog/cache', $user )->get_status() );
+		$this->run_jobs();
 		$login = $this->call( 'POST', $id . '/hosting/sites/blog/login', $user );
 		$this->assertStringStartsWith( 'https://blog.preview', $login->get_data()['url'] );
 		$this->assertSame( 'private, no-store', $login->get_headers()['Cache-Control'] );
 
 		$domain = $this->call( 'POST', $id . '/hosting/sites/blog/domains', $user, array( 'host' => 'www.outside.example' ) );
-		$this->assertSame( 200, $domain->get_status() );
-		$this->assertSame( 200, $this->call( 'DELETE', $id . '/hosting/domains/www.outside.example', $user )->get_status() );
+		$this->assertSame( 202, $domain->get_status() );
+		$this->assertSame( 'external', $domain->get_data()['kind'], 'The answer says what the customer must point the name at.' );
+		$this->run_jobs();
+		$this->assertSame( 202, $this->call( 'DELETE', $id . '/hosting/domains/www.outside.example', $user )->get_status() );
+		$this->run_jobs();
 		$this->assertSame( 422, $this->call( 'DELETE', $id . '/hosting/sites/blog', $user, array( 'confirm' => 'wrong' ) )->get_status() );
-		$this->assertSame( 200, $this->call( 'DELETE', $id . '/hosting/sites/blog', $user, array( 'confirm' => 'blog' ) )->get_status() );
+		$this->assertSame( 202, $this->call( 'DELETE', $id . '/hosting/sites/blog', $user, array( 'confirm' => 'blog' ) )->get_status() );
+		$this->run_jobs();
+		$this->assertNull( Sites::find( $id, 'blog' ) );
 		$this->connect_domain( Resource::find( (int) $r->id() ), 'mine.example' );
 		$this->assertSame( 201, $this->call( 'POST', $id . '/hosting/mail', $user, array( 'domain' => 'mine.example' ) )->get_status() );
 
@@ -564,7 +560,8 @@ class AccountTest extends HostingCase {
 		$facade = new \ReflectionClass( HostingActions::class );
 
 		foreach ( $facade->getMethods( \ReflectionMethod::IS_PUBLIC ) as $method ) {
-			if ( $method->isConstructor() ) {
+			// queue() is in every group (the Base trait) and on the facade with its own signature; job() is the facade's alone.
+			if ( $method->isConstructor() || in_array( $method->getName(), array( 'queue', 'job' ), true ) ) {
 				continue;
 			}
 
@@ -604,10 +601,13 @@ class AccountTest extends HostingCase {
 		$base = $r->id() . '/hosting/sites';
 
 		$made = $this->call( 'POST', $base, $user, array( 'slug' => '', 'install' => false ) );
-		$this->assertSame( 201, $made->get_status(), (string) wp_json_encode( $made->get_data() ) );
+		$this->assertSame( 202, $made->get_status(), (string) wp_json_encode( $made->get_data() ) );
 		$this->assertMatchesRegularExpression( '/^[a-z0-9-]+-[a-hj-km-np-z2-9]{2}$/D', $made->get_data()['slug'] );
+		$this->run_jobs();
+		$this->assertNotNull( Sites::find( $r->id(), $made->get_data()['slug'] ), 'The job made the website under the name the request chose.' );
 
-		$this->assertSame( 201, $this->call( 'POST', $base, $user, array( 'slug' => 'named', 'install' => false ) )->get_status() );
+		$this->assertSame( 202, $this->call( 'POST', $base, $user, array( 'slug' => 'named', 'install' => false ) )->get_status() );
+		$this->run_jobs();
 		$this->assertSame( 409, $this->call( 'POST', $base, $user, array( 'slug' => 'named' ) )->get_status() );
 	}
 }

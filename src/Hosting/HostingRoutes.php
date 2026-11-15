@@ -295,6 +295,11 @@ final class HostingRoutes {
 	 * @param int                            $status Status of a success.
 	 */
 	private static function reply( $result, int $status = 200 ): \WP_REST_Response {
+		// A change that was queued as the account's task is accepted, not done: 202, with the task to watch.
+		if ( is_array( $result ) && 'pending' === ( $result['status'] ?? '' ) && isset( $result['task'] ) ) {
+			$status = 202;
+		}
+
 		return is_wp_error( $result ) ? self::error( $result->get_error_code(), $result->get_error_message(), is_array( $result->get_error_data() ) ? array_diff_key( $result->get_error_data(), array( 'status' => 1 ) ) : array() ) : self::ok( $result, $status );
 	}
 
@@ -347,18 +352,29 @@ final class HostingRoutes {
 		}
 
 		$actions = new HostingActions( $r );
+		$state   = Tasks::overview( $r );
+
+		// The page asks every few seconds while a task runs: a job that has waited a few seconds is run here, one agent step, so
+		// the task goes on even where the runners are slow.
+		if ( null !== $state['task'] ) {
+			\BeltoftServices\Jobs::run_waiting( $r->id() );
+			$state = Tasks::overview( $r );
+		}
 
 		return self::ok(
 			array(
 				'sites'  => $actions->sites(),
 				'limits' => $actions->limits(),
 				'point_at' => SiteDns::instructions( (array) ( Nodes::get( (string) ( Records::for_resource( $r->id() )['node'] ?? '' ) ) ?? array() ) ),
+				'task'   => $state['task'],
+				'last'   => $state['last'],
 			)
 		);
 	}
 
 	/**
-	 * Runs one change: guard, hourly limit, the action.
+	 * Runs one change: guard, hourly limit, the action. A change of the account's websites, settings or access is checked here and
+	 * queued as the account's task (HostingActions::queue): the answer is 202 with status pending and the task.
 	 *
 	 * @param \WP_REST_Request $request Request.
 	 * @param callable         $do      fn( HostingActions ): array|\WP_Error.
@@ -373,28 +389,27 @@ final class HostingRoutes {
 	public static function add_site( \WP_REST_Request $request ): \WP_REST_Response {
 		return self::change(
 			$request,
-			static fn( HostingActions $a ) => $a->add_site( (string) $request['slug'], (string) $request['label'], (string) $request['php'], null === $request['install'] || (bool) $request['install'] ),
-			201
+			static fn( HostingActions $a ) => $a->queue( 'add_site', array( (string) $request['slug'], (string) $request['label'], (string) $request['php'], null === $request['install'] || (bool) $request['install'] ) )
 		);
 	}
 
 	public static function remove_site( \WP_REST_Request $request ): \WP_REST_Response {
-		return self::change( $request, static fn( HostingActions $a ) => $a->remove_site( (string) $request['slug'], (string) $request['confirm'] ) );
+		return self::change( $request, static fn( HostingActions $a ) => $a->queue( 'remove_site', array( (string) $request['slug'], (string) $request['confirm'] ) ) );
 	}
 
 	public static function set_php( \WP_REST_Request $request ): \WP_REST_Response {
 		return self::change(
 			$request,
-			static fn( HostingActions $a ) => $a->set_php( (string) $request['slug'], (string) $request['php'], null === $request['memory_mb'] ? null : (int) $request['memory_mb'], null === $request['upload_mb'] ? null : (int) $request['upload_mb'] )
+			static fn( HostingActions $a ) => $a->queue( 'set_php', array( (string) $request['slug'], (string) $request['php'], null === $request['memory_mb'] ? null : (int) $request['memory_mb'], null === $request['upload_mb'] ? null : (int) $request['upload_mb'] ) )
 		);
 	}
 
 	public static function php_rollback( \WP_REST_Request $request ): \WP_REST_Response {
-		return self::change( $request, static fn( HostingActions $a ) => $a->php_rollback( (string) $request['slug'] ) );
+		return self::change( $request, static fn( HostingActions $a ) => $a->queue( 'php_rollback', array( (string) $request['slug'] ) ) );
 	}
 
 	public static function set_workers( \WP_REST_Request $request ): \WP_REST_Response {
-		return self::change( $request, static fn( HostingActions $a ) => $a->set_workers( (string) $request['slug'], (int) $request['workers'] ) );
+		return self::change( $request, static fn( HostingActions $a ) => $a->queue( 'set_workers', array( (string) $request['slug'], (int) $request['workers'] ) ) );
 	}
 
 	/**
@@ -417,12 +432,12 @@ final class HostingRoutes {
 	public static function set_country_block( \WP_REST_Request $request ): \WP_REST_Response {
 		return self::change(
 			$request,
-			static fn( HostingActions $a ) => $a->set_country_block( (string) $request['slug'], (array) $request['countries'], (string) ( $request['scope'] ?: 'site' ), true === $request['confirm'] )
+			static fn( HostingActions $a ) => $a->queue( 'set_country_block', array( (string) $request['slug'], (array) $request['countries'], (string) ( $request['scope'] ?: 'site' ), true === $request['confirm'] ) )
 		);
 	}
 
 	public static function purge_cache( \WP_REST_Request $request ): \WP_REST_Response {
-		return self::change( $request, static fn( HostingActions $a ) => $a->purge_cache( (string) $request['slug'] ) );
+		return self::change( $request, static fn( HostingActions $a ) => $a->queue( 'purge_cache', array( (string) $request['slug'] ) ) );
 	}
 
 	public static function add_domain( \WP_REST_Request $request ): \WP_REST_Response {
@@ -432,7 +447,7 @@ final class HostingRoutes {
 			return $r;
 		}
 
-		$out = ( new HostingActions( $r ) )->add_domain( (string) $request['slug'], (string) $request['host'] );
+		$out = ( new HostingActions( $r ) )->queue( 'add_domain', array( (string) $request['slug'], (string) $request['host'] ) );
 
 		// A first look at the DNS right away, so the guide shows what is there and where the DNS is managed.
 		if ( is_array( $out ) && 'external' === ( $out['kind'] ?? '' ) && 'active' !== ( $out['state'] ?? '' ) && ! empty( $out['host'] ) ) {
@@ -503,7 +518,7 @@ final class HostingRoutes {
 	}
 
 	public static function remove_domain( \WP_REST_Request $request ): \WP_REST_Response {
-		return self::change( $request, static fn( HostingActions $a ) => $a->remove_domain( rawurldecode( (string) $request['host'] ) ) );
+		return self::change( $request, static fn( HostingActions $a ) => $a->queue( 'remove_domain', array( rawurldecode( (string) $request['host'] ) ) ) );
 	}
 
 	public static function buy_addon( \WP_REST_Request $request ): \WP_REST_Response {
@@ -579,7 +594,7 @@ final class HostingRoutes {
 	}
 
 	public static function set_main_address( \WP_REST_Request $request ): \WP_REST_Response {
-		return self::change( $request, static fn( HostingActions $a ) => $a->set_main_address( rawurldecode( (string) $request['host'] ) ) );
+		return self::change( $request, static fn( HostingActions $a ) => $a->queue( 'set_main_address', array( rawurldecode( (string) $request['host'] ) ) ) );
 	}
 
 	/**
@@ -603,18 +618,28 @@ final class HostingRoutes {
 		return self::reply( $do( new HostingActions( $r ) ) );
 	}
 
+	/**
+	 * The SFTP password is shown once, before the change is queued: the answer carries it with where to connect.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 */
 	public static function sftp_password( \WP_REST_Request $request ): \WP_REST_Response {
-		return self::files_change( $request, static fn( HostingActions $a ) => $a->set_sftp_password( (string) $request['password'] ) );
+		return self::files_change( $request, static function ( HostingActions $a ) use ( $request ) {
+			$out = $a->queue( 'set_sftp_password', array( (string) $request['password'] ) );
+
+			// Where to connect, with the password that was queued: the customer reads it once.
+			return is_array( $out ) && isset( $out['password'] ) ? array_merge( $out, array_intersect_key( $a->files(), array_flip( array( 'host', 'port', 'user' ) ) ) ) : $out;
+		} );
 	}
 
 	public static function add_ssh_key( \WP_REST_Request $request ): \WP_REST_Response {
-		return self::files_change( $request, static fn( HostingActions $a ) => $a->add_ssh_key( (string) $request['key'] ) );
+		return self::files_change( $request, static fn( HostingActions $a ) => $a->queue( 'add_ssh_key', array( (string) $request['key'] ) ) );
 	}
 
 	public static function remove_ssh_key( \WP_REST_Request $request ): \WP_REST_Response {
 		$r = self::guard( $request, true, Routes::RATE_LIMIT, 'files', self::FILES_LIMIT );
 
-		return $r instanceof Resource ? self::reply( ( new HostingActions( $r ) )->remove_ssh_key( (string) $request['fingerprint'] ) ) : $r;
+		return $r instanceof Resource ? self::reply( ( new HostingActions( $r ) )->queue( 'remove_ssh_key', array( (string) $request['fingerprint'] ) ) ) : $r;
 	}
 
 	public static function password_link( \WP_REST_Request $request ): \WP_REST_Response {

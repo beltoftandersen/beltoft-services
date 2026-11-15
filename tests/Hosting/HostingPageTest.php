@@ -426,8 +426,9 @@ class HostingPageTest extends HostingCase {
 		$this->activate( 'example.org', 'www.example.org' );
 
 		$res = $this->call( 'POST', $r->id() . '/hosting/domains/www.example.org/main', $this->user( $r ) );
-		$this->assertSame( 200, $res->get_status() );
+		$this->assertSame( 202, $res->get_status() );
 		$this->assertSame( 'www.example.org', $res->get_data()['main'] );
+		$this->run_jobs();
 		$this->assertSame( 403, $this->call( 'POST', $r->id() . '/hosting/domains/example.org/main', self::factory()->user->create() )->get_status() );
 		$this->assertSame( 404, $this->call( 'POST', $r->id() . '/hosting/domains/shop.example.net/main', $this->user( $r ) )->get_status() );
 	}
@@ -455,17 +456,25 @@ class HostingPageTest extends HostingCase {
 		$this->assertSame( array(), $this->agent->calls_of( 'ssh.password' ), 'Nothing reaches the node without the code.' );
 
 		$ok = $this->call( 'POST', $path, $user, array( 'code' => $this->code( $user ) ) );
-		$this->assertSame( 200, $ok->get_status() );
+		$this->assertSame( 202, $ok->get_status() );
 		$data = $ok->get_data();
 		$this->assertSame( 24, strlen( $data['password'] ) );
 		$this->assertSame( 'web', $data['user'] );
 		$this->assertStringContainsString( 'no-store', (string) $ok->get_headers()['Cache-Control'] );
 
+		// Queued: the password is in the task only encrypted, never in the arguments of the job (Action Scheduler keeps those in plain text).
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$this->assertSame( '0', (string) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}actionscheduler_actions WHERE args LIKE %s", '%' . $wpdb->esc_like( $data['password'] ) . '%' ) ) );
+		$this->assertStringNotContainsString( $data['password'], (string) wp_json_encode( \BeltoftServices\Hosting\Tasks::get( Resource::find( $r->id() ) ) ) );
+		$this->assertSame( array(), $this->agent->calls_of( 'ssh.password' ), 'Nothing is sent to the node in the request.' );
+		$this->run_jobs();
+		$this->assertNull( \BeltoftServices\Hosting\Tasks::get( Resource::find( $r->id() ) ), 'The task, and with it the secret, is gone when the job ends.' );
+
 		$sent = $this->agent->calls_of( 'ssh.password' )[0]['args']['password'];
 		$this->assertNotSame( $data['password'], $sent, 'The call log has the password masked.' );
 		$this->assertTrue( ( new HostingActions( Resource::find( $r->id() ) ) )->files()['password_set'] );
 
-		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
 		$this->assertSame( '0', (string) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->options} WHERE option_value LIKE %s", '%' . $wpdb->esc_like( $data['password'] ) . '%' ) ) );
 		$this->assertStringNotContainsString( $data['password'], (string) wp_json_encode( Resource::find( $r->id() )->get( 'sftp_password_at' ) ) );
@@ -483,8 +492,10 @@ class HostingPageTest extends HostingCase {
 
 		$long = 'a-long-password-of-mine-1';
 		$ok   = $this->call( 'POST', $path, $user, array( 'code' => $this->code( $user ), 'password' => $long ) );
-		$this->assertSame( 200, $ok->get_status() );
+		$this->assertSame( 202, $ok->get_status() );
 		$this->assertSame( $long, $ok->get_data()['password'] );
+		$this->run_jobs();
+		$this->assertCount( 1, $this->agent->calls_of( 'ssh.password' ) );
 	}
 
 	public function test_file_access_is_for_the_owner_only_and_the_code_of_another_purpose_does_not_work(): void {
@@ -524,7 +535,8 @@ class HostingPageTest extends HostingCase {
 		$this->assertSame( 403, $this->call( 'POST', $base, $user, array( 'code' => '000000', 'key' => self::KEY ) )->get_status() );
 
 		$ok = $this->call( 'POST', $base, $user, array( 'code' => $this->code( $user ), 'key' => self::KEY ) );
-		$this->assertSame( 200, $ok->get_status() );
+		$this->assertSame( 202, $ok->get_status() );
+		$this->run_jobs();
 		$this->assertCount( 1, $this->agent->calls_of( 'ssh.keys' ), 'The node got the whole list (the call log masks the keys).' );
 
 		$files = ( new HostingActions( Resource::find( $r->id() ) ) )->files();
@@ -540,7 +552,8 @@ class HostingPageTest extends HostingCase {
 		$this->assertSame( 'invalid', $actions->add_ssh_key( 'ssh-ed25519 AAAA' )->get_error_code(), 'Too short to be a key.' );
 
 		$gone = $this->call( 'DELETE', $base, $user, array( 'fingerprint' => $files['keys'][0]['fingerprint'] ) );
-		$this->assertSame( 200, $gone->get_status() );
+		$this->assertSame( 202, $gone->get_status() );
+		$this->run_jobs();
 		$this->assertCount( 2, $this->agent->calls_of( 'ssh.keys' ) );
 		$this->assertSame( array(), ( new HostingActions( Resource::find( $r->id() ) ) )->files()['keys'] );
 		$this->assertSame( 404, $this->call( 'DELETE', $base, $user, array( 'fingerprint' => 'SHA256:nothing' ) )->get_status() );

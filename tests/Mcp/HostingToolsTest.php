@@ -93,17 +93,27 @@ final class HostingToolsTest extends HostingCase {
 
 		$domain = $this->json( $this->tool( 'add_site_domain', array( 'id' => $id, 'site' => 'blog', 'domain' => 'www.example.org' ), $token ) );
 		$this->assertSame( 'www.example.org', $domain['added'] );
+		$this->assertTrue( $domain['queued'], 'The names go to the node in the background.' );
 		$this->assertNotNull( SiteDomains::find( 'www.example.org' ) );
+		$this->assertSame( 'names', \BeltoftServices\Hosting\Tasks::get( \BeltoftServices\Resource::find( $id ) )['action'] );
+
+		$wait = $this->tool( 'set_php_version', array( 'id' => $id, 'site' => 'blog', 'php' => '8.4' ), $token );
+		$this->assertTrue( $wait['isError'], 'A second change is refused while one runs.' );
+		$this->assertStringContainsString( 'Wait until adding an address is done', (string) wp_json_encode( $wait ) );
+		$this->run_jobs();
 
 		$php = $this->json( $this->tool( 'set_php_version', array( 'id' => $id, 'site' => 'blog', 'php' => '8.4', 'memory_mb' => 256 ), $token ) );
-		$this->assertIsArray( $php );
+		$this->assertTrue( $php['queued'] );
+		$this->run_jobs();
 		$this->assertSame( '8.4', Sites::find( $id, 'blog' )['php'] );
 
 		$over = $this->tool( 'set_php_version', array( 'id' => $id, 'site' => 'blog', 'php' => '8.4', 'memory_mb' => 4096 ), $token );
 		$this->assertTrue( $over['isError'], 'The plan ceiling holds for a tool as for the dashboard.' );
 
 		$cache = $this->json( $this->tool( 'clear_site_cache', array( 'id' => $id, 'site' => $first ), $token ) );
-		$this->assertSame( $first, $cache['cleared'] );
+		$this->assertSame( $first, $cache['site'] );
+		$this->assertTrue( $cache['queued'] );
+		$this->run_jobs();
 
 		$backup = $this->json( $this->tool( 'create_hosting_backup', array( 'id' => $id ), $token ) );
 		$this->assertTrue( $backup['started'] );
@@ -131,7 +141,9 @@ final class HostingToolsTest extends HostingCase {
 		$this->assertNotNull( Sites::find( $r->id(), 'blog' ), 'Nothing is deleted before the confirmation.' );
 
 		$done = $this->json( $this->tool( 'delete_site', array( 'id' => $r->id(), 'site' => 'blog', 'confirm' => $first['confirm'] ), $token ) );
-		$this->assertSame( 'blog', $done['deleted'] );
+		$this->assertSame( 'blog', $done['deleting'] );
+		$this->assertTrue( $done['queued'] );
+		$this->run_jobs();
 		$this->assertNull( Sites::find( $r->id(), 'blog' ) );
 
 		$last = $this->tool( 'delete_site', array( 'id' => $r->id(), 'site' => 'w' . $r->id() ), $token );

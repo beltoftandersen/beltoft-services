@@ -353,7 +353,8 @@ class SafetyTest extends HostingCase {
 		$this->assertSame( 403, rest_get_server()->dispatch( new \WP_REST_Request( 'POST', $path ) )->get_status() );
 
 		wp_set_current_user( (int) $r->license()['user_id'] );
-		$this->assertSame( 200, rest_get_server()->dispatch( new \WP_REST_Request( 'POST', $path ) )->get_status() );
+		$this->assertSame( 202, rest_get_server()->dispatch( new \WP_REST_Request( 'POST', $path ) )->get_status() );
+		$this->run_jobs();
 		$this->assertSame( 404, rest_get_server()->dispatch( new \WP_REST_Request( 'POST', $path ) )->get_status() );
 	}
 }

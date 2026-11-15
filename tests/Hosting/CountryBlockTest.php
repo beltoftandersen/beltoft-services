@@ -179,8 +179,9 @@ class CountryBlockTest extends HostingCase {
 		$path = $r->id() . '/hosting/sites/' . $slug . '/country-block';
 
 		$set = $this->rest( 'POST', $path, $user, array( 'countries' => array( 'RU', 'CN' ), 'scope' => 'login' ) );
-		$this->assertSame( 200, $set->get_status() );
+		$this->assertSame( 202, $set->get_status(), 'Saved in the background.' );
 		$this->assertStringContainsString( 'no-store', (string) $set->get_headers()['Cache-Control'] );
+		$this->run_jobs();
 
 		$get = $this->rest( 'GET', $path, $user );
 		$this->assertSame( 200, $get->get_status() );
@@ -205,7 +206,9 @@ class CountryBlockTest extends HostingCase {
 		$ask = $this->rest( 'POST', $path, $user, array( 'countries' => array( 'RU' ), 'scope' => 'site' ) );
 		$this->assertSame( 409, $ask->get_status() );
 		$this->assertSame( 'beltoft_services_hosting_country_confirm', $ask->get_data()['code'] );
-		$this->assertSame( 200, $this->rest( 'POST', $path, $user, array( 'countries' => array( 'RU' ), 'scope' => 'site', 'confirm' => true ) )->get_status() );
+		$this->assertSame( 202, $this->rest( 'POST', $path, $user, array( 'countries' => array( 'RU' ), 'scope' => 'site', 'confirm' => true ) )->get_status() );
+		$this->run_jobs();
+		$this->assertSame( array( 'RU' ), array_column( $this->rest( 'GET', $path, $user )->get_data()['countries'], 'code' ) );
 	}
 
 	public function test_the_routes_are_for_the_dashboard_only(): void {

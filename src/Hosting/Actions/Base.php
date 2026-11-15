@@ -15,7 +15,10 @@ use BeltoftServices\Hosting\Records;
 use BeltoftServices\Hosting\Runs;
 use BeltoftServices\Hosting\SiteDns;
 use BeltoftServices\Hosting\Sites;
+use BeltoftServices\Hosting\Tasks;
+use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
+use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -36,11 +39,91 @@ trait Base {
 	private $plan = array();
 
 	/**
-	 * @param Resource $r Hosting resource.
+	 * How the agent calls of this object are made: 'inline' (the caller waits a few seconds for each, for the command line, the
+	 * add-ons and the jobs that already run in the background), 'request' (a web request: every check and the local work
+	 * run, the first agent call ends it with a queued task) or 'job' (a run of the task's job: one agent step, nothing waits).
+	 *
+	 * @var string
 	 */
-	public function __construct( Resource $r ) {
+	private $mode = 'inline';
+
+	/**
+	 * The change a request asked for: facade method and arguments.
+	 *
+	 * @var array{0: string, 1: array<int, mixed>}
+	 */
+	private $request = array( '', array() );
+
+	/**
+	 * What the change says about itself before its first agent call: the answer to the customer and the arguments of the job
+	 * when they are not the ones asked with (a name that was made up).
+	 *
+	 * @var array{result: array<string, mixed>, args: array<int, mixed>|null}
+	 */
+	private $deferred = array( 'result' => array(), 'args' => null );
+
+	/**
+	 * The secret of the change that is being queued (see queue()).
+	 *
+	 * @var string|null
+	 */
+	private $secret_arg = null;
+
+	/**
+	 * @param Resource $r    Hosting resource.
+	 * @param string   $mode inline, request or job.
+	 */
+	public function __construct( Resource $r, string $mode = 'inline' ) {
 		$this->r    = $r;
 		$this->plan = Plan::typed( (array) $r->get( 'plan' ) );
+		$this->mode = in_array( $mode, array( 'request', 'job' ), true ) ? $mode : 'inline';
+	}
+
+	/**
+	 * Is this a run of the task's job?
+	 */
+	private function in_job(): bool {
+		return 'job' === $this->mode;
+	}
+
+	/**
+	 * Says what the customer is answered and what the job is given, when the change is queued at its first agent call.
+	 *
+	 * @param array<string, mixed>   $result The answer.
+	 * @param array<int, mixed>|null $args   The job's arguments, when they differ from the request's.
+	 */
+	private function defer_with( array $result, ?array $args = null ): void {
+		$this->deferred = array( 'result' => $result, 'args' => $args );
+	}
+
+	/**
+	 * Runs a change in a web request: its checks and local work, and then, at the first agent call, the task is taken and its
+	 * job is queued. A change that needs no agent call is simply done.
+	 *
+	 * @param string            $method The method to run.
+	 * @param array<int, mixed> $args   Its arguments.
+	 * @param string|null       $secret A secret first argument: it goes into the task encrypted, never into the job's arguments.
+	 * @return array<string, mixed>|\WP_Error The answer: status pending with the task, or the plain result.
+	 */
+	public function queue( string $method, array $args, ?string $secret = null ) {
+		$busy = Tasks::busy( $this->r );
+
+		if ( null !== $busy ) {
+			return Tasks::refusal( $busy );
+		}
+
+		$this->mode       = 'request';
+		$this->request    = array( $method, $args );
+		$this->secret_arg = $secret;
+		$this->deferred   = array( 'result' => array(), 'args' => null );
+
+		try {
+			return $this->{$method}( ...$args );
+		} catch ( Deferred $d ) {
+			return $d->answer;
+		} finally {
+			$this->mode = 'inline';
+		}
 	}
 
 	/**
@@ -51,7 +134,12 @@ trait Base {
 	 * @return mixed|\WP_Error The change's result, or busy.
 	 */
 	private function locked( callable $change ) {
-		list( $taken, $result ) = \BeltoftServices\Locks::with( \BeltoftServices\Locks::name( 'hosting-site', $this->r->id() ), (int) apply_filters( 'beltoft_services_hosting_lock_wait', 10 ), $change );
+		list( $taken, $result ) = \BeltoftServices\Locks::with( \BeltoftServices\Locks::name( 'hosting-site', $this->r->id() ), $this->in_job() ? 0 : (int) apply_filters( 'beltoft_services_hosting_lock_wait', 10 ), $change );
+
+		if ( ! $taken && $this->in_job() ) {
+			// Something else (a sweep) is changing the account: look again in a few seconds, never give up the task for it.
+			throw new TaskPending( StepResult::poll( 5, 'hosting: the account is being changed by something else', 300 ) );
+		}
 
 		return $taken ? $result : $this->error( 'busy', __( 'Your hosting is being changed. Try again in a moment.', 'beltoft-services' ) );
 	}
@@ -59,14 +147,24 @@ trait Base {
 	/**
 	 * One agent job as a result or a customer error.
 	 *
+	 * In a web request that makes a change (queue()) the call is not made: it ends the request with a queued task. In a job it
+	 * is one step: a call that has finished is read from the task, one that has not is submitted or read once, and while the
+	 * agent is still working the run ends (TaskPending). Anywhere else the caller waits a few seconds, then is asked to try again.
+	 *
 	 * @param string               $name Job name.
 	 * @param string               $op   Operation.
 	 * @param array<string, mixed> $args Arguments.
-	 * @param int                  $wait Seconds to wait for the job; 0 = the default (8, filter). A WordPress install takes
-	 *                                   about 12 seconds, so the add-website install waits longer.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	private function call( string $name, string $op, array $args, int $wait = 0 ) {
+	private function call( string $name, string $op, array $args ) {
+		if ( 'request' === $this->mode ) {
+			throw new Deferred( $name, $this->defer_answer() );
+		}
+
+		if ( $this->in_job() ) {
+			return $this->job_call( $name, $op, $args );
+		}
+
 		$done = $this->agent_call( $name, $op, $args );
 
 		// A live agent answers queued first and finishes in a second or two: look again (same job id) for a few seconds before asking the customer to retry.
@@ -76,7 +174,7 @@ trait Base {
 		 * @param int    $seconds Seconds.
 		 * @param string $name    The job's name (for example site_install_<slug>).
 		 */
-		$until = microtime( true ) + (int) apply_filters( 'beltoft_services_hosting_action_wait', $wait > 0 ? $wait : 8, $name );
+		$until = microtime( true ) + (int) apply_filters( 'beltoft_services_hosting_action_wait', 8, $name );
 
 		while ( $done instanceof StepResult && $done->is_poll() && microtime( true ) < $until ) {
 			usleep( 400000 );
@@ -90,6 +188,151 @@ trait Base {
 		return $done->is_poll()
 			? $this->error( 'busy', __( 'The server is busy. Try again in a moment.', 'beltoft-services' ) )
 			: $this->error( 'failed', __( 'That did not work. Try again in a moment, or contact support if it keeps happening.', 'beltoft-services' ) );
+	}
+
+	/**
+	 * The answer of a change that is queued: its task is taken now (with the site lock held by the change) and its job is queued.
+	 *
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private function defer_answer() {
+		list( $method, $args ) = $this->request;
+
+		$task = Tasks::claim( $this->r, $method, null === $this->deferred['args'] ? $args : $this->deferred['args'], $this->secret_arg );
+
+		if ( is_wp_error( $task ) ) {
+			return $task;
+		}
+
+		Tasks::queue( $this->r, (string) $task['action'] );
+
+		return array_merge( $this->deferred['result'], array( 'status' => 'pending', 'task' => Tasks::view( $task ) ) );
+	}
+
+	/**
+	 * One agent step of a job run.
+	 *
+	 * @param string               $name Call name.
+	 * @param string               $op   Operation.
+	 * @param array<string, mixed> $args Arguments.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private function job_call( string $name, string $op, array $args ) {
+		$memo = Tasks::memo( $this->r, $name );
+
+		if ( null !== $memo ) {
+			return $memo['ok'] ? (array) $memo['result'] : $this->failed_call();
+		}
+
+		Tasks::step( $this->r, $name );
+
+		$done = $this->agent_step( $name, $op, $args );
+
+		if ( $done instanceof StepResult && ! $done->is_failed() ) {
+			// Still working, or the agent did not answer: this run ends, and the same action is queued again.
+			throw new TaskPending( $this->progressed ? $done->with_progress() : $done );
+		}
+
+		$ok = is_array( $done );
+
+		if ( ! Tasks::remember( $this->r, $name, $ok, $ok ? $done : null ) ) {
+			throw new TaskPending( StepResult::retry( 0, $name . ': the task step could not be stored' ) );
+		}
+
+		$this->bump_job( $name );
+		$this->progressed = true;
+
+		return $ok ? $done : $this->failed_call();
+	}
+
+	/**
+	 * What a call that really failed is to the customer.
+	 */
+	private function failed_call(): \WP_Error {
+		return $this->error( 'failed', __( 'That did not work. Try again in a moment, or contact support if it keeps happening.', 'beltoft-services' ) );
+	}
+
+	/**
+	 * Reads or submits the agent job of a call, once.
+	 *
+	 * @param string               $name Call name.
+	 * @param string               $op   Operation.
+	 * @param array<string, mixed> $args Arguments.
+	 * @return array<string, mixed>|StepResult|\WP_Error The result of a job that is done; a poll while it works, a retry when the
+	 *                                                  agent did not answer; a failure (StepResult or WP_Error) when it failed for good.
+	 */
+	private function agent_step( string $name, string $op, array $args ) {
+		if ( Settings::get( 'pause_all' ) ) {
+			return StepResult::wait( Jobs::PAUSED_DELAY, $name . ': all driver activity is paused', time() + 7 * DAY_IN_SECONDS );
+		}
+
+		$job = $this->agent->submit( $op, $args, $this->job_id( $name ) );
+
+		if ( is_wp_error( $job ) ) {
+			return $this->classify( $job, $name );
+		}
+
+		$status = (string) ( $job['status'] ?? '' );
+
+		if ( in_array( $status, array( 'queued', 'running' ), true ) ) {
+			return StepResult::poll( 2, $name . ': waiting for the node agent', 600 );
+		}
+
+		if ( 'failed' === $status ) {
+			return new \WP_Error( 'agent_failed', $this->scrub( (string) ( $job['error'] ?? '' ), 200 ) );
+		}
+
+		if ( 'done' !== $status ) {
+			return StepResult::retry( 0, $name . ': the node agent sent an unknown job status' );
+		}
+
+		return is_array( $job['result'] ?? null ) ? $job['result'] : array();
+	}
+
+	/**
+	 * The agent's job id of a call: resource, name and the number kept in the resource meta (see Runs::agent_call()).
+	 *
+	 * @param string $name Call name.
+	 */
+	private function job_id( string $name ): string {
+		$fresh = Resource::find( $this->r->id() ) ?? $this->r;
+
+		return $this->r->get( 'uuid' ) . ':' . $name . ':' . (int) ( $fresh->get( $this->job_key( $name ) ) ?? 0 );
+	}
+
+	/**
+	 * Resource meta key of a call's job number.
+	 *
+	 * @param string $name Call name.
+	 */
+	private function job_key( string $name ): string {
+		return 'agent_job_' . substr( (string) preg_replace( '/[^a-z0-9_]/', '_', strtolower( $name ) ), 0, 60 );
+	}
+
+	/**
+	 * Moves a call's job number on, so a later change of the same name is a new agent job.
+	 *
+	 * @param string $name Call name.
+	 */
+	private function bump_job( string $name ): void {
+		$fresh = Resource::find( $this->r->id() ) ?? $this->r;
+
+		$fresh->set( array( $this->job_key( $name ) => (int) ( $fresh->get( $this->job_key( $name ) ) ?? 0 ) + 1 ) );
+	}
+
+	/**
+	 * Is this run of the job on this website's task (so a website that no longer has the pending mark is still the one being added)?
+	 *
+	 * @param string $slug Site.
+	 */
+	private function in_task( string $slug ): bool {
+		if ( ! $this->in_job() ) {
+			return false;
+		}
+
+		$task = Tasks::get( $this->r );
+
+		return null !== $task && $slug === (string) $task['slug'];
 	}
 
 	/**
@@ -136,7 +379,12 @@ trait Base {
 		}
 
 		$record = (array) Records::for_resource( $this->r->id() );
-		$done   = $this->call( 'site_' . $name . '_' . $slug, $op, array( 'vmid' => (int) $record['vmid'], 'slug' => $slug ) );
+
+		if ( null !== $out ) {
+			$this->defer_with( $out );
+		}
+
+		$done = $this->call( 'site_' . $name . '_' . $slug, $op, array( 'vmid' => (int) $record['vmid'], 'slug' => $slug ) );
 
 		return is_wp_error( $done ) ? $done : ( null === $out ? $done : $out );
 	}

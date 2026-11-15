@@ -70,7 +70,10 @@ final class PhpActions {
 		}
 
 		$record = (array) Records::for_resource( $this->r->id() );
-		$done   = $this->call(
+
+		$this->defer_with( array( 'slug' => $slug, 'php' => $php, 'memory_mb' => $memory, 'upload_mb' => $upload ) );
+
+		$done = $this->call(
 			'site_php_' . $slug,
 			'site.php',
 			array(
@@ -122,7 +125,10 @@ final class PhpActions {
 		}
 
 		$record = (array) Records::for_resource( $this->r->id() );
-		$done   = $this->call( 'site_php_back_' . $slug, 'site.php', array( 'vmid' => (int) $record['vmid'], 'slug' => $slug, 'php' => (string) $marker['from'] ) );
+
+		$this->defer_with( array( 'slug' => $slug, 'php' => (string) $marker['from'] ) );
+
+		$done = $this->call( 'site_php_back_' . $slug, 'site.php', array( 'vmid' => (int) $record['vmid'], 'slug' => $slug, 'php' => (string) $marker['from'] ) );
 
 		if ( is_wp_error( $done ) ) {
 			return $done;
@@ -175,7 +181,10 @@ final class PhpActions {
 		}
 
 		$record = (array) Records::for_resource( $this->r->id() );
-		$done   = $this->call( 'site_workers_' . $slug, 'site.workers', array( 'vmid' => (int) $record['vmid'], 'slug' => $slug, 'workers' => $workers ) );
+
+		$this->defer_with( array( 'slug' => $slug, 'workers' => $workers ) );
+
+		$done = $this->call( 'site_workers_' . $slug, 'site.workers', array( 'vmid' => (int) $record['vmid'], 'slug' => $slug, 'workers' => $workers ) );
 
 		if ( is_wp_error( $done ) ) {
 			return $done;

@@ -96,7 +96,10 @@ final class CountryActions {
 		}
 
 		$record = (array) Records::for_resource( $this->r->id() );
-		$done   = $this->call( 'site_country_' . $slug, 'site.country_block', array( 'vmid' => (int) $record['vmid'], 'slug' => $slug, 'countries' => $codes, 'scope' => $scope ) );
+
+		$this->defer_with( array( 'slug' => $slug ) );
+
+		$done = $this->call( 'site_country_' . $slug, 'site.country_block', array( 'vmid' => (int) $record['vmid'], 'slug' => $slug, 'countries' => $codes, 'scope' => $scope ) );
 
 		if ( is_wp_error( $done ) ) {
 			return $done;

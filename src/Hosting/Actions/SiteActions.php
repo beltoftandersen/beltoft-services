@@ -21,6 +21,7 @@ use BeltoftServices\Hosting\SiteNames;
 use BeltoftServices\Hosting\SiteStaging;
 use BeltoftServices\Hosting\SiteWordPress;
 use BeltoftServices\Hosting\Sites;
+use BeltoftServices\Hosting\Tasks;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -39,10 +40,22 @@ final class SiteActions {
 	public function sites(): array {
 		$domains = SiteDomains::for_resource( $this->r->id() );
 		$out     = array();
+		$task    = Tasks::busy( $this->r );
+		$task    = null === $task ? null : Tasks::view( $task );
 
 		foreach ( Sites::for_resource( $this->r->id() ) as $site ) {
 			if ( ! empty( $site['flags']['pending'] ) ) {
-				continue; // Not finished: the customer sees it once it works.
+				// Not finished: the customer sees it once it works. While it is being added it shows as a row that says so.
+				if ( null !== $task && 'add_site' === $task['action'] && $task['slug'] === $site['slug'] ) {
+					$out[] = array(
+						'slug'    => $site['slug'],
+						'label'   => $site['label'],
+						'pending' => true,
+						'task'    => $task,
+					);
+				}
+
+				continue;
 			}
 
 			$names = array();
@@ -89,6 +102,7 @@ final class SiteActions {
 				'country'     => \BeltoftServices\Hosting\CountryBlock::view( $site ),
 				'staging'     => SiteStaging::view( $site ),
 				'scan'        => \BeltoftServices\Hosting\MalwareScan::view( $site ),
+				'task'        => null !== $task && $task['slug'] === $site['slug'] ? $task : null,
 			);
 		}
 
@@ -146,9 +160,22 @@ final class SiteActions {
 			return $this->error( 'invalid', __( 'That PHP version is not offered.', 'beltoft-services' ) );
 		}
 
+		// The name is chosen here, in the request: the job is given it, never a new one.
+		$this->defer_with( array( 'slug' => $slug, 'host' => EdgeMap::preview_host( $slug ) ), array( $slug, $label, $php, $install ) );
+
+		// A run of the job after a failure goes on with the cleanup it began, never with a new website.
+		$failure = $this->in_job() ? ( Tasks::get( $this->r )['fail'] ?? null ) : null;
+
+		if ( is_array( $failure ) ) {
+			$record = (array) Records::for_resource( $this->r->id() );
+			$this->abandon_site( $slug, (int) $record['vmid'], ! empty( $failure['db'] ) );
+
+			return $this->error( (string) $failure['code'], (string) $failure['message'] );
+		}
+
 		$existing = Sites::for_resource( $this->r->id() );
 		$found    = Sites::find( $this->r->id(), $slug );
-		$resuming = null !== $found && ! empty( $found['flags']['pending'] );
+		$resuming = null !== $found && ( ! empty( $found['flags']['pending'] ) || $this->in_task( $slug ) );
 
 		// A name this account was adding and could not finish (and could not clean up) is picked up again, not refused.
 		if ( null !== $found && ! $resuming ) {
@@ -183,18 +210,14 @@ final class SiteActions {
 		$gave = $this->make_room( $deficit, $slug, (int) $record['vmid'] );
 
 		if ( is_wp_error( $gave ) ) {
-			$this->abandon_site( $slug, (int) $record['vmid'], false );
-
-			return $gave;
+			return $this->abort_site( $slug, (int) $record['vmid'], false, $gave );
 		}
 
 		// The site's database comes first: the install needs it (the account's user is the same, with the password kept since the order).
 		$password = Crypto::decrypt( (string) $this->r->get( 'db_secret' ) );
 
 		if ( null === $password || '' === $password ) {
-			Sites::remove( $this->r->id(), $slug );
-
-			return $this->error( 'failed', __( 'Websites cannot be added right now.', 'beltoft-services' ) );
+			return $this->abort_site( $slug, (int) $record['vmid'], false, $this->error( 'failed', __( 'Websites cannot be added right now.', 'beltoft-services' ) ) );
 		}
 
 		$this->secrets[] = $password;
@@ -211,9 +234,7 @@ final class SiteActions {
 		);
 
 		if ( is_wp_error( $done ) ) {
-			$this->abandon_site( $slug, (int) $record['vmid'] );
-
-			return $done;
+			return $this->abort_site( $slug, (int) $record['vmid'], true, $done );
 		}
 
 		$done = $this->call(
@@ -229,9 +250,7 @@ final class SiteActions {
 		);
 
 		if ( is_wp_error( $done ) ) {
-			$this->abandon_site( $slug, (int) $record['vmid'] );
-
-			return $done;
+			return $this->abort_site( $slug, (int) $record['vmid'], true, $done );
 		}
 
 		if ( $install ) {
@@ -246,14 +265,11 @@ final class SiteActions {
 					'admin_user'  => Config::admin_user(),
 					'admin_email' => sanitize_email( (string) ( $license['email'] ?? '' ) ),
 					'woocommerce' => false,
-				),
-				60
+				)
 			);
 
 			if ( is_wp_error( $done ) ) {
-				$this->abandon_site( $slug, (int) $record['vmid'] );
-
-				return $done;
+				return $this->abort_site( $slug, (int) $record['vmid'], true, $done );
 			}
 
 			// Who the install made the administrator, so the page can say which user the sign-in link uses.
@@ -272,6 +288,32 @@ final class SiteActions {
 		$edge = $this->edge();
 
 		return is_wp_error( $edge ) ? $edge : array( 'slug' => $slug, 'host' => $host );
+	}
+
+	/**
+	 * A website that could not be made, after the agent said so (never because it was slow): the failure is kept, and the
+	 * cleanup runs, step by step in a job.
+	 *
+	 * @param string    $slug Site name.
+	 * @param int       $vmid Container id.
+	 * @param bool      $db   Whether a database may have been made.
+	 * @param \WP_Error $e    The failure.
+	 * @return \WP_Error The failure.
+	 */
+	private function abort_site( string $slug, int $vmid, bool $db, \WP_Error $e ): \WP_Error {
+		// A slow agent (a caller that waited and was told to try again) is not a failure: nothing is removed, the website
+		// stays marked pending and the next add of the same name goes on from there.
+		if ( 'busy' === $e->get_error_code() ) {
+			return $e;
+		}
+
+		if ( $this->in_job() ) {
+			Tasks::remember_failure( $this->r, $e, $db );
+		}
+
+		$this->abandon_site( $slug, $vmid, $db );
+
+		return $e;
 	}
 
 	/**
@@ -294,6 +336,36 @@ final class SiteActions {
 		if ( $clean ) {
 			Sites::remove( $this->r->id(), $slug );
 		}
+	}
+
+	/**
+	 * The cleanup of a website that was being added and never finished (the watchdog queues it): its database and folder go, then
+	 * its record. Only a website that is still marked pending is touched.
+	 *
+	 * @param string $slug Site name.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function abandon_new_site( string $slug ) {
+		return $this->locked(
+			function () use ( $slug ) {
+				$ready = $this->ready();
+
+				if ( is_wp_error( $ready ) ) {
+					return $ready;
+				}
+
+				$site = Sites::find( $this->r->id(), $slug );
+
+				if ( null === $site || empty( $site['flags']['pending'] ) ) {
+					return array( 'abandoned' => false );
+				}
+
+				$record = (array) Records::for_resource( $this->r->id() );
+				$this->abandon_site( $slug, (int) $record['vmid'], true );
+
+				return array( 'abandoned' => null === Sites::find( $this->r->id(), $slug ) );
+			}
+		);
 	}
 
 	/**
@@ -321,6 +393,13 @@ final class SiteActions {
 
 		$site = Sites::find( $this->r->id(), $slug );
 
+		// A run of the job after the record was removed (a crash before the edge map was sent) only sends the edge map.
+		if ( null === $site && $this->in_task( $slug ) && null !== Tasks::memo( $this->r, 'db_drop_' . $slug ) ) {
+			$edge = $this->edge();
+
+			return is_wp_error( $edge ) ? $edge : array( 'removed' => $slug );
+		}
+
 		if ( null === $site ) {
 			return $this->error( 'not_found', __( 'That website does not exist.', 'beltoft-services' ) );
 		}
@@ -336,6 +415,8 @@ final class SiteActions {
 		if ( SiteStaging::view( $site )['busy'] ) {
 			return $this->error( 'busy', __( 'The staging copy of this website is being changed. Try again when that is done.', 'beltoft-services' ) );
 		}
+
+		$this->defer_with( array( 'removed' => $slug ) );
 
 		$record = (array) Records::for_resource( $this->r->id() );
 
@@ -467,6 +548,19 @@ final class SiteActions {
 			Addons::keep( $this->r, Addons::KIND_DOMAIN, Addons::registrable( $host ) );
 		}
 
+		$answer = array_merge(
+			$added,
+			array(
+				'host'     => $host,
+				'also'     => $also,
+				'notice'   => $notice,
+				'point_at' => 'external' === $added['kind'] ? SiteDns::instructions( $this->node, $host, $this->r->id() ) : array(),
+			)
+		);
+
+		// In a request the names go to the node in the background (the job also looks at WordPress's address afterwards).
+		$this->defer_with( $answer, array() );
+
 		$edge = $this->names_and_edge();
 
 		if ( is_wp_error( $edge ) ) {
@@ -476,15 +570,7 @@ final class SiteActions {
 		// A first own domain that is live moves WordPress to it (queued, done in the background).
 		SiteWordPress::consider( $this->r, $slug );
 
-		return array_merge(
-			$added,
-			array(
-				'host'     => $host,
-				'also'     => $also,
-				'notice'   => $notice,
-				'point_at' => 'external' === $added['kind'] ? SiteDns::instructions( $this->node, $host, $this->r->id() ) : array(),
-			)
-		);
+		return $answer;
 	}
 
 	/**
@@ -556,6 +642,8 @@ final class SiteActions {
 		if ( 0 === strpos( $row['host'], 'www.' ) ) {
 			SiteDomains::set_www_mode( substr( $row['host'], 4 ), '' );
 		}
+
+		$this->defer_with( array( 'removed' => $row['host'] ), array() );
 
 		$edge = $this->names_and_edge();
 
@@ -654,6 +742,34 @@ final class SiteActions {
 	}
 
 	/**
+	 * The job behind a change of the account's addresses (an address added or removed, the main address of a pair): the names go
+	 * to the node and the routes to the edge, and then WordPress's own address is looked at, as the change did when it
+	 * ran in one request.
+	 *
+	 * @param string $chosen The website whose main address the customer just chose, or ''.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function apply_names( string $chosen = '' ) {
+		return $this->locked(
+			function () use ( $chosen ) {
+				$done = $this->sync_edge();
+
+				if ( is_wp_error( $done ) ) {
+					return $done;
+				}
+
+				if ( '' !== $chosen ) {
+					SiteWordPress::consider( $this->r, $chosen, true );
+				}
+
+				SiteWordPress::consider_all( $this->r );
+
+				return array( 'names' => true );
+			}
+		);
+	}
+
+	/**
 	 * Chooses which name of a with-and-without-www pair is the main address; the other one redirects to it (301). The
 	 * redirect changes at once. When WordPress is on the other name of the pair it moves to the chosen one in the background
 	 * (SiteWordPress), and the redirect is sent when that is done; otherwise the WordPress address is left alone.
@@ -716,6 +832,8 @@ final class SiteActions {
 				'redirect' => true,
 			);
 		}
+
+		$this->defer_with( array( 'main' => $host, 'redirect' => 'active' === $apex['state'] && 'active' === $www['state'] ), array( (string) $site['slug'] ) );
 
 		$pushed = $this->push_site_names( $site );
 

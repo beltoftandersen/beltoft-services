@@ -89,7 +89,10 @@ final class FilesActions {
 
 		$this->secrets[] = $password;
 		$record          = (array) Records::for_resource( $this->r->id() );
-		$done            = $this->call( 'sftp_password', 'ssh.password', array( 'vmid' => (int) $record['vmid'], 'password' => $password ) );
+
+		$this->defer_with( array( 'password' => $password ) );
+
+		$done = $this->call( 'sftp_password', 'ssh.password', array( 'vmid' => (int) $record['vmid'], 'password' => $password ) );
 
 		if ( is_wp_error( $done ) ) {
 			return $done;
@@ -175,7 +178,10 @@ final class FilesActions {
 		}
 
 		$record = (array) Records::for_resource( $this->r->id() );
-		$done   = $this->call( 'sftp_keys', 'ssh.keys', array( 'vmid' => (int) $record['vmid'], 'keys' => $keys ) );
+
+		$this->defer_with( array( 'keys' => count( $keys ) ) );
+
+		$done = $this->call( 'sftp_keys', 'ssh.keys', array( 'vmid' => (int) $record['vmid'], 'keys' => $keys ) );
 
 		if ( is_wp_error( $done ) ) {
 			return $done;

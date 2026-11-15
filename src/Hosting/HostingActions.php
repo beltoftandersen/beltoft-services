@@ -157,17 +157,87 @@ final class HostingActions {
 	private $files;
 
 	/**
-	 * @param Resource $r Hosting resource.
+	 * @param Resource $r    Hosting resource.
+	 * @param string   $mode inline (default: the caller waits a few seconds for each agent call), or job (a run of a background
+	 *                       task, see Tasks). A web request queues its change with queue().
 	 */
-	public function __construct( Resource $r ) {
-		$this->files  = new FilesActions( $r );
-		$this->sites  = new SiteActions( $r );
-		$this->php    = new PhpActions( $r );
-		$this->tools  = new ToolActions( $r );
-		$this->addons = new AddonActions( $r );
-		$this->country = new CountryActions( $r );
-		$this->staging = new StagingActions( $r );
-		$this->care   = new CareActions( $r );
+	public function __construct( Resource $r, string $mode = 'inline' ) {
+		$this->files   = new FilesActions( $r, $mode );
+		$this->sites   = new SiteActions( $r, $mode );
+		$this->php     = new PhpActions( $r, $mode );
+		$this->tools   = new ToolActions( $r, $mode );
+		$this->addons  = new AddonActions( $r, $mode );
+		$this->country = new CountryActions( $r, $mode );
+		$this->staging = new StagingActions( $r, $mode );
+		$this->care    = new CareActions( $r, $mode );
+	}
+
+	/**
+	 * The group that owns a change.
+	 *
+	 * @param string $method Method name.
+	 * @return object|null
+	 */
+	private function owner( string $method ): ?object {
+		$owners = array(
+			'add_site'          => $this->sites,
+			'remove_site'       => $this->sites,
+			'add_domain'        => $this->sites,
+			'remove_domain'     => $this->sites,
+			'set_main_address'  => $this->sites,
+			'apply_names'       => $this->sites,
+			'abandon_new_site'  => $this->sites,
+			'set_php'           => $this->php,
+			'php_rollback'      => $this->php,
+			'set_workers'       => $this->php,
+			'purge_cache'       => $this->php,
+			'set_country_block' => $this->country,
+			'set_sftp_password' => $this->files,
+			'add_ssh_key'       => $this->files,
+			'remove_ssh_key'    => $this->files,
+		);
+
+		return $owners[ $method ] ?? null;
+	}
+
+	/**
+	 * Makes a change from a web request: it is checked, its local work is done, and its agent work is queued as the
+	 * account's one task (see Tasks). The answer is status pending with the task, or a refusal. A second change while one
+	 * runs is refused ("Wait until ... is done").
+	 *
+	 * @param string            $method One of the changes in Tasks::table().
+	 * @param array<int, mixed> $args   Its arguments, as the method takes them.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function queue( string $method, array $args = array() ) {
+		$group = isset( Tasks::table()[ $method ] ) ? $this->owner( $method ) : null;
+
+		if ( null === $group ) {
+			return new \WP_Error( 'failed', __( 'That cannot be done right now.', 'beltoft-services' ) );
+		}
+
+		// The SFTP password is shown once, before it is queued; the task keeps it encrypted until the job ends.
+		if ( 'set_sftp_password' === $method ) {
+			$chosen = (string) ( $args[0] ?? '' );
+			$chosen = '' !== $chosen ? $chosen : wp_generate_password( 24, false );
+
+			return $group->queue( $method, array( $chosen ), $chosen );
+		}
+
+		return $group->queue( $method, $args );
+	}
+
+	/**
+	 * Runs the change of a task's job (see Tasks::run()).
+	 *
+	 * @param string            $method The method of the facade.
+	 * @param array<int, mixed> $args   Its arguments.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function job( string $method, array $args = array() ) {
+		$group = $this->owner( $method );
+
+		return null === $group ? new \WP_Error( 'failed', __( 'That cannot be done right now.', 'beltoft-services' ) ) : $group->{$method}( ...$args );
 	}
 
 	/**

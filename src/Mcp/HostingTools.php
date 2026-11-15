@@ -29,6 +29,9 @@ defined( 'ABSPATH' ) || exit;
  */
 final class HostingTools {
 
+	/** What a change that is queued answers: it is accepted, not done. A second change waits for it. */
+	public const QUEUED = 'Accepted and queued: it runs in the background, one change of the account at a time (another change is refused until it is done). hosting_info shows the current task of the account and of each website.';
+
 	/** Read tools. */
 	public const READS = array( 'hosting_info', 'hosting_usage', 'list_hosting_backups' );
 
@@ -97,7 +100,7 @@ final class HostingTools {
 			case 'add_site_domain':
 				$done = Tools::route( 'POST', '/resources/' . $id . '/hosting/sites/' . $site . '/domains', array(), array( 'host' => (string) $args['domain'] ), $id, 'site domain added' );
 
-				return $done instanceof \WP_Error ? $done : array( 'added' => (string) $args['domain'], 'kind' => (string) $done['kind'], 'state' => (string) $done['state'], 'point_at' => (array) ( $done['point_at'] ?? array() ) );
+				return $done instanceof \WP_Error ? $done : array( 'added' => (string) $args['domain'], 'kind' => (string) $done['kind'], 'state' => (string) $done['state'], 'point_at' => (array) ( $done['point_at'] ?? array() ), 'queued' => true, 'message' => self::QUEUED );
 
 			case 'set_php_version':
 				$body = array( 'php' => (string) $args['php'] );
@@ -110,12 +113,12 @@ final class HostingTools {
 
 				$done = Tools::route( 'POST', '/resources/' . $id . '/hosting/sites/' . $site . '/php', array(), $body, $id, 'site PHP version changed' );
 
-				return $done instanceof \WP_Error ? $done : (array) $done;
+				return $done instanceof \WP_Error ? $done : array_merge( (array) $done, array( 'queued' => true, 'message' => self::QUEUED ) );
 
 			case 'clear_site_cache':
 				$done = Tools::route( 'POST', '/resources/' . $id . '/hosting/sites/' . $site . '/cache', array(), array(), $id, 'site cache cleared' );
 
-				return $done instanceof \WP_Error ? $done : array( 'cleared' => (string) $args['site'] );
+				return $done instanceof \WP_Error ? $done : array( 'queued' => true, 'site' => (string) $args['site'], 'message' => self::QUEUED );
 		}
 
 		$done = Tools::route( 'POST', '/resources/' . $id . '/hosting/backups', array(), array(), $id, 'hosting backup started' );
@@ -211,7 +214,7 @@ final class HostingTools {
 		if ( 'delete_site' === $name ) {
 			$done = Tools::route( 'DELETE', '/resources/' . $id . '/hosting/sites/' . rawurlencode( (string) $args['site'] ), array( 'confirm' => (string) $args['site'] ), null, $id, 'website deleted' );
 
-			return $done instanceof \WP_Error ? $done : array( 'deleted' => (string) $done['removed'], 'message' => 'The website and its database were deleted.' );
+			return $done instanceof \WP_Error ? $done : array( 'queued' => true, 'deleting' => (string) $done['removed'], 'message' => 'The website and its database are being deleted in the background. hosting_info shows the website and its task until it is gone.' );
 		}
 
 		$done = Tools::route(
