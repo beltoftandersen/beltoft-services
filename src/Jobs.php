@@ -1119,6 +1119,18 @@ final class Jobs {
 			Reconciler::clear_stale( Resource::find( $r->id() ) ?? $r );
 
 			Events::add( $license_id, 'service', '' !== $result->event() ? $result->event() : sprintf( 'Customer action "%s" done', $action ) );
+
+			/**
+			 * A customer action ended well. Fired after its result is stored and its marker is gone, so a feature may queue a
+			 * follow-up action of the service through Jobs::start_action() (the hosting address change looks at WordPress's
+			 * address afterwards). Not fired for an expected refusal or a failure (see beltoft_services_action_failed).
+			 *
+			 * @param Resource             $r      Resource.
+			 * @param string               $action Action name.
+			 * @param array<string, mixed> $args   Its arguments.
+			 */
+			do_action( 'beltoft_services_action_done', Resource::find( $r->id() ) ?? $r, $action, $args );
+
 			return;
 		}
 

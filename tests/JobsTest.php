@@ -541,6 +541,33 @@ final class JobsTest extends TestCase {
 		$this->assertNull( $fresh->get( Jobs::TEXT ), 'The sentence is not resource meta.' );
 	}
 
+	public function test_a_customer_action_that_ended_well_fires_the_done_hook_after_its_marker_is_gone_and_a_failure_does_not(): void {
+		list( $r, $driver ) = $this->resource( array( 'state' => 'ready', 'desired' => 'ready' ) );
+		$driver->customer_actions = array( 'tidy' => 'Tidy up' );
+		$seen                     = array();
+		add_action(
+			'beltoft_services_action_done',
+			static function ( $res, $action, $args ) use ( &$seen ) {
+				$seen[] = array( $action, $args, null === Progress::pending( $res ), $res->get( Jobs::RESULT )['ok'] );
+			},
+			10,
+			3
+		);
+
+		// The driver answers done, then a failure, then an expected refusal (the last answer stays).
+		$driver->will( 'act', StepResult::done() )->will( 'act', StepResult::fail( 'broke' ) )->will( 'act', StepResult::fail( 'taken', array( Jobs::TEXT => 'That name is taken.', Jobs::EXPECTED => true ) ) );
+
+		// A follow-up change may be started from the hook: the marker is gone, so the service is free.
+		Progress::mark( $r, 'tidy', 'Tidy up' );
+		Jobs::act( $r->id(), 'tidy', array( 'x' ) );
+		$this->assertSame( array( array( 'tidy', array( 'x' ), true, true ) ), $seen );
+
+		// A failure and an expected refusal do not fire it.
+		Jobs::act( $r->id(), 'tidy', array() );
+		Jobs::act( $r->id(), 'tidy', array() );
+		$this->assertCount( 1, $seen, (string) wp_json_encode( $seen ) );
+	}
+
 	public function test_a_refusal_with_a_sentence_is_told_to_the_customer_and_not_to_staff(): void {
 		$mails = 0;
 		add_filter(
