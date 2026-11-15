@@ -83,7 +83,9 @@ final class LiveUsage {
 				'slow'     => self::SLOW_INTERVAL * 1000,
 				'idle'     => self::IDLE_AFTER * 1000,
 				'strings'  => array(
+					/* translators: %d: seconds. */
 					'secondsAgo' => __( '%d s ago', 'beltoft-services' ),
+					/* translators: %d: minutes. */
 					'minutesAgo' => __( '%d min ago', 'beltoft-services' ),
 					/* translators: 1: memory in use in GB, 2: total memory in GB, 3: how long ago the reading was taken, such as "8 s ago". */
 					'line'       => __( '%1$s of %2$s GB, updated %3$s', 'beltoft-services' ),
