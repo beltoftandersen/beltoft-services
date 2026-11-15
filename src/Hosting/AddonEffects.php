@@ -20,6 +20,12 @@ defined( 'ABSPATH' ) || exit;
  */
 final class AddonEffects {
 
+	/** Resource meta: paid domains not on a website yet because a change was under way (host => site slug). See retry(). */
+	public const WANT_CONNECT = 'addon_connect_wanted';
+
+	/** Resource meta: registrable domains whose line ended and whose names are still on the account (a list). See retry(). */
+	public const WANT_DROP = 'addon_drop_wanted';
+
 	/**
 	 * The registrable domain of a host name (the name itself when the ending is unknown).
 	 *
@@ -155,6 +161,17 @@ final class AddonEffects {
 		// A change of the account like any other: its checks and local work here, the names to the node in its job.
 		$added = ( new HostingActions( $r ) )->queue( 'add_domain', array( $slug, $host ) );
 
+		// A change under way is no failure: the wish is kept with the account and the domain sweep makes it when the account is free.
+		if ( is_wp_error( $added ) && 'busy' === $added->get_error_code() ) {
+			$fresh           = Resource::find( $r->id() ) ?? $r;
+			$wanted          = (array) $fresh->get( self::WANT_CONNECT );
+			$wanted[ $host ] = $slug;
+			$fresh->set( array( self::WANT_CONNECT => $wanted ) );
+			$order->add_order_note( 'The domain ' . $host . ' is paid. Your hosting is being changed, so it is added to the website afterwards.' );
+
+			return;
+		}
+
 		if ( is_wp_error( $added ) ) {
 			$order->add_order_note( 'The domain ' . $host . ' is paid but could not be added to the website: ' . $added->get_error_message() );
 			AddonBilling::alert( 'Paid domain was not connected', sprintf( "Order #%1\$d paid for the extra domain %2\$s, but it could not be added to the website: %3\$s.\n\nAdd it by hand or ask the customer to add it from the hosting page.", $order->get_id(), $host, $added->get_error_message() ) );
@@ -173,11 +190,85 @@ final class AddonEffects {
 		// One change takes every name of the domain (queued through the shared controller; the names reach the node in its job).
 		foreach ( SiteDomains::for_resource( $r->id() ) as $row ) {
 			if ( 'preview' !== $row['kind'] && self::registrable( $row['host'] ) === $reg ) {
-				return ! is_wp_error( ( new HostingActions( $r ) )->queue( 'remove_domain', array( $row['host'], true ) ) );
+				$dropped = ( new HostingActions( $r ) )->queue( 'remove_domain', array( $row['host'], true ) );
+
+				// A change under way is no failure: the domain is kept as to be dropped and the domain sweep does it when the account is free.
+				if ( is_wp_error( $dropped ) && 'busy' === $dropped->get_error_code() ) {
+					$fresh  = Resource::find( $r->id() ) ?? $r;
+					$wanted = array_values( array_unique( array_merge( array_filter( (array) $fresh->get( self::WANT_DROP ), 'is_string' ), array( $reg ) ) ) );
+
+					return $fresh->set( array( self::WANT_DROP => $wanted ) );
+				}
+
+				return ! is_wp_error( $dropped );
 			}
 		}
 
 		return true;
+	}
+
+	/**
+	 * What the account still owes its paid domains, looked at again from the stored wishes (the domain sweep calls this for each
+	 * ready account): a paid domain that could not be added while a change ran is added now, and one whose line has ended and that
+	 * could not be dropped is dropped now. A wish that a change under way holds up stays for the next look.
+	 *
+	 * @param Resource $r Hosting resource.
+	 */
+	public static function retry( Resource $r ): void {
+		$fresh = Resource::find( $r->id() ) ?? $r;
+		$add   = (array) $fresh->get( self::WANT_CONNECT );
+		$drop  = array_values( array_filter( (array) $fresh->get( self::WANT_DROP ), 'is_string' ) );
+
+		if ( array() === $add && array() === $drop ) {
+			return;
+		}
+
+		foreach ( $add as $host => $slug ) {
+			if ( null !== SiteDomains::find( (string) $host ) ) {
+				unset( $add[ $host ] );
+				continue;
+			}
+
+			$done = ( new HostingActions( $fresh ) )->queue( 'add_domain', array( (string) $slug, (string) $host ) );
+
+			if ( is_wp_error( $done ) && 'busy' === $done->get_error_code() ) {
+				continue;
+			}
+
+			unset( $add[ $host ] );
+
+			if ( is_wp_error( $done ) ) {
+				AddonBilling::alert( 'Paid domain was not connected', sprintf( "The paid extra domain %1\$s of hosting account #%2\$d could not be added to the website: %3\$s.\n\nAdd it by hand or ask the customer to add it from the hosting page.", (string) $host, $r->id(), $done->get_error_message() ) );
+			}
+
+			break; // One change at a time: the next wish waits for the next look.
+		}
+
+		foreach ( $drop as $i => $reg ) {
+			$rows = array_values( array_filter( SiteDomains::for_resource( $r->id() ), static fn( $row ) => 'preview' !== $row['kind'] && self::registrable( $row['host'] ) === $reg ) );
+			$paid = array_filter( AddonBilling::lines( $r, Addons::KIND_DOMAIN, $reg ), static fn( $item ) => '' === (string) $item->get_meta( Addons::I_ENDING ) );
+
+			// The domain is bought again, or it is gone: nothing to take back.
+			if ( array() === $rows || array() !== $paid ) {
+				unset( $drop[ $i ] );
+				continue;
+			}
+
+			$done = ( new HostingActions( $fresh ) )->queue( 'remove_domain', array( $rows[0]['host'], true ) );
+
+			if ( is_wp_error( $done ) && 'busy' === $done->get_error_code() ) {
+				continue;
+			}
+
+			if ( is_wp_error( $done ) ) {
+				unset( $drop[ $i ] );
+				AddonBilling::alert( 'Add-on change needs a look', sprintf( "The extra domain %1\$s of hosting account #%2\$d ended, but its names could not be taken off the website: %3\$s.\n\nTake them off by hand.", $reg, $r->id(), $done->get_error_message() ) );
+			}
+
+			break;
+		}
+
+		$fresh->set( array( self::WANT_CONNECT => $add, self::WANT_DROP => array_values( $drop ) ) );
 	}
 
 	/**

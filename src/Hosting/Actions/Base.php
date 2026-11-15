@@ -69,6 +69,13 @@ trait Base {
 	private $secret_arg = null;
 
 	/**
+	 * Puts right the local work of the request when the change cannot be queued after all (see defer_undo()).
+	 *
+	 * @var callable|null
+	 */
+	private $undo = null;
+
+	/**
 	 * @param Resource $r    Hosting resource.
 	 * @param string   $mode inline, request or job.
 	 */
@@ -125,6 +132,7 @@ trait Base {
 		$this->mode       = 'request';
 		$this->request    = array( $method, $args );
 		$this->secret_arg = $secret;
+		$this->undo       = null;
 		$this->deferred   = array( 'result' => array(), 'args' => null );
 
 		try {
@@ -133,7 +141,18 @@ trait Base {
 			return $d->answer;
 		} finally {
 			$this->mode = 'inline';
+			$this->undo = null;
 		}
+	}
+
+	/**
+	 * Says how the local work a request has done is put right when the change is not queued after all (the account became busy
+	 * between the check and the start, or the task could not be stored): the request leaves nothing half done behind.
+	 *
+	 * @param callable $undo Puts the local work right.
+	 */
+	private function defer_undo( callable $undo ): void {
+		$this->undo = $undo;
 	}
 
 	/**
@@ -230,7 +249,16 @@ trait Base {
 
 		$task = Steps::start( $this->r, $method, null === $this->deferred['args'] ? $args : $this->deferred['args'], $this->secret_arg );
 
-		return is_wp_error( $task ) ? $task : array_merge( $this->deferred['result'], array( 'status' => 'pending', 'task' => $task ) );
+		if ( is_wp_error( $task ) ) {
+			if ( null !== $this->undo ) {
+				( $this->undo )();
+				$this->undo = null;
+			}
+
+			return $task;
+		}
+
+		return array_merge( $this->deferred['result'], array( 'status' => 'pending', 'task' => $task ) );
 	}
 
 	/**
@@ -327,7 +355,11 @@ trait Base {
 	private function job_id( string $name ): string {
 		$fresh = Resource::find( $this->r->id() ) ?? $this->r;
 
-		return $this->r->get( 'uuid' ) . ':' . $name . ':' . (int) ( $fresh->get( $this->job_key( $name ) ) ?? 0 );
+		// The change's own token (made when it was queued) keeps a later change of the same name from reading this one's job: a change
+		// that ends before its counter moved on (stopped, lapsed) leaves the counter as it was.
+		$run = $this->in_job() ? (string) Steps::state( $fresh )['run'] : '';
+
+		return $this->r->get( 'uuid' ) . ':' . $name . ':' . (int) ( $fresh->get( $this->job_key( $name ) ) ?? 0 ) . ( '' !== $run ? ':' . $run : '' );
 	}
 
 	/**
@@ -423,6 +455,9 @@ trait Base {
 	 * @return true|\WP_Error
 	 */
 	private function edge() {
+		// The signature of what is sent, kept with the change: a replay of the job reads the first run's answer, so what is recorded is
+		// what was sent then, not what the database says now (a name activated meanwhile is still to be sent).
+		$sig  = $this->sent_signature( 'sig_edge', $this->edge_signature() );
 		$done = $this->call( 'edge_update', 'edge.apply', array( 'account' => Config::account( $this->r->id() ), 'routes' => EdgeMap::routes( $this->r->id(), false ) ) );
 
 		if ( is_wp_error( $done ) ) {
@@ -430,9 +465,31 @@ trait Base {
 		}
 
 		// What was sent last: the domain sweep compares it with the routes now (SiteActions::names_stale()).
-		( Resource::find( $this->r->id() ) ?? $this->r )->set( array( 'edge_sig' => $this->edge_signature() ) );
+		( Resource::find( $this->r->id() ) ?? $this->r )->set( array( 'edge_sig' => $sig ) );
 
 		return true;
+	}
+
+	/**
+	 * The signature of what a call sends, fixed by the first run of a job: later runs of the same change get the same one back.
+	 *
+	 * @param string $key Memo key of the signature.
+	 * @param string $now The signature of the current state.
+	 */
+	private function sent_signature( string $key, string $now ): string {
+		if ( ! $this->in_job() ) {
+			return $now;
+		}
+
+		$kept = Steps::memo( $this->r, $key );
+
+		if ( null !== $kept && ! empty( $kept['result']['sig'] ) ) {
+			return (string) $kept['result']['sig'];
+		}
+
+		Steps::remember( $this->r, $key, true, array( 'sig' => $now ) );
+
+		return $now;
 	}
 
 	/**

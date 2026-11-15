@@ -74,6 +74,8 @@ final class CareActions {
 			return $checked;
 		}
 
+		$r = Resource::find( $this->r->id() ) ?? $this->r;
+		$this->defer_undo( static fn() => ( new HostingBackups( $r ) )->undo_manual() );
 		$this->defer_with( $checked );
 		$this->defer_now( 'backup' );
 
@@ -130,6 +132,8 @@ final class CareActions {
 			return $checked;
 		}
 
+		$r = Resource::find( $this->r->id() ) ?? $this->r;
+		$this->defer_undo( static fn() => ( new HostingRestore( $r ) )->undo_prepare() );
 		$this->defer_with( $checked, 'undo' === $what ? array() : array( $scope, $volid, $slug ) );
 		$this->defer_now( 'restore' );
 

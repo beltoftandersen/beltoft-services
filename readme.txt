@@ -258,6 +258,14 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 == Changelog ==
 
+= 0.31.1 =
+* Hosting review fixes. A domain that became the account's included one (its paid line was marked as ending) is no longer disconnected at the renewal, and adding another name of it no longer makes it bill again.
+* A paid domain that could not be connected, or an ended one that could not be taken off, because another change of the account was running, is now done by the domain sweep when the account is free.
+* What is recorded as sent to the node (names and routes) is what the first run of the job sent, so a name that became active meanwhile is still sent by the sweep. Names that had to go without redirects are no longer sent again by every sweep.
+* A request that cannot queue its change after all (another change won) undoes its local work: the new website, the staging address, the backup or restore round.
+* An agent job id is never reused by a later change of the same name. A job that cannot read the SFTP password fails instead of making up another one.
+* The hosting page follows the account's task until it is gone, also when a follow-up change replaced the last result, and no longer says "done" after a timeout.
+
 = 0.31.0 =
 * Hosting staging copies (make, refresh, push, undo, delete), the move of WordPress to another address, "Back up now", restores and undo are changes of the hosting account on the shared action controller. Each is checked and queued by the route (202 with the task), runs as one agent step at a time with its steps kept, and ends with the shared outcome. The loops of their own (retry counters, give-up rules, schedules and watchers) are gone: a node job that fails is not sent again by the plugin, a lost job goes on where it stopped, and a change nobody works on any more ends as failed with one staff mail.
 * One change at a time: a staging push, a move of WordPress, a backup and a restore refuse each other and every other change of the account ("Wait until restoring from a backup is done.").

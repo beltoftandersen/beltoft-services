@@ -187,6 +187,13 @@ final class HostingRestore {
 	}
 
 	/**
+	 * A restore or an undo could not be queued after all: the round that was only stored (nothing reached the node) is dropped.
+	 */
+	public function undo_prepare(): void {
+		( Resource::find( $this->r->id() ) ?? $this->r )->set( array( 'restore' => null ) );
+	}
+
+	/**
 	 * A round whose job ended without finishing (it failed for good, was lost, or nothing worked on it): the round ends, so the account
 	 * is not left half way. An account restore that had stopped the container starts it again. Nothing happens when no round runs.
 	 *

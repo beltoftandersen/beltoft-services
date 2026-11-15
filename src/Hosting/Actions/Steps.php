@@ -299,6 +299,7 @@ final class Steps {
 			'step_label' => '',
 			'memo'       => array(),
 			'fail'       => null,
+			'run'        => strtolower( wp_generate_password( 8, false ) ),
 		);
 
 		// The one entry point: the busy check, then the step memory as the preparation, the marker and the job.
@@ -422,7 +423,7 @@ final class Steps {
 	public static function state( Resource $r ): array {
 		$state = ( Resource::find( $r->id() ) ?? $r )->get( self::META );
 
-		return array_merge( array( 'action' => '', 'slug' => '', 'args' => array(), 'secret' => '', 'step' => '', 'step_label' => '', 'memo' => array(), 'fail' => null ), is_array( $state ) ? $state : array() );
+		return array_merge( array( 'action' => '', 'slug' => '', 'args' => array(), 'secret' => '', 'step' => '', 'step_label' => '', 'memo' => array(), 'fail' => null, 'run' => '' ), is_array( $state ) ? $state : array() );
 	}
 
 	/**
@@ -556,7 +557,7 @@ final class Steps {
 
 		// A job whose steps are not the steps of this action (they were lost, or are an older change's) starts clean.
 		if ( $state['action'] !== $action ) {
-			$state = array_merge( $state, array( 'action' => $action, 'slug' => '', 'args' => array(), 'secret' => '', 'step' => '', 'step_label' => '', 'memo' => array(), 'fail' => null ) );
+			$state = array_merge( $state, array( 'action' => $action, 'slug' => '', 'args' => array(), 'secret' => '', 'step' => '', 'step_label' => '', 'memo' => array(), 'fail' => null, 'run' => '' ) );
 			$fresh->set( array( self::META => $state ) );
 		}
 

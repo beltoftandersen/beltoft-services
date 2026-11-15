@@ -97,6 +97,9 @@ final class DomainSweep {
 				continue;
 			}
 
+			// Paid domains a change under way held up (to add, or to take off) are made now.
+			AddonEffects::retry( $r );
+
 			if ( ( new HostingActions( $r ) )->names_stale() ) {
 				Steps::start_follow( $r, 'apply_names', array() );
 			} else {

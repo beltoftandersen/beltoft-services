@@ -85,6 +85,14 @@ final class FilesActions {
 			return $this->error( 'invalid', __( 'A password needs 16 to 200 characters.', 'beltoft-services' ) );
 		}
 
+		// The password the customer was shown is the only one that may be set. A job that cannot read it (the stored secret is gone or
+		// cannot be decrypted) fails, and never makes up another one that nobody has seen.
+		if ( $this->in_job() && '' === $chosen ) {
+			$text = __( 'The password could not be set. Set a new one.', 'beltoft-services' );
+
+			return new \WP_Error( 'failed', $text, array( 'text' => $text ) );
+		}
+
 		$password = '' !== $chosen ? $chosen : wp_generate_password( 24, false );
 
 		$this->secrets[] = $password;

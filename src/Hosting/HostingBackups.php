@@ -182,6 +182,17 @@ final class HostingBackups {
 	}
 
 	/**
+	 * "Back up now" could not be queued after all: the round that was only stored is dropped, and the day's count gets the start back.
+	 */
+	public function undo_manual(): void {
+		$this->r = Resource::find( $this->r->id() ) ?? $this->r;
+		$log     = array_values( array_map( 'intval', (array) $this->r->get( 'backup_manual_log' ) ) );
+
+		array_pop( $log );
+		$this->r->set( array( 'backup' => null, 'backup_manual_log' => $log ) );
+	}
+
+	/**
 	 * Checks "Back up now" and stores its round: up to 3 in 24 hours. The request that queues the change calls this, with the
 	 * account's site lock held; the round is driven by step() in the job of the change.
 	 *

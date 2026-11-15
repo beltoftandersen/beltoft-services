@@ -32,6 +32,9 @@ final class SiteActions {
 
 	use Base;
 
+	/** Prefix of the stored names signature when the names went without the redirects (an agent that does not know them). */
+	private const PLAIN_SIG = 'plain:';
+
 	/**
 	 * The sites of the account with their names and settings.
 	 *
@@ -200,6 +203,12 @@ final class SiteActions {
 
 		if ( ! $resuming && ! Sites::add( $this->r->id(), $slug, sanitize_text_field( $label ), $php, $workers, array( 'pending' => true ) ) ) {
 			return $this->error( 'exists', __( 'That site name is taken. Choose another.', 'beltoft-services' ) );
+		}
+
+		// A request that cannot queue the job after all takes the new website's record away again (it would stay pending for good).
+		if ( ! $resuming ) {
+			$id = $this->r->id();
+			$this->defer_undo( static fn() => Sites::remove( $id, $slug ) );
 		}
 
 		$site   = Sites::find( $this->r->id(), $slug );
@@ -1079,7 +1088,8 @@ final class SiteActions {
 			if ( empty( $site['flags']['pending'] ) ) {
 				$names = $this->site_names( $site );
 
-				if ( $names['last'] !== $names['sig'] && ! ( '' === $names['last'] && array() === $names['names'] ) ) {
+				// The names that went without the redirects (an agent that does not know them) are as current as they can be.
+				if ( $names['last'] !== $names['sig'] && self::PLAIN_SIG . $names['sig'] !== $names['last'] && ! ( '' === $names['last'] && array() === $names['names'] ) ) {
 					return true;
 				}
 			}
@@ -1110,9 +1120,12 @@ final class SiteActions {
 		$sig       = $want['sig'];
 		$last      = $want['last'];
 
-		if ( $last === $sig || ( '' === $last && array() === $names ) ) {
+		if ( $last === $sig || self::PLAIN_SIG . $sig === $last || ( '' === $last && array() === $names ) ) {
 			return true;
 		}
+
+		// What is sent is what is recorded: a replay of the job reads the first run's answer, and a name activated since is still to be sent.
+		$sig = $this->sent_signature( 'sig_names_' . $site['slug'], $sig );
 
 		$record = (array) Records::for_resource( $this->r->id() );
 		$args   = array(
@@ -1132,7 +1145,7 @@ final class SiteActions {
 			$plain = $this->call( 'site_names_plain_' . $site['slug'], 'site.domains', $args );
 
 			if ( ! is_wp_error( $plain ) ) {
-				Sites::update( $this->r->id(), (string) $site['slug'], array( 'flags' => array( 'names_sig' => '' ) ) );
+				Sites::update( $this->r->id(), (string) $site['slug'], array( 'flags' => array( 'names_sig' => self::PLAIN_SIG . $sig ) ) );
 
 				return 'unsupported';
 			}

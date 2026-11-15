@@ -275,6 +275,14 @@ final class StagingActions {
 			}
 
 			SiteStaging::begin( $this->r, $slug, 'create', $label );
+
+			$r = $this->r;
+			$this->defer_undo(
+				static function () use ( $r, $slug, $host ) {
+					SiteDomains::remove( $host );
+					SiteStaging::forget( $r, $slug );
+				}
+			);
 			$this->defer_with(
 				array(
 					'state'   => 'creating',
@@ -362,6 +370,9 @@ final class StagingActions {
 
 			if ( 'delete' === $kind ) {
 				SiteStaging::begin( $this->r, $slug, 'delete' );
+
+				$r = $this->r;
+				$this->defer_undo( static fn() => SiteStaging::resume_after_failed_delete( $r, $slug ) );
 			}
 
 			$words = array(

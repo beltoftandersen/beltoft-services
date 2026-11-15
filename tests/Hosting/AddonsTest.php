@@ -13,7 +13,9 @@ use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Hosting\Addons;
 use BeltoftServices\Hosting\HostingAccount;
+use BeltoftServices\Hosting\DomainSweep;
 use BeltoftServices\Hosting\HostingActions;
+use BeltoftServices\Progress;
 use BeltoftServices\Hosting\SiteDomains;
 use BeltoftServices\Mail\FakeMailcowClient;
 use BeltoftServices\Mail\Mailboxes;
@@ -1052,5 +1054,54 @@ class AddonsTest extends HostingCase {
 		$this->assertArrayNotHasKey( 'included', $gone );
 		$this->assertSame( array( 'one.example' ), Addons::ending_domains( $r ) );
 		$this->assertSame( array(), Addons::included_domains( $r ) );
+	}
+
+	public function test_a_domain_paid_while_a_change_runs_is_connected_by_the_sweep_when_the_account_is_free(): void {
+		$r = $this->account();
+		$this->connect_domain( $r, 'main.example' );
+		$a    = new HostingActions( Resource::find( $r->id() ) );
+		$slug = 'w' . $r->id();
+
+		$bought = $a->buy_addon( 'domain', 'other.example', 100, 'www.other.example', $slug );
+		Progress::mark( Resource::find( $r->id() ), 'purge_cache', 'Clearing the cache' ); // A long change runs at the time of payment.
+		wc_get_order( $bought['order'] )->payment_complete();
+
+		$this->assertTrue( Addons::has( $r, Addons::KIND_DOMAIN, 'other.example' ) );
+		$this->assertNull( SiteDomains::find( 'www.other.example' ), 'Not connected while the other change runs.' );
+		$this->assertSame( array( 'other.example' ), Addons::unconnected_domains( $r ) );
+
+		DomainSweep::run();
+		$this->assertNull( SiteDomains::find( 'www.other.example' ), 'Still busy: the wish stays.' );
+
+		Progress::clear( Resource::find( $r->id() ) );
+		DomainSweep::run();
+		$row = SiteDomains::find( 'www.other.example' );
+		$this->assertNotNull( $row, 'The sweep connects the paid domain.' );
+		$this->assertSame( $r->id(), $row['resource_id'] );
+		$this->assertSame( array(), (array) Resource::find( $r->id() )->get( \BeltoftServices\Hosting\AddonEffects::WANT_CONNECT ), 'The wish is gone.' );
+	}
+
+	public function test_an_ended_domain_is_dropped_by_the_sweep_when_a_change_ran_at_the_renewal(): void {
+		$this->card_pays();
+		$r = $this->account();
+		$this->connect_domain( $r, 'main.example' );
+		$a    = new HostingActions( Resource::find( $r->id() ) );
+		$slug = 'w' . $r->id();
+
+		$a->buy_addon( 'domain', 'gone.example', 100 );
+		$this->assertIsArray( $a->add_domain( $slug, 'gone.example' ) );
+		$this->assertTrue( Addons::end( $r, Addons::KIND_DOMAIN, 'gone.example' ) );
+
+		Progress::mark( Resource::find( $r->id() ), 'purge_cache', 'Clearing the cache' );
+		wcs_create_renewal_order( $this->sub( $r ) );
+
+		$this->assertFalse( Addons::has( $r, Addons::KIND_DOMAIN, 'gone.example' ), 'The line left the subscription.' );
+		$this->assertNotNull( SiteDomains::find( 'gone.example' ), 'Busy: the names are still on the account.' );
+		$this->assertSame( array( 'gone.example' ), Resource::find( $r->id() )->get( \BeltoftServices\Hosting\AddonEffects::WANT_DROP ) );
+
+		Progress::clear( Resource::find( $r->id() ) );
+		DomainSweep::run();
+		$this->assertNull( SiteDomains::find( 'gone.example' ), 'The sweep takes the names off.' );
+		$this->assertNotNull( SiteDomains::find( 'main.example' ), 'The included domain is not touched.' );
 	}
 }

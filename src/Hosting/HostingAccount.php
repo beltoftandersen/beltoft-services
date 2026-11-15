@@ -115,6 +115,7 @@ final class HostingAccount {
 					'waitUntil' => __( 'Wait until %s is done.', 'beltoft-services' ),
 					/* translators: %s: what was done, for example "Adding a website". */
 					'taskDone' => __( '%s is done.', 'beltoft-services' ),
+					'taskLong' => __( 'This takes longer than usual. It goes on in the background.', 'beltoft-services' ),
 				),
 			)
 		);
