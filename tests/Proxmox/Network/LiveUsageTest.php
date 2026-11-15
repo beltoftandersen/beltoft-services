@@ -129,7 +129,14 @@ class LiveUsageTest extends MonitoringTestCase {
 		$r = $this->ready_vm();
 		set_transient( Operations::STATUS_PREFIX . $r->id(), array( 'power' => 'running', 'cpu' => 0.25, 'mem' => 3221225472 ), HOUR_IN_SECONDS );
 		$view = View::license( $r->license() );
-		$this->assertArrayNotHasKey( 'mem', array_column( Servers::rows( array( $view ) )[0]['bars'], 'percent', 'key' ), 'No agent reading, no memory bar (never the Proxmox figure).' );
+		$bars = array_column( Servers::rows( array( $view ) )[0]['bars'], 'percent', 'key' );
+		$this->assertArrayHasKey( 'mem', $bars, 'The memory bar is always printed, so the live refresh can fill it.' );
+		$this->assertNull( $bars['mem'], 'No agent reading: no figure (never the Proxmox one); the bar is printed hidden.' );
+		$rows = Servers::rows( array( $view ) );
+		ob_start();
+		include BELTOFT_SERVICES_PATH . 'templates/account/servers-list.php';
+		$html = (string) ob_get_clean();
+		$this->assertMatchesRegularExpression( '/data-usage-bar="mem" hidden/', $html );
 		set_transient( LiveUsage::MEM_PREFIX . $r->id(), array( 'percent' => 40 ), 60 );
 		$bars = array_column( Servers::rows( array( $view ) )[0]['bars'], 'percent', 'key' );
 		$this->assertSame( 40, $bars['mem'] );

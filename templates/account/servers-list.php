@@ -25,7 +25,8 @@ defined( 'ABSPATH' ) || exit;
 			</span>
 			<span class="beltoft-services-srv__bars" data-usage-resource="<?php echo (int) $beltoft_services_row['id']; ?>">
 				<?php foreach ( $beltoft_services_row['bars'] as $beltoft_services_bar ) : ?>
-					<span class="beltoft-services-bar"<?php echo isset( $beltoft_services_bar['key'] ) ? ' data-usage-bar="' . esc_attr( $beltoft_services_bar['key'] ) . '"' : ''; ?>>
+					<?php $beltoft_services_known = null !== $beltoft_services_bar['percent']; ?>
+					<span class="beltoft-services-bar"<?php echo isset( $beltoft_services_bar['key'] ) ? ' data-usage-bar="' . esc_attr( $beltoft_services_bar['key'] ) . '"' : ''; ?><?php echo $beltoft_services_known ? '' : ' hidden'; ?>>
 						<span><?php echo esc_html( $beltoft_services_bar['label'] ); ?></span>
 						<span class="beltoft-services-bar__track"><i data-usage-fill style="width:<?php echo (int) $beltoft_services_bar['percent']; ?>%"></i></span>
 						<span data-usage-text><?php echo (int) $beltoft_services_bar['percent']; ?>%</span>

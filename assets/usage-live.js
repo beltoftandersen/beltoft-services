@@ -20,6 +20,7 @@
 				var text = bar.querySelector( '[data-usage-text]' );
 				if ( fill ) { fill.style.width = percent + '%'; }
 				if ( text ) { text.textContent = percent + '%'; }
+				bar.hidden = false;
 			} );
 		} );
 	}

@@ -506,23 +506,21 @@ final class Servers {
 			// Only the guest's own figure (MemAvailable); PVE counts page cache as used, so there is no fallback.
 			$guest = \BeltoftServices\Proxmox\Network\LiveUsage::cached_memory( $resource->id() );
 
-			if ( null !== $guest ) {
-				$bars[] = array(
-					'key'     => 'mem',
-					'label'   => __( 'Memory', 'beltoft-services' ),
-					'percent' => $guest,
-				);
-			}
+			// The memory and disk bars are always printed; without a cached guest reading they stay hidden until the live
+			// refresh (assets/usage-live.js) brings one, so a reading that arrives after the page load still shows.
+			$bars[] = array(
+				'key'     => 'mem',
+				'label'   => __( 'Memory', 'beltoft-services' ),
+				'percent' => $guest,
+			);
 
 			$disk = GuestDisk::cached( $resource );
 
-			if ( null !== $disk ) {
-				$bars[] = array(
-					'key'     => 'disk',
-					'label'   => __( 'Disk', 'beltoft-services' ),
-					'percent' => max( 0, min( 100, (int) round( $disk['used'] / $disk['total'] * 100 ) ) ),
-				);
-			}
+			$bars[] = array(
+				'key'     => 'disk',
+				'label'   => __( 'Disk', 'beltoft-services' ),
+				'percent' => null !== $disk ? max( 0, min( 100, (int) round( $disk['used'] / $disk['total'] * 100 ) ) ) : null,
+			);
 		}
 
 		$parts = array();
