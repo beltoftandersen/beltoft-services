@@ -9,6 +9,7 @@ namespace BeltoftServices\Licences;
 
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Alerts;
+use BeltoftServices\Background;
 use BeltoftServices\Crypto;
 use BeltoftServices\Domains\Client as RegistrarClient;
 use BeltoftServices\Domains\Clients as RegistrarClients;
@@ -63,6 +64,20 @@ final class KeyOrder {
 	public static function register(): void {
 		add_action( self::KEY_HOOK, array( __CLASS__, 'run_key' ) );
 		add_action( self::SYNC_HOOK, array( __CLASS__, 'run_sync' ) );
+		Background::declare(
+			self::KEY_HOOK,
+			array(
+				'due'   => array( __CLASS__, 'key_due' ),
+				'label' => 'Licence key fetch',
+			)
+		);
+		Background::declare(
+			self::SYNC_HOOK,
+			array(
+				'due'   => array( __CLASS__, 'sync_due' ),
+				'label' => 'Licence deletion at the vendor',
+			)
+		);
 	}
 
 	// -- Helpers ---------------------------------------------------------------------------------
@@ -471,6 +486,45 @@ final class KeyOrder {
 		$meta['lic_state']    = 'ready';
 
 		return $r->set( $meta );
+	}
+
+	/**
+	 * The watchdog's list (Background): a licence that waits for its key and has no job. The business limit of the asks
+	 * (3 x TRIES) is respected here, so a licence given up on is not asked again.
+	 *
+	 * @return array<int, array<int, int>>
+	 */
+	public static function key_due(): array {
+		$sets = array();
+
+		foreach ( Resource::find_by_meta( KeyDriver::KIND, 'lic_state', 'waiting' ) as $id ) {
+			$r = Resource::find( (int) $id );
+
+			if ( $r && KeyDriver::ID === $r->get( 'driver' ) && (int) $r->get( 'lic_key_id' ) > 0 && '' === (string) $r->get( 'lic_key' ) && ! self::ended( $r ) && (int) $r->get( 'lic_tries' ) < 3 * self::TRIES ) {
+				$sets[] = array( (int) $id );
+			}
+		}
+
+		return $sets;
+	}
+
+	/**
+	 * The watchdog's list (Background): an ended licence whose deletion at the vendor has not gone through.
+	 *
+	 * @return array<int, array<int, int>>
+	 */
+	public static function sync_due(): array {
+		$sets = array();
+
+		foreach ( Resource::ids_with_meta_value( 'lic_key_id' ) as $id ) {
+			$r = Resource::find( (int) $id );
+
+			if ( $r && KeyDriver::ID === $r->get( 'driver' ) && (int) $r->get( 'lic_key_id' ) > 0 && self::ended( $r ) && (int) $r->get( 'lic_tries' ) < 3 * self::TRIES ) {
+				$sets[] = array( (int) $id );
+			}
+		}
+
+		return $sets;
 	}
 
 	/**

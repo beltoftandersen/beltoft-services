@@ -184,9 +184,9 @@ final class MailDnsTest extends MailTestCase {
 			\ActionScheduler::store()->cancel_action( $id );
 		}
 		$this->assertSame( 0, $this->pending( $r->id() ) );
-		MailDns::sweep();
+		\BeltoftServices\Background::watchdog();
 		$this->assertSame( 1, $this->pending( $r->id() ) );
-		MailDns::sweep();
+		\BeltoftServices\Background::watchdog();
 		$this->assertSame( 1, $this->pending( $r->id() ), 'Never queued twice.' );
 	}
 

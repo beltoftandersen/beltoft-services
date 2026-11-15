@@ -3,6 +3,7 @@
 
 namespace BeltoftServices\Apps;
 
+use BeltoftServices\Background;
 use BeltoftServices\Domains\DnsQuery;
 use BeltoftServices\Domains\HostName;
 use BeltoftServices\Emails\Emails;
@@ -38,7 +39,13 @@ final class AppOwnDomain {
 
 	public static function register(): void {
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
-		add_action( Jobs::SWEEP, array( __CLASS__, 'sweep' ) );
+		Background::declare(
+			self::HOOK,
+			array(
+				'due'   => array( __CLASS__, 'due' ),
+				'label' => 'App own domain look',
+			)
+		);
 	}
 
 	// -- The name ------------------------------------------------------------------------------
@@ -146,14 +153,20 @@ final class AppOwnDomain {
 		Jobs::schedule_once( time() + $delay, self::HOOK, array( $id ) );
 	}
 
-	/** Recovers a read that was lost (a worker stopped, an action removed). */
-	public static function sweep(): void {
+	/**
+	 * The watchdog's list (Background): a read lost (a worker stopped, an action removed).
+	 *
+	 * @return array<int, array<int, int>>
+	 */
+	public static function due(): array {
+		$sets = array();
 		foreach ( Resource::find_by_meta( 'vm', 'app_domain_dns', 'waiting' ) as $id ) {
 			$r = Resource::find( (int) $id );
 			if ( $r && 'ready' === $r->get( 'state' ) && self::waiting( $r ) ) {
-				self::start( $r );
+				$sets[] = array( (int) $id );
 			}
 		}
+		return $sets;
 	}
 
 	/**
@@ -163,6 +176,12 @@ final class AppOwnDomain {
 	public static function run( int $id ): void {
 		$r = Resource::find( $id );
 		if ( ! $r || ! $r->is_live() || 'ready' !== $r->get( 'state' ) || ! self::waiting( $r ) ) {
+			return;
+		}
+
+		// The clock starts here too when the job was queued by the watchdog and not by start().
+		if ( 0 === (int) $r->get( 'app_domain_dns_since' ) ) {
+			self::start( $r );
 			return;
 		}
 

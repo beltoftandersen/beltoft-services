@@ -440,7 +440,7 @@ $this->assertSame( 'retry', $fresh->get( 'app_www_reason' ) );
 
 	public function test_the_sweep_finds_a_lost_look_and_the_ready_report_starts_one(): void {
 		$r = $this->ready_waiting();
-		AppWww::sweep();
+		\BeltoftServices\Background::watchdog();
 		$this->assertNotFalse( as_next_scheduled_action( AppWww::HOOK, array( $r->id() ), \BeltoftServices\Jobs::GROUP ) );
 
 		$other = $this->own_server( 'example.org', array( 'app_domain' => 'example.org', 'app_www' => 'waiting' ), 5001 );

@@ -258,6 +258,11 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 == Changelog ==
 
+= 0.31.0 =
+* Background jobs have one shared mechanism: a feature declares each follow-up hook once (`Background::declare()`) and gets the site runners claiming it, a re-queue along the retry backoff when the job crashes (one staff mail per error, the action `beltoft_services_job_failed` for clean-up) and a watchdog on every sweep that queues a job that is missing. Used by the email sending hold, an email domain joining its plan, the email DNS look and its daily look, DNS ownership claim checks and scans, app install, status, own domain, www and record release, the Plesk and licence key jobs.
+* DNS ownership claims: a claim check or scan is a background job of the shared mechanism (before: its own queueing); the page that polls a claim runs a waiting job through the shared helper.
+* App record release retries along the shared backoff (before: its own list of delays).
+
 = 0.30.0 =
 * "Use Beltoft DNS": the switch of the name servers is checked at once and then done by a job (zone check, name servers, DS keys, the stored state), with the usual retries. The page shows that it is working and then the outcome. A registrar that answers late, or fails after the name servers were set, leaves nothing half stored: the page already shows our name servers while only the DS is missing, and the retry finishes it.
 * Show transfer code: the emailed one-time code is used up only after the registrar has returned the code, and the re-lock clock restarts only then. A registrar that fails costs the customer no new code ("Your code is still valid, try again in a minute").

@@ -7,8 +7,9 @@
 
 namespace BeltoftServices\Domains;
 
-use BeltoftServices\Jobs;
 use BeltoftServices\Alerts;
+use BeltoftServices\Background;
+use BeltoftServices\Jobs;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -35,6 +36,23 @@ final class DnsClaimJobs {
 		add_action( self::CHECK, array( __CLASS__, 'check' ) );
 		add_action( self::SCAN, array( __CLASS__, 'scan' ) );
 		add_action( self::CLEANUP, array( __CLASS__, 'cleanup' ) );
+		// A claim is not a service (it exists before one is bought), so its check is not a driver action: it is a background
+		// job. The claim row holds its outcome. The scan has no stored "requested" mark, so it has no watchdog.
+		Background::declare(
+			self::CHECK,
+			array(
+				'due'      => array( __CLASS__, 'checks_due' ),
+				'resource' => false,
+				'label'    => 'DNS claim check',
+			)
+		);
+		Background::declare(
+			self::SCAN,
+			array(
+				'resource' => false,
+				'label'    => 'DNS claim scan',
+			)
+		);
 		Jobs::recurring( array( __CLASS__, 'schedule' ) );
 	}
 
@@ -61,29 +79,26 @@ final class DnsClaimJobs {
 	 * @param int    $claim_id Claim id.
 	 */
 	public static function enqueue( string $hook, int $claim_id ): void {
-		if ( ! function_exists( 'as_enqueue_async_action' ) || ! function_exists( 'as_has_scheduled_action' ) ) {
-			return;
-		}
+		Jobs::schedule_once( time(), $hook, array( $claim_id ) );
+	}
 
-		if ( ! as_has_scheduled_action( $hook, array( $claim_id ), Jobs::GROUP ) ) {
-			as_enqueue_async_action( $hook, array( $claim_id ), Jobs::GROUP );
-		}
+	/**
+	 * The watchdog's list: a claim that is being checked should have a check job.
+	 *
+	 * @return array<int, array<int, int>>
+	 */
+	public static function checks_due(): array {
+		return DnsClaimsFeature::enabled() ? array_map( static fn( int $id ): array => array( $id ), DnsClaims::checking_ids() ) : array();
 	}
 
 	/**
 	 * Runs this claim's check or scan that has waited a few seconds. The queue is normally started
 	 * by a cron tick (up to a minute away), so the account page, which polls the claim while it
-	 * waits, calls this instead of leaving the customer watching a loader. Safe next to the regular
-	 * runner: Action Scheduler only runs an action that is still pending, and the jobs re-read the
-	 * claim before they write.
+	 * waits, calls this instead of leaving the customer watching a loader (Background::run_waiting()).
 	 *
 	 * @param int $claim_id Claim id.
 	 */
 	public static function run_waiting( int $claim_id ): void {
-		if ( ! class_exists( '\ActionScheduler' ) || ! function_exists( 'as_get_scheduled_actions' ) ) {
-			return;
-		}
-
 		/**
 		 * Seconds a claim's check or scan must have been due before the polling page runs it.
 		 *
@@ -92,24 +107,7 @@ final class DnsClaimJobs {
 		$waited = max( 0, (int) apply_filters( 'beltoft_services_dns_claim_run_after', 2 ) );
 
 		foreach ( array( self::CHECK, self::SCAN ) as $hook ) {
-			$ids = as_get_scheduled_actions(
-				array(
-					'hook'     => $hook,
-					'args'     => array( $claim_id ),
-					'group'    => Jobs::GROUP,
-					'status'   => \ActionScheduler_Store::STATUS_PENDING,
-					'per_page' => 1,
-				),
-				'ids'
-			);
-
-			foreach ( $ids as $id ) {
-				$date = \ActionScheduler::store()->get_date( $id );
-
-				if ( $date && $date->getTimestamp() <= time() - $waited ) {
-					\ActionScheduler::runner()->process_action( (int) $id, 'Beltoft Services' );
-				}
-			}
+			Background::run_waiting( $hook, array( $claim_id ), $waited );
 		}
 	}
 
