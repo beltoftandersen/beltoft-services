@@ -210,7 +210,7 @@ final class Overview {
 				return $data['attention'] ? self::template( 'overview/attention.php', array( 'items' => $data['attention'] ) ) : '';
 			case 'servers':
 				if ( $data['servers'] ) {
-					\BeltoftServices\Proxmox\Network\LiveUsage::enqueue();
+					\BeltoftServices\Monitoring\LiveUsage::enqueue();
 				}
 
 				if ( ! $data['servers'] ) {

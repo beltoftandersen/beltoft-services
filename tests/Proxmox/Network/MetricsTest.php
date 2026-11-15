@@ -2,7 +2,7 @@
 /** Usage sample shaping tests. @package BeltoftServices */
 namespace BeltoftServices\Tests\Proxmox\Network;
 
-use BeltoftServices\Proxmox\Network\Metrics;
+use BeltoftServices\Monitoring\Metrics;
 use BeltoftServices\Tests\TestCase;
 
 class MetricsTest extends TestCase {

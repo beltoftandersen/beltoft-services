@@ -1,40 +1,26 @@
 <?php
 /**
- * Live CPU, memory and disk of a customer's servers, for the bars on the Servers list and the Overview.
+ * Live CPU, memory and disk of a customer's servers and hosting accounts, for the bars on the Servers list, the Overview and the hosting page.
  *
- * Power and CPU come from one /cluster/resources call per cluster, kept 15 seconds. Memory is the guest's own
- * MemAvailable (PVE counts page cache as used), read through the guest agent and kept 10 seconds per VM; without
- * an agent answer there is no figure (PVE's is never shown). Every fresh reading goes to GuestMemory (latest reading and
- * history). Disk is the guest agent's filesystem reading, refreshed here at most once in ten minutes per VM.
+ * Power and CPU come from the guest adapter's listing (kept 15 seconds). Memory is the guest's own reading without the file
+ * cache (never the hypervisor's figure), kept 10 seconds per guest; without an answer there is no figure. Every fresh
+ * reading goes to GuestMemory (latest reading and history). The disk is the adapter's reading.
  *
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Proxmox\Network;
+namespace BeltoftServices\Monitoring;
 
 use BeltoftLicenses\Account\Endpoint;
 use BeltoftServices\Api\Routes;
-use BeltoftServices\Proxmox\Pve\Client;
-use BeltoftServices\Proxmox\Pve\Clients;
-use BeltoftServices\Proxmox\Pve\Clusters;
-use BeltoftServices\Proxmox\Vm\GuestDisk;
-use BeltoftServices\Proxmox\Vm\PowerJobs;
-use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
-use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
 
 final class LiveUsage {
-	/** Transient of a cluster's VM rows. */
-	public const ROWS_PREFIX = 'beltoft_services_proxmox_vmrows_';
 	/** Transient of a VM's guest memory reading. */
 	public const MEM_PREFIX = 'beltoft_services_proxmox_memavail_';
-	/** Transient that holds a VM's next allowed disk refresh. */
-	public const DISK_PREFIX = 'beltoft_services_proxmox_diskpoll_';
-	public const ROWS_TTL    = 15;
-	public const MEM_TTL     = 10;
-	public const DISK_TTL    = 10 * MINUTE_IN_SECONDS;
+	public const MEM_TTL = 10;
 	/** Seconds between two refreshes in the browser, the slower refresh after ten minutes without a page interaction, and that idle time. */
 	public const INTERVAL      = 10;
 	public const SLOW_INTERVAL = 60;
@@ -96,7 +82,7 @@ final class LiveUsage {
 	}
 
 	/**
-	 * GET usage: { resources: { <id>: { power, cpu, mem, disk, memory } } } for the current user's ready servers. With ids only those.
+	 * GET usage: { resources: { <id>: { power, cpu, mem, disk, memory } } } for the current user's ready servers and hosting accounts. With ids only those.
 	 *
 	 * @param \WP_REST_Request $request Request.
 	 */
@@ -130,7 +116,8 @@ final class LiveUsage {
 			return array();
 		}
 
-		$by_cluster = array();
+		$by_guest = array();
+		$guests   = Guests::all();
 
 		foreach ( array_slice( Endpoint::licenses_for_user( $user_id ), 0, 100 ) as $license ) {
 			if ( (int) ( $license['user_id'] ?? 0 ) !== $user_id ) {
@@ -139,7 +126,7 @@ final class LiveUsage {
 
 			$resource = Resource::for_license( (int) $license['id'] );
 
-			if ( ! $resource || ProxmoxDriver::ID !== $resource->get( 'driver' ) || 'ready' !== $resource->get( 'state' ) || ! $resource->shows_status() || $resource->on_hold() ) {
+			if ( ! $resource || 'ready' !== $resource->get( 'state' ) || ! $resource->shows_status() || $resource->on_hold() ) {
 				continue;
 			}
 
@@ -147,39 +134,35 @@ final class LiveUsage {
 				continue;
 			}
 
-			$record = VmRecords::for_resource( $resource->id() );
-
-			if ( null !== $record ) {
-				$by_cluster[ (string) $record['cluster'] ][] = array( $resource, (int) $record['vmid'] );
+			foreach ( $guests as $index => $guest ) {
+				if ( $guest->owns( $resource ) ) {
+					$by_guest[ $index ][] = $resource;
+					break;
+				}
 			}
 		}
 
 		$out = array();
 
-		foreach ( $by_cluster as $cluster_id => $items ) {
-			$client = self::client( $cluster_id );
-			$rows   = null === $client ? null : self::cluster_rows( $cluster_id, $client );
+		foreach ( $by_guest as $index => $resources ) {
+			$guest = $guests[ $index ];
+			$rows  = $guest->live_rows( $resources );
 
-			if ( null === $rows ) {
-				continue;
-			}
+			foreach ( $resources as $resource ) {
+				$row = $rows[ $resource->id() ] ?? null;
 
-			foreach ( $items as $item ) {
-				list( $resource, $vmid ) = $item;
-
-				$vm = $rows[ $vmid ] ?? null;
-
-				if ( null === $vm ) {
+				if ( null === $row ) {
 					continue;
 				}
 
-				$power   = (string) $vm['status'];
-				$entry   = array( 'power' => $power, 'cpu' => null, 'mem' => null, 'disk' => null, 'memory' => array( 'state' => 'stopped' ) );
+				$entry = array( 'power' => $row['power'], 'cpu' => null, 'mem' => null, 'disk' => null, 'memory' => array( 'state' => 'stopped' ) );
 
-				if ( 'running' === $power ) {
-					$entry['cpu']    = self::percent( (float) ( $vm['cpu'] ?? 0 ) * 100 );
-					$entry['mem']    = self::memory( $resource, $client, $vm );
-					$entry['disk']   = self::disk( $resource );
+				if ( 'running' === $row['power'] ) {
+					$disk = $guest->disk( $resource, true );
+
+					$entry['cpu']    = self::percent( $row['cpu'] * 100 );
+					$entry['mem']    = self::memory( $guest, $resource, $row['ref'] );
+					$entry['disk']   = null === $disk || $disk['total'] <= 0 ? null : self::percent( $disk['used'] / $disk['total'] * 100 );
 					$entry['memory'] = GuestMemory::view( $resource->id() );
 				}
 
@@ -202,61 +185,15 @@ final class LiveUsage {
 	}
 
 	/**
-	 * Our VMs of a cluster, by vmid, from one /cluster/resources call kept 15 seconds. The status transients
-	 * of the resources are refreshed from it (a VM with a lock is left to its operation).
+	 * Memory percent of a running guest: the guest's own reading (used without the file cache over total), kept 10 seconds, so
+	 * several tabs share one reading; null when the guest cannot be read (the hypervisor's own figure counts the file cache, so it
+	 * is never shown). A fresh reading is kept by GuestMemory (latest value, and a history row once in five minutes).
 	 *
-	 * @param string $cluster_id Cluster id.
-	 * @param Client $client     Client.
-	 * @return array<int, array<string, mixed>>|null Null when the cluster cannot be read.
+	 * @param Guest    $guest    Adapter.
+	 * @param Resource $resource Resource.
+	 * @param mixed    $ref      The adapter's handle of the guest.
 	 */
-	private static function cluster_rows( string $cluster_id, Client $client ): ?array {
-		$kept = get_transient( self::ROWS_PREFIX . $cluster_id );
-
-		if ( is_array( $kept ) ) {
-			return $kept;
-		}
-
-		$list = $client->request( 'GET', '/cluster/resources', array( 'type' => 'vm' ) );
-
-		if ( ! is_array( $list ) ) {
-			// A failed read is not repeated for the window either.
-			set_transient( self::ROWS_PREFIX . $cluster_id, array(), self::ROWS_TTL );
-
-			return null;
-		}
-
-		$ours = VmRecords::for_cluster( $cluster_id );
-		$rows = array();
-
-		foreach ( $list as $vm ) {
-			$vmid = is_array( $vm ) ? (int) ( $vm['vmid'] ?? 0 ) : 0;
-
-			if ( ! isset( $ours[ $vmid ] ) || ! empty( $vm['template'] ) || '' === (string) ( $vm['status'] ?? '' ) ) {
-				continue;
-			}
-
-			$rows[ $vmid ] = $vm;
-
-			if ( '' === (string) ( $vm['lock'] ?? '' ) ) {
-				PowerJobs::remember_status( (int) $ours[ $vmid ], $vm );
-			}
-		}
-
-		set_transient( self::ROWS_PREFIX . $cluster_id, $rows, self::ROWS_TTL );
-
-		return $rows;
-	}
-
-	/**
-	 * Memory percent of a running VM: the guest's (MemTotal - MemAvailable) / MemTotal, kept 10 seconds, so several tabs
-	 * share one reading; null when the agent does not answer (PVE's own mem counts the guest's file cache, so it is never
-	 * shown). A fresh reading is kept by GuestMemory (latest value, and a history row once in five minutes).
-	 *
-	 * @param Resource             $resource Resource.
-	 * @param Client               $client   Client.
-	 * @param array<string, mixed> $vm       The VM's cluster row.
-	 */
-	private static function memory( Resource $resource, Client $client, array $vm ): ?int {
+	private static function memory( Guest $guest, Resource $resource, $ref ): ?int {
 		$key  = self::MEM_PREFIX . $resource->id();
 		$kept = get_transient( $key );
 
@@ -264,7 +201,7 @@ final class LiveUsage {
 			return isset( $kept['percent'] ) ? (int) $kept['percent'] : null;
 		}
 
-		$reading = GuestMemory::fetch( $resource, $client, (string) ( $vm['node'] ?? '' ), (int) $vm['vmid'] );
+		$reading = $guest->memory( $resource, $ref );
 		$percent = null;
 
 		if ( null === $reading ) {
@@ -291,46 +228,7 @@ final class LiveUsage {
 		return null === $reading ? null : GuestMemory::percent( $reading['used_mb'], $reading['total_mb'] );
 	}
 
-	/**
-	 * Disk percent from the stored guest reading. A reading older than ten minutes is read again here, at most
-	 * once in ten minutes per VM (the alert schedule of ProxmoxJobs is not changed).
-	 *
-	 * @param Resource $resource Resource.
-	 */
-	private static function disk( Resource $resource ): ?int {
-		$key = self::DISK_PREFIX . $resource->id();
-
-		if ( time() - (int) $resource->get( 'disk_read_at' ) >= self::DISK_TTL && false === get_transient( $key ) ) {
-			set_transient( $key, 1, self::DISK_TTL );
-			GuestDisk::read( $resource, true );
-			$resource = Resource::find( $resource->id() ) ?? $resource;
-		}
-
-		$disk = GuestDisk::cached( $resource );
-
-		return null === $disk ? null : self::percent( $disk['used'] / $disk['total'] * 100 );
-	}
-
 	private static function percent( float $value ): int {
 		return max( 0, min( 100, (int) round( $value ) ) );
-	}
-
-	/**
-	 * The client of a cluster, or null when it is missing or not allowed.
-	 *
-	 * @param string $cluster_id Cluster id.
-	 */
-	private static function client( string $cluster_id ): ?Client {
-		$cluster = Clusters::get( $cluster_id );
-
-		if ( null === $cluster || null !== Clients::gate( $cluster_id, $cluster, Clients::live_allowed() ) ) {
-			return null;
-		}
-
-		try {
-			return Clients::for( $cluster );
-		} catch ( \Throwable $e ) {
-			return null;
-		}
 	}
 }

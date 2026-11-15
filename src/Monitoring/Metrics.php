@@ -1,6 +1,6 @@
 <?php
 /** Shape Proxmox usage samples for customer charts. @package BeltoftServices */
-namespace BeltoftServices\Proxmox\Network;
+namespace BeltoftServices\Monitoring;
 
 defined( 'ABSPATH' ) || exit;
 

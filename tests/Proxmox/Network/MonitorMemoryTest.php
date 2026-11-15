@@ -4,7 +4,7 @@ namespace BeltoftServices\Tests\Proxmox\Network;
 
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Network\GuestMemory;
+use BeltoftServices\Monitoring\GuestMemory;
 use BeltoftServices\Proxmox\Network\Monitor;
 use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Resource;

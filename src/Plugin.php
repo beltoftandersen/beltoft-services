@@ -193,9 +193,10 @@ final class Plugin {
 		Apps\AppOwnDomain::register();
 		Apps\AppWww::register();
 		Apps\AppStatus::register();
-		Proxmox\Network\MetricsRoute::register();
+		Monitoring\MetricsRoute::register();
+		Proxmox\Network\VmGuest::register();
 		Proxmox\Network\Flows::register();
-		Proxmox\Network\LiveUsage::register();
+		Monitoring\LiveUsage::register();
 		Proxmox\Network\FirewallRoute::register();
 		Proxmox\Network\FirewallTab::register();
 		Proxmox\Network\NetworkTab::register();

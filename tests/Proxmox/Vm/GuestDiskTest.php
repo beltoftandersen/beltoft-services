@@ -3,7 +3,7 @@
 namespace BeltoftServices\Tests\Proxmox\Vm;
 
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\Network\MetricsRoute;
+use BeltoftServices\Monitoring\MetricsRoute;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\Vm\DiskJobs;

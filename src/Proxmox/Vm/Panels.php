@@ -136,7 +136,7 @@ final class Panels {
 			/* translators: 1: memory in use in GB, 2: total memory in GB, 3: percent in use. */
 			'memNow' => __( '%1$s of %2$s GB (%3$s%)', 'beltoft-services' ),
 			'total' => __( 'Total', 'beltoft-services' ),
-			'agentHint' => \BeltoftServices\Proxmox\Network\GuestMemory::agent_hint(),
+			'agentHint' => \BeltoftServices\Monitoring\GuestMemory::agent_hint(),
 			'alertsOn' => __( 'Usage emails are on for this server.', 'beltoft-services' ),
 			'alertsOff' => __( 'Usage emails are off for this server.', 'beltoft-services' ),
 			'alertsSaving' => __( 'Saving the usage email setting…', 'beltoft-services' ),
@@ -230,17 +230,7 @@ final class Panels {
 			$lines[] = sprintf( __( 'Disk %1$d percent full since %2$s', 'beltoft-services' ), (int) floor( 100 * (int) $r->get( 'disk_used' ) / $total ), wp_date( $date, (int) $r->get( 'monitor_disk_notified' ) ) );
 		}
 
-		if ( $r->get( 'monitor_cpu_notified' ) && $r->get( 'monitor_cpu_since' ) ) {
-			/* translators: %s: date and time. */
-			$lines[] = sprintf( __( 'CPU high since %s', 'beltoft-services' ), wp_date( $date . ' ' . get_option( 'time_format' ), (int) $r->get( 'monitor_cpu_since' ) ) );
-		}
-
-		if ( $r->get( 'monitor_mem_notified' ) && $r->get( 'monitor_mem_since' ) ) {
-			/* translators: %s: date and time. */
-			$lines[] = sprintf( __( 'Memory high since %s', 'beltoft-services' ), wp_date( $date . ' ' . get_option( 'time_format' ), (int) $r->get( 'monitor_mem_since' ) ) );
-		}
-
-		return $lines;
+		return array_merge( $lines, \BeltoftServices\Monitoring\UsageRules::states( $r ) );
 	}
 
 	/**

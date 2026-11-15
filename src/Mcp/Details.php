@@ -20,7 +20,7 @@ use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\Proxmox\Network\Firewall;
 use BeltoftServices\Proxmox\Network\FirewallRules;
 use BeltoftServices\Proxmox\Vm\GuestDisk;
-use BeltoftServices\Proxmox\Network\LiveUsage;
+use BeltoftServices\Monitoring\LiveUsage;
 use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Proxmox\Network\PrivateAttach;
 use BeltoftServices\Proxmox\Network\PrivateNets;

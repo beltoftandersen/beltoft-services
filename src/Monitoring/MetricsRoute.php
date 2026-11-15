@@ -1,13 +1,9 @@
 <?php
-/** Owner-only VPS usage route. @package BeltoftServices */
-namespace BeltoftServices\Proxmox\Network;
+/** Owner-only usage routes of a server or a hosting account: the charts and the switch of the usage emails. @package BeltoftServices */
+namespace BeltoftServices\Monitoring;
 
 use BeltoftLicenses\Events;
 use BeltoftServices\Api\Routes;
-use BeltoftServices\Proxmox\Vm\GuestDisk;
-use BeltoftServices\Proxmox\Vm\Operations;
-use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
-use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -46,16 +42,16 @@ final class MetricsRoute {
 		if ( ! $resource instanceof Resource ) {
 			return $resource;
 		}
-		if ( ProxmoxDriver::ID !== $resource->get( 'driver' ) || true === $resource->get( 'linked' ) ) {
+		if ( null === Guests::for( $resource ) || true === $resource->get( 'linked' ) ) {
 			return rest_convert_error_to_response( new \WP_Error( 'beltoft_services_forbidden', __( 'This service is not available.', 'beltoft-services' ), array( 'status' => 403 ) ) );
 		}
 		$on = (bool) $request['on'];
-		$changed = $on !== Monitor::usage_wanted( $resource );
+		$changed = $on !== UsageRules::wanted( $resource );
 		$stored = $resource->locked( static fn(): bool => $resource->set( array( 'usage_alerts' => $on ? null : 'off' ) ) );
 		if ( $changed && $stored ) {
 			Events::add( (int) ( $resource->license()['id'] ?? 0 ), 'service', $on ? 'Customer turned usage emails on' : 'Customer turned usage emails off' );
 		}
-		$response = new \WP_REST_Response( array( 'on' => Monitor::usage_wanted( Resource::find( $resource->id() ) ) ), $stored ? 200 : 500 );
+		$response = new \WP_REST_Response( array( 'on' => UsageRules::wanted( Resource::find( $resource->id() ) ) ), $stored ? 200 : 500 );
 		$response->header( 'Cache-Control', 'private, no-store' );
 		return $response;
 	}
@@ -65,7 +61,8 @@ final class MetricsRoute {
 		if ( ! $resource instanceof Resource ) {
 			return $resource;
 		}
-		if ( ProxmoxDriver::ID !== $resource->get( 'driver' ) || 'ready' !== $resource->get( 'state' ) || null === VmRecords::for_resource( $resource->id() ) ) {
+		$guest = Guests::for( $resource );
+		if ( null === $guest || 'ready' !== $resource->get( 'state' ) ) {
 			return rest_convert_error_to_response( new \WP_Error( 'beltoft_services_forbidden', __( 'This service is not available.', 'beltoft-services' ), array( 'status' => 403 ) ) );
 		}
 		$range = (string) $request['range'];
@@ -75,13 +72,13 @@ final class MetricsRoute {
 		$key = 'beltoft_services_proxmox_metrics_' . $resource->id() . '_' . $range;
 		$series = get_transient( $key );
 		if ( ! is_array( $series ) ) {
-			$rows = ( new Operations( $resource ) )->series( $range );
+			$rows = $guest->samples( $resource, $range );
 			$series = null === $rows ? array( 'range' => $range, 'step' => 0, 'points' => array() ) : Metrics::shape( $rows, $range );
 			// A failed read is kept for 20 seconds too, so polling does not reach the cluster on every request.
 			set_transient( $key, $series, null === $rows ? 20 : MINUTE_IN_SECONDS );
 		}
-		$series['disk'] = GuestDisk::cached( $resource );
-		// Memory is our own history of the guest's reading, never Proxmox's figure (which counts the file cache); not cached here.
+		$series['disk'] = $guest->disk( $resource );
+		// Memory is our own history of the guest's reading, never the hypervisor's figure (which counts the file cache); not cached here.
 		$memory = GuestMemory::series( $resource->id(), $range );
 		$memory['state'] = GuestMemory::view( $resource->id() )['state'];
 		$series['memory'] = $memory;

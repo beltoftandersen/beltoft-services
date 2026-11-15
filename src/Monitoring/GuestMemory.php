@@ -1,6 +1,6 @@
 <?php
 /**
- * The memory a server's guest says it uses: latest reading, history table, background job and retention.
+ * The memory a guest says it uses: latest reading, history table, background job and retention.
  *
  * Only the guest's own /proc/meminfo is used (MemTotal and MemAvailable, read through the guest agent); a Proxmox
  * memory figure is never stored or shown, because Proxmox counts the guest's file cache as used.
@@ -12,16 +12,8 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Proxmox\Network;
+namespace BeltoftServices\Monitoring;
 
-use BeltoftServices\Proxmox\Db\DbActions;
-use BeltoftServices\Proxmox\Pve\Client;
-use BeltoftServices\Proxmox\Pve\JobScope;
-use BeltoftServices\Proxmox\Pve\LiveClient;
-use BeltoftServices\Proxmox\Pve\Ownership;
-use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
-use BeltoftServices\Proxmox\Vm\Schema;
-use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -78,47 +70,6 @@ final class GuestMemory {
 	}
 
 	/**
-	 * Reads /proc/meminfo of a running VM through the guest agent: one fixed path, and only on a VM that carries this
-	 * resource's tag (the same proof as every other VM access). Never a customer-supplied path. Null when it cannot be read.
-	 *
-	 * @param Resource $resource Resource.
-	 * @param Client   $client   Client.
-	 * @param string   $node     Node.
-	 * @param int      $vmid     VMID.
-	 * @param bool     $node_down Set to true when the node itself did not answer (not the guest agent).
-	 * @return array{used_mb: int, total_mb: int}|null
-	 */
-	public static function fetch( Resource $resource, Client $client, string $node, int $vmid, ?bool &$node_down = null ): ?array {
-		$node_down = false;
-
-		if ( '' === $node || $vmid <= 0 ) {
-			return null;
-		}
-
-		$config = Ownership::config( $client, $node, $vmid );
-
-		if ( is_wp_error( $config ) ) {
-			$node_down = true;
-
-			return null;
-		}
-
-		if ( ! Ownership::has_tag( (string) ( $config['description'] ?? '' ), Ownership::tag( $resource ) ) ) {
-			return null;
-		}
-
-		$path   = '/nodes/' . rawurlencode( $node ) . '/qemu/' . $vmid . '/agent/file-read';
-		$params = array( 'file' => '/proc/meminfo' );
-		$reply  = $client instanceof LiveClient ? $client->request_with_timeout( 'GET', $path, $params, 5 ) : $client->request( 'GET', $path, $params );
-
-		if ( is_wp_error( $reply ) || ! is_array( $reply ) || ! is_string( $reply['content'] ?? null ) ) {
-			return null;
-		}
-
-		return self::parse( $reply['content'] );
-	}
-
-	/**
 	 * Keeps a reading: it becomes the latest one, and a row of the 5-minute slot is written when the slot has none.
 	 * Live reads and the background job both end here, so a slot never gets more than one row.
 	 *
@@ -142,7 +93,7 @@ final class GuestMemory {
 		$wpdb->query(
 			$wpdb->prepare(
 				'INSERT IGNORE INTO %i (resource_id, span, bucket, used_mb, total_mb, used_max_mb) VALUES (%d, %d, %d, %d, %d, %d)',
-				Schema::tables()['guest_memory'],
+				self::table(),
 				$resource_id,
 				self::SPAN_RAW,
 				intdiv( $now, self::SPAN_RAW ) * self::SPAN_RAW,
@@ -186,7 +137,7 @@ final class GuestMemory {
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- the plugin's own table.
-		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT bucket, used_mb, total_mb FROM %i WHERE resource_id = %d AND span = %d AND bucket >= %d ORDER BY bucket DESC LIMIT 1', Schema::tables()['guest_memory'], $resource_id, self::SPAN_RAW, $now - self::MAX_AGE ), ARRAY_A );
+		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT bucket, used_mb, total_mb FROM %i WHERE resource_id = %d AND span = %d AND bucket >= %d ORDER BY bucket DESC LIMIT 1', self::table(), $resource_id, self::SPAN_RAW, $now - self::MAX_AGE ), ARRAY_A );
 
 		if ( ! is_array( $row ) ) {
 			return null;
@@ -281,7 +232,7 @@ final class GuestMemory {
 		global $wpdb;
 
 		$now   = $now ?? time();
-		$table = Schema::tables()['guest_memory'];
+		$table = self::table();
 		$hour  = 'month' === $range;
 		$step  = $hour ? self::SPAN_HOUR : self::SPAN_RAW;
 		$count = array(
@@ -354,7 +305,7 @@ final class GuestMemory {
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- the plugin's own table.
-		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT bucket, used_mb, total_mb FROM %i WHERE resource_id = %d AND span = %d AND bucket >= %d ORDER BY bucket DESC LIMIT %d', Schema::tables()['guest_memory'], $resource_id, self::SPAN_RAW, $since, $limit ), ARRAY_A );
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT bucket, used_mb, total_mb FROM %i WHERE resource_id = %d AND span = %d AND bucket >= %d ORDER BY bucket DESC LIMIT %d', self::table(), $resource_id, self::SPAN_RAW, $since, $limit ), ARRAY_A );
 		$out  = array();
 
 		foreach ( is_array( $rows ) ? $rows : array() as $row ) {
@@ -378,7 +329,7 @@ final class GuestMemory {
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- the plugin's own table.
-		$wpdb->delete( Schema::tables()['guest_memory'], array( 'resource_id' => $resource_id ), array( '%d' ) );
+		$wpdb->delete( self::table(), array( 'resource_id' => $resource_id ), array( '%d' ) );
 		delete_transient( self::LATEST_PREFIX . $resource_id );
 		delete_transient( self::FAILED_PREFIX . $resource_id );
 	}
@@ -392,9 +343,10 @@ final class GuestMemory {
 	public static function cleanup( ?int $now = null ): void {
 		global $wpdb;
 
+		$orphan = array();
+
 		$now    = $now ?? time();
-		$table  = Schema::tables()['guest_memory'];
-		$vms    = Schema::tables()['vms'];
+		$table  = self::table();
 		$cutoff = intdiv( $now - self::RAW_DAYS * DAY_IN_SECONDS, self::SPAN_HOUR ) * self::SPAN_HOUR;
 
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery -- the plugin's own table.
@@ -413,44 +365,40 @@ final class GuestMemory {
 		);
 		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i WHERE span = %d AND bucket < %d', $table, self::SPAN_RAW, $cutoff ) );
 		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i WHERE span = %d AND bucket < %d', $table, self::SPAN_HOUR, $now - self::HOURLY_DAYS * DAY_IN_SECONDS ) );
-		$wpdb->query( $wpdb->prepare( 'DELETE m FROM %i m LEFT JOIN %i v ON v.resource_id = m.resource_id WHERE v.resource_id IS NULL', $table, $vms ) );
+
+		// A row stays while any guest's record table has the resource; with no adapter at all nothing is deleted.
+		$known = array_values( array_unique( array_map( static fn( Guest $guest ) => $guest->record_table(), Guests::all() ) ) );
+
+		foreach ( $known as $record_table ) {
+			$orphan[] = $wpdb->prepare( 'NOT EXISTS (SELECT 1 FROM %i v WHERE v.resource_id = m.resource_id)', $record_table );
+		}
+
+		if ( array() !== $known ) {
+			$wpdb->query( $wpdb->prepare( 'DELETE m FROM %i m WHERE ', $table ) . implode( ' AND ', $orphan ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- every part is prepared above.
+		}
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery
 	}
 
 	/**
-	 * The recurring job (every 5 minutes): reads the memory of every running server of ours whose VM carries its tag, in
-	 * a time budget, the servers read longest ago first. A node whose reads keep failing is skipped for the round, a server whose
-	 * agent fails is marked and asked again next round. A server whose current 5-minute slot already has a reading (a customer's live read) is skipped, never one by age alone.
+	 * The recurring job (every 5 minutes): reads the memory of every running guest of every adapter whose tag proof holds, in
+	 * a time budget, the guests read longest ago first. A node whose reads keep failing is skipped for the round, a guest
+	 * whose agent fails is marked and asked again next round. A guest whose current 5-minute slot already has a reading (a
+	 * customer's live read) is skipped, never one by age alone.
+	 *
+	 * @param int|null $now Timestamp.
 	 */
 	public static function run( ?int $now = null ): void {
 		$deadline = microtime( true ) + self::BUDGET_SECONDS;
 		$now      = $now ?? time();
 		$slot     = intdiv( $now, self::SPAN_RAW );
 
-		foreach ( JobScope::clusters() as $id => $one ) {
-			$rows = JobScope::vm_rows( $one['client'] );
-
-			if ( null === $rows ) {
-				continue;
-			}
-
-			$ours  = VmRecords::for_cluster( (string) $id );
+		foreach ( Guests::all() as $guest ) {
 			$queue = array();
 
-			foreach ( $rows as $vm ) {
-				$vmid = (int) ( $vm['vmid'] ?? 0 );
+			foreach ( $guest->running() as $item ) {
+				$resource = $item['resource'];
 
-				if ( ! isset( $ours[ $vmid ] ) || ! empty( $vm['template'] ) || 'running' !== (string) ( $vm['status'] ?? '' ) || '' !== (string) ( $vm['lock'] ?? '' ) ) {
-					continue;
-				}
-
-				$resource = Resource::find( (int) $ours[ $vmid ] );
-
-				if ( ! $resource || 'ready' !== $resource->get( 'state' ) || 'ready' !== $resource->get( 'desired' ) || $resource->get( 'task' ) || $resource->on_hold() ) {
-					continue;
-				}
-
-				if ( ProxmoxDriver::ID !== $resource->get( 'driver' ) && ! DbActions::is_db( $resource ) ) {
+				if ( 'ready' !== $resource->get( 'state' ) || 'ready' !== $resource->get( 'desired' ) || $resource->get( 'task' ) || $resource->on_hold() ) {
 					continue;
 				}
 
@@ -461,46 +409,54 @@ final class GuestMemory {
 					continue;
 				}
 
-				// Oldest reading first; a server whose agent did not answer lately goes after the others, so servers without
+				// Oldest reading first; a guest whose agent did not answer lately goes after the others, so guests without
 				// the agent never crowd out the ones that have it.
 				$failed  = get_transient( self::FAILED_PREFIX . $resource->id() );
-				$queue[] = array( $resource, $vm, max( null === $latest ? 0 : $latest['at'], is_numeric( $failed ) ? (int) $failed : 0 ) );
+				$queue[] = array( $item, max( null === $latest ? 0 : $latest['at'], is_numeric( $failed ) ? (int) $failed : 0 ) );
 			}
 
-			usort( $queue, static fn( $a, $b ) => $a[2] <=> $b[2] );
+			usort( $queue, static fn( $a, $b ) => $a[1] <=> $b[1] );
 
 			$failures = array();
 
-			foreach ( $queue as $item ) {
+			foreach ( $queue as $entry ) {
 				if ( microtime( true ) >= $deadline ) {
 					return;
 				}
 
-				list( $resource, $vm ) = $item;
+				$item     = $entry[0];
+				$resource = $item['resource'];
 
-				$node = (string) ( $vm['node'] ?? '' );
-
-				if ( ( $failures[ $node ] ?? 0 ) >= self::NODE_FAILURES ) {
+				if ( ( $failures[ $item['group'] ] ?? 0 ) >= self::NODE_FAILURES ) {
 					continue;
 				}
 
 				$down    = false;
-				$reading = self::fetch( $resource, $one['client'], $node, (int) $vm['vmid'], $down );
+				$reading = $guest->memory( $resource, $item['ref'], $down );
 
 				if ( null === $reading ) {
-					// Only a node that does not answer counts towards skipping it; a missing guest agent is the server's own.
+					// Only a node that does not answer counts towards skipping it; a missing guest agent is the guest's own.
 					if ( $down ) {
-						$failures[ $node ] = ( $failures[ $node ] ?? 0 ) + 1;
+						$failures[ $item['group'] ] = ( $failures[ $item['group'] ] ?? 0 ) + 1;
 					}
 
 					self::failed( $resource->id(), $now );
 					continue;
 				}
 
-				$failures[ $node ] = 0;
+				$failures[ $item['group'] ] = 0;
 				self::store( $resource->id(), $reading, $now );
-				Monitor::memory( $resource, isset( $vm['uptime'] ) ? (int) $vm['uptime'] : null, $now );
+				UsageRules::memory( $resource, $item['uptime'], $now );
 			}
 		}
+	}
+
+	/**
+	 * The history table.
+	 */
+	private static function table(): string {
+		global $wpdb;
+
+		return $wpdb->prefix . 'bs_guest_memory';
 	}
 }

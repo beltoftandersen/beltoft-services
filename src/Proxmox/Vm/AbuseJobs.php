@@ -221,50 +221,7 @@ final class AbuseJobs {
 	 * @return array{first: int, last: int, longest: int, trailing: ?int}|null Seconds. `trailing` is where the run that reaches the newest sample began. Null: no usable sample.
 	 */
 	public static function analyse( array $samples, float $threshold ): ?array {
-		$usable = array();
-
-		foreach ( array_values( $samples ) as $sample ) {
-			$ok = is_array( $sample ) && isset( $sample['cpu'], $sample['time'] ) && is_numeric( $sample['cpu'] ) && is_numeric( $sample['time'] );
-
-			$usable[] = $ok ? array( (int) $sample['time'], (float) $sample['cpu'] * 100 ) : null;
-		}
-
-		while ( array() !== $usable && null === end( $usable ) ) {
-			array_pop( $usable );
-		}
-
-		if ( array() === array_filter( $usable ) ) {
-			return null;
-		}
-
-		$run     = null;
-		$longest = 0;
-		$first   = null;
-		$last    = 0;
-
-		foreach ( $usable as $point ) {
-			if ( null === $point ) {
-				$run = null;
-				continue;
-			}
-
-			$first ??= $point[0];
-			$last    = $point[0];
-
-			if ( $point[1] >= $threshold ) {
-				$run     ??= $point[0];
-				$longest   = max( $longest, $point[0] - $run );
-			} else {
-				$run = null;
-			}
-		}
-
-		return array(
-			'first'    => (int) $first,
-			'last'     => $last,
-			'longest'  => $longest,
-			'trailing' => $run,
-		);
+		return \BeltoftServices\Monitoring\Samples::analyse( $samples, $threshold );
 	}
 
 	/**

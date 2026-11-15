@@ -3,8 +3,8 @@
 namespace BeltoftServices\Tests\Proxmox\Network;
 
 use BeltoftServices\Account\Servers;
-use BeltoftServices\Proxmox\Network\GuestMemory;
-use BeltoftServices\Proxmox\Network\LiveUsage;
+use BeltoftServices\Monitoring\GuestMemory;
+use BeltoftServices\Monitoring\LiveUsage;
 use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftLicenses\Account\View;
 
@@ -86,7 +86,7 @@ class LiveUsageTest extends MonitoringTestCase {
 		$this->assertSame( $base + 1, $this->calls( '/cluster/resources' ) );
 		$this->assertSame( $reads + 2, $this->calls( '/agent/file-read' ), 'Guest memory is read once a minute per VM (two VMs, two reads).' );
 		$this->assertCount( 0, array_filter( $this->fake->calls(), static fn( $c ) => 1 === preg_match( '#/qemu/\d+/status/current$#', $c['path'] ) ), 'No per-VM status call.' );
-		delete_transient( LiveUsage::ROWS_PREFIX . 'lab' );
+		delete_transient( \BeltoftServices\Proxmox\Network\VmGuest::ROWS_PREFIX . 'lab' );
 		delete_transient( LiveUsage::MEM_PREFIX . $first->id() );
 		wp_set_current_user( (int) $first->license()['user_id'] );
 		$this->route();
@@ -104,7 +104,7 @@ class LiveUsageTest extends MonitoringTestCase {
 		$r->set( array( 'disk_read_at' => time() - 11 * MINUTE_IN_SECONDS ) );
 		$this->route();
 		$this->assertSame( 1, $this->calls( '/agent/get-fsinfo' ), 'Not again within ten minutes of the last attempt.' );
-		delete_transient( LiveUsage::DISK_PREFIX . $r->id() );
+		delete_transient( \BeltoftServices\Proxmox\Network\VmGuest::DISK_PREFIX . $r->id() );
 		$this->route();
 		$this->assertSame( 2, $this->calls( '/agent/get-fsinfo' ), 'Old reading and ten minutes passed: read once.' );
 	}
@@ -155,7 +155,7 @@ class LiveUsageTest extends MonitoringTestCase {
 		$this->assertSame( 0, $this->calls( '/agent/file-read' ) );
 		$this->assertNull( LiveUsage::cached_memory( $r->id() ) );
 		$config_calls = $this->calls( '/qemu/5000/config' );
-		delete_transient( LiveUsage::ROWS_PREFIX . 'lab' );
+		delete_transient( \BeltoftServices\Proxmox\Network\VmGuest::ROWS_PREFIX . 'lab' );
 		$this->route();
 		$this->assertSame( $config_calls, $this->calls( '/qemu/5000/config' ), 'The outcome is kept a minute: the config is not read again.' );
 		$this->assertSame( 0, $this->calls( '/agent/file-read' ) );

@@ -318,7 +318,7 @@ final class VmRecords {
 		$removed = (int) $wpdb->delete( Schema::tables()['vms'], array( 'resource_id' => $resource_id ), array( '%d' ) ) > 0;
 
 		// The server's memory history goes with it (the daily job also removes rows of servers without a record).
-		\BeltoftServices\Proxmox\Network\GuestMemory::purge( $resource_id );
+		\BeltoftServices\Monitoring\GuestMemory::purge( $resource_id );
 
 		return $removed;
 	}

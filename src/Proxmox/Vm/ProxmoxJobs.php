@@ -12,7 +12,7 @@ use BeltoftServices\Proxmox\Backup\BackupJobs;
 use BeltoftServices\Proxmox\Pve\CapacityCheck;
 use BeltoftServices\Proxmox\Pve\CapacityJobs;
 use BeltoftServices\Proxmox\Snapshot\SnapshotJobs;
-use BeltoftServices\Proxmox\Network\GuestMemory;
+use BeltoftServices\Monitoring\GuestMemory;
 use BeltoftServices\Proxmox\Network\PrivateNets;
 
 defined( 'ABSPATH' ) || exit;

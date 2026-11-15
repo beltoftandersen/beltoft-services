@@ -21,7 +21,7 @@ use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Network\IpfilterReport;
 use BeltoftServices\Proxmox\Network\IpWho;
 use BeltoftServices\Proxmox\Vm\LinkVm;
-use BeltoftServices\Proxmox\Network\Metrics;
+use BeltoftServices\Monitoring\Metrics;
 use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Proxmox\Vm\GuestDisk;
 use BeltoftServices\Proxmox\Disk\DiskDriver;

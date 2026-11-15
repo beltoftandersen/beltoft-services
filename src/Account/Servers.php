@@ -355,7 +355,7 @@ final class Servers {
 
 		if ( $rows ) {
 			ServiceArea::actions( $buttons, false );
-			\BeltoftServices\Proxmox\Network\LiveUsage::enqueue();
+			\BeltoftServices\Monitoring\LiveUsage::enqueue();
 			include self::file( 'servers-list.php' );
 		}
 
@@ -505,7 +505,7 @@ final class Servers {
 
 			// Only the guest's own figure (MemAvailable); PVE counts page cache as used, so there is no fallback. The bar is always
 			// there for a running server: the newest reading, "…" while the first one is on its way, "–" and a hint without the agent.
-			$memory = \BeltoftServices\Proxmox\Network\GuestMemory::view( $resource->id() );
+			$memory = \BeltoftServices\Monitoring\GuestMemory::view( $resource->id() );
 
 			$bars[] = array(
 				'key'     => 'mem',
@@ -515,7 +515,7 @@ final class Servers {
 				'state'   => $memory['state'],
 				'text'    => 'ok' === $memory['state'] ? '' : ( 'no_agent' === $memory['state'] ? "\u{2013}" : "\u{2026}" ),
 				// The list shows the percent only (owner 2026-11-15); GB figures are in the server's monitoring. The hint stays.
-				'sub'     => 'no_agent' === $memory['state'] ? \BeltoftServices\Proxmox\Network\GuestMemory::agent_hint() : '',
+				'sub'     => 'no_agent' === $memory['state'] ? \BeltoftServices\Monitoring\GuestMemory::agent_hint() : '',
 			);
 
 			$disk = GuestDisk::cached( $resource );

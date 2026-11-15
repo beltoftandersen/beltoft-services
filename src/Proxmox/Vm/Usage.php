@@ -12,7 +12,7 @@ defined( 'ABSPATH' ) || exit;
 
 final class Usage {
 	/** Transient prefix of the customer CPU alert. */
-	public const CPU_PREFIX = 'beltoft_services_proxmox_usage_cpu_';
+	public const CPU_PREFIX = \BeltoftServices\Monitoring\Samples::CPU_PREFIX;
 
 	/**
 	 * Since when the VM has been above a threshold, over several hourly readings. It is reset by
@@ -25,23 +25,6 @@ final class Usage {
 	 * @return int|null Timestamp, or null when the newest sample is below the threshold.
 	 */
 	public static function since( string $prefix, int $resource_id, array $reading, int $keep_hours ): ?int {
-		$key = $prefix . $resource_id;
-
-		if ( null === $reading['trailing'] ) {
-			delete_transient( $key );
-			return null;
-		}
-
-		$since = $reading['trailing'];
-		$prev  = get_transient( $key );
-
-		// The run reaches back to the first sample, and the earlier reading ended where this one begins.
-		if ( is_array( $prev ) && isset( $prev['since'], $prev['last'] ) && $reading['trailing'] === $reading['first'] && (int) $prev['last'] >= $reading['first'] - ProxmoxJobs::CONTINUITY_SLACK ) {
-			$since = min( $since, (int) $prev['since'] );
-		}
-
-		set_transient( $key, array( 'since' => $since, 'last' => $reading['last'] ), $keep_hours * HOUR_IN_SECONDS );
-
-		return $since;
+		return \BeltoftServices\Monitoring\Samples::since( $prefix, $resource_id, $reading, $keep_hours );
 	}
 }

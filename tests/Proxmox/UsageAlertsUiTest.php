@@ -12,7 +12,7 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Emails\Emails;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Network\MetricsRoute;
+use BeltoftServices\Monitoring\MetricsRoute;
 use BeltoftServices\Proxmox\Network\Monitor;
 use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Proxmox\Vm\Upgrades;

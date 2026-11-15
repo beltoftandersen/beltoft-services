@@ -2,7 +2,7 @@
 /** Owner-only metrics route tests. @package BeltoftServices */
 namespace BeltoftServices\Tests\Proxmox\Network;
 
-use BeltoftServices\Proxmox\Network\MetricsRoute;
+use BeltoftServices\Monitoring\MetricsRoute;
 use BeltoftServices\Resource;
 
 require_once __DIR__ . '/MonitoringTestCase.php';

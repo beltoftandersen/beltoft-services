@@ -62,7 +62,7 @@ final class Schema {
 	 * Columns that the code writes and that a version may be stored only once they exist, per table.
 	 * Version 6: the currency of a ledger row. An empty value reads as the shop's currency (Currency::of_row()).
 	 * Version 7: the name of a customer private network (empty reads as "Network N").
-	 * Version 8: the guest memory table (bs_guest_memory, Network\GuestMemory).
+	 * Version 8: the guest memory table (bs_guest_memory, Monitoring\GuestMemory).
 	 */
 	private const REQUIRED_COLUMNS = array(
 		'usage'        => array( 'currency' ),
@@ -369,7 +369,7 @@ final class Schema {
 		);
 
 		// Version 8: the guest's memory in use, one row per server and time slot (span 300 = five minutes, 3600 = an hour).
-		// Operational numbers only (used and total MB); retention is in Network\GuestMemory.
+		// Operational numbers only (used and total MB); retention is in Monitoring\GuestMemory.
 		dbDelta(
 			"CREATE TABLE {$t['guest_memory']} (
 				resource_id bigint(20) unsigned NOT NULL,
