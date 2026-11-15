@@ -73,6 +73,20 @@ async function main() {
 		ok( ! await shown(), name + ': done goes away after the wait' );
 		ok( JSON.stringify( await geometry() ) === JSON.stringify( before ), name + ': the page is as before' );
 
+		if ( 'desktop' === name ) {
+			await page.evaluate( () => { document.querySelector( '.woocommerce-MyAccount-content > div:nth-of-type(2)' ).style.height = '3500px'; window.scrollTo( 0, 2000 ); } );
+			const still = await geometry();
+			await page.evaluate( () => { window.h = beltoftStatus.busy( 'Restoring…', 'r1', null ); } );
+			const top = await page.evaluate( () => document.querySelector( '.bs-loader' ).getBoundingClientRect().top );
+			ok( top >= 0 && top < 50, name + ': scrolled down, the line sticks at the top (' + top + ')' );
+			ok( JSON.stringify( await geometry() ) === JSON.stringify( still ), name + ': nothing moved when it stuck' );
+			await page.evaluate( () => beltoftStatus.done( window.h, 'Restored.' ) );
+			await page.clock.fastForward( 5000 );
+			await page.clock.fastForward( 500 );
+			ok( ! await shown() && JSON.stringify( await geometry() ) === JSON.stringify( still ), name + ': hidden, nothing moved' );
+			await page.evaluate( () => window.scrollTo( 0, 0 ) );
+		}
+
 		await page.evaluate( () => { const h = beltoftStatus.busy( 'Working…', 'r1', null ); beltoftStatus.fail( h, 'No answer.', '#name' ); } );
 		await page.clock.fastForward( 60000 );
 		ok( await shown() && 'Failed: No answer.' === await text(), name + ': fail stays' );

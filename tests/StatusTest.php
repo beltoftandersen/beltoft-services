@@ -69,6 +69,7 @@ class StatusTest extends TestCase {
 		$this->assertStringContainsString( '@media (max-width: 767px)', $own );
 		$this->assertMatchesRegularExpression( '/\.bs-loader \{ position: fixed;[^}]*env\(safe-area-inset-bottom/', $own );
 		$this->assertMatchesRegularExpression( '/@media \(prefers-reduced-motion: reduce\) \{[^}]*\.bs-loader[^}]*animation: none/', $own );
+		$this->assertMatchesRegularExpression( '/\.bs-loader\.is-stuck \{ position: fixed;[^}]*top: var\(--bs-header-offset/', $own );
 		$this->assertStringNotContainsString( '!important', $own );
 		$this->assertStringNotContainsString( '—', $own );
 		$this->assertStringNotContainsString( '·', $own );

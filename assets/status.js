@@ -231,6 +231,43 @@
 		parts.fill.style.width = null === fraction ? '' : Math.round( fraction * 1000 ) / 10 + '%';
 	}
 
+	// Wide screen: while the line shows and its place at the top has scrolled out of view, it sticks under the fixed site header.
+	// The state line keeps the height the line had, so nothing in the page moves.
+	function unstick() {
+		var parts = loaderParts();
+
+		parts.el.classList.remove( 'is-stuck' );
+		parts.el.style.left = '';
+		parts.el.style.width = '';
+
+		if ( parts.host ) {
+			parts.host.style.minHeight = '';
+		}
+	}
+
+	function stick() {
+		var parts = loaderParts();
+		var host = parts.host;
+		var box;
+
+		if ( ! host || parts.el.hidden || phone() ) {
+			unstick();
+
+			return;
+		}
+
+		box = host.getBoundingClientRect();
+
+		if ( box.top < headerTop && ! parts.el.classList.contains( 'is-stuck' ) ) {
+			host.style.minHeight = parts.el.offsetHeight + 'px';
+			parts.el.style.left = box.left + 'px';
+			parts.el.style.width = box.width + 'px';
+			parts.el.classList.add( 'is-stuck' );
+		} else if ( box.top >= headerTop && parts.el.classList.contains( 'is-stuck' ) ) {
+			unstick();
+		}
+	}
+
 	function release_host( host ) {
 		if ( host ) {
 			host.classList.remove( 'has-loader' );
@@ -255,6 +292,7 @@
 		parts.base = '';
 		parts.stem = '';
 		setFraction( null );
+		unstick();
 		release_host( parts.host );
 		current = null;
 	}
@@ -315,6 +353,7 @@
 		parts.base = full;
 		parts.stem = '';
 		current = handle || null;
+		stick();
 
 		if ( 'done' === kind || 'info' === kind ) {
 			timers.done = window.setTimeout( function () {
@@ -837,13 +876,20 @@
 		}
 
 		offset();
+		window.addEventListener( 'scroll', function () {
+			if ( loader && ! loader.el.hidden ) {
+				stick();
+			}
+		}, { passive: true } );
 		window.addEventListener( 'resize', function () {
 			candidates = null;
 			offset();
 
 			// The line moves between the state line and the bottom of the screen when the window crosses the phone breakpoint.
 			if ( loader && ! loader.el.hidden && loader.host ) {
+				unstick();
 				place( loader.host );
+				stick();
 			}
 		} );
 	}
