@@ -197,7 +197,7 @@ final class OpenApi {
 				'errors'  => array( 401, 403, 409, 429 ),
 			),
 			'POST /resources/{id}/mail/mailboxes'        => array(
-				'summary' => 'Make a mailbox in an email domain. The work runs in the background (answer 202): read GET /resources/{id} until `working` is false and look at `last_result` (action mailbox_create, ok, text); GET /resources/{id}/mail lists the mailbox with reveal true when it is ready. It gets a generated secret that is never in the reply: the customer shows it once in the dashboard.',
+				'summary' => 'Make a mailbox in an email domain. The work runs in the background (answer 202): read GET /resources/{id} until `working` is false and look at `last_result` (action mailbox_create, ok, text); GET /resources/{id}/mail lists the mailbox when it is ready. It gets a generated secret that is never in the reply: the customer shows it once in the dashboard.',
 				'scope'   => 'actions',
 				'body'    => array( 'local' => array( 'type' => 'string', 'description' => 'The part before the @.' ), 'name' => array( 'type' => 'string', 'description' => 'The name shown for the mailbox. Optional.' ), 'quota_mb' => array( 'type' => 'integer', 'description' => 'The size in MB, up to the size of the plan. Optional.' ) ),
 				'required' => array( 'local' ),
