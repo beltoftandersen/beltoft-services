@@ -5,7 +5,6 @@
 	var config = window.beltoftServicesUsage;
 	if ( ! config || ! window.fetch || ! window.beltoftApi ) { return; }
 	var strings = config.strings || {};
-	var LANG = ( document.documentElement.lang || '' ).trim() || undefined;
 	var busy = false;
 	var timer = null;
 	var lastActive = Date.now();
@@ -18,19 +17,6 @@
 		return list;
 	}
 
-	function fill( text, parts ) {
-		var n = 0;
-		return String( text || '' ).replace( /%(\d\$)?[ds]/g, function () { var part = parts[ n ]; n += 1; return undefined === part ? '' : part; } );
-	}
-
-	function gb( mb ) {
-		return ( mb / 1024 ).toLocaleString( LANG, { minimumFractionDigits: 1, maximumFractionDigits: 1 } );
-	}
-
-	function ago( seconds ) {
-		return seconds < 60 ? fill( strings.secondsAgo, [ seconds ] ) : fill( strings.minutesAgo, [ Math.floor( seconds / 60 ) ] );
-	}
-
 	function memory( bar, info ) {
 		var fillNode = bar.querySelector( '[data-usage-fill]' );
 		var text = bar.querySelector( '[data-usage-text]' );
@@ -41,7 +27,7 @@
 		if ( 'ok' === state && 'number' === typeof info.percent ) {
 			if ( fillNode ) { fillNode.style.width = Math.max( 0, Math.min( 100, Math.round( info.percent ) ) ) + '%'; }
 			if ( text ) { text.textContent = Math.round( info.percent ) + '%'; }
-			if ( sub ) { sub.textContent = fill( strings.line, [ gb( info.used_mb ), gb( info.total_mb ), ago( info.age || 0 ) ] ); }
+			if ( sub ) { sub.textContent = ''; }
 			return;
 		}
 		if ( fillNode ) { fillNode.style.width = '0%'; }

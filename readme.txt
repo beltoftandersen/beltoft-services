@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.28.0
+Stable tag: 0.28.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,10 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.28.1 =
+* Server list: the memory bar shows the percent only (the GB figures are in the server's monitoring); all bars share one set of columns, so they start at the same place and have the same length, also on a phone and in the Overview.
+* One hover for rows and tiles that open something: a thin line round the row, following the card's corners.
 
 = 0.28.0 =
 * Guest memory: the server list and Overview always show a memory bar for a running server (the newest reading at once, "..." while the first one is on its way, "-" and a hint when the guest agent does not answer). Under the bar: used and total GB and how old the reading is. The figure is the memory in use without the file cache, as the guest reports it; no Proxmox figure is shown.

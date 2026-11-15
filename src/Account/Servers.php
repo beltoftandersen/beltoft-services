@@ -514,7 +514,8 @@ final class Servers {
 				'percent' => (int) $memory['percent'],
 				'state'   => $memory['state'],
 				'text'    => 'ok' === $memory['state'] ? '' : ( 'no_agent' === $memory['state'] ? "\u{2013}" : "\u{2026}" ),
-				'sub'     => 'ok' === $memory['state'] ? \BeltoftServices\Proxmox\Network\GuestMemory::line( $memory ) : ( 'no_agent' === $memory['state'] ? \BeltoftServices\Proxmox\Network\GuestMemory::agent_hint() : '' ),
+				// The list shows the percent only (owner 2026-11-15); GB figures are in the server's monitoring. The hint stays.
+				'sub'     => 'no_agent' === $memory['state'] ? \BeltoftServices\Proxmox\Network\GuestMemory::agent_hint() : '',
 			);
 
 			$disk = GuestDisk::cached( $resource );

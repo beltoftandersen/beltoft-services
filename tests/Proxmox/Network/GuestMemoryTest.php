@@ -188,7 +188,7 @@ class GuestMemoryTest extends MonitoringTestCase {
 		$ok = $bar( $r );
 		$this->assertSame( 'ok', $ok['state'] );
 		$this->assertSame( 21, $ok['percent'] );
-		$this->assertStringContainsString( '0.4 of 1.9 GB, updated', $ok['sub'] );
+		$this->assertSame( '', $ok['sub'], 'The list shows the percent only, no GB line.' );
 		$this->assertSame( 'Memory in use (excluding cache)', $ok['title'] );
 
 		set_transient( Operations::STATUS_PREFIX . $r->id(), array( 'power' => 'stopped', 'cpu' => 0.0, 'mem' => 0 ), HOUR_IN_SECONDS );
