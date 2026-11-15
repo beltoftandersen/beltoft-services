@@ -22,6 +22,14 @@ class DeleteGuardTest extends UsageTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		// Saved cards are not rolled back with the test transaction, and user ids are reused: a card left by an earlier
+		// run or test would count as "another card" of a new customer. Start with none.
+		global $wpdb;
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery
+		$wpdb->query( "DELETE FROM {$wpdb->prefix}woocommerce_payment_tokenmeta" );
+		$wpdb->query( "DELETE FROM {$wpdb->prefix}woocommerce_payment_tokens" );
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery
+		wp_cache_flush();
 		update_option( 'woocommerce_currency', 'EUR' );
 		$gateway           = new UsageCardGateway( 'stripe_cc' );
 		$gateway->supports = array_merge( $gateway->supports, array( 'add_payment_method', 'tokenization' ) );
