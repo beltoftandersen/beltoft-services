@@ -17,7 +17,25 @@ if ( '' !== (string) ( $customer_name ?? '' ) ) {
 $beltoft_services_name = '' !== (string) $product_name ? (string) $product_name : __( 'Your server', 'beltoft-services' );
 $beltoft_services_usage = in_array( $monitor_reason, array( 'disk', 'disk_urgent', 'cpu', 'memory' ), true );
 ?>
-<?php if ( 'db_disk' === $monitor_reason ) : ?>
+<?php if ( ! empty( $monitor_hosting ) ) : ?>
+	<?php $beltoft_services_name = '' !== (string) $product_name ? (string) $product_name : __( 'Your hosting', 'beltoft-services' ); ?>
+	<?php if ( 'cpu' === $monitor_reason ) : ?>
+		<p><?php
+		/* translators: 1: hosting name, 2: CPU percent, 3: time of day. */
+		echo esc_html( sprintf( __( '%1$s has been at %2$d percent or more of its CPU since %3$s.', 'beltoft-services' ), $beltoft_services_name, $monitor_cpu_percent, $monitor_cpu_since ) );
+		?> <?php esc_html_e( 'This can be normal for an import or a backup. If you do not expect it, a plugin or a script may be stuck.', 'beltoft-services' ); ?></p>
+	<?php else : ?>
+		<p><?php
+		/* translators: 1: hosting name, 2: memory in use in GB, 3: total memory in GB, 4: percent, 5: minutes. */
+		echo esc_html( sprintf( __( '%1$s has used %2$s of %3$s GB of its memory (%4$d percent or more) for %5$d minutes.', 'beltoft-services' ), $beltoft_services_name, number_format_i18n( $monitor_mem_used_mb / 1024, 1 ), number_format_i18n( $monitor_mem_total_mb / 1024, 1 ), $monitor_mem_percent, $monitor_mem_minutes ) );
+		?> <?php esc_html_e( 'This does not count the file cache, which Linux gives back when programs need it.', 'beltoft-services' ); ?></p>
+	<?php endif; ?>
+	<p><?php esc_html_e( 'What you can do:', 'beltoft-services' ); ?></p>
+	<ul>
+		<li><?php esc_html_e( 'Look for a plugin or a script that runs a long task, and stop it.', 'beltoft-services' ); ?></li>
+		<li><?php esc_html_e( 'If the load is normal for your websites, they need a larger plan.', 'beltoft-services' ); ?></li>
+	</ul>
+<?php elseif ( 'db_disk' === $monitor_reason ) : ?>
 	<p><?php
 	/* translators: 1: database name, 2: percent used. */
 	echo esc_html( sprintf( __( '%1$s: the data disk is %2$d percent full.', 'beltoft-services' ), '' !== (string) $product_name ? (string) $product_name : __( 'Your database', 'beltoft-services' ), $monitor_disk_percent ) );
@@ -69,9 +87,9 @@ $beltoft_services_usage = in_array( $monitor_reason, array( 'disk', 'disk_urgent
 	<p><?php esc_html_e( 'Your server has not been running for about 30 minutes. This alert was sent only if you did not shut it down from your account.', 'beltoft-services' ); ?></p>
 	<p><?php esc_html_e( 'Check the server in your account and start it if needed. Contact support if it does not start.', 'beltoft-services' ); ?></p>
 <?php endif; ?>
-<p><a href="<?php echo esc_url( $account_url ); ?>"><?php echo esc_html( in_array( $monitor_reason, array( 'db_down', 'db_disk' ), true ) ? __( 'View your database in your account', 'beltoft-services' ) : __( 'View your server in your account', 'beltoft-services' ) ); ?></a></p>
+<p><a href="<?php echo esc_url( $account_url ); ?>"><?php echo esc_html( in_array( $monitor_reason, array( 'db_down', 'db_disk' ), true ) ? __( 'View your database in your account', 'beltoft-services' ) : ( ! empty( $monitor_hosting ) ? __( 'View your hosting in your account', 'beltoft-services' ) : __( 'View your server in your account', 'beltoft-services' ) ) ); ?></a></p>
 <?php if ( $beltoft_services_usage ) : ?>
-	<p><?php esc_html_e( 'You can turn these emails off for this server in your account, under Monitoring.', 'beltoft-services' ); ?></p>
+	<p><?php echo esc_html( ! empty( $monitor_hosting ) ? __( 'You can turn these emails off for this hosting in your account, under Monitoring.', 'beltoft-services' ) : __( 'You can turn these emails off for this server in your account, under Monitoring.', 'beltoft-services' ) ); ?></p>
 <?php endif; ?>
 <?php
 if ( $additional_content ) { echo wp_kses_post( wpautop( wptexturize( $additional_content ) ) ); }

@@ -96,6 +96,7 @@ final class Plugin {
 		Mail\MailRoutes::register();
 		Hosting\HostingRoutes::register();
 		Hosting\HostingUsage::register();
+		Hosting\HostingGuest::register();
 		Hosting\HostingBackups::register();
 		Hosting\HostingRestore::register();
 		Hosting\NodeHealth::register();

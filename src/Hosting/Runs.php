@@ -112,6 +112,29 @@ trait Runs {
 	}
 
 	/**
+	 * The rrd samples of the container for hour, day or month (cpu, netin, netout, diskread, diskwrite, time): a read only,
+	 * after the container is proven ours. GET /nodes/{node}/lxc/{vmid}/rrddata. Null when the proof or the read fails.
+	 *
+	 * @param string $timeframe hour, day or month.
+	 * @return array<int, mixed>|null
+	 */
+	protected function rrd( string $timeframe ): ?array {
+		if ( ! in_array( $timeframe, array( 'hour', 'day', 'month' ), true ) ) {
+			return null;
+		}
+
+		$v = $this->verified( (array) Records::for_resource( $this->r->id() ), 'usage' );
+
+		if ( $v instanceof StepResult ) {
+			return null;
+		}
+
+		$rows = $this->client->request( 'GET', $this->lxc( $v['node'] ) . '/rrddata', array( 'timeframe' => $timeframe, 'cf' => 'AVERAGE' ) );
+
+		return is_array( $rows ) ? $rows : null;
+	}
+
+	/**
 	 * The container, verified as ours (tag, range, record), with its node, config and state.
 	 *
 	 * @param array<string, mixed> $record Hosting record (kept for the signature of Steps::verified()).

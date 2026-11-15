@@ -18,6 +18,7 @@ defined( 'ABSPATH' ) || exit;
  * Documented replies (the `result` of a done job):
  * - ct.prepare: prepared (true), hostname. Needs nothing. The container is marked prepared.
  * - ct.stats: memory_mb, disk_mb (0 here).
+ * - ct.memory: used_mb (memory in use without the file cache), total_mb. Read only. 0 and 1024 unless set_memory().
  * - site.create: slug, root. Fails with "container not prepared" before ct.prepare.
  * - site.delete, site.php, site.domains, site.cache_purge, site.cron, site.workers: ok (true), slug. Fail with
  *   "unknown site" for a site that was not created, except site.delete (deleting a missing site is fine).
@@ -102,6 +103,7 @@ class FakeAgent implements Agent {
 			'ssh'       => array( 'bool', false ),
 		),
 		'ct.stats'          => array( 'vmid' => array( 'vmid', true ) ),
+		'ct.memory'         => array( 'vmid' => array( 'vmid', true ) ),
 		'ct.release'        => array( 'vmid' => array( 'vmid', true ) ),
 		'ct.refresh'        => array( 'vmid' => array( 'vmid', true ) ),
 		'site.create'       => array(
@@ -357,6 +359,7 @@ class FakeAgent implements Agent {
 			'edge'  => array(),
 			'smtp'  => array(),
 			'db_sizes' => array(),
+			'memory'   => array(),
 			'dumps'    => array(),
 			'dump_fails' => array(),
 			'restore_tests' => array(),
@@ -403,6 +406,19 @@ class FakeAgent implements Agent {
 	public function set_db_size( string $database, int $bytes ): void {
 		$this->load();
 		$this->state['db_sizes'][ $database ] = $bytes;
+		$this->save();
+	}
+
+	/**
+	 * Sets what ct.memory reports for a container.
+	 *
+	 * @param int $vmid     Container id.
+	 * @param int $used_mb  Memory in use without the file cache.
+	 * @param int $total_mb Memory limit.
+	 */
+	public function set_memory( int $vmid, int $used_mb, int $total_mb ): void {
+		$this->load();
+		$this->state['memory'][ $vmid ] = array( 'used_mb' => $used_mb, 'total_mb' => $total_mb );
 		$this->save();
 	}
 
@@ -944,6 +960,9 @@ class FakeAgent implements Agent {
 					'memory_mb' => 0,
 					'disk_mb'   => 0,
 				);
+
+			case 'ct.memory':
+				return (array) ( $this->state['memory'][ $vmid ] ?? array( 'used_mb' => 0, 'total_mb' => 1024 ) );
 
 			case 'site.create':
 				if ( empty( $this->state['cts'][ $vmid ]['prepared'] ) ) {

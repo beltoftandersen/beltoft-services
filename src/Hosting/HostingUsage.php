@@ -10,6 +10,7 @@ namespace BeltoftServices\Hosting;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Emails\Emails;
 use BeltoftServices\Jobs;
+use BeltoftServices\Monitoring\UsageRules;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
@@ -90,7 +91,7 @@ final class HostingUsage {
 			return;
 		}
 
-		foreach ( array( 'stats', 'databases', 'storage', 'loaders', 'php' ) as $step ) {
+		foreach ( array( 'stats', 'cpu', 'databases', 'storage', 'loaders', 'php' ) as $step ) {
 			try {
 				$this->{'step_' . $step}();
 			} catch ( \Throwable $e ) {
@@ -136,6 +137,24 @@ final class HostingUsage {
 				'disk_mb'   => (int) round( (int) ( $now['disk'] ?? 0 ) / 1048576 ),
 			)
 		);
+	}
+
+	/**
+	 * Sustained high CPU: the shared usage rule over the hour of rrd samples of a running container (the customer's "Usage
+	 * emails" switch, the monitor_cpu_* settings and the cool-down are the rule's). Nothing is read when the emails are off.
+	 */
+	private function step_cpu(): void {
+		$usage = (array) $this->r->get( 'usage' );
+
+		if ( 'on' !== Settings::get( 'monitor_alerts' ) || 'running' !== (string) ( $usage['status'] ?? '' ) ) {
+			return;
+		}
+
+		$rows = $this->rrd( 'hour' );
+
+		if ( null !== $rows ) {
+			UsageRules::usage( $this->r, $rows );
+		}
 	}
 
 	/**
@@ -196,7 +215,7 @@ final class HostingUsage {
 		$data  = array( 'percent' => (int) round( $percent ), 'used' => $gb, 'limit' => (int) $plan['disk_gb'] );
 
 		if ( $percent >= self::WARN_PERCENT ) {
-			if ( ! $state['warned'] && Emails::send( 'beltoft_services_hosting_notice', $this->r, array_merge( $data, array( 'hosting_notice' => 'storage_warning' ) ) ) ) {
+			if ( ! $state['warned'] && UsageRules::wanted( $this->r ) && Emails::send( 'beltoft_services_hosting_notice', $this->r, array_merge( $data, array( 'hosting_notice' => 'storage_warning' ) ) ) ) {
 				$state['warned'] = $now;
 			}
 		} elseif ( $percent < self::WARN_PERCENT - 5 ) {

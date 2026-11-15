@@ -42,6 +42,7 @@ final class EmailValues {
 
 		$data = is_array( $data ) ? $data : array();
 
+		$values['monitor_hosting'] = 'hosting' === $r->get( 'driver' ) && in_array( $data['reason'] ?? '', array( 'cpu', 'memory' ), true );
 		$values['hosting']         = 'hosting' === $r->get( 'driver' ) ? HostingEmail::values( $r ) : array();
 		$values['hosting_notice']  = in_array( $data['hosting_notice'] ?? '', HostingNotice::KINDS, true ) ? array(
 			'kind'        => (string) $data['hosting_notice'],

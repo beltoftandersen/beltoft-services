@@ -9,7 +9,21 @@ if ( '' !== (string) ( $customer_name ?? '' ) ) {
 } else {
 	echo __( 'Hi,', 'beltoft-services' ) . "\n\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
 }
-if ( 'db_disk' === $monitor_reason ) {
+if ( ! empty( $monitor_hosting ) ) {
+	$beltoft_services_name = '' !== (string) $product_name ? (string) $product_name : __( 'Your hosting', 'beltoft-services' );
+	if ( 'cpu' === $monitor_reason ) {
+		/* translators: 1: hosting name, 2: CPU percent, 3: time of day. */
+		echo wp_strip_all_tags( sprintf( __( '%1$s has been at %2$d percent or more of its CPU since %3$s.', 'beltoft-services' ), $beltoft_services_name, $monitor_cpu_percent, $monitor_cpu_since ) ) . ' '; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
+		echo __( 'This can be normal for an import or a backup. If you do not expect it, a plugin or a script may be stuck.', 'beltoft-services' ) . "\n\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
+	} else {
+		/* translators: 1: hosting name, 2: memory in use in GB, 3: total memory in GB, 4: percent, 5: minutes. */
+		echo wp_strip_all_tags( sprintf( __( '%1$s has used %2$s of %3$s GB of its memory (%4$d percent or more) for %5$d minutes.', 'beltoft-services' ), $beltoft_services_name, number_format_i18n( $monitor_mem_used_mb / 1024, 1 ), number_format_i18n( $monitor_mem_total_mb / 1024, 1 ), $monitor_mem_percent, $monitor_mem_minutes ) ) . ' '; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
+		echo __( 'This does not count the file cache, which Linux gives back when programs need it.', 'beltoft-services' ) . "\n\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
+	}
+	echo __( 'What you can do:', 'beltoft-services' ) . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
+	echo '- ' . __( 'Look for a plugin or a script that runs a long task, and stop it.', 'beltoft-services' ) . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
+	echo '- ' . __( 'If the load is normal for your websites, they need a larger plan.', 'beltoft-services' ) . "\n\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
+} elseif ( 'db_disk' === $monitor_reason ) {
 	$beltoft_services_db = '' !== (string) $product_name ? (string) $product_name : __( 'Your database', 'beltoft-services' );
 	/* translators: 1: database name, 2: percent used. */
 	echo wp_strip_all_tags( sprintf( __( '%1$s: the data disk is %2$d percent full.', 'beltoft-services' ), $beltoft_services_db, $monitor_disk_percent ) ) . ' '; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
@@ -53,8 +67,8 @@ if ( 'db_disk' === $monitor_reason ) {
 	echo __( 'Your server has not been running for about 30 minutes. This alert was sent only if you did not shut it down from your account.', 'beltoft-services' ) . "\n\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
 	echo __( 'Check the server in your account and start it if needed. Contact support if it does not start.', 'beltoft-services' ) . "\n\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
 }
-echo ( in_array( $monitor_reason, array( 'db_down', 'db_disk' ), true ) ? __( 'View your database in your account:', 'beltoft-services' ) : __( 'View your server in your account:', 'beltoft-services' ) ) . ' ' . esc_url_raw( $account_url ) . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
+echo ( in_array( $monitor_reason, array( 'db_down', 'db_disk' ), true ) ? __( 'View your database in your account:', 'beltoft-services' ) : ( ! empty( $monitor_hosting ) ? __( 'View your hosting in your account:', 'beltoft-services' ) : __( 'View your server in your account:', 'beltoft-services' ) ) ) . ' ' . esc_url_raw( $account_url ) . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
 if ( in_array( $monitor_reason, array( 'disk', 'disk_urgent', 'cpu', 'memory' ), true ) ) {
-	echo "\n" . __( 'You can turn these emails off for this server in your account, under Monitoring.', 'beltoft-services' ) . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
+	echo "\n" . ( ! empty( $monitor_hosting ) ? __( 'You can turn these emails off for this hosting in your account, under Monitoring.', 'beltoft-services' ) : __( 'You can turn these emails off for this server in your account, under Monitoring.', 'beltoft-services' ) ) . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain text email.
 }
 echo "\n" . wp_strip_all_tags( (string) preg_replace( '#<br\s*/?>#i', "\n", (string) apply_filters( 'woocommerce_email_footer_text', get_option( 'woocommerce_email_footer_text' ) ) ) ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound, WordPress.Security.EscapeOutput.OutputNotEscaped -- WooCommerce's own filter; plain text email.

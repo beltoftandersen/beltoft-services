@@ -269,6 +269,10 @@ final class Records {
 		$done = false !== $wpdb->delete( Schema::tables()['hosting'], array( 'resource_id' => $resource_id ), array( '%d' ) );
 		HostingCapacity::forget();
 
+		if ( $done ) {
+			\BeltoftServices\Monitoring\GuestMemory::purge( $resource_id );
+		}
+
 		return $done;
 	}
 }

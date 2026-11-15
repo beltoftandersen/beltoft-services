@@ -19,6 +19,13 @@ final class MonitorAlert extends ServiceEmail {
 			return sprintf( __( 'Your server disk is %d percent full', 'beltoft-services' ), $pct );
 		}
 		if ( 'disk_urgent' === $reason ) { return __( 'Your server disk is almost completely full', 'beltoft-services' ); }
+		if ( ! empty( $this->values['monitor_hosting'] ) ) {
+			if ( 'cpu' === $reason ) {
+				/* translators: %d: number of hours. */
+				return sprintf( _n( 'Your hosting has used almost all of its CPU for %d hour', 'Your hosting has used almost all of its CPU for %d hours', (int) ( $this->values['monitor_cpu_hours'] ?? 0 ), 'beltoft-services' ), (int) ( $this->values['monitor_cpu_hours'] ?? 0 ) );
+			}
+			return __( 'Your hosting is using most of its memory', 'beltoft-services' );
+		}
 		if ( 'cpu' === $reason ) {
 			/* translators: %d: number of hours. */
 			return sprintf( _n( 'Your server has used almost all of its CPU for %d hour', 'Your server has used almost all of its CPU for %d hours', (int) ( $this->values['monitor_cpu_hours'] ?? 0 ), 'beltoft-services' ), (int) ( $this->values['monitor_cpu_hours'] ?? 0 ) );
@@ -34,6 +41,7 @@ final class MonitorAlert extends ServiceEmail {
 		return __( 'Check your server', 'beltoft-services' );
 	}
 	public function get_default_heading() {
+		if ( ! empty( $this->values['monitor_hosting'] ) ) { return __( 'Your hosting needs attention', 'beltoft-services' ); }
 		return in_array( (string) ( $this->values['monitor_reason'] ?? '' ), array( 'db_down', 'db_disk' ), true ) ? __( 'Your database needs attention', 'beltoft-services' ) : __( 'Your server needs attention', 'beltoft-services' );
 	}
 }

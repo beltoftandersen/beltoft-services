@@ -28,6 +28,7 @@ final class ValueDefaults {
 			'disk_server_url'       => '',
 			'disk_guide_url'        => '',
 			'monitor_reason'        => 'down',
+			'monitor_hosting'       => false,
 			'monitor_disk_percent'  => 0,
 			'monitor_cpu_percent'   => 0,
 			'monitor_cpu_hours'     => 0,

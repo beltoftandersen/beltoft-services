@@ -174,6 +174,21 @@ class FakeNode extends FakePve {
 		}
 	}
 
+	/**
+	 * Sets what GET .../rrddata reports: rows with time, cpu (0 to 1), netin, netout, diskread, diskwrite.
+	 *
+	 * @param int                           $vmid Container id.
+	 * @param array<int, array<string, mixed>> $rows Rows.
+	 */
+	public function set_rrd( int $vmid, array $rows ): void {
+		$this->load();
+
+		if ( isset( $this->state['cts'][ $vmid ] ) ) {
+			$this->state['cts'][ $vmid ]['rrd'] = $rows;
+			$this->save();
+		}
+	}
+
 	// Client.
 
 	/**
@@ -260,6 +275,7 @@ class FakeNode extends FakePve {
 				'size' => array( 'string', true ),
 			) ),
 			array( 'GET', $ct . '/status/current$#', 'h_status', array() ),
+			array( 'GET', $ct . '/rrddata$#', 'h_rrddata', array( 'timeframe' => array( 'string', true ), 'cf' => array( 'string', false ) ) ),
 			array( 'POST', $ct . '/status/start$#', 'h_start', array() ),
 			array( 'POST', $ct . '/status/shutdown$#', 'h_shutdown', array( 'timeout' => array( 'int', false ) ) ),
 			array( 'POST', $ct . '/status/stop$#', 'h_stop', array() ),
@@ -360,6 +376,8 @@ class FakeNode extends FakePve {
 				'status'   => $ct['status'],
 				'template' => (int) $ct['template'],
 				'pool'     => $ct['pool'],
+				'cpu'      => (float) ( $ct['usage']['cpu'] ?? 0 ),
+				'uptime'   => (int) ( $ct['usage']['uptime'] ?? 0 ),
 			);
 		}
 
@@ -559,6 +577,19 @@ class FakeNode extends FakePve {
 				$this->state['cts'][ $vmid ]['config'][ $disk ] = preg_replace( '/size=\d+G/', 'size=' . $new . 'G', $cur );
 			}
 		);
+	}
+
+	/**
+	 * GET .../rrddata.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_rrddata( array $a, array $p ) {
+		unset( $p );
+		$ct = $this->find( $a );
+
+		return is_wp_error( $ct ) ? $ct : (array) ( $ct['rrd'] ?? array() );
 	}
 
 	/**
