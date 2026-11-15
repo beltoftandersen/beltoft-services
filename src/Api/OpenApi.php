@@ -197,12 +197,12 @@ final class OpenApi {
 				'errors'  => array( 401, 403, 409, 429 ),
 			),
 			'POST /resources/{id}/mail/mailboxes'        => array(
-				'summary' => 'Make a mailbox in an email domain. It gets a generated secret that is never in the reply: the customer shows it once in the dashboard.',
+				'summary' => 'Make a mailbox in an email domain. The work runs in the background (answer 202): read GET /resources/{id} until `working` is false and look at `last_result` (action mailbox_create, ok, text); GET /resources/{id}/mail lists the mailbox with reveal true when it is ready. It gets a generated secret that is never in the reply: the customer shows it once in the dashboard.',
 				'scope'   => 'actions',
 				'body'    => array( 'local' => array( 'type' => 'string', 'description' => 'The part before the @.' ), 'name' => array( 'type' => 'string', 'description' => 'The name shown for the mailbox. Optional.' ), 'quota_mb' => array( 'type' => 'integer', 'description' => 'The size in MB, up to the size of the plan. Optional.' ) ),
 				'required' => array( 'local' ),
-				'reply'   => array( 'email' => $text, 'quota_mb' => $int, 'message' => $text ),
-				'status'  => 201,
+				'reply'   => array( 'queued' => $bool, 'action' => $text, 'at' => $int, 'status' => $text, 'email' => $text, 'quota_mb' => $int, 'message' => $text ),
+				'status'  => 202,
 				'errors'  => array( 401, 403, 409, 422, 429, 503 ),
 			),
 			'POST /resources/{id}/mail/aliases'          => array(
@@ -221,10 +221,11 @@ final class OpenApi {
 				'errors'  => array( 401, 403, 409, 422, 429, 503 ),
 			),
 			'POST /resources/{id}/mail/dns/check'        => array(
-				'summary' => 'Look at the DNS of an email domain now. The reply says which records are ok, missing or in conflict.',
+				'summary' => 'Look at the DNS of an email domain now. The look runs in the background (answer 202): read GET /resources/{id} until `working` is false and look at `last_result` (action mail_dns_check); GET /resources/{id}/mail shows which records are ok, missing or in conflict. The reply carries the records as they were when you asked.',
 				'scope'   => 'actions',
-				'reply'   => array( 'dns' => array( 'type' => 'object' ) ),
-				'errors'  => array( 401, 403, 429 ),
+				'reply'   => array( 'queued' => $bool, 'action' => $text, 'at' => $int, 'status' => $text, 'message' => $text, 'dns' => array( 'type' => 'object' ) ),
+				'status'  => 202,
+				'errors'  => array( 401, 403, 409, 429 ),
 			),
 			'GET /resources/{id}/ssl-certificate'        => array(
 				'summary' => 'The current certificate of an SSL certificate service and its chain, as PEM text, for a script that installs it. Only public parts: the private key is never in a reply.',

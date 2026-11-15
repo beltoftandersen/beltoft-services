@@ -109,6 +109,7 @@ final class Plugin {
 		Mail\MailField::register();
 		Mail\MailSwitch::register();
 		Mail\MailAccess::register();
+		Mail\Mailboxes::register();
 		Mail\MailDomains::register();
 		Mail\MailWake::register();
 		add_action( 'beltoft_services_account_assets', array( Mail\MailCard::class, 'early' ), 20, 2 );

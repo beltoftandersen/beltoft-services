@@ -61,9 +61,17 @@ final class MailRoutesTest extends MailTestCase {
 		return rest_get_server()->dispatch( $request );
 	}
 
+	/** A new mailbox through the route: the request, then the queued action is run. */
+	private function box( Resource $r, int $user, array $body ): \WP_REST_Response {
+		$response = $this->call( 'POST', $r->id() . '/mail/mailboxes', $user, $body );
+		$this->run_jobs();
+
+		return $response;
+	}
+
 	public function test_the_overview_is_for_the_owner_only_and_holds_no_password(): void {
 		list( $r, $user ) = $this->domain();
-		$this->assertSame( 201, $this->call( 'POST', $r->id() . '/mail/mailboxes', $user, array( 'local' => 'info', 'name' => 'Info' ) )->get_status() );
+		$this->assertSame( 202, $this->box( $r, $user, array( 'local' => 'info', 'name' => 'Info' ) )->get_status() );
 
 		$response = $this->call( 'GET', $r->id() . '/mail', $user );
 		$data     = $response->get_data();
@@ -93,14 +101,17 @@ final class MailRoutesTest extends MailTestCase {
 		$r      = Resource::create( $server, $this->fake_driver(), array(), array( 'state' => 'ready' ) );
 
 		$this->assertSame( 409, $this->call( 'GET', $r->id() . '/mail', $user )->get_status() );
-		$this->assertSame( 409, $this->call( 'POST', $r->id() . '/mail/mailboxes', $user, array( 'local' => 'a' ) )->get_status() );
+		$this->assertSame( 409, $this->box( $r, $user, array( 'local' => 'a' ) )->get_status() );
 	}
 
 	public function test_create_a_mailbox_then_show_its_password_once(): void {
 		list( $r, $user ) = $this->domain();
 
-		$made = $this->call( 'POST', $r->id() . '/mail/mailboxes', $user, array( 'local' => 'Info', 'name' => 'Front desk' ) );
-		$this->assertSame( 201, $made->get_status() );
+		$made = $this->box( $r, $user, array( 'local' => 'Info', 'name' => 'Front desk' ) );
+		$this->assertSame( 202, $made->get_status() );
+		$this->assertTrue( $made->get_data()['queued'] );
+		$this->assertSame( '/resources/' . $r->id(), $made->get_data()['status'] );
+		$this->assertSame( 'mailbox_create', $made->get_data()['action'] );
 		$this->assertSame( 'info@route.example', $made->get_data()['email'] );
 		$this->assertArrayNotHasKey( 'password', $made->get_data() );
 		$this->assertSame( 'Front desk', $this->mailcow->mailbox( 'info@route.example' )['name'] );
@@ -119,8 +130,8 @@ final class MailRoutesTest extends MailTestCase {
 	public function test_only_the_owner_can_show_a_password_and_only_for_a_mailbox_of_the_domain(): void {
 		list( $r, $user ) = $this->domain();
 		list( $other, $other_user ) = $this->domain( 'other.example' );
-		$this->call( 'POST', $r->id() . '/mail/mailboxes', $user, array( 'local' => 'a' ) );
-		$this->call( 'POST', $other->id() . '/mail/mailboxes', $other_user, array( 'local' => 'a' ) );
+		$this->box( $r, $user, array( 'local' => 'a' ) );
+		$this->box( $other, $other_user, array( 'local' => 'a' ) );
 
 		$this->assertSame( 403, $this->call( 'POST', $r->id() . '/mail-reveal', $other_user, array( 'email' => 'a@route.example' ) )->get_status() );
 		$this->assertSame( 409, $this->call( 'POST', $r->id() . '/mail-reveal', $user, array( 'email' => 'a@other.example' ) )->get_status(), 'A name outside the domain.' );
@@ -142,30 +153,34 @@ final class MailRoutesTest extends MailTestCase {
 
 	public function test_a_bad_name_a_taken_name_and_the_plan_limit_are_refused_with_words(): void {
 		list( $r, $user ) = $this->domain();
-		$bad = $this->call( 'POST', $r->id() . '/mail/mailboxes', $user, array( 'local' => 'not valid' ) );
+		$bad = $this->box( $r, $user, array( 'local' => 'not valid' ) );
 		$this->assertSame( 422, $bad->get_status() );
 		$this->assertSame( 'beltoft_services_mail_invalid', $bad->get_data()['code'] );
 
-		$this->assertSame( 201, $this->call( 'POST', $r->id() . '/mail/mailboxes', $user, array( 'local' => 'a' ) )->get_status() );
-		$this->assertSame( 409, $this->call( 'POST', $r->id() . '/mail/mailboxes', $user, array( 'local' => 'a' ) )->get_status() );
+		$this->assertSame( 202, $this->box( $r, $user, array( 'local' => 'a' ) )->get_status() );
+		$this->assertSame( 409, $this->box( $r, $user, array( 'local' => 'a' ) )->get_status() );
 
 		foreach ( array( 'b', 'c', 'd', 'e' ) as $local ) {
-			$this->call( 'POST', $r->id() . '/mail/mailboxes', $user, array( 'local' => $local ) );
+			$this->box( $r, $user, array( 'local' => $local ) );
 		}
 
-		$full = $this->call( 'POST', $r->id() . '/mail/mailboxes', $user, array( 'local' => 'f' ) );
-		$this->assertSame( 409, $full->get_status() );
-		$this->assertStringContainsString( 'no room', $full->get_data()['message'] );
+		$full = $this->box( $r, $user, array( 'local' => 'f' ) );
+		$this->assertSame( 202, $full->get_status(), 'The plan is counted at the mail server, in the job.' );
+		$last = Resource::find( $r->id() )->get( 'last_result' );
+		$this->assertFalse( $last['ok'] );
+		$this->assertSame( 'mailbox_create', $last['action'] );
+		$this->assertStringContainsString( 'no room', $last['text'] );
+		$this->assertNull( $this->mailcow->mailbox( 'f@route.example' ) );
 	}
 
 	public function test_a_size_within_the_plan_can_be_chosen(): void {
 		list( $r, $user ) = $this->domain();
 
-		$small = $this->call( 'POST', $r->id() . '/mail/mailboxes', $user, array( 'local' => 'small', 'quota_mb' => 1024 ) );
-		$this->assertSame( 201, $small->get_status() );
+		$small = $this->box( $r, $user, array( 'local' => 'small', 'quota_mb' => 1024 ) );
+		$this->assertSame( 202, $small->get_status() );
 		$this->assertSame( 1024, $small->get_data()['quota_mb'] );
 
-		$big = $this->call( 'POST', $r->id() . '/mail/mailboxes', $user, array( 'local' => 'big', 'quota_mb' => 99999 ) );
+		$big = $this->box( $r, $user, array( 'local' => 'big', 'quota_mb' => 99999 ) );
 		$this->assertSame( 409, $big->get_status() );
 		$this->assertStringContainsString( 'outside what your plan allows', $big->get_data()['message'] );
 	}
@@ -173,8 +188,8 @@ final class MailRoutesTest extends MailTestCase {
 	public function test_deleting_a_mailbox_needs_the_typed_word_and_stays_inside_the_domain(): void {
 		list( $r, $user ) = $this->domain();
 		list( $other, $other_user ) = $this->domain( 'other.example' );
-		$this->call( 'POST', $r->id() . '/mail/mailboxes', $user, array( 'local' => 'a' ) );
-		$this->call( 'POST', $other->id() . '/mail/mailboxes', $other_user, array( 'local' => 'a' ) );
+		$this->box( $r, $user, array( 'local' => 'a' ) );
+		$this->box( $other, $other_user, array( 'local' => 'a' ) );
 
 		$this->assertSame( 422, $this->call( 'DELETE', $r->id() . '/mail/mailboxes/a%40route.example', $user )->get_status() );
 		$this->assertSame( 422, $this->call( 'DELETE', $r->id() . '/mail/mailboxes/a%40route.example', $user, array( 'confirm' => 'delete' ) )->get_status() );
@@ -193,18 +208,25 @@ final class MailRoutesTest extends MailTestCase {
 
 	public function test_a_new_password_replaces_the_old_one_and_is_shown_once(): void {
 		list( $r, $user ) = $this->domain();
-		$this->call( 'POST', $r->id() . '/mail/mailboxes', $user, array( 'local' => 'a' ) );
+		$this->box( $r, $user, array( 'local' => 'a' ) );
 		$first = $this->call( 'POST', $r->id() . '/mail-reveal', $user, array( 'email' => 'a@route.example' ) )->get_data()['password'];
 
 		$reset = $this->call( 'POST', $r->id() . '/mail/mailboxes/a%40route.example/password', $user );
-		$this->assertSame( 200, $reset->get_status() );
+		$this->assertSame( 202, $reset->get_status() );
+		$this->assertSame( 'mailbox_password', $reset->get_data()['action'] );
 		$this->assertArrayNotHasKey( 'password', $reset->get_data() );
+		$this->assertFalse( MailAccess::revealable( Resource::find( $r->id() ), 'a@route.example' ), 'Not before the job has set it.' );
+		$this->run_jobs();
 
 		$second = $this->call( 'POST', $r->id() . '/mail-reveal', $user, array( 'email' => 'a@route.example' ) )->get_data()['password'];
 		$this->assertNotSame( $first, $second );
 		$this->assertSame( 409, $this->call( 'POST', $r->id() . '/mail-reveal', $user, array( 'email' => 'a@route.example' ) )->get_status() );
 
-		$this->assertSame( 404, $this->call( 'POST', $r->id() . '/mail/mailboxes/zz%40route.example/password', $user )->get_status() );
+		$this->assertSame( 202, $this->call( 'POST', $r->id() . '/mail/mailboxes/zz%40route.example/password', $user )->get_status() );
+		$this->run_jobs();
+		$last = Resource::find( $r->id() )->get( 'last_result' );
+		$this->assertFalse( $last['ok'], 'No such mailbox: said in the outcome.' );
+		$this->assertStringContainsString( 'does not exist', $last['text'] );
 		$this->assertSame( 403, $this->call( 'POST', $r->id() . '/mail/mailboxes/a%40route.example/password', self::factory()->user->create() )->get_status() );
 	}
 
@@ -243,10 +265,18 @@ final class MailRoutesTest extends MailTestCase {
 		$this->dns['MX dnscheck.example'] = array( '10 mail.example.net' );
 		$result = $this->call( 'POST', $r->id() . '/mail/dns/check', $user );
 
-		$this->assertSame( 200, $result->get_status() );
-		$status = array_column( $result->get_data()['dns']['rows'], 'status', 'type' );
+		$this->assertSame( 202, $result->get_status() );
+		$this->assertSame( 'mail_dns_check', $result->get_data()['action'] );
+		$this->assertSame( 'missing', array_column( $result->get_data()['dns']['rows'], 'status', 'type' )['MX'], 'The answer carries the state as it was asked.' );
+		$this->assertTrue( $this->call( 'GET', $r->id() . '/mail', $user )->get_data()['task']['working'] );
+		$this->run_jobs();
+
+		$after = $this->call( 'GET', $r->id() . '/mail', $user )->get_data();
+		$status = array_column( $after['dns']['rows'], 'status', 'type' );
 		$this->assertSame( 'ok', $status['MX'] );
 		$this->assertSame( 'missing', $status['TXT'] );
+		$this->assertFalse( $after['task']['working'] );
+		$this->assertTrue( $after['task']['last_result']['ok'] );
 
 		$this->assertSame( 403, $this->call( 'POST', $r->id() . '/mail/dns/check', self::factory()->user->create() )->get_status() );
 	}
@@ -306,7 +336,7 @@ final class MailRoutesTest extends MailTestCase {
 		list( $r, $user ) = $this->domain();
 		$r->set( array( 'state' => 'paused' ) );
 
-		$this->assertSame( 403, $this->call( 'POST', $r->id() . '/mail/mailboxes', $user, array( 'local' => 'a' ) )->get_status() );
+		$this->assertSame( 403, $this->box( $r, $user, array( 'local' => 'a' ) )->get_status() );
 		$this->assertNull( $this->mailcow->mailbox( 'a@route.example' ) );
 	}
 
@@ -314,11 +344,14 @@ final class MailRoutesTest extends MailTestCase {
 		list( $r, $user ) = $this->domain();
 		$this->mailcow->fail_next( 'add_mailbox', new \WP_Error( 'mailcow_transport', 'secret-host.internal refused' ) );
 
-		$response = $this->call( 'POST', $r->id() . '/mail/mailboxes', $user, array( 'local' => 'a' ) );
+		$response = $this->box( $r, $user, array( 'local' => 'a' ) );
 
-		$this->assertSame( 503, $response->get_status() );
+		$this->assertSame( 202, $response->get_status(), 'Accepted: the job waits for the mail server and tries again.' );
 		$this->assertStringNotContainsString( 'secret-host', (string) wp_json_encode( $response->get_data() ) );
-		$this->assertArrayNotHasKey( 'a@route.example', (array) Resource::find( $r->id() )->get( MailAccess::META ) );
+		$view = $this->call( 'GET', $r->id() . '/mail', $user )->get_data();
+		$this->assertStringNotContainsString( 'secret-host', (string) wp_json_encode( $view ) );
+		$this->assertFalse( MailAccess::revealable( Resource::find( $r->id() ), 'a@route.example' ), 'Nothing to show before the mailbox is made.' );
+		$this->assertTrue( $view['task']['working'], 'Still on its backoff: the page keeps saying so.' );
 	}
 
 	public function test_add_a_domain_of_ours_and_one_at_another_provider(): void {
@@ -383,7 +416,7 @@ final class MailRoutesTest extends MailTestCase {
 		$made  = $this->call( 'POST', $r->id() . '/mail-domains', $user, array( 'mode' => 'own', 'domain' => 'full.example' ) );
 		$this->run_jobs();
 		$child = Resource::find( (int) $made->get_data()['id'] );
-		\BeltoftServices\Mail\Mailboxes::create( $child, 'a' );
+		$this->create_box( $child, 'a' );
 
 		$res = $this->call( 'DELETE', $r->id() . '/mail-domains/full.example', $user );
 		$this->assertSame( 409, $res->get_status() );

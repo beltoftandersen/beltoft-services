@@ -29,6 +29,13 @@ final class Jobs {
 	 * Meta key of the outcome of the last customer action, for the card.
 	 */
 	public const RESULT = 'last_result';
+
+	/**
+	 * Meta key of a StepResult in which a driver gives the customer its own sentence for the outcome (the text of last_result).
+	 * It is never stored as meta (Reconciler::RESERVED). A failure with a sentence is an expected refusal (a name that is taken,
+	 * a plan with no room): the customer is told, staff are not.
+	 */
+	public const TEXT = 'customer_text';
 	public const USAGE = 'beltoft_services_usage_refresh';
 	public const GROUP = 'beltoft-services';
 	public const CRON  = '*/15 * * * *';
@@ -871,6 +878,41 @@ final class Jobs {
 	}
 
 	/**
+	 * The one way a route starts a customer action that a driver carries out in a job: refused while another action of the
+	 * service is pending (one at a time), else the Progress marker is set and the job queued. A route checks its input first.
+	 *
+	 * @param Resource             $r      Resource.
+	 * @param string               $action Action name (offered by the driver's customer_actions() or internal_actions()).
+	 * @param string               $label  The action's label for the customer.
+	 * @param array<string, mixed> $args   Arguments of the job (never a secret).
+	 * @param callable|null        $prepare Stores what the job reads (a previewed list, an encrypted secret) once the service is known
+	 *                                     to be free and before the job is queued: returns true, or an error that refuses the action.
+	 * @return true|\WP_Error True when queued; error code busy when another action is pending, or the error of $prepare.
+	 */
+	public static function start_action( Resource $r, string $action, string $label, array $args = array(), ?callable $prepare = null ) {
+		$fresh = Resource::find( $r->id() ) ?? $r;
+
+		if ( null !== Progress::pending( $fresh ) ) {
+			return new \WP_Error( 'busy', __( 'Another change is running. Try again in a moment.', 'beltoft-services' ) );
+		}
+
+		if ( null !== $prepare ) {
+			$prepared = $prepare();
+
+			if ( is_wp_error( $prepared ) ) {
+				return $prepared;
+			}
+
+			$fresh = Resource::find( $r->id() ) ?? $fresh;
+		}
+
+		Progress::mark( $fresh, $action, $label );
+		self::queue_act( $r->id(), $action, $args );
+
+		return true;
+	}
+
+	/**
 	 * The customer action job: runs Driver::act() under the resource lock, and not while the
 	 * kill switch is on (the job waits and keeps its place). The resource must still accept
 	 * actions and the driver must still offer the action; otherwise the job is dropped. The
@@ -1031,8 +1073,14 @@ final class Jobs {
 		// What the customer is told about the outcome: success only for a done action that did not refuse. Fixed texts, never the driver's.
 		$refused = 1 === preg_match( '/\brefused\b/i', $result->event() . ' ' . $result->error() );
 		$ok      = $result->is_done() && ! $refused;
+		$said    = isset( $result->meta()[ self::TEXT ] ) ? (string) $result->meta()[ self::TEXT ] : '';
 
-		if ( ! $r->set( array_merge( $meta, array( 'act_attempts' => 0, 'waiting' => '', 'act_wait_since' => $episodes ? $episodes : null, Progress::MARKER => null, self::RESULT => self::result( $action, $ok, $result->is_failed() && ! $refused ) ) ) ) ) {
+		// A driver's own sentence for an expected refusal is not a failure for staff.
+		if ( ! $result->is_done() && '' !== $said ) {
+			$refused = true;
+		}
+
+		if ( ! $r->set( array_merge( $meta, array( 'act_attempts' => 0, 'waiting' => '', 'act_wait_since' => $episodes ? $episodes : null, Progress::MARKER => null, self::RESULT => self::result( $action, $ok, $result->is_failed() && ! $refused, $said ) ) ) ) ) {
 			Alerts::write_failed( $r, 'Resource could not be updated' );
 		}
 
@@ -1047,7 +1095,11 @@ final class Jobs {
 		$error = sprintf( 'Customer action "%s" failed: %s', $action, '' !== $result->error() ? $result->error() : 'Unknown error' );
 
 		Events::add( $license_id, 'service', $error );
-		Alerts::admin( $r, $error );
+
+		if ( '' === $said ) {
+			Alerts::admin( $r, $error );
+		}
+
 		self::failed( Resource::find( $r->id() ) ?? $r, $action, $args, 'failed' );
 	}
 
@@ -1057,12 +1109,13 @@ final class Jobs {
 	 * @param string $action Action name.
 	 * @param bool   $ok     Whether it was done.
 	 * @param bool   $failed Whether it failed part way (not just refused).
+	 * @param string $said   The driver's own sentence (Jobs::TEXT), for a done or a refused action.
 	 * @return array{action: string, ok: bool, at: int, text: string}
 	 */
-	private static function result( string $action, bool $ok, bool $failed = false ): array {
-		$text = '';
+	private static function result( string $action, bool $ok, bool $failed = false, string $said = '' ): array {
+		$text = $said;
 
-		if ( ! $ok ) {
+		if ( '' === $said && ! $ok ) {
 			$text = $failed
 				? __( 'This did not finish. We have been told and will look into it.', 'beltoft-services' )
 				: __( 'This was not done. Your server was not changed.', 'beltoft-services' );

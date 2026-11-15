@@ -38,7 +38,7 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 		return sprintf( _n( '%d domain', '%d domains', $max, 'beltoft-services' ), $used );
 	}
 	public function plan_fields(): array { return array(); }
-	public function internal_actions(): array { return array( 'renew', 'transfer_renew' ); }
+	public function internal_actions(): array { return array_merge( array( 'renew', 'transfer_renew' ), Actions::INTERNAL ); }
 
 	public function provision( Resource $r ): StepResult {
 		$result = $this->build( $r );

@@ -94,6 +94,92 @@ final class MailAccess {
 	}
 
 	/**
+	 * Where a stored password stands: pending (reserved, not yet set on the mail server), ready (set, waiting to be revealed) or
+	 * null (none stored). A job that finds `ready` knows an earlier run of it finished.
+	 *
+	 * @param Resource $r     Resource.
+	 * @param string   $email Mailbox address.
+	 * @return string|null
+	 */
+	public static function state( Resource $r, string $email ): ?string {
+		$row = self::all( $r )[ strtolower( $email ) ] ?? null;
+
+		if ( ! is_array( $row ) || '' === (string) ( $row['pw'] ?? '' ) ) {
+			return null;
+		}
+
+		return ! empty( $row['pending'] ) ? 'pending' : 'ready';
+	}
+
+	/**
+	 * Has the job asked the mail server to add this mailbox with the stored password? Only then may a mailbox that already exists
+	 * be taken as the one this password belongs to (an earlier run of the job added it); without it the mailbox was there before.
+	 *
+	 * @param Resource $r     Resource.
+	 * @param string   $email Mailbox address.
+	 */
+	public static function sent( Resource $r, string $email ): bool {
+		return ! empty( ( self::all( $r )[ strtolower( $email ) ] ?? array() )['sent'] );
+	}
+
+	/**
+	 * Notes that the add call is about to be made (see sent()).
+	 *
+	 * @param Resource $r     Resource.
+	 * @param string   $email Mailbox address.
+	 */
+	public static function mark_sent( Resource $r, string $email ): bool {
+		$email = strtolower( $email );
+		$ok    = false;
+
+		$r->locked(
+			static function () use ( $r, $email, &$ok ): bool {
+				$all = self::all( $r );
+
+				if ( ! isset( $all[ $email ] ) ) {
+					return false;
+				}
+
+				$all[ $email ]['sent'] = true;
+				$ok                    = $r->set( array( self::META => $all ) );
+
+				return $ok;
+			}
+		);
+
+		return $ok;
+	}
+
+	/**
+	 * The pending password in the clear, for the job that sets it on the mail server. Never logged, never in a job's arguments;
+	 * the caller drops it as soon as the call is made. Null when none is pending.
+	 *
+	 * @param Resource $r     Resource.
+	 * @param string   $email Mailbox address.
+	 */
+	public static function pending_password( Resource $r, string $email ): ?string {
+		$row = self::all( $r )[ strtolower( $email ) ] ?? null;
+
+		if ( ! is_array( $row ) || empty( $row['pending'] ) ) {
+			return null;
+		}
+
+		$plain = Crypto::decrypt( (string) ( $row['pw'] ?? '' ) );
+
+		return is_string( $plain ) && '' !== $plain ? $plain : null;
+	}
+
+	/**
+	 * Is anything stored for this address (a password in flight, or one not yet revealed)?
+	 *
+	 * @param Resource $r     Resource.
+	 * @param string   $email Mailbox address.
+	 */
+	public static function has( Resource $r, string $email ): bool {
+		return isset( self::all( $r )[ strtolower( $email ) ] );
+	}
+
+	/**
 	 * Is a password stored that the customer may still reveal?
 	 *
 	 * @param Resource $r     Resource.

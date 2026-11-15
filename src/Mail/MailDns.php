@@ -9,6 +9,7 @@ namespace BeltoftServices\Mail;
 
 use BeltoftServices\Domains\PublicDns;
 use BeltoftServices\Domains\Records;
+use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
@@ -542,6 +543,27 @@ final class MailDns {
 	}
 
 	/**
+	 * The job of the shared action `mail_dns_check` (MailDriver::act): the customer asked for a look now. It starts the look again and
+	 * makes it, which publishes records into the customer's zone and changes the sending hold, so it runs as a job and not in the
+	 * request. Safe to run again: every record is read or published again and the rows are stored as they are found.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function run_check( Resource $r ): StepResult {
+		if ( ! $r->is_live() ) {
+			return StepResult::fail( 'The email service is not available.' );
+		}
+
+		if ( ! self::restart( $r ) ) {
+			return StepResult::retry( 30, 'The look could not be started.' );
+		}
+
+		self::run( $r->id() );
+
+		return StepResult::done();
+	}
+
+	/**
 	 * Recovers reads that were lost (a worker stopped, an action removed).
 	 */
 	public static function sweep(): void {
@@ -596,6 +618,8 @@ final class MailDns {
 				if ( ! is_wp_error( $result ) ) {
 					$rows[ $i ]['status'] = $result[0];
 					$rows[ $i ]['reason'] = $result[1];
+					// Stored as each record is published, so a stopped run never loses what it already wrote into the zone.
+					self::store( $id, array( 'mail_records' => $rows ), null );
 				}
 
 				continue;

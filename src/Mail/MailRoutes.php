@@ -22,14 +22,14 @@ defined( 'ABSPATH' ) || exit;
  * MailDns, which check that the domain is ready and keep every name inside it.
  *
  * - GET    mail                              the whole picture (MailView)
- * - POST   mail/mailboxes                    local, name
+ * - POST   mail/mailboxes                    local, name (202: queued as the action mailbox_create; read GET resources/<id> last_result)
  * - DELETE mail/mailboxes/<email>            confirm (the word DELETE)
- * - POST   mail/mailboxes/<email>/password   a new password, kept for one reveal
+ * - POST   mail/mailboxes/<email>/password   a new password, kept for one reveal (202: queued as mailbox_password)
  * - POST   mail/aliases                      address (the part before the @), goto
  * - DELETE mail/aliases/<address>
  * - POST   mail-domains                     mode (ours or own), domain: adds a domain to the plan
  * - DELETE mail-domains/<domain>             removes an extra domain of the plan
- * - POST   mail/dns/check                    reads public DNS now
+ * - POST   mail/dns/check                    reads public DNS now (202: queued as mail_dns_check)
  * - POST   mail-reveal                       email: the password, once (never reachable with an API token)
  *
  * A password is in no reply except the one of mail-reveal, which is never cached.
@@ -216,6 +216,18 @@ final class MailRoutes {
 	}
 
 	/**
+	 * The answer of a route that queued a shared action: 202 with how to read the outcome (Routes::queued).
+	 *
+	 * @param Resource             $r       Resource.
+	 * @param string               $action  Action name.
+	 * @param array<string, mixed> $extra   More fields (never a password).
+	 * @param string               $message Words for the customer.
+	 */
+	private static function queued( Resource $r, string $action, array $extra, string $message ): \WP_REST_Response {
+		return Routes::queued( $r, $action, $extra, $message );
+	}
+
+	/**
 	 * A reply.
 	 *
 	 * @param array<string, mixed> $data   Data.
@@ -247,21 +259,20 @@ final class MailRoutes {
 			return $limited;
 		}
 
-		$made = Mailboxes::create( $r, $request->get_param( 'local' ), is_string( $request->get_param( 'name' ) ) ? $request->get_param( 'name' ) : '', (int) $request->get_param( 'quota_mb' ) );
+		$plan = Mailboxes::plan_create( $r, $request->get_param( 'local' ), is_string( $request->get_param( 'name' ) ) ? $request->get_param( 'name' ) : '', (int) $request->get_param( 'quota_mb' ) );
 
-		if ( is_wp_error( $made ) ) {
-			return self::failure( $made );
+		if ( is_wp_error( $plan ) ) {
+			return self::failure( $plan );
 		}
 
-		return self::ok(
-			array(
-				'email'    => $made['email'],
-				'quota_mb' => $made['quota_mb'],
-				'reveal'   => true,
-				'message'  => __( 'The mailbox is ready. Show the password once to set up your mail program.', 'beltoft-services' ),
-			),
-			201
-		);
+		// The mailbox is made by the shared action mailbox_create; its password is kept encrypted (reserve) and never queued.
+		$queued = Jobs::start_action( $r, Mailboxes::CREATE, __( 'Creating the mailbox', 'beltoft-services' ), $plan, static fn() => Mailboxes::reserve( $r, $plan['email'] ) );
+
+		if ( is_wp_error( $queued ) ) {
+			return self::failure( $queued );
+		}
+
+		return self::queued( $r, Mailboxes::CREATE, array( 'email' => $plan['email'], 'quota_mb' => $plan['quota'], 'reveal' => true ), __( 'We are making the mailbox. This can take a minute. Then you can show the password once.', 'beltoft-services' ) );
 	}
 
 	public static function delete_mailbox( \WP_REST_Request $request ): \WP_REST_Response {
@@ -301,16 +312,19 @@ final class MailRoutes {
 			return $limited;
 		}
 
-		$email = rawurldecode( (string) $request['email'] );
-		$done  = Mailboxes::reset_password( $r, $email );
+		$email = Mailboxes::plan_password( $r, rawurldecode( (string) $request['email'] ) );
 
-		return is_wp_error( $done ) ? self::failure( $done ) : self::ok(
-			array(
-				'email'    => strtolower( $email ),
-				'reveal'   => true,
-				'message'  => __( 'The old password no longer works. Show the new password once.', 'beltoft-services' ),
-			)
-		);
+		if ( is_wp_error( $email ) ) {
+			return self::failure( $email );
+		}
+
+		$queued = Jobs::start_action( $r, Mailboxes::PASSWORD, __( 'Setting a new password', 'beltoft-services' ), array( 'email' => $email ), static fn() => Mailboxes::reserve( $r, $email ) );
+
+		if ( is_wp_error( $queued ) ) {
+			return self::failure( $queued );
+		}
+
+		return self::queued( $r, Mailboxes::PASSWORD, array( 'email' => $email, 'reveal' => true ), __( 'We are setting a new password. This can take a minute. Then you can show it once.', 'beltoft-services' ) );
 	}
 
 	public static function create_alias( \WP_REST_Request $request ): \WP_REST_Response {
@@ -451,13 +465,16 @@ final class MailRoutes {
 			return $limited;
 		}
 
-		MailDns::restart( $r );
-		MailDns::run( $r->id() );
+		// The look publishes records into the customer's zone and changes the sending hold: it is the shared action mail_dns_check.
+		$queued = Jobs::start_action( $r, Mailboxes::DNS_CHECK, __( 'Checking the DNS records', 'beltoft-services' ) );
 
-		$fresh = Resource::find( $r->id() ) ?? $r;
-		$view  = MailView::data( $fresh, array() );
+		if ( is_wp_error( $queued ) ) {
+			return self::failure( $queued );
+		}
 
-		return self::ok( array( 'dns' => $view['dns'] ) );
+		$view = MailView::data( Resource::find( $r->id() ) ?? $r, array() );
+
+		return self::queued( $r, Mailboxes::DNS_CHECK, array( 'dns' => $view['dns'] ), __( 'We are checking your DNS records. This can take a minute.', 'beltoft-services' ) );
 	}
 
 	/**

@@ -279,6 +279,45 @@ final class Routes {
 	}
 
 	/**
+	 * The answer of a route that queued a customer action (Jobs::start_action): 202, what was queued, and how to read the
+	 * outcome. The state is GET resources/<id>: `working` while the job waits or runs, then `last_result` ({action, ok, at, text}).
+	 *
+	 * @param Resource             $resource Resource.
+	 * @param string               $action   Action name that was queued.
+	 * @param array<string, mixed> $extra    More fields for this route's answer (never a secret).
+	 * @param string               $message  Words for the customer.
+	 */
+	public static function queued( Resource $resource, string $action, array $extra = array(), string $message = '' ): \WP_REST_Response {
+		$response = new \WP_REST_Response(
+			array_merge(
+				array(
+					'queued'  => true,
+					'action'  => $action,
+					'at'      => time(),
+					'status'  => '/resources/' . $resource->id(),
+					'message' => '' !== $message ? $message : __( 'Your request is on its way. This can take a minute.', 'beltoft-services' ),
+				),
+				$extra
+			),
+			202
+		);
+		$response->header( 'Cache-Control', 'private, no-store' );
+
+		return $response;
+	}
+
+	/**
+	 * The refusal of a route whose action could not be started: another change is pending (409), or the job could not be queued.
+	 *
+	 * @param \WP_Error $error Error from Jobs::start_action().
+	 */
+	public static function not_queued( \WP_Error $error ): \WP_REST_Response {
+		$data = $error->get_error_data();
+
+		return self::error( 'beltoft_services_' . $error->get_error_code(), $error->get_error_message(), is_array( $data ) && isset( $data['status'] ) ? (int) $data['status'] : 409 );
+	}
+
+	/**
 	 * POST resources/<id>/delete: the customer deletes their pay-as-you-go server or database (typed confirmation in
 	 * `confirm`). Dashboard only: the token gate does not allow this address. The service is queued for deletion and the
 	 * driver does the work in the background.

@@ -30,11 +30,11 @@ final class MailPlanTest extends MailTestCase {
 		list( $root, $child ) = $this->pair();
 
 		foreach ( array( 'a', 'b', 'c' ) as $local ) {
-			$this->assertIsArray( Mailboxes::create( $root, $local ) );
+			$this->assertIsArray( $this->create_box( $root, $local ) );
 		}
 
 		foreach ( array( 'd', 'e' ) as $local ) {
-			$this->assertIsArray( Mailboxes::create( $child, $local ) );
+			$this->assertIsArray( $this->create_box( $child, $local ) );
 		}
 
 		$this->assertSame( $root->id(), MailPlan::root( $child )->id() );
@@ -48,20 +48,20 @@ final class MailPlanTest extends MailTestCase {
 		list( $root, $child ) = $this->pair();
 
 		foreach ( array( 'a', 'b', 'c' ) as $local ) {
-			$this->assertIsArray( Mailboxes::create( $root, $local ) );
+			$this->assertIsArray( $this->create_box( $root, $local ) );
 		}
 
 		foreach ( array( 'd', 'e' ) as $local ) {
-			$this->assertIsArray( Mailboxes::create( $child, $local ) );
+			$this->assertIsArray( $this->create_box( $child, $local ) );
 		}
 
-		$on_child = Mailboxes::create( $child, 'f' );
+		$on_child = $this->create_box( $child, 'f' );
 		$this->assertWPError( $on_child );
-		$this->assertSame( 'limit', $on_child->get_error_code() );
+		$this->assertSame( 'Your plan has no room for more mailboxes.', $on_child->get_error_message() );
 
-		$on_root = Mailboxes::create( $root, 'f' );
+		$on_root = $this->create_box( $root, 'f' );
 		$this->assertWPError( $on_root );
-		$this->assertSame( 'limit', $on_root->get_error_code() );
+		$this->assertSame( 'Your plan has no room for more mailboxes.', $on_root->get_error_message() );
 	}
 
 	public function test_aliases_share_the_plan_limit(): void {
@@ -82,11 +82,11 @@ final class MailPlanTest extends MailTestCase {
 
 		$this->assertSame( $r->id(), MailPlan::root( $r )->id() );
 		$this->assertSame( array( $r->id() ), array_map( static fn( $m ) => $m->id(), MailPlan::members( $r ) ) );
-		$this->assertIsArray( Mailboxes::create( $r, 'a' ) );
-		$this->assertIsArray( Mailboxes::create( $r, 'b' ) );
-		$res = Mailboxes::create( $r, 'c' );
+		$this->assertIsArray( $this->create_box( $r, 'a' ) );
+		$this->assertIsArray( $this->create_box( $r, 'b' ) );
+		$res = $this->create_box( $r, 'c' );
 		$this->assertWPError( $res );
-		$this->assertSame( 'limit', $res->get_error_code() );
+		$this->assertSame( 'Your plan has no room for more mailboxes.', $res->get_error_message() );
 		$this->assertSame( 1, MailPlan::used( $r )['domains'] );
 	}
 

@@ -104,8 +104,8 @@ final class MailHoldTest extends MailTestCase {
 		$r = $this->ready_mail( 'held.example' );
 
 		$this->assertTrue( MailHold::held( $r ) );
-		$this->assertIsArray( Mailboxes::create( $r, 'anna' ) );
-		$this->assertIsArray( Mailboxes::create( $r, 'carl' ) );
+		$this->assertIsArray( $this->create_box( $r, 'anna' ) );
+		$this->assertIsArray( $this->create_box( $r, 'carl' ) );
 
 		$this->assertFalse( $this->mailcow->mailbox( 'anna@held.example' )['smtp'] );
 		$this->assertFalse( $this->mailcow->mailbox( 'carl@held.example' )['smtp'] );
@@ -138,7 +138,7 @@ final class MailHoldTest extends MailTestCase {
 		$this->assertSame( 'lifted', $r->get( MailHold::META ) );
 		$this->assertFalse( MailHold::held( $r ) );
 
-		$later = Mailboxes::create( $r, 'new' );
+		$later = $this->create_box( $r, 'new' );
 		$this->assertIsArray( $later );
 		$this->assertTrue( $this->mailcow->mailbox( 'new@life.example' )['smtp'], 'Not held once lifted.' );
 	}
@@ -149,7 +149,7 @@ final class MailHoldTest extends MailTestCase {
 		$r = $this->ready_mail( 'zone.example', array(), $user );
 
 		$this->assertFalse( MailHold::held( $r ) );
-		Mailboxes::create( $r, 'anna' );
+		$this->create_box( $r, 'anna' );
 		$this->assertTrue( $this->mailcow->mailbox( 'anna@zone.example' )['smtp'] );
 		$this->assertSame( array(), $this->mailcow->calls_of( 'set_smtp_access' ) );
 	}
@@ -164,13 +164,13 @@ final class MailHoldTest extends MailTestCase {
 
 	public function test_a_failed_hold_removes_the_new_mailbox_and_a_failed_lift_is_tried_again(): void {
 		$r = $this->ready_mail( 'fail.example' );
-		$this->mailcow->fail_next( 'set_smtp_access', new \WP_Error( 'mailcow_transport', 'down' ) );
-		$res = Mailboxes::create( $r, 'anna' );
+		$this->mailcow->fail_next( 'set_smtp_access', new \WP_Error( 'mailcow_error', 'refused', array( 'key' => 'x' ) ) );
+		$res = $this->create_box( $r, 'anna' );
 
 		$this->assertWPError( $res );
 		$this->assertNull( $this->mailcow->mailbox( 'anna@fail.example' ), 'No mailbox that could send.' );
 
-		$this->assertIsArray( Mailboxes::create( $r, 'anna' ) );
+		$this->assertIsArray( $this->create_box( $r, 'anna' ) );
 		$this->found( 'fail.example', array( 'mx', 'spf', 'dkim' ) );
 		$this->mailcow->fail_next( 'set_smtp_access', new \WP_Error( 'mailcow_transport', 'down' ) );
 		$r = $this->check( Resource::find( $r->id() ) );
@@ -183,7 +183,7 @@ final class MailHoldTest extends MailTestCase {
 
 	public function test_the_view_tells_the_customer_while_held_and_stops_when_lifted(): void {
 		$r = $this->ready_mail( 'say.example' );
-		Mailboxes::create( $r, 'anna' );
+		$this->create_box( $r, 'anna' );
 		$line = 'Sending is held until the SPF and DKIM records are found. Receiving works once the MX record points here.';
 
 		$view = MailView::data( Resource::find( $r->id() ) );

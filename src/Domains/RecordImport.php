@@ -7,6 +7,10 @@
 
 namespace BeltoftServices\Domains;
 
+use BeltoftServices\Drivers\StepResult;
+use BeltoftServices\Jobs;
+use BeltoftServices\Resource;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -114,35 +118,115 @@ final class RecordImport {
 		return array( 'sets' => $sets, 'skipped' => array_values( $skipped ) );
 	}
 
+	/** Resource meta that holds a queued import: the sets still to write and how far the job is. Cleared when the job ends. */
+	public const JOB = 'dns_import_job';
+
+	/** Error codes of Records::change() that mean this set can never be written (the others are tried again). */
+	private const FINAL = array( 'bad_record', 'cname_conflict', 'too_many_records', 'records_off', 'exists', 'stale', 'not_ours' );
+
 	/**
-	 * Writes the sets that are new or different, one set at a time under the zone lock (Records::change). A set that cannot be written
-	 * is reported, the others still go in.
+	 * Queues the writing of previewed sets (the shared action `dns_import`). The sets are kept in the resource's meta, not in the job's
+	 * arguments, so the job can go on where it stopped.
 	 *
-	 * @param string $zone Zone.
-	 * @param array  $sets Sets from plan().
-	 * @return array{added: int, replaced: int, unchanged: int, failed: array<int, array{name: string, type: string, reason: string}>}
+	 * @param Resource $r    Resource.
+	 * @param array    $sets Sets from plan().
+	 * @return true|\WP_Error
 	 */
-	public static function apply( string $zone, array $sets ): array {
-		$out = array( 'added' => 0, 'replaced' => 0, 'unchanged' => 0, 'failed' => array() );
+	public static function queue( Resource $r, array $sets ) {
+		$todo      = array();
+		$unchanged = 0;
 
 		foreach ( $sets as $set ) {
 			if ( 'same' === $set['status'] ) {
-				++$out['unchanged'];
+				++$unchanged;
 				continue;
 			}
 
+			$todo[] = array( 'name' => (string) $set['name'], 'type' => (string) $set['type'], 'status' => (string) $set['status'], 'rows' => array_values( (array) $set['rows'] ) );
+		}
+
+		return Jobs::start_action(
+			$r,
+			'dns_import',
+			__( 'Adding DNS records', 'beltoft-services' ),
+			array(),
+			static fn() => $r->set( array( self::JOB => array( 'sets' => $todo, 'next' => 0, 'unchanged' => $unchanged, 'added' => 0, 'replaced' => 0, 'failed' => array() ) ) )
+				? true
+				: new \WP_Error( 'failed', __( 'This was not done. Nothing was changed.', 'beltoft-services' ), array( 'status' => 500 ) )
+		);
+	}
+
+	/**
+	 * The job of `dns_import` (Actions::run): writes the queued sets one at a time through Records::change (the zone owner, with its lock
+	 * and checks), keeping its place after every set. A set that can never be written is reported and the others still go in; a set that
+	 * failed for a passing reason is tried again with the whole job. A replay starts at the set it had reached, and a set that was written
+	 * already is written again as it is, which changes nothing. The report is the outcome (Jobs::TEXT).
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function run_job( Resource $r ): StepResult {
+		$job  = $r->get( self::JOB );
+		$zone = (string) $r->get( 'domain' );
+
+		if ( ! is_array( $job ) || ! isset( $job['sets'] ) ) {
+			// Replayed after it ended: nothing is left and nothing is lost.
+			return StepResult::done();
+		}
+
+		$sets = (array) $job['sets'];
+
+		for ( $i = (int) $job['next']; $i < count( $sets ); $i++ ) {
+			$set  = (array) $sets[ $i ];
 			$rows = array_map( static fn( $row ) => array_diff_key( (array) $row, array( 'name' => 1, 'type' => 1 ) ), (array) $set['rows'] );
 			$done = Records::change( $zone, (string) $set['name'], (string) $set['type'], $rows );
 
 			if ( is_wp_error( $done ) ) {
-				$out['failed'][] = array( 'name' => (string) $set['name'], 'type' => (string) $set['type'], 'reason' => $done->get_error_message() );
-				continue;
+				if ( ! in_array( $done->get_error_code(), self::FINAL, true ) ) {
+					return StepResult::retry( 60, 'DNS records could not be saved: ' . $done->get_error_code() );
+				}
+
+				$job['failed'][] = array( 'name' => (string) $set['name'], 'type' => (string) $set['type'], 'reason' => $done->get_error_message() );
+			} else {
+				'new' === $set['status'] ? ++$job['added'] : ++$job['replaced'];
 			}
 
-			'new' === $set['status'] ? ++$out['added'] : ++$out['replaced'];
+			$job['next'] = $i + 1;
+
+			if ( ! $r->set( array( self::JOB => $job ) ) ) {
+				return StepResult::retry( 60, 'The import could not be saved.' );
+			}
 		}
 
-		return $out;
+		$failed = (array) $job['failed'];
+		$meta   = array( self::JOB => null );
+
+		if ( ! $failed && ( (int) $job['added'] + (int) $job['replaced'] + (int) $job['unchanged'] ) > 0 ) {
+			// A zone made for a transfer (or for the move to our DNS) notes that the customer brought their records.
+			$meta['dns_imported_at'] = time();
+		}
+
+		$text = self::report( $job );
+
+		return $failed ? StepResult::fail( 'Some DNS records were not added.', $meta + array( Jobs::TEXT => $text ) ) : StepResult::done( $meta + array( Jobs::TEXT => $text ) );
+	}
+
+	/**
+	 * The report of an import, for the customer.
+	 *
+	 * @param array<string, mixed> $job The job state.
+	 */
+	public static function report( array $job ): string {
+		/* translators: 1: number of record sets added, 2: number replaced. */
+		$text = sprintf( __( 'The records were imported: %1$d added, %2$d replaced.', 'beltoft-services' ), (int) $job['added'], (int) $job['replaced'] );
+
+		if ( empty( $job['failed'] ) ) {
+			return $text;
+		}
+
+		$list = array_map( static fn( $f ) => $f['name'] . ' ' . $f['type'] . ' (' . $f['reason'] . ')', array_slice( (array) $job['failed'], 0, 5 ) );
+
+		/* translators: 1: the part about what was added, 2: the records that were not added, with the reason of each. */
+		return sprintf( __( '%1$s Not added: %2$s', 'beltoft-services' ), $text, implode( ', ', $list ) );
 	}
 
 	/**

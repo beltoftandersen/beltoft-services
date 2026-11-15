@@ -12,6 +12,12 @@
  * headers (more headers), plus any other fetch option (cache, signal). A path that does not start with / or http is
  * joined to holder.root.
  *
+ * window.beltoftApi.follow( queued, options ) follows a queued customer action to its end: queued is the 202 answer of a route
+ * (its `status` path, /resources/<id>, which is read below the holder's root as the other account scripts do, and `at`), and it reads that status every few seconds until the job is over. It resolves to the outcome
+ * {action, ok, at, text} (the resource's last_result) or, when the job is still going after options.rounds looks (default 30),
+ * to null. Options: holder (as for call), interval (milliseconds, default 4000), rounds, onTick( data ) with every status read.
+ * Nothing is rejected for a failed job: the outcome has ok false and the server's own text.
+ *
  * window.beltoftApi.copy( text, button ) copies text (the clipboard, or a hidden textarea and the old copy command) and
  * resolves when it worked; with a button, its label shows the button's data-copied text for two seconds. No dependencies.
  */
@@ -80,6 +86,49 @@
 		} );
 	}
 
+	function follow( queued, options ) {
+		var settings = options || {};
+		var holder = settings.holder || window.beltoftServicesAccount || {};
+		var rounds = settings.rounds || 30;
+		var interval = settings.interval || 4000;
+		var since = ( queued && queued.at ? queued.at : 0 ) - 1;
+		var action = queued ? queued.action : '';
+		var path = queued && queued.status ? queued.status : '';
+
+		return new Promise( function ( resolve ) {
+			function look() {
+				call( path.replace( /^\/?resources\//, '' ), { holder: holder } ).then( function ( reply ) {
+					var data = reply.data || {};
+					var result = data.last_result;
+
+					if ( settings.onTick ) {
+						settings.onTick( data );
+					}
+
+					if ( reply.ok && ! data.working && result && result.action === action && result.at >= since ) {
+						resolve( result );
+						return;
+					}
+
+					next();
+				}, next );
+			}
+
+			function next() {
+				rounds -= 1;
+
+				if ( rounds < 1 ) {
+					resolve( null );
+					return;
+				}
+
+				window.setTimeout( look, interval );
+			}
+
+			look();
+		} );
+	}
+
 	function copy( text, button ) {
 		var label = button ? button.textContent : '';
 
@@ -122,5 +171,5 @@
 		} ).then( shown );
 	}
 
-	window.beltoftApi = { call: call, copy: copy };
+	window.beltoftApi = { call: call, copy: copy, follow: follow };
 }() );

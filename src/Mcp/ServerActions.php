@@ -106,7 +106,7 @@ final class ServerActions {
 				$id   = (int) $args['id'];
 				$done = Tools::route( 'POST', '/resources/' . $id . '/mail/mailboxes/' . rawurlencode( (string) $args['email'] ) . '/password', array(), array(), $id, 'new mailbox password made' );
 
-				return $done instanceof \WP_Error ? $done : array( 'done' => true, 'message' => 'The old password no longer works. The new one is not shown here. The customer shows it once in the dashboard, or reveal_mailbox_password shows it after the customer says yes.' );
+				return $done instanceof \WP_Error ? $done : array( 'queued' => true, 'message' => Acts::EMAIL_QUEUED . ' When it is done the old password no longer works. The new one is not shown here: the customer shows it once in the dashboard, or reveal_mailbox_password shows it after the customer says yes.' );
 
 			case 'delete_snapshot':
 				return self::send( $args, 'snapshot_delete', array( 'id' => (string) $args['snapshot'] ), 'delete snapshot requested' );

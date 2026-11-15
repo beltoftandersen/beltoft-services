@@ -449,6 +449,78 @@ abstract class TestCase extends \WP_UnitTestCase {
 	}
 
 	/**
+	 * A new mailbox the way a customer asks for it: the request checks and keeps the password (\BeltoftServices\Mail\Mailboxes::plan_create, reserve), the
+	 * shared action is queued (\BeltoftServices\Jobs::start_action) and the jobs are run. Returns what the old synchronous call returned: the address and
+	 * size, or an error. A refusal of the request keeps its code; a job that ended without success is a WP_Error `job` whose message is
+	 * the outcome text (last_result).
+	 *
+	 * @param \BeltoftServices\Resource $r     Resource.
+	 * @param mixed    $local Local part.
+	 * @param string   $name  Display name.
+	 * @param int      $size  Size in MB.
+	 * @return array{email:string,quota_mb:int}|\WP_Error
+	 */
+	protected function create_box( \BeltoftServices\Resource $r, $local, string $name = '', int $size = 0 ) {
+		$r    = \BeltoftServices\Resource::find( $r->id() ) ?? $r;
+		$plan = \BeltoftServices\Mail\Mailboxes::plan_create( $r, $local, $name, $size );
+
+		if ( is_wp_error( $plan ) ) {
+			return $plan;
+		}
+
+		\BeltoftServices\Resource::find( $r->id() )->set( array( \BeltoftServices\Jobs::RESULT => null ) );
+		$queued = \BeltoftServices\Jobs::start_action( $r, \BeltoftServices\Mail\Mailboxes::CREATE, 'Creating the mailbox', $plan, static fn() => \BeltoftServices\Mail\Mailboxes::reserve( $r, $plan['email'] ) );
+
+		if ( is_wp_error( $queued ) ) {
+			return $queued;
+		}
+
+		$this->run_jobs();
+
+		return $this->outcome( $r, array( 'email' => $plan['email'], 'quota_mb' => $plan['quota'] ) );
+	}
+
+	/**
+	 * A new password the way a customer asks for it (see create_box).
+	 *
+	 * @param \BeltoftServices\Resource $r     Resource.
+	 * @param mixed    $email Address.
+	 * @return true|\WP_Error
+	 */
+	protected function reset_box( \BeltoftServices\Resource $r, $email ) {
+		$r     = \BeltoftServices\Resource::find( $r->id() ) ?? $r;
+		$email = \BeltoftServices\Mail\Mailboxes::plan_password( $r, $email );
+
+		if ( is_wp_error( $email ) ) {
+			return $email;
+		}
+
+		\BeltoftServices\Resource::find( $r->id() )->set( array( \BeltoftServices\Jobs::RESULT => null ) );
+		$queued = \BeltoftServices\Jobs::start_action( $r, \BeltoftServices\Mail\Mailboxes::PASSWORD, 'Setting a new password', array( 'email' => $email ), static fn() => \BeltoftServices\Mail\Mailboxes::reserve( $r, $email ) );
+
+		if ( is_wp_error( $queued ) ) {
+			return $queued;
+		}
+
+		$this->run_jobs();
+
+		return $this->outcome( $r, true );
+	}
+
+	/**
+	 * The outcome of the last action of a resource: the given value when it was done, else an error `job` with the outcome text.
+	 *
+	 * @param \BeltoftServices\Resource $r  Resource.
+	 * @param mixed    $ok What to return when it was done.
+	 * @return mixed|\WP_Error
+	 */
+	protected function outcome( \BeltoftServices\Resource $r, $ok = true ) {
+		$last = \BeltoftServices\Resource::find( $r->id() )->get( \BeltoftServices\Jobs::RESULT );
+
+		return is_array( $last ) && ! empty( $last['ok'] ) ? $ok : new \WP_Error( 'job', is_array( $last ) ? (string) $last['text'] : 'no outcome' );
+	}
+
+	/**
 	 * Replaces the private network pool with this many free /28 networks (10.77.n.0/28, VLAN 3000+n).
 	 *
 	 * @param int $count Free networks.
