@@ -85,18 +85,19 @@ class LineNamesTest extends UsageTestCase {
 		$this->assertSame( Account::product_id(), (int) $item->get_product_id() );
 	}
 
-	public function test_the_usage_account_shows_a_translated_name_where_the_stored_name_is_read(): void {
+	public function test_the_usage_account_shows_the_one_customer_name_where_the_stored_name_is_read(): void {
 		$user  = $this->new_user();
 		$sub   = $this->usage_account( $user );
 		$items = array_values( $sub->get_items() );
 		$other = new \WC_Order_Item_Product();
 		$other->set_name( 'Backup' );
 
-		$this->assertSame( 'Usage account', LineNames::display_name( $items[0] ) );
+		$this->assertSame( 'Pay as you go account', LineNames::display_name( $items[0] ) );
+		$this->assertSame( LineNames::label( $items[0]->get_product() ), LineNames::display_name( $items[0] ) );
 		$this->assertSame( 'Backup', LineNames::display_name( $other ) );
 		$this->assertSame( '', LineNames::display_name( null ) );
 
-		$da = static fn( $translated, $text, $domain ) => 'beltoft-services' === $domain && 'Usage account' === $text ? 'Forbrugskonto' : $translated;
+		$da = static fn( $translated, $text, $domain ) => 'beltoft-services' === $domain && 'Pay as you go account' === $text ? 'Forbrugskonto' : $translated;
 		add_filter( 'gettext', $da, 10, 3 );
 		$this->assertSame( 'Forbrugskonto', LineNames::display_name( $items[0] ) );
 		$this->assertSame( 'Forbrugskonto', \BeltoftServices\Billing\SubscriptionNames::names( $sub ) );

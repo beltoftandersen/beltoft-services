@@ -262,7 +262,7 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 * A code check that a site refuses for another reason (for example an unconfirmed email address) can now say so: the message goes through the filter `beltoft_services_step_up_refusal( $message, $user_id, $purpose )`.
 * The hosting page follows a running change until the account has no task left, through the shared script helper, instead of its own polling.
 * A hosting page that loads just after a change ended asks for the cache facts once more when the first answer is "not yet".
-* The pay as you go usage account is shown with a translated name in the subscription list and the Overview.
+* The pay as you go usage account is shown with the same translatable name (Pay as you go account) in the subscription list and the Overview as on order and cart lines.
 
 = 0.31.2 =
 * Setting an SFTP password, adding an SSH key and asking for a transfer code now send the code request to the right address (it was a 404 from the hosting page and the domain page).
