@@ -181,6 +181,20 @@ final class MailHoldTest extends MailTestCase {
 		$this->assertSame( 'lifted', Resource::find( $r->id() )->get( MailHold::META ) );
 	}
 
+	public function test_a_domain_whose_mailboxes_are_not_as_the_rule_says_is_found_by_the_watchdog(): void {
+		$r = $this->ready_mail( 'dog.example' );
+		$this->assertTrue( MailHold::held( $r ) );
+		as_unschedule_all_actions( MailHold::HOOK );
+
+		$this->assertSame( array( array( $r->id() ) ), MailHold::due() );
+		\BeltoftServices\Background::watchdog();
+		$this->assertTrue( \BeltoftServices\Jobs::pending_action( MailHold::HOOK, array( $r->id() ) ) );
+
+		MailHold::retry( $r->id() );
+		$this->assertSame( 'held', Resource::find( $r->id() )->get( MailHold::META ) );
+		$this->assertSame( array(), MailHold::due(), 'In line with the rule: nothing to do.' );
+	}
+
 	public function test_the_view_tells_the_customer_while_held_and_stops_when_lifted(): void {
 		$r = $this->ready_mail( 'say.example' );
 		$this->create_box( $r, 'anna' );

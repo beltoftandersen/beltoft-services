@@ -663,7 +663,7 @@ class ProvisionTest extends TestCase {
 		$jobs = as_get_scheduled_actions( array( 'hook' => AppInstall::HOOK, 'args' => array( $resource->id() ), 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING ), 'ids' );
 		$this->assertCount( 1, $jobs );
 		as_unschedule_all_actions( AppInstall::HOOK, array( $resource->id() ), Jobs::GROUP );
-		AppInstall::sweep();
+		\BeltoftServices\Background::watchdog();
 		$jobs = as_get_scheduled_actions( array( 'hook' => AppInstall::HOOK, 'args' => array( $resource->id() ), 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING ), 'ids' );
 		$this->assertCount( 1, $jobs );
 	}

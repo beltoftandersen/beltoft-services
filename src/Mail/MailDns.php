@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Mail;
 
+use BeltoftServices\Background;
 use BeltoftServices\Domains\PublicDns;
 use BeltoftServices\Domains\Records;
 use BeltoftServices\Drivers\StepResult;
@@ -60,7 +61,13 @@ final class MailDns {
 
 	public static function register(): void {
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
-		add_action( Jobs::SWEEP, array( __CLASS__, 'sweep' ) );
+		Background::declare(
+			self::HOOK,
+			array(
+				'due'   => array( __CLASS__, 'due' ),
+				'label' => 'Email DNS look',
+			)
+		);
 		self::register_recheck();
 	}
 
@@ -564,12 +571,13 @@ final class MailDns {
 	}
 
 	/**
-	 * Recovers reads that were lost (a worker stopped, an action removed).
+	 * The watchdog's list (Background): every domain still waiting for records should have a read queued. A read that was
+	 * lost (a worker stopped, an action removed) is queued again by the shared sweep.
+	 *
+	 * @return array<int, array<int, int>>
 	 */
-	public static function sweep(): void {
-		foreach ( Resource::find_by_meta( MailDriver::KIND, 'mail_dns', 'waiting' ) as $id ) {
-			self::schedule( (int) $id, 0 );
-		}
+	public static function due(): array {
+		return array_map( static fn( $id ): array => array( (int) $id ), Resource::find_by_meta( MailDriver::KIND, 'mail_dns', 'waiting' ) );
 	}
 
 	/**
@@ -696,6 +704,8 @@ final class MailDns {
 	public static function register_recheck(): void {
 		add_action( self::RECHECK_ALL, array( __CLASS__, 'recheck_all' ) );
 		add_action( self::RECHECK, array( __CLASS__, 'recheck' ) );
+		// One look a day per domain, queued by the daily sweep: claimed by the runners and covered when it crashes. No watchdog.
+		Background::declare( self::RECHECK, array( 'label' => 'Email DNS daily look' ) );
 		Jobs::recurring( array( __CLASS__, 'schedule_recheck' ) );
 	}
 

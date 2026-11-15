@@ -308,6 +308,21 @@ final class DnsClaims {
 	}
 
 	/**
+	 * Ids of the claims that are being checked and not past their time: each should have a check job (the watchdog).
+	 *
+	 * @param int $limit Most ids.
+	 * @return int[]
+	 */
+	public static function checking_ids( int $limit = 200 ): array {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- own table, always fresh.
+		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM %i WHERE status = 'checking' AND expires_at > %s ORDER BY id ASC LIMIT %d", self::table(), self::now(), max( 1, $limit ) ) );
+
+		return array_map( 'intval', (array) $ids );
+	}
+
+	/**
 	 * Open claims past their expiry become expired.
 	 *
 	 * @return int Rows changed.

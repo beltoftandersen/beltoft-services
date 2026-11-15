@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Mail;
 
+use BeltoftServices\Background;
 use BeltoftServices\Children;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
@@ -38,6 +39,13 @@ final class MailDomains {
 	public static function register(): void {
 		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'on_state_changed' ), 10, 3 );
 		add_action( self::RETRY_HOOK, array( __CLASS__, 'retry' ) );
+		Background::declare(
+			self::RETRY_HOOK,
+			array(
+				'due'   => array( __CLASS__, 'retry_due' ),
+				'label' => 'Email domain joins its plan',
+			)
+		);
 		add_filter( 'beltoft_services_domain_cart_attach', array( __CLASS__, 'cart_attach' ), 10, 3 );
 	}
 
@@ -132,6 +140,25 @@ final class MailDomains {
 		if ( $r && 'domain' === $r->get( 'driver' ) && 'ready' === (string) $r->get( 'state' ) ) {
 			self::attempt( $r );
 		}
+	}
+
+	/**
+	 * The watchdog's list: a ready domain whose joining was asked again and not finished, inside its window.
+	 *
+	 * @return array<int, array<int, int>>
+	 */
+	public static function retry_due(): array {
+		$sets = array();
+
+		foreach ( Resource::ids_with_meta_value( self::ATTACH_UNTIL ) as $id ) {
+			$r = Resource::find( (int) $id );
+
+			if ( $r && 'domain' === $r->get( 'driver' ) && $r->is_live() && 'ready' === (string) $r->get( 'state' ) && ! $r->get( self::ATTACH_DONE ) && (int) $r->get( self::ATTACH_UNTIL ) > time() ) {
+				$sets[] = array( (int) $id );
+			}
+		}
+
+		return $sets;
 	}
 
 	/**

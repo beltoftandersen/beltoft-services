@@ -299,7 +299,7 @@ final class AppReinstallDomainTest extends MonitoringTestCase {
 		$this->assertFalse( (bool) $r->get( 'app_domain_release_alerted' ) );
 	}
 
-	public function test_release_transport_errors_retry_four_times_then_alert_once(): void {
+	public function test_release_transport_errors_retry_along_the_shared_backoff_then_alert_once(): void {
 		$r = $this->server( 'wordpress', array( 'app_domain_old' => array( array( 'zone' => 'mine.example', 'name' => 'old.mine.example', 'ip' => '192.0.2.10', 'tries' => 0 ) ) ) );
 		$this->zone( (int) $r->license()['user_id'] );
 		$this->assertTrue( Records::replace( 'mine.example', array( array( 'name' => 'old', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.10' ) ) ) );
@@ -314,7 +314,7 @@ final class AppReinstallDomainTest extends MonitoringTestCase {
 		$mails = array();
 		$capture = static function ( $pre, $mail ) use ( &$mails ) { $mails[] = $mail; return true; };
 		add_filter( 'pre_wp_mail', $capture, 10, 2 );
-		for ( $attempt = 1; $attempt <= 4; ++$attempt ) {
+		for ( $attempt = 1; $attempt <= count( \BeltoftServices\Reconciler::BACKOFF ); ++$attempt ) {
 			AppDomainRelease::run( $r->id() );
 			$this->assertSame( $attempt, Resource::find( $r->id() )->get( 'app_domain_old' )[0]['tries'] );
 		}
@@ -481,7 +481,7 @@ final class AppReinstallDomainTest extends MonitoringTestCase {
 		$r = $this->server( 'wordpress', array( 'app_domain_old' => array( 'x' ) ) );
 		AppDomainRelease::run( $r->id() );
 		$this->assertSame( array(), (array) Resource::find( $r->id() )->get( 'app_domain_old' ) );
-		AppDomainRelease::sweep();
+		\BeltoftServices\Background::watchdog();
 		$this->assertFalse( as_has_scheduled_action( AppDomainRelease::HOOK, array( $r->id() ), \BeltoftServices\Jobs::GROUP ) );
 	}
 

@@ -54,6 +54,7 @@ final class Plugin {
 		LineNames::register();
 
 		Jobs::register();
+		Background::register();
 
 		// Driver settings screens add their tabs to Settings::register()'s filters, so they come after it.
 		Http\Connections::register();

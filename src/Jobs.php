@@ -686,6 +686,11 @@ final class Jobs {
 		$args = method_exists( $action, 'get_args' ) ? (array) $action->get_args() : array();
 		$id   = (int) ( $args[0] ?? 0 );
 
+		// A background hook a feature declared (Background::declare()): the one generic crash handling.
+		if ( Background::failed( $hook, $args, $error ) ) {
+			return;
+		}
+
 		if ( $id < 1 || ! in_array( $hook, array( self::HOOK, self::ACT ), true ) ) {
 			return;
 		}
