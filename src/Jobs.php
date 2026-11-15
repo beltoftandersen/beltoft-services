@@ -633,7 +633,9 @@ final class Jobs {
 	 * Action Scheduler gave up on one of our jobs: it threw, or its PHP process died (a fatal error, a deploy that
 	 * changed files under it). A build or reconcile job is queued again in a minute (the reconciler starts from the
 	 * stored state, so this is safe); a customer action is not repeated, because it may have done part of its work,
-	 * but it gets a failed result so the page that waits for it stops and says so, and staff are told.
+	 * but it gets a failed result so the page that waits for it stops and says so, and staff are told. An action its
+	 * driver says is resumable (see resumable(): its steps are kept, so a repeat is safe) is queued again once while its
+	 * Progress marker is still young, and goes on where it stopped.
 	 *
 	 * @param mixed $action_id Action Scheduler action id.
 	 * @param mixed $error     The exception, or the error array of an unexpected shutdown.
@@ -691,10 +693,75 @@ final class Jobs {
 			return;
 		}
 
-		$name = (string) ( $args[1] ?? '' );
+		$name   = (string) ( $args[1] ?? '' );
+		$marker = $resource->get( Progress::MARKER );
+		$at     = is_array( $marker ) ? (int) ( $marker['at'] ?? 0 ) : 0;
+
+		// Once per marker, and only while it is young: the repeat that is lost again is a failure.
+		if ( self::resumable( $resource, $name ) && $at > time() - Progress::MARKER_TTL && (string) ( $marker['action'] ?? '' ) === $name && (int) $resource->get( 'act_resumed_at' ) !== $at ) {
+			$resource->set( array( 'act_resumed_at' => $at ) );
+			self::queue_act( $id, $name, (array) ( $args[2] ?? array() ), 5 );
+			Alerts::admin( $resource, sprintf( 'Customer action "%s" stopped with an error and is queued again: %s', $name, '' !== $why ? $why : 'no message' ) );
+			return;
+		}
+
 		Progress::clear( $resource );
 		$resource->set( array( self::RESULT => self::result( $name, false, true ) ) );
 		Alerts::admin( $resource, sprintf( 'Customer action "%s" stopped with an error and was not finished: %s', $name, '' !== $why ? $why : 'no message' ) );
+		self::failed( $resource, $name, (array) ( $args[2] ?? array() ), 'stopped' );
+	}
+
+	/**
+	 * May a customer action whose job was lost be queued again? Only when its driver says so: a repeat must be safe.
+	 *
+	 * @param Resource $r      Resource.
+	 * @param string   $action Action name.
+	 */
+	public static function resumable( Resource $r, string $action ): bool {
+		/**
+		 * Whether a customer action whose job was lost (a crash, a deploy, an out of memory kill) is queued again, once,
+		 * while its Progress marker is young. True only for an action that keeps its own steps, so a repeat starts
+		 * nothing twice (the hosting changes). Servers and databases stay false: their actions may have done part of their work.
+		 *
+		 * @param bool   $resumable Default false.
+		 * @param string $driver    Driver id.
+		 * @param string $action    Action name.
+		 */
+		return (bool) apply_filters( 'beltoft_services_action_resumable', false, (string) $r->get( 'driver' ), $action );
+	}
+
+	/**
+	 * A customer action ended without finishing (it failed for good, its job was lost, or nothing worked on it). Features
+	 * clean up what it left half done.
+	 *
+	 * @param Resource             $r      Resource.
+	 * @param string               $action Action name.
+	 * @param array<string, mixed> $args   Its arguments, when known (empty for a lapsed one).
+	 * @param string               $why    failed, stopped or lapsed.
+	 */
+	private static function failed( Resource $r, string $action, array $args, string $why ): void {
+		/**
+		 * A customer action ended without finishing. Fired after its failed result is stored and staff were told.
+		 *
+		 * @param Resource             $r      Resource.
+		 * @param string               $action Action name.
+		 * @param array<string, mixed> $args   Its arguments, when known.
+		 * @param string               $why    failed, stopped or lapsed.
+		 */
+		do_action( 'beltoft_services_action_failed', $r, $action, $args, $why );
+	}
+
+	/**
+	 * A Progress marker that nothing works on any more (no job waits or runs, and it is older than MARKER_TTL): the action
+	 * ends with a failed result, staff are told once (the marker is gone afterwards) and features may clean up.
+	 *
+	 * @param Resource $r      Resource.
+	 * @param string   $action Action name from the marker.
+	 */
+	public static function lapsed( Resource $r, string $action ): void {
+		$r->set( array( Progress::MARKER => null, self::RESULT => self::result( $action, false, true ) ) );
+		Alerts::admin( $r, sprintf( 'Customer action "%s" was given up: no job worked on it for %d minutes', $action, (int) ( Progress::MARKER_TTL / 60 ) ) );
+		self::failed( $r, $action, array(), 'lapsed' );
 	}
 
 	/**
@@ -981,6 +1048,7 @@ final class Jobs {
 
 		Events::add( $license_id, 'service', $error );
 		Alerts::admin( $r, $error );
+		self::failed( Resource::find( $r->id() ) ?? $r, $action, $args, 'failed' );
 	}
 
 	/**
@@ -1129,6 +1197,9 @@ final class Jobs {
 				Alerts::admin( $resource, $resource->get( 'last_error' ) );
 				continue;
 			}
+
+			// An action whose job vanished is ended here (result, staff alert) even when nobody opens the page.
+			Progress::pending( $resource );
 
 			// A desired state that could not take the lock is applied by the next step.
 			if ( null !== $resource->pending_desire() ) {

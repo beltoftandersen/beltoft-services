@@ -466,10 +466,10 @@ class HostingPageTest extends HostingCase {
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
 		$this->assertSame( '0', (string) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}actionscheduler_actions WHERE args LIKE %s", '%' . $wpdb->esc_like( $data['password'] ) . '%' ) ) );
-		$this->assertStringNotContainsString( $data['password'], (string) wp_json_encode( \BeltoftServices\Hosting\Tasks::get( Resource::find( $r->id() ) ) ) );
+		$this->assertStringNotContainsString( $data['password'], (string) wp_json_encode( \BeltoftServices\Hosting\Actions\Steps::state( Resource::find( $r->id() ) ) ) );
 		$this->assertSame( array(), $this->agent->calls_of( 'ssh.password' ), 'Nothing is sent to the node in the request.' );
 		$this->run_jobs();
-		$this->assertNull( \BeltoftServices\Hosting\Tasks::get( Resource::find( $r->id() ) ), 'The task, and with it the secret, is gone when the job ends.' );
+		$this->assertSame( "", \BeltoftServices\Hosting\Actions\Steps::state( Resource::find( $r->id() ) )["secret"], 'The task, and with it the secret, is gone when the job ends.' );
 
 		$sent = $this->agent->calls_of( 'ssh.password' )[0]['args']['password'];
 		$this->assertNotSame( $data['password'], $sent, 'The call log has the password masked.' );

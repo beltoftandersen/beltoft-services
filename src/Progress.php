@@ -64,7 +64,8 @@ final class Progress {
 
 	/**
 	 * The marker, unless it is older than MARKER_TTL and no job of the service is waiting or
-	 * running (a job that waits or retries keeps it alive; only a vanished job lets it lapse).
+	 * running (a job that waits or retries keeps it alive; only a vanished job lets it lapse). A marker that lapses ends
+	 * the action: Jobs::lapsed() writes a failed result, tells staff once and lets features clean up.
 	 *
 	 * @param Resource $r Resource.
 	 * @return array{action: string, at: int, label: string}|null
@@ -77,6 +78,8 @@ final class Progress {
 		}
 
 		if ( (int) $marker['at'] < time() - self::MARKER_TTL && ! Jobs::acting( $r->id() ) ) {
+			Jobs::lapsed( $r, (string) $marker['action'] );
+
 			return null;
 		}
 

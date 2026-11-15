@@ -101,7 +101,7 @@ final class Plugin {
 		Hosting\NodeHealth::register();
 		Hosting\HostingRefresh::register();
 		Hosting\DomainSweep::register();
-		Hosting\Tasks::register();
+		Hosting\Actions\Steps::register();
 		Hosting\SiteWordPress::register();
 		Hosting\SiteStaging::register();
 		Hosting\MalwareScan::register();

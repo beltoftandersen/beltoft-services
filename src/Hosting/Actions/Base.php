@@ -15,8 +15,8 @@ use BeltoftServices\Hosting\Records;
 use BeltoftServices\Hosting\Runs;
 use BeltoftServices\Hosting\SiteDns;
 use BeltoftServices\Hosting\Sites;
-use BeltoftServices\Hosting\Tasks;
 use BeltoftServices\Jobs;
+use BeltoftServices\Progress;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
@@ -106,10 +106,11 @@ trait Base {
 	 * @return array<string, mixed>|\WP_Error The answer: status pending with the task, or the plain result.
 	 */
 	public function queue( string $method, array $args, ?string $secret = null ) {
-		$busy = Tasks::busy( $this->r );
+		// One change at a time, as for servers: the Progress marker. Asked again under the account's lock (locked()).
+		$busy = Progress::pending( Resource::find( $this->r->id() ) ?? $this->r );
 
 		if ( null !== $busy ) {
-			return Tasks::refusal( $busy );
+			return Steps::refusal( $busy );
 		}
 
 		$this->mode       = 'request';
@@ -134,7 +135,14 @@ trait Base {
 	 * @return mixed|\WP_Error The change's result, or busy.
 	 */
 	private function locked( callable $change ) {
-		list( $taken, $result ) = \BeltoftServices\Locks::with( \BeltoftServices\Locks::name( 'hosting-site', $this->r->id() ), $this->in_job() ? 0 : (int) apply_filters( 'beltoft_services_hosting_lock_wait', 10 ), $change );
+		$guarded = function () use ( $change ) {
+			// A request that makes a change asks again under the lock, so two clicks at once cannot both do their local work.
+			$busy = 'request' === $this->mode ? Progress::pending( Resource::find( $this->r->id() ) ?? $this->r ) : null;
+
+			return null !== $busy ? Steps::refusal( $busy ) : $change();
+		};
+
+		list( $taken, $result ) = \BeltoftServices\Locks::with( \BeltoftServices\Locks::name( 'hosting-site', $this->r->id() ), $this->in_job() ? 0 : (int) apply_filters( 'beltoft_services_hosting_lock_wait', 10 ), $guarded );
 
 		if ( ! $taken && $this->in_job() ) {
 			// Something else (a sweep) is changing the account: look again in a few seconds, never give up the task for it.
@@ -191,22 +199,16 @@ trait Base {
 	}
 
 	/**
-	 * The answer of a change that is queued: its task is taken now (with the site lock held by the change) and its job is queued.
+	 * The answer of a change that is queued: through the shared controller (Progress marker, Jobs::queue_act), with the site lock held by the change.
 	 *
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	private function defer_answer() {
 		list( $method, $args ) = $this->request;
 
-		$task = Tasks::claim( $this->r, $method, null === $this->deferred['args'] ? $args : $this->deferred['args'], $this->secret_arg );
+		$task = Steps::start( $this->r, $method, null === $this->deferred['args'] ? $args : $this->deferred['args'], $this->secret_arg );
 
-		if ( is_wp_error( $task ) ) {
-			return $task;
-		}
-
-		Tasks::queue( $this->r, (string) $task['action'] );
-
-		return array_merge( $this->deferred['result'], array( 'status' => 'pending', 'task' => Tasks::view( $task ) ) );
+		return is_wp_error( $task ) ? $task : array_merge( $this->deferred['result'], array( 'status' => 'pending', 'task' => $task ) );
 	}
 
 	/**
@@ -218,13 +220,13 @@ trait Base {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	private function job_call( string $name, string $op, array $args ) {
-		$memo = Tasks::memo( $this->r, $name );
+		$memo = Steps::memo( $this->r, $name );
 
 		if ( null !== $memo ) {
 			return $memo['ok'] ? (array) $memo['result'] : $this->failed_call();
 		}
 
-		Tasks::step( $this->r, $name );
+		Steps::step( $this->r, $name );
 
 		$done = $this->agent_step( $name, $op, $args );
 
@@ -235,7 +237,7 @@ trait Base {
 
 		$ok = is_array( $done );
 
-		if ( ! Tasks::remember( $this->r, $name, $ok, $ok ? $done : null ) ) {
+		if ( ! Steps::remember( $this->r, $name, $ok, $ok ? $done : null ) ) {
 			throw new TaskPending( StepResult::retry( 0, $name . ': the task step could not be stored' ) );
 		}
 
@@ -330,9 +332,7 @@ trait Base {
 			return false;
 		}
 
-		$task = Tasks::get( $this->r );
-
-		return null !== $task && $slug === (string) $task['slug'];
+		return $slug === (string) Steps::state( $this->r )['slug'];
 	}
 
 	/**

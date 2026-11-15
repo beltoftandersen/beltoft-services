@@ -402,12 +402,15 @@ final class ProgressTest extends TestCase {
 		list( $r ) = $this->resource( 'fake', array( 'state' => 'ready' ) );
 		$r->set( array( Progress::MARKER => array( 'action' => 'reinstall', 'at' => time() - Progress::MARKER_TTL - 600 ) ) );
 
-		$this->assertNull( Progress::pending( $r ) );
-
 		Jobs::queue_act( $r->id(), 'reinstall', array(), 3600 );
 
 		$this->assertNotNull( Progress::pending( $r ), 'The job still waits: the card keeps saying requested.' );
 		$this->assertSame( 'queued', Progress::build( $r )['phase'] );
+
+		// Once the job is gone the marker lapses, and the lapse ends the action with a failed result (Jobs::lapsed).
+		as_unschedule_all_actions( Jobs::ACT, array( $r->id(), 'reinstall', array() ), Jobs::GROUP );
+		$this->assertNull( Progress::pending( $r ) );
+		$this->assertFalse( $r->get( Jobs::RESULT )['ok'] ?? ( Resource::find( $r->id() )->get( Jobs::RESULT )['ok'] ) );
 	}
 
 	public function test_real_work_wins_over_the_marker(): void {

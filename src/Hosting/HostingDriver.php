@@ -188,7 +188,7 @@ class HostingDriver implements Driver, StopsOnDelete, NeedsBilling, InternalActi
 	 * {@inheritDoc}
 	 *
 	 * None: the changes of a hosting account have their own routes (HostingRoutes), which check the input and queue the
-	 * background task (Tasks). They are the driver's internal actions, so the generic action route and the generic buttons never
+	 * change through the shared controller (Actions\Steps). They are the driver's internal actions, so the generic action route and the generic buttons never
 	 * reach them.
 	 *
 	 * @param Resource $r Resource.
@@ -203,26 +203,24 @@ class HostingDriver implements Driver, StopsOnDelete, NeedsBilling, InternalActi
 	 * {@inheritDoc}
 	 */
 	public function internal_actions(): array {
-		return Tasks::actions();
+		return Actions\Steps::actions();
 	}
 
 	/**
 	 * {@inheritDoc}
 	 *
-	 * One agent step of the account's task (see Tasks::run()); the job queues itself again until the task is done.
+	 * One agent step of the account's task (see Actions\Steps::run()); the job queues itself again until the task is done.
 	 *
 	 * @param Resource             $r      Resource.
 	 * @param string               $action Action.
 	 * @param array<string, mixed> $args   Arguments (none: the task holds them).
 	 */
 	public function act( Resource $r, string $action, array $args ): StepResult {
-		unset( $args );
-
-		if ( ! in_array( $action, Tasks::actions(), true ) ) {
+		if ( ! in_array( $action, Actions\Steps::actions(), true ) ) {
 			return StepResult::fail( 'Unknown hosting action "' . mb_substr( sanitize_key( $action ), 0, 40 ) . '"' );
 		}
 
-		return Tasks::run( $r, $action );
+		return Actions\Steps::run( $r, $action, array_values( $args ) );
 	}
 
 	/**

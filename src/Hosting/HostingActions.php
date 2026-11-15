@@ -159,7 +159,7 @@ final class HostingActions {
 	/**
 	 * @param Resource $r    Hosting resource.
 	 * @param string   $mode inline (default: the caller waits a few seconds for each agent call), or job (a run of a background
-	 *                       task, see Tasks). A web request queues its change with queue().
+	 *                       change, see Actions\Steps). A web request queues its change with queue().
 	 */
 	public function __construct( Resource $r, string $mode = 'inline' ) {
 		$this->files   = new FilesActions( $r, $mode );
@@ -202,15 +202,15 @@ final class HostingActions {
 
 	/**
 	 * Makes a change from a web request: it is checked, its local work is done, and its agent work is queued as the
-	 * account's one task (see Tasks). The answer is status pending with the task, or a refusal. A second change while one
+	 * account's one change (Progress marker, Jobs::queue_act; see Actions\Steps). The answer is status pending with the task, or a refusal. A second change while one
 	 * runs is refused ("Wait until ... is done").
 	 *
-	 * @param string            $method One of the changes in Tasks::table().
+	 * @param string            $method One of the changes in Actions\Steps::table().
 	 * @param array<int, mixed> $args   Its arguments, as the method takes them.
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public function queue( string $method, array $args = array() ) {
-		$group = isset( Tasks::table()[ $method ] ) ? $this->owner( $method ) : null;
+		$group = isset( Actions\Steps::table()[ $method ] ) ? $this->owner( $method ) : null;
 
 		if ( null === $group ) {
 			return new \WP_Error( 'failed', __( 'That cannot be done right now.', 'beltoft-services' ) );
@@ -228,7 +228,7 @@ final class HostingActions {
 	}
 
 	/**
-	 * Runs the change of a task's job (see Tasks::run()).
+	 * Runs the change of a task's job (see Actions\Steps::run()).
 	 *
 	 * @param string            $method The method of the facade.
 	 * @param array<int, mixed> $args   Its arguments.

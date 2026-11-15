@@ -21,7 +21,6 @@ use BeltoftServices\Hosting\SiteNames;
 use BeltoftServices\Hosting\SiteStaging;
 use BeltoftServices\Hosting\SiteWordPress;
 use BeltoftServices\Hosting\Sites;
-use BeltoftServices\Hosting\Tasks;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -40,8 +39,7 @@ final class SiteActions {
 	public function sites(): array {
 		$domains = SiteDomains::for_resource( $this->r->id() );
 		$out     = array();
-		$task    = Tasks::busy( $this->r );
-		$task    = null === $task ? null : Tasks::view( $task );
+		$task    = Steps::view( $this->r );
 
 		foreach ( Sites::for_resource( $this->r->id() ) as $site ) {
 			if ( ! empty( $site['flags']['pending'] ) ) {
@@ -164,7 +162,7 @@ final class SiteActions {
 		$this->defer_with( array( 'slug' => $slug, 'host' => EdgeMap::preview_host( $slug ) ), array( $slug, $label, $php, $install ) );
 
 		// A run of the job after a failure goes on with the cleanup it began, never with a new website.
-		$failure = $this->in_job() ? ( Tasks::get( $this->r )['fail'] ?? null ) : null;
+		$failure = $this->in_job() ? ( Steps::state( $this->r )['fail'] ?? null ) : null;
 
 		if ( is_array( $failure ) ) {
 			$record = (array) Records::for_resource( $this->r->id() );
@@ -308,7 +306,7 @@ final class SiteActions {
 		}
 
 		if ( $this->in_job() ) {
-			Tasks::remember_failure( $this->r, $e, $db );
+			Steps::remember_failure( $this->r, $e, $db );
 		}
 
 		$this->abandon_site( $slug, $vmid, $db );
@@ -394,7 +392,7 @@ final class SiteActions {
 		$site = Sites::find( $this->r->id(), $slug );
 
 		// A run of the job after the record was removed (a crash before the edge map was sent) only sends the edge map.
-		if ( null === $site && $this->in_task( $slug ) && null !== Tasks::memo( $this->r, 'db_drop_' . $slug ) ) {
+		if ( null === $site && $this->in_task( $slug ) && null !== Steps::memo( $this->r, 'db_drop_' . $slug ) ) {
 			$edge = $this->edge();
 
 			return is_wp_error( $edge ) ? $edge : array( 'removed' => $slug );

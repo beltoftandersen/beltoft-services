@@ -352,13 +352,13 @@ final class HostingRoutes {
 		}
 
 		$actions = new HostingActions( $r );
-		$state   = Tasks::overview( $r );
+		$task    = Actions\Steps::view( $r );
 
-		// The page asks every few seconds while a task runs: a job that has waited a few seconds is run here, one agent step, so
-		// the task goes on even where the runners are slow.
-		if ( null !== $state['task'] ) {
+		// The page asks every few seconds while a change runs: a job that has waited a few seconds is run here (one agent step),
+		// as the status route does for a server, so the change goes on even where the runners are slow.
+		if ( null !== $task ) {
 			\BeltoftServices\Jobs::run_waiting( $r->id() );
-			$state = Tasks::overview( $r );
+			$task = Actions\Steps::view( $r );
 		}
 
 		return self::ok(
@@ -366,8 +366,10 @@ final class HostingRoutes {
 				'sites'  => $actions->sites(),
 				'limits' => $actions->limits(),
 				'point_at' => SiteDns::instructions( (array) ( Nodes::get( (string) ( Records::for_resource( $r->id() )['node'] ?? '' ) ) ?? array() ) ),
-				'task'   => $state['task'],
-				'last'   => $state['last'],
+				'task'   => $task,
+				'last'   => Actions\Steps::last( $r ),
+				'progress' => \BeltoftServices\Progress::build( $r ),
+				'last_result' => is_array( $r->get( \BeltoftServices\Jobs::RESULT ) ) ? $r->get( \BeltoftServices\Jobs::RESULT ) : null,
 			)
 		);
 	}

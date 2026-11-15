@@ -9,6 +9,7 @@ namespace BeltoftServices\Tests;
 
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
+use BeltoftServices\Progress;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\Support\FakeDriver;
 
@@ -77,6 +78,88 @@ final class JobsTest extends TestCase {
 		$this->assertSame( 'private_detach', $result['action'] );
 		$this->assertFalse( $result['ok'], 'The page waiting for it stops and says so.' );
 		$this->assertNotSame( '', $result['text'] );
+	}
+
+	public function test_a_resumable_action_whose_job_was_lost_is_queued_again_once_and_a_server_action_is_not(): void {
+		list( $r ) = $this->resource( array( 'state' => 'ready', 'desired' => 'ready' ) );
+		$failed = array();
+		add_action(
+			'beltoft_services_action_failed',
+			static function ( $res, $action, $args, $why ) use ( &$failed ) {
+				$failed[] = array( $action, $why );
+			},
+			10,
+			4
+		);
+		add_filter( 'beltoft_services_action_resumable', static fn( $yes, $driver, $action ) => 'fake' === $driver && 'resumable' === $action ? true : $yes, 10, 3 );
+
+		// An action that keeps its steps: queued again, the marker and the page stay, no failed result.
+		Progress::mark( $r, 'resumable', 'Doing it' );
+		$id = as_schedule_single_action( time() - 5, Jobs::ACT, array( $r->id(), 'resumable', array( 'x' ) ), Jobs::GROUP );
+		\ActionScheduler::store()->mark_failure( $id );
+		Jobs::job_failed( $id, new \Error( 'Class not found' ) );
+
+		$fresh = Resource::find( $r->id() );
+		$this->assertNotNull( Progress::pending( $fresh ), 'Still in progress.' );
+		$this->assertNull( $fresh->get( Jobs::RESULT ) );
+		$this->assertTrue( as_has_scheduled_action( Jobs::ACT, array( $r->id(), 'resumable', array( 'x' ) ), Jobs::GROUP ), 'Queued again with its arguments.' );
+		$this->assertSame( array(), $failed );
+
+		// Lost again: that is a failure.
+		$again = as_schedule_single_action( time() - 5, Jobs::ACT, array( $r->id(), 'resumable', array( 'x' ) ), Jobs::GROUP );
+		\ActionScheduler::store()->mark_failure( $again );
+		Jobs::job_failed( $again, new \Error( 'Class not found' ) );
+		$this->assertFalse( Resource::find( $r->id() )->get( Jobs::RESULT )['ok'] );
+		$this->assertNull( Progress::pending( Resource::find( $r->id() ) ) );
+		$this->assertSame( array( array( 'resumable', 'stopped' ) ), $failed );
+
+		// A server action (not resumable) is unchanged: a failed result at once, nothing queued again.
+		Progress::mark( $r, 'reboot', 'Reboot' );
+		$reboot = as_schedule_single_action( time() - 5, Jobs::ACT, array( $r->id(), 'reboot', array() ), Jobs::GROUP );
+		\ActionScheduler::store()->mark_failure( $reboot );
+		Jobs::job_failed( $reboot, new \Error( 'Class not found' ) );
+		$this->assertFalse( Resource::find( $r->id() )->get( Jobs::RESULT )['ok'] );
+		$this->assertSame( 'reboot', Resource::find( $r->id() )->get( Jobs::RESULT )['action'] );
+		$this->assertFalse( as_has_scheduled_action( Jobs::ACT, array( $r->id(), 'reboot', array() ), Jobs::GROUP ) );
+	}
+
+	public function test_a_marker_nothing_works_on_ends_with_a_failed_result_and_one_staff_alert(): void {
+		list( $r ) = $this->resource( array( 'state' => 'ready', 'desired' => 'ready' ) );
+		$mails = 0;
+		$hooks = 0;
+		add_filter(
+			'pre_wp_mail',
+			static function () use ( &$mails ) {
+				++$mails;
+				return true;
+			},
+			20
+		);
+		add_action(
+			'beltoft_services_action_failed',
+			static function () use ( &$hooks ) {
+				++$hooks;
+			}
+		);
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
+
+		Progress::mark( $r, 'reboot', 'Reboot' );
+		$this->assertNotNull( Progress::pending( Resource::find( $r->id() ) ), 'A young marker stands.' );
+
+		$fresh = Resource::find( $r->id() );
+		$fresh->set( array( Progress::MARKER => array( 'action' => 'reboot', 'at' => time() - Progress::MARKER_TTL - 5, 'label' => 'Reboot' ) ) );
+
+		$this->assertNull( Progress::pending( Resource::find( $r->id() ) ) );
+		$result = Resource::find( $r->id() )->get( Jobs::RESULT );
+		$this->assertFalse( $result['ok'] );
+		$this->assertSame( 'reboot', $result['action'] );
+		$this->assertSame( 1, $mails, 'Staff are told.' );
+		$this->assertSame( 1, $hooks );
+
+		Progress::pending( Resource::find( $r->id() ) );
+		Jobs::sweep();
+		$this->assertSame( 1, $mails, 'Once.' );
+		$this->assertSame( 1, $hooks );
 	}
 
 	public function test_a_build_job_whose_process_died_is_queued_again(): void {

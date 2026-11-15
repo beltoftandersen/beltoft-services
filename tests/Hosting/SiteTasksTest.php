@@ -14,12 +14,13 @@ use BeltoftServices\Crypto;
 use BeltoftServices\Hosting\HostingActions;
 use BeltoftServices\Hosting\Sites;
 use BeltoftServices\Hosting\SiteDomains;
-use BeltoftServices\Hosting\Tasks;
+use BeltoftServices\Hosting\Actions\Steps;
+use BeltoftServices\Progress;
 use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 
 /**
- * Tasks, and the job mode and request mode of the hosting action groups.
+ * The hosting changes on the shared action controller (Progress marker, Jobs::queue_act, Jobs::act): request mode, job mode, steps.
  */
 class SiteTasksTest extends HostingCase {
 
@@ -62,12 +63,45 @@ class SiteTasksTest extends HostingCase {
 	}
 
 	/**
+	 * The change in progress as the page sees it, or null when it ended.
+	 *
+	 * @param Resource $r Resource.
+	 * @return array<string, mixed>|null
+	 */
+	private function task( Resource $r ): ?array {
+		return Steps::view( $this->fresh( $r ) );
+	}
+
+	/**
+	 * The shared outcome of the last action.
+	 *
+	 * @param Resource $r Resource.
+	 * @return array<string, mixed>
+	 */
+	private function result( Resource $r ): array {
+		return (array) $this->fresh( $r )->get( Jobs::RESULT );
+	}
+
+	/**
 	 * One run of the account's task, as the runner makes it. No waiting: the job answers poll and the test looks again.
 	 *
 	 * @param Resource $r      Resource.
 	 * @param string   $action Job action.
 	 */
 	private function step( Resource $r, string $action ): void {
+		// The arguments are the job's own (what the route queued); the test runs the waiting job as a runner would.
+		$ids = as_get_scheduled_actions( array( 'hook' => Jobs::ACT, 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => -1 ), 'ids' );
+
+		foreach ( $ids as $id ) {
+			$args = \ActionScheduler::store()->fetch_action( (string) $id )->get_args();
+
+			if ( (int) $args[0] === $r->id() && $args[1] === $action ) {
+				Jobs::act( $r->id(), $action, (array) $args[2] );
+
+				return;
+			}
+		}
+
 		Jobs::act( $r->id(), $action, array() );
 	}
 
@@ -84,16 +118,16 @@ class SiteTasksTest extends HostingCase {
 
 		for ( $i = 0; $i < $most; $i++ ) {
 			$this->step( $this->fresh( $r ), $action );
-			$task = Tasks::get( $this->fresh( $r ) );
+			$task = $this->task( $r );
 
 			if ( null === $task ) {
 				return $seen;
 			}
 
-			$seen[] = Tasks::view( $task )['step_label'];
+			$seen[] = $task['step_label'];
 		}
 
-		$this->fail( 'The task did not end in ' . $most . ' runs: ' . (string) wp_json_encode( Tasks::get( $this->fresh( $r ) ) ) );
+		$this->fail( 'The task did not end in ' . $most . ' runs: ' . (string) wp_json_encode( $this->task( $r ) ) );
 	}
 
 	/**
@@ -116,7 +150,10 @@ class SiteTasksTest extends HostingCase {
 	 * @param string   $action Job action.
 	 */
 	private function lose_the_job( Resource $r, string $action ): void {
-		as_unschedule_all_actions( Jobs::ACT, array( $r->id(), $action, array() ), Jobs::GROUP );
+		foreach ( as_get_scheduled_actions( array( 'hook' => Jobs::ACT, 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => -1 ), 'ids' ) as $id ) {
+			\ActionScheduler::store()->cancel_action( (string) $id );
+		}
+
 		$this->assertFalse( Jobs::acting( $r->id() ) );
 	}
 
@@ -150,13 +187,13 @@ class SiteTasksTest extends HostingCase {
 		$this->assertSame( 'active', SiteDomains::find( 'blog.preview.example.test' )['state'] );
 		$this->assertContains( 'blog.preview.example.test', array_column( $this->agent->state()['edge'][ 'c' . $r->id() ], 'host' ) );
 		$this->assertArrayHasKey( 'blog', $this->agent->state()['sites'][1000] );
-		$this->assertNull( Tasks::get( $this->fresh( $r ) ) );
+		$this->assertNull( $this->task( $r ) );
 
 		foreach ( array( 'db.create', 'site.create', 'site.wp_install' ) as $op ) {
 			$this->assertCount( 1, $this->job_ids( $op, 'blog' ), $op . ' ran once, however often it was read.' );
 		}
 
-		$last = $this->fresh( $r )->get( Tasks::LAST );
+		$last = $this->result( $r );
 		$this->assertTrue( $last['ok'] );
 		$this->assertSame( 'add_site', $last['action'] );
 	}
@@ -172,7 +209,7 @@ class SiteTasksTest extends HostingCase {
 		$this->assertEmpty( Sites::find( $r->id(), 'slowpoke' )['flags']['pending'] );
 		$this->assertSame( array(), $this->agent->calls_of( 'site.delete' ), 'Nothing was undone because it was slow.' );
 		$this->assertSame( array(), $this->agent->calls_of( 'db.drop' ) );
-		$this->assertTrue( $this->fresh( $r )->get( Tasks::LAST )['ok'] );
+		$this->assertTrue( $this->result( $r )['ok'] );
 	}
 
 	public function test_a_slow_agent_is_not_a_failure_for_a_caller_that_waits_either(): void {
@@ -232,25 +269,25 @@ class SiteTasksTest extends HostingCase {
 
 		for ( $i = 0; $i < 40; $i++ ) {
 			$this->step( $this->fresh( $r ), 'add_site' );
-			$task = Tasks::get( $this->fresh( $r ) );
+			$task = $this->task( $r );
 			$this->assertNotNull( $task, 'The task reached the step before it ended.' );
 
-			if ( $words === Tasks::view( $task )['step_label'] ) {
+			if ( $words === $task['step_label'] ) {
 				break;
 			}
 		}
 
-		$this->assertSame( $words, Tasks::view( $task )['step_label'] );
+		$this->assertSame( $words, $task['step_label'] );
 
 		foreach ( $memoed as $name ) {
-			$this->assertArrayHasKey( $name, $task['memo'], 'What was done is kept in the task.' );
+			$this->assertArrayHasKey( $name, Steps::state( $this->fresh( $r ) )['memo'], 'What was done is kept in the steps.' );
 		}
 
 		// The process is gone: nothing but the stored task is left. A new run goes on, and the steps already done are not asked again.
 		$this->drive( $this->fresh( $r ), 'add_site' );
 
 		$this->assertEmpty( Sites::find( $r->id(), 'again' )['flags']['pending'], $op );
-		$this->assertTrue( $this->fresh( $r )->get( Tasks::LAST )['ok'], $op );
+		$this->assertTrue( $this->result( $r )['ok'], $op );
 
 		foreach ( array( 'db.create', 'site.create', 'site.wp_install' ) as $each ) {
 			$this->assertCount( 1, $this->job_ids( $each, 'again' ), $each . ' was never started twice' );
@@ -282,11 +319,11 @@ class SiteTasksTest extends HostingCase {
 
 		$this->assertContains( 'Cleaning up', $words, 'The cleanup is steps too.' );
 		$this->assertNull( Sites::find( $r->id(), 'doomed' ), 'The name is free for a second try.' );
-		$this->assertNull( Tasks::get( $this->fresh( $r ) ) );
+		$this->assertNull( $this->task( $r ) );
 		$this->assertNotSame( array(), $this->agent->calls_of( 'db.drop' ), 'The database it made is dropped.' );
 		$this->assertNotSame( array(), $this->agent->calls_of( 'site.delete' ) );
 
-		$last = $this->fresh( $r )->get( Tasks::LAST );
+		$last = $this->result( $r );
 		$this->assertFalse( $last['ok'] );
 		$this->assertStringNotContainsString( '10.200', $last['text'], 'What the agent said never reaches the customer.' );
 		$this->assertNotSame( '', $last['text'] );
@@ -303,12 +340,12 @@ class SiteTasksTest extends HostingCase {
 		for ( $i = 0; $i < 20; $i++ ) {
 			$this->step( $r, 'add_site' );
 
-			if ( null !== ( Tasks::get( $this->fresh( $r ) )['fail'] ?? null ) ) {
+			if ( null !== ( Steps::state( $this->fresh( $r ) )['fail'] ?? null ) ) {
 				break;
 			}
 		}
 
-		$this->assertNotNull( Tasks::get( $this->fresh( $r ) )['fail'], 'The failure is kept in the task.' );
+		$this->assertNotNull( Steps::state( $this->fresh( $r ) )['fail'], 'The failure is kept in the task.' );
 		$this->assertNotNull( Sites::find( $r->id(), 'half' ), 'Not removed before the cleanup is done.' );
 
 		$this->drive( $this->fresh( $r ), 'add_site' );
@@ -389,46 +426,116 @@ class SiteTasksTest extends HostingCase {
 		$this->assertNotContains( 'bye.preview.example.test', array_column( $this->agent->state()['edge'][ 'c' . $r->id() ], 'host' ) );
 	}
 
-	public function test_the_watchdog_gives_up_a_task_nobody_works_on_and_cleans_up_a_website_that_was_not_made(): void {
+	/**
+	 * The marker of the change in progress made old: nobody has worked on it for longer than the shared limit.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	private function age_the_marker( Resource $r ): void {
+		$fresh  = $this->fresh( $r );
+		$marker = (array) $fresh->get( Progress::MARKER );
+		$fresh->set( array( Progress::MARKER => array_merge( $marker, array( 'at' => Jobs::now() - Progress::MARKER_TTL - 10 ) ) ) );
+	}
+
+	/**
+	 * The waiting job of the account's change, the way Action Scheduler marks it when its process died.
+	 *
+	 * @param Resource $r Resource.
+	 * @return int The action id.
+	 */
+	private function the_job_dies( Resource $r ): int {
+		$ids = as_get_scheduled_actions( array( 'hook' => Jobs::ACT, 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => -1 ), 'ids' );
+		$this->assertNotEmpty( $ids, 'A job waits.' );
+		$id = (int) end( $ids );
+		\ActionScheduler::store()->mark_failure( $id );
+		Jobs::job_failed( $id, new \Error( 'Class not found' ) );
+
+		return $id;
+	}
+
+	public function test_a_change_nobody_works_on_ends_failed_with_one_staff_alert_and_a_website_that_was_not_made_is_cleaned_up(): void {
 		$r = $this->account();
 		( new HostingActions( $r ) )->queue( 'add_site', array( 'stuck', '', '', true ) );
 		$this->assertNotNull( Sites::find( $r->id(), 'stuck' ) );
+		$mails = 0;
+		add_filter(
+			'pre_wp_mail',
+			static function () use ( &$mails ) {
+				++$mails;
+				return true;
+			}
+		);
 
-		// The job is gone (lost, never run) and the task is old.
+		// The job is gone (lost, never run) and the marker is old.
 		$this->lose_the_job( $r, 'add_site' );
-		$fresh = $this->fresh( $r );
-		$task  = Tasks::get( $fresh );
-		$task['started'] = Jobs::now() - 3600;
-		$fresh->set( array( Tasks::META => $task ) );
+		$this->age_the_marker( $r );
 
-		$this->assertTrue( Tasks::watchdog( $this->fresh( $r ) ) );
-
-		$last = $this->fresh( $r )->get( Tasks::LAST );
+		$this->assertNull( Progress::pending( $this->fresh( $r ) ), 'The shared controller ends it.' );
+		$last = $this->result( $r );
 		$this->assertFalse( $last['ok'] );
-		$this->assertStringContainsString( 'stopped before it was finished', $last['text'] );
-		$this->assertSame( 'abandon_site', Tasks::get( $this->fresh( $r ) )['action'], 'The cleanup of the half made website is a task of its own.' );
+		$this->assertSame( 'add_site', $last['action'] );
+		$this->assertSame( 1, $mails, 'Staff are told once.' );
 
+		Progress::pending( $this->fresh( $r ) );
+		$this->assertSame( 1, $mails, 'Not again.' );
+
+		$this->assertSame( 'abandon_site', $this->task( $r )['action'], 'The clean-up of the half made website is a hosting change of its own, queued through the same path.' );
 		$this->drive( $r, 'abandon_site' );
 		$this->assertNull( Sites::find( $r->id(), 'stuck' ), 'The website that was never made is removed, step by step.' );
-		$this->assertFalse( Tasks::watchdog( $this->fresh( $r ) ), 'Nothing left to give up.' );
 	}
 
-	public function test_a_young_task_without_a_waiting_job_still_holds_the_account_and_an_old_one_does_not(): void {
+	public function test_a_young_marker_without_a_waiting_job_still_holds_the_account_and_an_old_one_does_not(): void {
 		$r = $this->account();
 		( new HostingActions( $r ) )->queue( 'set_workers', array( 'w' . $r->id(), 3 ) );
 		$this->lose_the_job( $r, 'set_workers' );
 
-		$this->assertNotNull( Tasks::busy( $this->fresh( $r ) ) );
-		$this->assertFalse( Tasks::watchdog( $this->fresh( $r ) ), 'Not yet half an hour.' );
+		$this->assertNotNull( $this->task( $r ) );
+		$busy = ( new HostingActions( $this->fresh( $r ) ) )->queue( 'set_php', array( 'w' . $r->id(), '8.4' ) );
+		$this->assertSame( 'Wait until changing the PHP workers is done.', $busy->get_error_message() );
 
-		$fresh           = $this->fresh( $r );
-		$task            = Tasks::get( $fresh );
-		$task['started'] = Jobs::now() - Tasks::STALE - 5;
-		$fresh->set( array( Tasks::META => $task ) );
+		$this->age_the_marker( $r );
 
-		$this->assertNull( Tasks::busy( $this->fresh( $r ) ) );
-		$this->assertTrue( Tasks::watchdog( $this->fresh( $r ) ) );
-		$this->assertNull( Tasks::get( $this->fresh( $r ) ) );
+		$this->assertNull( $this->task( $r ) );
+		$this->assertFalse( $this->result( $r )['ok'] );
+		$this->assertSame( 'pending', ( new HostingActions( $this->fresh( $r ) ) )->queue( 'set_php', array( 'w' . $r->id(), '8.4' ) )['status'] );
+	}
+
+	public function test_the_shared_sweep_ends_a_stale_change_of_an_account_whose_customer_never_opens_the_page(): void {
+		$r = $this->account();
+		( new HostingActions( $r ) )->queue( 'purge_cache', array( 'w' . $r->id() ) );
+		$this->lose_the_job( $r, 'purge_cache' );
+
+		Jobs::sweep();
+		$this->assertNotNull( $this->fresh( $r )->get( Progress::MARKER ), 'Not old enough.' );
+
+		$this->age_the_marker( $r );
+		Jobs::sweep();
+
+		$this->assertNull( $this->fresh( $r )->get( Progress::MARKER ) );
+		$this->assertFalse( $this->result( $r )['ok'] );
+	}
+
+	public function test_a_lost_job_of_a_change_is_queued_again_once_and_goes_on_where_it_stopped(): void {
+		$r = $this->account();
+		$this->agent->pending( 'site.create', 3 );
+		( new HostingActions( $r ) )->queue( 'add_site', array( 'resumed', '', '', true ) );
+
+		// Two runs, then the process dies (a deploy): Action Scheduler marks the job failed.
+		$this->step( $r, 'add_site' );
+		$this->step( $this->fresh( $r ), 'add_site' );
+		$this->assertArrayHasKey( 'db_add_resumed', Steps::state( $this->fresh( $r ) )['memo'] );
+
+		// The jobs the two runs queued are still waiting: only the last one is lost.
+		$this->the_job_dies( $r );
+
+		$this->assertNotNull( $this->task( $r ), 'The change is still in progress.' );
+		$this->assertTrue( Jobs::acting( $r->id() ), 'Queued again.' );
+		$this->assertArrayNotHasKey( 'ok', $this->result( $r ), 'No failed result.' );
+
+		$this->drive( $r, 'add_site' );
+		$this->assertEmpty( Sites::find( $r->id(), 'resumed' )['flags']['pending'] );
+		$this->assertCount( 1, $this->job_ids( 'db.create', 'resumed' ), 'The step that was done was not started again.' );
+		$this->assertTrue( $this->result( $r )['ok'] );
 	}
 
 	public function test_the_database_password_is_never_in_the_job_arguments_or_the_task(): void {
@@ -444,7 +551,7 @@ class SiteTasksTest extends HostingCase {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
 		$this->assertSame( '0', (string) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}actionscheduler_actions WHERE args LIKE %s", '%' . $wpdb->esc_like( $password ) . '%' ) ) );
 		$this->drive( $r, 'add_site' );
-		$this->assertStringNotContainsString( $password, (string) wp_json_encode( $this->fresh( $r )->get( Tasks::LAST ) ) );
+		$this->assertStringNotContainsString( $password, (string) wp_json_encode( $this->result( $r ) ) );
 	}
 
 	public function test_a_job_for_a_task_that_is_gone_does_nothing(): void {
@@ -452,7 +559,7 @@ class SiteTasksTest extends HostingCase {
 
 		$this->step( $r, 'set_php' );
 
-		$this->assertNull( Tasks::get( $this->fresh( $r ) ) );
+		$this->assertNull( $this->task( $r ) );
 		$this->assertNull( Sites::find( $r->id(), 'nothing' ) );
 	}
 
@@ -461,7 +568,7 @@ class SiteTasksTest extends HostingCase {
 		$slug = 'w' . $r->id();
 
 		$this->assertSame( 'invalid', ( new HostingActions( $r ) )->queue( 'set_php', array( $slug, '7.0' ) )->get_error_code(), 'The checks stay in the request.' );
-		$this->assertNull( Tasks::get( $this->fresh( $r ) ) );
+		$this->assertNull( $this->task( $r ) );
 		$this->assertSame( 'not_found', ( new HostingActions( $r ) )->queue( 'purge_cache', array( 'ghost' ) )->get_error_code() );
 		$this->assertSame( 'limit', ( new HostingActions( $r ) )->queue( 'set_workers', array( $slug, 1 ) )->get_error_code() );
 
@@ -517,7 +624,7 @@ class SiteTasksTest extends HostingCase {
 
 		$html = $this->page( $r );
 		$this->assertStringContainsString( 'data-task-failed', $html );
-		$this->assertStringContainsString( 'Adding a website. That did not work.', $html );
+		$this->assertStringContainsString( 'Adding a website. This did not finish.', $html );
 		$this->assertStringNotContainsString( 'Being set up', $html );
 	}
 
@@ -548,24 +655,6 @@ class SiteTasksTest extends HostingCase {
 		$this->assertStringContainsString( '<td>1.2 GB</td>', $html );
 		$this->assertStringContainsString( '<td>1.4 GB</td>', $html );
 		$this->assertStringContainsString( 'Each backup holds your whole hosting as it was that night. Backups are kept apart from your disk and do not use its space.', $html );
-	}
-
-	public function test_the_sweep_gives_up_old_tasks_of_accounts_whose_customer_never_opens_the_page(): void {
-		$r = $this->account();
-		( new HostingActions( $r ) )->queue( 'purge_cache', array( 'w' . $r->id() ) );
-		$this->lose_the_job( $r, 'purge_cache' );
-
-		$this->assertSame( 0, Tasks::sweep(), 'Not old enough.' );
-
-		$fresh           = $this->fresh( $r );
-		$task            = Tasks::get( $fresh );
-		$task['started'] = Jobs::now() - Tasks::STALE - 10;
-		$fresh->set( array( Tasks::META => $task ) );
-
-		$this->assertSame( 1, Tasks::sweep() );
-		$this->assertNull( Tasks::get( $this->fresh( $r ) ) );
-		$this->assertFalse( $this->fresh( $r )->get( Tasks::LAST )['ok'] );
-		$this->assertContains( Tasks::SWEEP, array_column( Jobs::declared(), 'hook' ), 'The sweep is a recurring job.' );
 	}
 
 	public function test_the_hosting_driver_offers_no_customer_action_and_runs_the_tasks_as_internal_ones(): void {

@@ -95,7 +95,7 @@ final class HostingToolsTest extends HostingCase {
 		$this->assertSame( 'www.example.org', $domain['added'] );
 		$this->assertTrue( $domain['queued'], 'The names go to the node in the background.' );
 		$this->assertNotNull( SiteDomains::find( 'www.example.org' ) );
-		$this->assertSame( 'names', \BeltoftServices\Hosting\Tasks::get( \BeltoftServices\Resource::find( $id ) )['action'] );
+		$this->assertSame( 'names', \BeltoftServices\Hosting\Actions\Steps::view( \BeltoftServices\Resource::find( $id ) )['action'] );
 
 		$wait = $this->tool( 'set_php_version', array( 'id' => $id, 'site' => 'blog', 'php' => '8.4' ), $token );
 		$this->assertTrue( $wait['isError'], 'A second change is refused while one runs.' );

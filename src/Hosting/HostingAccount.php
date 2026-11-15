@@ -236,7 +236,7 @@ final class HostingAccount {
 
 		$actions = new HostingActions( $r );
 		$limits  = $actions->limits();
-		$state   = Tasks::overview( $r );
+		$state   = array( 'task' => Actions\Steps::view( $r ), 'last' => Actions\Steps::last( $r ) );
 		$all     = $actions->sites();
 		$pending = array_values( array_filter( $all, static fn( $s ) => ! empty( $s['pending'] ) ) );
 		$sites   = array_values( array_filter( $all, static fn( $s ) => empty( $s['pending'] ) ) );
@@ -374,7 +374,7 @@ final class HostingAccount {
 	 * What the account is doing in the background, in words, and why the last change did not work. The line is always printed
 	 * (hidden when nothing runs) so the script can show it when a change is queued.
 	 *
-	 * @param array{task: array<string, mixed>|null, last: array<string, mixed>|null} $state Tasks::overview().
+	 * @param array{task: array<string, mixed>|null, last: array<string, mixed>|null} $state the task from Actions\Steps::view() and the last failure from Actions\Steps::last().
 	 */
 	private static function print_task_line( array $state ): void {
 		$task  = $state['task'];
