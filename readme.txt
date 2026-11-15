@@ -258,6 +258,11 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 == Changelog ==
 
+= 0.32.1 =
+* The hosting page has tabs like the server page: Overview (facts, live bars, first-visit list, monitoring), Websites (each website with its domains, PHP, cache, staging and country block, Add a website, Move a website here), Files (SFTP), Backups and Email. Each tab has its own address (`/hosting/<id>/websites`, `/files`, `/backups`, `/email`), so back and links work. Only the tab asked for is built.
+* The hosting page markup moved from PHP strings to templates in `templates/account/hosting/`, fed by `Hosting\HostingView`; `HostingAccount` keeps the data and the dispatch. No change in what buttons, forms and texts do.
+* A button with a very long domain name wraps on a phone instead of widening the page.
+
 = 0.32.0 =
 * WordPress hosting accounts have the same monitoring as a server: CPU, memory, network and disk activity graphs (1 hour, 1 day, 30 days), live CPU and memory bars on the hosting page (every 10 seconds while it is visible), the storage as a bar, and the usage emails (CPU sustained, memory high, storage at 90 percent) with the same "Usage emails" switch and settings. There is no PHP workers metric.
 * Memory is memory in use without the file cache, read inside the container by the node agent (new operation `ct.memory`, needs the agent branch `hosting-memory`); the Proxmox figure is never used. Readings go to the same history table as a server's (`bs_guest_memory`), same retention.
