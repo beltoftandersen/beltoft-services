@@ -260,6 +260,7 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 = 0.27.10 =
 * The memory and disk bars of the server list are always printed and stay hidden until a guest reading exists, so a reading that arrives after the page load shows (they were missing when the first render had no cached reading).
+* The MaxMind GeoLite2 attribution on the country block is translatable.
 
 = 0.27.9 =
 * No memory figure from Proxmox is shown anywhere: its reading includes the guest's file cache. The server list, the API and the MCP tools show the memory use the server itself reports (through the guest agent), and no figure when there is none. The memory graph is removed; the hosting usage route no longer returns memory_mb.

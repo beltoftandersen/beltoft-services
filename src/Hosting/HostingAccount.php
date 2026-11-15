@@ -904,7 +904,7 @@ final class HostingAccount {
 		}
 
 		echo '<p class="beltoft-hosting-help">' . esc_html__( 'The country is looked up from the visitor\'s address. This is not exact, and a VPN gets around it.', 'beltoft-services' ) . '</p>';
-		echo '<p class="beltoft-hosting-help">' . esc_html( \BeltoftServices\Hosting\CountryBlock::ATTRIBUTION ) . '</p>';
+		echo '<p class="beltoft-hosting-help">' . esc_html__( 'This product includes GeoLite2 data created by MaxMind, available from https://www.maxmind.com', 'beltoft-services' ) . '</p>';
 		self::sec_close();
 	}
 
