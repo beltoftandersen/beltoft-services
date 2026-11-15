@@ -401,7 +401,7 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 /* One hover for everything that opens something (server and domain rows, overview rows, overview tiles): a light ground and a thin line round it. */
 .beltoft-services-servers a.beltoft-services-srv:hover, .beltoft-services-servers a.beltoft-services-srv:focus-visible,
 .beltoft-services-ov__rows a.beltoft-services-ov__row:hover, .beltoft-services-ov__rows a.beltoft-services-ov__row:focus-visible,
-.beltoft-services-glance a.beltoft-services-glance__item:hover { box-shadow: inset 0 0 0 1px var(--navy, #0c1535); }
+.beltoft-services-glance a.beltoft-services-glance__item:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--navy, #0c1535) 25%, transparent); }
 .beltoft-services-servers a.beltoft-services-srv:hover, .beltoft-services-servers a.beltoft-services-srv:focus-visible,
 .beltoft-services-ov__rows a.beltoft-services-ov__row:hover, .beltoft-services-ov__rows a.beltoft-services-ov__row:focus-visible { background: var(--bg, #f9f7f2); }
 .beltoft-services-glance a.beltoft-services-glance__item:hover { background: var(--bg-card, #fff); }
