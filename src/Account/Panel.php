@@ -381,6 +381,8 @@ final class Panel {
 			'beltoftServicesAccount',
 			array(
 				'root'     => esc_url_raw( rest_url( Routes::NAMESPACE . '/resources/' ) ),
+				// The step-up code request is not below /resources/: it has its own route.
+				'stepUpUrl' => esc_url_raw( rest_url( Routes::NAMESPACE . '/step-up/send' ) ),
 				'nonce'    => wp_create_nonce( 'wp_rest' ),
 				// WordPress's own rest-nonce action hands out a fresh nonce to a logged-in user.
 				'nonceUrl' => esc_url_raw( add_query_arg( 'action', 'rest-nonce', admin_url( 'admin-ajax.php' ) ) ),

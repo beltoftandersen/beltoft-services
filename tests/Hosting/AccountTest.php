@@ -439,7 +439,8 @@ class AccountTest extends HostingCase {
 	public function test_a_website_named_from_its_domain_shows_its_title_only(): void {
 		$this->assertSame( 'ux-shop.example.com', HostingAccount::site_name( array( 'label' => 'ux-shop.example.com', 'slug' => 'ux-shop-example-com-2' ) ) );
 		$this->assertSame( 'www.ux-shop.example.com', HostingAccount::site_name( array( 'label' => 'www.ux-shop.example.com', 'slug' => 'ux-shop-example-com' ) ) );
-		$this->assertSame( 'My shop (myshop)', HostingAccount::site_name( array( 'label' => 'My shop', 'slug' => 'myshop' ) ), 'A name the customer chose stays.' );
+		$this->assertSame( 'My shop', HostingAccount::site_name( array( 'label' => 'My shop', 'slug' => 'myshop' ) ), 'A title the customer chose is shown alone.' );
+		$this->assertSame( 'Second site', HostingAccount::site_name( array( 'label' => 'Second site', 'slug' => 'second-site-7w' ) ), 'The slug is not printed beside a given title.' );
 		$this->assertSame( 'blog', HostingAccount::site_name( array( 'label' => '', 'slug' => 'blog' ) ) );
 	}
 

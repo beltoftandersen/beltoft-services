@@ -395,7 +395,7 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 
 /* Servers: the list, and one server's page (templates/account/servers-list.php, vm-head.php, vm.php). Palette variables come from the theme; the fallbacks keep the layout when they are missing. */
 .beltoft-services-notice { margin: 0 0 12px; padding: 8px 16px; background: var(--bg-warm, #eeece6); color: var(--navy, #0c1535); }
-.beltoft-services-servers { max-width: 880px; background: var(--bg-card, #fff); container-type: inline-size; }
+.beltoft-services-servers { max-width: none; background: var(--bg-card, #fff); container-type: inline-size; }
 .beltoft-services-servers a.beltoft-services-srv { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.4fr) minmax(0, 1.6fr) auto; gap: 12px; align-items: center; padding: 8px 16px; border-top: 1px solid var(--bg-warm, #eeece6); color: var(--navy, #0c1535) !important; text-decoration: none !important; }
 .beltoft-services-servers a.beltoft-services-srv:first-child { border-top: 0; }
 /* One hover for everything that opens something (server and domain rows, overview rows, overview tiles): a light ground and a thin line round it. */
@@ -664,7 +664,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-server
 .beltoft-services-servers--area .beltoft-services-http-open { justify-self: end; margin: 0; }
 @container (max-width: 620px) { .beltoft-services-servers--area .beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; } .beltoft-services-servers--area .beltoft-services-srv__extra { grid-column: 1 / -1; } .beltoft-services-servers--area .beltoft-services-srv__extra:empty { display: none; } .beltoft-services-servers--area .beltoft-services-http-open { grid-column: 1 / -1; justify-self: start; margin-top: 4px; } }
 @media (max-width: 700px) { .beltoft-services-servers--area .beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; } .beltoft-services-servers--area .beltoft-services-srv__extra { grid-column: 1 / -1; } .beltoft-services-servers--area .beltoft-services-srv__extra:empty { display: none; } .beltoft-services-servers--area .beltoft-services-http-open { grid-column: 1 / -1; justify-self: start; margin-top: 4px; } }
-.beltoft-services-list-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; max-width: 880px; margin: 0 0 12px; }
+.beltoft-services-list-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; max-width: none; margin: 0 0 12px; }
 .beltoft-services-domains.is-empty .beltoft-services-list-actions, .beltoft-services-list-actions.is-start { justify-content: flex-start; margin: 12px 0 0; }
 .beltoft-services-list-actions a.beltoft-services-list-btn { white-space: nowrap; }
 .beltoft-services-domain--page { font-size: 15px; }

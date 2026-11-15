@@ -658,7 +658,9 @@ abstract class ServiceArea {
 		$state = (string) $resource->get( 'state' );
 		$group = Panel::group( $state, $resource );
 
-		if ( Progress::build( $resource )['active'] ) {
+		// A ready service that is doing something says Working; a service that is still being set up says what it is
+		// (Getting ready): the list rows, the head of the page and the status row of a card all use these words.
+		if ( 'ready' === $group && Progress::build( $resource )['active'] ) {
 			return array( __( 'Working', 'beltoft-services' ), 'busy' );
 		}
 
@@ -686,12 +688,16 @@ abstract class ServiceArea {
 
 		$state = (string) $resource->get( 'state' );
 		$group = Panel::group( $state, $resource );
+		$text  = Panel::message( $state, $resource );
+		$prog  = Progress::build( $resource );
+		$same  = ! empty( $prog['active'] ) && (string) ( $prog['text'] ?? '' ) === $text;
 		$vars  = array(
 			'title'        => self::$page['area']->title_of( $resource, $view ),
 			'group'        => $group,
-			'badge'        => Panel::label( $state, $resource ),
-			'message'      => Panel::message( $state, $resource ),
-			'show_message' => 'ready' !== $group,
+			'badge'        => self::state( $resource )[0],
+			'message'      => $same ? '' : $text,
+			// The progress block under the head says the same thing while it is shown: once, not twice.
+			'show_message' => 'ready' !== $group && ! $same,
 			'kind'         => (string) self::$page['area']->label_of( $resource ),
 			'renews'       => ServerLinks::renewal( self::$page['license'] ),
 		);

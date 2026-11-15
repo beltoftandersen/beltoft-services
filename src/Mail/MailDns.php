@@ -568,7 +568,34 @@ final class MailDns {
 
 		self::run( $r->id() );
 
-		return StepResult::done();
+		$fresh = Resource::find( $r->id() ) ?? $r;
+
+		return StepResult::done( array( Jobs::TEXT => self::check_text( (array) $fresh->get( 'mail_records' ) ) ) );
+	}
+
+	/**
+	 * What the customer reads when a look they asked for has ended.
+	 *
+	 * @param array<int, array<string, mixed>> $rows Stored rows with their status.
+	 */
+	public static function check_text( array $rows ): string {
+		if ( self::complete( $rows ) ) {
+			return __( 'Checked. All the needed DNS records were found.', 'beltoft-services' );
+		}
+
+		$missing = 0;
+
+		foreach ( $rows as $row ) {
+			if ( 'ok' !== ( $row['status'] ?? '' ) && self::required( (string) ( $row['key'] ?? '' ) ) ) {
+				++$missing;
+			}
+		}
+
+		return sprintf(
+			/* translators: %d: number of needed DNS records that were not found. */
+			_n( 'Checked. %d needed DNS record is not found yet. Add it, then check again.', 'Checked. %d needed DNS records are not found yet. Add them, then check again.', max( 1, $missing ), 'beltoft-services' ),
+			max( 1, $missing )
+		);
 	}
 
 	/**

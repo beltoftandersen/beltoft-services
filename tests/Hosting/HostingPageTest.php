@@ -691,7 +691,7 @@ class HostingPageTest extends HostingCase {
 	public function test_the_script_knows_the_new_actions_and_stays_free_of_dashes(): void {
 		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/hosting.js' );
 
-		foreach ( array( "'password'", "'php_save'", "'set_main'", "'remove_domain'", "'files_password'", "'files_key'", "'remove_key'", "'send_code'", "step-up/send", "hosting_files", 'data-files-secret' ) as $needle ) {
+		foreach ( array( "'password'", "'php_save'", "'set_main'", "'remove_domain'", "'files_password'", "'files_key'", "'remove_key'", "'send_code'", "stepUpUrl", "hosting_files", 'data-files-secret' ) as $needle ) {
 			$this->assertStringContainsString( $needle, $js, $needle );
 		}
 

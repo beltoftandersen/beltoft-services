@@ -46,6 +46,8 @@ final class MailView {
 			'domain'    => MailGuard::domain( $r ),
 			'included'  => (string) apply_filters( 'beltoft_services_mail_included_label', '', $r ),
 			'kind'      => $kind,
+			// The same words as the list row and the head of the page.
+			'status'    => \BeltoftServices\Account\ServiceArea::state( $r )[0],
 			'ready'     => $ready,
 			'limits'    => $limits,
 			'mailboxes' => null,

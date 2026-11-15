@@ -369,8 +369,12 @@
 		if ( target.hasAttribute( 'data-mail-proof-check' ) ) {
 			guarded( box, target, strings.checking, function ( h ) {
 				return call( box, 'POST', '/mail/proof/check' ).then( function ( result ) {
-					if ( result.ok ) {
+					if ( result.ok && result.data && result.data.ready ) {
 						fresh( box );
+					} else if ( result.ok ) {
+						// Not proven yet: say so on the page, then draw the records again.
+						S.done( h, strings.proofNot );
+						redraw( box );
 					} else {
 						S.fail( h, problem( result ) );
 					}
@@ -391,7 +395,9 @@
 
 					return followed( result ).then( function ( outcome ) {
 						if ( outcome && outcome.ok ) {
-							fresh( box );
+							// The outcome in words (all found, or how many are still missing), then the records drawn again.
+							S.done( h, outcome.text || strings.checked );
+							redraw( box );
 						} else {
 							stopped( h, outcome );
 						}

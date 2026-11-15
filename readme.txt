@@ -258,6 +258,15 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 == Changelog ==
 
+= 0.31.2 =
+* Setting an SFTP password, adding an SSH key and asking for a transfer code now send the code request to the right address (it was a 404 from the hosting page and the domain page).
+* The hosting page follows a running change more gently (a read every 5 seconds, slower after ten minutes, and it waits when the server asks it to), clears the step line of a website as soon as the change is over, and asks for the cache facts only when no change is running.
+* The Overview has a WordPress hosting section like the other services.
+* The email list, the page head and the Status row use the same words, and the waiting-for-proof text is printed once.
+* "Check now" on an email domain says what it found, and the records are drawn again.
+* The validity of a domain claim is shown in the site's date and time format and language.
+* A hosting website shows the title the customer gave, without its address in brackets. Lists run as wide as the notices above them; the DNS hosting heading has a gap to its text.
+
 = 0.31.1 =
 * Hosting review fixes. A domain that became the account's included one (its paid line was marked as ending) is no longer disconnected at the renewal, and adding another name of it no longer makes it bill again.
 * A paid domain that could not be connected, or an ended one that could not be taken off, because another change of the account was running, is now done by the domain sweep when the account is free.

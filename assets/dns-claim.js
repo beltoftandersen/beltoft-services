@@ -210,7 +210,9 @@
 		} );
 		box.appendChild( list );
 		var when = new Date( claim.checked_at );
-		if ( ! isNaN( when.getTime() ) ) {
+		if ( claim.checked_label ) {
+			box.appendChild( el( 'p', 'beltoft-dns-claim__note', t.checked_at.replace( '%s', claim.checked_label ) ) );
+		} else if ( ! isNaN( when.getTime() ) ) {
 			box.appendChild( el( 'p', 'beltoft-dns-claim__note', t.checked_at.replace( '%s', when.toLocaleTimeString( [], { hour: '2-digit', minute: '2-digit' } ) ) ) );
 		}
 		return box;
@@ -231,7 +233,9 @@
 		if ( host !== full ) {
 			block.appendChild( el( 'p', 'beltoft-dns-claim__hint', t.full_name.replace( '%s', full ) ) );
 		}
-		if ( claim.expires_at ) {
+		if ( claim.expires_label ) {
+			block.appendChild( message( t.validUntil.replace( '%s', claim.expires_label ), 'beltoft-dns-claim__note' ) );
+		} else if ( claim.expires_at ) {
 			var date = new Date( claim.expires_at );
 			if ( ! isNaN( date.getTime() ) ) {
 				block.appendChild( message( t.validUntil.replace( '%s', date.toLocaleString() ), 'beltoft-dns-claim__note' ) );
