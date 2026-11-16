@@ -110,4 +110,8 @@ final class PleskFamily implements LicenceFamily {
 
 		return 'The Plesk key could not be fetched from Openprovider after ' . LicenceVendor::TRIES . ' tries.';
 	}
+
+	public function changed_meta(): array {
+		return array( 'plesk_sync_tries' => null, 'plesk_key' => null, 'plesk_key_tries' => null );
+	}
 }

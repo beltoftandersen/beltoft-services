@@ -409,18 +409,7 @@ final class PleskLicence {
 					return false;
 				}
 
-				$reply = $client->request( 'PUT', '/licenses/plesk/' . $key_id, array( 'items' => array( $item ) ) );
-
-				if ( is_wp_error( $reply ) ) {
-					$error = $reply;
-				} else {
-					// The edition changed: the key does too. The old key goes first, so it is never kept as the new one.
-					$licence->set( array( 'plesk_item' => $item, 'plesk_sync_tries' => null, 'plesk_key' => null, 'plesk_key_tries' => null ) );
-
-					if ( ! self::fetch_key( $licence ) ) {
-						self::schedule( self::KEY_HOOK, $licence->id(), 120 );
-					}
-				}
+				$error = LicenceVendor::change_item( $licence, new PleskFamily(), $item );
 			}
 		}
 

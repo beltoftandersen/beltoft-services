@@ -443,16 +443,10 @@ final class KeyOrder {
 			return StepResult::retry( 3600, $problem );
 		}
 
-		$reply = self::client()->request( 'PUT', '/licenses/plesk/' . $id, array( 'items' => array( $item ) ) );
+		$error = LicenceVendor::change_item( $r, new KeyFamily(), $item );
 
-		if ( is_wp_error( $reply ) ) {
-			return self::failure( $r, $reply, 'Openprovider did not change the licence.' );
-		}
-
-		$r->set( array( 'lic_item' => $item, 'lic_key' => null, 'lic_state' => 'waiting', 'lic_tries' => 0 ) );
-
-		if ( ! self::fetch_key( $r ) ) {
-			self::schedule( self::KEY_HOOK, $r->id(), 120 );
+		if ( null !== $error ) {
+			return self::failure( $r, $error, 'Openprovider did not change the licence.' );
 		}
 
 		return StepResult::done();

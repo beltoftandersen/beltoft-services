@@ -89,4 +89,8 @@ final class KeyFamily implements LicenceFamily {
 	public function ask_alert( Resource $r ): string {
 		return 'Openprovider has not handed over a key for this licence after ' . LicenceVendor::TRIES . ' tries. Open the licence at Openprovider and copy the key to the customer. Fields answered: ' . (string) $r->get( 'lic_shape' ) . '.';
 	}
+
+	public function changed_meta(): array {
+		return array( 'lic_key' => null, 'lic_state' => 'waiting', 'lic_tries' => 0 );
+	}
 }

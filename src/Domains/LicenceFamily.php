@@ -107,4 +107,12 @@ interface LicenceFamily {
 	 * @param Resource $r Licence resource.
 	 */
 	public function ask_alert( Resource $r ): string;
+
+	/**
+	 * Meta to store when the vendor accepted a new item: the old key goes (the edition changed, so the key does), and the
+	 * counters of the change start again.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function changed_meta(): array;
 }

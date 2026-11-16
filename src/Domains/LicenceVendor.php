@@ -371,4 +371,31 @@ final class LicenceVendor {
 
 		return $sets;
 	}
+
+	/**
+	 * Changes the item of the vendor licence (an edition change, which can be a dearer item: the caller has run the cost
+	 * guard). On success the old key is forgotten first, so it is never kept as the new one, the new item is stored and the
+	 * key is fetched again, or asked for by a job in 2 minutes. A failure is returned for the caller to count and repeat; a
+	 * failed change never deletes anything.
+	 *
+	 * @param Resource      $r      Licence resource.
+	 * @param LicenceFamily $family Family.
+	 * @param string        $item   The new vendor item.
+	 * @return \WP_Error|null The vendor's error, or null when the item was changed.
+	 */
+	public static function change_item( Resource $r, LicenceFamily $family, string $item ): ?\WP_Error {
+		$reply = self::client()->request( 'PUT', '/licenses/plesk/' . (int) $r->get( $family->meta( 'key_id' ) ), array( 'items' => array( $item ) ) );
+
+		if ( is_wp_error( $reply ) ) {
+			return $reply;
+		}
+
+		$r->set( array( $family->meta( 'item' ) => $item ) + $family->changed_meta() );
+
+		if ( ! self::fetch_key( $r, $family ) ) {
+			Jobs::schedule_once( time() + 120, $family->key_hook(), array( $r->id() ) );
+		}
+
+		return null;
+	}
 }
