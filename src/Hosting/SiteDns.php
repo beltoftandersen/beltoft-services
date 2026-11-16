@@ -82,9 +82,6 @@ final class SiteDns {
 		return $out;
 	}
 
-	/** Label of the ownership proof record, in front of the host name. */
-	public const PROOF_LABEL = '_beltoft-verify';
-
 	/** Resource meta: the names whose proof was the TXT record itself, host => time. Only these answer for other features. */
 	public const META_PROOFS = 'host_proofs';
 

@@ -25,7 +25,6 @@ final class DnsClaims {
 	public const PURGE_AFTER  = 90 * DAY_IN_SECONDS;
 
 	private const JSON_FIELDS = array( 'parent_ns', 'last_result', 'draft_records' );
-	private const OPEN        = array( 'pending', 'checking', 'verified' );
 
 	/**
 	 * The claims table.

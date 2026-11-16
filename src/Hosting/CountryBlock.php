@@ -24,9 +24,6 @@ final class CountryBlock {
 	/** Where the block applies. */
 	public const SCOPES = array( 'site', 'login' );
 
-	/** The line MaxMind's licence asks for. */
-	public const ATTRIBUTION = 'This product includes GeoLite2 data created by MaxMind, available from https://www.maxmind.com';
-
 	/**
 	 * The ready lists: id => label and ISO 3166-1 alpha-2 codes.
 	 *

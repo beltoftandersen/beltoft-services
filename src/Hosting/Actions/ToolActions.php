@@ -22,9 +22,6 @@ final class ToolActions {
 
 	use Base;
 
-	/** The tools, by the name the agent knows. */
-	public const TOOLS = array( 'files', 'database' );
-
 	/**
 	 * A one-time address that opens the file manager of the website.
 	 *

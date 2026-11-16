@@ -24,10 +24,6 @@ final class SnapshotMeta {
 		return AddonLink::initial_meta( self::addon(), $meta, $license, $driver );
 	}
 
-	private static function is_server( array $license ): bool {
-		return AddonLink::is_server( $license );
-	}
-
 	private static function addon(): Addon {
 		return Addon::for_driver( SnapshotDriver::ID );
 	}
