@@ -330,10 +330,26 @@ final class Operations {
 
 		foreach ( Sites::for_resource( $this->r->id() ) as $site ) {
 			$names[] = Provision::db_name( $this->r->id(), (string) $site['slug'] );
+
+			// A staging copy has its own database under the same account user.
+			$copy = SiteStaging::view( $site, array( 'action' => '', 'slug' => '' ) )['copy'];
+
+			if ( '' !== $copy ) {
+				$names[] = Provision::db_name( $this->r->id(), $copy );
+			}
 		}
 
+		// A provision that stopped after step db and before the site row: the first site's name is in the stored spec.
+		$spec = $this->r->get( 'site_spec' );
+
+		if ( is_array( $spec ) && '' !== (string) ( $spec['slug'] ?? '' ) ) {
+			$names[] = Provision::db_name( $this->r->id(), (string) $spec['slug'] );
+		}
+
+		$names = array_values( array_unique( $names ) );
+
 		if ( array() === $names ) {
-			return true; // No site was recorded, so no database was made.
+			return true; // No site and no stored spec: no database was made.
 		}
 
 		$result = $this->agent_call(
