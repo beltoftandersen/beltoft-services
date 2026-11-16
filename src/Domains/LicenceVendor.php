@@ -398,4 +398,74 @@ final class LicenceVendor {
 
 		return null;
 	}
+
+	/**
+	 * Deletes the vendor licence. Safe to run again; a licence that is already gone counts as deleted. A failure is counted
+	 * apart from the key asks (so a licence that used up its asks is still deleted), staff are told once at TRIES tries and the
+	 * deletion is repeated by a job, later each time (5 minutes times the square of the tries, at most a day), until three times
+	 * TRIES tries.
+	 *
+	 * @param Resource      $r      Licence resource.
+	 * @param LicenceFamily $family Family.
+	 * @return bool Whether the vendor licence is gone.
+	 */
+	public static function release( Resource $r, LicenceFamily $family ): bool {
+		$id = (int) $r->get( $family->meta( 'key_id' ) );
+
+		if ( $id < 1 ) {
+			return true;
+		}
+
+		$reply = self::client()->request( 'DELETE', '/licenses/plesk/' . $id );
+
+		if ( ! is_wp_error( $reply ) || self::gone( $reply ) ) {
+			$r->set( $family->released_meta() );
+
+			return true;
+		}
+
+		$tries = (int) $r->get( $family->meta( 'delete_tries' ) ) + 1;
+		$r->set( array( $family->meta( 'delete_tries' ) => $tries ) );
+
+		if ( self::TRIES === $tries ) {
+			Alerts::admin( $r, 'Openprovider did not answer the licence deletion after ' . self::TRIES . ' tries (' . $reply->get_error_code() . '). Delete the licence at Openprovider, or it keeps billing.' );
+		}
+
+		if ( $tries < 3 * self::TRIES ) {
+			Jobs::schedule_once( time() + min( DAY_IN_SECONDS, 300 * $tries * $tries ), $family->sync_hook(), array( $r->id() ) );
+		}
+
+		return false;
+	}
+
+	/**
+	 * Does the deletion of this licence's vendor licence still wait: the vendor id is known, the licence must go and the tries
+	 * have not run out?
+	 *
+	 * @param LicenceFamily $family Family.
+	 * @param Resource      $r      Licence resource.
+	 */
+	public static function delete_pending( LicenceFamily $family, Resource $r ): bool {
+		return (int) $r->get( $family->meta( 'key_id' ) ) > 0 && $family->release_due( $r ) && (int) $r->get( $family->meta( 'delete_tries' ) ) < 3 * self::TRIES;
+	}
+
+	/**
+	 * The watchdog's list of licences whose vendor licence must go and whose deletion has not gone through. The caller
+	 * narrows the resources to those that still hold a vendor id (a finished deletion clears it).
+	 *
+	 * @param LicenceFamily          $family    Family.
+	 * @param iterable<int,Resource> $resources Candidates, by id.
+	 * @return array<int, array<int, int>>
+	 */
+	public static function delete_due( LicenceFamily $family, iterable $resources ): array {
+		$sets = array();
+
+		foreach ( $resources as $id => $r ) {
+			if ( $family->owns( $r ) && self::delete_pending( $family, $r ) ) {
+				$sets[] = array( (int) $id );
+			}
+		}
+
+		return $sets;
+	}
 }

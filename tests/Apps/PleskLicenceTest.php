@@ -1108,4 +1108,18 @@ final class PleskLicenceTest extends PaidAppCase {
 		$this->assertCount( $before, $this->op_calls( 'POST', '/licenses/plesk' ) );
 		$this->assertSame( array(), $this->mails, 'A found licence is not a spend, so no refusal is mailed.' );
 	}
+
+	public function test_s7_the_twelfth_failed_delete_is_told_in_the_one_wording_of_both_families(): void {
+		$o      = $this->provisioned( 'pro' );
+		$key_id = (int) $o['licence']->get( 'plesk_key_id' );
+		$this->assertTrue( Licenses::update( (int) $o['licence']->license()['id'], array( 'status' => Licenses::STATUS_REVOKED ) ) );
+		$this->assertTrue( $this->fresh( $o['licence'] )->set( array( 'plesk_delete_tries' => 11 ) ) );
+		$this->op->reply( 'DELETE', '/licenses/plesk/' . $key_id, new \WP_Error( 'transport', 'down' ) );
+		$this->mails = array();
+
+		$this->assertFalse( PleskLicence::sync( $this->fresh( $o['licence'] ) ) );
+
+		$this->assertCount( 1, $this->mails );
+		$this->assertStringContainsString( 'Openprovider did not answer the licence deletion after 12 tries (transport). Delete the licence at Openprovider, or it keeps billing.', (string) $this->mails[0]['message'] );
+	}
 }

@@ -19,7 +19,7 @@ defined( 'ABSPATH' ) || exit;
 interface LicenceFamily {
 
 	/**
-	 * The stored meta name of a logical field. Fields: title, key_id, item, key, key_tries, shape.
+	 * The stored meta name of a logical field. Fields: title, key_id, item, key, key_tries, shape, delete_tries.
 	 *
 	 * @param string $field Logical field.
 	 */
@@ -115,4 +115,25 @@ interface LicenceFamily {
 	 * @return array<string, mixed>
 	 */
 	public function changed_meta(): array;
+
+	/**
+	 * The Action Scheduler hook of the job that repeats a call to the vendor that failed (the deletion).
+	 */
+	public function sync_hook(): string;
+
+	/**
+	 * Must the vendor licence go now? Each family has its own rule (owner decisions 2026-11-16): a standalone key goes at
+	 * the lapse, a Plesk app licence only when it is gone for good.
+	 *
+	 * @param Resource $r Licence resource.
+	 */
+	public function release_due( Resource $r ): bool;
+
+	/**
+	 * Meta to store when the vendor licence was deleted (or was already gone): the vendor id and the key are forgotten,
+	 * the counters end, and the mark of the deletion is set.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function released_meta(): array;
 }

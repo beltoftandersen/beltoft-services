@@ -21,12 +21,13 @@ final class KeyFamily implements LicenceFamily {
 
 	/** Logical field => stored meta name. */
 	private const META = array(
-		'title'     => 'lic_title',
-		'key_id'    => 'lic_key_id',
-		'item'      => 'lic_item',
-		'key'       => 'lic_key',
-		'key_tries' => 'lic_tries',
-		'shape'     => 'lic_shape',
+		'title'        => 'lic_title',
+		'key_id'       => 'lic_key_id',
+		'item'         => 'lic_item',
+		'key'          => 'lic_key',
+		'key_tries'    => 'lic_tries',
+		'shape'        => 'lic_shape',
+		'delete_tries' => 'lic_delete_tries',
 	);
 
 	public function meta( string $field ): string {
@@ -92,5 +93,17 @@ final class KeyFamily implements LicenceFamily {
 
 	public function changed_meta(): array {
 		return array( 'lic_key' => null, 'lic_state' => 'waiting', 'lic_tries' => 0 );
+	}
+
+	public function sync_hook(): string {
+		return KeyOrder::SYNC_HOOK;
+	}
+
+	public function release_due( Resource $r ): bool {
+		return KeyOrder::release_due( $r );
+	}
+
+	public function released_meta(): array {
+		return array( 'lic_key_id' => null, 'lic_key' => null, 'lic_state' => null, 'lic_deleted' => time(), 'lic_tries' => null, 'lic_delete_tries' => null );
 	}
 }

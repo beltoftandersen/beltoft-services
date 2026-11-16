@@ -371,21 +371,14 @@ final class PleskLicence {
 			return true;
 		}
 
-		$client = self::client();
-		$error  = null;
-
+		// Deleting counts apart from fetching the key, so a licence that used up its key fetches is still deleted.
 		if ( AppLicence::release_due( $licence ) ) {
-			$reply = $client->request( 'DELETE', '/licenses/plesk/' . $key_id );
+			return LicenceVendor::release( $licence, new PleskFamily() );
+		}
 
-			// A licence that is gone already is a deleted one.
-			if ( ! is_wp_error( $reply ) || self::gone( $reply ) ) {
-				$licence->set( array( 'plesk_key_id' => null, 'plesk_key' => null, 'plesk_key_job' => null, 'plesk_key_state' => null, 'plesk_deleted' => time(), 'plesk_sync_tries' => null, 'plesk_delete_tries' => null ) );
+		$error = null;
 
-				return true;
-			}
-
-			$error = $reply;
-		} elseif ( 'ended' !== AppLicence::state( $licence ) ) {
+		if ( 'ended' !== AppLicence::state( $licence ) ) {
 			// Not for a lapsed licence: nothing is bought or changed at the vendor for one that is not paid.
 			$tier = self::tier_of( $licence );
 			$item = self::items()[ $tier ] ?? '';
@@ -417,10 +410,9 @@ final class PleskLicence {
 			return true;
 		}
 
-		// Deleting and changing count apart from fetching the key, so a licence that used up its key fetches is still deleted.
-		$counter = AppLicence::release_due( $licence ) ? 'plesk_delete_tries' : 'plesk_sync_tries';
-		$tries   = (int) $licence->get( $counter ) + 1;
-		$licence->set( array( $counter => $tries ) );
+		// A change counts apart from fetching the key.
+		$tries = (int) $licence->get( 'plesk_sync_tries' ) + 1;
+		$licence->set( array( 'plesk_sync_tries' => $tries ) );
 
 		if ( self::TRIES === $tries ) {
 			self::alert( $licence, 'Openprovider did not answer the Plesk licence change after ' . self::TRIES . ' tries (' . $error->get_error_code() . '). Check the licence at Openprovider.' );
@@ -441,7 +433,7 @@ final class PleskLicence {
 	 */
 	public static function key_due(): array {
 		// Every licence with a vendor key id, in one query; only the ones still without a key pass.
-		return LicenceVendor::key_due( new PleskFamily(), Resource::find_many( Resource::ids_with_meta_value( 'plesk_key_id' ) ) );
+		return LicenceVendor::key_due( new PleskFamily(), array_filter( Resource::find_many( Resource::ids_with_meta_value( 'plesk_key_id' ) ), static fn( $licence ) => $licence->is_live() ) );
 	}
 
 	/**
@@ -451,7 +443,8 @@ final class PleskLicence {
 	 * @return array<int, array<int, int>>
 	 */
 	public static function sync_due(): array {
-		$sets = array();
+		$sets   = array();
+		$family = new PleskFamily();
 
 		foreach ( Resource::find_many( Resource::ids_with_meta_value( 'plesk_key_id' ) ) as $id => $licence ) {
 			if ( ! self::is_plesk( $licence ) || (int) $licence->get( 'plesk_key_id' ) < 1 ) {
@@ -459,7 +452,7 @@ final class PleskLicence {
 			}
 
 			if ( AppLicence::release_due( $licence ) ) {
-				if ( (int) $licence->get( 'plesk_delete_tries' ) < 3 * self::TRIES ) {
+				if ( LicenceVendor::delete_pending( $family, $licence ) ) {
 					$sets[] = array( (int) $id );
 				}
 			} elseif ( $licence->is_live() && 'ended' !== AppLicence::state( $licence ) && (int) $licence->get( 'plesk_sync_tries' ) < 3 * self::TRIES ) {

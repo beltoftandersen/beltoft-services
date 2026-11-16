@@ -26,11 +26,12 @@ final class PleskFamily implements LicenceFamily {
 
 	/** Logical field => stored meta name. */
 	private const META = array(
-		'title'     => 'plesk_title',
-		'key_id'    => 'plesk_key_id',
-		'item'      => 'plesk_item',
-		'key'       => 'plesk_key',
-		'key_tries' => 'plesk_key_tries',
+		'title'        => 'plesk_title',
+		'key_id'       => 'plesk_key_id',
+		'item'         => 'plesk_item',
+		'key'          => 'plesk_key',
+		'key_tries'    => 'plesk_key_tries',
+		'delete_tries' => 'plesk_delete_tries',
 	);
 
 	public function meta( string $field ): string {
@@ -77,7 +78,7 @@ final class PleskFamily implements LicenceFamily {
 	}
 
 	public function owns( Resource $r ): bool {
-		return $r->is_live() && self::APP === (string) ( ( (array) $r->get( 'plan' ) )['app'] ?? '' );
+		return self::APP === (string) ( ( (array) $r->get( 'plan' ) )['app'] ?? '' );
 	}
 
 	public function ended( Resource $r ): bool {
@@ -113,5 +114,17 @@ final class PleskFamily implements LicenceFamily {
 
 	public function changed_meta(): array {
 		return array( 'plesk_sync_tries' => null, 'plesk_key' => null, 'plesk_key_tries' => null );
+	}
+
+	public function sync_hook(): string {
+		return PleskLicence::SYNC_HOOK;
+	}
+
+	public function release_due( Resource $r ): bool {
+		return AppLicence::release_due( $r );
+	}
+
+	public function released_meta(): array {
+		return array( 'plesk_key_id' => null, 'plesk_key' => null, 'plesk_key_job' => null, 'plesk_key_state' => null, 'plesk_deleted' => time(), 'plesk_sync_tries' => null, 'plesk_delete_tries' => null );
 	}
 }

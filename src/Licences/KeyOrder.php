@@ -391,15 +391,7 @@ final class KeyOrder {
 	 * @return array<int, array<int, int>>
 	 */
 	public static function sync_due(): array {
-		$sets = array();
-
-		foreach ( Resource::find_many( Resource::ids_with_meta_value( 'lic_key_id', array(), KeyDriver::KIND ) ) as $id => $r ) {
-			if ( KeyDriver::ID === $r->get( 'driver' ) && (int) $r->get( 'lic_key_id' ) > 0 && self::release_due( $r ) && (int) $r->get( 'lic_delete_tries' ) < 3 * self::TRIES ) {
-				$sets[] = array( (int) $id );
-			}
-		}
-
-		return $sets;
+		return LicenceVendor::delete_due( new KeyFamily(), Resource::find_many( Resource::ids_with_meta_value( 'lic_key_id', array(), KeyDriver::KIND ) ) );
 	}
 
 	/**
@@ -458,33 +450,7 @@ final class KeyOrder {
 	 * @param Resource $r Licence resource.
 	 */
 	public static function release( Resource $r ): bool {
-		$id = (int) $r->get( 'lic_key_id' );
-
-		if ( $id < 1 ) {
-			return true;
-		}
-
-		$reply = self::client()->request( 'DELETE', '/licenses/plesk/' . $id );
-
-		if ( ! is_wp_error( $reply ) || LicenceVendor::gone( $reply ) ) {
-			$r->set( array( 'lic_key_id' => null, 'lic_key' => null, 'lic_state' => null, 'lic_deleted' => time(), 'lic_tries' => null, 'lic_delete_tries' => null ) );
-
-			return true;
-		}
-
-		// Its own counter: a licence that used up its key asks (lic_tries) is still deleted.
-		$tries = (int) $r->get( 'lic_delete_tries' ) + 1;
-		$r->set( array( 'lic_delete_tries' => $tries ) );
-
-		if ( self::TRIES === $tries ) {
-			Alerts::admin( $r, 'Openprovider did not answer the licence deletion after ' . self::TRIES . ' tries (' . $reply->get_error_code() . '). Delete the licence at Openprovider, or it keeps billing.' );
-		}
-
-		if ( $tries < 3 * self::TRIES ) {
-			self::schedule( self::SYNC_HOOK, $r->id(), min( DAY_IN_SECONDS, 300 * $tries * $tries ) );
-		}
-
-		return false;
+		return LicenceVendor::release( $r, new KeyFamily() );
 	}
 
 	/**
