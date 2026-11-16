@@ -753,6 +753,11 @@ final class AppReinstall {
 		$use = AppLicenceKeep::use_choice( $tier );
 
 		if ( null !== $use ) {
+			// The server's own licence of this app is used when it has one; the kept licence then stays kept.
+			if ( ! AppReinstallPaid::quoting() && AppReinstallPaid::licensed( $r, $app_id ) ) {
+				return null;
+			}
+
 			return null !== AppLicenceKeep::offered( $app_id, $use, (int) ( $r->license()['user_id'] ?? 0 ) ) ? null : __( 'The licence you chose can no longer be used. Choose a tier, or no app.', 'beltoft-services' );
 		}
 
@@ -861,7 +866,13 @@ final class AppReinstall {
 			// The app runs on its own system, as at checkout: the posted one when the version runs on it, else the version's.
 			$paid = AppLicence::paid( $pick[0] ) ? array( 'app_tier' => sanitize_key( (string) ( $args['app_tier'] ?? '' ) ), AppLicenceKeep::USE => null ) : array();
 			$use  = AppLicence::paid( $pick[0] ) ? AppLicenceKeep::use_choice( sanitize_key( (string) ( $args['app_tier'] ?? '' ) ) ) : null;
-			$kept = null === $use ? null : AppLicenceKeep::offered( $pick[0], $use, (int) ( $r->license()['user_id'] ?? 0 ), false );
+			// A server that holds a licence of this app already keeps using it: a kept one chosen beside it stays kept.
+			$kept = null === $use || AppReinstallPaid::licensed( $r, $pick[0] ) ? null : AppLicenceKeep::offered( $pick[0], $use, (int) ( $r->license()['user_id'] ?? 0 ), false );
+
+			if ( null !== $use && null === $kept ) {
+				$current = AppLicence::current( $r );
+				$paid    = array( 'app_tier' => $current ? (string) ( ( (array) $current->get( 'plan' ) )['tier'] ?? '' ) : '', AppLicenceKeep::USE => null );
+			}
 
 			if ( null !== $kept ) {
 				// The licence's own tier, and the licence to link when the install starts (AppLicenceKeep::claim_chosen).

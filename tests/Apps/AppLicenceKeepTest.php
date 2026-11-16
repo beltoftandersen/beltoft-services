@@ -116,6 +116,21 @@ final class AppLicenceKeepTest extends PaidAppCase {
 		$this->assertFalse( AppLicence::release_due( $k['licence'] ), 'The vendor licence is never released while kept.' );
 	}
 
+	public function test_a_kept_licence_whose_subscription_the_customer_made_active_again_can_still_be_used(): void {
+		$k = $this->kept();
+		wcs_get_subscription( $k['sub'] )->update_status( 'active' );
+		$licence = $this->fresh( $k['licence'] );
+
+		$this->assertTrue( AppLicenceKeep::kept( $licence ) );
+		$this->assertTrue( AppLicenceKeep::reusable( $licence ), 'An active subscription does not hide the licence.' );
+		$this->assertStringNotContainsString( 'not renewed', AppLicenceKeep::kept_text( $licence ) );
+
+		$server = $this->second_server( $k['user'], $licence->id(), 5002 );
+		$this->assertNull( AppLicenceKeep::attach( $licence, $server ) );
+		$this->assertSame( 'active', wcs_get_subscription( $k['sub'] )->get_status() );
+		$this->assertSame( (int) $server->license()['id'], (int) $this->fresh( $licence )->get( 'server_license' ) );
+	}
+
 	public function test_a_licence_billed_by_the_hour_is_not_kept(): void {
 		$o = $this->ordered( $this->tiers['basic'], 'basic' );
 		Jobs::run( $o['licence']->id() );

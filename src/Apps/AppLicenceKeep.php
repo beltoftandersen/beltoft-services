@@ -168,7 +168,8 @@ final class AppLicenceKeep {
 
 		$sub = self::subscription( $licence );
 
-		return null !== $sub && $sub->has_status( 'pending-cancel' ) && $sub->can_be_updated_to( 'active' ) && self::paid_until( $licence ) > time();
+		// A customer who made the subscription active again on its own page has a kept licence that renews: it can be used just the same.
+		return null !== $sub && ( $sub->has_status( 'active' ) || ( $sub->has_status( 'pending-cancel' ) && $sub->can_be_updated_to( 'active' ) ) ) && self::paid_until( $licence ) > time();
 	}
 
 	/**
@@ -250,6 +251,13 @@ final class AppLicenceKeep {
 	public static function kept_text( Resource $licence ): string {
 		/* translators: %s: date */
 		$base = sprintf( __( 'Paid until %s.', 'beltoft-services' ), self::paid_until_text( $licence ) );
+
+		$sub = self::subscription( $licence );
+
+		if ( $sub && $sub->has_status( 'active' ) ) {
+			// Made active again by the customer: it renews, so "not renewed" would be wrong.
+			return $base . ' ' . __( 'You can use it on a new server.', 'beltoft-services' );
+		}
 
 		return self::reusable( $licence ) ? $base . ' ' . __( 'You can use it on a new server until then. It is not renewed.', 'beltoft-services' ) : $base . ' ' . __( 'It is not renewed.', 'beltoft-services' );
 	}
