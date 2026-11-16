@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.32.1
+Stable tag: 0.32.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,19 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.32.2 =
+* Fixes from the November review, each with a test.
+* Account credit used on an order counts as paid in the registrar, SSL certificate and licence key cost checks, so an order paid partly with credit is no longer refused after payment.
+* A step-up check by an authenticator app is refused for 15 minutes after five wrong codes.
+* When the live mail server connection is chosen but cannot be built, mail jobs fail and retry and the administrator gets one email a day; the test client is never used in its place.
+* A change to custom name servers on a domain with DNSSEC waits until the registry has removed the DS record (at most a day) before the name servers move.
+* Hosting storage at 150 percent of the plan stops database writes at once and alerts the administrator.
+* A licence key is deleted at the vendor only when the licence is gone for good (revoked, deleted, or a failed first order); a lapsed key is kept until its retention ends (3 days by default), and a failed plan change, pause or resume never deletes it. A Plesk app licence is kept through a lapse and ordered again on resume if it was deleted.
+* Deleting a server removes the A and www records that were made for its app domain, while they are still the records we wrote.
+* A hosting set-up step with two node calls no longer restarts its first call on every poll.
+* An account restore skips websites made after the backup and imports each database once.
+* A managed database restored from a backup gets its public network card, listen addresses and allow-list back.
 
 = 0.32.1 =
 * No change for customers: the shared job controller was split into `Jobs` (scheduling, runner, hold, sweep), `JobActions` (customer actions) and `JobFailures` (lost and failed jobs); every public `Jobs` method is unchanged.
