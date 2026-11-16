@@ -54,6 +54,7 @@ final class Account {
 		add_action( 'woocommerce_subscription_renewal_payment_complete', array( __CLASS__, 'paid' ), 10, 2 );
 		// An early bill is paid on an account that stays active, and WooCommerce Subscriptions then does not fire the hook above.
 		add_action( 'woocommerce_payment_complete', array( __CLASS__, 'early_paid' ) );
+		add_filter( 'beltoft_licenses_cancel_subscription_on_refund', array( __CLASS__, 'keep_on_refund' ), 10, 2 );
 		// The customer's currency, when nothing earlier answered (the core asks the filter and names no feature).
 		add_filter( 'beltoft_services_user_currency', array( __CLASS__, 'user_currency' ), 20, 2 );
 	}
@@ -408,5 +409,17 @@ final class Account {
 				}
 			)
 		);
+	}
+
+	/**
+	 * A refunded usage invoice must not end the pay as you go account: the account is the subscription that every later
+	 * invoice is made from (answer for beltoft-licenses 0.8.9).
+	 *
+	 * @param mixed $cancel       Whether the refund cancels the subscription.
+	 * @param mixed $subscription The subscription.
+	 * @return mixed
+	 */
+	public static function keep_on_refund( $cancel, $subscription = null ) {
+		return $subscription instanceof \WC_Subscription && self::is_account( $subscription ) ? false : $cancel;
 	}
 }
