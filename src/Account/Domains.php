@@ -178,7 +178,13 @@ final class Domains {
 	 * @return array<string, mixed>|null
 	 */
 	public static function page(): ?array {
-		return self::$page;
+		if ( null !== self::$page ) {
+			return self::$page;
+		}
+
+		$page = ServiceArea::page();
+
+		return null !== $page && ( $page['area'] ?? null ) instanceof DomainArea ? $page : null;
 	}
 
 	/**
