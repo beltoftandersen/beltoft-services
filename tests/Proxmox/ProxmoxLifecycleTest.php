@@ -424,6 +424,17 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->assertCount( $seen, $this->fake->calls() );
 	}
 
+	public function test_a_pause_during_a_reinstall_before_the_wipe_switches_the_old_vm_off(): void {
+		$r = $this->built();
+		// What Reinstall::reinstall stores: the clone step is gone, the old VM still runs.
+		$r->set( array( 'wipe' => true, 'steps' => array( 'ip', 'vmid' ) ) );
+		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
+
+		$this->assert_done( $this->op( 'pause', $r ) );
+
+		$this->assertSame( 'stopped', $this->fake->vm( 5000 )['status'], 'The paid-for or abusive VM is not left running.' );
+	}
+
 	public function test_pause_waits_for_a_pending_clone(): void {
 		$resource = $this->resource();
 		$this->fake->next_task( array( 'polls' => 400 ) );
