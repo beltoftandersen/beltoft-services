@@ -27,6 +27,11 @@ class BoundaryTest extends UsageTestCase {
 	}
 
 	public function tear_down(): void {
+		// The tax switch below commits what was written before it: the thresholds go back to their defaults first.
+		$stored = get_option( \BeltoftServices\Settings::OPTION, array() );
+		unset( $stored['usage_minimum'], $stored['usage_threshold_new'], $stored['usage_threshold'] );
+		update_option( \BeltoftServices\Settings::OPTION, $stored );
+		$GLOBALS['wpdb']->query( 'COMMIT' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- see above.
 		$this->vat( false );
 		Estimate::reset();
 		parent::tear_down();

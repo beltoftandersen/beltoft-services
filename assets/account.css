@@ -1000,7 +1000,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dnse__danger { 
 @media (max-width: 767px) {
 	body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-vm__copy, .beltoft-services-console__action, .beltoft-services-mail__actions .button, .beltoft-services-mail__actions summary, [data-snapshot-rollback], [data-snapshot-delete], [data-db-access-remove], [data-db-access-mine], .beltoft-services-vm__password + .button),
 	.beltoft-vm-usage__ranges button { min-height: var(--bs-btn-h); }
-	body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-fw__link, .beltoft-services-vm .beltoft-services-vm__link, div.beltoft-services-domain button.beltoft-services-domain__link, .beltoft-services-vm__disk a, .beltoft-services-vm__disks p a, .beltoft-services-ov__head a, .beltoft-services-server__back a, .beltoft-services-ov__attention a, table.shop_table td .button, .beltoft-licenses__copy{ min-height: var(--bs-btn-h); display: inline-flex; align-items: center; }
+	body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-fw__link, .beltoft-services-vm .beltoft-services-vm__link, div.beltoft-services-domain button.beltoft-services-domain__link, .beltoft-services-vm__disk a, .beltoft-services-vm__disks p a, .beltoft-services-ov__head a, .beltoft-services-server__back a, .beltoft-services-ov__attention a, table.shop_table td .button, .beltoft-licenses__copy, a.acct-edit-link) { min-height: var(--bs-btn-h); display: inline-flex; align-items: center; }
 	.beltoft-services-vm__disk p { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--bs-space-4); }
 }
 
