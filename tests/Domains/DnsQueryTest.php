@@ -89,4 +89,25 @@ class DnsQueryTest extends TestCase {
 		$this->assertSame( 'dns_response', DnsQuery::parse_answer( $this->answer_for( 'example.com', 16, 'example.com', 48, 'k1' ), 7, 48, 'example.com' )->get_error_code(), 'Another question type.' );
 		$this->assertSame( 2026111601, DnsQuery::parse_answer( $this->answer_for( 'EXAMPLE.com', 6, 'Example.COM', 6, $soa ), 7, 6, 'example.com.' ), 'Case and a trailing dot do not matter.' );
 	}
+
+	public function test_an_answer_with_records_only_in_the_authority_section_has_no_value(): void {
+		$wire = pack( 'nnnnnn', 7, 0x8400, 1, 0, 1, 0 ) . "\x07example\x03com\x00" . pack( 'nn', 6, 1 ) . "\xc0\x0c" . pack( 'nnNn', 6, 1, 300, 2 ) . 'xx';
+		$this->assertSame( 'dns_missing', DnsQuery::parse_answer( $wire, 7, 6, 'example.com' )->get_error_code() );
+	}
+
+	public function test_an_answer_that_claims_more_records_than_it_holds_is_refused(): void {
+		$wire = pack( 'nnnnnn', 7, 0x8400, 1, 3, 0, 0 ) . "\x07example\x03com\x00" . pack( 'nn', 48, 1 ) . "\xc0\x0c" . pack( 'nnNn', 48, 1, 300, 2 ) . 'k1';
+		$this->assertSame( 'dns_response', DnsQuery::parse_answer( $wire, 7, 48, 'example.com' )->get_error_code() );
+	}
+
+	public function test_an_owner_pointer_to_nowhere_is_refused(): void {
+		$wire = pack( 'nnnnnn', 7, 0x8400, 1, 1, 0, 0 ) . "\x07example\x03com\x00" . pack( 'nn', 48, 1 ) . "\xc3\xe8" . pack( 'nnNn', 48, 1, 300, 2 ) . 'k1';
+		$this->assertSame( 'dns_response', DnsQuery::parse_answer( $wire, 7, 48, 'example.com' )->get_error_code() );
+	}
+
+	public function test_the_question_packet_for_a_name_with_a_long_label_is_wrong_today(): void {
+		// Pins today's packet(): a label over 63 bytes is written with a wrong length byte. The strict builder (DnsWire::query) refuses such a name.
+		$wire = DnsQuery::packet( 7, str_repeat( 'a', 64 ) . '.example.com', 6 );
+		$this->assertSame( 64, ord( $wire[12] ), 'The length byte of a 64 byte label is 64, which a name server reads as a compression flag.' );
+	}
 }

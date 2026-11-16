@@ -137,4 +137,69 @@ class DnsWireTest extends TestCase {
 		$this->assertSame( 'dns_bad_name', $result->get_error_code() );
 		$this->assertSame( 0, $seen, 'Refused before the network (or its test replacement) is reached.' );
 	}
+
+	/** A response header and the question for example.com A (id 3), with the counts given. */
+	private function head( int $qd = 1, int $an = 0, int $ns = 0, int $ar = 0 ): string {
+		return pack( 'nnnnnn', 3, 0x8400, $qd, $an, $ns, $ar ) . ( $qd > 0 ? DnsPackets::name( 'example.com' ) . pack( 'nn', 1, 1 ) : '' );
+	}
+
+	private function code( string $packet ): string {
+		$r = DnsWire::parse( $packet, 3, 'example.com', 1 );
+		return is_wp_error( $r ) ? $r->get_error_code() : 'ok';
+	}
+
+	public function test_a_compression_pointer_inside_rdata_is_followed(): void {
+		$ns = $this->head( 1, 1 ) . "\xc0\x0c" . pack( 'nnNn', 2, 1, 60, 5 ) . "\x02ns\xc0\x0c";
+		$r  = DnsWire::parse( $ns, 3, 'example.com', 1 );
+		$this->assertSame( 'ns.example.com', $r['answer'][0]['data'] );
+		$mx = $this->head( 1, 1 ) . "\xc0\x0c" . pack( 'nnNn', 15, 1, 60, 9 ) . pack( 'n', 10 ) . "\x04mail\xc0\x0c";
+		$this->assertSame( 'mail.example.com', DnsWire::parse( $mx, 3, 'example.com', 1 )['answer'][0]['data']['target'] );
+	}
+
+	public function test_bad_pointers_and_names_are_malformed(): void {
+		$base = $this->head( 1, 1 );
+		$this->assertSame( 'dns_malformed', $this->code( $base . "\xc0" . chr( strlen( $base ) ) . pack( 'nnNn', 1, 1, 60, 4 ) . "\1\2\3\4" ), 'A pointer to itself.' );
+		$this->assertSame( 'dns_malformed', $this->code( $base . "\xc0\xff" . pack( 'nnNn', 1, 1, 60, 4 ) . "\1\2\3\4" ), 'A pointer forward.' );
+		$this->assertSame( 'dns_malformed', $this->code( $this->head( 1, 1 ) . chr( 64 ) . str_repeat( 'a', 64 ) . "\0" . pack( 'nnNn', 1, 1, 60, 4 ) . "\1\2\3\4" ), 'A label of 64 bytes.' );
+		$long = implode( '.', array( str_repeat( 'a', 63 ), str_repeat( 'b', 63 ), str_repeat( 'c', 63 ), str_repeat( 'd', 63 ) ) );
+		$this->assertSame( 'dns_malformed', $this->code( $this->head( 1, 1 ) . DnsPackets::name( $long ) . pack( 'nnNn', 1, 1, 60, 4 ) . "\1\2\3\4" ), 'A name over 254 bytes.' );
+	}
+
+	public function test_a_chain_of_pointers_has_a_limit(): void {
+		// An unknown record (type 99, skipped) carries a chain of pointers in its rdata; the next record's owner points at the end of it.
+		$build = function ( int $links ): string {
+			$head  = $this->head( 1, 2 );
+			$first = strlen( $head ) + 12; // Where the rdata of the first record starts.
+			$rdata = '';
+			for ( $i = 0; $i < $links; ++$i ) { $rdata .= pack( 'n', 0xc000 | ( 0 === $i ? 12 : $first + 2 * ( $i - 1 ) ) ); }
+			$last = $first + 2 * ( $links - 1 );
+			return $head . "\xc0\x0c" . pack( 'nnNn', 99, 1, 60, strlen( $rdata ) ) . $rdata . pack( 'n', 0xc000 | $last ) . pack( 'nnNn', 1, 1, 60, 4 ) . "\1\2\3\4";
+		};
+		$this->assertSame( 'ok', $this->code( $build( 5 ) ), 'A short chain is followed.' );
+		$this->assertSame( 'dns_malformed', $this->code( $build( 25 ) ), 'A chain of 25 jumps is refused.' );
+	}
+
+	public function test_the_question_count_and_record_counts_are_checked(): void {
+		$this->assertSame( 'dns_mismatch', $this->code( pack( 'nnnnnn', 3, 0x8400, 0, 0, 0, 0 ) ), 'No question.' );
+		$this->assertSame( 'dns_mismatch', $this->code( $this->head( 2 ) ), 'Two questions.' );
+		$this->assertSame( 'dns_malformed', $this->code( $this->head( 1, 2 ) ), 'More answers claimed than present.' );
+		$one = $this->head( 1, 1 ) . "\xc0\x0c" . pack( 'nnNn', 1, 1, 60, 4 ) . "\1\2\3\4";
+		$this->assertSame( 'ok', $this->code( $one . "\0\0\0" ), 'Bytes after the last record are ignored.' );
+	}
+
+	public function test_other_classes_and_opt_records_are_skipped_and_an_empty_txt_string_is_kept(): void {
+		$chaos = $this->head( 1, 2 ) . "\xc0\x0c" . pack( 'nnNn', 1, 3, 60, 4 ) . "\1\2\3\4" . "\xc0\x0c" . pack( 'nnNn', 1, 1, 60, 4 ) . "\5\6\7\8";
+		$r     = DnsWire::parse( $chaos, 3, 'example.com', 1 );
+		$this->assertCount( 1, $r['answer'], 'Class CH is skipped.' );
+		$opt = $this->head( 1, 0, 0, 1 ) . "\0" . pack( 'nnNn', 41, 4096, 0, 0 );
+		$this->assertSame( array(), DnsWire::parse( $opt, 3, 'example.com', 1 )['additional'], 'The OPT record is skipped.' );
+		$txt = $this->head( 1, 1 ) . "\xc0\x0c" . pack( 'nnNn', 16, 1, 60, 3 ) . "\0\1a";
+		$this->assertSame( array( '', 'a' ), DnsWire::parse( $txt, 3, 'example.com', 1 )['answer'][0]['data'] );
+	}
+
+	public function test_an_uppercase_name_is_asked_as_typed_and_answered_in_lowercase(): void {
+		$this->assertStringContainsString( "\x07EXAMPLE\x03COM\x00", DnsWire::query( 'EXAMPLE.COM', 1, 3 ) );
+		$packet = DnsPackets::response( 'example.com', 1, array( 'id' => 3, 'answer' => array( array( 'name' => 'WWW.Example.COM', 'type' => 1, 'data' => '192.0.2.1' ) ) ) );
+		$this->assertSame( 'www.example.com', DnsWire::parse( $packet, 3, 'EXAMPLE.com', 1 )['answer'][0]['name'] );
+	}
 }

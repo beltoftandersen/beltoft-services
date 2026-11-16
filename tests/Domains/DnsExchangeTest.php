@@ -30,4 +30,51 @@ class DnsExchangeTest extends TestCase {
 		$this->assertIsString( $data );
 		$this->assertSame( 40, DnsQuery::parse_answer( $data, 7, 48, 'example.com' ), 'The full answer came over TCP, all forty keys.' );
 	}
+
+	/** Runs the scripted test name server and asks it one DNSKEY question; returns [exchange result, the packet sent]. */
+	private function ask_server( string $scenario ): array {
+		$proc = proc_open( array( PHP_BINARY, dirname( __DIR__ ) . '/Support/dns-test-server.php', $scenario ), array( 1 => array( 'pipe', 'w' ), 2 => array( 'pipe', 'w' ) ), $pipes );
+		$this->assertIsResource( $proc );
+		$port = (int) trim( (string) fgets( $pipes[1] ) );
+		$this->assertGreaterThan( 0, $port, 'The test name server started.' );
+
+		$wire   = DnsQuery::packet( 7, 'example.com', 48 );
+		$result = DnsTransport::exchange( '127.0.0.1', $wire, $port );
+		proc_terminate( $proc );
+		proc_close( $proc );
+
+		return array( $result, $wire );
+	}
+
+	public function test_a_reply_with_another_id_is_handed_back_unchecked_and_refused_by_the_parser(): void {
+		list( $data ) = $this->ask_server( 'wrong_id' );
+		$this->assertIsString( $data, 'The transport does not look at the id.' );
+		$this->assertSame( 'dns_response', DnsQuery::parse_answer( $data, 7, 48, 'example.com' )->get_error_code() );
+	}
+
+	public function test_a_truncated_answer_with_nothing_in_it_is_read_again_over_tcp(): void {
+		list( $data ) = $this->ask_server( 'tc_empty' );
+		$this->assertSame( 1, DnsQuery::parse_answer( $data, 7, 48, 'example.com' ) );
+	}
+
+	public function test_a_tcp_answer_that_comes_in_three_pieces_is_read_whole(): void {
+		list( $data ) = $this->ask_server( 'tc_two_segments' );
+		$this->assertSame( 3, DnsQuery::parse_answer( $data, 7, 48, 'example.com' ) );
+	}
+
+	public function test_a_tcp_answer_shorter_than_its_length_prefix_is_an_error(): void {
+		list( $data ) = $this->ask_server( 'tc_short_body' );
+		$this->assertSame( 'dns_timeout', $data->get_error_code() );
+	}
+
+	public function test_a_tcp_connection_closed_without_an_answer_is_an_error(): void {
+		list( $data ) = $this->ask_server( 'tc_closed' );
+		$this->assertSame( 'dns_timeout', $data->get_error_code() );
+	}
+
+	public function test_an_answer_that_is_truncated_over_tcp_too_is_handed_back_as_is_and_refused_by_the_parser(): void {
+		list( $data ) = $this->ask_server( 'tc_empty_loop' );
+		$this->assertIsString( $data );
+		$this->assertSame( 'dns_response', DnsQuery::parse_answer( $data, 7, 48, 'example.com' )->get_error_code(), 'Truncated: not an authoritative answer.' );
+	}
 }
