@@ -541,7 +541,7 @@ final class PrivateAttach {
 		}
 
 		if ( 'detaching' === $state ) {
-			return StepResult::done( array(), 'Private network attach refused: a detach is still running' );
+			return StepResult::refused( array(), 'Private network attach refused: a detach is still running' );
 		}
 
 		if ( 'attaching' !== $state || 'attach' !== ( $op['action'] ?? '' ) || 'nic' === ( $op['phase'] ?? 'nic' ) ) {
@@ -554,7 +554,7 @@ final class PrivateAttach {
 			if ( 'running' !== $v['status'] ) {
 				$this->r->set( array( self::NOTICE => 'stopped', self::WANT => null ) );
 
-				return StepResult::done( array(), 'Private network attach refused: the server is not running' );
+				return StepResult::refused( array(), 'Private network attach refused: the server is not running' );
 			}
 
 			// Nothing is reserved or changed until the agent answers.
@@ -563,7 +563,7 @@ final class PrivateAttach {
 			if ( null === $info ) {
 				$this->r->set( array( self::NOTICE => 'agent', self::WANT => null ) );
 
-				return StepResult::done( array(), 'Private network attach refused: the guest agent did not answer' );
+				return StepResult::refused( array(), 'Private network attach refused: the guest agent did not answer' );
 			}
 
 			$this->r->set( array( 'agent' => 'ok', 'agent_checked_at' => null ) );
@@ -646,14 +646,14 @@ final class PrivateAttach {
 
 			if ( 'attaching' === $state && 'attach' === ( $op['action'] ?? '' ) && 'file' !== ( $op['phase'] ?? '' ) ) {
 				// An attach is mid-restart: it is finished first (the restart is not interrupted).
-				return StepResult::done( array(), 'Private network detach refused: an attach is still running' );
+				return StepResult::refused( array(), 'Private network detach refused: an attach is still running' );
 			}
 
 			if ( $this->foreign_nic( $v ) ) {
 				$this->r->set( array( self::NOTICE => 'occupied' ) );
 				Events::add( (int) ( $this->r->license()['id'] ?? 0 ), 'service', 'Private network detach refused: the second network interface is not the private one' );
 
-				return StepResult::done( array(), 'Private network detach refused: the second network interface is not ours' );
+				return StepResult::refused( array(), 'Private network detach refused: the second network interface is not ours' );
 			}
 
 			$op = array(
@@ -706,7 +706,7 @@ final class PrivateAttach {
 
 		$this->r->set( array( self::NOTICE => 'private_nic_occupied' === $code ? 'occupied' : 'unavailable', self::WANT => null ) );
 
-		return StepResult::done( array(), 'Private network attach refused: ' . $this->scrub( $e->get_error_message(), 120 ) );
+		return StepResult::refused( array(), 'Private network attach refused: ' . $this->scrub( $e->get_error_message(), 120 ) );
 	}
 
 	// -- Rebuild (a reinstall keeps the private network) -------------------------------------------------

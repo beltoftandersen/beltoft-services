@@ -165,7 +165,7 @@ final class Firewall {
 		}
 
 		if ( ! FirewallRules::editable( $this->r ) || ( 'fw_apply' === $action && ! FirewallRules::managed( $this->r ) ) ) {
-			return StepResult::done( array(), 'Firewall refused: not available for this server' );
+			return StepResult::refused( array(), 'Firewall refused: not available for this server' );
 		}
 
 		if ( 'fw_reset' === $action ) {

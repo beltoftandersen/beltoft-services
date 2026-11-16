@@ -85,7 +85,7 @@ final class Engine {
 			return; // A retry or a wait is not a problem to show, and it must not hide one.
 		}
 
-		$text = $result->is_failed() ? $result->error() : ( 1 === preg_match( '/\brefused\b/i', $result->event() ) ? $result->event() : '' );
+		$text = $result->is_failed() ? $result->error() : ( $result->is_refusal() ? $result->event() : '' );
 		$next = $this->scrub( $text, 200 );
 
 		if ( $now !== $next ) {
@@ -330,7 +330,7 @@ final class Engine {
 			$text = sprintf( 'Snapshot refused: the storage %s has less than %d GB free', $storage, Policy::reserve_gb() );
 			Alerts::admin( $this->r, $text );
 
-			return StepResult::done( array(), $text );
+			return StepResult::refused( array(), $text );
 		}
 
 		return null;
@@ -522,7 +522,7 @@ final class Engine {
 	 */
 	private function take_begin( array $record, array $v, array $args ) {
 		if ( Policy::used( $this->r ) >= Policy::slots( $this->r ) ) {
-			return StepResult::done( array(), 'Snapshot refused: no slot is free' );
+			return StepResult::refused( array(), 'Snapshot refused: no slot is free' );
 		}
 
 		$quiet = $this->quiet( $v, 'snapshot' );
@@ -538,12 +538,12 @@ final class Engine {
 				$text = 'Snapshot refused: the volume ' . $this->scrub( $volid, 120 ) . ' is not qcow2';
 				Alerts::admin( $this->r, $text );
 
-				return StepResult::done( array(), $text );
+				return StepResult::refused( array(), $text );
 			}
 		}
 
 		if ( ! $covers ) {
-			return StepResult::done( array(), 'Snapshot refused: the server has no disk' );
+			return StepResult::refused( array(), 'Snapshot refused: the server has no disk' );
 		}
 
 		$guard = $this->space( $record, $v );
@@ -675,11 +675,11 @@ final class Engine {
 
 		if ( '' === $phase ) {
 			if ( null === $entry || 'ok' !== ( $entry['state'] ?? 'ok' ) ) {
-				return StepResult::done( array( Snapshots::ROLLBACK => null ), 'Rollback refused: that snapshot is not available' );
+				return StepResult::refused( array( Snapshots::ROLLBACK => null ), 'Rollback refused: that snapshot is not available' );
 			}
 
 			if ( null !== Actions::disk_block( $this->r, 'rollback' ) ) {
-				return StepResult::done( array( Snapshots::ROLLBACK => null ), 'Rollback refused: an extra disk is detached or needs attention; the server was not touched' );
+				return StepResult::refused( array( Snapshots::ROLLBACK => null ), 'Rollback refused: an extra disk is detached or needs attention; the server was not touched' );
 			}
 
 			$remote = $this->remote( $record, $v );
@@ -691,7 +691,7 @@ final class Engine {
 			if ( ! isset( $remote[ $entry['snap'] ] ) ) {
 				$this->save( $this->with( $id, null ), $this->open_op() );
 
-				return StepResult::done( array( Snapshots::ROLLBACK => null ), 'Rollback refused: the snapshot is not on the server any more' );
+				return StepResult::refused( array( Snapshots::ROLLBACK => null ), 'Rollback refused: the snapshot is not on the server any more' );
 			}
 
 			$quiet = $this->quiet( $v, 'rollback' );

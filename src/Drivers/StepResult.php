@@ -64,6 +64,9 @@ final class StepResult {
 	/** Deadline for an explicitly bounded external wait; zero uses normal retry limits. */
 	private int $wait_until = 0;
 
+	/** The driver refused the request on purpose (see refused()). */
+	private bool $refusal = false;
+
 	/** Seconds until the next look of a poll (zero: not a poll). */
 	private int $poll_seconds = 0;
 
@@ -96,6 +99,38 @@ final class StepResult {
 	 */
 	public static function done( array $meta = array(), string $event = '' ): self {
 		return new self( self::DONE, 0, '', $meta, $event );
+	}
+
+	/**
+	 * A customer action the driver refuses on purpose (the state does not allow it, a value is not valid): the action is
+	 * over and nothing was changed. It is stored as done for the reconciler and shown to the customer as "not done", and
+	 * the follow-ups of a done action do not run. The driver says so here; JobActions never reads it from the event text.
+	 *
+	 * @param array<string, mixed> $meta  Meta to merge into the resource.
+	 * @param string               $event History text, for example "Reboot refused: the server is not running".
+	 * @return self
+	 */
+	public static function refused( array $meta = array(), string $event = '' ): self {
+		return self::done( $meta, $event )->as_refusal();
+	}
+
+	/**
+	 * Marks this result as a refusal (also for a failure that is the driver's answer to a request it will not run).
+	 *
+	 * @return self
+	 */
+	public function as_refusal(): self {
+		$copy          = clone $this;
+		$copy->refusal = true;
+
+		return $copy;
+	}
+
+	/**
+	 * Did the driver refuse the request on purpose?
+	 */
+	public function is_refusal(): bool {
+		return $this->refusal;
 	}
 
 	/**

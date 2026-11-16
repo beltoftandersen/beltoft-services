@@ -283,7 +283,7 @@ final class JobActions {
 
 		// What the customer is told about the outcome: success only for a done action that did not refuse. The sentence is the driver's
 		// own (Jobs::TEXT, also on an unexpected failure): result() cleans and caps it, a fixed text stands in when there is none.
-		$refused = 1 === preg_match( '/\brefused\b/i', $result->event() . ' ' . $result->error() );
+		$refused = $result->is_refusal();
 		$ok      = $result->is_done() && ! $refused;
 		$said    = isset( $result->meta()[ Jobs::TEXT ] ) ? (string) $result->meta()[ Jobs::TEXT ] : '';
 

@@ -492,7 +492,7 @@ final class Actions {
 
 		// A refusal is an answer, not an error: no alert for a stray click.
 		if ( null !== $why ) {
-			return StepResult::done( array(), ucfirst( str_replace( '_', ' ', $action ) ) . ' refused: ' . $this->scrub( $why, 160 ) );
+			return StepResult::refused( array(), ucfirst( str_replace( '_', ' ', $action ) ) . ' refused: ' . $this->scrub( $why, 160 ) );
 		}
 
 		// Snapshots have their own steps (verification, task polling and all).

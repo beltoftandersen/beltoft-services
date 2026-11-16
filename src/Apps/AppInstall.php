@@ -71,7 +71,7 @@ final class AppInstall {
 	 */
 	public static function retry( Resource $r ): StepResult {
 		if ( ! self::can_retry( $r ) ) {
-			return StepResult::done( array(), 'Try again refused: the app is not failed' );
+			return StepResult::refused( array(), 'Try again refused: the app is not failed' );
 		}
 		$ok = $r->set( array(
 			'app_state'       => 'pending',
