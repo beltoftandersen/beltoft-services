@@ -133,19 +133,6 @@ class OpsTest extends HostingCase {
 		$this->assertCount( 1, $this->agent->calls_of( 'agent.health' ) );
 	}
 
-	public function test_the_health_job_is_quiet_when_the_real_free_memory_and_disk_are_fine(): void {
-		$this->agent->set_health_extra( array( 'host' => array( 'mem_total_mb' => 32768, 'mem_free_mb' => 8000, 'disk_total_gb' => 1000, 'disk_free_gb' => 500 ) ) );
-		NodeHealth::run();
-		$this->assertSame( array(), $this->admin_mails( 'is low' ), 'Plenty free: quiet.' );
-	}
-
-	public function test_the_health_job_cross_checks_the_real_free_memory_the_agent_reports(): void {
-		$this->agent->set_health_extra( array( 'host' => array( 'mem_total_mb' => 32768, 'mem_free_mb' => 900, 'disk_total_gb' => 1000, 'disk_free_gb' => 500 ) ) );
-		NodeHealth::run();
-		NodeHealth::run();
-		$this->assertCount( 1, $this->admin_mails( 'is low' ), 'Low real free memory is mailed, once a day.' );
-	}
-
 	public function test_an_unreachable_agent_is_mailed_once_a_day(): void {
 		$this->agent->fail_next( 'agent.health', 'down' );
 
@@ -161,24 +148,79 @@ class OpsTest extends HostingCase {
 		$this->assertCount( 1, $this->admin_mails( 'attention' ), 'Once a day per problem.' );
 	}
 
-	public function test_agent_alerts_isolation_and_loader_problems_are_each_reported(): void {
+	public function test_agent_alerts_and_loader_problems_are_each_reported(): void {
 		$this->agent->set_loaders( array( '1000/shop' => array( 'state' => 'refused:symlink', 'ts' => 1 ), '1000/ok' => array( 'state' => 'ok', 'ts' => 2 ) ) );
 		$this->agent->set_health_extra(
 			array(
 				'alerts'    => array( array( 'message' => 'db-shared CPU above 80 percent for 15 minutes' ) ),
-				'isolation' => array( '1000' => 'ok', '1001' => 'off', 'bad key' => 'off' ),
 			)
 		);
 
 		$found = NodeHealth::run();
 
-		$this->assertCount( 3, $found['n1'] );
+		$this->assertCount( 2, $found['n1'] );
 		$all = implode( ' | ', $this->admin_mails( 'attention' ) );
 		$this->assertStringContainsString( 'db-shared CPU above 80 percent', $all );
-		$this->assertStringContainsString( 'Port isolation is not on for container(s): 1001 (off)', $all );
-		$this->assertStringNotContainsString( 'bad key', $all );
 		$this->assertStringContainsString( '1 site(s) have a refused or failed loader file: 1000/shop (refused:symlink)', $all );
-		$this->assertCount( 3, $this->admin_mails( 'attention' ) );
+		$this->assertCount( 2, $this->admin_mails( 'attention' ) );
+	}
+
+	private const GB = 1073741824;
+
+	public function test_a_node_with_room_and_a_guard_that_is_off_or_ok_sends_nothing(): void {
+		$this->agent->set_health_extra(
+			array(
+				'storage'  => array(
+					'node' => array( 'path' => '/hostingpool/ct', 'total_bytes' => 200 * self::GB, 'free_bytes' => 100 * self::GB ),
+					'db'   => array( 'total_bytes' => 20 * self::GB, 'free_bytes' => 15 * self::GB ),
+				),
+				'db_guard' => array( 'state' => 'ok', 'floor_mb' => 2048, 'readonly' => array(), 'free_bytes' => 15 * self::GB ),
+			)
+		);
+		NodeHealth::run();
+		$this->assertSame( array(), $this->admin_mails( 'attention' ) );
+
+		$this->agent->set_health_extra( array( 'storage' => array( 'node' => array( 'path' => '/', 'error' => 'no such path' ), 'db' => array( 'error' => 'no db' ) ), 'db_guard' => array( 'state' => 'off' ) ) );
+		NodeHealth::run();
+		$this->assertSame( array(), $this->admin_mails( 'attention' ), 'A reading that failed is not a low reading.' );
+	}
+
+	public function test_little_free_space_on_the_node_or_the_database_server_is_mailed_once_a_day(): void {
+		$this->agent->set_health_extra(
+			array(
+				'storage' => array(
+					'node' => array( 'path' => '/hostingpool/ct', 'total_bytes' => 200 * self::GB, 'free_bytes' => 10 * self::GB ),
+					'db'   => array( 'total_bytes' => 20 * self::GB, 'free_bytes' => 1 * self::GB ),
+				),
+			)
+		);
+
+		$found = NodeHealth::run();
+		NodeHealth::run();
+
+		$this->assertCount( 2, $found['n1'] );
+		$all = implode( ' | ', $this->admin_mails( 'attention' ) );
+		$this->assertStringContainsString( 'Container storage on the node has 10.0 GB free of 200.0 GB.', $all );
+		$this->assertStringContainsString( 'The database server has 1.0 GB free of 20.0 GB.', $all );
+		$this->assertCount( 2, $this->admin_mails( 'attention' ), 'Once a day per problem.' );
+		$this->assertStringNotContainsString( '—', $all );
+	}
+
+	public function test_a_tripped_database_guard_names_the_accounts_it_set_read_only(): void {
+		$this->agent->set_health_extra( array( 'db_guard' => array( 'state' => 'tripped', 'floor_mb' => 2048, 'readonly' => array( 'c1001', 'c1002', 'bad name!' ), 'free_bytes' => 100 ) ) );
+
+		$found = NodeHealth::run();
+
+		$this->assertCount( 1, $found['n1'] );
+		$mails = $this->admin_mails( 'attention' );
+		$this->assertCount( 1, $mails );
+		$this->assertStringContainsString( 'The database guard on the node set these accounts read only: c1001, c1002.', $mails[0] );
+		$this->assertStringNotContainsString( 'bad name', $mails[0] );
+	}
+
+	public function test_an_older_agent_without_the_new_members_is_quiet(): void {
+		$this->agent->set_health_extra( array( 'isolation' => array( '1001' => 'off' ), 'host' => array( 'mem_total_mb' => 100, 'mem_free_mb' => 1 ) ) );
+		$this->assertSame( array(), NodeHealth::run() );
 	}
 
 	public function test_a_health_job_still_running_is_read_again_by_the_same_id_and_its_alerts_are_mailed(): void {
