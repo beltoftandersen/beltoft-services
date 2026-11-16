@@ -64,6 +64,10 @@ defined( 'ABSPATH' ) || exit;
  *   container is on the node, so the plugin calls it after the destroy; idempotent.
  * - db.drop: dropped (list of names that existed), idempotent.
  * - db.size: sizes (map of database => bytes; 0 unless set_db_size()).
+ * - db.sizes: accounts (map account => { bytes, databases (map name => bytes), limit_mb (int or null), readonly (bool), readonly_by
+ *   ("", "plugin" or "guard") }) for every account that has databases. Read only. The node agent has it since the database
+ *   guard; an older agent answers unknown_op.
+ * - db.limit: account, limit_mb (int, or null after 0 removes it). The agent keeps it for its safety net only.
  * - backup.prepare: dumped (true), label ("nightly" when none), databases (dumped), failed (not dumped). The optional
  *   label (`[a-z0-9_-]{1,32}`) names the dump, a safety point keeps its own; a labelled run fails the job if any dump fails.
  * - backup.file_restore: restored (true), slug. The snapshot must be b<unix ctime> of a backup: a safety point name is
@@ -247,6 +251,11 @@ class FakeAgent implements Agent {
 			'database' => array( 'ident', true ),
 		),
 		'db.size'           => array( 'account' => array( 'ident', true ) ),
+		'db.sizes'          => array(),
+		'db.limit'          => array(
+			'account'  => array( 'ident', true ),
+			'limit_mb' => array( 'int', true ),
+		),
 		'db.readonly'       => array(
 			'account' => array( 'ident', true ),
 			'enabled' => array( 'bool', true ),
@@ -368,6 +377,7 @@ class FakeAgent implements Agent {
 			'backup_slots' => array(),
 			'restores' => array(),
 			'readonly' => array(),
+			'limits'   => array(),
 			'loaders'  => array(),
 			'unsupported' => array(),
 			'wp_scripts'  => array(),
@@ -1217,6 +1227,38 @@ class FakeAgent implements Agent {
 				$this->state['restore_tests'][] = array( 'vmid' => $vmid, 'snapshot' => $args['snapshot'], 'scratch_vmid' => $args['scratch_vmid'] );
 
 				return array_merge( array( 'ok' => true, 'status' => 200, 'title_match' => true ), (array) ( $this->state['restore_test_result'] ?? array() ) );
+
+			case 'db.sizes':
+				$accounts = array();
+
+				foreach ( (array) $this->state['dbs'] as $account => $row ) {
+					$dbs = array();
+
+					foreach ( (array) ( $row['databases'] ?? array() ) as $name ) {
+						$dbs[ $name ] = (int) ( $this->state['db_sizes'][ $name ] ?? 0 );
+					}
+
+					$ro = ! empty( $this->state['readonly'][ $account ] );
+
+					$accounts[ $account ] = array(
+						'bytes'       => array_sum( $dbs ),
+						'databases'   => (object) $dbs,
+						'limit_mb'    => $this->state['limits'][ $account ] ?? null,
+						'readonly'    => $ro,
+						'readonly_by' => $ro ? 'plugin' : '',
+					);
+				}
+
+				return array( 'accounts' => (object) $accounts );
+
+			case 'db.limit':
+				if ( (int) $args['limit_mb'] > 0 ) {
+					$this->state['limits'][ $args['account'] ] = (int) $args['limit_mb'];
+				} else {
+					unset( $this->state['limits'][ $args['account'] ] );
+				}
+
+				return array( 'account' => $args['account'], 'limit_mb' => $this->state['limits'][ $args['account'] ] ?? null );
 
 			case 'db.readonly':
 				$this->state['readonly'][ $args['account'] ] = $args['enabled'];

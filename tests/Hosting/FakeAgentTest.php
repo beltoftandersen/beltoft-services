@@ -38,7 +38,7 @@ class FakeAgentTest extends TestCase {
 		$expected = array(
 			'ct.prepare', 'ct.stats', 'ct.memory', 'ct.release', 'ct.refresh',
 			'site.create', 'site.delete', 'site.php', 'site.domains', 'site.cache_purge', 'site.cache_setup', 'site.cache_status', 'site.wp_address', 'site.wp_install', 'site.verify', 'site.wp_login_link', 'site.wp_password_link', 'site.tool_link', 'site.scan_results', 'site.scan_now', 'site.country_block', 'site.staging_create', 'site.staging_push', 'site.staging_refresh', 'site.staging_undo', 'site.staging_delete', 'site.cron', 'site.workers',
-			'db.create', 'db.drop', 'db.password', 'db.dump', 'db.size', 'db.readonly',
+			'db.create', 'db.drop', 'db.password', 'db.dump', 'db.size', 'db.sizes', 'db.limit', 'db.readonly',
 			'ssh.keys', 'ssh.password',
 			'edge.apply', 'edge.cert_push', 'edge.storage_backup',
 			'backup.prepare', 'backup.file_restore', 'backup.db_restore', 'backup.restore_test', 'backup.export',
@@ -134,6 +134,12 @@ class FakeAgentTest extends TestCase {
 		$db = $a->submit( 'db.create', array( 'account' => 'c1', 'vmid' => 1000, 'ip' => '10.200.0.10', 'databases' => array( 'c1_shop' ), 'password' => self::PASSWORD ), 'j6' );
 		$this->assertSame( array( 'user' => 'c1', 'databases' => array( 'c1_shop' ) ), $db['result'] );
 		$this->assertSame( array( 'sizes' => array( 'c1_shop' => 0 ) ), $a->submit( 'db.size', array( 'account' => 'c1' ), 'j7' )['result'] );
+		$a->set_db_size( 'c1_shop', 2048 );
+		$sizes = $a->submit( 'db.sizes', array(), 'j7b' )['result'];
+		$this->assertSame( array( 'bytes' => 2048, 'databases' => array( 'c1_shop' => 2048 ), 'limit_mb' => null, 'readonly' => false, 'readonly_by' => '' ), json_decode( wp_json_encode( $sizes['accounts'] ), true )['c1'] );
+		$this->assertSame( array( 'account' => 'c1', 'limit_mb' => 15360 ), $a->submit( 'db.limit', array( 'account' => 'c1', 'limit_mb' => 15360 ), 'j7c' )['result'] );
+		$this->assertSame( 15360, json_decode( wp_json_encode( $a->submit( 'db.sizes', array(), 'j7d' )['result']['accounts'] ), true )['c1']['limit_mb'] );
+		$this->assertSame( array( 'account' => 'c1', 'limit_mb' => null ), $a->submit( 'db.limit', array( 'account' => 'c1', 'limit_mb' => 0 ), 'j7e' )['result'], '0 removes the limit.' );
 		$this->assertSame( array( 'dropped' => array( 'c1_shop' ) ), $a->submit( 'db.drop', array( 'account' => 'c1', 'databases' => array( 'c1_shop', 'c1_other' ) ), 'j8' )['result'] );
 		$this->assertSame( array( 'dropped' => array() ), $a->submit( 'db.drop', array( 'account' => 'c1', 'databases' => array( 'c1_shop' ) ), 'j9' )['result'], 'Dropping again is fine.' );
 

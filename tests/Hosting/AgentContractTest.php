@@ -34,6 +34,8 @@ class AgentContractTest extends TestCase {
 		'site.php'          => array( 'memory_mb', 'upload_mb' ),
 		'backup.prepare'    => array( 'label' ),
 		'db.readonly'       => array(),
+		'db.sizes'          => array(),
+		'db.limit'          => array(),
 		'ct.release'        => array(),
 		'ct.refresh'        => array(),
 		'backup.restore_test' => array(),
