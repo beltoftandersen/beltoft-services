@@ -74,6 +74,73 @@ class RenewalsTest extends TestCase {
 		$this->assertNotSame( '', (string) $r->get( 'alerted' ), 'The admin is alerted.' );
 	}
 
+	private function renewal_fake(): FakeClient {
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains/123', array( 'expiration_date' => '2027-10-26 00:00:00' ) );
+		$fake->reply( 'POST', '/domains/123/renew', array( 'status' => 'ACT' ) );
+		$fake->reply( 'GET', '/domains/123', array( 'expiration_date' => '2028-10-26 00:00:00' ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		return $fake;
+	}
+
+	public function test_a_renewal_below_cost_within_the_loss_cap_is_bought_and_staff_get_one_mail(): void {
+		list( $r, $order ) = $this->paid_renewal( 9.0 );
+		$this->settings( array( 'admin_email' => 'ops@example.com', 'domain_renew_loss_cap' => 5 ) );
+		$fake = $this->renewal_fake();
+		$mails = array();
+		add_filter( 'pre_wp_mail', static function ( $null, $atts ) use ( &$mails ) { $mails[] = $atts; return true; }, 10, 2 );
+		$this->assertTrue( ( $done = Renewals::renew( $r, (string) $order->get_id() ) )->is_done(), (string) $done->error() );
+		$this->assertSame( 1, $this->posts( $fake ) );
+		$this->assertCount( 1, $mails );
+		$body = $mails[0]['subject'] . $mails[0]['message'];
+		$this->assertStringContainsString( 'example.com', $body );
+		$this->assertStringContainsString( '9.00', $body );
+		$this->assertStringContainsString( '12.50', $body );
+		$this->assertStringContainsString( '3.50', $body );
+	}
+
+	public function test_a_renewal_below_cost_above_the_loss_cap_waits_with_a_plain_sentence(): void {
+		list( $r, $order ) = $this->paid_renewal( 5.0 );
+		$this->settings( array( 'admin_email' => 'ops@example.com', 'domain_renew_loss_cap' => 5 ) );
+		$fake = $this->renewal_fake();
+		$result = Renewals::renew( $r, (string) $order->get_id() );
+		$this->assertTrue( $result->is_failed() );
+		$this->assertSame( 0, $this->posts( $fake ) );
+		$this->assertNotSame( '', (string) ( $result->meta()[ \BeltoftServices\Jobs::TEXT ] ?? '' ), 'The customer reads a plain sentence.' );
+		$this->assertStringNotContainsString( 'did not finish', (string) $result->meta()[ \BeltoftServices\Jobs::TEXT ] );
+		$this->assertNotSame( '', (string) $r->get( 'alerted' ), 'Staff are told.' );
+	}
+
+	public function test_a_loss_cap_of_zero_keeps_the_refusal(): void {
+		list( $r, $order ) = $this->paid_renewal( 12.0 );
+		$this->settings( array( 'admin_email' => 'ops@example.com', 'domain_renew_loss_cap' => 0 ) );
+		$fake = $this->renewal_fake();
+		$this->assertTrue( Renewals::renew( $r, (string) $order->get_id() )->is_failed() );
+		$this->assertSame( 0, $this->posts( $fake ) );
+	}
+
+	public function test_the_loss_cap_does_not_cover_an_unknown_cost_or_another_currency_without_a_guard_rate(): void {
+		list( $r, $order ) = $this->paid_renewal( 12.0 );
+		$order->set_currency( 'USD' );
+		$order->save();
+		$this->settings( array( 'admin_email' => 'ops@example.com', 'domain_renew_loss_cap' => 500 ) );
+		$fake = $this->renewal_fake();
+		$this->assertTrue( Renewals::renew( $r, (string) $order->get_id() )->is_failed() );
+		$this->assertSame( 0, $this->posts( $fake ) );
+	}
+
+	public function test_the_loss_cap_is_a_domain_setting_defaulting_to_five(): void {
+		$fields = \BeltoftServices\Domains\DomainSettings::fields( array() );
+		$this->assertSame( 5, $fields['domain_renew_loss_cap']['default'] );
+		$this->assertSame( 0, $fields['domain_renew_loss_cap']['min'] );
+	}
+
+	public function test_registrations_and_transfers_are_not_covered_by_the_loss_cap(): void {
+		$this->settings( array( 'domain_renew_loss_cap' => 500 ) );
+		$src = file_get_contents( dirname( __DIR__, 2 ) . '/src/Domains/DomainDriver.php' );
+		$this->assertStringNotContainsString( 'guard_renewal', $src );
+	}
+
 	public function test_renewal_paid_exactly_the_cost_proceeds(): void {
 		list( $r, $order ) = $this->paid_renewal( 12.5 );
 		$fake = new FakeClient();

@@ -5,7 +5,9 @@ namespace BeltoftServices\Domains;
 use BeltoftServices\Alerts;
 use BeltoftServices\Currency;
 use BeltoftServices\Drivers\StepResult;
+use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
+use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -89,5 +91,59 @@ final class SpendGuard {
 		if ( null === $why ) { return null; }
 		Alerts::admin( $r, $why . ' No registrar order was placed for ' . $name . '.' );
 		return StepResult::fail( $why );
+	}
+
+	/** What a customer reads when a paid renewal waits for staff (the money is taken, the registrar order is not placed yet). */
+	public const RENEWAL_WAITING = 'Your renewal payment is received. The renewal is waiting for our staff to confirm it with the registrar. We have been told.';
+
+	/** The loss cap for one renewal, in the cost currency: the setting, 0 when off, 5 when unset. */
+	public static function loss_cap(): float {
+		$cap = Settings::get( 'domain_renew_loss_cap' );
+		return is_numeric( $cap ) ? max( 0.0, (float) $cap ) : 5.0;
+	}
+
+	/** How much below the registrar's cost the line was paid, in the cost currency (0 when not below), or null when it cannot be told. */
+	public static function loss( string $name, string $key, $item ): ?float {
+		$cost = Prices::cost( $name, $key );
+		if ( null === $cost || ! $item instanceof \WC_Order_Item_Product ) { return null; }
+		$order = $item->get_order();
+		$paid = $order ? Currency::to_cost( self::paid( $item ), (string) $order->get_currency() ) : null;
+		return null === $paid ? null : max( 0.0, round( $cost - $paid, 2 ) );
+	}
+
+	/**
+	 * The guard for a paid renewal. A renewal paid below the registrar cost is still bought when the loss is at most the loss cap
+	 * (setting domain_renew_loss_cap, 0 turns it off), and staff get one mail with the figures. Above the cap, or when the cost or the
+	 * paid amount cannot be compared, it waits for staff as before: no registrar order, one alert, and a plain sentence for the customer.
+	 * Registrations and transfers never use this.
+	 *
+	 * @param Resource $r        The domain.
+	 * @param string   $name     Domain name.
+	 * @param mixed    $item     The paid renewal line.
+	 * @param string   $order_id The renewal order id.
+	 */
+	public static function guard_renewal( Resource $r, string $name, $item, string $order_id ): ?StepResult {
+		$why = self::problem( $name, 'renew', $item );
+		if ( null === $why ) { return null; }
+		$cap = self::loss_cap();
+		$loss = self::MESSAGE === $why && $cap > 0 ? self::loss( $name, 'renew', $item ) : null;
+		if ( null !== $loss && $loss <= $cap + 0.001 ) {
+			$cost = (float) Prices::cost( $name, 'renew' );
+			Alerts::notify(
+				'Domain renewed below the registrar cost: ' . $name,
+				array(
+					sprintf( 'The renewal of %s (order %s) was paid below the registrar cost and was bought anyway, within the loss cap of %s.', $name, $order_id, number_format( $cap, 2, '.', '' ) ),
+					sprintf( 'Price paid: %s %s', number_format( $cost - $loss, 2, '.', '' ), Currency::COST ),
+					sprintf( 'Registrar cost: %s %s', number_format( $cost, 2, '.', '' ), Currency::COST ),
+					sprintf( 'Loss: %s %s', number_format( $loss, 2, '.', '' ), Currency::COST ),
+				),
+				$r,
+				'beltoft_services_renew_loss_' . $r->id() . '_' . $order_id,
+				array( 'ttl' => 30 * DAY_IN_SECONDS )
+			);
+			return null;
+		}
+		Alerts::admin( $r, $why . ' No registrar order was placed for ' . $name . '.' );
+		return StepResult::fail( $why, array( Jobs::TEXT => self::RENEWAL_WAITING, Jobs::EXPECTED => true ) );
 	}
 }
