@@ -213,6 +213,11 @@ final class DbIp {
 			if ( null === IpPool::for_resource( $resource->id() ) && 0 === IpPool::available_for_db() ) {
 				return __( 'No public IP address is available right now. Please try again later.', 'beltoft-services' );
 			}
+
+			// The new address reaches the guest through its agent: a stopped database cannot take it (the add would wait out its budget and fail after payment).
+			if ( DbPower::stopped( $resource ) ) {
+				return __( 'Start the database before you add the public IP address.', 'beltoft-services' );
+			}
 		}
 
 		return '';

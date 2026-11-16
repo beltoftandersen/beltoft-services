@@ -450,6 +450,13 @@ class DbPhase4Test extends TestCase {
 		$this->assertSame( '', DbIp::switch_error( $sub->get_id(), $product, array_merge( $target, array( 'public_ip' => 0 ) ), null ), 'A switch to a plan without the add-on is never refused.' );
 		$this->pool( 2 );
 		$this->assertSame( '', DbIp::switch_error( $sub->get_id(), $product, $target, null ) );
+
+		// A stopped database cannot take the new address in its guest: the switch waits until it runs.
+		\BeltoftServices\Proxmox\Vm\Operations::remember_power( $r->id(), 'stopped' );
+		$this->assertStringContainsString( 'Start the database', DbIp::switch_error( $sub->get_id(), $product, $target, null ) );
+		$this->assertSame( '', DbIp::switch_error( $sub->get_id(), $product, array_merge( $target, array( 'public_ip' => 0 ) ), null ), 'Taking the add-on away is not held by the power.' );
+		\BeltoftServices\Proxmox\Vm\Operations::remember_power( $r->id(), 'running' );
+		$this->assertSame( '', DbIp::switch_error( $sub->get_id(), $product, $target, null ) );
 	}
 
 	// -- The profile and the build ---------------------------------------------------------------
