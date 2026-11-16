@@ -761,6 +761,30 @@ class ProxmoxJobsTest extends TestCase {
 		$this->assertSame( '', (string) Resource::find( $fresh->id() )->get( Access::META_REVEAL ) );
 	}
 
+	public function test_a_password_purge_that_dies_part_way_is_not_marked_as_run(): void {
+		$expired = $this->vm( 5000 );
+		$this->assertTrue( $expired->set( array( Access::META_REVEAL => 'ciphertext-1', Access::META_UNTIL => time() - 60 ) ) );
+		delete_transient( ProxmoxJobs::PURGE_RAN );
+
+		$die = static function () {
+			throw new \RuntimeException( 'request died' );
+		};
+		add_filter( 'beltoft_services_desire_lock_wait', $die );
+
+		try {
+			PasswordJobs::purge_passwords();
+		} catch ( \RuntimeException $e ) {
+			unset( $e );
+		}
+
+		remove_filter( 'beltoft_services_desire_lock_wait', $die );
+		$this->assertFalse( get_transient( ProxmoxJobs::PURGE_RAN ), 'An interrupted run is retried by the next sweep.' );
+
+		PasswordJobs::purge_passwords();
+		$this->assertSame( '', (string) Resource::find( $expired->id() )->get( Access::META_REVEAL ) );
+		$this->assertNotFalse( get_transient( ProxmoxJobs::PURGE_RAN ) );
+	}
+
 	public function test_the_password_purge_and_a_breach_hold_do_not_interfere(): void {
 		$held = $this->vm( 5000 );
 		$this->assertTrue(
