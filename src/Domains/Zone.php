@@ -10,6 +10,26 @@ use BeltoftServices\Settings;
 defined( 'ABSPATH' ) || exit;
 
 final class Zone {
+	/**
+	 * The live services that hold a name: one indexed lookup per kind, never a walk over every live domain. The name is matched
+	 * as given and in lower case (names are stored lower case).
+	 *
+	 * @param string   $name  Domain name.
+	 * @param string[] $kinds Service kinds to look in.
+	 * @return array<int, array{0: string, 1: Resource}> Kind and service, kinds in the order given, services by id.
+	 */
+	public static function holders( string $name, array $kinds = array( 'domain', 'dns' ) ): array {
+		$lower = strtolower( $name );
+		$out   = array();
+		foreach ( $kinds as $kind ) {
+			$ids = Resource::find_by_meta( $kind, 'domain', array_values( array_unique( array( $name, $lower ) ) ) );
+			foreach ( Resource::find_many( $ids ) as $other ) {
+				if ( strtolower( (string) $other->get( 'domain' ) ) === $lower && self::holds( $other ) ) { $out[] = array( $kind, $other ); }
+			}
+		}
+		return $out;
+	}
+
 	/** The other live license claiming this name, relative to this resource's customer. */
 	public static function owner( Resource $r ): string {
 		$name = (string) $r->get( 'domain' );
@@ -18,13 +38,10 @@ final class Zone {
 			$row = DnsAssignments::get( $name );
 			if ( null !== $row && (int) $row['user_id'] !== (int) ( $r->license()['user_id'] ?? 0 ) ) { return 'other'; }
 		}
-		foreach ( array( 'domain', 'dns' ) as $kind ) {
-			foreach ( Resource::live_ids( $kind ) as $id ) {
-				$other = Resource::find( $id );
-				if ( ! $other || $other->id() === $r->id() || ! self::holds( $other ) || $other->get( 'domain' ) !== $name ) { continue; }
-				if ( (int) ( $other->license()['user_id'] ?? 0 ) !== (int) ( $r->license()['user_id'] ?? 0 ) ) { return 'other'; }
-				return $kind;
-			}
+		foreach ( self::holders( $name ) as list( $kind, $other ) ) {
+			if ( $other->id() === $r->id() ) { continue; }
+			if ( (int) ( $other->license()['user_id'] ?? 0 ) !== (int) ( $r->license()['user_id'] ?? 0 ) ) { return 'other'; }
+			return $kind;
 		}
 		return 'none';
 	}

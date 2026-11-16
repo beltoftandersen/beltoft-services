@@ -326,11 +326,8 @@ final class Cart {
 	 * purchase is allowed.
 	 */
 	public static function domain_held( string $domain ): ?int {
-		foreach ( Resource::live_ids( 'domain' ) as $id ) {
-			$other = Resource::find( $id );
-			if ( ! $other || strtolower( (string) $other->get( 'domain' ) ) !== strtolower( $domain ) ) { continue; }
-			if ( ! Zone::holds( $other ) ) { continue; }
-			$license = $other->license();
+		foreach ( Zone::holders( $domain, array( 'domain' ) ) as $row ) {
+			$license = $row[1]->license();
 			return (int) ( $license['user_id'] ?? 0 );
 		}
 		return null;

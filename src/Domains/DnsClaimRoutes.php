@@ -292,16 +292,8 @@ final class DnsClaimRoutes {
 		$domain  = (string) $claim['domain'];
 		$generic = self::error( 'domain_taken', __( 'This domain cannot be added here. Contact support.', 'beltoft-services' ), 409 );
 
-		foreach ( array( 'domain', 'dns' ) as $kind ) {
-			foreach ( Resource::live_ids( $kind ) as $resource_id ) {
-				$resource = Resource::find( $resource_id );
-
-				if ( ! $resource || strtolower( (string) $resource->get( 'domain' ) ) !== $domain || ! Zone::holds( $resource ) ) {
-					continue;
-				}
-
-				return (int) ( $resource->license()['user_id'] ?? 0 ) === $user_id ? self::mine( $resource_id ) : $generic;
-			}
+		foreach ( Zone::holders( $domain ) as list( , $resource ) ) {
+			return (int) ( $resource->license()['user_id'] ?? 0 ) === $user_id ? self::mine( $resource->id() ) : $generic;
 		}
 
 		$product = Cart::dns_product();
@@ -454,20 +446,12 @@ final class DnsClaimRoutes {
 	private static function taken( int $user_id, string $domain ): ?\WP_REST_Response {
 		$other = self::error( 'domain_taken', __( 'This domain cannot be added here. Contact support.', 'beltoft-services' ), 409 );
 
-		foreach ( array( 'domain', 'dns' ) as $kind ) {
-			foreach ( Resource::live_ids( $kind ) as $resource_id ) {
-				$resource = Resource::find( $resource_id );
-
-				if ( ! $resource || strtolower( (string) $resource->get( 'domain' ) ) !== $domain || ! Zone::holds( $resource ) ) {
-					continue;
-				}
-
-				if ( (int) ( $resource->license()['user_id'] ?? 0 ) !== $user_id ) {
-					return $other;
-				}
-
-				return self::mine( $resource_id );
+		foreach ( Zone::holders( $domain ) as list( , $resource ) ) {
+			if ( (int) ( $resource->license()['user_id'] ?? 0 ) !== $user_id ) {
+				return $other;
 			}
+
+			return self::mine( $resource->id() );
 		}
 
 		$assigned = DnsAssignments::get( $domain );
