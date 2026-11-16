@@ -21,6 +21,11 @@ final class StepUp {
 	 */
 	public const TTL_MINUTES = 10;
 	public const MAX_TRIES   = 5;
+
+	/**
+	 * Seconds a wrong try against a site's own check is remembered.
+	 */
+	public const FAIL_WINDOW = 900;
 	public const SEND_LIMIT  = 3;
 	public const SEND_WINDOW = 600;
 
@@ -227,13 +232,28 @@ final class StepUp {
 		 * @param string    $kind    What was asked for (see beltoft_services_step_up_ask).
 		 * @param string    $purpose api_token or transfer_code.
 		 */
+		$fails = 'beltoft_services_stepfail_' . $user_id . '_' . $purpose;
+
+		if ( (int) get_transient( $fails ) >= self::MAX_TRIES ) {
+			// Too many wrong tries against a site's own check (an authenticator code can be guessed): do not ask it again for now.
+			return false;
+		}
+
 		$ok = apply_filters( 'beltoft_services_step_up_verify', null, $user_id, $secret, $ask['kind'], $purpose );
 
 		if ( null !== $ok ) {
 			// A site's own check decided: there is no emailed code to use up.
 			unset( self::$matched[ $user_id . '|' . $purpose ] );
 
-			return true === $ok;
+			if ( true === $ok ) {
+				delete_transient( $fails );
+
+				return true;
+			}
+
+			set_transient( $fails, (int) get_transient( $fails ) + 1, self::FAIL_WINDOW );
+
+			return false;
 		}
 
 		if ( 'emailed' !== $ask['kind'] ) {

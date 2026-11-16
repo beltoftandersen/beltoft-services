@@ -438,4 +438,27 @@ final class StepUpTest extends TestCase {
 		$this->assertTrue( StepUp::verify( $user, '123456', AuthCodeRoute::PURPOSE, false ) );
 		$this->assertTrue( StepUp::consume( $user, AuthCodeRoute::PURPOSE ) );
 	}
+
+	public function test_a_site_check_is_not_asked_again_after_five_wrong_tries(): void {
+		$user  = $this->customer();
+		$calls = 0;
+		$check = static function ( $ok, $u, $secret ) use ( &$calls ) {
+			++$calls;
+
+			return '123456' === $secret;
+		};
+		add_filter( 'beltoft_services_step_up_verify', $check, 10, 3 );
+
+		for ( $i = 0; $i < StepUp::MAX_TRIES; $i++ ) {
+			$this->assertFalse( StepUp::verify( $user, '00000' . $i, AuthCodeRoute::PURPOSE ) );
+		}
+
+		$this->assertSame( StepUp::MAX_TRIES, $calls );
+		$this->assertFalse( StepUp::verify( $user, '123456', AuthCodeRoute::PURPOSE ), 'The right code is refused during the lockout.' );
+		$this->assertSame( StepUp::MAX_TRIES, $calls, 'The site check is not asked during the lockout.' );
+
+		delete_transient( 'beltoft_services_stepfail_' . $user . '_' . AuthCodeRoute::PURPOSE );
+		$this->assertTrue( StepUp::verify( $user, '123456', AuthCodeRoute::PURPOSE ) );
+		remove_filter( 'beltoft_services_step_up_verify', $check, 10 );
+	}
 }
