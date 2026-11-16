@@ -713,4 +713,322 @@ final class PleskLicenceTest extends PaidAppCase {
 		$this->assertStringContainsString( 'below the Openprovider cost', (string) PleskLicence::spend_problem( $licence, 'pro' ) );
 		remove_filter( 'pre_wp_mail', '__return_true' );
 	}
+
+	// -- Characterisation of the vendor calls (licence vendor layer, step S0): pins today's behaviour ---------------
+
+	/**
+	 * Seconds until the next job of a hook for a licence, or null when none waits.
+	 *
+	 * @param string $hook Hook.
+	 * @param int    $id   Licence resource id.
+	 */
+	private function due_in( string $hook, int $id ): ?int {
+		$at = as_next_scheduled_action( $hook, array( $id ), Jobs::GROUP );
+
+		return is_int( $at ) ? $at - time() : null;
+	}
+
+	private function clear_jobs(): void {
+		as_unschedule_all_actions( PleskLicence::KEY_HOOK );
+		as_unschedule_all_actions( PleskLicence::SYNC_HOOK );
+	}
+
+	public function test_s0_an_error_on_the_find_and_on_the_order_alerts_or_retries_by_kind(): void {
+		$o      = $this->plesk_order( 'pro' );
+		$server = $o['server'];
+		$err    = new \WP_Error( 'op_199', 'x', array( 'status' => 400, 'desc' => 'nope' ) );
+
+		$this->op->reply( 'GET', '/licenses/plesk', $err );
+		$result = PleskLicence::provision( null, $this->fresh( $o['licence'] ), $server, 'plesk' );
+		$this->assertTrue( $result->is_retry() );
+		$this->assertSame( 3600, $result->delay() );
+		$this->assertCount( 1, $this->mails );
+		$this->assertStringContainsString( 'op_199: nope', (string) $this->mails[0]['message'] );
+
+		$this->mails = array();
+		$this->op->reply( 'GET', '/licenses/plesk', new \WP_Error( 'transport', 'down' ) );
+		$result = PleskLicence::provision( null, $this->fresh( $o['licence'] ), $server, 'plesk' );
+		$this->assertSame( 300, $result->delay() );
+		$this->assertSame( array(), $this->mails, 'A temporary error tells nobody.' );
+
+		$this->op->reply( 'POST', '/licenses/plesk', $err );
+		$result = PleskLicence::provision( null, $this->fresh( $o['licence'] ), $server, 'plesk' );
+		$this->assertSame( 3600, $result->delay() );
+		$this->assertCount( 1, $this->mails );
+		$this->assertStringContainsString( 'Openprovider did not order the Plesk licence. (op_199: nope)', (string) $this->mails[0]['message'] );
+
+		$this->mails = array();
+		$this->op->reply( 'POST', '/licenses/plesk', new \WP_Error( 'http_503', 'down', array( 'status' => 503 ) ) );
+		$result = PleskLicence::provision( null, $this->fresh( $o['licence'] ), $server, 'plesk' );
+		$this->assertSame( 300, $result->delay() );
+		$this->assertSame( array(), $this->mails );
+		$this->assertSame( 0, (int) $this->fresh( $o['licence'] )->get( 'plesk_key_id' ) );
+	}
+
+	public function test_s0_a_failed_item_change_is_counted_and_scheduled_not_alerted_at_the_first_try(): void {
+		$o      = $this->provisioned( 'admin' );
+		$key_id = (int) $o['licence']->get( 'plesk_key_id' );
+		$this->clear_jobs();
+		$this->mails = array();
+		$this->assertTrue( Licenses::update( (int) $o['licence']->license()['id'], array( 'variation_id' => $o['tiers']['host']->get_id() ) ) );
+		$this->clear_jobs();
+		$this->assertTrue( $this->fresh( $o['licence'] )->set( array( 'plesk_sync_tries' => null ) ) );
+		$this->op->reply( 'PUT', '/licenses/plesk/' . $key_id, new \WP_Error( 'op_199', 'x', array( 'status' => 400, 'desc' => 'nope' ) ) );
+
+		$this->assertFalse( PleskLicence::sync( $this->fresh( $o['licence'] ) ) );
+
+		$licence = $this->fresh( $o['licence'] );
+		$this->assertSame( 1, (int) $licence->get( 'plesk_sync_tries' ), 'A failed PUT is counted, it does not go through the step failure path.' );
+		$this->assertSame( 'PLESK-12-VPS-WEB-ADMIN-1M', $licence->get( 'plesk_item' ) );
+		$this->assertNotEmpty( (string) $licence->get( 'plesk_key' ), 'A failed change keeps the key.' );
+		$this->assertEqualsWithDelta( 300, (int) $this->due_in( PleskLicence::SYNC_HOOK, $licence->id() ), 5 );
+		$this->assertSame( array(), $this->mails, 'The alert comes at the twelfth try.' );
+		$this->assertCount( 0, $this->op_calls( 'DELETE' ) );
+	}
+
+	public function test_s0_the_key_asks_alert_at_twelve_and_stop_at_thirty_six_with_the_delays(): void {
+		$o  = $this->provisioned( 'pro' );
+		$id = $o['licence']->id();
+		$this->assertTrue( $this->fresh( $o['licence'] )->set( array( 'plesk_key' => null ) ) );
+		$key_id = (int) $o['licence']->get( 'plesk_key_id' );
+		for ( $i = 0; $i < 8; $i++ ) {
+			$this->op->reply( 'GET', '/licenses/plesk/key/' . $key_id, array() );
+		}
+
+		foreach ( array( array( 0, 120 ), array( 10, 1320 ), array( 11, 1440 ), array( 34, 4200 ), array( 35, null ) ) as list( $before, $delay ) ) {
+			$this->clear_jobs();
+			$this->mails = array();
+			$tries       = $before;
+			$this->assertTrue( $this->fresh( $o['licence'] )->set( array( 'plesk_key_tries' => $tries ) ) );
+			PleskLicence::run_key( $id );
+			$this->assertSame( $tries + 1, (int) $this->fresh( $o['licence'] )->get( 'plesk_key_tries' ) );
+
+			if ( null === $delay ) {
+				$this->assertNull( $this->due_in( PleskLicence::KEY_HOOK, $id ), 'The thirty sixth ask is the last.' );
+			} else {
+				$this->assertEqualsWithDelta( $delay, (int) $this->due_in( PleskLicence::KEY_HOOK, $id ), 5, 'after ' . $tries );
+			}
+
+			$this->assertCount( 11 === $before ? 1 : 0, $this->mails, 'Staff are told exactly at the twelfth ask (try ' . ( $tries + 1 ) . ').' );
+		}
+	}
+
+	public function test_s0_the_delete_counter_alerts_at_twelve_and_waits_longer_each_time_and_stops_at_thirty_six(): void {
+		$o      = $this->provisioned( 'pro' );
+		$id     = $o['licence']->id();
+		$key_id = (int) $o['licence']->get( 'plesk_key_id' );
+		$this->assertTrue( Licenses::update( (int) $o['licence']->license()['id'], array( 'status' => Licenses::STATUS_REVOKED ) ) );
+
+		foreach ( array( array( 0, 300, 0 ), array( 11, 43200, 1 ), array( 34, 86400, 0 ), array( 35, null, 0 ) ) as list( $before, $delay, $mails ) ) {
+			$this->clear_jobs();
+			$this->mails = array();
+			$this->assertTrue( $this->fresh( $o['licence'] )->set( array( 'plesk_key_id' => $key_id, 'plesk_delete_tries' => $before ) ) );
+			$this->op->reply( 'DELETE', '/licenses/plesk/' . $key_id, new \WP_Error( 'transport', 'down' ) );
+			$this->assertFalse( PleskLicence::sync( $this->fresh( $o['licence'] ) ) );
+			$this->assertSame( $before + 1, (int) $this->fresh( $o['licence'] )->get( 'plesk_delete_tries' ) );
+
+			if ( null === $delay ) {
+				$this->assertNull( $this->due_in( PleskLicence::SYNC_HOOK, $id ) );
+			} else {
+				$this->assertEqualsWithDelta( $delay, (int) $this->due_in( PleskLicence::SYNC_HOOK, $id ), 5, 'after ' . $before );
+			}
+
+			$this->assertCount( $mails, $this->mails );
+		}
+	}
+
+	public function test_s0_a_refused_switch_alerts_at_the_first_try_then_hourly_then_daily_and_stops_at_thirty_six(): void {
+		$o  = $this->provisioned( 'admin' );
+		$id = $o['licence']->id();
+		$this->settings( array( 'plesk_costs' => "admin=6\nhost=99" ) );
+		$this->assertTrue( Licenses::update( (int) $o['licence']->license()['id'], array( 'variation_id' => $o['tiers']['host']->get_id() ) ) );
+
+		foreach ( array( array( 0, 3600, 1 ), array( 5, 3600, 0 ), array( 11, 86400, 0 ), array( 34, 86400, 0 ), array( 35, null, 0 ) ) as list( $before, $delay, $mails ) ) {
+			$this->clear_jobs();
+			$this->mails = array();
+			$this->assertTrue( $this->fresh( $o['licence'] )->set( array( 'plesk_sync_tries' => $before, 'alerted' => null ) ) );
+			$this->assertFalse( PleskLicence::sync( $this->fresh( $o['licence'] ) ) );
+			$this->assertSame( $before + 1, (int) $this->fresh( $o['licence'] )->get( 'plesk_sync_tries' ) );
+
+			if ( null === $delay ) {
+				$this->assertNull( $this->due_in( PleskLicence::SYNC_HOOK, $id ) );
+			} else {
+				$this->assertEqualsWithDelta( $delay, (int) $this->due_in( PleskLicence::SYNC_HOOK, $id ), 5, 'after ' . $before );
+			}
+
+			$this->assertCount( $mails, $this->mails, 'try ' . ( $before + 1 ) );
+		}
+
+		$this->assertCount( 0, $this->op_calls( 'PUT' ) );
+	}
+
+	public function test_s0_the_order_body_and_the_title_are_exactly_these_strings(): void {
+		$o       = $this->provisioned( 'pro' );
+		$license = (int) $o['licence']->license()['id'];
+		$posts   = $this->op_calls( 'POST', '/licenses/plesk' );
+
+		$this->assertCount( 1, $posts );
+		$this->assertEquals(
+			array(
+				'title'               => 'licence ' . $license . ' server',
+				'comment'             => sprintf( 'Beltoft Services licence %d, server %d', $license, (int) $o['server']->license()['id'] ),
+				'items'               => array( 'PLESK-12-VPS-WEB-PRO-1M' ),
+				'period'              => 1,
+				'ip_address_binding'  => '192.0.2.10',
+				'restrict_ip_binding' => true,
+			),
+			$posts[0]['body']
+		);
+		$this->assertSame( 'licence ' . $license . ' server', $this->fresh( $o['licence'] )->get( 'plesk_title' ) );
+		$find = $this->op_calls( 'GET', '/licenses/plesk' );
+		$this->assertSame( array( 'title_pattern' => 'licence ' . $license . ' server', 'limit' => 10 ), $find[0]['query'] );
+	}
+
+	public function test_s0_a_missing_item_fails_and_cancels_the_subscription_and_orders_nothing(): void {
+		add_filter( 'beltoft_services_plesk_items', static function ( $items ) { unset( $items['pro'] ); return $items; } );
+		$o  = $this->plesk_order( 'pro' );
+		$id = (int) ( $o['licence']->license()['subscription_id'] ?? 0 );
+
+		Jobs::run( $o['licence']->id() );
+
+		$licence = $this->fresh( $o['licence'] );
+		$this->assertSame( 'failed', $licence->get( 'state' ) );
+		$this->assertStringContainsString( 'No Openprovider item is set for the Plesk tier "pro"', (string) $licence->get( 'last_error' ) );
+		$this->assertCount( 0, $this->op_calls( 'POST' ) );
+		$this->assertCount( 0, $this->op_calls( 'GET' ) );
+		$this->assertSame( 'cancelled', wcs_get_subscription( $id )->get_status() );
+		remove_all_filters( 'beltoft_services_plesk_items' );
+	}
+
+	public function test_s0_without_the_encryption_key_nothing_is_ordered_and_it_is_tried_again_in_an_hour(): void {
+		$o = $this->plesk_order( 'pro' );
+		remove_all_filters( 'beltoft_services_key' );
+		add_filter( 'beltoft_services_key', '__return_empty_string' );
+		$this->assertFalse( \BeltoftServices\Crypto::available() );
+
+		$result = PleskLicence::provision( null, $this->fresh( $o['licence'] ), $o['server'], 'plesk' );
+
+		$this->assertTrue( $result->is_retry() );
+		$this->assertSame( 3600, $result->delay() );
+		$this->assertSame( array(), $this->op->calls(), 'Not even a look at Openprovider.' );
+		remove_all_filters( 'beltoft_services_key' );
+	}
+
+	public function test_s0_a_server_without_an_address_is_waited_for_until_the_deadline_and_then_fails_and_cancels(): void {
+		$o = $this->plesk_order( 'pro' );
+		\BeltoftServices\Proxmox\Network\IpPool::release( $o['server']->id() );
+		$id = (int) ( $o['licence']->license()['subscription_id'] ?? 0 );
+
+		$result = PleskLicence::provision( null, $this->fresh( $o['licence'] ), $o['server'], 'plesk' );
+		$until  = (int) $this->fresh( $o['licence'] )->get( 'plesk_wait_until' );
+		$this->assertFalse( $result->is_failed() );
+		$this->assertSame( $until, $result->wait_until() );
+		$this->assertSame( 60, $result->delay() );
+		$this->assertEqualsWithDelta( time() + HOUR_IN_SECONDS, $until, 5 );
+
+		$this->assertTrue( $this->fresh( $o['licence'] )->set( array( 'plesk_wait_until' => time() + 60 ) ) );
+		$this->assertFalse( PleskLicence::provision( null, $this->fresh( $o['licence'] ), $o['server'], 'plesk' )->is_failed(), 'Still waiting a minute before the deadline.' );
+
+		$this->assertTrue( $this->fresh( $o['licence'] )->set( array( 'plesk_wait_until' => time() - 1 ) ) );
+		$result = PleskLicence::provision( null, $this->fresh( $o['licence'] ), $o['server'], 'plesk' );
+		$this->assertTrue( $result->is_failed() );
+		$this->assertSame( 'The server has no public address, so no Plesk licence was ordered.', $result->error() );
+		$this->assertSame( array(), $this->op_calls( 'POST' ) );
+
+		Jobs::run( $o['licence']->id() );
+		$this->assertSame( 'failed', $this->fresh( $o['licence'] )->get( 'state' ) );
+		$this->assertSame( 'cancelled', wcs_get_subscription( $id )->get_status() );
+	}
+
+	public function test_s0_a_successful_delete_clears_exactly_these_meta_values_and_sets_the_mark(): void {
+		$o = $this->provisioned( 'pro' );
+		$this->assertTrue( $this->fresh( $o['licence'] )->set( array( 'plesk_key_job' => 'h', 'plesk_key_state' => 'installed', 'plesk_sync_tries' => 2, 'plesk_delete_tries' => 3, 'plesk_key_tries' => 4, 'plesk_key_pushes' => 1 ) ) );
+		$this->assertTrue( Licenses::update( (int) $o['licence']->license()['id'], array( 'status' => Licenses::STATUS_REVOKED ) ) );
+
+		Jobs::run( $o['licence']->id() );
+
+		$licence = $this->fresh( $o['licence'] );
+
+		foreach ( array( 'plesk_key_id', 'plesk_key', 'plesk_key_job', 'plesk_key_state', 'plesk_sync_tries', 'plesk_delete_tries' ) as $name ) {
+			$this->assertSame( '', (string) $licence->get( $name ), $name );
+		}
+
+		$this->assertGreaterThan( 0, (int) $licence->get( 'plesk_deleted' ) );
+		$this->assertSame( 'PLESK-12-VPS-WEB-PRO-1M', $licence->get( 'plesk_item' ), 'The item and the title stay as a record.' );
+		$this->assertNotSame( '', (string) $licence->get( 'plesk_title' ) );
+		$this->assertSame( 4, (int) $licence->get( 'plesk_key_tries' ), 'The key asks counter is not part of a delete.' );
+	}
+
+	public function test_s0_a_failed_vendor_delete_does_not_hold_up_the_delete_of_the_licence_resource(): void {
+		$o      = $this->provisioned( 'pro' );
+		$key_id = (int) $o['licence']->get( 'plesk_key_id' );
+		$this->assertTrue( $this->fresh( $o['licence'] )->set( array( 'state' => 'deleting' ) ) );
+		$this->op->reply( 'DELETE', '/licenses/plesk/' . $key_id, new \WP_Error( 'transport', 'down' ) );
+
+		$result = ( new \BeltoftServices\Apps\AppLicenceDriver() )->delete( $this->fresh( $o['licence'] ) );
+
+		$this->assertTrue( $result->is_done(), 'The server cascade is not blocked; a job and the watchdog repeat the delete.' );
+		$this->assertSame( $key_id, (int) $this->fresh( $o['licence'] )->get( 'plesk_key_id' ) );
+		$this->assertTrue( Jobs::pending_action( PleskLicence::SYNC_HOOK, array( $o['licence']->id() ) ) );
+	}
+
+	public function test_s0_the_key_is_fetched_with_one_request_and_the_licence_record_is_not_read(): void {
+		$o      = $this->provisioned( 'pro' );
+		$key_id = (int) $o['licence']->get( 'plesk_key_id' );
+
+		$this->assertCount( 1, $this->op_calls( 'GET', '/licenses/plesk/key/' . $key_id ) );
+		$this->assertCount( 0, $this->op_calls( 'GET', '/licenses/plesk/' . $key_id ) );
+		$this->assertSame( '', (string) $this->fresh( $o['licence'] )->get( 'plesk_shape' ) );
+	}
+
+	public function test_s0_today_a_licence_whose_retries_ran_out_is_not_cancelled(): void {
+		// Retries that run out (APPS-08, the part that is open for both): the licence fails, the subscription lives on.
+		$o  = $this->plesk_order( 'pro' );
+		$id = (int) ( $o['licence']->license()['subscription_id'] ?? 0 );
+		for ( $i = 0; $i < 12; $i++ ) {
+			$this->op->reply( 'POST', '/licenses/plesk', new \WP_Error( 'transport', 'down' ) );
+		}
+
+		for ( $i = 0; $i < 8 && 'failed' !== $this->fresh( $o['licence'] )->get( 'state' ); $i++ ) {
+			$this->fresh( $o['licence'] )->set( array( 'next_attempt_at' => time() - 1 ) );
+			Jobs::run( $o['licence']->id() );
+		}
+
+		$this->assertSame( 'failed', $this->fresh( $o['licence'] )->get( 'state' ) );
+		$this->assertSame( 0, (int) $this->fresh( $o['licence'] )->get( 'plesk_key_id' ) );
+		$this->assertNotSame( 'cancelled', wcs_get_subscription( $id )->get_status(), 'Today only an explicit failure cancels.' );
+	}
+
+	public function test_s0_release_due_for_every_resource_state_and_licence_status(): void {
+		$o       = $this->provisioned( 'pro' );
+		$license = (int) $o['licence']->license()['id'];
+		$states  = array(
+			'ready'              => array( 'ready', '' ),
+			'deleting'           => array( 'deleting', '' ),
+			'deleted'            => array( 'deleted', '' ),
+			'failed provision'   => array( 'failed', 'provision' ),
+			'failed delete'      => array( 'failed', 'delete' ),
+			'failed update_plan' => array( 'failed', 'update_plan' ),
+			'failed resume'      => array( 'failed', 'resume' ),
+			'failed pause'       => array( 'failed', 'pause' ),
+		);
+		$gone    = array( 'deleting', 'deleted', 'failed provision', 'failed delete' );
+
+		foreach ( array( Licenses::STATUS_ACTIVE, Licenses::STATUS_SUSPENDED, Licenses::STATUS_EXPIRED, Licenses::STATUS_REVOKED ) as $status ) {
+			$this->assertTrue( Licenses::update( $license, array( 'status' => $status ) ) );
+
+			foreach ( $states as $name => list( $state, $op ) ) {
+				$this->assertTrue( $this->fresh( $o['licence'] )->set( array( 'state' => $state, 'failed_op' => $op ) ) );
+				$expected = in_array( $name, $gone, true ) || Licenses::STATUS_REVOKED === $status;
+				$this->assertSame( $expected, AppLicence::release_due( $this->fresh( $o['licence'] ) ), $name . ' / ' . $status );
+			}
+		}
+
+		// A lapse (expired, on hold) of a working licence keeps the Plesk licence; the ended mark of a deleted server releases it.
+		$this->assertTrue( Licenses::update( $license, array( 'status' => Licenses::STATUS_ACTIVE ) ) );
+		$this->assertTrue( $this->fresh( $o['licence'] )->set( array( 'state' => 'ready', 'failed_op' => '' ) ) );
+		$this->assertFalse( AppLicence::release_due( $this->fresh( $o['licence'] ) ) );
+		$this->assertTrue( $this->fresh( $o['licence'] )->set( array( AppLicence::ENDED => 'server deleted' ) ) );
+		$this->assertTrue( AppLicence::release_due( $this->fresh( $o['licence'] ) ) );
+	}
 }
