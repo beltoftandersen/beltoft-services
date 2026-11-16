@@ -9,6 +9,8 @@ namespace BeltoftServices\Apps;
 
 use BeltoftServices\Currency;
 use BeltoftServices\Domains\LicenceFamily;
+use BeltoftServices\Domains\LicenceVendor;
+use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 use BeltoftServices\Usage\Rates;
 
@@ -20,11 +22,15 @@ defined( 'ABSPATH' ) || exit;
  */
 final class PleskFamily implements LicenceFamily {
 
+	private const APP = PleskLicence::APP;
+
 	/** Logical field => stored meta name. */
 	private const META = array(
-		'title'  => 'plesk_title',
-		'key_id' => 'plesk_key_id',
-		'item'   => 'plesk_item',
+		'title'     => 'plesk_title',
+		'key_id'    => 'plesk_key_id',
+		'item'      => 'plesk_item',
+		'key'       => 'plesk_key',
+		'key_tries' => 'plesk_key_tries',
 	);
 
 	public function meta( string $field ): string {
@@ -64,5 +70,44 @@ final class PleskFamily implements LicenceFamily {
 		$code = $sub instanceof \WC_Subscription ? Currency::clean( $sub->get_currency() ) : '';
 
 		return '' !== $code ? $code : Currency::base();
+	}
+
+	public function key_hook(): string {
+		return PleskLicence::KEY_HOOK;
+	}
+
+	public function owns( Resource $r ): bool {
+		return $r->is_live() && self::APP === (string) ( ( (array) $r->get( 'plan' ) )['app'] ?? '' );
+	}
+
+	public function ended( Resource $r ): bool {
+		return 'ended' === AppLicence::state( $r );
+	}
+
+	public function detailed_key(): bool {
+		return false;
+	}
+
+	public function key_meta( Resource $r, string $key ): array {
+		unset( $r, $key );
+
+		return array( 'plesk_key_pushes' => 0 );
+	}
+
+	public function on_key_stored( Resource $r, string $key ): void {
+		// A key the server has not confirmed yet is sent once the app is there.
+		if ( hash( 'sha256', $key ) !== (string) $r->get( 'plesk_key_job' ) ) {
+			Jobs::schedule_once( time(), PleskLicence::KEY_HOOK, array( $r->id() ) );
+		}
+	}
+
+	public function ask_meta( int $tries ): array {
+		return array( 'plesk_key_tries' => $tries );
+	}
+
+	public function ask_alert( Resource $r ): string {
+		unset( $r );
+
+		return 'The Plesk key could not be fetched from Openprovider after ' . LicenceVendor::TRIES . ' tries.';
 	}
 }

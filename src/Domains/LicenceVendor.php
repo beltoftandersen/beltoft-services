@@ -8,8 +8,10 @@
 namespace BeltoftServices\Domains;
 
 use BeltoftServices\Alerts;
+use BeltoftServices\Crypto;
 use BeltoftServices\Currency;
 use BeltoftServices\Drivers\StepResult;
+use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -21,6 +23,9 @@ defined( 'ABSPATH' ) || exit;
  * Clients::registrar(): the fake in tests and on staging, the live client only behind LiveGate.
  */
 final class LicenceVendor {
+
+	/** Key asks (and repeated calls) before an admin is told; the asks stop at three times this. */
+	public const TRIES = 12;
 
 	/**
 	 * The registrar client (the fake, the sandbox or the live one, as Clients decides).
@@ -258,5 +263,112 @@ final class LicenceVendor {
 		}
 
 		return $existing;
+	}
+
+	/**
+	 * Asks the vendor for the key and keeps it encrypted. A family with a detailed fetch reads the licence record too, records
+	 * the NAMES of the fields the vendor answered with and takes an activation code when there is no key file. A key is
+	 * stored only with the encryption key available, and never logged, mailed or put in an alert.
+	 *
+	 * @param Resource      $r      Licence resource.
+	 * @param LicenceFamily $family Family.
+	 * @return bool Whether a key is stored now.
+	 */
+	public static function fetch_key( Resource $r, LicenceFamily $family ): bool {
+		$id = (int) $r->get( $family->meta( 'key_id' ) );
+
+		if ( $id < 1 || ! Crypto::available() ) {
+			return false;
+		}
+
+		$client   = self::client();
+		$reply    = $client->request( 'GET', '/licenses/plesk/key/' . $id );
+		$detailed = $family->detailed_key();
+		$info     = $detailed ? $client->request( 'GET', '/licenses/plesk/' . $id ) : null;
+		$meta     = array();
+
+		if ( $detailed ) {
+			$shape = array();
+
+			foreach ( array( 'key' => $reply, 'licence' => $info ) as $label => $answer ) {
+				if ( is_array( $answer ) ) {
+					$shape[] = $label . ':' . implode( '|', array_slice( array_map( 'strval', array_keys( $answer ) ), 0, 30 ) );
+				}
+			}
+
+			$meta[ $family->meta( 'shape' ) ] = substr( implode( ' ', $shape ), 0, 400 );
+		}
+
+		$key = is_array( $reply ) ? self::normalise_key( (string) ( $reply['key'] ?? '' ) ) : '';
+
+		if ( $detailed && '' === $key && is_array( $info ) && is_string( $info['activation_code'] ?? null ) ) {
+			$key = trim( $info['activation_code'] );
+		}
+
+		if ( '' === $key || strlen( $key ) > 60000 ) {
+			if ( array() !== $meta ) {
+				$r->set( $meta );
+			}
+
+			return false;
+		}
+
+		$meta[ $family->meta( 'key' ) ] = Crypto::encrypt( $key );
+		$meta                           = $meta + $family->key_meta( $r, $key );
+
+		if ( ! $r->set( $meta ) ) {
+			return false;
+		}
+
+		$family->on_key_stored( $r, $key );
+
+		return true;
+	}
+
+	/**
+	 * One ask for a key that is not stored yet: fetch it; when there is none, count the ask, tell staff once at TRIES asks
+	 * and ask again later (2 minutes times the tries, at most 6 hours), until three times TRIES asks.
+	 *
+	 * @param Resource      $r      Licence resource.
+	 * @param LicenceFamily $family Family.
+	 * @return bool Whether a key is stored now.
+	 */
+	public static function ask_key( Resource $r, LicenceFamily $family ): bool {
+		if ( self::fetch_key( $r, $family ) ) {
+			return true;
+		}
+
+		$tries = (int) $r->get( $family->meta( 'key_tries' ) ) + 1;
+		$r->set( $family->ask_meta( $tries ) );
+
+		if ( self::TRIES === $tries ) {
+			Alerts::admin( $r, $family->ask_alert( $r ) );
+		}
+
+		if ( $tries < 3 * self::TRIES ) {
+			Jobs::schedule_once( time() + min( 6 * HOUR_IN_SECONDS, 120 * $tries ), $family->key_hook(), array( $r->id() ) );
+		}
+
+		return false;
+	}
+
+	/**
+	 * The watchdog's list of licences that wait for a key: the vendor id is known, no key is stored, the licence has not
+	 * ended and the asks have not run out. The caller narrows the resources with its own query.
+	 *
+	 * @param LicenceFamily         $family    Family.
+	 * @param iterable<int,Resource> $resources Candidates, by id.
+	 * @return array<int, array<int, int>>
+	 */
+	public static function key_due( LicenceFamily $family, iterable $resources ): array {
+		$sets = array();
+
+		foreach ( $resources as $id => $r ) {
+			if ( $family->owns( $r ) && (int) $r->get( $family->meta( 'key_id' ) ) > 0 && '' === (string) $r->get( $family->meta( 'key' ) ) && ! $family->ended( $r ) && (int) $r->get( $family->meta( 'key_tries' ) ) < 3 * self::TRIES ) {
+				$sets[] = array( (int) $id );
+			}
+		}
+
+		return $sets;
 	}
 }

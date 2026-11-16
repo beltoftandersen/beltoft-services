@@ -334,31 +334,7 @@ final class PleskLicence {
 	 * @param Resource $licence Licence resource.
 	 */
 	private static function fetch_key( Resource $licence ): bool {
-		$key_id = (int) $licence->get( 'plesk_key_id' );
-
-		if ( $key_id < 1 || ! Crypto::available() ) {
-			return false;
-		}
-
-		$reply = self::client()->request( 'GET', '/licenses/plesk/key/' . $key_id );
-		$key   = is_wp_error( $reply ) ? '' : LicenceVendor::normalise_key( (string) ( $reply['key'] ?? '' ) );
-
-		if ( '' === $key || strlen( $key ) > 60000 ) {
-			return false;
-		}
-
-		$changed = hash( 'sha256', $key ) !== (string) $licence->get( 'plesk_key_job' );
-
-		if ( ! $licence->set( array( 'plesk_key' => Crypto::encrypt( $key ), 'plesk_key_pushes' => 0 ) ) ) {
-			return false;
-		}
-
-		// A key the server has not confirmed yet is sent once the app is there.
-		if ( $changed ) {
-			self::schedule( self::KEY_HOOK, $licence->id(), 0 );
-		}
-
-		return true;
+		return LicenceVendor::fetch_key( $licence, new PleskFamily() );
 	}
 
 	// -- Events ----------------------------------------------------------------------------------
@@ -475,16 +451,8 @@ final class PleskLicence {
 	 * @return array<int, array<int, int>>
 	 */
 	public static function key_due(): array {
-		$sets = array();
-
 		// Every licence with a vendor key id, in one query; only the ones still without a key pass.
-		foreach ( Resource::find_many( Resource::ids_with_meta_value( 'plesk_key_id' ) ) as $id => $licence ) {
-			if ( $licence->is_live() && self::is_plesk( $licence ) && (int) $licence->get( 'plesk_key_id' ) > 0 && '' === (string) $licence->get( 'plesk_key' ) && 'ended' !== AppLicence::state( $licence ) && (int) $licence->get( 'plesk_key_tries' ) < 3 * self::TRIES ) {
-				$sets[] = array( (int) $id );
-			}
-		}
-
-		return $sets;
+		return LicenceVendor::key_due( new PleskFamily(), Resource::find_many( Resource::ids_with_meta_value( 'plesk_key_id' ) ) );
 	}
 
 	/**
@@ -616,21 +584,10 @@ final class PleskLicence {
 			return;
 		}
 
-		$tries = (int) $licence->get( 'plesk_key_tries' );
-		$key   = self::key_of( $licence );
+		$key = self::key_of( $licence );
 
 		if ( '' === $key ) {
-			if ( ! self::fetch_key( $licence ) ) {
-				$licence->set( array( 'plesk_key_tries' => $tries + 1 ) );
-
-				if ( $tries + 1 === self::TRIES ) {
-					self::alert( $licence, 'The Plesk key could not be fetched from Openprovider after ' . self::TRIES . ' tries.' );
-				}
-
-				if ( $tries + 1 < 3 * self::TRIES ) {
-					self::schedule( self::KEY_HOOK, $id, min( 6 * HOUR_IN_SECONDS, 120 * ( $tries + 1 ) ) );
-				}
-			}
+			LicenceVendor::ask_key( $licence, new PleskFamily() );
 
 			return;
 		}

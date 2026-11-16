@@ -370,42 +370,7 @@ final class KeyOrder {
 	 * @param Resource $r Licence resource.
 	 */
 	public static function fetch_key( Resource $r ): bool {
-		$id = (int) $r->get( 'lic_key_id' );
-
-		if ( $id < 1 || ! Crypto::available() ) {
-			return false;
-		}
-
-		$client = self::client();
-		$reply  = $client->request( 'GET', '/licenses/plesk/key/' . $id );
-		$info   = $client->request( 'GET', '/licenses/plesk/' . $id );
-		$shape  = array();
-
-		foreach ( array( 'key' => $reply, 'licence' => $info ) as $label => $answer ) {
-			if ( is_array( $answer ) ) {
-				$shape[] = $label . ':' . implode( '|', array_slice( array_map( 'strval', array_keys( $answer ) ), 0, 30 ) );
-			}
-		}
-
-		$key = is_array( $reply ) ? LicenceVendor::normalise_key( (string) ( $reply['key'] ?? '' ) ) : '';
-
-		if ( '' === $key && is_array( $info ) && is_string( $info['activation_code'] ?? null ) ) {
-			$key = trim( $info['activation_code'] );
-		}
-
-		$meta = array( 'lic_shape' => substr( implode( ' ', $shape ), 0, 400 ) );
-
-		if ( '' === $key || strlen( $key ) > 60000 ) {
-			$r->set( $meta );
-
-			return false;
-		}
-
-		$meta['lic_key']      = Crypto::encrypt( $key );
-		$meta['lic_key_kind'] = '<' === $key[0] ? 'file' : 'code';
-		$meta['lic_state']    = 'ready';
-
-		return $r->set( $meta );
+		return LicenceVendor::fetch_key( $r, new KeyFamily() );
 	}
 
 	/**
@@ -415,16 +380,8 @@ final class KeyOrder {
 	 * @return array<int, array<int, int>>
 	 */
 	public static function key_due(): array {
-		$sets = array();
-
 		// Only the licences still waiting for a key (SQL), read in one query.
-		foreach ( Resource::find_many( Resource::find_by_meta( KeyDriver::KIND, 'lic_state', 'waiting' ) ) as $id => $r ) {
-			if ( KeyDriver::ID === $r->get( 'driver' ) && (int) $r->get( 'lic_key_id' ) > 0 && '' === (string) $r->get( 'lic_key' ) && ! self::ended( $r ) && (int) $r->get( 'lic_tries' ) < 3 * self::TRIES ) {
-				$sets[] = array( (int) $id );
-			}
-		}
-
-		return $sets;
+		return LicenceVendor::key_due( new KeyFamily(), Resource::find_many( Resource::find_by_meta( KeyDriver::KIND, 'lic_state', 'waiting' ) ) );
 	}
 
 	/**
@@ -457,20 +414,7 @@ final class KeyOrder {
 			return;
 		}
 
-		if ( self::fetch_key( $r ) ) {
-			return;
-		}
-
-		$tries = (int) $r->get( 'lic_tries' ) + 1;
-		$r->set( array( 'lic_tries' => $tries, 'lic_state' => 'waiting' ) );
-
-		if ( self::TRIES === $tries ) {
-			Alerts::admin( $r, 'Openprovider has not handed over a key for this licence after ' . self::TRIES . ' tries. Open the licence at Openprovider and copy the key to the customer. Fields answered: ' . (string) $r->get( 'lic_shape' ) . '.' );
-		}
-
-		if ( $tries < 3 * self::TRIES ) {
-			self::schedule( self::KEY_HOOK, $id, min( 6 * HOUR_IN_SECONDS, 120 * $tries ) );
-		}
+		LicenceVendor::ask_key( $r, new KeyFamily() );
 	}
 
 	// -- Change and end --------------------------------------------------------------------------

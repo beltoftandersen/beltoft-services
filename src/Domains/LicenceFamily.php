@@ -19,7 +19,7 @@ defined( 'ABSPATH' ) || exit;
 interface LicenceFamily {
 
 	/**
-	 * The stored meta name of a logical field. Fields: title, key_id, item.
+	 * The stored meta name of a logical field. Fields: title, key_id, item, key, key_tries, shape.
 	 *
 	 * @param string $field Logical field.
 	 */
@@ -50,4 +50,61 @@ interface LicenceFamily {
 	 * @param float    $cost Cost per month at the vendor, EUR excluding VAT.
 	 */
 	public function cap_problem( Resource $r, float $cost ): ?string;
+
+	/**
+	 * The Action Scheduler hook of the job that asks for the key again.
+	 */
+	public function key_hook(): string;
+
+	/**
+	 * Is this resource a licence of the family (and live, where the family says so)? Used by the watchdog lists.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public function owns( Resource $r ): bool;
+
+	/**
+	 * Has the licence ended, so that no key is fetched for it any more?
+	 *
+	 * @param Resource $r Licence resource.
+	 */
+	public function ended( Resource $r ): bool;
+
+	/**
+	 * Does a key fetch read the licence record too (a second request), and record the names of the fields the vendor
+	 * answered with (and an activation code as a fallback key)?
+	 */
+	public function detailed_key(): bool;
+
+	/**
+	 * More meta to store with a fetched key (kind and state, or the push counter).
+	 *
+	 * @param Resource $r   Licence resource.
+	 * @param string   $key The key (never to be stored in clear).
+	 * @return array<string, mixed>
+	 */
+	public function key_meta( Resource $r, string $key ): array;
+
+	/**
+	 * Called after a key was stored. The Plesk app licence hands a changed key to the server here.
+	 *
+	 * @param Resource $r   Licence resource.
+	 * @param string   $key The key.
+	 */
+	public function on_key_stored( Resource $r, string $key ): void;
+
+	/**
+	 * Meta to store with the count of key asks that found no key.
+	 *
+	 * @param int $tries Asks so far, this one included.
+	 * @return array<string, mixed>
+	 */
+	public function ask_meta( int $tries ): array;
+
+	/**
+	 * The text of the admin alert when the asks reach the limit. Never carries a key.
+	 *
+	 * @param Resource $r Licence resource.
+	 */
+	public function ask_alert( Resource $r ): string;
 }
