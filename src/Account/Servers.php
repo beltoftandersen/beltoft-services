@@ -232,6 +232,9 @@ final class Servers {
 
 				$servers[ $id ]   = $view;
 				$resources[ $id ] = $resource;
+			} elseif ( is_array( $view ) && isset( $view['license'] ) && ServiceArea::ended_and_gone( $view['license'], Resource::for_license( (int) $view['license']['id'] ) ) ) {
+				// An ended add-on with no live service (an expired disk or snapshot pack) is history, not a row.
+				continue;
 			} else {
 				$others[] = $view;
 			}
