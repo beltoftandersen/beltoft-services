@@ -316,7 +316,8 @@ final class ServerPicker {
 			} else {
 				$choices['app']       = $app['app'];
 				$choices['version']   = $app['version'];
-				$choices['tier']      = $app['tier'];
+				// A kept licence of the customer's own travels as its `use-<id>` value, so checkout starts from the same choice.
+				$choices['tier']      = ! empty( $app['use'] ) ? 'use-' . (int) $app['use'] : $app['tier'];
 				$choices['zone']      = $app['zone'];
 				$choices['sub']       = '' !== $app['domain'] ? $values['sub'] : '';
 				$choices['domain_on'] = '' !== $app['domain'] ? '1' : '';

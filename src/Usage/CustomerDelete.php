@@ -174,8 +174,8 @@ final class CustomerDelete {
 	}
 
 	/**
-	 * One sentence for a server with a paid app licence of its own subscription: it ends with the server and the started
-	 * month is not refunded. '' for any other service, and for a licence still billed by the hour with its server (sold
+	 * One sentence for a server with a paid app licence of its own subscription: the licence stays on the account until the end of
+	 * the month paid and can be used on a new server. '' for any other service, and for a licence still billed by the hour with its server (sold
 	 * before the licence became monthly), where the hourly billing note is already true.
 	 *
 	 * @param Resource $r Resource.
@@ -191,7 +191,15 @@ final class CustomerDelete {
 			return '';
 		}
 
-		return __( 'The app licence ends with the server. The month that has started is not refunded.', 'beltoft-services' );
+		$until = \BeltoftServices\Apps\AppLicenceKeep::keepable( $licence ) ? \BeltoftServices\Apps\AppLicenceKeep::paid_until_text( $licence ) : '';
+
+		if ( '' === $until ) {
+			// Nothing to keep (the paid time is over): the licence ends with the server.
+			return __( 'The app licence ends with the server.', 'beltoft-services' );
+		}
+
+		/* translators: %s: date */
+		return sprintf( __( 'The app licence stays on your account until %s, the end of the month you paid for, and can be used on a new server until then. It is not renewed unless it is used.', 'beltoft-services' ), $until );
 	}
 
 	/**

@@ -122,9 +122,9 @@ final class AppField {
 			}
 		}
 
-		// A paid app nobody can buy a tier of is not offered.
+		// A paid app nobody can buy a tier of is not offered, unless the customer has a kept licence of it to use.
 		foreach ( array_keys( $apps ) as $id ) {
-			if ( AppLicence::paid( (string) $id ) && array() === AppLicence::tiers( (string) $id ) ) {
+			if ( AppLicence::paid( (string) $id ) && array() === AppLicence::tiers( (string) $id ) && array() === AppLicenceKeep::usable( get_current_user_id(), (string) $id ) ) {
 				unset( $apps[ $id ] );
 			}
 		}
@@ -145,10 +145,10 @@ final class AppField {
 	 * The choice a customer made, checked against what is offered.
 	 *
 	 * @param array<string, mixed> $offer  The offer.
-	 * @param array<string, mixed> $input  app, version, os (the system template chosen, optional), tier (a paid app), domain_on, zone, sub, own_on, own (a domain registered elsewhere).
+	 * @param array<string, mixed> $input  app, version, os (the system template chosen, optional), tier (a paid app: a tier key, or `use-<id>` for a kept licence of the customer), domain_on, zone, sub, own_on, own (a domain registered elsewhere).
 	 * @param int                  $user   The customer.
 	 * @param bool                 $check_dns Whether to read the zone for a free name, and whether a paid app's tier must be on sale now (an order already paid is built even if the tier is out of stock).
-	 * @return array{app: string, version: string, os: int, tier: string, zone: string, domain: string, own: string}|string An empty app when none is wanted; else the refusal text. `os` is the template the server is built from: the chosen one when the version runs on it, else the version's own.
+	 * @return array{app: string, version: string, os: int, tier: string, zone: string, domain: string, own: string, use?: int}|string An empty app when none is wanted; else the refusal text. `os` is the template the server is built from: the chosen one when the version runs on it, else the version's own.
 	 */
 	public static function resolve( array $offer, array $input, int $user, bool $check_dns = true ) {
 		$none = array( 'app' => '', 'version' => '', 'os' => 0, 'tier' => '', 'zone' => '', 'domain' => '', 'own' => '' );
@@ -209,15 +209,25 @@ final class AppField {
 				return sprintf( __( '%s has a monthly licence. Choose a tier, or no app.', 'beltoft-services' ), (string) $app['name'] );
 			}
 
-			if ( null === AppLicence::tier( $id, $tier, false ) ) {
+			$use = AppLicenceKeep::use_choice( $tier );
+
+			if ( null !== $use ) {
+				// A kept licence of the customer's own, no price and no licence line. After the order is paid only the owner and the app are checked here.
+				$kept = AppLicenceKeep::offered( $id, $use, $user, $check_dns );
+
+				if ( null === $kept ) {
+					return __( 'The licence you chose can no longer be used. Choose a tier, or no app.', 'beltoft-services' );
+				}
+
+				$out['tier'] = (string) ( ( (array) $kept->get( 'plan' ) )['tier'] ?? '' );
+				$out['use']  = $use;
+			} elseif ( null === AppLicence::tier( $id, $tier, false ) ) {
 				return __( 'Choose one of the listed tiers.', 'beltoft-services' );
-			}
-
-			if ( $check_dns && null === AppLicence::tier( $id, $tier ) ) {
+			} elseif ( $check_dns && null === AppLicence::tier( $id, $tier ) ) {
 				return __( 'This tier cannot be bought now. Choose another tier or no app.', 'beltoft-services' );
+			} else {
+				$out['tier'] = $tier;
 			}
-
-			$out['tier'] = $tier;
 		}
 
 		if ( ! empty( $input['own_on'] ) ) {
@@ -471,6 +481,13 @@ final class AppField {
 
 		$usage = AppLicenceCart::server_usage();
 
+		// A kept licence of the customer's own, first: no price and no licence line (see AppLicenceKeep).
+		foreach ( AppLicenceKeep::usable( get_current_user_id(), $id ) as $kept ) {
+			$value = AppLicenceKeep::value_of( $kept );
+
+			echo '<label class="beltoft-services-app__domain-choice"><input type="radio" class="input-radio" name="' . esc_attr( self::POST_TIER ) . '" value="' . esc_attr( $value ) . '" data-app-tier data-app-kept' . checked( $shown && $selected === $value, true, false ) . ( $shown ? '' : ' disabled' ) . '> <span>' . esc_html( AppLicenceKeep::choice_label( $kept ) ) . '</span></label>';
+		}
+
 		foreach ( AppLicence::tiers( $id ) as $key => $tier ) {
 			// Both prices are printed: the script shows the one that fits the billing choice. The licence is a whole month in advance either way; on a pay-as-you-go server the price says so.
 			echo '<label class="beltoft-services-app__domain-choice"><input type="radio" class="input-radio" name="' . esc_attr( self::POST_TIER ) . '" value="' . esc_attr( (string) $key ) . '" data-app-tier' . checked( $shown && $selected === (string) $key, true, false ) . ( $shown ? '' : ' disabled' ) . '> <span>' . esc_html( $tier['label'] ) . '</span>';
@@ -549,7 +566,12 @@ final class AppField {
 			// The tier is its own cart line: it must be there once, and be the tier chosen (the monthly one, whatever the server's billing).
 			$want = null === $tier ? null : AppLicence::line_variation( $tier, AppLicenceCart::server_usage() );
 
-			if ( null === $want || 1 !== AppLicenceCart::lines() || (int) ( $line['item']['variation_id'] ?? 0 ) !== $want->get_id() ) {
+			if ( ! empty( $why['use'] ) ) {
+				// A kept licence is not bought: no licence line may be in the cart.
+				if ( AppLicenceCart::lines() > 0 ) {
+					$errors->add( 'beltoft_services_app', __( 'A licence is in your cart although you chose to use your own. Reload the page and choose again.', 'beltoft-services' ) );
+				}
+			} elseif ( null === $want || 1 !== AppLicenceCart::lines() || (int) ( $line['item']['variation_id'] ?? 0 ) !== $want->get_id() ) {
 				$errors->add( 'beltoft_services_app', __( 'The tier is not in your cart. Reload the page and choose the tier again.', 'beltoft-services' ) );
 			}
 		} elseif ( AppLicenceCart::lines() > 0 ) {
@@ -584,6 +606,10 @@ final class AppField {
 
 		if ( '' !== $choice['tier'] ) {
 			$item->add_meta_data( self::ITEM_TIER, $choice['tier'], true );
+		}
+
+		if ( ! empty( $choice['use'] ) ) {
+			$item->add_meta_data( AppLicenceKeep::ITEM_USE, (int) $choice['use'], true );
 		}
 
 		$item->update_meta_data( OsField::ITEM_META, (string) $choice['os'] );
@@ -684,7 +710,7 @@ final class AppField {
 					'app'       => $id,
 					'version'   => (string) $item->get_meta( self::ITEM_VERSION, true ),
 					'os'        => (string) $item->get_meta( OsField::ITEM_META, true ),
-					'tier'      => (string) $item->get_meta( self::ITEM_TIER, true ),
+					'tier'      => (int) $item->get_meta( AppLicenceKeep::ITEM_USE, true ) > 0 ? 'use-' . (int) $item->get_meta( AppLicenceKeep::ITEM_USE, true ) : (string) $item->get_meta( self::ITEM_TIER, true ),
 					'domain_on' => '' !== (string) $item->get_meta( self::ITEM_DOMAIN, true ),
 					'zone'      => (string) $item->get_meta( self::ITEM_ZONE, true ),
 					'sub'       => self::sub_of( (string) $item->get_meta( self::ITEM_DOMAIN, true ), (string) $item->get_meta( self::ITEM_ZONE, true ) ),
@@ -704,6 +730,11 @@ final class AppField {
 
 			if ( '' !== $choice['tier'] ) {
 				$meta['app_tier'] = $choice['tier'];
+			}
+
+			if ( ! empty( $choice['use'] ) ) {
+				// The kept licence is linked when the install starts (AppLicenceKeep::claim_chosen).
+				$meta[ AppLicenceKeep::USE ] = (int) $choice['use'];
 			}
 
 			$meta[ OsField::META ]   = $choice['os'];

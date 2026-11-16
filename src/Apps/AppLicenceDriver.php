@@ -164,6 +164,18 @@ final class AppLicenceDriver implements Driver {
 	}
 
 	public function pause( Resource $r ): StepResult {
+		// A kept licence (no server) whose subscription has ended is over: it ends now, so the vendor licence is released and not paid for
+		// through the retention days.
+		if ( (int) $r->get( AppLicenceKeep::KEPT ) > 0 && (int) $r->get( 'server_license' ) < 1 && 'ended' === AppLicence::state( $r ) ) {
+			if ( '' === (string) $r->get( AppLicence::ENDED ) ) {
+				$r->set( array( AppLicence::ENDED => 'The kept licence ran out.' ) );
+			}
+
+			AppLicence::announce( $r, 'cancelled' );
+
+			return StepResult::done();
+		}
+
 		// A licence on hold or lapsed (expired) is "paused": the vendor licence is kept until retention deletes the resource,
 		// and a paid renewal resumes it. Only a revoked one has ended.
 		AppLicence::announce( $r, Licenses::STATUS_REVOKED === Licenses::effective_status( (array) $r->license() ) ? 'cancelled' : 'paused' );
@@ -235,6 +247,15 @@ final class AppLicenceDriver implements Driver {
 
 		if ( '' !== $url ) {
 			echo '<p><a href="' . esc_url( $url ) . '">' . esc_html__( 'Open your server', 'beltoft-services' ) . '</a></p>';
+		} elseif ( AppLicenceKeep::kept( $r ) ) {
+			// Kept: its server is gone. What it is, until when, and the way to a new server.
+			$new = \BeltoftServices\Account\ServerLinks::url_new();
+
+			echo '<p class="beltoft-services-applic__kept" data-applic-kept>' . esc_html( AppLicenceKeep::kept_text( $r ) ) . '</p>';
+
+			if ( '' !== $new && AppLicenceKeep::reusable( $r ) ) {
+				echo '<p><a class="button woocommerce-button bs-btn" href="' . esc_url( $new ) . '">' . esc_html__( 'Create a server', 'beltoft-services' ) . '</a></p>';
+			}
 		}
 
 		echo '</div>';
@@ -250,6 +271,14 @@ final class AppLicenceDriver implements Driver {
 			__( 'Server license', 'beltoft-services' )  => (string) $r->get( 'server_license' ),
 			__( 'Server resource', 'beltoft-services' ) => $server ? (string) $server->id() : '',
 		);
+
+		if ( (int) $r->get( AppLicenceKeep::PREV ) > 0 ) {
+			$rows[ __( 'Last server license', 'beltoft-services' ) ] = (string) (int) $r->get( AppLicenceKeep::PREV );
+		}
+
+		if ( AppLicenceKeep::kept( $r ) ) {
+			$rows[ __( 'Kept for a new server since', 'beltoft-services' ) ] = gmdate( 'Y-m-d H:i', (int) $r->get( AppLicenceKeep::KEPT ) ) . ' UTC';
+		}
 
 		/**
 		 * Rows of the admin panel of an app licence: a vendor driver adds its own ids (never a key).

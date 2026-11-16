@@ -111,6 +111,40 @@ final class AppLicencePickerTest extends BackupTestCase {
 		$this->assertCount( 0, WC()->cart->get_cart() );
 	}
 
+	public function test_a_kept_licence_chosen_in_the_picker_adds_no_licence_line_and_checkout_starts_from_the_same_choice(): void {
+		// A delivered licence of this customer whose server is gone, kept.
+		$tier         = $this->tiers['pro'];
+		$subscription = wcs_create_subscription( array( 'customer_id' => $this->user, 'billing_period' => 'month', 'billing_interval' => 1, 'status' => 'active' ) );
+		$subscription->add_product( $tier, 1 );
+		$subscription->set_requires_manual_renewal( true );
+		$subscription->update_dates( array( 'next_payment' => gmdate( 'Y-m-d H:i:s', time() + 30 * DAY_IN_SECONDS ) ) );
+		$subscription->save();
+		global $wpdb;
+		$wpdb->delete( \BeltoftLicenses\Install::tables()['licenses'], array( 'subscription_id' => $subscription->get_id() ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Test fixture reset.
+		$row    = $this->service_license( wc_get_product( $tier->get_parent_id() ), array( 'fire' => false, 'user_id' => $this->user, 'variation_id' => $tier->get_id(), 'subscription_id' => $subscription->get_id(), 'email' => 'christian.beltoft@gmail.com' ) );
+		$driver = \BeltoftServices\Drivers\Registry::get( 'proxmox-app' );
+		$made   = \BeltoftServices\Resource::create( $row, $driver, \BeltoftServices\Product::plan( $tier->get_parent_id(), $tier->get_id() ), \BeltoftServices\Lifecycle::initial_meta( $row, $driver ) );
+		$this->assertTrue( $made->set( array( 'state' => 'ready', 'desired' => 'ready', 'steps' => array( 'ready' ) ) ) );
+		$this->assertTrue( \BeltoftServices\Apps\AppLicenceKeep::keep( \BeltoftServices\Resource::find( $made->id() ), null, 'Test.' ) );
+		$licence = \BeltoftServices\Resource::find( $made->id() );
+		$this->assertTrue( \BeltoftServices\Apps\AppLicenceKeep::kept( $licence ) );
+
+		$result = $this->send( array( AppField::POST_APP => 'docker', AppField::POST_TIER => 'use-' . $licence->id() ) );
+
+		$this->assertSame( array(), $result['errors'] );
+		$this->assertCount( 1, WC()->cart->get_cart(), 'Only the server: the licence is not bought again.' );
+		$this->assertSame( 0, AppLicenceCart::lines() );
+		$carried = array();
+		foreach ( WC()->cart->get_cart() as $item ) {
+			$carried = $item[ Picked::KEY ] ?? $carried;
+		}
+		$this->assertSame( 'use-' . $licence->id(), $carried['tier'] );
+		$this->assertSame( 'docker', $carried['app'] );
+
+		$other = $this->send( array( AppField::POST_APP => 'docker', AppField::POST_TIER => 'use-' . ( $licence->id() + 999 ) ) );
+		$this->assertNotSame( '', $other['errors']['app'] ?? '', 'Not a licence of this customer.' );
+	}
+
 	public function test_a_tier_is_carried_and_its_line_joins_the_server_and_follows_it_when_the_server_is_picked_again(): void {
 		$result = $this->send( array( AppField::POST_APP => 'docker', AppField::POST_TIER => 'pro' ) );
 		$this->assertSame( array(), $result['errors'] );

@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.36.0
+Stable tag: 0.37.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,11 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.37.0 =
+* App licences (Plesk and others): a paid licence with its own subscription is kept when its server is deleted or reinstalled without the app. It stays on the account until the end of the paid month, is not renewed while it is not in use, and can be used on a new server or in the reinstall form at no charge. When it is used, its subscription runs on with the same payment date and the vendor licence is moved to the new server.
+* The Servers page lists a kept licence with the date it is paid until. The order form and the reinstall form offer it beside the tiers.
+* A kept licence that is not used ends at the end of the paid month, and the vendor licence is released then.
 
 = 0.36.0 =
 * App licences (Plesk and others): a paid licence is a monthly subscription on every server, also a pay as you go one. A whole month is charged when it is ordered and again each month it is kept; the server itself stays billed by the hour. Licences already sold by the hour keep their hourly billing.

@@ -80,6 +80,8 @@ final class PleskLicence {
 	public static function register(): void {
 		add_filter( 'beltoft_services_app_licence_provision', array( __CLASS__, 'provision' ), 10, 4 );
 		add_action( AppLicence::EVENT, array( __CLASS__, 'changed' ), 10, 5 );
+		add_action( AppLicence::LOOSE_EVENT, array( __CLASS__, 'loose' ), 10, 4 );
+		add_action( AppLicenceKeep::ATTACHED, array( __CLASS__, 'attached' ), 10, 3 );
 		add_filter( 'beltoft_services_app_install_licence', array( __CLASS__, 'install_job' ), 10, 3 );
 		add_filter( 'beltoft_services_app_licence_admin_rows', array( __CLASS__, 'admin_rows' ), 10, 2 );
 		add_action( 'beltoft_services_app_installed', array( __CLASS__, 'installed' ) );
@@ -375,6 +377,78 @@ final class PleskLicence {
 	}
 
 	/**
+	 * A licence with no server ended (a kept licence ran out): the vendor licence is released.
+	 *
+	 * @param mixed $licence Licence resource.
+	 * @param mixed $app     App id.
+	 * @param mixed $tier    Tier (unused).
+	 * @param mixed $event   Event.
+	 */
+	public static function loose( $licence, $app, $tier, $event ): void {
+		unset( $tier );
+
+		if ( self::APP === $app && 'cancelled' === $event && $licence instanceof Resource ) {
+			self::sync( $licence );
+		}
+	}
+
+	/**
+	 * A kept licence was linked to a new server: its vendor licence must move to the new address (done in install_job() before the key
+	 * goes into the job, repeated until it worked) and the new system has a new hardware id, reset there as after a reinstall. The key
+	 * state of the old server is forgotten. Nothing is ordered or released.
+	 *
+	 * @param mixed $licence Licence resource.
+	 * @param mixed $server  Server (unused).
+	 * @param mixed $app     App id.
+	 */
+	public static function attached( $licence, $server, $app ): void {
+		unset( $server );
+
+		if ( self::APP !== $app || ! $licence instanceof Resource || ! self::is_plesk( $licence ) || (int) $licence->get( 'plesk_key_id' ) < 1 ) {
+			return;
+		}
+
+		$licence->set( array( 'plesk_rebind' => 1, 'plesk_hwid_reset' => 1, 'plesk_key_job' => null, 'plesk_key_state' => null, 'plesk_key_pushes' => 0, 'plesk_key_tried' => null ) );
+	}
+
+	/**
+	 * Binds the vendor licence to the server's address when a kept licence moved to it. A temporary error waits, any other is told to staff and
+	 * fails the install in words the customer reads. The licence stays on the server and `plesk_rebind` stays set, so the next install try repeats it.
+	 *
+	 * @param Resource $licence Licence resource.
+	 * @param Resource $server  Server.
+	 * @return StepResult|null Null when nothing is left to do.
+	 */
+	private static function rebind( Resource $licence, Resource $server ): ?StepResult {
+		if ( 1 !== (int) $licence->get( 'plesk_rebind' ) ) {
+			return null;
+		}
+
+		$ip = IpPool::for_resource( $server->id() );
+
+		if ( null === $ip || false === filter_var( (string) $ip['address'], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
+			return StepResult::poll( 60, 'app: waiting for the address of the server', 900 );
+		}
+
+		$error = LicenceVendor::rebind( $licence, new PleskFamily(), (string) $ip['address'] );
+
+		if ( null === $error ) {
+			$licence->set( array( 'plesk_rebind' => null ) );
+
+			return null;
+		}
+
+		if ( self::transient( $error ) ) {
+			return StepResult::poll( 60, 'app: waiting to move the Plesk licence', 900 );
+		}
+
+		$data = $error->get_error_data();
+		self::alert( $licence, 'The Plesk licence could not be moved to the new server address (' . $error->get_error_code() . ( is_array( $data ) && ! empty( $data['desc'] ) ? ': ' . $data['desc'] : '' ) . '). The licence is on the server and paid; bind it to ' . (string) $ip['address'] . ' at Openprovider, then try the install again.' );
+
+		return StepResult::fail( 'The app licence could not be moved to this server. We have been told and will fix it; then try again.' );
+	}
+
+	/**
 	 * Makes Openprovider match the licence: deleted when it ended, the item of the tier otherwise. Safe to run again.
 	 *
 	 * @param Resource $licence Licence resource.
@@ -550,6 +624,12 @@ final class PleskLicence {
 	public static function install_job( $job, $server, $licence ) {
 		if ( ! is_array( $job ) || ! $licence instanceof Resource || ! $server instanceof Resource || self::APP !== (string) $server->get( 'app_id' ) || ! self::is_plesk( $licence ) ) {
 			return $job;
+		}
+
+		$moved = self::rebind( $licence, $server );
+
+		if ( null !== $moved ) {
+			return $moved;
 		}
 
 		if ( 1 === (int) $licence->get( 'plesk_hwid_reset' ) && (int) $licence->get( 'plesk_key_id' ) > 0 ) {

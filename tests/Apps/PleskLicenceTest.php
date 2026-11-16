@@ -26,8 +26,12 @@ final class PleskLicenceTest extends PaidAppCase {
 
 	private Registrar $op;
 
+	/** @var int Calls of the fake registrar before this number are not looked at by op_calls(). */
+	private int $op_from = 0;
+
 	public function set_up(): void {
 		parent::set_up();
+		$this->op_from = 0;
 		delete_option( Registrar::OPTION );
 		$this->op = new Registrar( true );
 		add_filter( 'beltoft_services_domains_client', fn() => $this->op );
@@ -104,7 +108,7 @@ final class PleskLicenceTest extends PaidAppCase {
 	 * @return array<int, array<string, mixed>>
 	 */
 	private function op_calls( string $method, string $path = '' ): array {
-		return array_values( array_filter( $this->op->calls(), static fn( $c ) => $c['method'] === $method && ( '' === $path || $c['path'] === $path ) ) );
+		return array_values( array_filter( array_slice( $this->op->calls(), $this->op_from ), static fn( $c ) => $c['method'] === $method && ( '' === $path || $c['path'] === $path ) ) );
 	}
 
 	private function licences(): array {
@@ -513,9 +517,23 @@ final class PleskLicenceTest extends PaidAppCase {
 		$this->assertSame( array( array( $o['licence']->id() ) ), PleskLicence::sync_due(), 'A provision that failed after the order is still released.' );
 	}
 
-	public function test_deleting_the_server_deletes_the_licence(): void {
+	public function test_deleting_the_server_keeps_the_vendor_licence_while_the_licence_is_kept(): void {
 		$o      = $this->provisioned( 'pro' );
 		$key_id = (int) $o['licence']->get( 'plesk_key_id' );
+
+		do_action( 'beltoft_services_state_changed', $this->fresh( $o['server'] ), 'ready', 'deleted' );
+
+		$this->assertCount( 0, $this->op_calls( 'DELETE' ), 'The vendor licence is not released while the licence is kept.' );
+		$this->assertArrayHasKey( $key_id, $this->licences() );
+		$this->assertSame( $key_id, (int) $this->fresh( $o['licence'] )->get( 'plesk_key_id' ) );
+		$this->assertFalse( AppLicence::release_due( $this->fresh( $o['licence'] ) ) );
+		$this->assertSame( array(), PleskLicence::sync_due() );
+	}
+
+	public function test_a_licence_that_cannot_be_kept_still_deletes_the_vendor_licence_with_its_server(): void {
+		$o      = $this->provisioned( 'pro' );
+		$key_id = (int) $o['licence']->get( 'plesk_key_id' );
+		wcs_get_subscription( (int) $o['licence']->license()['subscription_id'] )->update_dates( array( 'next_payment' => gmdate( 'Y-m-d H:i:s', time() + HOUR_IN_SECONDS ) ) );
 
 		do_action( 'beltoft_services_state_changed', $this->fresh( $o['server'] ), 'ready', 'deleted' );
 
@@ -562,6 +580,98 @@ final class PleskLicenceTest extends PaidAppCase {
 		$this->assertSame( 1, $this->licences()[ $key_id ]['hwid_resets'] );
 		$job = json_decode( (string) $this->fake->guest_file( 5000, Apps::JOB ), true );
 		$this->assertNotSame( '', $job['licence']['key'] );
+	}
+
+	// -- A kept licence used on another server --------------------------------------------------------
+
+	/**
+	 * A Plesk licence kept after its server was deleted, and a second ready server of the same customer that runs Plesk and chose it.
+	 *
+	 * @return array{licence: Resource, server2: Resource, key_id: int, user: int}
+	 */
+	private function kept_for_new_server(): array {
+		$o      = $this->provisioned( 'pro' );
+		$key_id = (int) $o['licence']->get( 'plesk_key_id' );
+		do_action( 'beltoft_services_state_changed', $this->fresh( $o['server'] ), 'ready', 'deleted' );
+		$licence = $this->fresh( $o['licence'] );
+		$this->assertTrue( \BeltoftServices\Apps\AppLicenceKeep::kept( $licence ) );
+
+		$vm      = $this->vm_product();
+		$order   = wc_create_order( array( 'customer_id' => $o['user'] ) );
+		$order->add_product( $vm, 1 );
+		$order->save();
+		$row     = $this->service_license( $vm, array( 'fire' => false, 'user_id' => $o['user'], 'order_id' => $order->get_id(), 'email' => 'christian.beltoft@gmail.com' ) );
+		$driver  = \BeltoftServices\Drivers\Registry::get( 'proxmox' );
+		$server2 = Resource::create( $row, $driver, \BeltoftServices\Product::plan( $vm->get_id() ), \BeltoftServices\Lifecycle::initial_meta( $row, $driver ) );
+		$this->assertSame( 5001, \BeltoftServices\Proxmox\Vm\VmRecords::allocate( $server2->id(), 'lab', 5001, 5001, array(), static fn() => true ) );
+		$this->assertTrue( $server2->set( array( 'state' => 'ready', 'desired' => 'ready', 'ip' => '192.0.2.11', 'app_id' => 'plesk', 'app_version' => '18', 'app_state' => 'pending', OsField::META => 9001, \BeltoftServices\Apps\AppLicenceKeep::USE => $licence->id(), 'plan' => array( 'cluster' => 'lab', 'template' => 9001, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 50 ) ) ) );
+		\BeltoftServices\Proxmox\Network\IpPool::add( '192.0.2.11' );
+		$this->assertNotNull( \BeltoftServices\Proxmox\Network\IpPool::hold( $server2->id() ) );
+		$this->assertTrue( \BeltoftServices\Proxmox\Vm\VmRecords::move( $server2->id(), 'node-a' ) );
+		$this->fake->add_vm( array( 'vmid' => 5001, 'node' => 'node-a', 'status' => 'running', 'config' => array( 'description' => \BeltoftServices\Proxmox\Pve\Ownership::tag( $server2 ), 'memory' => 4096, 'cores' => 2, 'agent' => '1' ) ) );
+		$this->op_from = count( $this->op->calls() );
+
+		return array( 'licence' => $licence, 'server2' => $this->fresh( $server2 ), 'key_id' => $key_id, 'user' => $o['user'] );
+	}
+
+	public function test_a_kept_licence_is_rebound_to_the_new_address_and_the_hardware_id_reset_before_the_key_goes_on(): void {
+		$k = $this->kept_for_new_server();
+
+		$result = AppInstall::queue( $k['server2'], $this->fake );
+
+		$this->assertTrue( $result->is_done(), $result->error() );
+		$puts = $this->op_calls( 'PUT', '/licenses/plesk/' . $k['key_id'] );
+		$this->assertCount( 1, $puts );
+		$this->assertSame( array( 'ip_address_binding' => '192.0.2.11', 'restrict_ip_binding' => true ), $puts[0]['body'], 'Only the address: no items and no period, which would order.' );
+		$this->assertCount( 0, $this->op_calls( 'POST', '/licenses/plesk' ), 'Nothing is ordered.' );
+		$this->assertCount( 0, $this->op_calls( 'DELETE' ), 'Nothing is released.' );
+		$this->assertCount( 1, $this->op_calls( 'POST', '/licenses/hwids/reset/plesk/' . $k['key_id'] ) );
+		$this->assertSame( '192.0.2.11', $this->licences()[ $k['key_id'] ]['ip_address_binding'] );
+		$job = json_decode( (string) $this->fake->guest_file( 5001, Apps::JOB ), true );
+		$this->assertNotSame( '', $job['licence']['key'] );
+		$this->assertSame( 'pro', $job['tier'] );
+		$this->assertNull( $this->fresh( $k['licence'] )->get( 'plesk_rebind' ) );
+	}
+
+	public function test_a_temporary_rebind_error_waits_and_a_final_refusal_alerts_fails_and_loses_nothing(): void {
+		$k = $this->kept_for_new_server();
+		$this->op->reply( 'PUT', '/licenses/plesk/' . $k['key_id'], new \WP_Error( 'transport', 'down' ) );
+
+		$wait = AppInstall::queue( $k['server2'], $this->fake );
+		$this->assertFalse( $wait->is_done() || $wait->is_failed(), 'A temporary error is waited for.' );
+		$this->assertSame( 1, (int) $this->fresh( $k['licence'] )->get( 'plesk_rebind' ) );
+
+		$this->op->reply( 'PUT', '/licenses/plesk/' . $k['key_id'], new \WP_Error( 'op_3108', 'Registrar request failed.', array( 'status' => 404, 'desc' => 'License not found.' ) ) );
+		$this->mails = array();
+		$failed = AppInstall::queue( $this->fresh( $k['server2'] ), $this->fake );
+
+		$this->assertTrue( $failed->is_failed() );
+		$this->assertStringContainsString( 'could not be moved to this server', $failed->error() );
+		$this->assertNotSame( array(), $this->mails, 'The admin is told.' );
+		$licence = $this->fresh( $k['licence'] );
+		$this->assertSame( (int) $k['server2']->license()['id'], (int) $licence->get( 'server_license' ), 'The licence stays on the server and is paid.' );
+		$this->assertSame( 'active', AppLicence::state( $licence ) );
+		$this->assertSame( 1, (int) $licence->get( 'plesk_rebind' ), 'The next try repeats it.' );
+		$this->assertSame( $k['key_id'], (int) $licence->get( 'plesk_key_id' ) );
+		$this->assertCount( 0, $this->op_calls( 'DELETE' ) );
+
+		// Fixed at the vendor: the next try works.
+		$this->op->reply( 'PUT', '/licenses/plesk/' . $k['key_id'], array( 'success' => true ) );
+		$again = AppInstall::queue( $this->fresh( $k['server2'] ), $this->fake );
+		$this->assertTrue( $again->is_done(), $again->error() );
+		$this->assertNull( $this->fresh( $k['licence'] )->get( 'plesk_rebind' ) );
+	}
+
+	public function test_a_kept_licence_that_ran_out_releases_the_vendor_licence_at_once(): void {
+		$k = $this->kept_for_new_server();
+		$this->assertTrue( Licenses::update( (int) $k['licence']->license()['id'], array( 'status' => Licenses::STATUS_EXPIRED ) ) );
+		wcs_get_subscription( (int) $k['licence']->license()['subscription_id'] )->update_status( 'expired' );
+
+		Jobs::run( $k['licence']->id() );
+
+		$this->assertCount( 1, $this->op_calls( 'DELETE', '/licenses/plesk/' . $k['key_id'] ), 'Not kept through the retention days: its month is over.' );
+		$this->assertArrayNotHasKey( $k['key_id'], $this->licences() );
+		$this->assertSame( 0, (int) $this->fresh( $k['licence'] )->get( 'plesk_key_id' ) );
 	}
 
 	// -- The app, the product and the client ---------------------------------------------------------

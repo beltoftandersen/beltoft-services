@@ -400,6 +400,28 @@ final class LicenceVendor {
 	}
 
 	/**
+	 * Binds the vendor licence to another address (a kept licence used on a new server). Only the address and the restriction are
+	 * sent: no items and no period, which would order. Safe to repeat. A failure is returned for the caller to sort (a temporary one
+	 * is tried again, any other is told to staff); nothing is deleted or bought here.
+	 *
+	 * @param Resource      $r      Licence resource.
+	 * @param LicenceFamily $family Family.
+	 * @param string        $ip     The new server's address.
+	 * @return \WP_Error|null The vendor's error, or null when the licence is bound to the address.
+	 */
+	public static function rebind( Resource $r, LicenceFamily $family, string $ip ): ?\WP_Error {
+		$id = (int) $r->get( $family->meta( 'key_id' ) );
+
+		if ( $id < 1 || false === filter_var( $ip, FILTER_VALIDATE_IP ) ) {
+			return new \WP_Error( 'licence_rebind_invalid', 'The licence or the address is missing.' );
+		}
+
+		$reply = self::client()->request( 'PUT', '/licenses/plesk/' . $id, array( 'ip_address_binding' => $ip, 'restrict_ip_binding' => true ) );
+
+		return is_wp_error( $reply ) ? $reply : null;
+	}
+
+	/**
 	 * Deletes the vendor licence. Safe to run again; a licence that is already gone counts as deleted. A failure is counted
 	 * apart from the key asks (so a licence that used up its asks is still deleted), staff are told once at TRIES tries and the
 	 * deletion is repeated by a job, later each time (5 minutes times the square of the tries, at most a day), until three times

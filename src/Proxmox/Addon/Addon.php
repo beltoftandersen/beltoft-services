@@ -8,6 +8,7 @@ use BeltoftServices\Apps\AppLicenceDriver;
 use BeltoftServices\Proxmox\Disk\DiskDriver;
 use BeltoftServices\Proxmox\Disk\DiskMeta;
 use BeltoftServices\Apps\AppLicence;
+use BeltoftServices\Apps\AppLicenceKeep;
 use BeltoftServices\Proxmox\Snapshot\SnapshotMeta;
 use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
 
@@ -30,6 +31,7 @@ final class Addon {
 	 * @param string $parent_deleted_event History text when its server is deleted.
 	 * @param \Closure $after_parent_deleted What it does once ended for a deleted server, given the resource.
 	 * @param bool   $skips_deleted       Whether the server's cascade leaves an add-on that is already deleted alone (true for packs and app licences; a disk is always ended, so its activation is closed and the admin told).
+	 * @param \Closure|null $keeps        Asked before a deleted server ends this add-on, with the add-on and the server: true when the add-on kept itself and is left alone. Null: it always ends with its server.
 	 */
 	public function __construct(
 		public readonly string $driver_id,
@@ -42,7 +44,8 @@ final class Addon {
 		public readonly string $list_order,
 		public readonly string $parent_deleted_event,
 		public readonly \Closure $after_parent_deleted,
-		public readonly bool $skips_deleted = true
+		public readonly bool $skips_deleted = true,
+		public readonly ?\Closure $keeps = null
 	) {}
 
 	/** Cart item key holding the server the add-on is for. */
@@ -74,7 +77,7 @@ final class Addon {
 		return array(
 			new self( DiskDriver::ID, 'disk', 'disk', '_disk_', 'beltoft-services-disk', true, false, 'ASC', 'Parent server deleted; extra disk no longer available', DiskMeta::after_parent_deleted( ... ), false ),
 			new self( SnapshotDriver::ID, 'snapshot', 'snapshot', '_snapshots_', 'beltoft-services-snapshots', false, true, 'ASC', 'Parent server deleted; snapshot slots no longer available', SnapshotMeta::after_parent_deleted( ... ) ),
-			new self( AppLicenceDriver::ID, 'applic', 'applic', '_applic_', AppLicenceCart::NONCE, true, false, 'DESC', 'Parent server deleted; app licence no longer available', AppLicence::after_parent_deleted( ... ) ),
+			new self( AppLicenceDriver::ID, 'applic', 'applic', '_applic_', AppLicenceCart::NONCE, true, false, 'DESC', 'Parent server deleted; app licence no longer available', AppLicence::after_parent_deleted( ... ), true, AppLicenceKeep::for_deleted_server( ... ) ),
 		);
 	}
 

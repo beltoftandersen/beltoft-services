@@ -218,7 +218,8 @@ final class AppReinstallPaid {
 
 		$pick = self::pick( $args );
 
-		if ( null === $pick || self::licensed( $resource, $pick['app'] ) ) {
+		// A kept licence is used, not bought: no checkout; the reinstall check decides whether it can be used.
+		if ( null === $pick || self::licensed( $resource, $pick['app'] ) || null !== AppLicenceKeep::use_choice( $pick['tier'] ) ) {
 			return $url;
 		}
 
