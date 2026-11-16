@@ -97,6 +97,7 @@ final class MailcowClientTest extends TestCase {
 	}
 
 	public function test_reads(): void {
+		LiveMailcowClient::forget_aliases();
 		$this->respond_with(
 			function ( $url ) {
 				if ( str_contains( $url, 'get/alias/all' ) ) {
@@ -123,6 +124,24 @@ final class MailcowClientTest extends TestCase {
 		$this->assertSame( array( 6 ), array_column( $c->list_aliases( 'a.example' ), 'id' ) );
 		$this->assertStringContainsString( 'get/mailbox/all/a.example', $this->http_calls()[3]['url'] );
 		$this->assertSame( 'GET', $this->http_calls()[0]['args']['method'] );
+	}
+
+	public function test_the_whole_alias_list_is_read_once_for_all_domains_and_forgotten_after_a_write_or_a_lock(): void {
+		LiveMailcowClient::forget_aliases();
+		$this->respond_with( fn() => $this->json( array( array( 'id' => 6, 'address' => 'a@a.example', 'goto' => 'b@x.example', 'domain' => 'a.example' ), array( 'id' => 7, 'address' => 'a@b.example', 'goto' => 'c@x.example', 'domain' => 'b.example' ) ) ) );
+
+		$this->assertSame( array( 6 ), array_column( $this->live()->list_aliases( 'a.example' ), 'id' ) );
+		$this->assertSame( array( 7 ), array_column( $this->live()->list_aliases( 'b.example' ), 'id' ) );
+		$this->assertCount( 1, $this->http_calls(), 'One download for two domains.' );
+
+		$this->live()->delete_alias( 6 );
+		$this->live()->list_aliases( 'a.example' );
+		$this->assertCount( 3, $this->http_calls(), 'A write makes the next look read again.' );
+
+		LiveMailcowClient::forget_aliases();
+		$this->live()->list_aliases( 'a.example' );
+		$this->assertCount( 4, $this->http_calls() );
+		LiveMailcowClient::forget_aliases();
 	}
 
 	public function test_add_alias_returns_the_id_mailcow_reports(): void {

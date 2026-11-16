@@ -208,6 +208,8 @@ final class MailPlan {
 	 */
 	public static function locked( Resource $r, callable $callback ): ?bool {
 		$root = self::root( $r );
+		// A count taken under the lock must be read from the server, never from a list remembered before the lock.
+		LiveMailcowClient::forget_aliases();
 
 		if ( $root->id() === $r->id() ) {
 			return $r->locked( $callback );
