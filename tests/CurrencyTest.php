@@ -218,4 +218,12 @@ final class CurrencyTest extends TestCase {
 		$this->assertSame( array( true, 5 ), $out );
 		$this->assertCount( 1, array_filter( $sent, static fn( $s ) => false !== strpos( $s, 'did not restore' ) ), 'Once, not on every call.' );
 	}
+
+	public function test_a_guard_rate_is_plausible_from_one_to_a_thousand_inclusive(): void {
+		$this->assertTrue( Currency::plausible_rate( 1.0, 'DKK' ), 'The lower limit is accepted.' );
+		$this->assertTrue( Currency::plausible_rate( 1000.0, 'DKK' ), 'The upper limit is accepted.' );
+		$this->assertFalse( Currency::plausible_rate( 0.99, 'DKK' ) );
+		$this->assertFalse( Currency::plausible_rate( 1000.01, 'DKK' ) );
+		$this->assertFalse( Currency::plausible_rate( 0.0, 'DKK' ) );
+	}
 }

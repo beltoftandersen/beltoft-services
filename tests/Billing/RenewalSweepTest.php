@@ -141,6 +141,20 @@ class RenewalSweepTest extends SslTestCase {
 		$this->assertFalse( RenewalSweep::act_open( $r->id(), (string) $unpaid->get_id() ) );
 	}
 
+	public function test_the_sweep_only_looks_at_orders_of_the_last_thirty_days(): void {
+		list( $r, $sub ) = $this->resource( 'domain', 'expires_at' );
+		$old    = $this->paid_order( $sub );
+		$recent = $this->paid_order( $sub );
+		$old->set_date_created( time() - 31 * DAY_IN_SECONDS );
+		$old->save();
+		$recent->set_date_created( time() - 29 * DAY_IN_SECONDS );
+		$recent->save();
+
+		$this->assertSame( 1, RenewalSweep::sweep( 'domain', 'domain', 10 ) );
+		$this->assertSame( 0, $this->waiting( $r, $old ), 'A paid order 31 days old is not queued.' );
+		$this->assertSame( 1, $this->waiting( $r, $recent ) );
+	}
+
 	public function test_the_sweep_stops_at_its_limit(): void {
 		list( $r, $sub ) = $this->resource( 'domain', 'expires_at' );
 		$first  = $this->paid_order( $sub );

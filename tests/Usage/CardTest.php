@@ -308,6 +308,24 @@ class CardTest extends UsageTestCase {
 		$this->assertFalse( Account::chargeable( $account ) );
 	}
 
+	public function test_a_card_is_valid_through_its_expiry_month_and_expired_the_month_after(): void {
+		foreach ( array( array( 'now', false ), array( 'first day of last month', true ) ) as list( $when, $expired ) ) {
+			$user  = $this->new_user();
+			$token = $this->token( $user, 'pm_' . ( $expired ? 'old' : 'now' ) );
+			$stamp = strtotime( $when );
+			$token->set_expiry_month( gmdate( 'm', $stamp ) );
+			$token->set_expiry_year( gmdate( 'Y', $stamp ) );
+			$token->save();
+			$account = $this->usage_account( $user );
+			$account->set_payment_method( 'stripe_cc' );
+			$account->update_meta_data( '_payment_method_token', $token->get_token() );
+			$account->update_meta_data( '_wc_stripe_customer', 'cus_1' );
+			$account->save();
+
+			$this->assertSame( $expired, Card::details( $account )['expired'], $when );
+		}
+	}
+
 	public function test_a_card_of_an_inactive_payment_method_is_not_shown_or_charged(): void {
 		$user    = $this->new_user();
 		$account = $this->usage_account( $user );
