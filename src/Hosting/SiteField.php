@@ -92,6 +92,23 @@ final class SiteField {
 	}
 
 	/**
+	 * Is the name held by a hosting account in a way that blocks this customer? A waiting outside name nobody proved does
+	 * not, once this customer has proven the name; the same words are used for every refusal.
+	 *
+	 * @param string $host    Host name.
+	 * @param int    $user_id Customer.
+	 */
+	private static function held( string $host, int $user_id ): bool {
+		$row = SiteDomains::find( $host );
+
+		if ( null === $row ) {
+			return false;
+		}
+
+		return ! ( 'external' === $row['kind'] && 'waiting' === $row['state'] && \BeltoftServices\Domains\Ownership::proven( $user_id, $host ) );
+	}
+
+	/**
 	 * The site a choice describes, or the reason it cannot be used.
 	 *
 	 * @param array<string, string> $input   slug, label, mode, host, install, language, email.
@@ -115,8 +132,8 @@ final class SiteField {
 				return new \WP_Error( 'site_new', __( 'Choose a domain that is part of this order.', 'beltoft-services' ) );
 			}
 
-			if ( null !== SiteDomains::find( $host ) ) {
-				return new \WP_Error( 'site_host', __( 'That domain is already used by a hosting account. Enter another domain.', 'beltoft-services' ) );
+			if ( self::held( $host, $user_id ) ) {
+				return new \WP_Error( 'site_host', __( 'That domain cannot be used for hosting here. Enter another domain, or prove the domain is yours first.', 'beltoft-services' ) );
 			}
 
 			$domain = $host;
@@ -133,8 +150,8 @@ final class SiteField {
 				return new \WP_Error( 'site_host', __( 'That is a temporary address. Enter your own domain, or choose the temporary address option.', 'beltoft-services' ) );
 			}
 
-			if ( null !== SiteDomains::find( $host ) ) {
-				return new \WP_Error( 'site_host', __( 'That domain is already used by a hosting account. Enter another domain.', 'beltoft-services' ) );
+			if ( self::held( $host, $user_id ) ) {
+				return new \WP_Error( 'site_host', __( 'That domain cannot be used for hosting here. Enter another domain, or prove the domain is yours first.', 'beltoft-services' ) );
 			}
 
 			if ( self::MODE_OURS === $mode && null === SiteDns::zone_for( $user_id, $host ) ) {
