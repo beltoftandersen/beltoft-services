@@ -264,6 +264,8 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 * One shared move sequence and one hardware id reset for every kind of licence (`LicenceVendor::move()`, `reset_hardware()`).
 * `BeltoftServices\CartCompanion::keeps()` and the filter `beltoft_services_cart_companion`: a site's one-product cart rule asks the plugin which lines belong beside each other (a server with its disk or app licence, a domain with its plan, the usage account line).
 * The generic action route answers with the action name and where its outcome is read.
+* Checkout: a service that needs the customer's phone number says so (`Drivers\NeedsPhone`: domain, SSL certificate) and `BillingRequirements::cart_needs_phone()` answers for a cart, so a site that hides the phone field shows it for those orders. An SSL order no longer waits for a phone number after it is paid.
+* Faster page renders: the pay as you go price tags work each answer out once per request.
 
 = 0.37.0 =
 * App licences (Plesk and others): a paid licence with its own subscription is kept when its server is deleted or reinstalled without the app. It stays on the account until the end of the paid month, is not renewed while it is not in use, and can be used on a new server or in the reinstall form at no charge. When it is used, its subscription runs on with the same payment date and the vendor licence is moved to the new server.
