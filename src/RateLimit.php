@@ -44,8 +44,22 @@ final class RateLimit {
 			return false;
 		}
 
+		return self::hit( $user_id, $key, $window ) > $limit;
+	}
+
+	/**
+	 * Counts one event in the current window and gives the count. The one counter of the plugin: exceeded() is a hit
+	 * compared with a limit; a caller that counts only some events (wrong codes) and clears on success uses hit(), count()
+	 * and reset(). Atomic in a persistent object cache. If counting fails, 0 (the call is let through).
+	 *
+	 * @param int|string $user_id User id or visitor key.
+	 * @param string     $key     What is counted.
+	 * @param int        $window  Window length in seconds.
+	 * @return int The count including this event.
+	 */
+	public static function hit( int|string $user_id, string $key, int $window = MINUTE_IN_SECONDS ): int {
 		$window = max( 1, $window );
-		$name   = 'rl_' . substr( hash( 'sha256', $user_id . '|' . $key . '|' . (int) floor( time() / $window ) ), 0, 40 );
+		$name   = self::name( $user_id, $key, $window );
 
 		if ( wp_using_ext_object_cache() ) {
 			wp_cache_add( $name, 0, self::GROUP, $window );
@@ -55,7 +69,48 @@ final class RateLimit {
 			set_transient( 'beltoft_services_' . $name, $count, $window );
 		}
 
-		return false !== $count && (int) $count > $limit;
+		return false === $count ? 0 : (int) $count;
+	}
+
+	/**
+	 * The count of the current window, without counting.
+	 *
+	 * @param int|string $user_id User id or visitor key.
+	 * @param string     $key     What is counted.
+	 * @param int        $window  Window length in seconds.
+	 */
+	public static function count( int|string $user_id, string $key, int $window = MINUTE_IN_SECONDS ): int {
+		$name = self::name( $user_id, $key, max( 1, $window ) );
+
+		return wp_using_ext_object_cache() ? (int) wp_cache_get( $name, self::GROUP ) : (int) get_transient( 'beltoft_services_' . $name );
+	}
+
+	/**
+	 * Clears the count of the current window.
+	 *
+	 * @param int|string $user_id User id or visitor key.
+	 * @param string     $key     What is counted.
+	 * @param int        $window  Window length in seconds.
+	 */
+	public static function reset( int|string $user_id, string $key, int $window = MINUTE_IN_SECONDS ): void {
+		$name = self::name( $user_id, $key, max( 1, $window ) );
+
+		if ( wp_using_ext_object_cache() ) {
+			wp_cache_delete( $name, self::GROUP );
+		} else {
+			delete_transient( 'beltoft_services_' . $name );
+		}
+	}
+
+	/**
+	 * Name of the counter of this window.
+	 *
+	 * @param int|string $user_id User id or visitor key.
+	 * @param string     $key     What is counted.
+	 * @param int        $window  Window length in seconds.
+	 */
+	private static function name( int|string $user_id, string $key, int $window ): string {
+		return 'rl_' . substr( hash( 'sha256', $user_id . '|' . $key . '|' . (int) floor( time() / $window ) ), 0, 40 );
 	}
 
 	/**

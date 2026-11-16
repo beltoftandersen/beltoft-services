@@ -23,6 +23,22 @@ final class RateLimitTest extends TestCase {
 		$this->assertTrue( RateLimit::exceeded( 7, 'boundary', 3 ) );
 	}
 
+	public function test_hits_are_counted_apart_from_the_check_and_can_be_cleared(): void {
+		$this->assertSame( 0, RateLimit::count( 9, 'fails', 600 ) );
+		$this->assertSame( 1, RateLimit::hit( 9, 'fails', 600 ) );
+		$this->assertSame( 2, RateLimit::hit( 9, 'fails', 600 ) );
+		$this->assertSame( 2, RateLimit::count( 9, 'fails', 600 ), 'Reading does not count.' );
+		$this->assertSame( 0, RateLimit::count( 10, 'fails', 600 ), 'Another user.' );
+
+		RateLimit::reset( 9, 'fails', 600 );
+		$this->assertSame( 0, RateLimit::count( 9, 'fails', 600 ) );
+	}
+
+	public function test_exceeded_and_hit_share_one_counter(): void {
+		RateLimit::exceeded( 11, 'shared-counter', 5, 600 );
+		$this->assertSame( 2, RateLimit::hit( 11, 'shared-counter', 600 ) );
+	}
+
 	public function test_zero_or_negative_limit_is_off(): void {
 		for ( $i = 0; $i < 5; $i++ ) {
 			$this->assertFalse( RateLimit::exceeded( 7, 'off', 0 ) );
