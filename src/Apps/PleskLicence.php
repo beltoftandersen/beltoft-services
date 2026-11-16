@@ -11,7 +11,6 @@ use BeltoftServices\Alerts;
 use BeltoftServices\Background;
 use BeltoftServices\Crypto;
 use BeltoftServices\Domains\Client as RegistrarClient;
-use BeltoftServices\Domains\Clients as RegistrarClients;
 use BeltoftServices\Domains\DomainSettings;
 use BeltoftServices\Domains\LicenceCatalog;
 use BeltoftServices\Domains\LicenceVendor;
@@ -73,7 +72,7 @@ final class PleskLicence {
 	private const WAIT = HOUR_IN_SECONDS;
 
 	/** Tries of the key job and of a repeated call before an admin is told. */
-	private const TRIES = 12;
+	private const TRIES = LicenceVendor::TRIES;
 
 	/** Times the key is written to the server before it is called failed. */
 	private const PUSHES = 3;
@@ -479,6 +478,23 @@ final class PleskLicence {
 		if ( $licence && self::is_plesk( $licence ) ) {
 			self::sync( $licence );
 		}
+	}
+
+	/**
+	 * The vendor id of the Plesk licence of one of our servers, for a standalone add-on that belongs to it. 0 when the server has
+	 * no live Plesk licence; -1 when it has one that is not ordered yet (still being ordered).
+	 *
+	 * @param Resource $server Server resource.
+	 */
+	public static function vendor_id_for_server( Resource $server ): int {
+		$licence = AppLicence::current( $server );
+		$id      = $licence ? (int) $licence->get( 'plesk_key_id' ) : 0;
+
+		if ( $id > 0 ) {
+			return $id;
+		}
+
+		return $licence && 'ended' !== AppLicence::state( $licence ) ? -1 : 0;
 	}
 
 	// -- Reinstall -------------------------------------------------------------------------------

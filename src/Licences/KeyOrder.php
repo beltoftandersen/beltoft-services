@@ -11,13 +11,10 @@ use BeltoftLicenses\Licenses;
 use BeltoftServices\Alerts;
 use BeltoftServices\Background;
 use BeltoftServices\Crypto;
-use BeltoftServices\Domains\Client as RegistrarClient;
-use BeltoftServices\Domains\Clients as RegistrarClients;
 use BeltoftServices\Domains\LicenceVendor;
-use BeltoftServices\Domains\SpendGuard;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
-use BeltoftServices\Apps\AppLicence;
+use BeltoftServices\Apps\PleskLicence;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
 
@@ -55,7 +52,7 @@ final class KeyOrder {
 	private const WAIT = HOUR_IN_SECONDS;
 
 	/** Asks before staff are told. */
-	private const TRIES = 12;
+	private const TRIES = LicenceVendor::TRIES;
 
 	/**
 	 * Hooks.
@@ -93,14 +90,6 @@ final class KeyOrder {
 		$tier = (string) ( $plan['lic_tier'] ?? '' );
 
 		return KeyCatalog::is_edition( $tier ) && 'physical' === (string) ( $plan['lic_server'] ?? '' ) ? $tier . '-physical' : $tier;
-	}
-
-	private static function client(): RegistrarClient {
-		return LicenceVendor::client();
-	}
-
-	private static function transient( \WP_Error $error ): bool {
-		return LicenceVendor::transient( $error );
 	}
 
 	/**
@@ -201,15 +190,10 @@ final class KeyOrder {
 		$owner  = $attach > 0 ? Resource::for_license( $attach ) : null;
 
 		if ( $owner && ProxmoxDriver::ID === $owner->get( 'driver' ) && (int) ( $owner->license()['user_id'] ?? 0 ) === $user ) {
-			$licence = AppLicence::current( $owner );
-			$id      = $licence ? (int) $licence->get( 'plesk_key_id' ) : 0;
+			$id = PleskLicence::vendor_id_for_server( $owner );
 
-			if ( $id > 0 ) {
+			if ( 0 !== $id ) {
 				return $id;
-			}
-
-			if ( $licence && 'ended' !== AppLicence::state( $licence ) ) {
-				return -1;
 			}
 		}
 

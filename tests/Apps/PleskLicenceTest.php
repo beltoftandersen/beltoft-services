@@ -1122,4 +1122,17 @@ final class PleskLicenceTest extends PaidAppCase {
 		$this->assertCount( 1, $this->mails );
 		$this->assertStringContainsString( 'Openprovider did not answer the licence deletion after 12 tries (transport). Delete the licence at Openprovider, or it keeps billing.', (string) $this->mails[0]['message'] );
 	}
+
+	public function test_s8_the_vendor_id_of_a_servers_plesk_licence_is_its_id_minus_one_while_ordering_and_zero_when_none(): void {
+		$o      = $this->provisioned( 'pro' );
+		$key_id = (int) $o['licence']->get( 'plesk_key_id' );
+		$this->assertGreaterThan( 0, $key_id );
+		$this->assertSame( $key_id, PleskLicence::vendor_id_for_server( $this->fresh( $o['server'] ) ) );
+
+		$this->assertTrue( $this->fresh( $o['licence'] )->set( array( 'plesk_key_id' => null ) ) );
+		$this->assertSame( -1, PleskLicence::vendor_id_for_server( $this->fresh( $o['server'] ) ), 'A live licence that is not ordered yet.' );
+
+		$this->assertTrue( $this->fresh( $o['licence'] )->set( array( AppLicence::ENDED => 'server deleted' ) ) );
+		$this->assertSame( 0, PleskLicence::vendor_id_for_server( $this->fresh( $o['server'] ) ), 'An ended licence is no parent.' );
+	}
 }
