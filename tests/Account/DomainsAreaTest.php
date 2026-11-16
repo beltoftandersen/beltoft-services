@@ -1,11 +1,10 @@
 <?php
-/** The Domains service area (Account\DomainArea): addresses, request, buttons, and the same output as the static Domains class. @package BeltoftServices */
+/** The Domains service area (Account\Domains): addresses, request, buttons, and the same output as the static Domains class. @package BeltoftServices */
 namespace BeltoftServices\Tests\Account;
 
 use BeltoftLicenses\Account\View;
-use BeltoftServices\Account\DomainArea;
-use BeltoftServices\Account\DomainRows;
 use BeltoftServices\Account\Domains;
+use BeltoftServices\Account\DomainRows;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Domains\DnsClaims;
@@ -15,7 +14,7 @@ use BeltoftServices\Domains\FakeDns;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
 
-class DomainAreaTest extends TestCase {
+class DomainsAreaTest extends TestCase {
 	private int $user = 0;
 	private FakeDns $dns;
 
@@ -40,8 +39,8 @@ class DomainAreaTest extends TestCase {
 		parent::tear_down();
 	}
 
-	private function area(): DomainArea {
-		return ServiceArea::get( DomainArea::class );
+	private function area(): Domains {
+		return ServiceArea::get( Domains::class );
 	}
 
 	private function service( string $name, string $driver = 'domain', array $meta = array(), string $state = 'ready' ): Resource {
@@ -76,41 +75,51 @@ class DomainAreaTest extends TestCase {
 		$area    = $this->area();
 		$license = $this->service( 'urls.example' )->license();
 
-		$this->assertSame( Domains::url( $license ), $area->url( $license ) );
-		$this->assertSame( Domains::url( $license, 'dns' ), $area->url( $license, 'dns' ) );
-		$this->assertSame( Domains::url( $license ), $area->url( $license, 'bogus' ) );
-		$this->assertSame( Domains::url_add(), $area->url_add() );
-		$this->assertSame( Domains::url_list(), $area->url_list() );
-		$this->assertSame( Domains::tabs(), $area->tabs() );
+		$this->assertSame( home_url() . '?domains=urls.example', $area->url( $license ) );
+		$this->assertSame( home_url() . '?domains=urls.example/dns', $area->url( $license, 'dns' ) );
+		$this->assertSame( $area->url( $license ), $area->url( $license, 'bogus' ) );
+		$this->assertSame( home_url() . '?domains=add', $area->url_add() );
+		$this->assertSame( home_url() . '?domains', $area->url_list() );
+		$this->assertSame( array( 'dns', 'nameservers', 'transfer', 'danger' ), $area->tabs() );
 		add_filter( 'beltoft_services_domain_page_tabs', static fn( $tabs ) => array_merge( $tabs, array( 'extra' ) ) );
 		$this->assertContains( 'extra', $area->tabs() );
 		add_filter( 'beltoft_services_domains_slug', static fn() => 'names' );
 		$this->assertSame( 'names', $area->slug() );
-		$this->assertSame( Domains::url_list(), $area->url_list() );
+		$this->assertSame( home_url() . '?names', $area->url_list() );
 	}
 
 	public function test_the_request_reads_the_id_the_tab_and_add(): void {
 		$wp = $GLOBALS['wp'];
 
-		foreach ( array( '', '12', '12/dns', '12/danger/', '12/nonsense', 'add', 'x/dns' ) as $value ) {
+		$expected = array(
+			''            => array( 0, '', false ),
+			'12'          => array( 12, '', false ),
+			'12/dns'      => array( 12, 'dns', false ),
+			'12/danger/'  => array( 12, 'danger', false ),
+			'12/nonsense' => array( 12, '', false ),
+			'add'         => array( 0, '', true ),
+			'x/dns'       => array( 0, 'dns', false ),
+		);
+
+		foreach ( array_keys( $expected ) as $value ) {
 			$wp->query_vars['domains'] = $value;
 			$got = $this->area()->requested();
-			$this->assertSame( array( $got['id'], $got['tab'], $got['add'] ), array( Domains::requested()['id'], Domains::requested()['tab'], Domains::requested()['add'] ), 'value ' . $value );
+			$this->assertSame( $expected[ $value ], array( $got['id'], $got['tab'], $got['add'] ), 'value ' . $value );
 			$this->assertSame( array( 'id', 'tab', 'add', 'path' ), array_keys( $got ) );
 		}
 	}
 
 	public function test_the_register_url_the_buttons_and_the_order_url(): void {
 		$area = $this->area();
-		$this->assertSame( Domains::url_register(), $area->url_register() );
+		$this->assertSame( '', $area->url_register() );
 		$this->assertSame( array(), $area->buttons() );
 		$this->settings( array( 'domain_search_url' => '/domains/', 'domain_dns_claims_enabled' => 1 ) );
-		$this->assertSame( Domains::buttons(), $area->buttons() );
 		$this->assertSame( array( 'Add a domain', 'Register a domain' ), array_column( $area->buttons(), 'label' ) );
 
 		$domain = $this->service( 'order.example' );
-		$this->assertSame( Domains::url_for_order( 0, array( 'order.example' ) ), $area->url_for_order( 0, array( 'order.example' ) ) );
-		$this->assertSame( Domains::url_for_order( (int) $domain->license()['order_id'], array( 'order.example' ) ), $area->url_for_order( (int) $domain->license()['order_id'], array( 'order.example' ) ) );
+		$this->assertSame( $area->url_list(), $area->url_for_order( 0, array( 'order.example' ) ) );
+		$this->assertSame( $area->url_list(), $area->url_for_order( (int) $domain->license()['order_id'], array( 'order.example', 'other.example' ) ), 'Two names: the list.' );
+		$this->assertSame( $area->url_list(), $area->url_for_order( (int) $domain->license()['order_id'], array( 'order.example' ) ), 'No order on the license: the list.' );
 	}
 
 	public function test_the_claim_rows_come_first_and_the_rows_equal_the_overview_rows(): void {
@@ -122,38 +131,9 @@ class DomainAreaTest extends TestCase {
 		$rows   = $this->area()->rows( array( $id => $views[0] ), array( $id => $domain ) );
 
 		$this->assertSame( array( 'waiting.example', 'have.example' ), array_column( $rows, 'name' ) );
-		$this->assertSame( Domains::claim_rows( $this->user ), $this->area()->claim_rows( $this->user ) );
+		$this->assertSame( array( 'waiting.example' ), array_column( $this->area()->claim_rows( $this->user ), 'name' ) );
+		$this->assertSame( array(), $this->area()->claim_rows( 0 ) );
 		$this->assertSame( DomainRows::row( $views[0], $domain ), $rows[1] );
-	}
-
-	/**
-	 * The area prints what the static class printed, for the list, the notice, the add page and a domain page.
-	 */
-	public function test_it_prints_what_the_static_class_prints(): void {
-		$mine    = $this->service( 'mine.example' );
-		$hosted  = $this->service( 'hosted.example', 'dns' );
-		$folded  = $this->service( 'folded.example', 'dns', array( 'folded_into' => 99 ) );
-		$deleted = $this->service( 'deleted.example', 'domain', array(), 'deleted' );
-		$views   = $this->views( $mine, $hosted, $folded, $deleted );
-		$this->settings( array( 'domain_dns_claims_enabled' => 1, 'domain_search_url' => '/domains/' ) );
-		DnsClaims::create( $this->user, 'waiting.example' );
-
-		foreach ( array( '', 'add', 'nope', (string) $folded->license()['id'], (string) $mine->license()['id'], (string) $mine->license()['id'] . '/dns', (string) $mine->license()['id'] . '/danger', (string) $hosted->license()['id'] . '/nameservers', (string) $deleted->license()['id'] ) as $value ) {
-			$GLOBALS['wp']->query_vars['domains'] = $value;
-			ob_start();
-			Domains::render( $views );
-			$old = (string) ob_get_clean();
-			ob_start();
-			$this->area()->render( $views );
-			$new = (string) ob_get_clean();
-
-			$this->assertSame( $this->flat( $old ), $this->flat( $new ), 'value ' . $value );
-			$this->assertNotSame( '', $new );
-		}
-	}
-
-	private function flat( string $html ): string {
-		return trim( (string) preg_replace( '/\s+(<\/)/', '$1', (string) preg_replace( '/>\s+</', '><', (string) preg_replace( '/\s+/', ' ', $html ) ) ) );
 	}
 
 	public function test_a_domain_in_state_deleted_is_still_listed_and_a_folded_one_is_not(): void {
@@ -194,7 +174,7 @@ class DomainAreaTest extends TestCase {
 
 		$this->assertSame( 1, $count( 'wc_get_template' ) );
 		$this->assertSame( 1, $count( 'template_redirect' ) );
-		$this->assertInstanceOf( DomainArea::class, ServiceArea::all()[0] );
+		$this->assertInstanceOf( Domains::class, ServiceArea::all()[0] );
 		$this->assertSame( array( 'domains', 'vps' ), array_slice( array_column( \BeltoftServices\Account\Tabs::groups( array() ), 'slug' ), 0, 2 ) );
 	}
 
@@ -215,7 +195,8 @@ class DomainAreaTest extends TestCase {
 	public function test_url_for_license_now_answers_for_a_domain_license(): void {
 		$domain = $this->service( 'portal.example' );
 
-		$this->assertSame( Domains::url( $domain->license() ), ServiceArea::url_for_license( $domain->license() ) );
-		$this->assertSame( Domains::url( $domain->license(), 'dns' ), $this->area()->url( $domain->license(), 'dns' ) );
+		$this->assertSame( $this->area()->url( $domain->license() ), ServiceArea::url_for_license( $domain->license() ) );
+		$this->assertStringContainsString( 'portal.example', ServiceArea::url_for_license( $domain->license() ) );
+		$this->assertStringContainsString( 'portal.example/dns', $this->area()->url( $domain->license(), 'dns' ) );
 	}
 }

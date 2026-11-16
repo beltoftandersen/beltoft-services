@@ -174,7 +174,7 @@ final class ThankYou {
 		self::$printed[ $order_id ] = true;
 
 		// One domain on the order: its own page. Several: the list.
-		$account_url = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\DomainArea::class )->url_for_order( $order_id, array_merge( array_keys( $domains ), array_keys( $transfers ) ) );
+		$account_url = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Domains::class )->url_for_order( $order_id, array_merge( array_keys( $domains ), array_keys( $transfers ) ) );
 
 		if ( $transfers ) {
 			wc_get_template(

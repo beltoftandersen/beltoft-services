@@ -18,7 +18,7 @@ final class Panels {
 	}
 	public static function assets( $parent, $endpoint = null ): void {
 		// The domain script is for the Domains endpoint only (the Servers and Licenses pages have no domain panel).
-		if ( is_string( $endpoint ) && \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\DomainArea::class )->slug() !== $endpoint ) {
+		if ( is_string( $endpoint ) && \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Domains::class )->slug() !== $endpoint ) {
 			return;
 		}
 
@@ -26,7 +26,7 @@ final class Panels {
 		wp_set_script_translations( 'beltoft-services-domain', 'beltoft-services', plugin_dir_path( BELTOFT_SERVICES_FILE ) . 'languages' );
 
 		// The row-by-row DNS records editor of a domain's page.
-		if ( \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\DomainArea::class )->requested()['id'] > 0 ) {
+		if ( \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Domains::class )->requested()['id'] > 0 ) {
 			wp_enqueue_script( 'beltoft-services-dns-editor', plugins_url( 'assets/dns-editor.js', BELTOFT_SERVICES_FILE ), is_string( $parent ) ? array( $parent, \BeltoftServices\Status::HANDLE, \BeltoftServices\Status::API_HANDLE ) : array( \BeltoftServices\Status::HANDLE, \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/dns-editor.js' ), true );
 		}
 	}
@@ -45,7 +45,7 @@ final class Panels {
 	}
 	public static function account( Resource $r ): void {
 		// On a domain page (My Account → Domains → one domain) the tabs print instead of the one card.
-		$page = \BeltoftServices\Account\DomainArea::on_page();
+		$page = \BeltoftServices\Account\Domains::on_page();
 		if ( $page && (int) ( $page['license']['id'] ?? 0 ) === (int) ( $r->license()['id'] ?? -1 ) ) {
 			$d = \BeltoftServices\Account\DomainPage::build( $r, $page );
 			include \BeltoftServices\Account\ServiceArea::file( 'domain-page.php' );

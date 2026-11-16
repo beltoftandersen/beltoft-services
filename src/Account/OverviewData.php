@@ -218,7 +218,7 @@ final class OverviewData {
 			$data['licenses'][] = self::license_row( $view );
 		}
 
-		$data['domains_url']  = $domains ? ServiceArea::get( DomainArea::class )->url_list() : '';
+		$data['domains_url']  = $domains ? ServiceArea::get( Domains::class )->url_list() : '';
 		$data['licenses_url'] = $plain ? Endpoint::url_for_license( $plain[0] ) : '';
 
 		$subscriptions = self::subscriptions( $user_id );

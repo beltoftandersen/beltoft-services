@@ -47,7 +47,7 @@ final class DomainPage {
 	public static function head( $handled, $resource, $license = array(), $view = array(), $page = array() ) {
 		unset( $license, $view );
 
-		if ( $handled || ! $resource instanceof Resource || ! in_array( $resource->get( 'driver' ), array( 'domain', 'dns' ), true ) || ! is_array( $page ) || ! DomainArea::on_page() ) {
+		if ( $handled || ! $resource instanceof Resource || ! in_array( $resource->get( 'driver' ), array( 'domain', 'dns' ), true ) || ! is_array( $page ) || ! Domains::on_page() ) {
 			return $handled;
 		}
 

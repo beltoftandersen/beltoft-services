@@ -38,7 +38,7 @@ final class DomainRows {
 
 		return array(
 			'id'     => (string) $resource->id(),
-			'url'    => ServiceArea::get( DomainArea::class )->url( $view['license'] ),
+			'url'    => ServiceArea::get( Domains::class )->url( $view['license'] ),
 			'name'   => (string) $view['product'],
 			'sub'    => self::kind( $resource ),
 			'state'  => Panel::label( $state, $resource ),

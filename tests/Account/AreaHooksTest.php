@@ -50,8 +50,8 @@ class AreaHooksTest extends TestCase {
 		foreach ( ServiceArea::all() as $area ) {
 			$name = get_class( $area );
 
-			// The Domains area overrides them on purpose (see DomainAreaTest).
-			if ( $area instanceof \BeltoftServices\Account\DomainArea ) {
+			// The Domains area overrides them on purpose (see DomainsAreaTest).
+			if ( $area instanceof \BeltoftServices\Account\Domains ) {
 				continue;
 			}
 

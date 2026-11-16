@@ -5,7 +5,7 @@ namespace BeltoftServices\Tests\Account;
 use BeltoftLicenses\Account\View;
 use BeltoftServices\Account\DomainPage;
 use BeltoftServices\Account\DomainRows;
-use BeltoftServices\Account\DomainArea;
+use BeltoftServices\Account\Domains;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Domains\DnsClaims;
@@ -64,7 +64,7 @@ class DomainsTest extends TestCase {
 	private function render( array $views, string $value = '' ): string {
 		$GLOBALS['wp']->query_vars['domains'] = $value;
 		ob_start();
-		ServiceArea::get( DomainArea::class )->render( $views );
+		ServiceArea::get( Domains::class )->render( $views );
 
 		return (string) ob_get_clean();
 	}
@@ -83,37 +83,37 @@ class DomainsTest extends TestCase {
 			'x/dns'      => array( 0, 'dns', false ),
 		) as $value => $expected ) {
 			$wp->query_vars['domains'] = (string) $value;
-			$got = ServiceArea::get( DomainArea::class )->requested();
+			$got = ServiceArea::get( Domains::class )->requested();
 			$this->assertSame( $expected, array( $got['id'], $got['tab'], $got['add'] ), 'value ' . $value );
 		}
 	}
 
 	public function test_urls_and_the_slug_filter(): void {
 		$license = array( 'id' => 42 );
-		$this->assertMatchesRegularExpression( '#domains(/|=)42/?$#', rawurldecode( ServiceArea::get( DomainArea::class )->url( $license ) ) );
-		$this->assertMatchesRegularExpression( '#domains(/|=)42(/|%2F)dns/?$#', ServiceArea::get( DomainArea::class )->url( $license, 'dns' ) );
-		$this->assertSame( ServiceArea::get( DomainArea::class )->url( $license ), ServiceArea::get( DomainArea::class )->url( $license, 'bogus' ), 'An unknown tab is the overview.' );
-		$this->assertMatchesRegularExpression( '#domains(/|=)add/?$#', rawurldecode( ServiceArea::get( DomainArea::class )->url_add() ) );
+		$this->assertMatchesRegularExpression( '#domains(/|=)42/?$#', rawurldecode( ServiceArea::get( Domains::class )->url( $license ) ) );
+		$this->assertMatchesRegularExpression( '#domains(/|=)42(/|%2F)dns/?$#', ServiceArea::get( Domains::class )->url( $license, 'dns' ) );
+		$this->assertSame( ServiceArea::get( Domains::class )->url( $license ), ServiceArea::get( Domains::class )->url( $license, 'bogus' ), 'An unknown tab is the overview.' );
+		$this->assertMatchesRegularExpression( '#domains(/|=)add/?$#', rawurldecode( ServiceArea::get( Domains::class )->url_add() ) );
 		add_filter( 'beltoft_services_domains_slug', static fn() => 'names' );
-		$this->assertSame( 'names', ServiceArea::get( DomainArea::class )->slug() );
-		$this->assertStringContainsString( 'names', ServiceArea::get( DomainArea::class )->url_list() );
+		$this->assertSame( 'names', ServiceArea::get( Domains::class )->slug() );
+		$this->assertStringContainsString( 'names', ServiceArea::get( Domains::class )->url_list() );
 	}
 
 	public function test_the_tab_slugs_go_through_a_filter(): void {
 		add_filter( 'beltoft_services_domain_page_tabs', static fn( $tabs ) => array_merge( $tabs, array( 'extra' ) ) );
-		$this->assertContains( 'extra', ServiceArea::get( DomainArea::class )->tabs() );
+		$this->assertContains( 'extra', ServiceArea::get( Domains::class )->tabs() );
 		$GLOBALS['wp']->query_vars['domains'] = '5/extra';
-		$this->assertSame( 'extra', ServiceArea::get( DomainArea::class )->requested()['tab'] );
+		$this->assertSame( 'extra', ServiceArea::get( Domains::class )->requested()['tab'] );
 	}
 
 	public function test_the_register_url_follows_the_setting(): void {
-		$this->assertSame( '', ServiceArea::get( DomainArea::class )->url_register() );
+		$this->assertSame( '', ServiceArea::get( Domains::class )->url_register() );
 		$this->settings( array( 'domain_search_url' => '/domains/' ) );
-		$this->assertSame( home_url( '/domains/' ), ServiceArea::get( DomainArea::class )->url_register() );
+		$this->assertSame( home_url( '/domains/' ), ServiceArea::get( Domains::class )->url_register() );
 		$this->settings( array( 'domain_search_url' => 'https://example.org/find' ) );
-		$this->assertSame( 'https://example.org/find', ServiceArea::get( DomainArea::class )->url_register() );
+		$this->assertSame( 'https://example.org/find', ServiceArea::get( Domains::class )->url_register() );
 		$this->settings( array( 'domain_search_url' => '//evil.example/x' ) );
-		$this->assertSame( '', ServiceArea::get( DomainArea::class )->url_register(), 'A scheme-less //host is refused.' );
+		$this->assertSame( '', ServiceArea::get( Domains::class )->url_register(), 'A scheme-less //host is refused.' );
 	}
 
 	// -- The template takeover ------------------------------------------------------------------
@@ -172,7 +172,7 @@ class DomainsTest extends TestCase {
 		$this->assertStringContainsString( 'hosted.example', $html );
 		$this->assertStringContainsString( 'DNS with us', $html );
 		$this->assertStringContainsString( 'is-ok', $html );
-		$this->assertStringContainsString( 'href="' . esc_url( ServiceArea::get( DomainArea::class )->url( $domain->license() ) ) . '"', $html );
+		$this->assertStringContainsString( 'href="' . esc_url( ServiceArea::get( Domains::class )->url( $domain->license() ) ) . '"', $html );
 		$this->assertStringNotContainsString( 'beltoft-licenses', $html, 'No default license card.' );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
 	}
@@ -183,9 +183,9 @@ class DomainsTest extends TestCase {
 		$domain = Resource::find( $domain->id() );
 		$views  = $this->views( $domain );
 
-		$this->assertSame( array( DomainRows::row( $views[0], $domain ) ), ServiceArea::get( DomainArea::class )->rows( array( (int) $domain->license()['id'] => $views[0] ), array( (int) $domain->license()['id'] => $domain ) ) );
+		$this->assertSame( array( DomainRows::row( $views[0], $domain ) ), ServiceArea::get( Domains::class )->rows( array( (int) $domain->license()['id'] => $views[0] ), array( (int) $domain->license()['id'] => $domain ) ) );
 		$this->assertSame( array( DomainRows::row( $views[0], $domain ) ), Overview::data()['domains'] ?? array( DomainRows::row( $views[0], $domain ) ) );
-		$this->assertSame( ServiceArea::get( DomainArea::class )->url( $domain->license() ), DomainRows::row( $views[0], $domain )['url'], 'The Overview row links to the new page.' );
+		$this->assertSame( ServiceArea::get( Domains::class )->url( $domain->license() ), DomainRows::row( $views[0], $domain )['url'], 'The Overview row links to the new page.' );
 		$this->assertSame( 'Expires ' . wp_date( get_option( 'date_format' ), strtotime( '2027-11-02 00:00:00 UTC' ) ), DomainRows::row( $views[0], $domain )['renews'] );
 	}
 
@@ -206,23 +206,23 @@ class DomainsTest extends TestCase {
 	}
 
 	public function test_the_buttons_follow_the_claim_feature_and_the_search_setting(): void {
-		$this->assertSame( array(), ServiceArea::get( DomainArea::class )->buttons() );
+		$this->assertSame( array(), ServiceArea::get( Domains::class )->buttons() );
 		$this->assertStringNotContainsString( 'beltoft-services-list-actions', $this->render( array() ) );
 
 		$this->settings( array( 'domain_search_url' => '/domains/' ) );
-		$this->assertSame( array( 'Register a domain' ), array_column( ServiceArea::get( DomainArea::class )->buttons(), 'label' ) );
+		$this->assertSame( array( 'Register a domain' ), array_column( ServiceArea::get( Domains::class )->buttons(), 'label' ) );
 
 		$this->settings( array( 'domain_dns_claims_enabled' => 1 ) );
-		$buttons = ServiceArea::get( DomainArea::class )->buttons();
+		$buttons = ServiceArea::get( Domains::class )->buttons();
 		$this->assertSame( array( 'Add a domain', 'Register a domain' ), array_column( $buttons, 'label' ) );
-		$this->assertSame( ServiceArea::get( DomainArea::class )->url_add(), $buttons[0]['url'] );
+		$this->assertSame( ServiceArea::get( Domains::class )->url_add(), $buttons[0]['url'] );
 		$html = $this->render( array() );
 		$this->assertStringContainsString( 'Add a domain', $html );
 		$this->assertStringContainsString( 'Register a domain', $html );
 		$this->assertStringContainsString( home_url( '/domains/' ), $html );
 
 		$this->settings( array( 'domain_dns_claims_enabled' => 0 ) );
-		$this->assertSame( array( 'Register a domain' ), array_column( ServiceArea::get( DomainArea::class )->buttons(), 'label' ) );
+		$this->assertSame( array( 'Register a domain' ), array_column( ServiceArea::get( Domains::class )->buttons(), 'label' ) );
 	}
 
 	public function test_open_claims_are_listed_first_as_waiting_rows_linking_to_the_add_page(): void {
@@ -237,7 +237,7 @@ class DomainsTest extends TestCase {
 
 		$this->assertLessThan( strpos( $html, 'have.example' ), strpos( $html, 'waiting.example' ), 'Claims come first.' );
 		$this->assertStringContainsString( 'Waiting for verification', $html );
-		$this->assertStringContainsString( 'href="' . esc_url( ServiceArea::get( DomainArea::class )->url_add() ) . '"', $html );
+		$this->assertStringContainsString( 'href="' . esc_url( ServiceArea::get( Domains::class )->url_add() ) . '"', $html );
 		$this->assertStringNotContainsString( 'done.example', $html );
 		$this->assertStringNotContainsString( 'foreign.example', $html );
 
@@ -307,7 +307,7 @@ class DomainsTest extends TestCase {
 		$this->assertStringContainsString( 'beltoft-services-domain--page', $html );
 		$this->assertStringContainsString( '<h2 class="beltoft-services-page__name">example.com</h2>', $html );
 		$this->assertSame( array( 'overview', 'dns', 'nameservers', 'transfer' ), $this->nav( $html ) );
-		$this->assertStringContainsString( 'href="' . esc_url( ServiceArea::get( DomainArea::class )->url( $r->license(), 'dns' ) ) . '" data-tab-link="dns"', $html );
+		$this->assertStringContainsString( 'href="' . esc_url( ServiceArea::get( Domains::class )->url( $r->license(), 'dns' ) ) . '" data-tab-link="dns"', $html );
 		$this->assertSame( 1, substr_count( $html, 'aria-current="page"' ) );
 		$this->assertMatchesRegularExpression( '#href="[^"]+" data-tab-link="overview" aria-current="page"#', $html );
 		$this->assertDoesNotMatchRegularExpression( '/data-tab="overview" hidden/', $html );
@@ -380,14 +380,14 @@ class DomainsTest extends TestCase {
 	public function test_the_editor_script_loads_on_a_domain_page_only(): void {
 		global $wp;
 		wp_dequeue_script( 'beltoft-services-dns-editor' );
-		$wp->query_vars[ ServiceArea::get( DomainArea::class )->slug() ] = '';
-		\BeltoftServices\Domains\Panels::assets( 'beltoft-services-account', ServiceArea::get( DomainArea::class )->slug() );
+		$wp->query_vars[ ServiceArea::get( Domains::class )->slug() ] = '';
+		\BeltoftServices\Domains\Panels::assets( 'beltoft-services-account', ServiceArea::get( Domains::class )->slug() );
 		$this->assertFalse( wp_script_is( 'beltoft-services-dns-editor', 'enqueued' ), 'The list has no editor.' );
-		$wp->query_vars[ ServiceArea::get( DomainArea::class )->slug() ] = '12/dns';
-		\BeltoftServices\Domains\Panels::assets( 'beltoft-services-account', ServiceArea::get( DomainArea::class )->slug() );
+		$wp->query_vars[ ServiceArea::get( Domains::class )->slug() ] = '12/dns';
+		\BeltoftServices\Domains\Panels::assets( 'beltoft-services-account', ServiceArea::get( Domains::class )->slug() );
 		$this->assertTrue( wp_script_is( 'beltoft-services-dns-editor', 'enqueued' ) );
 		\BeltoftServices\Domains\Panels::assets( 'beltoft-services-account', 'servers' );
-		unset( $wp->query_vars[ ServiceArea::get( DomainArea::class )->slug() ] );
+		unset( $wp->query_vars[ ServiceArea::get( Domains::class )->slug() ] );
 		wp_dequeue_script( 'beltoft-services-dns-editor' );
 		wp_dequeue_script( 'beltoft-services-domain' );
 	}
@@ -451,7 +451,7 @@ class DomainsTest extends TestCase {
 	public function test_the_danger_slot_is_in_the_tab_filter_and_prints_nothing_by_default(): void {
 		$r = $this->service( $this->user, 'example.com' );
 		$this->assertNotContains( 'danger', $this->nav( $this->page( $r ) ) );
-		$this->assertContains( 'danger', ServiceArea::get( DomainArea::class )->tabs() );
+		$this->assertContains( 'danger', ServiceArea::get( Domains::class )->tabs() );
 
 		add_filter( 'beltoft_services_domain_tabs', static fn( $tabs ) => $tabs + array( 'danger' => 'Danger zone' ) );
 		add_action( 'beltoft_services_domain_tab_pane', static function ( $slug ): void { echo '<p id="pane-' . esc_attr( $slug ) . '">pane</p>'; } );

@@ -3,7 +3,7 @@
  * My Account → Domains: the list of domains, or one domain's page.
  *
  * Override by copying to yourtheme/beltoft-services/account/domains.php. Reached through the
- * licenses template call of Beltoft Licenses (see BeltoftServices\Account\DomainArea).
+ * licenses template call of Beltoft Licenses (see BeltoftServices\Account\Domains).
  *
  * @package BeltoftServices
  *

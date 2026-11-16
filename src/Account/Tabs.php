@@ -49,7 +49,7 @@ final class Tabs {
 
 		$missing = array();
 
-		foreach ( array( ServerLinks::slug(), ServiceArea::get( Databases::class )->slug(), ServiceArea::get( Hosting::class )->slug(), ServiceArea::get( DomainArea::class )->slug(), ServiceArea::get( Email::class )->slug(), ServiceArea::get( Apps::class )->slug(), ServiceArea::get( Ssl::class )->slug(), ServiceArea::get( Licences::class )->slug() ) as $slug ) {
+		foreach ( array( ServerLinks::slug(), ServiceArea::get( Databases::class )->slug(), ServiceArea::get( Hosting::class )->slug(), ServiceArea::get( Domains::class )->slug(), ServiceArea::get( Email::class )->slug(), ServiceArea::get( Apps::class )->slug(), ServiceArea::get( Ssl::class )->slug(), ServiceArea::get( Licences::class )->slug() ) as $slug ) {
 			if ( ! isset( $items[ $slug ] ) && isset( $labels[ $slug ] ) ) {
 				$missing[ $slug ] = $labels[ $slug ];
 			}
@@ -85,7 +85,7 @@ final class Tabs {
 		$groups = is_array( $groups ) ? $groups : array();
 		// Domains first, then the VPS tab, then the other areas.
 		$tabs   = array(
-			ServiceArea::get( DomainArea::class )->group(),
+			ServiceArea::get( Domains::class )->group(),
 			array(
 				'slug'  => ServerLinks::slug(),
 				'label' => __( 'VPS', 'beltoft-services' ),
@@ -95,7 +95,7 @@ final class Tabs {
 		);
 
 		foreach ( ServiceArea::all() as $area ) {
-			if ( ! $area instanceof DomainArea ) {
+			if ( ! $area instanceof Domains ) {
 				$tabs[] = $area->group();
 			}
 		}

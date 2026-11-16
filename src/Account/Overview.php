@@ -227,7 +227,7 @@ final class Overview {
 				) : '';
 			case 'domains':
 				if ( ! $data['domains'] ) {
-					return self::empty_section( 'domains', __( 'Domains & DNS', 'beltoft-services' ), __( 'You have no domains yet.', 'beltoft-services' ), ServiceArea::get( DomainArea::class )->buttons() );
+					return self::empty_section( 'domains', __( 'Domains & DNS', 'beltoft-services' ), __( 'You have no domains yet.', 'beltoft-services' ), ServiceArea::get( Domains::class )->buttons() );
 				}
 
 				return $data['domains'] ? self::template(

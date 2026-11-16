@@ -8,7 +8,7 @@
 namespace BeltoftServices\Mcp;
 
 use BeltoftServices\Account\DomainRows;
-use BeltoftServices\Account\DomainArea;
+use BeltoftServices\Account\Domains;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Account\Panel;
 use BeltoftServices\Account\ServerLinks;
@@ -87,7 +87,7 @@ final class Details {
 		}
 
 		if ( in_array( $kind, array( 'domain', 'dns' ), true ) ) {
-			return ServiceArea::get( DomainArea::class )->url( $license, $tab );
+			return ServiceArea::get( Domains::class )->url( $license, $tab );
 		}
 
 		return '';
