@@ -46,6 +46,23 @@ final class ApiReferenceTest extends TestCase {
 		$this->assertStringNotContainsString( '<h1', $html, 'The page heading comes from the page.' );
 	}
 
+	public function test_one_page_view_builds_the_openapi_document_once(): void {
+		$built = 0;
+		add_filter(
+			'rest_endpoints',
+			static function ( $endpoints ) use ( &$built ) {
+				++$built;
+				return $endpoints;
+			}
+		);
+
+		$data = Reference::data();
+
+		$this->assertNotEmpty( $data['ops'] );
+		$this->assertNotEmpty( $data['errors'] );
+		$this->assertSame( 1, $built, 'The route table is walked once for the operations and the errors.' );
+	}
+
 	public function test_endpoints_are_grouped_by_resource_with_anchors_and_navigation(): void {
 		$html   = Reference::html();
 		$groups = Reference::groups( Reference::operations() );

@@ -155,7 +155,9 @@ final class Reference {
 	 * @return array<string, mixed>
 	 */
 	public static function data(): array {
-		$ops = self::operations();
+		// The document is built once and both the operations and the errors are read from it.
+		$doc = OpenApi::document();
+		$ops = self::operations( $doc );
 
 		return array(
 			'groups'   => self::groups( $ops ),
@@ -165,7 +167,7 @@ final class Reference {
 			'scopes'   => Tokens::scopes(),
 			'ops'      => $ops,
 			'levels'   => self::levels(),
-			'errors'   => self::errors(),
+			'errors'   => self::errors( $doc, $ops ),
 			'mcp'      => array(
 				'on'    => Access::enabled(),
 				'url'   => Endpoint::url(),
@@ -625,10 +627,11 @@ final class Reference {
 	/**
 	 * The operations of the OpenAPI document, flattened for printing.
 	 *
+	 * @param array<string, mixed>|null $document The OpenAPI document, built when not given.
 	 * @return array<int, array<string, mixed>>
 	 */
-	public static function operations(): array {
-		$doc = json_decode( (string) wp_json_encode( OpenApi::document() ), true );
+	public static function operations( ?array $document = null ): array {
+		$doc = json_decode( (string) wp_json_encode( $document ?? OpenApi::document() ), true );
 		$out = array();
 
 		foreach ( (array) ( $doc['paths'] ?? array() ) as $path => $methods ) {
@@ -701,18 +704,21 @@ final class Reference {
 	/**
 	 * Error statuses and their meaning, from the document.
 	 *
+	 * @param array<string, mixed>|null             $document The OpenAPI document, built when not given.
+	 * @param array<int, array<string, mixed>>|null $ops      Its operations, read when not given.
 	 * @return array<int, string>
 	 */
-	public static function errors(): array {
-		$out = array();
+	public static function errors( ?array $document = null, ?array $ops = null ): array {
+		$document = $document ?? OpenApi::document();
+		$out      = array();
 
-		foreach ( self::operations() as $op ) {
+		foreach ( $ops ?? self::operations( $document ) as $op ) {
 			foreach ( $op['errors'] as $code ) {
 				$out[ $code ] = '';
 			}
 		}
 
-		foreach ( (array) OpenApi::document()['paths'] as $methods ) {
+		foreach ( (array) $document['paths'] as $methods ) {
 			foreach ( (array) $methods as $op ) {
 				foreach ( (array) $op['responses'] as $code => $response ) {
 					if ( (int) $code >= 400 ) {
