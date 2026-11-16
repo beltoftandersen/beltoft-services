@@ -428,4 +428,20 @@ class SslOperationsTest extends SslTestCase {
 		$waiting = as_get_scheduled_actions( array( 'hook' => \BeltoftServices\Jobs::ACT, 'args' => array( $r->id(), 'renew', array( 'order' => (string) $order->get_id() ) ), 'group' => \BeltoftServices\Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => 5 ), 'ids' );
 		$this->assertCount( 1, $waiting, 'A job is already waiting, so none is added.' );
 	}
+
+	public function test_a_product_with_a_shorter_registrar_refund_period_closes_the_window_sooner(): void {
+		$r = $this->built();
+		$product = (int) ( (array) $r->get( 'plan' ) )['ssl_product'];
+		$r->set( array( 'ssl_first_issued_at' => time() - 10 * DAY_IN_SECONDS ) );
+		$this->assertTrue( Operations::cancellable( Resource::find( $r->id() ) ), 'Thirty days by the setting and by the registrar.' );
+
+		$table = \BeltoftServices\Ssl\SslCatalog::all();
+		$table[ $product ]['refund'] = '7d';
+		update_option( \BeltoftServices\Ssl\SslCatalog::OPTION, $table );
+		$this->assertFalse( Operations::cancellable( Resource::find( $r->id() ) ), 'The registrar refunds for 7 days only.' );
+
+		$table[ $product ]['refund'] = '';
+		update_option( \BeltoftServices\Ssl\SslCatalog::OPTION, $table );
+		$this->assertTrue( Operations::cancellable( Resource::find( $r->id() ) ), 'No readable period: the setting.' );
+	}
 }

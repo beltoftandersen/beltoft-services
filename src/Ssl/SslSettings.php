@@ -80,6 +80,26 @@ final class SslSettings {
 	}
 
 	/**
+	 * The refund window of one order: the setting, or the registrar's own free refund period of the product when that is
+	 * shorter (a customer must not be offered a refund the registrar does not give back to us). A product without a
+	 * readable period uses the setting.
+	 *
+	 * @param \BeltoftServices\Resource $r Certificate resource.
+	 */
+	public static function refund_days_for( \BeltoftServices\Resource $r ): int {
+		$days    = self::refund_days();
+		$product = SslCatalog::get( (int) ( ( (array) $r->get( 'plan' ) )['ssl_product'] ?? 0 ) );
+
+		if ( is_array( $product ) && 1 === preg_match( '/^\s*(\d+)\s*([dwm]?)/i', (string) ( $product['refund'] ?? '' ), $m ) ) {
+			$unit  = strtolower( $m[2] );
+			$theirs = (int) $m[1] * ( 'w' === $unit ? 7 : ( 'm' === $unit ? 30 : 1 ) );
+			$days   = min( $days, $theirs );
+		}
+
+		return $days;
+	}
+
+	/**
 	 * Reissues one customer may ask for in a day.
 	 */
 	public static function reissues_per_day(): int {
