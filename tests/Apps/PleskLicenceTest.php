@@ -1031,4 +1031,15 @@ final class PleskLicenceTest extends PaidAppCase {
 		$this->assertTrue( $this->fresh( $o['licence'] )->set( array( AppLicence::ENDED => 'server deleted' ) ) );
 		$this->assertTrue( AppLicence::release_due( $this->fresh( $o['licence'] ) ) );
 	}
+
+	public function test_a_tier_key_of_up_to_forty_characters_is_read_like_the_key_catalogue_reads_it(): void {
+		$long = str_repeat( 'a', 40 );
+		$this->settings( array( 'plesk_items' => $long . "=LONG-ITEM-1M\n" . str_repeat( 'b', 41 ) . '=TOO-LONG-1M', 'plesk_costs' => $long . '=3.5' ) );
+
+		$this->assertSame( 'LONG-ITEM-1M', PleskLicence::items()[ $long ] );
+		$this->assertArrayNotHasKey( str_repeat( 'b', 41 ), PleskLicence::items() );
+		$this->assertSame( 3.5, PleskLicence::costs()[ $long ] );
+		$this->assertSame( array( $long, 'admin', 'pro', 'host' ), array_keys( PleskLicence::items() ), 'The setting comes first, as before.' );
+		$this->assertSame( \BeltoftServices\Licences\KeyCatalog::lines( "x=1\n" . $long . '=2' ), \BeltoftServices\Domains\LicenceCatalog::lines( "x=1\n" . $long . '=2' ) );
+	}
 }

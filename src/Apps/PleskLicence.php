@@ -13,13 +13,13 @@ use BeltoftServices\Crypto;
 use BeltoftServices\Domains\Client as RegistrarClient;
 use BeltoftServices\Domains\Clients as RegistrarClients;
 use BeltoftServices\Domains\DomainSettings;
+use BeltoftServices\Domains\LicenceCatalog;
 use BeltoftServices\Domains\LiveClient;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Vm\ServerName;
 use BeltoftServices\Resource;
-use BeltoftServices\Settings;
 use BeltoftServices\Usage\Rates;
 
 defined( 'ABSPATH' ) || exit;
@@ -78,18 +78,6 @@ final class PleskLicence {
 
 	/** Times the key is written to the server before it is called failed. */
 	private const PUSHES = 3;
-
-	/**
-	 * The Openprovider items of the three Plesk for VPS editions (monthly), by tier key. Checked against the Openprovider
-	 * sandbox's own listing (GET /licenses/items): these are the `item` ids the licence API takes. The price list's SKUs
-	 * (PLSKVPS-ADM-M, PLSKVPS-PRO-M, PLSKVPS-HST-M) are the same editions' `sku_values`, a billing name: the API refuses a
-	 * SKU as an item ("License request has invalid items").
-	 */
-	private const DEFAULT_ITEMS = array(
-		'admin' => 'PLESK-12-VPS-WEB-ADMIN-1M',
-		'pro'   => 'PLESK-12-VPS-WEB-PRO-1M',
-		'host'  => 'PLESK-12-VPS-WEB-HOST-1M',
-	);
 
 	public static function register(): void {
 		add_filter( 'beltoft_services_app_licence_provision', array( __CLASS__, 'provision' ), 10, 4 );
@@ -151,42 +139,17 @@ final class PleskLicence {
 	}
 
 	/**
-	 * "tier=value" lines as a map.
-	 *
-	 * @param mixed $raw Setting text.
-	 * @return array<string, string>
-	 */
-	private static function lines( $raw ): array {
-		$out = array();
-
-		foreach ( preg_split( '/\R/', is_string( $raw ) ? $raw : '' ) ?: array() as $line ) {
-			$parts = explode( '=', $line, 2 );
-			$key   = strtolower( trim( $parts[0] ) );
-
-			if ( 2 === count( $parts ) && 1 === preg_match( '/^[a-z0-9_-]{1,32}$/D', $key ) && '' !== trim( $parts[1] ) ) {
-				$out[ $key ] = trim( $parts[1] );
-			}
-		}
-
-		return $out;
-	}
-
-	/**
-	 * Tier key => Openprovider item id.
+	 * Tier key => Openprovider item id. The three Plesk for VPS editions (admin, pro, host) are the defaults.
 	 *
 	 * @return array<string, string>
 	 */
 	public static function items(): array {
-		$items = array_filter( self::lines( Settings::get( 'plesk_items' ) ) + self::DEFAULT_ITEMS, static fn( $item ) => 1 === preg_match( '/^[A-Za-z0-9._-]{3,80}$/D', (string) $item ) );
-
 		/**
 		 * The Openprovider item of each Plesk tier.
 		 *
 		 * @param array<string, string> $items Tier key => item id.
 		 */
-		$filtered = apply_filters( 'beltoft_services_plesk_items', $items );
-
-		return is_array( $filtered ) ? array_map( 'strval', $filtered ) : $items;
+		return LicenceCatalog::items( 'plesk_items', 'beltoft_services_plesk_items', LicenceCatalog::virtual_editions() );
 	}
 
 	/**
@@ -195,22 +158,12 @@ final class PleskLicence {
 	 * @return array<string, float>
 	 */
 	public static function costs(): array {
-		$costs = array();
-
-		foreach ( self::lines( Settings::get( 'plesk_costs' ) ) as $tier => $value ) {
-			if ( is_numeric( $value ) && (float) $value >= 0 ) {
-				$costs[ $tier ] = (float) $value;
-			}
-		}
-
 		/**
 		 * What each Plesk tier costs at Openprovider, EUR per month excluding VAT.
 		 *
 		 * @param array<string, float> $costs Tier key => cost.
 		 */
-		$filtered = apply_filters( 'beltoft_services_plesk_costs', $costs );
-
-		return is_array( $filtered ) ? array_map( 'floatval', $filtered ) : $costs;
+		return LicenceCatalog::costs( 'plesk_costs', 'beltoft_services_plesk_costs' );
 	}
 
 	// -- Helpers ---------------------------------------------------------------------------------

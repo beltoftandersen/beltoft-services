@@ -8,7 +8,7 @@
 namespace BeltoftServices\Licences;
 
 use BeltoftServices\Domains\DomainSettings;
-use BeltoftServices\Settings;
+use BeltoftServices\Domains\LicenceCatalog;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -63,13 +63,7 @@ final class KeyCatalog {
 	/**
 	 * Items read from the live catalogue (GET /licenses/items, 2026-11-06). The settings or the filter override them.
 	 */
-	private const DEFAULT_ITEMS = array(
-		'admin'                 => 'PLESK-12-VPS-WEB-ADMIN-1M',
-		'pro'                   => 'PLESK-12-VPS-WEB-PRO-1M',
-		'host'                  => 'PLESK-12-VPS-WEB-HOST-1M',
-		'admin-physical'        => 'PLESK-12-WEB-ADMIN-1M',
-		'pro-physical'          => 'PLESK-12-WEB-PRO-1M',
-		'host-physical'         => 'PLESK-12-WEB-HOST-1M',
+	private const DEFAULT_ITEMS = LicenceCatalog::EDITION_ITEMS + array(
 		'cloudlinux-solo'       => 'CLNX-SOL-1M',
 		'cloudlinux-admin'      => 'CLNX-ADM-1M',
 		'cloudlinux-shared'     => 'CLNX-SH-1M',
@@ -147,18 +141,7 @@ final class KeyCatalog {
 	 * @return array<string, string>
 	 */
 	public static function lines( $raw ): array {
-		$out = array();
-
-		foreach ( preg_split( '/\R/', is_string( $raw ) ? $raw : '' ) ?: array() as $line ) {
-			$parts = explode( '=', $line, 2 );
-			$key   = strtolower( trim( $parts[0] ) );
-
-			if ( 2 === count( $parts ) && 1 === preg_match( '/^[a-z0-9_-]{1,40}$/D', $key ) && '' !== trim( $parts[1] ) ) {
-				$out[ $key ] = trim( $parts[1] );
-			}
-		}
-
-		return $out;
+		return LicenceCatalog::lines( $raw );
 	}
 
 	/**
@@ -212,16 +195,12 @@ final class KeyCatalog {
 	 * @return array<string, string>
 	 */
 	public static function items(): array {
-		$items = array_filter( self::lines( Settings::get( 'licence_items' ) ) + self::DEFAULT_ITEMS, static fn( $item ) => 1 === preg_match( '/^[A-Za-z0-9._-]{3,80}$/D', (string) $item ) );
-
 		/**
 		 * The Openprovider item of each licence key.
 		 *
 		 * @param array<string, string> $items Key => item id.
 		 */
-		$filtered = apply_filters( 'beltoft_services_licence_items', $items );
-
-		return is_array( $filtered ) ? array_map( 'strval', $filtered ) : $items;
+		return LicenceCatalog::items( 'licence_items', 'beltoft_services_licence_items', self::DEFAULT_ITEMS );
 	}
 
 	/**
@@ -230,21 +209,11 @@ final class KeyCatalog {
 	 * @return array<string, float>
 	 */
 	public static function costs(): array {
-		$costs = array();
-
-		foreach ( self::lines( Settings::get( 'licence_costs' ) ) as $key => $value ) {
-			if ( is_numeric( $value ) && (float) $value >= 0 ) {
-				$costs[ $key ] = (float) $value;
-			}
-		}
-
 		/**
 		 * What each licence key costs at Openprovider, EUR per month excluding VAT.
 		 *
 		 * @param array<string, float> $costs Key => cost.
 		 */
-		$filtered = apply_filters( 'beltoft_services_licence_costs', $costs );
-
-		return is_array( $filtered ) ? array_map( 'floatval', $filtered ) : $costs;
+		return LicenceCatalog::costs( 'licence_costs', 'beltoft_services_licence_costs' );
 	}
 }
