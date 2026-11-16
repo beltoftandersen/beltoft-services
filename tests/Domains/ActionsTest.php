@@ -54,9 +54,46 @@ class ActionsTest extends TestCase {
 		$op->reply( 'PUT', '/domains/123', array() );
 		$op->reply( 'PUT', '/domains/123', array() );
 		add_filter( 'beltoft_services_domains_client', static fn() => $op );
+		add_filter( 'beltoft_services_dns_proof_result', static fn() => array( 'status' => 'ok', 'reason' => 'x', 'ds' => false, 'ours' => true ) );
 		$this->assertTrue( Actions::run( $r, 'set_nameservers', array( 'mode' => 'custom', 'hosts' => 'ns1.custom.net,ns2.custom.net' ) )->is_done() );
 		$this->assertSame( false, $op->calls()[0]['body']['is_dnssec_enabled'] );
 		$this->assertSame( 'ns1.custom.net', $op->calls()[1]['body']['name_servers'][0]['name'] );
+	}
+
+	public function test_custom_nameservers_wait_until_the_parent_has_dropped_the_ds(): void {
+		$r = $this->resource( 'domain' );
+		$r->set( array( 'dnssec_keys' => array( array( 'flags' => 257 ) ) ) );
+		$op = new FakeClient();
+		$op->reply( 'PUT', '/domains/123', array() );
+		$op->reply( 'PUT', '/domains/123', array() );
+		add_filter( 'beltoft_services_domains_client', static fn() => $op );
+		$ds = true;
+		add_filter( 'beltoft_services_dns_proof_result', static function () use ( &$ds ) { return array( 'status' => 'ok', 'reason' => 'x', 'ds' => $ds, 'ours' => true ); } );
+		$args = array( 'mode' => 'custom', 'hosts' => 'ns1.custom.net,ns2.custom.net' );
+
+		$first = Actions::run( $r, 'set_nameservers', $args );
+		$this->assertFalse( $first->is_done(), 'The name servers wait while the parent still publishes the DS.' );
+		$this->assertCount( 1, $op->calls(), 'Only the DS removal went out.' );
+		$this->assertArrayNotHasKey( 'name_servers', $op->calls()[0]['body'] );
+
+		$again = Actions::run( Resource::find( $r->id() ), 'set_nameservers', $args );
+		$this->assertFalse( $again->is_done() );
+		$this->assertCount( 1, $op->calls(), 'The DS removal is not sent twice.' );
+
+		$ds = false;
+		$this->assertTrue( Actions::run( Resource::find( $r->id() ), 'set_nameservers', $args )->is_done() );
+		$this->assertCount( 2, $op->calls() );
+		$this->assertSame( 'ns1.custom.net', $op->calls()[1]['body']['name_servers'][0]['name'] );
+	}
+
+	public function test_custom_nameservers_stop_waiting_for_the_ds_after_a_day(): void {
+		$r = $this->resource( 'domain' );
+		$r->set( array( 'dnssec_keys' => array(), 'ns_ds_removed_at' => time() - DAY_IN_SECONDS - 5 ) );
+		$op = new FakeClient();
+		$op->reply( 'PUT', '/domains/123', array() );
+		add_filter( 'beltoft_services_domains_client', static fn() => $op );
+		add_filter( 'beltoft_services_dns_proof_result', static fn() => array( 'status' => 'ok', 'reason' => 'x', 'ds' => null, 'ours' => true ) );
+		$this->assertTrue( Actions::run( $r, 'set_nameservers', array( 'mode' => 'custom', 'hosts' => 'ns1.custom.net,ns2.custom.net' ) )->is_done() );
 	}
 
 	public function test_switching_back_sets_nameservers_before_dnssec(): void {

@@ -101,12 +101,20 @@ final class Actions {
 			if ( ! empty( $r->get( 'dnssec_keys' ) ) ) {
 				$cleared = Clients::registrar()->request( 'PUT', '/domains/' . $id, array( 'dnssec_keys' => array(), 'is_dnssec_enabled' => false ) );
 				if ( is_wp_error( $cleared ) ) { return StepResult::retry( 60, 'DNSSEC could not be removed.' ); }
-				$r->set( array( 'dnssec_keys' => array() ) );
+				$r->set( array( 'dnssec_keys' => array(), 'ns_ds_removed_at' => time() ) );
+			}
+			// The parent zone caches the old DS: moving the name servers to an unsigned zone before it is gone makes validating resolvers refuse the whole domain.
+			$removed = (int) $r->get( 'ns_ds_removed_at' );
+			if ( $removed > 0 && time() < $removed + DAY_IN_SECONDS ) {
+				$found = Delegation::lookup( $name );
+				if ( false !== ( $found['ds'] ?? null ) ) {
+					return StepResult::wait( 600, 'Waiting for the DNSSEC record to be removed at the registry.', $removed + DAY_IN_SECONDS + HOUR_IN_SECONDS );
+				}
 			}
 			$reply = Clients::registrar()->request( 'PUT', '/domains/' . $id, array( 'ns_group' => '', 'name_servers' => array_map( static fn( $host ) => array( 'name' => $host ), $hosts ) ) );
 			if ( is_wp_error( $reply ) ) { return StepResult::retry( 60, 'Name servers could not be changed.' ); }
 			Security::notify( $r, 'ns_changed' );
-			return StepResult::done( array( 'ns_mode' => 'custom', 'nameservers' => $hosts, 'dnssec_keys' => array() ) );
+			return StepResult::done( array( 'ns_mode' => 'custom', 'nameservers' => $hosts, 'dnssec_keys' => array(), 'ns_ds_removed_at' => 0 ) );
 		}
 		$locked = 'lock' === $action;
 		$reply = Clients::registrar()->request( 'PUT', '/domains/' . $id, array( 'is_locked' => $locked ) );
