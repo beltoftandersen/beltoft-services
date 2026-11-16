@@ -34,6 +34,7 @@ final class DbCard {
 				'revealing' => __( 'Showing the password…', 'beltoft-services' ),
 				'gone'    => __( 'The password has already been shown or is no longer available.', 'beltoft-services' ),
 				'failed'  => __( 'Something went wrong. Please try again.', 'beltoft-services' ),
+				'lost'    => __( 'We could not check whether this has finished. Please reload the page.', 'beltoft-services' ),
 				'working' => __( 'Making a new password. This can take a minute.', 'beltoft-services' ),
 				'limit'   => __( 'Too many requests. Please wait and try again later.', 'beltoft-services' ),
 				'once'    => __( 'The password is shown one time only. Copy it now and keep it safe.', 'beltoft-services' ),

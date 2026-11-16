@@ -108,6 +108,9 @@
 			} ).catch( function () {
 				if ( tries < 60 ) {
 					waitForAction( panel, action, since, tries + 1, after, h );
+				} else {
+					// Every read was rejected for about five minutes: say so, free the buttons.
+					S.fail( h, db.strings.lost );
 				}
 			} );
 		}, 5000 );
