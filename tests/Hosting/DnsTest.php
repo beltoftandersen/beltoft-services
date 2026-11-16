@@ -155,6 +155,25 @@ class DnsTest extends HostingCase {
 		$this->assertStringContainsString( 'could not be read', $again->error() );
 	}
 
+	public function test_a_domain_of_the_order_that_stayed_pending_after_a_failed_write_is_written_on_the_retry(): void {
+		$r    = $this->resource( array(), array( 'site' => array( 'slug' => 'shop', 'domain' => 'www.shop.example' ) ) );
+		$user = (int) $r->license()['user_id'];
+		$this->domain( $user, 'shop.example' );
+		$this->agent->fail_next( 'site.verify', 'connection refused' );
+
+		$this->assertTrue( $this->provision( $r )->is_retry() );
+		$this->assertSame( 'active', SiteDomains::find( 'www.shop.example' )['state'] );
+
+		// What a failed write leaves: the row recorded, the name not written, and the step run again.
+		SiteDomains::set_state( 'www.shop.example', 'pending' );
+		$fresh = Resource::find( $r->id() );
+		$fresh->set( array( 'steps' => array_values( array_diff( (array) $fresh->get( 'steps' ), array( 'dns', 'verify', 'mail', 'ready' ) ) ) ) );
+
+		$this->provision_fully( $r );
+
+		$this->assertSame( 'active', SiteDomains::find( 'www.shop.example' )['state'], 'The retry published the name and did not skip it.' );
+	}
+
 	public function test_a_verify_that_does_not_answer_200_is_a_retry(): void {
 		$this->agent->fail_next( 'site.verify', 'connection refused' );
 		$r = $this->resource();

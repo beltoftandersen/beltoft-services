@@ -725,7 +725,9 @@ final class Provision {
 	 * @return array<string, mixed>|StepResult
 	 */
 	private function attach_domain( array $spec, array $site ) {
-		if ( '' === (string) $spec['domain'] || null !== SiteDomains::find( (string) $spec['domain'] ) ) {
+		// Not skipped because the row exists: a first run that failed to write the name left the row pending. add_domain() is
+		// idempotent for the account's own row (it writes the name again), and a name of another account is refused there.
+		if ( '' === (string) $spec['domain'] ) {
 			return array();
 		}
 
