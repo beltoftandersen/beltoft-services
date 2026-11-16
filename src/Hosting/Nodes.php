@@ -269,7 +269,7 @@ final class Nodes {
 			$clean[ $key ] = $pem;
 		}
 
-		$ca = trim( (string) ( $input['ca_file'] ?? '' ) );
+		$ca = trim( (string) ( $input['ca_file'] ?? $clean['ca_file'] ) ); // An absent field keeps the stored value; a posted empty one clears it.
 
 		if ( '' !== $ca && ( '/' !== $ca[0] || false !== strpos( $ca, "\0" ) || ! is_file( $ca ) || ! is_readable( $ca ) ) ) {
 			return self::error( 'ca_file', __( 'The CA file must be an absolute path to a file this site can read.', 'beltoft-services' ) );
@@ -281,7 +281,7 @@ final class Nodes {
 			'pin_sha256' => __( 'The node pin', 'beltoft-services' ),
 			'agent_pin'  => __( 'The agent pin', 'beltoft-services' ),
 		) as $key => $name ) {
-			$pin = trim( (string) ( $input[ $key ] ?? '' ) );
+			$pin = trim( (string) ( $input[ $key ] ?? $clean[ $key ] ) );
 
 			if ( '' !== $pin ) {
 				$raw = base64_decode( $pin, true );
@@ -295,7 +295,7 @@ final class Nodes {
 			$clean[ $key ] = $pin;
 		}
 
-		$client = (string) ( $input['client'] ?? 'fake' );
+		$client = (string) ( $input['client'] ?? $clean['client'] );
 
 		if ( ! in_array( $client, array( 'fake', 'live' ), true ) ) {
 			return self::error( 'client', __( 'The client must be fake or live.', 'beltoft-services' ) );
@@ -365,7 +365,7 @@ final class Nodes {
 			$clean[ $key ] = $value;
 		}
 
-		$backup = trim( (string) ( $input['backup_storage'] ?? '' ) );
+		$backup = trim( (string) ( $input['backup_storage'] ?? $clean['backup_storage'] ) );
 
 		if ( '' !== $backup && 1 !== preg_match( '/^[A-Za-z][A-Za-z0-9._-]*[A-Za-z0-9]$/D', $backup ) ) {
 			return self::error( 'backup_storage', __( 'The backup storage must be a storage id (letters, numbers, dots, dashes, underscores), or empty for no backups.', 'beltoft-services' ) );
@@ -393,7 +393,7 @@ final class Nodes {
 			'edge_ip'   => FILTER_FLAG_IPV4,
 			'edge_ipv6' => FILTER_FLAG_IPV6,
 		) as $key => $flag ) {
-			$value = trim( (string) ( $input[ $key ] ?? '' ) );
+			$value = trim( (string) ( $input[ $key ] ?? $clean[ $key ] ) );
 
 			if ( '' !== $value && false === filter_var( $value, FILTER_VALIDATE_IP, $flag ) ) {
 				/* translators: %s: field name. */

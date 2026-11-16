@@ -56,7 +56,7 @@ final class HostingRestore {
 		foreach ( Resource::live_ids( HostingDriver::KIND ) as $id ) {
 			$r = Resource::find( (int) $id );
 
-			if ( $r && HostingDriver::ID === $r->get( 'driver' ) && self::safety( $r ) && self::safety( $r )['expires'] <= Jobs::now() && ! self::active( $r ) ) {
+			if ( $r && HostingDriver::ID === $r->get( 'driver' ) && self::safety( $r ) && self::safety( $r )['expires'] <= Jobs::now() && ! self::active( $r ) && ! ( new HostingBackups( $r ) )->active() ) {
 				( new self( $r ) )->expire();
 			}
 		}

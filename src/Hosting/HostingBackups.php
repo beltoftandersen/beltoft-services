@@ -138,7 +138,8 @@ final class HostingBackups {
 	 * @param int $now Unix time.
 	 */
 	public function due( int $now ): bool {
-		if ( ! self::enabled( $this->r ) || $this->active() || 'ready' !== $this->r->get( 'state' ) ) {
+		// A restore holds the account's one task slot (the node task id): a backup round must not read or overwrite it.
+		if ( ! self::enabled( $this->r ) || $this->active() || HostingRestore::active( $this->r ) || 'ready' !== $this->r->get( 'state' ) ) {
 			return false;
 		}
 

@@ -586,6 +586,22 @@ class BackupsTest extends HostingCase {
 		$this->assertSame( 'not_found', ( new HostingActions( $this->account() ) )->queue( 'undo' )->get_error_code(), 'Nothing to undo.' );
 	}
 
+	public function test_the_nightly_backup_waits_for_a_restore_and_the_safety_expiry_waits_for_a_backup(): void {
+		$r    = $this->account();
+		$slot = HostingBackups::slot_minute( $r );
+		$day  = strtotime( '2027-03-02 00:00:00 UTC' );
+		$at   = $day + $slot * 60;
+
+		$this->assertTrue( ( new HostingBackups( $r ) )->due( $at ) );
+		$r->set( array( 'restore' => array( 'kind' => 'account', 'phase' => 'restore' ) ) );
+		$this->assertFalse( ( new HostingBackups( Resource::find( $r->id() ) ) )->due( $at ), 'A restore holds the account\'s task slot.' );
+
+		$r->set( array( 'restore' => array(), 'backup' => array( 'phase' => 'vzdump', 'kind' => 'nightly', 'started' => $at ) ) );
+		$r->set( array( 'safety' => array( 'name' => 'safety-1', 'at' => $at - 2 * DAY_IN_SECONDS, 'expires' => $at - DAY_IN_SECONDS, 'scope' => 'account', 'mode' => 'snapshot', 'volid' => '' ) ) );
+		HostingRestore::expire_all();
+		$this->assertNotNull( HostingRestore::safety( Resource::find( $r->id() ) ), 'A running backup keeps the task slot: the expiry waits.' );
+	}
+
 	public function test_the_safety_point_is_kept_24_hours_then_removed(): void {
 		list( $r, $volid ) = $this->with_backup();
 		$this->change( $r, 'restore', array( 'database', $volid, 'w' . $r->id() ) );

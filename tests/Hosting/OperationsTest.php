@@ -9,6 +9,7 @@ namespace BeltoftServices\Tests\Hosting;
 
 require_once __DIR__ . '/HostingCase.php';
 
+use BeltoftServices\Hosting\Provision;
 use BeltoftServices\Hosting\Records;
 use BeltoftServices\Hosting\Sites;
 use BeltoftServices\Resource;
@@ -125,6 +126,28 @@ class OperationsTest extends HostingCase {
 		$this->provision_fully( $next );
 		$this->assertSame( $vmid, Records::for_resource( $next->id() )['vmid'] );
 		$this->assertSame( 22001, Records::for_resource( $next->id() )['ssh_port'] );
+	}
+
+	public function test_delete_drops_the_staging_copy_database_and_the_one_of_a_provision_that_stopped_before_the_site_row(): void {
+		$r       = $this->ready();
+		$account = 'c' . $r->id();
+		$slug    = (string) Sites::for_resource( $r->id() )[0]['slug'];
+		$copy    = $slug . '-stg';
+
+		$record = Records::for_resource( $r->id() );
+		$job    = $this->agent->submit( 'db.create', array( 'account' => $account, 'vmid' => (int) $record['vmid'], 'ip' => (string) $record['ip'], 'databases' => array( Provision::db_name( $r->id(), $copy ) ), 'password' => 'pw-test-1234567890' ), 'test-copy-db' );
+		$this->assertSame( 'done', $job['status'] );
+		$this->assertContains( Provision::db_name( $r->id(), $copy ), $this->agent->state()['dbs'][ $account ]['databases'] );
+		Sites::update( $r->id(), $slug, array( 'flags' => array( 'staging' => array( 'state' => 'ready', 'copy' => $copy ) ) ) );
+
+		$this->assertTrue( $this->driver->delete( $r )->is_done() );
+		$this->assertArrayNotHasKey( $account, $this->agent->state()['dbs'], 'The copy database and the account user are gone.' );
+
+		$r2 = $this->ready();
+		Sites::remove_all( $r2->id() );
+		$this->assertNotSame( array(), $this->agent->state()['dbs']['c' . $r2->id()]['databases'] ?? array(), 'The database of the step db is there.' );
+		$this->assertTrue( $this->driver->delete( Resource::find( $r2->id() ) )->is_done() );
+		$this->assertArrayNotHasKey( 'c' . $r2->id(), $this->agent->state()['dbs'], 'No site row, but the database step ran: it is dropped.' );
 	}
 
 	public function test_delete_stops_a_running_container_first_and_can_run_again(): void {
