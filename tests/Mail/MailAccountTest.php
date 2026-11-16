@@ -342,6 +342,18 @@ final class MailAccountTest extends MailTestCase {
 		$this->assertStringContainsString( 'Your plan has no room for more aliases.', $this->page( Resource::find( $r->id() ), 'aliases' ) );
 	}
 
+	public function test_the_alias_count_on_a_domain_page_is_the_plan_total_the_limit_is_checked_against(): void {
+		$root  = $this->ready_mail( 'pt-root.example', array( 'aliases' => 2 ), $this->user );
+		$child = $this->ready_mail( 'pt-child.example', array( 'aliases' => 2 ), $this->user );
+		$this->assertTrue( \BeltoftServices\Children::attach( $root, $child ) );
+		$this->assertIsArray( \BeltoftServices\Mail\Aliases::create( Resource::find( $root->id() ), 'one', array( 'x@pt-root.example' ) ) );
+		$this->assertIsArray( \BeltoftServices\Mail\Aliases::create( Resource::find( $root->id() ), 'two', array( 'x@pt-root.example' ) ) );
+
+		$html = $this->page( Resource::find( $child->id() ), 'aliases' );
+		$this->assertStringContainsString( '2 of 2 aliases used', $html, 'The plan total, as the limit counts it.' );
+		$this->assertStringContainsString( 'Your plan has no room for more aliases.', $html );
+	}
+
 	public function test_the_dns_tab_tells_a_zone_of_ours_from_one_elsewhere_and_marks_each_record(): void {
 		$r = $this->ready_mail( 'elsewhere.example', array(), $this->user );
 		$html = $this->page( $r, 'dns' );

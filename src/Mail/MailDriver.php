@@ -63,7 +63,7 @@ final class MailDriver implements Driver, NeedsBilling, InternalActions {
 		return array(
 			'mailboxes' => array( 'number', __( 'Mailboxes', 'beltoft-services' ), __( 'How many mailboxes the whole plan may have, over all its domains.', 'beltoft-services' ), 1, true ),
 			'quota_mb'  => array( 'number', __( 'Size of each mailbox (MB)', 'beltoft-services' ), __( 'The storage of every mailbox, in MB (5 GB is 5120).', 'beltoft-services' ), 5120, true ),
-			'aliases'   => array( 'number', __( 'Aliases', 'beltoft-services' ), __( 'How many aliases one email domain may have.', 'beltoft-services' ), 20, true ),
+			'aliases'   => array( 'number', __( 'Aliases', 'beltoft-services' ), __( 'How many aliases the whole plan may have, over all its domains.', 'beltoft-services' ), 20, true ),
 			'domains'   => array( 'number', __( 'Email domains', 'beltoft-services' ), __( 'How many email domains the plan allows. Each domain is one service.', 'beltoft-services' ), 1, true ),
 		);
 	}
