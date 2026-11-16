@@ -359,7 +359,7 @@ final class AppReinstall {
 		$items = array();
 
 		foreach ( $apps as $app_id => $entry ) {
-			// A paid app with no tier that can be bought now (for a pay-as-you-go server: with an hourly price) is not offered.
+			// A paid app with no tier that can be bought now is not offered.
 			if ( AppLicence::paid( (string) $app_id ) && array() === self::tiers( (string) $app_id, $usage ) ) {
 				continue;
 			}
@@ -395,8 +395,7 @@ final class AppReinstall {
 	}
 
 	/**
-	 * The tiers of a paid app a server can be offered now: those that can be bought (for a pay-as-you-go server: those with
-	 * an hourly price), each with the price the customer reads.
+	 * The tiers of a paid app a server can be offered now: those that can be bought, each with the price the customer reads.
 	 *
 	 * @param string $app_id App id.
 	 * @param bool   $usage  Whether the server is billed pay as you go.
@@ -406,7 +405,7 @@ final class AppReinstall {
 		$out = array();
 
 		foreach ( AppLicence::tiers( $app_id ) as $key => $tier ) {
-			$price = $usage ? AppLicence::usage_price( $tier ) : $tier['price'];
+			$price = AppLicence::price_text( $tier, $usage );
 
 			if ( null !== AppLicence::line_variation( $tier, $usage ) && '' !== $price ) {
 				$out[ $key ] = array( 'label' => $tier['label'], 'price' => $price );
@@ -447,7 +446,7 @@ final class AppReinstall {
 
 		if ( $any ) {
 			echo '<p class="description" data-reinstall-paid-note hidden>' . esc_html( $usage
-				? __( 'This app has a licence, billed by the hour with your server. You are asked to confirm it at checkout, and the server is reinstalled when the order is placed. The licence ends when you reinstall without this app.', 'beltoft-services' )
+				? __( 'This app has a monthly licence. A whole month is charged in advance at checkout and again each month you keep it, while your server stays billed by the hour. A month that has started is not refunded. The server is reinstalled when the licence is paid. The licence ends when you reinstall without this app.', 'beltoft-services' )
 				: __( 'This app has a monthly licence. You pay for it at checkout first, and the server is reinstalled when the licence is paid. The licence ends when you reinstall without this app.', 'beltoft-services' )
 			) . '</p>';
 		}

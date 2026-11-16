@@ -37,6 +37,8 @@ final class AppLicenceCart {
 		add_filter( 'woocommerce_add_to_cart_validation', array( __CLASS__, 'validate' ), 20, 6 );
 		add_filter( 'woocommerce_add_cart_item_data', array( __CLASS__, 'item_data' ), 20, 2 );
 		AddonCart::register_line_hooks( Addon::for_driver( AppLicenceDriver::ID ) );
+		add_action( 'woocommerce_cart_loaded_from_session', array( __CLASS__, 'normalise' ), 30 );
+		add_action( 'woocommerce_check_cart_items', array( __CLASS__, 'normalise' ), 1 );
 		add_action( 'woocommerce_cart_item_removed', array( __CLASS__, 'clean_orphan' ) );
 		add_action( 'wc_ajax_' . self::AJAX, array( __CLASS__, 'ajax' ) );
 	}
@@ -238,6 +240,50 @@ final class AppLicenceCart {
 		$data[ AppLicence::CART_UID ] = wp_generate_uuid4();
 
 		return $data;
+	}
+
+	/**
+	 * A cart saved before the licence became monthly can hold the old hourly licence line. The server stays; the line
+	 * becomes the monthly one of the same tier, or leaves the cart with a notice when that tier is not sold or no server
+	 * is left to bind it to.
+	 */
+	public static function normalise(): void {
+		static $busy = false;
+
+		if ( $busy || DiskField::server_swap_in_progress() || ! function_exists( 'WC' ) || ! WC()->cart ) {
+			return;
+		}
+
+		$line = self::line();
+
+		if ( ! $line ) {
+			return;
+		}
+
+		$busy = true;
+
+		try {
+			$id   = (int) ( $line['item']['variation_id'] ?? 0 );
+			$app  = AppLicence::app_of( $id );
+			$plan = Product::plan( (int) ( $line['item']['product_id'] ?? 0 ), $id );
+			$tier = null === $app ? null : AppLicence::tier( $app, (string) ( $plan['tier'] ?? '' ) );
+			$want = null === $tier || null === DiskField::cart_server() ? null : AppLicence::line_variation( $tier, self::server_usage() );
+
+			if ( null !== $want && $want->get_id() === $id ) {
+				return;
+			}
+
+			if ( null !== $want && self::choose( (string) $app, (string) $tier['key'] ) ) {
+				wc_add_notice( __( 'The app licence in your cart is now the monthly licence: a whole month is charged when you order. Your server is unchanged.', 'beltoft-services' ), 'notice' );
+
+				return;
+			}
+
+			WC()->cart->remove_cart_item( $line['key'] );
+			wc_add_notice( __( 'The app licence was removed from your cart because it can no longer be ordered as it was. Choose the app and its tier again.', 'beltoft-services' ), 'notice' );
+		} finally {
+			$busy = false;
+		}
 	}
 
 	/**

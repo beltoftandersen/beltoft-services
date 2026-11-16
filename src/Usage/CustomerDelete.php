@@ -174,6 +174,27 @@ final class CustomerDelete {
 	}
 
 	/**
+	 * One sentence for a server with a paid app licence of its own subscription: it ends with the server and the started
+	 * month is not refunded. '' for any other service, and for a licence still billed by the hour with its server (sold
+	 * before the licence became monthly), where the hourly billing note is already true.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function licence_note( Resource $r ): string {
+		if ( 'server' !== self::kind( $r ) ) {
+			return '';
+		}
+
+		$licence = \BeltoftServices\Apps\AppLicence::current( $r );
+
+		if ( ! $licence || \BeltoftServices\Apps\AppLicence::usage_billed( $licence ) || 'ended' === \BeltoftServices\Apps\AppLicence::state( $licence ) ) {
+			return '';
+		}
+
+		return __( 'The app licence ends with the server. The month that has started is not refunded.', 'beltoft-services' );
+	}
+
+	/**
 	 * The billing line shown with the delete.
 	 *
 	 * @param string $kind server or database.

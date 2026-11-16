@@ -46,6 +46,12 @@ $beltoft_services_status_text = array(
 				<?php if ( ! empty( $beltoft_services_licence['usage'] ) ) : ?>
 					<p data-app-licence-usage><?php /* translators: %s: price such as 0.0226 per hour, max 16.50 per month excluding VAT */ echo esc_html( sprintf( __( 'Billed by the hour with your server: %s.', 'beltoft-services' ), (string) $beltoft_services_licence['usage'] ) ); ?></p>
 				<?php endif; ?>
+				<?php if ( ! empty( $beltoft_services_licence['price'] ) ) : ?>
+					<p data-app-licence-price><?php /* translators: %s: price such as 14.29 / month excl. VAT */ echo esc_html( sprintf( __( 'Licence price: %s.', 'beltoft-services' ), (string) $beltoft_services_licence['price'] ) ); ?></p>
+				<?php endif; ?>
+				<?php if ( ! empty( $beltoft_services_licence['next'] ) ) : ?>
+					<p data-app-licence-next><?php /* translators: %s: date */ echo esc_html( sprintf( __( 'Next payment: %s. A whole month is charged in advance.', 'beltoft-services' ), (string) $beltoft_services_licence['next'] ) ); ?></p>
+				<?php endif; ?>
 				<?php if ( 'ended' === $beltoft_services_licence['state'] ) : ?>
 					<p><?php esc_html_e( 'The licence for this app has ended. Your server keeps running and the app stays installed, but it may stop working without a licence. Nothing is removed from your server.', 'beltoft-services' ); ?></p>
 				<?php elseif ( 'paused' === $beltoft_services_licence['state'] ) : ?>

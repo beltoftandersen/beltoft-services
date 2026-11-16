@@ -192,43 +192,37 @@ final class AppLicence {
 	}
 
 	/**
-	 * The pay-as-you-go variation of a tier: its usage sibling (same tier, Billing "pay as you go", price 0 at checkout),
-	 * when it can be bought and the tier has a monthly price to bill from. Null when there is none.
+	 * The variation that goes in the cart for a tier: always the tier's own monthly one, a subscription line of its own. A
+	 * licence is billed the way the vendor bills it: a whole month in advance when it is ordered, and again each month it
+	 * is kept, whether the server is billed monthly or pay as you go (the server itself stays hourly). The pay-as-you-go
+	 * sibling of a tier is no longer sold; licences already sold on it keep their hourly billing (see usage_billed()).
 	 *
-	 * @param array<string, mixed> $tier A tier from tiers().
+	 * @param array<string, mixed> $tier  A tier from tiers().
+	 * @param bool                 $usage Whether the server is billed pay as you go (the licence line is the same).
 	 */
-	public static function usage_variation( array $tier ): ?\WC_Product_Variation {
-		$variation = $tier['variation'] ?? null;
+	public static function line_variation( array $tier, bool $usage ): ?\WC_Product_Variation {
+		unset( $usage );
 
-		if ( ! $variation instanceof \WC_Product_Variation || null === Rates::for_plan( $variation ) ) {
-			return null;
-		}
-
-		$usage = Rates::sibling( $variation, true );
-
-		return $usage && $usage->is_purchasable() && $usage->is_in_stock() ? $usage : null;
+		return $tier['variation'] ?? null;
 	}
 
 	/**
-	 * The variation that goes in the cart for a tier: the tier's own (monthly) one, or for a pay-as-you-go server
-	 * its usage sibling. A pay-as-you-go server never gets the monthly one: null when the tier has no usage sibling.
+	 * What a tier costs as the customer reads it on the order forms: the monthly price, and for a pay-as-you-go server that
+	 * the month is charged in advance ("14.29 / month excl. VAT, charged in advance").
 	 *
 	 * @param array<string, mixed> $tier  A tier from tiers().
 	 * @param bool                 $usage Whether the server is billed pay as you go.
 	 */
-	public static function line_variation( array $tier, bool $usage ): ?\WC_Product_Variation {
-		return $usage ? self::usage_variation( $tier ) : ( $tier['variation'] ?? null );
+	public static function price_text( array $tier, bool $usage ): string {
+		/* translators: %s: the monthly price of a licence tier such as "14.29 / month excl. VAT". */
+		return $usage ? sprintf( __( '%s, charged in advance', 'beltoft-services' ), (string) $tier['price'] ) : (string) $tier['price'];
 	}
 
 	/**
-	 * What a tier costs on a pay-as-you-go server, "0.0226 per hour, max 16.50 per month excluding VAT", or ''.
-	 *
-	 * @param array<string, mixed> $tier A tier from tiers().
+	 * The plain sentence under the tier prices of a pay-as-you-go server: what the licence costs and when.
 	 */
-	public static function usage_price( array $tier ): string {
-		$rates = null !== self::usage_variation( $tier ) ? Rates::for_plan( $tier['variation'] ) : null;
-
-		return null === $rates ? '' : Rates::terms( $rates['hourly'], $rates['cap'], $tier['variation'] );
+	public static function advance_note(): string {
+		return __( 'A whole month of the licence is charged when you order and again each month you keep it. The server itself stays billed by the hour.', 'beltoft-services' );
 	}
 
 	/**
@@ -448,7 +442,7 @@ final class AppLicence {
 	 * What the App tab shows about the licence, or null for a free app.
 	 *
 	 * @param Resource $server Server.
-	 * @return array{state: string, tier: string, usage: string, tiers: array<int, array{label: string, price: string, url: string}>}|null
+	 * @return array{state: string, tier: string, usage: string, price: string, next: string, tiers: array<int, array{label: string, price: string, url: string}>}|null
 	 */
 	public static function view( Resource $server ): ?array {
 		$app = (string) $server->get( 'app_id' );
@@ -460,7 +454,7 @@ final class AppLicence {
 		$licence = self::current( $server );
 
 		if ( ! $licence ) {
-			return array( 'state' => 'none', 'tier' => '', 'usage' => '', 'tiers' => array() );
+			return array( 'state' => 'none', 'tier' => '', 'usage' => '', 'price' => '', 'next' => '', 'tiers' => array() );
 		}
 
 		$state    = self::state( $licence );
@@ -468,12 +462,22 @@ final class AppLicence {
 		$switches = array();
 
 		$usage = '';
+		$price = '';
+		$next  = '';
 
 		if ( self::usage_billed( $licence ) ) {
 			// Billed by the hour with the server: no subscription of its own to switch.
 			$items = Rates::items( $licence );
 			$usage = $items ? Rates::terms( (float) $items[0]['rate'], round( (float) $items[0]['rate'] * Rates::HOURS, 2 ), wc_get_product( (int) ( $licence->license()['variation_id'] ?? 0 ) ) ?: null ) : '';
-		} elseif ( 'active' === $state && get_current_user_id() === (int) ( $licence->license()['user_id'] ?? 0 ) ) {
+		} else {
+			$tier  = self::tier( $app, $own, false );
+			$price = null === $tier ? '' : (string) $tier['price'];
+			$sub   = function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( (int) ( $licence->license()['subscription_id'] ?? 0 ) ) : null;
+			$time  = $sub && 'active' === $sub->get_status() ? (int) $sub->get_time( 'next_payment' ) : 0;
+			$next  = $time > 0 ? wp_date( get_option( 'date_format' ), $time ) : '';
+		}
+
+		if ( ! self::usage_billed( $licence ) && 'active' === $state && get_current_user_id() === (int) ( $licence->license()['user_id'] ?? 0 ) ) {
 			foreach ( self::tiers( $app ) as $key => $tier ) {
 				$url = $key === $own ? '' : Backups::switch_to( $licence, $tier['variation'] );
 
@@ -483,7 +487,7 @@ final class AppLicence {
 			}
 		}
 
-		return array( 'state' => $state, 'tier' => self::tier_label( $licence ), 'usage' => $usage, 'tiers' => $switches );
+		return array( 'state' => $state, 'tier' => self::tier_label( $licence ), 'usage' => $usage, 'price' => $price, 'next' => $next, 'tiers' => $switches );
 	}
 
 	// -- Hand-over to the server ----------------------------------------------------------------

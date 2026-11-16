@@ -174,7 +174,14 @@ final class Summary {
 		$saved = $user_id > 0 && null !== Account::for_user( $user_id, Account::ESTABLISHED );
 
 		/* translators: 1: how pay as you go is billed, 2: what happens to the card */
-		return sprintf( __( '%1$s. %2$s', 'beltoft-services' ), \BeltoftServices\LineNames::usage_note( 'cart' ), $saved ? __( 'Your saved card is charged after each month.', 'beltoft-services' ) : __( 'Your card is saved now and charged after each month.', 'beltoft-services' ) );
+		$note = sprintf( __( '%1$s. %2$s', 'beltoft-services' ), \BeltoftServices\LineNames::usage_note( 'cart' ), $saved ? __( 'Your saved card is charged after each month.', 'beltoft-services' ) : __( 'Your card is saved now and charged after each month.', 'beltoft-services' ) );
+
+		// A cart that also owes money today (an app licence month, a monthly line): say which part is charged now.
+		if ( function_exists( 'WC' ) && WC()->cart && (float) WC()->cart->get_total( 'edit' ) > 0 ) {
+			$note .= ' ' . __( 'The amount due today is charged now and does not include the hours the server is used.', 'beltoft-services' );
+		}
+
+		return $note;
 	}
 
 	/**
