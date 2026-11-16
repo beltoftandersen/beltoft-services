@@ -253,6 +253,20 @@ class RenewalTest extends UsageTestCase {
 		$this->assertTrue( Account::charged( wcs_get_subscription( $sub->get_id() ) ), 'WooCommerce Subscriptions does not fire its renewal hook for an active account.' );
 	}
 
+	public function test_a_month_with_two_rates_prints_hours_times_price_that_comes_to_the_charge(): void {
+		$user = $this->new_user();
+		$sub  = $this->usage_account( $user );
+		$this->hours( 501, $user, 100, 0.01, 'server', 151 );
+		$this->hours( 501, $user, 150, 0.02, 'server', 1 );
+
+		$fees = $this->fees( wcs_create_renewal_order( $sub ) );
+		$this->assertCount( 1, $fees );
+		$this->assertSame( '4', $fees[0]->get_total() );
+		$this->assertSame( '250', (string) $fees[0]->get_meta( '_beltoft_services_usage_hours' ) );
+		$this->assertEqualsWithDelta( 4.0, 250 * (float) $fees[0]->get_meta( '_beltoft_services_usage_price' ), 0.005, 'Hours x price is the charge, not the last rate x all hours.' );
+		$this->assertStringContainsString( '250 hours at €0.0160', $fees[0]->get_name() );
+	}
+
 	public function test_line_wording_uses_plural_forms_and_translatable_units(): void {
 		$call = static function ( string $method, ...$args ) {
 			$m = new \ReflectionMethod( \BeltoftServices\Usage\Renewal::class, $method );

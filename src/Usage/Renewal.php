@@ -77,6 +77,8 @@ final class Renewal {
 			$groups[ $key ]['resource_id'] = (int) $row['resource_id'];
 			$groups[ $key ]['item']        = (string) $row['item'];
 			$groups[ $key ]['unit']        = (string) $row['unit'];
+			// Rows of one month with another quantity or rate (a resized disk, a price change) make the line a mixed one.
+			$groups[ $key ]['mixed']       = ( $groups[ $key ]['mixed'] ?? false ) || ( isset( $groups[ $key ]['rate'] ) && ( abs( $groups[ $key ]['rate'] - (float) $row['rate'] ) > 1e-12 || abs( $groups[ $key ]['quantity'] - (float) $row['quantity'] ) > 1e-12 ) );
 			$groups[ $key ]['quantity']    = (float) $row['quantity'];
 			$groups[ $key ]['rate']        = (float) $row['rate'];
 			$groups[ $key ]['month']       = $start;
@@ -274,7 +276,8 @@ final class Renewal {
 			$subject = self::invoice_title( (string) $line['item'], (int) $line['resource_id'], (float) $line['quantity'], (string) $line['unit'] );
 			$month   = wp_date( 'F Y', (int) $line['month'], new \DateTimeZone( 'UTC' ) );
 			// The price of one hour of the whole item (a 100 GB disk, two snapshot packs), so the invoice reads hours x price per hour.
-			$hourly  = (float) $line['rate'] * (float) $line['quantity'];
+			// A month whose rows differ (a resized disk, a price change) shows the average price of an hour, so hours x price is the charge.
+			$hourly  = ! empty( $line['mixed'] ) ? (float) $line['raw'] / max( 1, (int) $line['hours'] ) : (float) $line['rate'] * (float) $line['quantity'];
 			$rate    = Rates::money( $hourly, 4, $currency );
 			// The name is what the accounting system prints: the title and month, then the hours and the rate on a line of its own. The
 			// amount stays the one charged, so the invoice there matches this order to the cent.
