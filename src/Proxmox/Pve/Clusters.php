@@ -110,6 +110,18 @@ final class Clusters {
 	}
 
 	/**
+	 * Is the cluster stored as live, whatever the allowance makes of it? A record built by a live cluster must never be
+	 * served by the fake that view() puts in its place.
+	 *
+	 * @param string $id Cluster id.
+	 */
+	public static function stored_live( string $id ): bool {
+		$list = self::stored();
+
+		return isset( $list[ $id ] ) && 'live' === $list[ $id ]['client'];
+	}
+
+	/**
 	 * Why a cluster cannot be saved as live, or null when it can.
 	 *
 	 * @param bool $allowed Whether wp-config.php allows live calls.

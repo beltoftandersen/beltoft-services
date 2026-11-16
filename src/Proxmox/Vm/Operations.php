@@ -111,7 +111,11 @@ final class Operations {
 
 		$pending = is_array( $task ) && ! empty( $task['upid'] );
 
-		if ( ! in_array( 'clone', $steps, true ) && ! $pending ) {
+		// A reinstall before its wipe has no clone step either, but the old VM is still there (and runs).
+		$unbuilt   = ! in_array( 'clone', $steps, true );
+		$reinstall = $unbuilt && ! empty( $this->r->get( 'wipe' ) );
+
+		if ( $unbuilt && ! $pending && ! $reinstall ) {
 			return StepResult::done( array( 'was_running' => null ) ); // Nothing was built: nothing to switch off.
 		}
 
@@ -121,6 +125,28 @@ final class Operations {
 			return $early;
 		}
 
+		if ( $reinstall && ! $pending ) {
+			$list = Ownership::listing( $this->client );
+
+			if ( is_wp_error( $list ) ) {
+				return $this->classify( $list, 'pause' );
+			}
+
+			if ( null === Ownership::entry( $list, $record['vmid'] ) ) {
+				if ( true !== Ownership::is_free( $this->client, $record['vmid'] ) ) {
+					return StepResult::retry( 0, 'pause: the id is not listed and not confirmed free' );
+				}
+
+				return StepResult::done( array( 'was_running' => null ) ); // The old VM is gone already.
+			}
+
+			$v = Ownership::verify( $this->client, $record, $this->r );
+
+			if ( is_wp_error( $v ) ) {
+				return in_array( $v->get_error_code(), array( 'not_ours', 'is_template' ), true ) ? StepResult::done( array( 'was_running' => null ) ) : $this->refuse_or_retry( $v, 'pause' );
+			}
+		}
+
 		// A clone (or any other task) that is still running is waited for, never paused over.
 		$early = $this->poll_task();
 
@@ -128,7 +154,7 @@ final class Operations {
 			return $early;
 		}
 
-		if ( ! in_array( 'clone', $steps, true ) ) {
+		if ( $unbuilt && ! $reinstall ) {
 			return StepResult::done( array( 'task' => null, 'was_running' => null ) );
 		}
 
@@ -396,7 +422,10 @@ final class Operations {
 			return StepResult::retry( 0, 'delete: the private network pool is busy' );
 		}
 		// Always: a no-op when the resource holds no address, and an address is never leaked by a profile answering wrong.
-		IpPool::release( $this->r->id() );
+		// A feature that still has records pointing at the address (app domain A records) keeps it held and frees it itself.
+		if ( true !== apply_filters( 'beltoft_services_hold_ip_on_delete', false, $this->r ) ) {
+			IpPool::release( $this->r->id() );
+		}
 		VmRecords::remove( $this->r->id() );
 		Access::purge( $this->r );
 

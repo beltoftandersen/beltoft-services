@@ -113,6 +113,22 @@ class DiskReinstallTest extends BackupTestCase {
 		$this->assertCount( 0, array_filter( $this->mails, static fn( $m ) => 'admin@example.com' === ( (array) $m['to'] )[0] ) );
 	}
 
+	public function test_a_boot_only_reinstall_with_a_missing_template_keeps_the_old_boot_volume(): void {
+		list( $server ) = $this->server_with( 1 );
+		$before = $this->config();
+		$this->fake->request( 'DELETE', '/nodes/node-a/qemu/9000', array() );
+		$seen = count( $this->fake->calls() );
+
+		$this->reinstall( $server );
+		Jobs::run( $server->id() );
+
+		$this->assertSame( $before['scsi0'], $this->config()['scsi0'], 'The old boot volume is still attached.' );
+		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
+		$writes = array_filter( array_slice( $this->fake->calls(), $seen ), static fn( $c ) => in_array( $c['method'], array( 'PUT', 'DELETE' ), true ) || false !== strpos( $c['path'], '/status/' ) );
+		$this->assertSame( array(), array_values( $writes ), 'Nothing was changed before the template was found missing.' );
+		$this->assertSame( 'failed', Resource::find( $server->id() )->get( 'state' ) );
+	}
+
 	public function test_the_sequence_is_stop_detach_destroy_old_import_then_configure(): void {
 		list( $server ) = $this->server_with( 1 );
 		$seen = count( $this->fake->calls() );

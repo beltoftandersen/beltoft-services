@@ -166,6 +166,37 @@ class SchemaTest extends TestCase {
 		$this->assertFalse( get_transient( Schema::RETRY_TRANSIENT ), 'success clears the throttle' );
 	}
 
+	public function test_a_failed_upgrade_tells_the_admin_once_per_version(): void {
+		delete_option( Schema::OPTION_DB_VERSION );
+		delete_option( 'beltoft_services_schema_alerted' );
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
+		$mails = array();
+		add_filter(
+			'pre_wp_mail',
+			static function ( $null, $atts ) use ( &$mails ) {
+				$mails[] = $atts;
+				return true;
+			},
+			10,
+			2
+		);
+		$break = static function ( $query ) {
+			return false !== stripos( $query, 'SHOW INDEX' ) ? 'SELECT * FROM zz_no_such_table' : $query;
+		};
+		add_filter( 'query', $break, 2 );
+
+		ob_start();
+		Schema::maybe_upgrade();
+		delete_transient( Schema::RETRY_TRANSIENT );
+		Schema::maybe_upgrade();
+		ob_end_clean();
+		remove_filter( 'query', $break, 2 );
+
+		$this->assertCount( 1, $mails, 'One mail for the version, not one per attempt.' );
+		$this->assertStringContainsString( 'database', strtolower( $mails[0]['subject'] . $mails[0]['message'] ) );
+		$this->assertStringContainsString( Schema::class, $mails[0]['message'] );
+	}
+
 	/**
 	 * Every transient family the plugin sets in src/ (one example each; checked against the code in review).
 	 */

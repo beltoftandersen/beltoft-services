@@ -278,6 +278,29 @@ final class AppReinstallDomainTest extends MonitoringTestCase {
 		$this->assertSame( array(), (array) Resource::find( $r->id() )->get( 'app_domain_old' ) );
 	}
 
+	public function test_the_address_of_a_deleted_server_stays_held_until_its_app_records_are_gone(): void {
+		$r    = $this->server();
+		$user = (int) $r->license()['user_id'];
+		$this->zone( $user );
+		$r->set( array( 'app_zone' => 'mine.example', 'app_domain_want' => 'mine.example' ) );
+		$this->assertSame( 'mine.example', ( new \ReflectionMethod( AppInstall::class, 'domain' ) )->invoke( null, $r, '192.0.2.10', $user ) );
+		$this->assertCount( 1, DnsClients::dns()->zone( 'mine.example' )['rrsets'] );
+
+		$result = \BeltoftServices\Drivers\Registry::get( 'proxmox' )->delete( Resource::find( $r->id() ) );
+		$this->assertTrue( $result->is_done() );
+		$this->assertSame( 0, IpPool::free_count(), 'The address is not offered to a new order while a record still points to it.' );
+
+		$r = Resource::find( $r->id() );
+		$r->transition( 'deleted', 'Deleted' );
+		$r->close();
+		do_action( 'beltoft_services_state_changed', Resource::find( $r->id() ), 'deleting', 'deleted' );
+		$this->assertSame( 0, IpPool::free_count() );
+
+		AppDomainRelease::run( $r->id() );
+		$this->assertSame( array(), DnsClients::dns()->zone( 'mine.example' )['rrsets'] );
+		$this->assertSame( 1, IpPool::free_count(), 'The address returns once the records are removed.' );
+	}
+
 	public function test_deleting_a_server_never_removes_a_record_the_customer_changed_or_one_we_did_not_make(): void {
 		$r    = $this->server( 'wordpress', array( 'app_domain' => 'shop.mine.example', 'app_domain_made' => true, 'app_zone' => 'mine.example' ) );
 		$this->zone( (int) $r->license()['user_id'] );

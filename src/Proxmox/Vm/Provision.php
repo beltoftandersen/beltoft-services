@@ -56,6 +56,9 @@ final class Provision {
 	 */
 	public const LOGIN_USER = 'root';
 
+	/** Seconds a paid order waits for a free address before it fails. */
+	private const IP_WAIT = 7 * DAY_IN_SECONDS;
+
 	/** The disk format of new volumes: qcow2 (snapshots need it). Existing raw volumes are left as they are. */
 	public const DISK_FORMAT = 'qcow2';
 
@@ -356,6 +359,15 @@ final class Provision {
 	private function step_wipe() {
 		$record = VmRecords::for_resource( $this->r->id() );
 
+		// The wipe destroys the customer's data: the replacement must exist first, with the VM untouched when it does not.
+		if ( null !== $record && 'boot' !== $this->r->get( 'wipe' ) ) {
+			$usable = $this->template_usable();
+
+			if ( null !== $usable ) {
+				return $usable;
+			}
+		}
+
 		if ( 'boot' === $this->r->get( 'wipe' ) ) {
 			return $this->step_wipe_boot( $record );
 		}
@@ -559,6 +571,15 @@ final class Provision {
 
 		$extra_ids = array_column( $extra, 'volid' );
 
+		// Before the old boot volume is touched: the template must be there with a disk in the boot slot.
+		if ( null === $this->r->get( 'wipe_boot_phase' ) && null === $this->r->get( 'wipe_old_boot' ) ) {
+			$volume = $this->template_boot_volume( $boot );
+
+			if ( $volume instanceof StepResult ) {
+				return $volume;
+			}
+		}
+
 		for ( $round = 0; $round < 8; $round++ ) {
 			$v = Ownership::verify( $this->client, $record, $this->r );
 
@@ -692,6 +713,27 @@ final class Provision {
 	}
 
 	/**
+	 * Is the template of the reinstall listed on the cluster and still a template? Null when it is.
+	 *
+	 * @return StepResult|null
+	 */
+	private function template_usable(): ?StepResult {
+		$list = Ownership::listing( $this->client );
+
+		if ( is_wp_error( $list ) ) {
+			return $this->classify( $list, 'wipe' );
+		}
+
+		$template = Ownership::entry( $list, $this->plan['template'] );
+
+		if ( null === $template || 'qemu' !== (string) ( $template['type'] ?? 'qemu' ) || empty( $template['template'] ) ) {
+			return StepResult::fail( sprintf( 'wipe: VMID %d is not a template on this cluster; the server was not touched', $this->plan['template'] ) );
+		}
+
+		return null;
+	}
+
+	/**
 	 * The volume the template boots from, for import-from.
 	 *
 	 * @param string $boot Boot drive key.
@@ -818,7 +860,21 @@ final class Provision {
 		}
 
 		if ( null === $ip ) {
-			return StepResult::fail( 'No free IP address' );
+			// Another order may have taken the last address after this one was paid; one can come back (a server deleted, a quarantine over).
+			$until = (int) $this->r->get( 'ip_wait_until' );
+			$until = $until > 0 ? $until : time() + self::IP_WAIT;
+
+			if ( ! $this->r->set( array( 'ip_wait_until' => $until ) ) ) {
+				return StepResult::retry( 60, 'ip: the wait deadline could not be stored' );
+			}
+
+			if ( time() >= $until ) {
+				return StepResult::fail( 'No free IP address' );
+			}
+
+			Alerts::admin( $this->r, 'ip: the IP pool is empty, the order waits for an address' );
+
+			return StepResult::wait( 600, 'Waiting for a free IP address.', $until );
 		}
 
 		return array();

@@ -424,6 +424,17 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->assertCount( $seen, $this->fake->calls() );
 	}
 
+	public function test_a_pause_during_a_reinstall_before_the_wipe_switches_the_old_vm_off(): void {
+		$r = $this->built();
+		// What Reinstall::reinstall stores: the clone step is gone, the old VM still runs.
+		$r->set( array( 'wipe' => true, 'steps' => array( 'ip', 'vmid' ) ) );
+		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
+
+		$this->assert_done( $this->op( 'pause', $r ) );
+
+		$this->assertSame( 'stopped', $this->fake->vm( 5000 )['status'], 'The paid-for or abusive VM is not left running.' );
+	}
+
 	public function test_pause_waits_for_a_pending_clone(): void {
 		$resource = $this->resource();
 		$this->fake->next_task( array( 'polls' => 400 ) );
@@ -494,6 +505,21 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->assertSame( $free + 1, IpPool::free_count() );
 		$this->assertNull( Access::take_reveal( Resource::find( $r->id() ), $owner ), 'No unread password survives the VM.' );
 		$this->assertEmpty( Resource::find( $r->id() )->get( Access::META_REVEAL ) );
+	}
+
+	public function test_a_cluster_stored_as_live_is_never_served_by_the_fake_when_the_live_constant_is_missing(): void {
+		$r = $this->built();
+		$this->assertFalse( \BeltoftServices\Proxmox\Pve\Clients::live_allowed(), 'The test site has no live constant.' );
+		$all                  = get_option( Clusters::OPTION );
+		$all['lab']['client'] = 'live';
+		update_option( Clusters::OPTION, $all, false );
+
+		$result = $this->op( 'delete', $r );
+
+		$this->assertTrue( $result->is_retry(), 'Nothing is deleted and nothing is cleaned up against a fake.' );
+		$this->assertNotNull( IpPool::for_resource( $r->id() ), 'The address stays with the server.' );
+		$this->assertNotNull( VmRecords::for_resource( $r->id() ) );
+		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
 	}
 
 	public function test_a_delete_that_died_after_the_cleanup_is_finished_by_the_next_run(): void {
@@ -758,6 +784,50 @@ class ProxmoxLifecycleTest extends TestCase {
 			}
 		};
 		$this->assertSame( '', apply_filters( 'woocommerce_subscriptions_switch_error_message', '', $small->get_id(), 1, 0, $other, null ), 'A subscription with no VM.' );
+	}
+
+	public function test_an_extra_disk_switch_to_a_smaller_size_is_refused_and_equal_or_larger_is_let_through(): void {
+		Switches::register();
+		$disk = static fn( int $gb ): array => array( 'disk_gb' => $gb );
+		$now  = $this->service_product( 'proxmox-disk', $disk( 50 ), array( 'slug' => 'disk-now' ) );
+		$license = $this->service_license( $now, array( 'fire' => false, 'subscription_id' => 7171 ) );
+		$this->assertInstanceOf( Resource::class, Resource::create( $license, Registry::get( 'proxmox-disk' ), Product::plan( $now->get_id() ) ) );
+		$subscription = new class() {
+			public function get_id() {
+				return 7171;
+			}
+		};
+
+		$cases = array( 'smaller' => array( 20, true ), 'equal' => array( 50, false ), 'larger' => array( 100, false ) );
+		foreach ( $cases as $name => $case ) {
+			$target = $this->service_product( 'proxmox-disk', $disk( $case[0] ), array( 'slug' => 'disk-target-' . $name ) );
+			$result = apply_filters( 'woocommerce_subscriptions_switch_error_message', '', $target->get_id(), 1, 0, $subscription, null );
+			$this->assertSame( $case[1] ? "Disks can't be made smaller. Choose a size at least as large as your current disk." : '', $result, $name );
+		}
+	}
+
+	public function test_an_extra_disk_switch_of_a_subscription_without_a_disk_resource_is_refused(): void {
+		Switches::register();
+		$target = $this->service_product( 'proxmox-disk', array( 'disk_gb' => 50 ), array( 'slug' => 'disk-orphan' ) );
+		$none   = new class() {
+			public function get_id() {
+				return 7272;
+			}
+		};
+
+		$this->assertSame( 'The disk for this subscription could not be found.', apply_filters( 'woocommerce_subscriptions_switch_error_message', '', $target->get_id(), 1, 0, $none, null ) );
+	}
+
+	public function test_the_switch_guard_lets_a_switch_through_when_it_cannot_tell(): void {
+		Switches::register();
+		$target = $this->service_product( 'proxmox-disk', array( 'disk_gb' => 50 ), array( 'slug' => 'disk-broken' ) );
+		$broken = new class() {
+			public function get_id() {
+				throw new \RuntimeException( 'cannot read the subscription' );
+			}
+		};
+
+		$this->assertSame( '', apply_filters( 'woocommerce_subscriptions_switch_error_message', '', $target->get_id(), 1, 0, $broken, null ), 'Fail open: update_plan keeps the disk anyway.' );
 	}
 
 	public function test_cpu_ram_downgrade_applies_and_disk_is_kept_with_one_alert(): void {

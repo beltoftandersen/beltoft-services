@@ -18,6 +18,7 @@ final class AppDomainRelease {
 	public static function register(): void {
 		add_action( 'beltoft_services_reinstall_started', array( __CLASS__, 'started' ), 10, 2 );
 		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'deleted' ), 10, 3 );
+		add_filter( 'beltoft_services_hold_ip_on_delete', array( __CLASS__, 'hold_ip' ), 10, 2 );
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
 		Background::declare(
 			self::HOOK,
@@ -67,11 +68,41 @@ final class AppDomainRelease {
 			$new[] = array( 'zone' => $zone, 'name' => 'www.' . $zone, 'ip' => (string) $r->get( 'app_www_ip' ), 'tries' => 0, 'final' => true );
 		}
 
-		if ( ! $new || ! $r->set( array( 'app_domain_old' => array_slice( array_merge( $old, $new ), 0, 6 ) ) ) ) {
+		if ( ! $new ) {
+			self::free_ip( $r );
+			return;
+		}
+		if ( ! $r->set( array( 'app_domain_old' => array_slice( array_merge( $old, $new ), 0, 6 ) ) ) ) {
 			return;
 		}
 
 		self::schedule( $r->id() );
+	}
+
+	/**
+	 * The server delete asks whether its address may go back to the pool: not while an A record we wrote still points to it.
+	 * The flag is stored first; run() frees the address when the queue is empty.
+	 *
+	 * @param mixed $hold Filter value.
+	 * @param mixed $r    Resource.
+	 */
+	public static function hold_ip( $hold, $r ) {
+		if ( ! $r instanceof Resource || '' === (string) $r->get( 'app_zone' ) ) {
+			return $hold;
+		}
+		$ours = ( true === $r->get( 'app_domain_made' ) && '' !== (string) $r->get( 'app_domain' ) ) || ( true === $r->get( 'app_www_made' ) && '' !== (string) $r->get( 'app_www_ip' ) );
+		if ( ! $ours || ! $r->set( array( 'app_ip_hold' => true ) ) ) {
+			return $hold;
+		}
+		return true;
+	}
+
+	/** Gives the held address back once nothing of ours points to it. */
+	private static function free_ip( Resource $r ): void {
+		if ( true === $r->get( 'app_ip_hold' ) && 'deleted' === (string) $r->get( 'state' ) && ! array_filter( (array) $r->get( 'app_domain_old' ), 'is_array' ) ) {
+			\BeltoftServices\Proxmox\Network\IpPool::release( $r->id() );
+			$r->set( array( 'app_ip_hold' => false ) );
+		}
 	}
 
 	public static function schedule( int $id, int $delay = 0 ): void {
@@ -120,6 +151,7 @@ final class AppDomainRelease {
 				return false;
 			}
 			if ( ! $old ) {
+				self::free_ip( $r );
 				return false;
 			}
 			$first = $old[0];
@@ -182,6 +214,9 @@ final class AppDomainRelease {
 		if ( true !== $finished ) {
 			self::schedule( $id, 30 );
 			return;
+		}
+		if ( null === $next ) {
+			self::free_ip( Resource::find( $id ) ?: $r );
 		}
 		if ( $alert ) {
 			AppAlerts::domain_release_failed( $r, (string) ( $entry['name'] ?? '' ), $done->get_error_message() );

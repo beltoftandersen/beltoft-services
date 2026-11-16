@@ -29,6 +29,36 @@ trait VersionedSchema {
 		// A persistent failure is tried again in an hour, not on every request.
 		if ( self::DB_VERSION !== get_option( self::OPTION_DB_VERSION ) ) {
 			set_transient( self::RETRY_TRANSIENT, 1, HOUR_IN_SECONDS );
+			self::alert_failed_upgrade();
+		}
+	}
+
+	/**
+	 * Tells the admin once per schema version that the upgrade did not finish, with what is missing. Without it a restricted
+	 * database account makes a deploy look fine while features that need the new tables or columns stay off.
+	 */
+	private static function alert_failed_upgrade(): void {
+		$alerted = get_option( 'beltoft_services_schema_alerted', array() );
+		$alerted = is_array( $alerted ) ? $alerted : array();
+
+		if ( ( $alerted[ self::class ] ?? '' ) === self::DB_VERSION ) {
+			return;
+		}
+
+		$missing = array_merge(
+			method_exists( self::class, 'missing_keys' ) ? (array) self::missing_keys() : array(),
+			method_exists( self::class, 'missing_columns' ) ? (array) self::missing_columns() : array()
+		);
+
+		$lines = array(
+			sprintf( 'The database upgrade of %s to version %s did not finish.', self::class, self::DB_VERSION ),
+			'Missing: ' . ( $missing ? implode( ', ', array_map( 'strval', $missing ) ) : 'the version could not be stored (see the database error log)' ),
+			'It is tried again every hour. Check that the database account may create tables and alter them.',
+		);
+
+		if ( Alerts::notify( 'The database upgrade did not finish', $lines, null, '', array( 'fallback' => true ) ) ) {
+			$alerted[ self::class ] = self::DB_VERSION;
+			update_option( 'beltoft_services_schema_alerted', $alerted, false );
 		}
 	}
 

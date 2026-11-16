@@ -125,6 +125,8 @@ final class Jobs {
 		add_action( self::ACT, array( __CLASS__, 'act' ), 10, 4 );
 		// A job that throws, or a PHP process that dies in one, must not leave the customer waiting or the service unbuilt.
 		add_action( 'action_scheduler_failed_execution', array( __CLASS__, 'job_failed' ), 10, 2 );
+		// Every other job of the plugin (sweeps, backups, health checks) waits while the hold file or the pause setting holds.
+		add_action( 'action_scheduler_before_execute', array( __CLASS__, 'hold_other_jobs' ) );
 		add_action( 'action_scheduler_unexpected_shutdown', array( __CLASS__, 'job_failed' ), 10, 2 );
 		// Action Scheduler's cleaner marks a job failed that stayed in progress too long (its process was killed or the server stopped).
 		add_action( 'action_scheduler_failed_action', array( __CLASS__, 'job_failed' ), 10, 2 );
@@ -647,6 +649,33 @@ final class Jobs {
 		 * @param bool $hold Default false.
 		 */
 		return (bool) apply_filters( 'beltoft_services_jobs_hold', false );
+	}
+
+	/**
+	 * A job of the plugin that the Action Scheduler runner is about to start while the plugin holds: it is cancelled before
+	 * it runs and queued again a little later (a recurring one comes back through its own schedule). Reconcile and customer
+	 * action jobs hold themselves and keep their own backoff.
+	 *
+	 * @param mixed $action_id Action id.
+	 */
+	public static function hold_other_jobs( $action_id ): void {
+		if ( ! class_exists( '\\ActionScheduler' ) || ! self::on_hold() ) {
+			return;
+		}
+
+		$store  = \ActionScheduler::store();
+		$action = $store->fetch_action( (string) (int) $action_id );
+
+		if ( ! method_exists( $action, 'get_hook' ) || ! method_exists( $action, 'get_group' ) || self::GROUP !== $action->get_group() || in_array( $action->get_hook(), array( self::HOOK, self::ACT ), true ) ) {
+			return;
+		}
+
+		$schedule = method_exists( $action, 'get_schedule' ) ? $action->get_schedule() : null;
+		$store->cancel_action( (string) (int) $action_id );
+
+		if ( ! is_object( $schedule ) || ! method_exists( $schedule, 'is_recurring' ) || ! $schedule->is_recurring() ) {
+			self::schedule_once( time() + self::PAUSED_DELAY, $action->get_hook(), (array) $action->get_args() );
+		}
 	}
 
 	/**
