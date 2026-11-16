@@ -154,7 +154,9 @@ final class Cart {
 	public static function add_line( string $domain, string $mode, string $auth_code = '', string $dns = '', int $mail_for = 0 ): array|\WP_Error {
 		// A locked domain cannot be transferred: asked again now (a few seconds at most); the cached answer stands in when that fails.
 		if ( 'transfer' === $mode ) {
-			$known = TransferDns::fresh_registrar( $domain );
+			$name = Search::normalise( $domain );
+			if ( is_wp_error( $name ) ) { return $name; }
+			$known = TransferDns::fresh_registrar( $name );
 			if ( ! empty( $known['locked'] ) ) { return new \WP_Error( 'domain_locked', TransferDns::locked_message( $domain ), array( 'status' => 422 ) ); }
 		}
 		$data = self::line_data( $domain, $mode, $auth_code, $dns, $mail_for );

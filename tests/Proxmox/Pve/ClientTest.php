@@ -186,6 +186,7 @@ class ClientTest extends TestCase {
 			'api_url'      => self::BASE,
 			'token_id'     => self::TOKEN,
 			'token_secret' => self::SECRET,
+			'console_token_secret' => 'console-secret-value',
 		);
 
 		$this->assertInstanceOf( FakeClient::class, Clients::for( $cluster ) );
@@ -218,6 +219,7 @@ class ClientTest extends TestCase {
 		);
 		Clients::for( $cluster );
 		$this->assertArrayNotHasKey( 'token_secret', $given );
+		$this->assertArrayNotHasKey( 'console_token_secret', $given );
 		$this->assertSame( self::TOKEN, $given['token_id'] );
 
 		remove_all_filters( 'beltoft_services_proxmox_client' );

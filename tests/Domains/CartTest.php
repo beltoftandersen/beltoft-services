@@ -46,6 +46,25 @@ class CartTest extends TestCase {
 		$this->assertStringContainsString( 'data-rest-nonce="' . wp_create_nonce( 'wp_rest' ) . '"', $html );
 	}
 
+	public function test_a_transfer_with_a_garbage_name_makes_no_registry_lookup(): void {
+		$result = \BeltoftServices\Domains\Cart::add_line( 'not a domain!! ' . str_repeat( 'x', 300 ), 'transfer', 'AUTH-CODE-1' );
+
+		$this->assertWPError( $result );
+		foreach ( $this->http_calls as $call ) {
+			$this->assertStringNotContainsString( 'rdap', $call['url'], 'No outbound lookup for a name that is not a domain.' );
+		}
+	}
+
+	public function test_the_registry_lookups_refuse_private_targets(): void {
+		\BeltoftServices\Domains\TransferDns::fresh_registrar( 'example-lookup.com' );
+		\BeltoftServices\Domains\TransferDns::registrar( 'example-lookup2.com' );
+
+		$this->assertCount( 2, $this->http_calls );
+		foreach ( $this->http_calls as $call ) {
+			$this->assertTrue( ! empty( $call['args']['reject_unsafe_urls'] ), 'The safe HTTP function is used.' );
+		}
+	}
+
 	public function test_public_cart_route_still_refuses_dns_hosting(): void {
 		$this->assertSame( 'dns_verification_required', Cart::line_data( 'example.com', 'dns' )->get_error_code() );
 		$this->assertSame( 'dns_verification_required', Cart::line_data( 'www.example.com', 'dns' )->get_error_code() );

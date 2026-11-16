@@ -243,7 +243,7 @@ final class TransferDns {
 			return $cached ? array( 'name' => (string) ( $cached['name'] ?? '' ), 'url' => (string) ( $cached['url'] ?? '' ) ) + ( ! empty( $cached['locked'] ) ? array( 'locked' => true ) : array() ) : null;
 		}
 
-		$reply = wp_remote_get(
+		$reply = wp_safe_remote_get(
 			'https://rdap.org/domain/' . rawurlencode( strtolower( $domain ) ),
 			array(
 				'timeout'     => 4,
@@ -274,7 +274,7 @@ final class TransferDns {
 			return self::cached_registrar( $domain );
 		}
 
-		$reply = wp_remote_get(
+		$reply = wp_safe_remote_get(
 			'https://rdap.org/domain/' . rawurlencode( strtolower( $domain ) ),
 			array(
 				'timeout'     => 3,
