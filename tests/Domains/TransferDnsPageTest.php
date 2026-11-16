@@ -169,6 +169,32 @@ class TransferDnsPageTest extends TestCase {
 		$this->assertSame( 403, rest_get_server()->dispatch( $bad )->get_status(), 'No nonce, no answer.' );
 	}
 
+	public function test_the_recommendation_route_looks_a_domain_up_once_in_a_few_minutes(): void {
+		add_filter( 'beltoft_services_transfer_registrar', static fn() => false );
+		$lookups = 0;
+		add_filter(
+			'beltoft_services_dns_proof_result',
+			static function ( $pre, $call ) use ( &$lookups ) {
+				if ( 'delegation' !== $call ) {
+					return $pre;
+				}
+				++$lookups;
+				return array( 'status' => 'ok', 'reason' => 'delegated', 'ns' => array( 'ns1.domaincontrol.com', 'ns2.domaincontrol.com' ), 'ips' => array(), 'ds' => false, 'ours' => false );
+			},
+			10,
+			2
+		);
+
+		for ( $i = 0; $i < 3; $i++ ) {
+			$request = new \WP_REST_Request( 'GET', '/beltoft-services/v1/domains/transfer-dns' );
+			$request->set_param( 'domain', 'slow-example.com' );
+			$request->set_header( 'X-WC-Nonce', wp_create_nonce( 'wc_store_api' ) );
+			$this->assertSame( 200, rest_get_server()->dispatch( $request )->get_status() );
+		}
+
+		$this->assertSame( 1, $lookups );
+	}
+
 	/** Mail text with the line breaks of the mail folded away. */
 	private function flat( string $text ): string {
 		return (string) preg_replace( '/\s+/', ' ', wp_strip_all_tags( $text ) );
