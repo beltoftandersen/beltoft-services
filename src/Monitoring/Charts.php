@@ -42,7 +42,7 @@ final class Charts {
 			/* translators: %s: the highest value in the period, such as 31% */
 			'peak' => __( 'peak %s', 'beltoft-services' ),
 			'noReading' => __( 'No reading', 'beltoft-services' ),
-			'memory' => __( 'Memory in use (excluding cache)', 'beltoft-services' ),
+			'memory' => __( 'Memory', 'beltoft-services' ),
 			/* translators: 1: memory in use in GB, 2: total memory in GB, 3: percent in use. */
 			'memNow' => __( '%1$s of %2$s GB (%3$s%)', 'beltoft-services' ),
 			'total' => __( 'Total', 'beltoft-services' ),
