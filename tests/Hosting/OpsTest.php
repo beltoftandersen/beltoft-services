@@ -199,6 +199,26 @@ class OpsTest extends HostingCase {
 		$this->assertCount( 1, array_unique( array_column( $this->agent->calls_of( 'agent.health' ), 'job_id' ) ), 'Never a second job.' );
 	}
 
+	public function test_the_bridge_and_a_failed_agent_loop_the_real_health_answer_carries_are_reported(): void {
+		$this->agent->set_health_extra(
+			array(
+				'bridge' => false,
+				'loops'  => array(
+					'isolation' => array( 'last' => 1, 'ok' => false, 'error' => 'OSError' ),
+					'scan'      => array( 'last' => 1, 'ok' => true ),
+				),
+			)
+		);
+
+		$found = NodeHealth::run();
+
+		$all = implode( ' | ', $this->admin_mails( 'attention' ) );
+		$this->assertCount( 2, $found['n1'] );
+		$this->assertStringContainsString( 'The network bridge of the containers is missing', $all );
+		$this->assertStringContainsString( 'Agent loop(s) failed: isolation (OSError)', $all );
+		$this->assertStringNotContainsString( 'scan', $all );
+	}
+
 	public function test_a_disabled_node_is_skipped_and_the_kill_switch_stops_the_job(): void {
 		$this->save_node( array( 'enabled' => '' ) );
 		$this->assertSame( array(), NodeHealth::run() );

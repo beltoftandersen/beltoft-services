@@ -19,6 +19,8 @@ defined( 'ABSPATH' ) || exit;
  *
  * - the agent cannot be reached, or the health job fails;
  * - the agent's own monitor alerts (its `alerts` list, for example the database monitor of plan 7.3);
+ * - the container bridge missing (`bridge` false) and a background loop of the agent that failed (`loops`, each with `ok`); these
+ *   are what the agent's health answer carries today;
  * - isolation problems: a container whose port isolation is not on (the optional `isolation` map vmid => state, the
  *   agent's loop re-asserts it every 30 seconds, so a state other than `ok` that stays is a real problem);
  * - loader problems: sites whose loader file is refused or failed, counted over all accounts of the node (the
@@ -198,6 +200,23 @@ final class NodeHealth {
 
 		if ( array() !== $bad ) {
 			$problems[] = self::notify( $id, 'isolation', 'Port isolation is not on for container(s): ' . implode( ', ', array_slice( $bad, 0, 20 ) ) . '.' );
+		}
+
+		// What the agent's health answer really carries: the container bridge and the state of each background loop.
+		if ( false === ( $result['bridge'] ?? null ) ) {
+			$problems[] = self::notify( $id, 'bridge', 'The network bridge of the containers is missing on the node.' );
+		}
+
+		$loops = array();
+
+		foreach ( (array) ( $result['loops'] ?? array() ) as $name => $loop ) {
+			if ( is_array( $loop ) && array_key_exists( 'ok', $loop ) && ! $loop['ok'] && 1 === preg_match( '/^[A-Za-z0-9_.-]{1,40}$/D', (string) $name ) ) {
+				$loops[] = (string) $name . ' (' . mb_substr( sanitize_text_field( (string) ( $loop['error'] ?? 'failed' ) ), 0, 40 ) . ')';
+			}
+		}
+
+		if ( array() !== $loops ) {
+			$problems[] = self::notify( $id, 'loops', 'Agent loop(s) failed: ' . implode( ', ', array_slice( $loops, 0, 10 ) ) . '.' );
 		}
 
 		$loaders = array();
