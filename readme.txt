@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.34.1
+Stable tag: 0.35.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,14 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.35.0 =
+* Licence keys and Plesk app licences share one vendor layer (`Domains\LicenceVendor` with a policy per kind); the existing settings, hooks and stored data are unchanged. A Plesk edition key may be up to 40 characters; the email about a failed Plesk licence deletion uses the same wording as for keys.
+* A licence whose first order failed before anything was bought at the vendor cancels its subscription. Not after a failed resume, plan change or pause, not when a vendor licence exists, and not when another live licence shares the subscription.
+* Domains are a service area like servers and hosting (`Account\Domains` extends `ServiceArea`); every address of the domain pages works as before. The old card for a domain outside its own page is one "Manage" link.
+* New filter `beltoft_services_product_url`: a site can say where the "order" links of the account pages point.
+* DNS: an answer to the DS record check must match the question asked; a name with a label over 63 characters is refused before a query is built; three lookups that left out the trailing dot now go through one function. Reads from the own name servers use one strict packet parser.
+* Job lookups use the search of Action Scheduler instead of reading every job; the mail mode (own name servers or elsewhere) is worked out live, and when a mail domain's zone leaves the own name servers the daily check reads its records again, holds outgoing mail only if SPF and DKIM are gone, and tells the administrator.
 
 = 0.34.1 =
 * The buttons of the hosting pages have the same height as the other account pages (40 px).
