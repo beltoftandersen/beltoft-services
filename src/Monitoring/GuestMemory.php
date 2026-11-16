@@ -70,7 +70,7 @@ final class GuestMemory {
 	}
 
 	/**
-	 * Keeps a reading: it becomes the latest one, and a row of the 5-minute slot is written when the slot has none.
+	 * Keeps a reading: it becomes the latest one, and a row of the 5-minute slot is written when the slot has none; a later, higher reading of the slot raises the slot's peak.
 	 * Live reads and the background job both end here, so a slot never gets more than one row.
 	 *
 	 * @param int                                       $resource_id Resource id.
@@ -92,7 +92,7 @@ final class GuestMemory {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- the plugin's own table; the primary key keeps one row per slot.
 		$wpdb->query(
 			$wpdb->prepare(
-				'INSERT IGNORE INTO %i (resource_id, span, bucket, used_mb, total_mb, used_max_mb) VALUES (%d, %d, %d, %d, %d, %d)',
+				'INSERT INTO %i (resource_id, span, bucket, used_mb, total_mb, used_max_mb) VALUES (%d, %d, %d, %d, %d, %d) ON DUPLICATE KEY UPDATE used_max_mb = GREATEST(used_max_mb, VALUES(used_max_mb))',
 				self::table(),
 				$resource_id,
 				self::SPAN_RAW,

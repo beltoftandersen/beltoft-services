@@ -334,6 +334,11 @@ final class HostingUsage {
 	 * PHP end of support: notices 90 and 30 days before, and the switch at the end date.
 	 */
 	private function step_php(): void {
+		// A change of the account the customer started (PHP version, a new site) is not worked against: the next hourly run looks again.
+		if ( null !== \BeltoftServices\Progress::pending( $this->r ) ) {
+			return;
+		}
+
 		$now      = Jobs::now();
 		$notified = (array) $this->r->get( 'php_notified' );
 		$default  = Config::get( 'php_default' );

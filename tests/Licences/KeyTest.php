@@ -448,6 +448,18 @@ final class KeyTest extends TestCase {
 		$this->assertTrue( KeyOrder::release( Resource::find( $r2->id() ) ) );
 	}
 
+	public function test_delete_is_not_done_while_the_vendor_licence_is_still_there(): void {
+		$r = $this->licence();
+		$this->build( $r );
+		$r = Resource::find( $r->id() );
+		$this->op->reply( 'DELETE', '/licenses/plesk/' . (int) $r->get( 'lic_key_id' ), new \WP_Error( 'http_500', 'down', array( 'status' => 500 ) ) );
+
+		$result = ( new KeyDriver() )->delete( $r );
+
+		$this->assertFalse( $result->is_done(), 'The resource is not closed while the vendor licence keeps billing.' );
+		$this->assertTrue( $result->is_retry() );
+	}
+
 	public function test_used_up_key_asks_do_not_stop_the_deletion_of_an_ended_licence(): void {
 		$r = $this->licence();
 		$this->build( $r );
@@ -628,6 +640,17 @@ final class KeyTest extends TestCase {
 		$this->assertSame( array( array( $r->id() ) ), KeyOrder::sync_due() );
 		KeyOrder::run_sync( $r->id() );
 		$this->assertCount( 1, $this->calls( 'DELETE' ) );
+	}
+
+	public function test_a_lapsed_licence_no_longer_holds_its_server_address(): void {
+		$r = $this->licence( array( 'ip' => '203.0.113.41' ) );
+		$this->build( $r );
+		$this->assertCount( 1, KeyOrder::live( '203.0.113.41' ) );
+
+		\BeltoftLicenses\Licenses::update( (int) Resource::find( $r->id() )->license()['id'], array( 'status' => \BeltoftLicenses\Licenses::STATUS_EXPIRED ) );
+		( new KeyDriver() )->pause( Resource::find( $r->id() ) );
+
+		$this->assertSame( array(), KeyOrder::live( '203.0.113.41' ), 'A paused, lapsed licence is no reason to refuse a new order for the address.' );
 	}
 
 	public function test_a_revoked_or_expired_licence_is_deleted_at_once_but_one_on_hold_is_kept(): void {

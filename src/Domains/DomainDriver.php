@@ -433,7 +433,14 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 		return StepResult::fail( 'This domain order needs staff attention. Registrar answer: ' . $why, array( 'steps' => $steps ) );
 	}
 
-	public function pause( Resource $r ): StepResult { return StepResult::done(); }
+	public function pause( Resource $r ): StepResult {
+		// A registration is never deleted here and its DNS stays served: a paused domain that is registered needs a staff decision.
+		if ( '' !== (string) $r->get( 'remote_id' ) ) {
+			\BeltoftServices\Alerts::domain_paused( $r );
+		}
+
+		return StepResult::done();
+	}
 	public function resume( Resource $r ): StepResult {
 		// A domain paused before or during provisioning is not built yet: resuming continues the build instead of marking it ready.
 		$steps = (array) $r->get( 'steps' );

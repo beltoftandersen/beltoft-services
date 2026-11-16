@@ -221,6 +221,29 @@ class DomainDriverTest extends TestCase {
 		$this->assertSame( 'The registrar is temporarily unavailable (http_request_failed).', $second->error() );
 	}
 
+	public function test_pausing_a_registered_domain_tells_staff_once_that_it_is_still_registered(): void {
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
+		$mails = array();
+		add_filter(
+			'pre_wp_mail',
+			static function ( $pre, $args ) use ( &$mails ) {
+				$mails[] = $args;
+				return true;
+			},
+			10,
+			2
+		);
+		$r = $this->resource( 'register', 'lapsed-example.com' );
+		$r->set( array( 'remote_id' => '123', 'expires_at' => '2027-10-26' ) );
+
+		$this->assertTrue( ( new DomainDriver() )->pause( Resource::find( $r->id() ) )->is_done() );
+		$this->assertTrue( ( new DomainDriver() )->pause( Resource::find( $r->id() ) )->is_done() );
+
+		$this->assertCount( 1, $mails );
+		$this->assertStringContainsString( 'lapsed-example.com', $mails[0]['subject'] . $mails[0]['message'] );
+		$this->assertStringContainsString( '123', $mails[0]['message'] );
+	}
+
 	public function test_register_happy_path(): void {
 		$fake = new FakeClient();
 		$fake->reply( 'GET', '/domains', array( 'results' => array() ) );

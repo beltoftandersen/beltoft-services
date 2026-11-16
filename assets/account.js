@@ -91,6 +91,19 @@
 		panel.beltoftActive = panel.beltoftActive || ( !! block && /^(queued|running)$/.test( block.getAttribute( 'data-phase' ) ) );
 		// Back on the page after a while: look at once.
 
+		// A dropped request or a server error (a deploy) is looked at again later, a few times; a refusal ends the chain.
+		function again() {
+			panel.beltoftFails = ( panel.beltoftFails || 0 ) + 1;
+
+			if ( panel.beltoftFails <= 20 ) {
+				later( function () {
+					if ( run === panel.beltoftRun ) {
+						poll( panel );
+					}
+				}, 15000 );
+			}
+		}
+
 		request( 'GET', id ).then( function ( result ) {
 			if ( 429 === result.status ) {
 				later( function () {
@@ -101,7 +114,13 @@
 				return null;
 			}
 
+			if ( result.status >= 500 ) {
+				again();
+				return null;
+			}
+
 			if ( result.ok ) {
+				panel.beltoftFails = 0;
 				// A body that is not JSON ends the polling, as it always has.
 				return result.parsed ? result.data : null;
 			}
@@ -135,7 +154,12 @@
 				// Settled in a new state, or the work shown has finished: the driver's part and the buttons change with it.
 				window.location.reload();
 			}
-		} ).catch( function () {} );
+		} ).catch( function () {
+			// The request itself failed (offline, dropped): the same wait as for a server error.
+			if ( run === panel.beltoftRun ) {
+				again();
+			}
+		} );
 	}
 
 	// After a queued action: look a few times (the job usually finishes within seconds), then

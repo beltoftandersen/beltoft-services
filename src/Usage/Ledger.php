@@ -257,6 +257,27 @@ final class Ledger {
 	}
 
 	/**
+	 * The largest hourly amount of the rows that earlier orders billed in a month, for the monthly cap.
+	 *
+	 * @param int    $resource_id Resource.
+	 * @param string $item        Item.
+	 * @param int    $month_start Unix time, first second of the month.
+	 * @param int    $month_end   Unix time, first second of the next month.
+	 * @param int    $except      An order whose rows do not count.
+	 * @param string $currency    Only rows in this currency count, '' for the shop's.
+	 */
+	public static function billed_peak( int $resource_id, string $item, int $month_start, int $month_end, int $except = 0, string $currency = '' ): float {
+		global $wpdb;
+
+		list( $sql, $args ) = self::in_currency( $currency );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- own table; $sql is fixed text.
+		$peak = $wpdb->get_var( $wpdb->prepare( "SELECT MAX(quantity * rate) FROM %i WHERE resource_id = %d AND item = %s AND order_id IS NOT NULL AND order_id <> %d AND hour_bucket >= %s AND hour_bucket < %s$sql", self::table(), $resource_id, $item, $except, gmdate( 'Y-m-d H:i:s', $month_start ), gmdate( 'Y-m-d H:i:s', $month_end ), ...$args ) );
+
+		return (float) $peak;
+	}
+
+	/**
 	 * Rows of a customer in a time range, newest hours last (for reports).
 	 *
 	 * @param int $user_id Customer.

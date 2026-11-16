@@ -45,7 +45,8 @@
       headers: { 'Content-Type': 'application/json', 'X-WC-Nonce': root.dataset.nonce, 'X-WP-Nonce': root.dataset.restNonce },
       body: JSON.stringify(Object.assign({ domain: domain, mode: mode, auth_code: authCode || '', dns: dns || '' }, mailFor() ? { mail_for: mailFor() } : {}))
     });
-    const data = await response.json();
+    // An error page that is not JSON (a 502, maintenance) gives the translated message below, not a parse error.
+    const data = await response.json().catch(function () { return {}; });
     if (!response.ok) throw new Error(data.message || __('Could not add this domain.', 'beltoft-services'));
     window.location.assign(data.checkout_url);
   }
@@ -73,7 +74,8 @@
   // One availability lookup through the public check route.
   async function check(root, name) {
     const response = await fetch(root.dataset.check + '?name=' + encodeURIComponent(name), { credentials: 'same-origin' });
-    const data = await response.json();
+    // An error page that is not JSON (a 502, maintenance) gives the translated message below, not a parse error.
+    const data = await response.json().catch(function () { return {}; });
     if (!response.ok) throw new Error(data.message || __('The search could not be completed.', 'beltoft-services'));
     taxMode = data.tax === 'incl' ? 'incl' : 'excl';
     return data;

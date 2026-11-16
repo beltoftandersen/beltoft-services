@@ -43,8 +43,6 @@ final class Credentials {
 			return;
 		}
 
-		set_transient( self::RAN, 1, DAY_IN_SECONDS );
-
 		foreach ( array( 'vm', 'db' ) as $kind ) {
 			foreach ( Resource::live_ids( $kind ) as $id ) {
 				$r = Resource::find( $id );
@@ -54,6 +52,9 @@ final class Credentials {
 				}
 			}
 		}
+
+		// Marked as run only when the whole walk finished: a request that died part way is repeated by the next sweep.
+		set_transient( self::RAN, 1, DAY_IN_SECONDS );
 	}
 
 	/**

@@ -517,7 +517,7 @@ final class AppReinstall {
 			$full   = '' === (string) $r->get( 'app_id' ) || self::NONE === $options['selected'] ? null : Apps::version( (string) $r->get( 'app_id' ), self::KEEP === $options['selected'] ? (string) $r->get( 'app_version' ) : $options['selected'] );
 			/* translators: %s: app and version, such as WordPress 7.1.4 */
 			$format = __( '%s is installed.', 'beltoft-services' );
-			echo '<p data-app-reinstall-summary data-text-none="' . esc_attr( $none ) . '" data-text-app="' . esc_attr( $format ) . '">' . esc_html( null === $full ? $none : sprintf( $format, Apps::version_label( $full ) ) ) . '</p>';
+			echo '<p data-app-reinstall-summary data-current="' . esc_attr( __( 'Current: ', 'beltoft-services' ) ) . '" data-text-none="' . esc_attr( $none ) . '" data-text-app="' . esc_attr( $format ) . '">' . esc_html( null === $full ? $none : sprintf( $format, Apps::version_label( $full ) ) ) . '</p>';
 		}
 		if ( true !== $r->get( 'app_domain_made' ) || '' === (string) $r->get( 'app_domain' ) ) {
 			return;

@@ -162,7 +162,7 @@ final class AddonEffects {
 		$added = ( new HostingActions( $r ) )->queue( 'add_domain', array( $slug, $host ) );
 
 		// A change under way is no failure: the wish is kept with the account and the domain sweep makes it when the account is free.
-		if ( is_wp_error( $added ) && 'busy' === $added->get_error_code() ) {
+		if ( self::waits( $added ) ) {
 			$fresh           = Resource::find( $r->id() ) ?? $r;
 			$wanted          = (array) $fresh->get( self::WANT_CONNECT );
 			$wanted[ $host ] = $slug;
@@ -176,6 +176,16 @@ final class AddonEffects {
 			$order->add_order_note( 'The domain ' . $host . ' is paid but could not be added to the website: ' . $added->get_error_message() );
 			AddonBilling::alert( 'Paid domain was not connected', sprintf( "Order #%1\$d paid for the extra domain %2\$s, but it could not be added to the website: %3\$s.\n\nAdd it by hand or ask the customer to add it from the hosting page.", $order->get_id(), $host, $added->get_error_message() ) );
 		}
+	}
+
+	/**
+	 * Whether a refusal of a change is only a wait: a change under way (busy) or an account that is not ready at this moment (not_ready).
+	 * The wish stays and the domain sweep tries again; any other refusal is final.
+	 *
+	 * @param mixed $answer Answer of HostingActions::queue().
+	 */
+	private static function waits( $answer ): bool {
+		return is_wp_error( $answer ) && in_array( $answer->get_error_code(), array( 'busy', 'not_ready' ), true );
 	}
 
 	/**
@@ -193,7 +203,7 @@ final class AddonEffects {
 				$dropped = ( new HostingActions( $r ) )->queue( 'remove_domain', array( $row['host'], true ) );
 
 				// A change under way is no failure: the domain is kept as to be dropped and the domain sweep does it when the account is free.
-				if ( is_wp_error( $dropped ) && 'busy' === $dropped->get_error_code() ) {
+				if ( self::waits( $dropped ) ) {
 					$fresh  = Resource::find( $r->id() ) ?? $r;
 					$wanted = array_values( array_unique( array_merge( array_filter( (array) $fresh->get( self::WANT_DROP ), 'is_string' ), array( $reg ) ) ) );
 
@@ -231,7 +241,7 @@ final class AddonEffects {
 
 			$done = ( new HostingActions( $fresh ) )->queue( 'add_domain', array( (string) $slug, (string) $host ) );
 
-			if ( is_wp_error( $done ) && 'busy' === $done->get_error_code() ) {
+			if ( self::waits( $done ) ) {
 				continue;
 			}
 
@@ -256,7 +266,7 @@ final class AddonEffects {
 
 			$done = ( new HostingActions( $fresh ) )->queue( 'remove_domain', array( $rows[0]['host'], true ) );
 
-			if ( is_wp_error( $done ) && 'busy' === $done->get_error_code() ) {
+			if ( self::waits( $done ) ) {
 				continue;
 			}
 

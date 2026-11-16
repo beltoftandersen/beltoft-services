@@ -80,6 +80,7 @@ final class Children {
 		if ( ! self::attach( $parent, $child ) ) {
 			// No half-made child: the service never started, so it is closed and its license revoked, and a retry starts clean.
 			$child->set( array( 'state' => 'deleted', 'desired' => 'deleted' ) );
+			$child->close();
 			Licenses::update( (int) $license['id'], array( 'status' => Licenses::STATUS_REVOKED ) );
 
 			return new \WP_Error( 'link', $link_error );

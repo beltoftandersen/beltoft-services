@@ -27,8 +27,6 @@ final class PasswordJobs {
 			return;
 		}
 
-		set_transient( ProxmoxJobs::PURGE_RAN, 1, DAY_IN_SECONDS );
-
 		$driver = Registry::get( ProxmoxDriver::ID );
 
 		if ( ! $driver ) {
@@ -61,5 +59,8 @@ final class PasswordJobs {
 				}
 			);
 		}
+
+		// Marked as run only when the whole walk finished: a request that died part way is repeated by the next sweep.
+		set_transient( ProxmoxJobs::PURGE_RAN, 1, DAY_IN_SECONDS );
 	}
 }

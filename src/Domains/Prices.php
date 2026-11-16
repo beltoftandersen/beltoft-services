@@ -165,6 +165,11 @@ final class Prices {
 				if ( null !== $parsed ) { $table[ $parsed[0] ] = $parsed[1]; }
 			}
 			if ( count( $page['results'] ) < self::PAGE_SIZE ) {
+				// An empty list is a glitch, not a registrar that sells nothing: the saved table stays.
+				if ( array() === $table ) {
+					return new \WP_Error( 'empty_list', 'Registrar TLD list was empty; the saved prices were kept.' );
+				}
+
 				update_option( self::OPTION, $table, false );
 				\BeltoftServices\Alerts::quietly( array( __CLASS__, 'alert_below_cost' ) );
 				return count( $table );

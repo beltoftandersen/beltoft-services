@@ -426,6 +426,35 @@ final class RetentionTest extends TestCase {
 		$this->assertSame( array(), $this->driver->calls( 'delete' ) );
 	}
 
+	public function test_a_warning_whose_record_could_not_be_written_is_not_mailed_again(): void {
+		$this->settings( array( 'deletion_mode' => 'on' ) );
+		$warn = $this->paused( 29.5 );
+
+		global $wpdb;
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection holds the lock.
+
+		// The mail goes out and is confirmed, then the resource lock is busy when warned_at is written.
+		add_action(
+			'beltoft_services_deletion_warning',
+			function ( $r ) use ( $other, $wpdb ) {
+				$other->query( $wpdb->prepare( 'SELECT GET_LOCK( %s, 1 )', \BeltoftServices\Locks::name( 'resource', $r->id() ) ) );
+			},
+			20
+		);
+		add_filter( 'beltoft_services_desire_lock_wait', '__return_zero' );
+		Retention::run();
+		$other->close();
+		remove_filter( 'beltoft_services_desire_lock_wait', '__return_zero' );
+
+		$this->assertCount( 1, $this->warnings );
+		$this->assertNull( $this->fresh( $warn )->get( 'warned_at' ), 'The record was not written.' );
+
+		Retention::run();
+
+		$this->assertCount( 1, $this->warnings, 'The customer is not mailed a second time.' );
+		$this->assertNotNull( $this->fresh( $warn )->get( 'warned_at' ), 'The record is written by the next run.' );
+	}
+
 	public function test_busy_lock_skips_the_deletion_until_the_next_run(): void {
 		$this->settings( array( 'deletion_mode' => 'on' ) );
 		$due = $this->paused( 31, array( 'warned_at' => time() - 2 * DAY_IN_SECONDS ) );

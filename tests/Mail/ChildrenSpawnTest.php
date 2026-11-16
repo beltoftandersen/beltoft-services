@@ -54,4 +54,24 @@ final class ChildrenSpawnTest extends MailTestCase {
 		$this->assertSame( Licenses::STATUS_REVOKED, $found[0]['status'] );
 		$this->assertSame( array(), Children::ids( Resource::find( $parent->id() ) ) );
 	}
+
+	public function test_spawn_closes_a_child_whose_link_cannot_be_stored(): void {
+		$parent = $this->ready_mail( 'parent3.example' );
+		$slug   = 'child-link-slug';
+
+		// The parent's activation row is gone, so the link on the parent cannot be written.
+		global $wpdb;
+		$wpdb->delete( \BeltoftLicenses\Install::tables()['activations'], array( 'id' => $parent->id() ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		Resource::memo_flush();
+
+		$res = Children::spawn( $parent, $slug, Registry::get( MailDriver::ID ), array( 'mailboxes' => 3 ), array( MailDomain::META_DOMAIN => 'kid3.example' ), 'no license', 'no link' );
+
+		$this->assertWPError( $res );
+		$found = $this->child_licenses( $parent, $slug );
+		$this->assertCount( 1, $found );
+		$this->assertSame( Licenses::STATUS_REVOKED, $found[0]['status'] );
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT live_domain FROM %i WHERE license_id = %d', \BeltoftLicenses\Install::tables()['activations'], (int) $found[0]['id'] ), ARRAY_A ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$this->assertCount( 1, $rows );
+		$this->assertEmpty( $rows[0]['live_domain'], 'The activation is closed, not left live.' );
+	}
 }

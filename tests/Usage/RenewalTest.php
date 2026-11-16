@@ -179,6 +179,25 @@ class RenewalTest extends UsageTestCase {
 		$this->assertSame( '2.94', $this->fees( $second )[0]->get_total() );
 	}
 
+	public function test_a_later_statement_at_a_lower_rate_keeps_the_month_peak_cap(): void {
+		$user = $this->new_user();
+		$sub  = $this->usage_account( $user );
+		$base = $this->long_month();
+
+		for ( $i = 0; $i < 300; $i++ ) {
+			Ledger::record( 501, $user, 'server', 1.0, 'hour', 0.02, $base + $i * HOUR_IN_SECONDS );
+		}
+		$first = wcs_create_renewal_order( $sub );
+		$this->assertSame( '6', $this->fees( $first )[0]->get_total() );
+
+		for ( $i = 300; $i < 744; $i++ ) {
+			Ledger::record( 501, $user, 'server', 1.0, 'hour', 0.01, $base + $i * HOUR_IN_SECONDS );
+		}
+		$second = wcs_create_renewal_order( $sub );
+		// The month's peak cap is 0.02 x 730 = 14.60: 14.60 - 6.00 is left, the 444 hours at 0.01 cost 4.44.
+		$this->assertSame( '4.44', $this->fees( $second )[0]->get_total() );
+	}
+
 	public function test_a_renewal_made_again_for_the_same_period_bills_nothing_twice(): void {
 		$user = $this->new_user();
 		$sub  = $this->usage_account( $user );

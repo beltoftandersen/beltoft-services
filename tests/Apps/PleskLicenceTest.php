@@ -189,6 +189,21 @@ final class PleskLicenceTest extends PaidAppCase {
 		$this->assertNotEmpty( $this->mails );
 	}
 
+	public function test_a_vendor_step_that_fails_for_good_cancels_the_undelivered_subscription_and_names_the_order(): void {
+		$this->settings( array( 'plesk_costs' => 'pro=15' ) );
+		$o = $this->plesk_order( 'pro' );
+		$this->mails = array();
+		$id = (int) ( $o['licence']->license()['subscription_id'] ?? 0 );
+		$this->assertGreaterThan( 0, $id, 'The order has a subscription.' );
+
+		Jobs::run( $o['licence']->id() );
+
+		$licence = $this->fresh( $o['licence'] );
+		$this->assertSame( 'failed', $licence->get( 'state' ) );
+		$this->assertStringContainsString( 'review and refund order #', (string) $licence->get( 'last_error' ) );
+		$this->assertSame( 'cancelled', wcs_get_subscription( $id )->get_status() );
+	}
+
 	public function test_an_unknown_cost_is_refused_except_on_the_fake_client_and_a_non_euro_order_is_refused(): void {
 		$o = $this->plesk_order( 'pro' );
 		$this->settings( array( 'plesk_costs' => '' ) );

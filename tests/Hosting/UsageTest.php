@@ -295,6 +295,23 @@ class UsageTest extends HostingCase {
 		$this->assertCount( 1, $this->agent->calls_of( 'site.php' ), 'Switched once.' );
 	}
 
+	public function test_the_php_switch_waits_while_a_change_of_the_account_is_under_way(): void {
+		$this->settings( array( 'hosting_php_default' => '8.4', 'hosting_php_eol' => '8.3=2027-02-10' ) );
+		$r = $this->account();
+		Sites::update( $r->id(), 'w' . $r->id(), array( 'php' => '8.3' ) );
+		\BeltoftServices\Progress::mark( Resource::find( $r->id() ), 'set_php', 'Changing PHP' );
+
+		$this->clock = strtotime( '2027-02-11 08:00:00 UTC' );
+		$r           = $this->sample( $r, 3, 1 );
+
+		$this->assertCount( 0, $this->agent->calls_of( 'site.php' ), 'The customer change is not overwritten.' );
+		$this->assertSame( '8.3', Sites::find( $r->id(), 'w' . $r->id() )['php'] );
+
+		\BeltoftServices\Progress::clear( Resource::find( $r->id() ) );
+		$this->sample( Resource::find( $r->id() ), 3, 1 );
+		$this->assertSame( '8.4', Sites::find( $r->id(), 'w' . $r->id() )['php'], 'The next run switches it.' );
+	}
+
 	public function test_a_site_already_on_the_default_or_with_no_date_is_left_alone(): void {
 		$this->settings( array( 'hosting_php_default' => '8.4', 'hosting_php_eol' => '8.4=2027-02-10' ) );
 		$r = $this->account(); // Runs 8.4, the default.

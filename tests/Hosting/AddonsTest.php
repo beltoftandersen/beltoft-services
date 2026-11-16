@@ -1146,4 +1146,25 @@ class AddonsTest extends HostingCase {
 		$this->assertNull( SiteDomains::find( 'gone.example' ), 'The sweep takes the names off.' );
 		$this->assertNotNull( SiteDomains::find( 'main.example' ), 'The included domain is not touched.' );
 	}
+
+	public function test_an_ended_domain_is_kept_as_to_be_dropped_when_the_account_is_not_ready_at_the_renewal(): void {
+		$this->card_pays();
+		$r = $this->account();
+		$this->connect_domain( $r, 'main.example' );
+		$a    = new HostingActions( Resource::find( $r->id() ) );
+		$slug = 'w' . $r->id();
+
+		$a->buy_addon( 'domain', 'gone2.example', 100 );
+		$this->assertIsArray( $a->add_domain( $slug, 'gone2.example' ) );
+		$this->assertTrue( Addons::end( $r, Addons::KIND_DOMAIN, 'gone2.example' ) );
+
+		Resource::find( $r->id() )->set( array( 'state' => 'failed' ) );
+		wcs_create_renewal_order( $this->sub( $r ) );
+
+		$this->assertSame( array( 'gone2.example' ), Resource::find( $r->id() )->get( \BeltoftServices\Hosting\AddonEffects::WANT_DROP ), 'Not ready is a wait, not the end of the wish.' );
+
+		Resource::find( $r->id() )->set( array( 'state' => 'ready' ) );
+		DomainSweep::run();
+		$this->assertNull( SiteDomains::find( 'gone2.example' ), 'The sweep takes the names off once the account is ready.' );
+	}
 }

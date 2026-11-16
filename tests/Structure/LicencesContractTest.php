@@ -21,14 +21,14 @@ final class LicencesContractTest extends TestCase {
 
 	public function test_the_installed_version_is_at_least_the_one_the_plugin_requires(): void {
 		$this->assertTrue( defined( 'BELTOFT_LICENSES_VERSION' ) );
-		$this->assertGreaterThanOrEqual( 0, version_compare( (string) BELTOFT_LICENSES_VERSION, '0.8.5' ) );
+		$this->assertGreaterThanOrEqual( 0, version_compare( (string) BELTOFT_LICENSES_VERSION, \BeltoftServices\Plugin::MIN_LICENSES ) );
 	}
 
 	public function test_the_dependency_gate_names_the_same_version(): void {
 		$source = (string) file_get_contents( dirname( __DIR__, 2 ) . '/src/Plugin.php' );
 
-		$this->assertStringContainsString( "'0.8.5', '<'", $source );
-		$this->assertStringContainsString( 'Beltoft Licenses 0.8.5 or newer', $source );
+		$this->assertStringContainsString( 'self::MIN_LICENSES, \'<\'', $source );
+		$this->assertStringContainsString( "'Beltoft Licenses ' . self::MIN_LICENSES . ' or newer'", $source );
 	}
 
 	public function test_install_tables_has_the_keys_the_plugin_reads(): void {

@@ -20,6 +20,16 @@ final class Plugin {
 	public const REST_NAMESPACE = 'beltoft-services/v1';
 
 	/**
+	 * The oldest Beltoft Licenses this release is tested with (0.8.6 closed a license leak, 0.8.8 hides child licenses from the account tabs).
+	 */
+	public const MIN_LICENSES = '0.8.8';
+
+	/**
+	 * The oldest WooCommerce this release is tested with (the header's WC requires at least).
+	 */
+	public const MIN_WOOCOMMERCE = '9.0';
+
+	/**
 	 * Whether the last boot registered the plugin's parts.
 	 *
 	 * @var bool
@@ -296,14 +306,16 @@ final class Plugin {
 
 		if ( ! class_exists( 'WooCommerce' ) ) {
 			$missing[] = 'WooCommerce';
+		} elseif ( defined( 'WC_VERSION' ) && version_compare( (string) WC_VERSION, self::MIN_WOOCOMMERCE, '<' ) ) {
+			$missing[] = 'WooCommerce ' . self::MIN_WOOCOMMERCE . ' or newer';
 		}
 
 		if ( ! class_exists( 'WC_Subscriptions' ) && ! function_exists( 'wcs_get_subscription' ) ) {
 			$missing[] = 'WooCommerce Subscriptions';
 		}
 
-		if ( ! class_exists( \BeltoftLicenses\Licenses::class ) || ! method_exists( \BeltoftLicenses\Licenses::class, 'add_resource' ) || ! defined( 'BELTOFT_LICENSES_VERSION' ) || version_compare( (string) BELTOFT_LICENSES_VERSION, '0.8.5', '<' ) ) {
-			$missing[] = 'Beltoft Licenses 0.8.5 or newer';
+		if ( ! class_exists( \BeltoftLicenses\Licenses::class ) || ! method_exists( \BeltoftLicenses\Licenses::class, 'add_resource' ) || ! defined( 'BELTOFT_LICENSES_VERSION' ) || version_compare( (string) BELTOFT_LICENSES_VERSION, self::MIN_LICENSES, '<' ) ) {
+			$missing[] = 'Beltoft Licenses ' . self::MIN_LICENSES . ' or newer';
 		}
 
 		global $wpdb;

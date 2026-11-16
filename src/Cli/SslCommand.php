@@ -447,6 +447,9 @@ final class SslCommand {
 	 * [--adopt=<order-id>]
 	 * : The registrar order id to take as this service's order (checked: same name, not ended). Without it the marker is cleared and the next run places a new order, so check the registrar first.
 	 *
+	 * [--yes]
+	 * : Needed without --adopt: confirms that the registrar holds no order for this name and a new one may be placed (it is paid for).
+	 *
 	 * @subcommand order-retry
 	 *
 	 * @param array<int, string>   $args       Resource id.
@@ -457,6 +460,10 @@ final class SslCommand {
 
 		if ( ! $r || SslDriver::ID !== $r->get( 'driver' ) ) {
 			\WP_CLI::error( 'That is not a certificate service.' );
+		}
+
+		if ( empty( $assoc_args['adopt'] ) && empty( $assoc_args['yes'] ) ) {
+			\WP_CLI::error( sprintf( 'Without --adopt the next run places a new order for %s at the registrar, which is paid for. Check the registrar, then add --yes.', (string) $r->get( 'ssl_name' ) ) );
 		}
 
 		$done = \BeltoftServices\Ssl\Provision::resolve_marker( $r, (int) ( $assoc_args['adopt'] ?? 0 ) );
@@ -479,15 +486,23 @@ final class SslCommand {
 	 * <renewal-order-id>
 	 * : The paid renewal order.
 	 *
+	 * [--yes]
+	 * : Confirms that the registrar was checked and holds no renewal for this order.
+	 *
 	 * @subcommand renew-retry
 	 *
-	 * @param array<int, string> $args Resource id and order id.
+	 * @param array<int, string>   $args       Resource id and order id.
+	 * @param array<string, mixed> $assoc_args Flags.
 	 */
-	public function renew_retry( array $args ): void {
+	public function renew_retry( array $args, array $assoc_args = array() ): void {
 		$r = Resource::find( (int) ( $args[0] ?? 0 ) );
 
 		if ( ! $r || SslDriver::ID !== $r->get( 'driver' ) || ! ctype_digit( (string) ( $args[1] ?? '' ) ) ) {
 			\WP_CLI::error( 'Give a certificate resource id and a renewal order id.' );
+		}
+
+		if ( empty( $assoc_args['yes'] ) ) {
+			\WP_CLI::error( 'A renewal that is requested again is paid for again. Check the registrar, then add --yes.' );
 		}
 
 		\WP_CLI::success( \BeltoftServices\Ssl\SslRenewals::retry_marker( $r, (string) $args[1] ) ? 'The renewal can be requested again.' : 'Could not save.' );

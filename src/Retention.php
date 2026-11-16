@@ -265,6 +265,17 @@ final class Retention {
 			return;
 		}
 
+		// A warning that was sent but whose record could not be written (the resource lock was busy) is only recorded now, never mailed twice.
+		$sent_key = 'beltoft_services_warn_sent_' . $r->id();
+
+		if ( (int) get_option( $sent_key, 0 ) === $paused_at ) {
+			if ( $r->record_retention( array( 'warned_at' => time() ), $paused_at ) ) {
+				delete_option( $sent_key );
+				Events::add( (int) $r->license()['id'], 'service', sprintf( 'Deletion warning: the service will be deleted on %s UTC.', $date ) );
+			}
+			return;
+		}
+
 		// Stored first: a warning whose record could not be written is not sent, so a record that
 		// cannot be written never makes a second mail.
 		if ( ! $r->record_retention( array( 'warn_started_at' => time() ), $paused_at ) ) {
@@ -302,7 +313,11 @@ final class Retention {
 
 		unset( self::$confirmed[ $r->id() ] );
 
+		// The mail is out: remembered apart from the resource lock, so a busy lock cannot make the next run send it again.
+		update_option( $sent_key, $paused_at, false );
+
 		if ( $r->record_retention( array( 'warned_at' => time() ), $paused_at ) ) {
+			delete_option( $sent_key );
 			Events::add( (int) $r->license()['id'], 'service', sprintf( 'Deletion warning: the service will be deleted on %s UTC.', $date ) );
 		}
 	}

@@ -110,6 +110,20 @@ class GuestMemoryTest extends MonitoringTestCase {
 		$this->assertSame( 2, $this->rows( $r->id() ) );
 	}
 
+	public function test_the_peak_of_a_slot_is_its_highest_reading_not_the_first(): void {
+		global $wpdb;
+		$r    = $this->ready_vm( 5000 );
+		$slot = intdiv( time(), 300 ) * 300;
+
+		GuestMemory::store( $r->id(), array( 'used_mb' => 500, 'total_mb' => 2048 ), $slot + 5 );
+		GuestMemory::store( $r->id(), array( 'used_mb' => 1500, 'total_mb' => 2048 ), $slot + 15 );
+		GuestMemory::store( $r->id(), array( 'used_mb' => 700, 'total_mb' => 2048 ), $slot + 25 );
+
+		$this->assertSame( 1, $this->rows( $r->id() ), 'Still one row per slot.' );
+		$peak = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT used_max_mb FROM %i WHERE resource_id = %d', Schema::tables()['guest_memory'], $r->id() ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$this->assertSame( 1500, $peak );
+	}
+
 	public function test_a_server_with_a_row_in_the_current_slot_is_not_asked_again_by_the_job(): void {
 		$r = $this->ready_vm( 5000 );
 		$this->fake->set_guest_file( 5000, '/proc/meminfo', self::MEMINFO );

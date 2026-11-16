@@ -67,6 +67,27 @@ class DiskCapacityTest extends BackupTestCase {
 		$this->assertSame( 70, DiskCapacity::reservation( $disk )['gb'], 'A refused replacement keeps the old reservation.' );
 	}
 
+	public function test_a_reservation_that_could_not_be_freed_because_the_lock_was_busy_is_dropped_by_the_sweep(): void {
+		global $wpdb;
+		$server = $this->ready_vm();
+		$this->assertTrue( DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
+		$disk = $this->disk_resource( $server );
+		$this->assertTrue( DiskCapacity::reserve( $disk, 'lab', 'node-a', 'disk-store', 50 ) );
+
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection holds the lock.
+		$other->query( $wpdb->prepare( 'SELECT GET_LOCK( %s, 1 )', \BeltoftServices\Locks::name( 'disk_capacity', 0 ) ) );
+		add_filter( 'beltoft_services_alloc_lock_wait', '__return_zero' );
+		DiskCapacity::release( $disk );
+		$other->close();
+
+		$this->assertNotNull( DiskCapacity::reservation( $disk ), 'The entry is still there: the lock was busy.' );
+
+		DiskCapacity::sweep();
+		remove_filter( 'beltoft_services_alloc_lock_wait', '__return_zero' );
+
+		$this->assertNull( DiskCapacity::reservation( $disk ), 'The sweep frees the released disk even though it is live.' );
+	}
+
 	public function test_hourly_capacity_job_sweeps_stale_reservations(): void {
 		$server = $this->ready_vm();
 		$live = $this->disk_resource( $server );
