@@ -50,6 +50,7 @@ final class KeyMove {
 	public static function register(): void {
 		add_filter( 'beltoft_services_action_refusal', array( __CLASS__, 'refusal' ), 10, 4 );
 		add_action( PleskLicence::MOVED, array( __CLASS__, 'app_licence_moved' ), 10, 3 );
+		add_filter( 'beltoft_services_account_buttons', array( __CLASS__, 'no_generic_button' ), 10, 2 );
 		add_action( 'beltoft_services_account_assets', array( __CLASS__, 'assets' ), 20, 2 );
 	}
 
@@ -379,6 +380,21 @@ final class KeyMove {
 		if ( ! self::queue_children( (int) $licence->get( 'plesk_key_id' ), $ip, (int) ( $server->license()['id'] ?? 0 ) ) ) {
 			Alerts::admin( $licence, 'An add-on of this Plesk licence is busy and did not follow the licence to ' . $ip . '. Change its server address by hand or wait and check the add-on.' );
 		}
+	}
+
+	/**
+	 * The address change needs an address: it has its own form (form()), so the generic button, which posts no arguments, is not drawn.
+	 *
+	 * @param mixed $actions  Action name => label.
+	 * @param mixed $resource Resource.
+	 * @return mixed
+	 */
+	public static function no_generic_button( $actions, $resource = null ) {
+		if ( is_array( $actions ) && $resource instanceof Resource && KeyDriver::ID === $resource->get( 'driver' ) ) {
+			unset( $actions[ self::ACTION ] );
+		}
+
+		return $actions;
 	}
 
 	/**

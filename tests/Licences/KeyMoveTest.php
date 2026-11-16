@@ -363,4 +363,15 @@ final class KeyMoveTest extends TestCase {
 		KeyPanel::account( $r );
 		$this->assertSame( '', (string) ob_get_clean() );
 	}
+
+	public function test_the_generic_button_is_not_drawn_and_the_route_names_the_action_and_where_to_follow_it(): void {
+		$r = $this->ready();
+
+		$this->assertArrayHasKey( KeyMove::ACTION, ( new \BeltoftServices\Licences\KeyDriver() )->customer_actions( $r ) );
+		$this->assertSame( array(), apply_filters( 'beltoft_services_account_buttons', array( KeyMove::ACTION => 'x' ), $r, 'card' ) );
+
+		$reply = \BeltoftServices\Api\Routes::queued( $r, KeyMove::ACTION )->get_data();
+		$this->assertSame( KeyMove::ACTION, $reply['action'] );
+		$this->assertSame( '/resources/' . $r->id(), $reply['status'] );
+	}
 }
