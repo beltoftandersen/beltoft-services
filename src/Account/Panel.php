@@ -394,6 +394,15 @@ final class Panel {
 					'failed'  => __( 'Something went wrong. Please try again.', 'beltoft-services' ),
 					'expired' => __( 'Your session has expired. Please reload the page.', 'beltoft-services' ),
 					'working' => __( 'Working…', 'beltoft-services' ),
+					// The code step before a secret is shown (beltoftApi.stepUp).
+					'stepTitle'  => __( 'Enter the code we emailed you', 'beltoft-services' ),
+					/* translators: %s: the account email address with most of the name hidden. */
+					'stepText'   => __( 'We sent a code to %s. It works once for 10 minutes.', 'beltoft-services' ),
+					'stepSent'   => __( 'Check your email.', 'beltoft-services' ),
+					'stepCode'   => __( 'Code from the email', 'beltoft-services' ),
+					'stepResend' => __( 'Send a new code', 'beltoft-services' ),
+					'stepGo'     => __( 'Continue', 'beltoft-services' ),
+					'stepCancel' => __( 'Cancel', 'beltoft-services' ),
 				),
 			)
 		);

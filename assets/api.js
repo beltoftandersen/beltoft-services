@@ -17,12 +17,18 @@
  * {action, ok, at, text} (the resource's last_result) or, when the job is still going after options.rounds looks (default 30),
  * to null. Options: holder (as for call), interval (milliseconds, default 4000), rounds, onTick( data ) with every status read,
  * handle (the beltoftStatus.busy() handle of the work: every status read that lists steps moves its progress line, "step n of m").
- * Nothing is rejected for a failed job: the outcome has ok false and the server's own text.
+ * Nothing is rejected for a failed job: the outcome has ok false and the server's own text. While the browser tab is hidden no
+ * status is read (beltoftApi.later); the look is made at once when the tab is shown again, and the pause does not use up a round.
  * With options.until = 'idle' it follows the service instead of one action: it resolves to { idle: true, data } when the status
  * shows no running task (`task` empty on the hosting overview, else no `working` and no `progress.active`), whatever the last
  * action was; options.path is the status path to read (default: the queued answer's status), the look is every 5 seconds (15
  * after ten minutes), and options.timeout (milliseconds, default seven hours) ends it with null, never with success. A 429 waits
  * for Retry-After in both modes.
+ *
+ * window.beltoftApi.stepUp( purpose, options ) asks the customer for the code we email before a secret is shown or changed. It emails
+ * the code at once (the step-up route of the holder) and shows a dialog with the code field; it resolves to the typed code, or to
+ * null when the customer cancels. The caller sends the code as step_code with its request. Options: holder (as for call; its
+ * stepUpUrl and its strings stepTitle, stepText (%s: the masked address), stepSent, stepCode, stepResend, stepGo and stepCancel are used).
  *
  * window.beltoftApi.copy( text, button ) copies text (the clipboard, or a hidden textarea and the old copy command) and
  * resolves when it worked; with a button, its label shows the button's data-copied text for two seconds. No dependencies.
@@ -108,6 +114,24 @@
 		return ! data.working && ! ( data.progress && data.progress.active );
 	}
 
+	// Runs fn after ms, and while the browser tab is hidden not at all: it runs at once when the tab is shown again. A tab nobody
+	// looks at sends no status reads.
+	function later( fn, ms ) {
+		window.setTimeout( function () {
+			if ( ! document.hidden ) {
+				fn();
+				return;
+			}
+
+			document.addEventListener( 'visibilitychange', function shown() {
+				if ( ! document.hidden ) {
+					document.removeEventListener( 'visibilitychange', shown );
+					fn();
+				}
+			} );
+		}, ms );
+	}
+
 	function follow( queued, options ) {
 		var settings = options || {};
 		var holder = settings.holder || window.beltoftServicesAccount || {};
@@ -164,7 +188,7 @@
 					}
 
 					// After ten minutes the look is slower (a restore may take hours).
-					window.setTimeout( look, wait || ( Date.now() - started > 600000 ? 3 * interval : interval ) );
+					later( look, wait || ( Date.now() - started > 600000 ? 3 * interval : interval ) );
 					return;
 				}
 
@@ -177,7 +201,7 @@
 					return;
 				}
 
-				window.setTimeout( look, wait || interval );
+				later( look, wait || interval );
 			}
 
 			look();
@@ -226,5 +250,119 @@
 		} ).then( shown );
 	}
 
-	window.beltoftApi = { call: call, copy: copy, follow: follow };
+	function stepUp( purpose, options ) {
+		var holder = ( options && options.holder ) || window.beltoftServicesAccount || {};
+		var words = holder.strings || {};
+
+		return new Promise( function ( resolve ) {
+			var dialog = document.createElement( 'dialog' );
+			var form = document.createElement( 'form' );
+			var title = document.createElement( 'h5' );
+			var note = document.createElement( 'p' );
+			var label = document.createElement( 'label' );
+			var input = document.createElement( 'input' );
+			var problem = document.createElement( 'p' );
+			var buttons = document.createElement( 'p' );
+			var go = document.createElement( 'button' );
+			var again = document.createElement( 'button' );
+			var cancel = document.createElement( 'button' );
+			var finished = false;
+
+			function finish( value ) {
+				if ( finished ) {
+					return;
+				}
+
+				finished = true;
+
+				if ( dialog.close ) {
+					dialog.close();
+				}
+
+				if ( dialog.parentNode ) {
+					dialog.parentNode.removeChild( dialog );
+				}
+
+				resolve( value );
+			}
+
+			function send() {
+				again.disabled = true;
+				problem.textContent = '';
+
+				return call( holder.stepUpUrl, { method: 'POST', body: { purpose: purpose }, holder: holder } ).then( function ( result ) {
+					again.disabled = false;
+
+					if ( result.ok ) {
+						note.textContent = ( words.stepText || '' ).replace( '%s', ( result.data && result.data.email ) || '' ) + ' ' + ( words.stepSent || '' );
+					} else {
+						problem.textContent = ( result.data && result.data.message ) || words.failed || '';
+					}
+				}, function () {
+					again.disabled = false;
+					problem.textContent = words.failed || '';
+				} );
+			}
+
+			dialog.className = 'beltoft-services-vm__dialog bs-dialog';
+			dialog.setAttribute( 'aria-labelledby', 'bs-stepup-title' );
+			form.className = 'bs-dialog__form';
+			form.method = 'dialog';
+			title.id = 'bs-stepup-title';
+			title.textContent = words.stepTitle || '';
+			label.textContent = words.stepCode || '';
+			input.type = 'text';
+			input.name = 'step_code';
+			input.maxLength = 12;
+			input.setAttribute( 'inputmode', 'numeric' );
+			input.setAttribute( 'autocomplete', 'one-time-code' );
+			input.setAttribute( 'spellcheck', 'false' );
+			input.required = true;
+			label.appendChild( document.createElement( 'br' ) );
+			label.appendChild( input );
+			problem.setAttribute( 'role', 'alert' );
+			go.type = 'submit';
+			go.className = 'button woocommerce-button bs-dialog__yes';
+			go.textContent = words.stepGo || '';
+			again.type = 'button';
+			again.className = 'button woocommerce-button bs-dialog__no';
+			again.textContent = words.stepResend || '';
+			cancel.type = 'button';
+			cancel.className = 'button woocommerce-button bs-dialog__no';
+			cancel.textContent = words.stepCancel || '';
+			buttons.className = 'beltoft-services-vm__buttons';
+			buttons.appendChild( go );
+			buttons.appendChild( again );
+			buttons.appendChild( cancel );
+			[ title, note, label, problem, buttons ].forEach( function ( part ) {
+				form.appendChild( part );
+			} );
+			dialog.appendChild( form );
+			document.body.appendChild( dialog );
+
+			form.addEventListener( 'submit', function ( event ) {
+				event.preventDefault();
+				finish( input.value.replace( /\s+/g, '' ) || null );
+			} );
+			again.addEventListener( 'click', send );
+			cancel.addEventListener( 'click', function () {
+				finish( null );
+			} );
+			dialog.addEventListener( 'cancel', function ( event ) {
+				event.preventDefault();
+				finish( null );
+			} );
+
+			if ( dialog.showModal ) {
+				dialog.showModal();
+			} else {
+				dialog.setAttribute( 'open', '' );
+			}
+
+			input.focus();
+			send();
+		} );
+	}
+
+	window.beltoftApi = { call: call, copy: copy, follow: follow, stepUp: stepUp, later: later };
 }() );

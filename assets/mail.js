@@ -63,25 +63,37 @@
 		holder.querySelector( '[data-mail-secret-value]' ).scrollIntoView( { block: 'nearest' } );
 	}
 
-	// h: the handle of the request that asked for the password; it ends here.
-	function reveal( box, email, line, button, h ) {
-		return call( box, 'POST', '/mail-reveal', { email: email } ).then( function ( result ) {
-			if ( ! result.ok || ! result.data.password ) {
-				S.fail( h, 409 === result.status ? strings.gone : problem( result ) );
+	// h: the handle of the request that asked for the password; it ends here. The password is shown only with the code we email
+	// to the account address: code is the one the caller already has (a new password is shown with the code that asked for it),
+	// else the customer is asked now.
+	function reveal( box, email, line, button, h, code ) {
+		var asked = code ? Promise.resolve( code ) : window.beltoftApi.stepUp( 'mail_password', { holder: account } );
 
-				if ( button ) {
-					button.disabled = 409 === result.status;
+		return asked.then( function ( typed ) {
+			if ( ! typed ) {
+				S.done( h, strings.noCode );
+
+				return null;
+			}
+
+			return call( box, 'POST', '/mail-reveal', { email: email, step_code: typed } ).then( function ( result ) {
+				if ( ! result.ok || ! result.data.password ) {
+					S.fail( h, 409 === result.status ? strings.gone : problem( result ) );
+
+					if ( button ) {
+						button.disabled = 409 === result.status;
+					}
+
+					return;
 				}
 
-				return;
-			}
+				secret( box, line || email, result.data.password );
+				S.done( h, line || email );
 
-			secret( box, line || email, result.data.password );
-			S.done( h, line || email );
-
-			if ( button ) {
-				button.hidden = true;
-			}
+				if ( button ) {
+					button.hidden = true;
+				}
+			} );
 		} );
 	}
 
@@ -181,21 +193,29 @@
 			var who = target.getAttribute( 'data-mail-reset' );
 
 			guarded( box, target, strings.resetting, function ( h ) {
-				return call( box, 'POST', '/mail/mailboxes/' + encodeURIComponent( who ) + '/password' ).then( function ( result ) {
-					if ( ! result.ok ) {
-						S.fail( h, problem( result ) );
+				return window.beltoftApi.stepUp( 'mail_password', { holder: account } ).then( function ( code ) {
+					if ( ! code ) {
+						S.done( h, strings.noCode );
 
 						return null;
 					}
 
-					return followed( result, h ).then( function ( outcome ) {
-						if ( ! outcome || ! outcome.ok ) {
-							stopped( h, outcome );
+					return call( box, 'POST', '/mail/mailboxes/' + encodeURIComponent( who ) + '/password', { step_code: code } ).then( function ( result ) {
+						if ( ! result.ok ) {
+							S.fail( h, problem( result ) );
 
 							return null;
 						}
 
-						return reveal( box, who, strings.reset.replace( '%s', who ), null, h );
+						return followed( result, h ).then( function ( outcome ) {
+							if ( ! outcome || ! outcome.ok ) {
+								stopped( h, outcome );
+
+								return null;
+							}
+
+							return reveal( box, who, strings.reset.replace( '%s', who ), null, h, code );
+						} );
 					} );
 				} );
 			} );

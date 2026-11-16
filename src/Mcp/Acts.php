@@ -154,7 +154,7 @@ final class Acts {
 
 				$done = Tools::route( 'POST', $base . '/mailboxes', array(), $body, $id, 'mailbox created' );
 
-				return $done instanceof \WP_Error ? $done : array( 'queued' => true, 'address' => (string) $done['email'], 'quota_mb' => (int) $done['quota_mb'], 'message' => self::EMAIL_QUEUED . ' When it is done the mailbox is in the list with reveal true. Its password is not shown here: the customer shows it once in the dashboard, or reveal_mailbox_password shows it after the customer says yes.' );
+				return $done instanceof \WP_Error ? $done : array( 'queued' => true, 'address' => (string) $done['email'], 'quota_mb' => (int) $done['quota_mb'], 'message' => self::EMAIL_QUEUED . ' When it is done the mailbox is in the list with reveal true. Its password is not shown here: the customer shows it once in the dashboard, after a code we email to them.' );
 
 			case 'add_email_alias':
 				$done = Tools::route( 'POST', $base . '/aliases', array(), array( 'address' => (string) $args['name'], 'goto' => array_values( array_map( 'strval', (array) $args['deliver_to'] ) ) ), $id, 'alias created' );

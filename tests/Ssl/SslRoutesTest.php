@@ -23,12 +23,15 @@ class SslRoutesTest extends SslTestCase {
 		global $wp_rest_server;
 		$wp_rest_server = new \WP_REST_Server();
 		do_action( 'rest_api_init', $wp_rest_server );
+		// A right emailed code is read as 123456 in these tests; the real check is StepUp's own (tested there).
+		add_filter( 'beltoft_services_step_up_verify', static fn( $ok, $user, $secret, $kind, $purpose ) => 'ssl_key' === $purpose ? ( '123456' === $secret ) : $ok, 10, 5 );
 	}
 
 	public function tear_down(): void {
 		global $wp_rest_server;
 		$wp_rest_server = null;
 		remove_all_filters( 'beltoft_services_rest_rate_limit' );
+		remove_all_filters( 'beltoft_services_step_up_verify' );
 		parent::tear_down();
 	}
 
@@ -41,6 +44,7 @@ class SslRoutesTest extends SslTestCase {
 			$request->set_query_params( $params );
 		} else {
 			$request->set_header( 'content-type', 'application/json' );
+			if ( str_ends_with( $path, '/ssl-key' ) ) { $params += array( 'step_code' => '123456' ); }
 			$request->set_body( (string) wp_json_encode( $params ) );
 		}
 

@@ -134,8 +134,14 @@
 		}
 
 		if ( target.hasAttribute( 'data-ssl-key' ) ) {
-			guarded( box, target, strings.working, function ( h ) {
-				return call( box, 'POST', '/ssl-key' ).then( function ( result ) {
+			// The emailed code is asked for before the busy line starts: the key is only taken with it.
+			window.beltoftApi.stepUp( 'ssl_key', { holder: account } ).then( function ( code ) {
+				if ( ! code ) {
+					return null;
+				}
+
+				return guarded( box, target, strings.working, function ( h ) {
+				return call( box, 'POST', '/ssl-key', { step_code: code } ).then( function ( result ) {
 					if ( ! result.ok || ! result.data.key ) {
 						S.fail( h, 409 === result.status ? strings.keyGone : problem( result ) );
 						target.disabled = 409 === result.status;
@@ -147,6 +153,7 @@
 					S.done( h, strings.keyOnce );
 					target.hidden = true;
 				} );
+				} );
 			} );
 
 			return;
@@ -156,8 +163,13 @@
 			var field = box.querySelector( '[data-ssl-p12-password]' );
 			var typedPassword = field ? field.value : '';
 
-			guarded( box, target, strings.working, function ( h ) {
-				return call( box, 'POST', '/ssl-pkcs12', { password: typedPassword } ).then( function ( result ) {
+			window.beltoftApi.stepUp( 'ssl_key', { holder: account } ).then( function ( code ) {
+				if ( ! code ) {
+					return null;
+				}
+
+				return guarded( box, target, strings.working, function ( h ) {
+				return call( box, 'POST', '/ssl-pkcs12', { password: typedPassword, step_code: code } ).then( function ( result ) {
 					if ( ! result.ok || ! result.data.pkcs12 ) {
 						S.fail( h, 409 === result.status ? strings.keyGone : problem( result ) );
 						target.disabled = 409 === result.status;
@@ -173,6 +185,7 @@
 						field.value = '';
 						field.hidden = true;
 					}
+				} );
 				} );
 			} );
 

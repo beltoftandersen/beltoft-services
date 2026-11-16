@@ -85,8 +85,6 @@ final class ActionMap {
 		'reveal_app_login'         => 'reveal_app_login',
 		'database_ca_certificate'  => 'get_database_ca_certificate',
 		'delete_mailbox'           => 'delete_mailbox',
-		'reset_mailbox_password'   => 'reset_mailbox_password',
-		'reveal_mailbox_password'  => 'reveal_mailbox_password',
 		'order_server'             => 'order_server',
 		'order_database'           => 'order_database',
 		'delete_server'            => 'delete_server',
@@ -101,6 +99,8 @@ final class ActionMap {
 	 */
 	public const CAPABILITIES_EXCLUDED = array(
 		'domain_transfer_code'        => 'never: the transfer code of a domain is only available in the dashboard, behind its password step',
+		'reset_mailbox_password'     => 'never: a new mailbox password needs the code emailed to the account address, so it is only available in the dashboard',
+		'reveal_mailbox_password'    => 'never: showing a mailbox password needs the code emailed to the account address, so it is only available in the dashboard',
 		'domain_unlock'               => 'never: a domain transfer is only possible in the dashboard',
 		'console_ticket'              => 'never: the console is a browser session bound to the visitor; console_link gives the page',
 		'cancel_domain_registration'  => 'never: a registered domain is not cancelled, auto-renew is turned off instead (set_auto_renew)',
@@ -147,12 +147,10 @@ final class ActionMap {
 		'email_domain_info'        => array( 'GET #^/resources/\d+/mail$#D' ),
 		'get_ssl_certificate'      => array( 'GET #^/resources/\d+/ssl-certificate$#D' ),
 		'create_mailbox'           => array( 'POST #^/resources/\d+/mail/mailboxes$#D' ),
-		'reset_mailbox_password'   => array( 'POST #^/resources/\d+/mail/mailboxes/[^/]+/password$#D' ),
 		'delete_mailbox'           => array( 'DELETE #^/resources/\d+/mail/mailboxes/[^/]+$#D' ),
 		'add_email_alias'          => array( 'POST #^/resources/\d+/mail/aliases$#D' ),
 		'remove_email_alias'       => array( 'DELETE #^/resources/\d+/mail/aliases/[^/]+$#D' ),
 		'email_dns_check'          => array( 'POST #^/resources/\d+/mail/dns/check$#D' ),
-		'reveal_mailbox_password'  => array( 'POST #^/resources/\d+/mail-reveal$#D' ),
 	);
 
 	/**

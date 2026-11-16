@@ -24,12 +24,15 @@ final class MailRoutesTest extends MailTestCase {
 		$wp_rest_server = new \WP_REST_Server();
 		do_action( 'rest_api_init', $wp_rest_server );
 		$this->settings( array( 'mail_allow_external_forward' => 1 ) );
+		// A right emailed code is read as 123456 in these tests; the real check is StepUp's own (tested there).
+		add_filter( 'beltoft_services_step_up_verify', static fn( $ok, $user, $secret, $kind, $purpose ) => in_array( $purpose, array( 'mail_password' ), true ) ? ( '123456' === $secret ) : $ok, 10, 5 );
 	}
 
 	public function tear_down(): void {
 		global $wp_rest_server;
 		$wp_rest_server = null;
 		remove_all_filters( 'beltoft_services_rest_rate_limit' );
+		remove_all_filters( 'beltoft_services_step_up_verify' );
 		parent::tear_down();
 	}
 
@@ -116,15 +119,51 @@ final class MailRoutesTest extends MailTestCase {
 		$this->assertArrayNotHasKey( 'password', $made->get_data() );
 		$this->assertSame( 'Front desk', $this->mailcow->mailbox( 'info@route.example' )['name'] );
 
-		$shown = $this->call( 'POST', $r->id() . '/mail-reveal', $user, array( 'email' => 'info@route.example' ) );
+		$shown = $this->call( 'POST', $r->id() . '/mail-reveal', $user, array( 'email' => 'info@route.example', 'step_code' => '123456' ) );
 		$this->assertSame( 200, $shown->get_status() );
 		$this->assertMatchesRegularExpression( '/^\S{20,}$/', $shown->get_data()['password'] );
 		$this->assertStringContainsString( 'no-store', (string) $shown->get_headers()['Cache-Control'] );
 
-		$again = $this->call( 'POST', $r->id() . '/mail-reveal', $user, array( 'email' => 'info@route.example' ) );
+		$again = $this->call( 'POST', $r->id() . '/mail-reveal', $user, array( 'email' => 'info@route.example', 'step_code' => '123456' ) );
 		$this->assertSame( 409, $again->get_status() );
 		$this->assertStringNotContainsString( $shown->get_data()['password'], (string) wp_json_encode( $again->get_data() ) );
 		$this->assertFalse( MailAccess::revealable( Resource::find( $r->id() ), 'info@route.example' ) );
+	}
+
+	public function test_a_mailbox_password_is_not_shown_or_reset_without_the_emailed_code(): void {
+		list( $r, $user ) = $this->domain();
+		$this->box( $r, $user, array( 'local' => 'a' ) );
+
+		foreach ( array( null, '', '000000' ) as $code ) {
+			$params = null === $code ? array( 'email' => 'a@route.example' ) : array( 'email' => 'a@route.example', 'step_code' => $code );
+			$shown  = $this->call( 'POST', $r->id() . '/mail-reveal', $user, $params );
+			$this->assertSame( 403, $shown->get_status() );
+			$this->assertSame( 'step_up', $shown->get_data()['code'] );
+			$this->assertArrayNotHasKey( 'password', $shown->get_data() );
+		}
+
+		$this->assertTrue( MailAccess::revealable( Resource::find( $r->id() ), 'a@route.example' ), 'A refused request took nothing.' );
+
+		$reset = $this->call( 'POST', $r->id() . '/mail/mailboxes/a%40route.example/password', $user, array( 'step_code' => '000000' ) );
+		$this->assertSame( 403, $reset->get_status() );
+		$this->assertSame( 403, $this->call( 'POST', $r->id() . '/mail/mailboxes/a%40route.example/password', $user )->get_status() );
+		$this->assertSame( 200, $this->call( 'POST', $r->id() . '/mail-reveal', $user, array( 'email' => 'a@route.example', 'step_code' => '123456' ) )->get_status() );
+	}
+
+	public function test_the_mail_password_purpose_is_registered_and_has_its_own_words(): void {
+		$this->assertContains( 'mail_password', \BeltoftServices\StepUp::purposes() );
+		$this->assertNotSame( 'confirming this step', apply_filters( 'beltoft_services_stepup_text', 'confirming this step', 'mail_password' ) );
+	}
+
+	public function test_the_account_scripts_ask_for_the_code_before_these_routes(): void {
+		$root = dirname( __DIR__, 2 ) . '/assets/';
+		$mail = (string) file_get_contents( $root . 'mail.js' );
+		$ssl  = (string) file_get_contents( $root . 'ssl.js' );
+		$this->assertStringContainsString( "stepUp( 'mail_password'", $mail );
+		$this->assertStringContainsString( 'step_code', $mail );
+		$this->assertStringContainsString( "stepUp( 'ssl_key'", $ssl );
+		$this->assertSame( 2, substr_count( $ssl, "stepUp( 'ssl_key'" ), 'The key and the .p12 file.' );
+		$this->assertStringContainsString( 'function stepUp', (string) file_get_contents( $root . 'api.js' ) );
 	}
 
 	public function test_only_the_owner_can_show_a_password_and_only_for_a_mailbox_of_the_domain(): void {
@@ -134,7 +173,7 @@ final class MailRoutesTest extends MailTestCase {
 		$this->box( $other, $other_user, array( 'local' => 'a' ) );
 
 		$this->assertSame( 403, $this->call( 'POST', $r->id() . '/mail-reveal', $other_user, array( 'email' => 'a@route.example' ) )->get_status() );
-		$this->assertSame( 409, $this->call( 'POST', $r->id() . '/mail-reveal', $user, array( 'email' => 'a@other.example' ) )->get_status(), 'A name outside the domain.' );
+		$this->assertSame( 409, $this->call( 'POST', $r->id() . '/mail-reveal', $user, array( 'email' => 'a@other.example', 'step_code' => '123456' ) )->get_status(), 'A name outside the domain.' );
 		$this->assertTrue( MailAccess::revealable( Resource::find( $r->id() ), 'a@route.example' ), 'Nothing was taken.' );
 	}
 
@@ -145,7 +184,7 @@ final class MailRoutesTest extends MailTestCase {
 		$codes = array();
 
 		for ( $i = 0; $i < 33; $i++ ) {
-			$codes[] = $this->call( 'POST', $r->id() . '/mail-reveal', $user, array( 'email' => 'a@route.example' ) )->get_status();
+			$codes[] = $this->call( 'POST', $r->id() . '/mail-reveal', $user, array( 'email' => 'a@route.example', 'step_code' => '123456' ) )->get_status();
 		}
 
 		$this->assertContains( 429, $codes );
@@ -208,20 +247,20 @@ final class MailRoutesTest extends MailTestCase {
 	public function test_a_new_password_replaces_the_old_one_and_is_shown_once(): void {
 		list( $r, $user ) = $this->domain();
 		$this->box( $r, $user, array( 'local' => 'a' ) );
-		$first = $this->call( 'POST', $r->id() . '/mail-reveal', $user, array( 'email' => 'a@route.example' ) )->get_data()['password'];
+		$first = $this->call( 'POST', $r->id() . '/mail-reveal', $user, array( 'email' => 'a@route.example', 'step_code' => '123456' ) )->get_data()['password'];
 
-		$reset = $this->call( 'POST', $r->id() . '/mail/mailboxes/a%40route.example/password', $user );
+		$reset = $this->call( 'POST', $r->id() . '/mail/mailboxes/a%40route.example/password', $user, array( 'step_code' => '123456' ) );
 		$this->assertSame( 202, $reset->get_status() );
 		$this->assertSame( 'mailbox_password', $reset->get_data()['action'] );
 		$this->assertArrayNotHasKey( 'password', $reset->get_data() );
 		$this->assertFalse( MailAccess::revealable( Resource::find( $r->id() ), 'a@route.example' ), 'Not before the job has set it.' );
 		$this->run_jobs();
 
-		$second = $this->call( 'POST', $r->id() . '/mail-reveal', $user, array( 'email' => 'a@route.example' ) )->get_data()['password'];
+		$second = $this->call( 'POST', $r->id() . '/mail-reveal', $user, array( 'email' => 'a@route.example', 'step_code' => '123456' ) )->get_data()['password'];
 		$this->assertNotSame( $first, $second );
-		$this->assertSame( 409, $this->call( 'POST', $r->id() . '/mail-reveal', $user, array( 'email' => 'a@route.example' ) )->get_status() );
+		$this->assertSame( 409, $this->call( 'POST', $r->id() . '/mail-reveal', $user, array( 'email' => 'a@route.example', 'step_code' => '123456' ) )->get_status() );
 
-		$this->assertSame( 202, $this->call( 'POST', $r->id() . '/mail/mailboxes/zz%40route.example/password', $user )->get_status() );
+		$this->assertSame( 202, $this->call( 'POST', $r->id() . '/mail/mailboxes/zz%40route.example/password', $user, array( 'step_code' => '123456' ) )->get_status() );
 		$this->run_jobs();
 		$last = Resource::find( $r->id() )->get( 'last_result' );
 		$this->assertFalse( $last['ok'], 'No such mailbox: said in the outcome.' );

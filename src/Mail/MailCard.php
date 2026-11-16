@@ -48,6 +48,7 @@ final class MailCard {
 					/* translators: %s: mailbox address. */
 					'reset'     => __( 'New password for %s.', 'beltoft-services' ),
 					'copied'    => __( 'Copied', 'beltoft-services' ),
+					'noCode'    => __( 'No password was shown. Use Show password once when you have the code we email you.', 'beltoft-services' ),
 					'confirm'   => __( 'Delete this alias?', 'beltoft-services' ),
 					'revealing' => __( 'Showing the password…', 'beltoft-services' ),
 					'resetting' => __( 'Making a new password…', 'beltoft-services' ),

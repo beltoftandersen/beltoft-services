@@ -13,6 +13,7 @@ use BeltoftServices\Api\Routes;
 use BeltoftServices\Jobs;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
+use BeltoftServices\StepUp;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -48,8 +49,59 @@ final class MailRoutes {
 	/** DNS checks per resource and hour. */
 	public const CHECK_LIMIT = 20;
 
+	/** The step-up purpose of showing or resetting a mailbox password. */
+	public const STEP_PURPOSE = 'mail_password';
+
 	public static function register(): void {
 		add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
+		add_filter( 'beltoft_services_stepup_purposes', array( __CLASS__, 'stepup_purposes' ) );
+		add_filter( 'beltoft_services_stepup_text', array( __CLASS__, 'stepup_text' ), 10, 2 );
+	}
+
+	/**
+	 * Registers the purpose of the code step before a mailbox password is shown or reset.
+	 *
+	 * @param array<int, string> $purposes Purposes so far.
+	 * @return array<int, string>
+	 */
+	public static function stepup_purposes( $purposes ): array {
+		return array_merge( (array) $purposes, array( self::STEP_PURPOSE ) );
+	}
+
+	/**
+	 * What the code email says this purpose is for.
+	 *
+	 * @param string $text    Text so far.
+	 * @param string $purpose The purpose.
+	 */
+	public static function stepup_text( $text, $purpose ): string {
+		return self::STEP_PURPOSE === $purpose ? __( 'showing or changing a mailbox password', 'beltoft-services' ) : (string) $text;
+	}
+
+	/** The refusal of a code that was already used up by another request. */
+	private static function refused_code(): \WP_REST_Response {
+		$response = rest_convert_error_to_response( new \WP_Error( 'step_up', StepUp::refusal( get_current_user_id(), self::STEP_PURPOSE ), array( 'status' => 403 ) ) );
+		$response->header( 'Cache-Control', 'no-store' );
+
+		return $response;
+	}
+
+	/**
+	 * The code check of a password route: a refusal response, or null when the emailed code is right (not used up yet).
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 */
+	private static function stepped( \WP_REST_Request $request ): ?\WP_REST_Response {
+		$refused = StepUp::demand( $request, self::STEP_PURPOSE );
+
+		if ( ! $refused ) {
+			return null;
+		}
+
+		$response = rest_convert_error_to_response( $refused );
+		$response->header( 'Cache-Control', 'no-store' );
+
+		return $response;
 	}
 
 	public static function routes(): void {
@@ -318,11 +370,19 @@ final class MailRoutes {
 			return self::failure( $email );
 		}
 
+		$refused = self::stepped( $request );
+
+		if ( $refused ) {
+			return $refused;
+		}
+
 		$queued = Jobs::start_action( $r, Mailboxes::PASSWORD, __( 'Setting a new password', 'beltoft-services' ), array( 'email' => $email ), static fn() => Mailboxes::reserve( $r, $email ) );
 
 		if ( is_wp_error( $queued ) ) {
 			return self::failure( $queued );
 		}
+
+		// The code is not used up here: the page shows the new password with the same code, and that request uses it up.
 
 		return self::queued( $r, Mailboxes::PASSWORD, array( 'email' => $email, 'reveal' => true ), __( 'We are setting a new password. This can take a minute. Then you can show it once.', 'beltoft-services' ) );
 	}
@@ -531,7 +591,21 @@ final class MailRoutes {
 			return $r;
 		}
 
-		$email    = MailGuard::inside( $r, rawurldecode( (string) $request->get_param( 'email' ) ) );
+		$email = MailGuard::inside( $r, rawurldecode( (string) $request->get_param( 'email' ) ) );
+
+		if ( null !== $email && MailAccess::revealable( $r, $email ) ) {
+			$refused = self::stepped( $request );
+
+			if ( $refused ) {
+				return $refused;
+			}
+
+			// Two requests with one right code both pass the check; only the one that uses the code up may take the password.
+			if ( ! StepUp::consume( get_current_user_id(), self::STEP_PURPOSE ) ) {
+				return self::refused_code();
+			}
+		}
+
 		$password = null === $email ? null : MailAccess::take( $r, $email, get_current_user_id() );
 
 		if ( null === $password ) {

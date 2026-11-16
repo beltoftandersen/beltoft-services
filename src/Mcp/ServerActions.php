@@ -102,12 +102,6 @@ final class ServerActions {
 
 				return $done instanceof \WP_Error ? $done : array( 'deleted' => (string) $done['deleted'], 'message' => 'The mailbox and every message in it were deleted.' );
 
-			case 'reset_mailbox_password':
-				$id   = (int) $args['id'];
-				$done = Tools::route( 'POST', '/resources/' . $id . '/mail/mailboxes/' . rawurlencode( (string) $args['email'] ) . '/password', array(), array(), $id, 'new mailbox password made' );
-
-				return $done instanceof \WP_Error ? $done : array( 'queued' => true, 'message' => Acts::EMAIL_QUEUED . ' When it is done the old password no longer works. The new one is not shown here: the customer shows it once in the dashboard, or reveal_mailbox_password shows it after the customer says yes.' );
-
 			case 'delete_snapshot':
 				return self::send( $args, 'snapshot_delete', array( 'id' => (string) $args['snapshot'] ), 'delete snapshot requested' );
 
@@ -209,7 +203,7 @@ final class ServerActions {
 	 * The summary of a mailbox deletion: the dashboard's checks (a ready email domain, a mailbox of it that exists).
 	 *
 	 * @param array<string, mixed> $args Arguments (id, email).
-	 * @param string               $name Tool: delete_mailbox or reset_mailbox_password.
+	 * @param string               $name Tool: delete_mailbox.
 	 * @return array{text: string, state: string}|\WP_Error
 	 */
 	public static function summary_mailbox( array $args, string $name = 'delete_mailbox' ) {
@@ -235,18 +229,6 @@ final class ServerActions {
 
 		if ( is_wp_error( $box ) || null === $box ) {
 			return new \WP_Error( 'beltoft_services_tool', is_wp_error( $box ) ? __( 'The mail server could not be reached. Try again in a moment.', 'beltoft-services' ) : __( 'That mailbox does not exist.', 'beltoft-services' ) );
-		}
-
-		if ( 'reset_mailbox_password' === $name ) {
-			return array(
-				'text'  => sprintf(
-					/* translators: 1: mailbox address, 2: name of the service. */
-					__( 'Make a new password for the mailbox %1$s of %2$s. The old password stops working at once, so every mail program and phone that uses it must be changed. The new password is not shown here: it can be shown once afterwards, with the customer\'s yes again.', 'beltoft-services' ),
-					$email,
-					Irreversible::name( $r )
-				),
-				'state' => $r->id() . '|reset_mailbox_password|' . $email,
-			);
 		}
 
 		return array(
