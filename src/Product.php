@@ -63,6 +63,9 @@ final class Product {
 			return $licenses;
 		}
 
+		// One query for the live resources of the whole list (a no-op while the request memo is off).
+		Resource::preload( array_map( static fn( $license ) => is_array( $license ) && self::is_service_license( $license ) ? (int) ( $license['id'] ?? 0 ) : 0, $licenses ) );
+
 		return array_values(
 			array_filter(
 				$licenses,

@@ -350,6 +350,8 @@ final class Slugs {
 
 		$licenses = Resource::remembered( 'user_licenses:' . $user, static fn() => Licenses::where( 'user_id', $user ) );
 
+		Resource::preload( array_map( static fn( $license ) => (int) ( $license['id'] ?? 0 ), $licenses ) );
+
 		foreach ( $licenses as $license ) {
 			if ( self::type_of( $license ) !== $type ) {
 				continue;

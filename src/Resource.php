@@ -214,6 +214,37 @@ final class Resource {
 	}
 
 	/**
+	 * Loads the live resources of many licenses into the request memo with one query, so the for_license() calls of a list
+	 * find them there. Does nothing while the memo is off or when beltoft-licenses has no bulk read (before 0.8.10), and
+	 * leaves alone a license that is already in the memo.
+	 *
+	 * @param int[] $license_ids License ids.
+	 */
+	public static function preload( array $license_ids ): void {
+		if ( null === self::$memo || ! method_exists( Licenses::class, 'resources_for' ) ) {
+			return;
+		}
+
+		$ids = array();
+
+		foreach ( $license_ids as $id ) {
+			$id = (int) $id;
+
+			if ( $id > 0 && ! array_key_exists( 'resources:' . $id, self::$memo ) ) {
+				$ids[ $id ] = $id;
+			}
+		}
+
+		if ( ! $ids ) {
+			return;
+		}
+
+		foreach ( Licenses::resources_for( array_values( $ids ) ) as $id => $rows ) {
+			self::$memo[ 'resources:' . (int) $id ] = array_values( $rows );
+		}
+	}
+
+	/**
 	 * A state in words, translated.
 	 *
 	 * @param string $state State (see STATES).
