@@ -295,7 +295,7 @@ final class ReviewFixesSharedTest extends TestCase {
 			}
 		);
 
-		$driver->will( 'act', StepResult::done( array(), 'The server refused the change' ) )->will( 'act', StepResult::done() );
+		$driver->will( 'act', StepResult::refused( array(), 'The server refused the change' ) )->will( 'act', StepResult::done() );
 		Jobs::act( $r->id(), 'tidy', array() );
 		$this->assertSame( 0, $fired, 'A refusal is not a success.' );
 		$this->assertFalse( Resource::find( $r->id() )->get( Jobs::RESULT )['ok'] );

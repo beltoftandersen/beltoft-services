@@ -68,8 +68,9 @@ final class ApiReferenceTest extends TestCase {
 
 		$this->assertEquals( $first, \BeltoftServices\Api\OpenApi::document() );
 		$this->assertSame( \BeltoftServices\Api\OpenApi::operations(), \BeltoftServices\Api\OpenApi::operations() );
-		// The document as it was before the operations table was built once (md5 taken on the old code).
-		$this->assertSame( '95d9c2f83348221fe96361edc4c6930f', md5( (string) wp_json_encode( $first ) ) );
+		// The document of 0.34.0 (the mailbox password and private key routes gained the step-up code). Building the operations
+		// table once must not change it; update this value only together with a deliberate change of the routes.
+		$this->assertSame( 'ad587eeff26048b44b995b2fc4ea9a28', md5( (string) wp_json_encode( $first ) ) );
 	}
 
 	public function test_endpoints_are_grouped_by_resource_with_anchors_and_navigation(): void {
