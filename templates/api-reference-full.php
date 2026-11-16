@@ -366,7 +366,7 @@ if ( $mcp['on'] ) {
 							<li><?php esc_html_e( 'Claude opens this site. Sign in if you are asked to.', 'beltoft-services' ); ?></li>
 							<li><?php esc_html_e( 'Choose an access level and confirm.', 'beltoft-services' ); ?></li>
 						</ol>
-						<p><?php esc_html_e( 'Claude never sees passwords. Domain transfers are never possible through Claude. Restoring, reinstalling and deleting are only possible in your dashboard. Every request Claude makes is written to the history of the service.', 'beltoft-services' ); ?></p>
+						<p><?php esc_html_e( 'Read and Actions access never show passwords and cannot restore, roll back, reinstall, delete or cancel. Full access can do those things, order a server or a database and show a password once, but only after Claude has shown you a summary and you have said yes in the chat. A password shown this way stays in the conversation. Domain transfers, transfer codes and the console are never possible through Claude, only in your dashboard. Every request Claude makes is written to the history of the service.', 'beltoft-services' ); ?></p>
 					</div>
 					<div class="bsdocs__samples">
 						<?php $beltoft_services_code( __( 'Connector address', 'beltoft-services' ), $mcp['url'], __( 'Copy the connector address', 'beltoft-services' ) ); ?>
