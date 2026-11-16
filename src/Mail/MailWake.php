@@ -47,7 +47,8 @@ final class MailWake {
 			return;
 		}
 
-		foreach ( Resource::live_ids( MailDriver::KIND ) as $id ) {
+		// Only the mail services that carry this name are loaded.
+		foreach ( Resource::find_by_meta( MailDriver::KIND, MailDomain::META_DOMAIN, $name ) as $id ) {
 			$mail = Resource::find( $id );
 
 			if ( ! $mail || MailDriver::ID !== $mail->get( 'driver' ) || (int) ( $mail->license()['user_id'] ?? 0 ) !== $user ) {
