@@ -660,6 +660,29 @@ class AddonsTest extends HostingCase {
 		$this->assertTrue( Addons::has( $r, Addons::KIND_DOMAIN, 'other.example' ) );
 	}
 
+	public function test_an_early_renewal_order_does_not_drop_a_removed_domain_before_its_date(): void {
+		$this->card_pays();
+		$r = $this->account();
+		$this->connect_domain( $r, 'main.example' );
+		$a = new HostingActions( Resource::find( $r->id() ) );
+		$a->buy_addon( 'domain', 'www.other.example', 100 );
+		$this->assertIsArray( $a->add_domain( 'w' . $r->id(), 'www.other.example' ) );
+		$a->remove_domain( 'other.example' );
+		$a->remove_domain( 'www.other.example' );
+
+		// The modal early renewal makes the order with the request flag, and WooCommerce Subscriptions marks it afterwards.
+		$_GET['process_early_renewal'] = '1';
+		try {
+			wcs_create_renewal_order( $this->sub( $r ) );
+		} finally {
+			unset( $_GET['process_early_renewal'] );
+		}
+
+		$this->assertNotNull( SiteDomains::find( 'www.other.example' ), 'The domain stays until the renewal date.' );
+		$this->assertTrue( Addons::has( $r, Addons::KIND_DOMAIN, 'other.example' ), 'The ending line is still on the subscription.' );
+		$this->assertSame( array( 'other.example' ), Addons::ending_domains( $r ) );
+	}
+
 	public function test_nothing_is_sold_on_a_subscription_that_will_not_renew(): void {
 		$this->card_pays();
 		$r = $this->account();

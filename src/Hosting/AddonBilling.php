@@ -837,6 +837,11 @@ final class AddonBilling {
 			return $renewal;
 		}
 
+		// An early renewal is made before the date the customer was told: nothing leaves the account until the real renewal.
+		if ( isset( $_GET['process_early_renewal'] ) || ( function_exists( 'wcs_order_contains_early_renewal' ) && wcs_order_contains_early_renewal( $renewal ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			return $renewal;
+		}
+
 		$ended = array();
 		$gone  = false;
 
