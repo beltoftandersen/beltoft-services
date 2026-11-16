@@ -51,8 +51,44 @@
 		this.draft = null; // what the customer typed in the row being edited, kept when a save fails
 		this.setRows( JSON.parse( root.getAttribute( 'data-rows' ) || '[]' ) );
 		this.build();
-		this.render();
+
+		if ( root.hasAttribute( 'data-rows-lazy' ) ) {
+			// The page did not read the zone (another tab was open): read the rows when the records are first shown.
+			this.whenShown( this.load.bind( this ) );
+		} else {
+			this.render();
+		}
 	}
+
+	// Calls done once, when the editor is first on screen (at once without IntersectionObserver).
+	Editor.prototype.whenShown = function ( done ) {
+		var root = this.root;
+		if ( ! ( 'IntersectionObserver' in window ) ) { done(); return; }
+		var observer = new window.IntersectionObserver( function ( entries ) {
+			if ( entries.some( function ( entry ) { return entry.isIntersecting; } ) ) {
+				observer.disconnect();
+				done();
+			}
+		} );
+		observer.observe( root );
+	};
+
+	Editor.prototype.load = function () {
+		var self = this;
+		function failed() {
+			self.bar.hidden = true;
+			self.holder.textContent = '';
+			self.holder.appendChild( el( 'p', { 'class': 'beltoft-services-domain__note', text: self.t.unavailable } ) );
+		}
+		request( 'GET', this.resource + '/dns-records' ).then( function ( result ) {
+			if ( result.ok && Array.isArray( result.data.rows ) ) {
+				self.setRows( result.data.rows );
+				self.render();
+			} else {
+				failed();
+			}
+		} ).catch( failed );
+	};
 
 	Editor.prototype.norm = function ( name ) {
 		var n = String( name || '' ).trim().toLowerCase().replace( /\.$/, '' );
