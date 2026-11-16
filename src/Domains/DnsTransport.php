@@ -5,7 +5,17 @@ namespace BeltoftServices\Domains;
 defined( 'ABSPATH' ) || exit;
 
 final class DnsTransport {
-	private const TIMEOUT = 3;
+	/** @var DnsChannel|null The channel that moves the bytes; null is the socket one. Tests swap it. */
+	private static ?DnsChannel $channel = null;
+
+	/** Swaps the channel that moves bytes (tests); null restores the socket channel. */
+	public static function use( ?DnsChannel $channel ): void {
+		self::$channel = $channel;
+	}
+
+	private static function channel(): DnsChannel {
+		return self::$channel ?? new SocketChannel();
+	}
 
 	/**
 	 * The parsed response of $ip for $name and $type. The address must already be checked with
@@ -29,9 +39,9 @@ final class DnsTransport {
 	 * @return string|\WP_Error The answer packet.
 	 */
 	public static function exchange( string $host, string $wire, int $port = 53 ): string|\WP_Error {
-		$data = self::udp( $host, $wire, $port );
+		$data = self::channel()->send( $host, $port, $wire, 'udp' );
 		if ( ! is_string( $data ) || strlen( $data ) < 12 || ( ord( $data[2] ) & 0x02 ) === 0 ) { return $data; }
-		return self::tcp( $host, $wire, $port );
+		return self::channel()->send( $host, $port, $wire, 'tcp' );
 	}
 
 	private static function once( string $ip, string $name, int $type, string $protocol ): array|\WP_Error {
@@ -50,43 +60,7 @@ final class DnsTransport {
 		}
 		if ( ! DnsAddress::is_public( $ip ) ) { return new \WP_Error( 'dns_unreachable', 'The address is not a public one.' ); }
 		$host = str_contains( $ip, ':' ) ? '[' . $ip . ']' : $ip;
-		$data = 'tcp' === $protocol ? self::tcp( $host, $wire ) : self::udp( $host, $wire );
+		$data = self::channel()->send( $host, 53, $wire, 'tcp' === $protocol ? 'tcp' : 'udp' );
 		return is_string( $data ) ? DnsWire::parse( $data, $id, $name, $type ) : $data;
-	}
-
-	private static function udp( string $host, string $wire, int $port = 53 ): string|\WP_Error {
-		$socket = @fsockopen( 'udp://' . $host, $port, $errno, $message, self::TIMEOUT ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged,WordPress.WP.AlternativeFunctions.file_system_operations_fsockopen -- UDP DNS query, not file I/O; transport error returned below.
-		if ( ! $socket ) { return new \WP_Error( 'dns_unreachable', 'Name server could not be reached.' ); }
-		stream_set_timeout( $socket, self::TIMEOUT );
-		fwrite( $socket, $wire ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- UDP DNS socket, not file I/O.
-		$data = fread( $socket, 4096 ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fread -- UDP DNS socket, not file I/O.
-		$timed_out = (bool) ( stream_get_meta_data( $socket )['timed_out'] ?? false );
-		fclose( $socket ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- UDP DNS socket, not file I/O.
-		if ( is_string( $data ) && '' !== $data ) { return $data; }
-		return new \WP_Error( $timed_out ? 'dns_timeout' : 'dns_unreachable', 'Name server did not answer.' );
-	}
-
-	private static function tcp( string $host, string $wire, int $port = 53 ): string|\WP_Error {
-		$socket = @fsockopen( 'tcp://' . $host, $port, $errno, $message, self::TIMEOUT ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged,WordPress.WP.AlternativeFunctions.file_system_operations_fsockopen -- TCP DNS query, not file I/O; transport error returned below.
-		if ( ! $socket ) { return new \WP_Error( 110 === $errno ? 'dns_timeout' : 'dns_unreachable', 'Name server could not be reached.' ); }
-		stream_set_timeout( $socket, self::TIMEOUT );
-		fwrite( $socket, pack( 'n', strlen( $wire ) ) . $wire ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- TCP DNS socket, not file I/O.
-		$deadline = microtime( true ) + self::TIMEOUT;
-		$head     = self::read_exactly( $socket, 2, $deadline );
-		$data     = null === $head ? null : self::read_exactly( $socket, unpack( 'n', $head )[1], $deadline );
-		fclose( $socket ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- TCP DNS socket, not file I/O.
-		return null === $data ? new \WP_Error( 'dns_timeout', 'Name server did not answer.' ) : $data;
-	}
-
-	/** @param resource $socket */
-	private static function read_exactly( $socket, int $length, float $deadline ): ?string {
-		$buffer = '';
-		while ( strlen( $buffer ) < $length ) {
-			if ( microtime( true ) > $deadline || feof( $socket ) ) { return null; }
-			$chunk = fread( $socket, $length - strlen( $buffer ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fread -- TCP DNS socket, not file I/O.
-			if ( false === $chunk || '' === $chunk ) { return null; }
-			$buffer .= $chunk;
-		}
-		return $buffer;
 	}
 }
