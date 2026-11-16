@@ -229,4 +229,69 @@ final class PleskMonthlyTest extends PaidAppCase {
 		$this->assertSame( 'usage', (string) $p['server']->license()['source'], 'The server itself stays pay as you go.' );
 
 	}
+
+	// -- Texts and the deploy cart ------------------------------------------------------------------
+
+	public function test_the_order_form_says_a_whole_month_is_charged_when_ordered_and_the_server_stays_hourly(): void {
+		$server = $this->server_variations();
+		$this->put_server_in_cart( $server['u'] );
+		ob_start();
+		AppField::render_classic();
+		$html = (string) ob_get_clean();
+
+		$this->assertStringContainsString( 'A whole month of the licence is charged when you order and again each month you keep it. The server itself stays billed by the hour.', $html );
+	}
+
+	public function test_the_app_tab_shows_the_monthly_price_and_the_next_payment_date(): void {
+		$p = $this->monthly_pair();
+		wp_set_current_user( $p['user'] );
+		$view = AppLicence::view( $p['server'] );
+
+		$this->assertStringContainsString( '14.29', $view['price'] );
+		$this->assertStringContainsString( 'month', $view['price'] );
+		$this->assertNotSame( '', $view['next'] );
+		$this->assertSame( wp_date( get_option( 'date_format' ), (int) $p['sub']->get_time( 'next_payment' ) ), $view['next'] );
+
+	}
+
+	public function test_the_delete_text_of_a_server_with_a_monthly_licence_says_the_month_is_not_refunded(): void {
+		$p    = $this->monthly_pair();
+		$note = \BeltoftServices\Usage\CustomerDelete::licence_note( $p['server'] );
+
+		$this->assertSame( 'The app licence ends with the server. The month that has started is not refunded.', $note );
+	}
+
+	public function test_a_stale_hourly_licence_line_becomes_the_monthly_line_and_the_server_stays(): void {
+		$server = $this->server_variations();
+		$this->put_server_in_cart( $server['u'] );
+		$this->assertTrue( AppLicenceCart::choose( 'docker', 'webadmin' ) );
+		$cart = WC()->cart;
+		$line = AppLicenceCart::line();
+		// What a cart saved before this release holds: the hourly sibling as the tier line.
+		$old = $this->usage['webadmin'];
+		$cart->cart_contents[ $line['key'] ]['variation_id'] = $old->get_id();
+		$cart->cart_contents[ $line['key'] ]['data']         = $old;
+
+		AppLicenceCart::normalise();
+
+		$this->assertNotNull( \BeltoftServices\Proxmox\Disk\DiskField::cart_server(), 'The server stays.' );
+		$this->assertSame( 1, AppLicenceCart::lines() );
+		$this->assertSame( $this->tiers['webadmin']->get_id(), (int) AppLicenceCart::line()['item']['variation_id'] );
+	}
+
+	public function test_a_stale_licence_line_whose_tier_is_gone_is_removed_with_a_notice_and_the_server_stays(): void {
+		$server = $this->server_variations();
+		$this->put_server_in_cart( $server['u'] );
+		$this->assertTrue( AppLicenceCart::choose( 'docker', 'webadmin' ) );
+		$line = AppLicenceCart::line();
+		wc_clear_notices();
+		$cart = WC()->cart;
+		$cart->cart_contents[ $line['key'] ]['variation_id'] = 999999991;
+
+		AppLicenceCart::normalise();
+
+		$this->assertSame( 0, AppLicenceCart::lines() );
+		$this->assertNotNull( \BeltoftServices\Proxmox\Disk\DiskField::cart_server() );
+		$this->assertNotEmpty( wc_get_notices( 'notice' ) );
+	}
 }

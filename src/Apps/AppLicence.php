@@ -219,6 +219,13 @@ final class AppLicence {
 	}
 
 	/**
+	 * The plain sentence under the tier prices of a pay-as-you-go server: what the licence costs and when.
+	 */
+	public static function advance_note(): string {
+		return __( 'A whole month of the licence is charged when you order and again each month you keep it. The server itself stays billed by the hour.', 'beltoft-services' );
+	}
+
+	/**
 	 * Is this server (or licence) billed from the usage ledger, pay as you go?
 	 *
 	 * @param Resource $resource Server or licence resource.
@@ -435,7 +442,7 @@ final class AppLicence {
 	 * What the App tab shows about the licence, or null for a free app.
 	 *
 	 * @param Resource $server Server.
-	 * @return array{state: string, tier: string, usage: string, tiers: array<int, array{label: string, price: string, url: string}>}|null
+	 * @return array{state: string, tier: string, usage: string, price: string, next: string, tiers: array<int, array{label: string, price: string, url: string}>}|null
 	 */
 	public static function view( Resource $server ): ?array {
 		$app = (string) $server->get( 'app_id' );
@@ -447,7 +454,7 @@ final class AppLicence {
 		$licence = self::current( $server );
 
 		if ( ! $licence ) {
-			return array( 'state' => 'none', 'tier' => '', 'usage' => '', 'tiers' => array() );
+			return array( 'state' => 'none', 'tier' => '', 'usage' => '', 'price' => '', 'next' => '', 'tiers' => array() );
 		}
 
 		$state    = self::state( $licence );
@@ -455,12 +462,22 @@ final class AppLicence {
 		$switches = array();
 
 		$usage = '';
+		$price = '';
+		$next  = '';
 
 		if ( self::usage_billed( $licence ) ) {
 			// Billed by the hour with the server: no subscription of its own to switch.
 			$items = Rates::items( $licence );
 			$usage = $items ? Rates::terms( (float) $items[0]['rate'], round( (float) $items[0]['rate'] * Rates::HOURS, 2 ), wc_get_product( (int) ( $licence->license()['variation_id'] ?? 0 ) ) ?: null ) : '';
-		} elseif ( 'active' === $state && get_current_user_id() === (int) ( $licence->license()['user_id'] ?? 0 ) ) {
+		} else {
+			$tier  = self::tier( $app, $own, false );
+			$price = null === $tier ? '' : (string) $tier['price'];
+			$sub   = function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( (int) ( $licence->license()['subscription_id'] ?? 0 ) ) : null;
+			$time  = $sub && 'active' === $sub->get_status() ? (int) $sub->get_time( 'next_payment' ) : 0;
+			$next  = $time > 0 ? wp_date( get_option( 'date_format' ), $time ) : '';
+		}
+
+		if ( ! self::usage_billed( $licence ) && 'active' === $state && get_current_user_id() === (int) ( $licence->license()['user_id'] ?? 0 ) ) {
 			foreach ( self::tiers( $app ) as $key => $tier ) {
 				$url = $key === $own ? '' : Backups::switch_to( $licence, $tier['variation'] );
 
@@ -470,7 +487,7 @@ final class AppLicence {
 			}
 		}
 
-		return array( 'state' => $state, 'tier' => self::tier_label( $licence ), 'usage' => $usage, 'tiers' => $switches );
+		return array( 'state' => $state, 'tier' => self::tier_label( $licence ), 'usage' => $usage, 'price' => $price, 'next' => $next, 'tiers' => $switches );
 	}
 
 	// -- Hand-over to the server ----------------------------------------------------------------

@@ -478,6 +478,8 @@ final class AppField {
 			echo '<span class="description" data-price-usage' . ( $usage ? '' : ' hidden' ) . '>' . esc_html( AppLicence::price_text( $tier, true ) ) . '</span></label>';
 		}
 
+		// Shown with the pay-as-you-go price (the script toggles it): the licence is not billed by the hour like the server.
+		echo '<p class="description" data-price-usage' . ( $usage ? '' : ' hidden' ) . '>' . esc_html( AppLicence::advance_note() ) . '</p>';
 		echo '</fieldset>';
 	}
 
