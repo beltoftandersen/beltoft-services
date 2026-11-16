@@ -396,7 +396,10 @@ final class Operations {
 			return StepResult::retry( 0, 'delete: the private network pool is busy' );
 		}
 		// Always: a no-op when the resource holds no address, and an address is never leaked by a profile answering wrong.
-		IpPool::release( $this->r->id() );
+		// A feature that still has records pointing at the address (app domain A records) keeps it held and frees it itself.
+		if ( true !== apply_filters( 'beltoft_services_hold_ip_on_delete', false, $this->r ) ) {
+			IpPool::release( $this->r->id() );
+		}
 		VmRecords::remove( $this->r->id() );
 		Access::purge( $this->r );
 
