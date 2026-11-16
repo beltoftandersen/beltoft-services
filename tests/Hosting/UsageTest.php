@@ -175,6 +175,24 @@ class UsageTest extends HostingCase {
 		$this->assertCount( 1, $this->agent->calls_of( 'db.readonly' ) );
 	}
 
+	public function test_growth_to_150_percent_restricts_writes_at_once_even_when_the_notice_mail_is_not_sent(): void {
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
+		add_filter( 'pre_wp_mail', static fn() => false, 20 ); // No mail goes out at all.
+		$r = $this->sample( $this->account(), 10, 5.5 ); // 155 percent, first reading.
+		$this->assertTrue( $this->agent->state()['readonly'][ 'c' . $r->id() ], 'No 7 day wait and no dependence on the mail.' );
+		$this->assertGreaterThan( 0, (int) $r->get( 'storage' )['restricted'] );
+		$this->assertCount( 1, $this->agent->calls_of( 'db.readonly' ) );
+		remove_all_filters( 'pre_wp_mail', 20 );
+
+		$r = $this->sample( $r, 6, 1 ); // 70 percent.
+		$this->assertFalse( $this->agent->state()['readonly'][ 'c' . $r->id() ], 'Back within the plan lifts it as before.' );
+	}
+
+	public function test_a_hundred_and_forty_percent_still_waits_the_7_days(): void {
+		$r = $this->sample( $this->account(), 10, 4 );
+		$this->assertSame( array(), $this->agent->state()['readonly'] );
+	}
+
 	public function test_back_within_the_plan_lifts_the_restriction_and_tells_the_customer(): void {
 		$r = $this->sample( $this->account(), 10, 2 );
 		$this->clock += 8 * DAY_IN_SECONDS;

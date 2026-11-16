@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Hosting;
 
+use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Emails\Emails;
 use BeltoftServices\Jobs;
@@ -43,6 +44,12 @@ final class HostingUsage {
 	public const OVER_PERCENT    = 110;
 	public const RESTORE_PERCENT = 100;
 	public const GRACE_DAYS      = 7;
+
+	/**
+	 * Storage percent at which database writes stop at once: no grace days and no dependence on the notice mail. The databases share one
+	 * server, so an account that grows far past its plan must not fill it for everyone.
+	 */
+	public const HARD_PERCENT    = 150;
 
 	/**
 	 * Hooks the job and its hourly schedule.
@@ -231,12 +238,18 @@ final class HostingUsage {
 				$state['over_told'] = $now;
 			}
 
-			if ( ! $state['restricted'] && $now - (int) $state['over_since'] >= self::GRACE_DAYS * DAY_IN_SECONDS && $state['over_told'] ) {
+			$hard = $percent >= self::HARD_PERCENT;
+
+			if ( ! $state['restricted'] && ( $hard || ( $now - (int) $state['over_since'] >= self::GRACE_DAYS * DAY_IN_SECONDS && $state['over_told'] ) ) ) {
 				$done = $this->agent_call( 'usage_readonly_on', 'db.readonly', array( 'account' => Config::account( $this->r->id() ), 'enabled' => true ) );
 
 				if ( ! $done instanceof StepResult ) {
 					$state['restricted'] = $now;
 					Emails::send( 'beltoft_services_hosting_notice', $this->r, array_merge( $data, array( 'hosting_notice' => 'storage_restricted' ) ) );
+
+					if ( $hard ) {
+						Alerts::admin( $this->r, sprintf( 'Hosting storage is at %d percent of the plan (%d GB of %d GB). Database writes were stopped at once; the databases share one server.', (int) round( $percent ), $gb, (int) $plan['disk_gb'] ) );
+					}
 				}
 			}
 		} elseif ( $percent <= self::RESTORE_PERCENT ) {
