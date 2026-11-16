@@ -776,4 +776,14 @@ final class JobsTest extends TestCase {
 		$this->assertSame( 'beltoft_services_busy', $busy->get_data()['code'] );
 		$this->assertSame( 422, \BeltoftServices\Api\Routes::not_queued( new \WP_Error( 'x', 'No.', array( 'status' => 422 ) ) )->get_status() );
 	}
+
+	public function test_acting_asks_the_store_for_this_service_only_and_does_not_mix_up_ids(): void {
+		Jobs::queue_act( 112, 'tidy' );
+		$sql = array();
+		add_filter( 'query', static function ( $q ) use ( &$sql ) { if ( str_contains( $q, 'actionscheduler_actions' ) ) { $sql[] = $q; } return $q; } );
+
+		$this->assertFalse( Jobs::acting( 12 ), 'Service 112 is acting, service 12 is not.' );
+		$this->assertTrue( Jobs::acting( 112 ) );
+		$this->assertNotEmpty( array_filter( $sql, static fn( $q ) => str_contains( $q, 'LIKE' ) && str_contains( $q, '12' ) ), 'The id goes to the store as a search, so it does not read every pending job.' );
+	}
 }

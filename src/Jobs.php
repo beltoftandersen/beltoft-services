@@ -522,7 +522,10 @@ final class Jobs {
 
 		$mine = array();
 
-		foreach ( as_get_scheduled_actions( array( 'hook' => self::ACT, 'group' => self::GROUP, 'status' => $status, 'per_page' => -1 ) ) as $id => $action ) {
+		// The id goes to the store as a search text, so the store filters in SQL ("12" also matches 112 and the hook name; the loop below
+		// removes those). A store that does not know the argument ignores it and the loop does all the work, as before. No row cap:
+		// an old store without the argument would then cut the list and miss the job.
+		foreach ( as_get_scheduled_actions( array( 'hook' => self::ACT, 'group' => self::GROUP, 'status' => $status, 'per_page' => -1, 'search' => (string) $activation_id ) ) as $id => $action ) {
 			$args = $action->get_args();
 
 			if ( (int) ( $args[0] ?? 0 ) === $activation_id ) {
