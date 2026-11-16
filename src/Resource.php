@@ -208,7 +208,7 @@ final class Resource {
 	 * @param int $license_id License id.
 	 */
 	public static function for_license( int $license_id ): ?Resource {
-		$rows = Licenses::resources( $license_id );
+		$rows = self::remembered( 'resources:' . $license_id, static fn() => Licenses::resources( $license_id ) );
 
 		return $rows ? new self( $rows[0] ) : null;
 	}
@@ -363,9 +363,87 @@ final class Resource {
 	 * @return array<string, mixed>
 	 */
 	public function license(): array {
-		$license = Licenses::find( (int) $this->row['license_id'] );
+		$id      = (int) $this->row['license_id'];
+		$license = self::remembered( 'license:' . $id, static fn() => Licenses::find( $id ) );
 
 		return $license ? $license : array();
+	}
+
+	/**
+	 * The per-request memo of the licenses and live resources read for a My Account page. It is OFF unless a page turns it on
+	 * (memo_begin), so a job, a webhook or a test never reads a value that is not fresh. It is emptied by every write that
+	 * goes through this class and by the license actions of beltoft-licenses (memo_hooks).
+	 *
+	 * @var array<string, mixed>|null Null when off.
+	 */
+	private static ?array $memo = null;
+
+	/**
+	 * Turns the per-request memo on (empty). Call memo_end() when the request or the test is done.
+	 */
+	public static function memo_begin(): void {
+		self::$memo = array();
+	}
+
+	/**
+	 * Turns the memo off and drops what it holds.
+	 */
+	public static function memo_end(): void {
+		self::$memo = null;
+	}
+
+	/**
+	 * Drops what the memo holds (a row was written). The memo stays on.
+	 */
+	public static function memo_flush(): void {
+		if ( null !== self::$memo ) {
+			self::$memo = array();
+		}
+	}
+
+	/**
+	 * Is the memo on?
+	 */
+	public static function memo_active(): bool {
+		return null !== self::$memo;
+	}
+
+	/**
+	 * A value read once per request while the memo is on, read every time when it is off. A null value is remembered too.
+	 *
+	 * @param string   $key  Key, for example "license:12".
+	 * @param callable $load Reads the value.
+	 * @return mixed
+	 */
+	public static function remembered( string $key, callable $load ) {
+		if ( null === self::$memo ) {
+			return $load();
+		}
+
+		if ( ! array_key_exists( $key, self::$memo ) ) {
+			self::$memo[ $key ] = $load();
+		}
+
+		return self::$memo[ $key ];
+	}
+
+	/**
+	 * Empties the memo whenever beltoft-licenses writes a license or an activation, and turns it on for My Account pages.
+	 */
+	public static function memo_hooks(): void {
+		foreach ( array( 'license_created', 'license_updated', 'status_changed', 'expiry_changed', 'activated', 'deactivated' ) as $name ) {
+			add_action( 'beltoft_licenses_' . $name, array( __CLASS__, 'memo_flush' ), 1, 0 );
+		}
+
+		add_action(
+			'wp',
+			static function (): void {
+				if ( function_exists( 'is_account_page' ) && is_account_page() && ! wp_doing_ajax() ) {
+					self::memo_begin();
+				}
+			},
+			1
+		);
 	}
 
 	/**
@@ -505,9 +583,13 @@ final class Resource {
 			return false;
 		}
 
+		self::memo_flush();
+
 		if ( ! Licenses::update_resource_meta( $this->id(), $meta ) ) {
 			return false;
 		}
+
+		self::memo_flush();
 
 		$fresh = Licenses::activation( $this->id() );
 
@@ -893,10 +975,16 @@ final class Resource {
 	private static function pending_raw( int $activation_id ): ?string {
 		global $wpdb;
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- always fresh: other requests write it.
-		$raw = $wpdb->get_var( $wpdb->prepare( 'SELECT option_value FROM %i WHERE option_name = %s', $wpdb->options, self::pending_desire_option( $activation_id ) ) );
+		// Always fresh (other requests write it), except inside a My Account page request, where the memo holds it until a write here.
+		return self::remembered(
+			'pending:' . $activation_id,
+			static function () use ( $wpdb, $activation_id ): ?string {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- always fresh: other requests write it.
+				$raw = $wpdb->get_var( $wpdb->prepare( 'SELECT option_value FROM %i WHERE option_name = %s', $wpdb->options, self::pending_desire_option( $activation_id ) ) );
 
-		return null === $raw ? null : (string) $raw;
+				return null === $raw ? null : (string) $raw;
+			}
+		);
 	}
 
 	/**
@@ -926,6 +1014,7 @@ final class Resource {
 	 * @param string $name Option name.
 	 */
 	private static function forget_cached_option( string $name ): void {
+		self::memo_flush();
 		wp_cache_delete( $name, 'options' );
 
 		$missing = wp_cache_get( 'notoptions', 'options' );
@@ -1156,6 +1245,7 @@ final class Resource {
 	 */
 	public function close(): void {
 		Licenses::close_resource( $this->license(), (string) $this->row['kind'], (string) $this->row['domain'] );
+		self::memo_flush();
 
 		$fresh = Licenses::activation( $this->id() );
 

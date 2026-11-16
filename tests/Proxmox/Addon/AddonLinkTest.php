@@ -68,4 +68,56 @@ class AddonLinkTest extends TestCase {
 
 		$this->assertSame( array(), $meta );
 	}
+
+	private function server_with_disk(): array {
+		$server_product = $this->service_product( 'fake', array(), array( 'slug' => 'srv-' . wp_generate_password( 6, false ) ) );
+		$server         = $this->service_license( $server_product, array( 'fire' => false ) );
+		$a              = Addon::all()[0];
+		$disk_product   = $this->service_product( $a->driver_id, array(), array( 'slug' => 'dsk-' . wp_generate_password( 6, false ) ) );
+		$disk_license   = $this->service_license( $disk_product, array( 'fire' => false ) );
+		$disk           = \BeltoftServices\Resource::create( $disk_license, Registry::get( $a->driver_id ), array(), array( 'server_license' => (int) $server['id'] ) );
+		$this->assertInstanceOf( \BeltoftServices\Resource::class, $disk );
+
+		return array( $a, \BeltoftServices\Resource::for_license( (int) $server['id'] ) ?? $this->fake_server( $server ), $disk );
+	}
+
+	private function fake_server( array $license ): \BeltoftServices\Resource {
+		$r = \BeltoftServices\Resource::create( $license, $this->fake_driver(), array() );
+		$this->assertInstanceOf( \BeltoftServices\Resource::class, $r );
+
+		return $r;
+	}
+
+	public function test_for_server_runs_its_lookup_once_per_request(): void {
+		global $wpdb;
+
+		list( $a, $server, $disk ) = $this->server_with_disk();
+		\BeltoftServices\Resource::memo_begin();
+		$before = $wpdb->num_queries;
+
+		for ( $i = 0; $i < 22; $i++ ) {
+			$found = AddonLink::for_server( $a, $server );
+			$this->assertSame( $disk->id(), $found[0]->id() );
+		}
+
+		$used = $wpdb->num_queries - $before;
+		\BeltoftServices\Resource::memo_end();
+
+		$this->assertLessThanOrEqual( 4, $used );
+	}
+
+	public function test_for_server_sees_an_add_on_made_or_closed_during_the_request(): void {
+		list( $a, $server, $disk ) = $this->server_with_disk();
+		\BeltoftServices\Resource::memo_begin();
+
+		$this->assertCount( 1, AddonLink::for_server( $a, $server ) );
+
+		$disk_product = $this->service_product( $a->driver_id, array(), array( 'slug' => 'dsk-' . wp_generate_password( 6, false ) ) );
+		$second       = \BeltoftServices\Resource::create( $this->service_license( $disk_product, array( 'fire' => false ) ), Registry::get( $a->driver_id ), array(), array( 'server_license' => (int) $server->license()['id'] ) );
+		$this->assertCount( 2, AddonLink::for_server( $a, $server ) );
+
+		$disk->close();
+		$this->assertCount( 1, AddonLink::for_server( $a, $server ) );
+		\BeltoftServices\Resource::memo_end();
+	}
 }
