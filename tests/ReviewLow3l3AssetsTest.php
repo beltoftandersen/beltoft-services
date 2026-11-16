@@ -43,9 +43,7 @@ final class ReviewLow3l3AssetsTest extends TestCase {
 		$this->assertStringNotContainsString( '/^Current: /', $this->js( 'app-reinstall.js' ) );
 		$this->assertStringContainsString( 'data-current', (string) file_get_contents( BELTOFT_SERVICES_PATH . 'src/Apps/AppReinstall.php' ) );
 
-		foreach ( array( 'api-reference.js', 'api-reference-full.js' ) as $name ) {
-			$this->assertStringContainsString( "getAttribute( 'data-copied' )", $this->js( $name ) );
-		}
+		$this->assertStringContainsString( "getAttribute( 'data-copied' )", $this->js( 'api-reference-core.js' ), 'Both reference layouts copy through the shared script.' );
 
 		foreach ( array( 'api-reference.php', 'api-reference-full.php' ) as $name ) {
 			$this->assertStringContainsString( 'data-copied=', (string) file_get_contents( BELTOFT_SERVICES_PATH . 'templates/' . $name ) );

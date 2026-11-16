@@ -48,30 +48,7 @@
 	} );
 
 	// Copy buttons: a sample's code, or the base address.
-	root.addEventListener( 'click', function ( event ) {
-		var button = event.target.closest ? event.target.closest( '[data-bsdocs-copy]' ) : null;
-
-		if ( ! button || ! navigator.clipboard ) {
-			return;
-		}
-
-		var holder = button.closest( '.bsdocs__code, .bsdocs__base' );
-		var code = holder ? holder.querySelector( 'code' ) : null;
-
-		if ( ! code ) {
-			return;
-		}
-
-		var label = button.textContent;
-
-		navigator.clipboard.writeText( code.textContent ).then( function () {
-			button.textContent = button.getAttribute( 'data-copied' ) || 'Copied';
-			button.setAttribute( 'aria-live', 'polite' );
-			window.setTimeout( function () {
-				button.textContent = label;
-			}, 1600 );
-		} );
-	} );
+	window.beltoftApiRef.copyButtons( root, '[data-bsdocs-copy]', '.bsdocs__code, .bsdocs__base' );
 
 	// Search in the navigation.
 	var search = root.querySelector( '[data-bsdocs-search]' );
@@ -140,21 +117,6 @@
 	}
 
 	// Scroll spy: highlight the section being read and keep it in view in the sidebar.
-	var links = {};
-
-	root.querySelectorAll( '.bsdocs__nav a[href^="#"]' ).forEach( function ( link ) {
-		links[ link.getAttribute( 'href' ).slice( 1 ) ] = link;
-	} );
-
-	var sections = root.querySelectorAll( '[data-bsdocs-section]' );
-
-	if ( ! ( 'IntersectionObserver' in window ) || ! sections.length ) {
-		return;
-	}
-
-	var visible = {};
-	var current = null;
-
 	function keepInView( link ) {
 		var side = root.querySelector( '.bsdocs__side' );
 
@@ -174,65 +136,15 @@
 		}
 	}
 
-	function update() {
-		var best = null;
-		var bestIsOp = false;
-
-		sections.forEach( function ( section ) {
-			if ( ! visible[ section.id ] ) {
-				return;
+	window.beltoftApiRef.scrollSpy( root, {
+		links: '.bsdocs__nav a[href^="#"]',
+		sections: '[data-bsdocs-section]',
+		opClass: 'bsdocs__op',
+		groupSelector: '.bsdocs__group-section',
+		onCurrent: function ( best, links ) {
+			if ( links[ best.id ] && window.matchMedia( '(min-width: 1200px)' ).matches ) {
+				keepInView( links[ best.id ] );
 			}
-
-			var isOp = section.classList.contains( 'bsdocs__op' );
-			var top = section.getBoundingClientRect().top;
-
-			if ( ! best || ( isOp && ! bestIsOp ) || ( isOp === bestIsOp && top < best.getBoundingClientRect().top ) ) {
-				best = section;
-				bestIsOp = isOp;
-			}
-		} );
-
-		if ( ! best || best === current ) {
-			return;
-		}
-
-		current = best;
-
-		var group = best.closest( '.bsdocs__group-section' );
-		var active = {};
-
-		active[ best.id ] = true;
-
-		if ( group ) {
-			active[ group.id ] = true;
-		}
-
-		Object.keys( links ).forEach( function ( id ) {
-			links[ id ].classList.toggle( 'is-current', !! active[ id ] );
-
-			if ( active[ id ] ) {
-				links[ id ].setAttribute( 'aria-current', 'location' );
-			} else {
-				links[ id ].removeAttribute( 'aria-current' );
-			}
-		} );
-
-		if ( links[ best.id ] && window.matchMedia( '(min-width: 1200px)' ).matches ) {
-			keepInView( links[ best.id ] );
-		}
-	}
-
-	var observer = new IntersectionObserver( function ( entries ) {
-		entries.forEach( function ( entry ) {
-			visible[ entry.target.id ] = entry.isIntersecting;
-		} );
-
-		update();
-	}, { rootMargin: '-96px 0px -60% 0px' } );
-
-	sections.forEach( function ( section ) {
-		if ( section.id ) {
-			observer.observe( section );
 		}
 	} );
 }() );

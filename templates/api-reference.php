@@ -19,21 +19,9 @@
 
 defined( 'ABSPATH' ) || exit;
 
-$beltoft_services_level = static function ( string $level ) use ( $scopes ): string {
-	return 'none' === $level ? __( 'None, public', 'beltoft-services' ) : (string) ( $scopes[ $level ] ?? $level );
-};
+$beltoft_services_cls = 'beltoft-services-apiref__';
 
-// A path with its {parameters} wrapped, so that they can be coloured.
-$beltoft_services_path = static function ( string $path ): string {
-	$parts = preg_split( '/(\{\w+\})/', $path, -1, PREG_SPLIT_DELIM_CAPTURE );
-	$out   = '';
-
-	foreach ( (array) $parts as $part ) {
-		$out .= 1 === preg_match( '/^\{\w+\}$/', (string) $part ) ? '<span class="beltoft-services-apiref__param">' . esc_html( (string) $part ) . '</span>' : esc_html( (string) $part );
-	}
-
-	return $out;
-};
+require BELTOFT_SERVICES_PATH . 'templates/parts/api-reference/helpers.php';
 
 // A navy code panel with a Copy button. $label names the panel, $what says what is copied.
 $beltoft_services_panel = static function ( string $label, string $code, string $what ): void {
@@ -47,13 +35,6 @@ $beltoft_services_panel = static function ( string $label, string $code, string 
 	</div>
 	<?php
 };
-
-$beltoft_services_methods = array(
-	'GET'    => 'get',
-	'POST'   => 'post',
-	'PUT'    => 'put',
-	'DELETE' => 'delete',
-);
 ?>
 <div class="beltoft-services-apiref" data-apiref>
 	<nav class="beltoft-services-apiref__nav" aria-label="<?php esc_attr_e( 'API reference sections', 'beltoft-services' ); ?>">
@@ -133,51 +114,7 @@ $beltoft_services_methods = array(
 							echo esc_html( sprintf( __( 'Access: %1$s. Success status: %2$d.', 'beltoft-services' ), $beltoft_services_level( $beltoft_services_op['scope'] ), $beltoft_services_op['status'] ) );
 							?>
 						</p>
-						<?php if ( $beltoft_services_op['params'] ) : ?>
-							<?php $beltoft_services_desc = '' !== implode( '', array_column( $beltoft_services_op['params'], 'desc' ) ); ?>
-							<table class="beltoft-services-apiref__table">
-								<caption><?php esc_html_e( 'Parameters', 'beltoft-services' ); ?></caption>
-								<thead><tr>
-									<th scope="col"><?php esc_html_e( 'Name', 'beltoft-services' ); ?></th>
-									<th scope="col"><?php esc_html_e( 'Type', 'beltoft-services' ); ?></th>
-									<th scope="col"><?php esc_html_e( 'Required', 'beltoft-services' ); ?></th>
-									<?php if ( $beltoft_services_desc ) : ?><th scope="col"><?php esc_html_e( 'Description', 'beltoft-services' ); ?></th><?php endif; ?>
-								</tr></thead>
-								<tbody>
-								<?php foreach ( $beltoft_services_op['params'] as $beltoft_services_param ) : ?>
-									<tr>
-										<td data-label="<?php esc_attr_e( 'Name', 'beltoft-services' ); ?>"><code<?php echo 'path' === $beltoft_services_param['in'] ? ' class="beltoft-services-apiref__param"' : ''; ?>><?php echo esc_html( $beltoft_services_param['name'] ); ?></code></td>
-										<td data-label="<?php esc_attr_e( 'Type', 'beltoft-services' ); ?>"><?php echo esc_html( $beltoft_services_param['type'] . ', ' . $beltoft_services_param['in'] ); ?></td>
-										<td data-label="<?php esc_attr_e( 'Required', 'beltoft-services' ); ?>"><?php echo esc_html( $beltoft_services_param['required'] ? __( 'Yes', 'beltoft-services' ) : __( 'No', 'beltoft-services' ) ); ?></td>
-										<?php if ( $beltoft_services_desc ) : ?><td data-label="<?php esc_attr_e( 'Description', 'beltoft-services' ); ?>"><?php echo esc_html( $beltoft_services_param['desc'] ); ?></td><?php endif; ?>
-									</tr>
-								<?php endforeach; ?>
-								</tbody>
-							</table>
-						<?php endif; ?>
-						<?php if ( $beltoft_services_op['reply'] ) : ?>
-							<?php $beltoft_services_desc = '' !== implode( '', array_column( $beltoft_services_op['reply'], 'desc' ) ); ?>
-							<table class="beltoft-services-apiref__table">
-								<caption><?php esc_html_e( 'Reply fields', 'beltoft-services' ); ?></caption>
-								<thead><tr>
-									<th scope="col"><?php esc_html_e( 'Field', 'beltoft-services' ); ?></th>
-									<th scope="col"><?php esc_html_e( 'Type', 'beltoft-services' ); ?></th>
-									<?php if ( $beltoft_services_desc ) : ?><th scope="col"><?php esc_html_e( 'Description', 'beltoft-services' ); ?></th><?php endif; ?>
-								</tr></thead>
-								<tbody>
-								<?php foreach ( $beltoft_services_op['reply'] as $beltoft_services_field ) : ?>
-									<tr>
-										<td data-label="<?php esc_attr_e( 'Field', 'beltoft-services' ); ?>"><code><?php echo esc_html( $beltoft_services_field['name'] ); ?></code></td>
-										<td data-label="<?php esc_attr_e( 'Type', 'beltoft-services' ); ?>"><?php echo esc_html( $beltoft_services_field['type'] ); ?></td>
-										<?php if ( $beltoft_services_desc ) : ?><td data-label="<?php esc_attr_e( 'Description', 'beltoft-services' ); ?>"><?php echo esc_html( $beltoft_services_field['desc'] ); ?></td><?php endif; ?>
-									</tr>
-								<?php endforeach; ?>
-								</tbody>
-							</table>
-						<?php endif; ?>
-						<?php if ( $beltoft_services_op['errors'] ) : ?>
-							<p class="beltoft-services-apiref__meta"><?php echo esc_html( sprintf( /* translators: %s: list of HTTP statuses. */ __( 'Error statuses: %s.', 'beltoft-services' ), implode( ', ', $beltoft_services_op['errors'] ) ) ); ?></p>
-						<?php endif; ?>
+<?php require BELTOFT_SERVICES_PATH . 'templates/parts/api-reference/op-tables.php'; ?>
 					</div>
 					<div class="beltoft-services-apiref__codes">
 						<?php
@@ -205,30 +142,8 @@ $beltoft_services_methods = array(
 		<div class="beltoft-services-apiref__split">
 			<div>
 				<p><?php esc_html_e( 'An error has an HTTP status and a JSON body with a code and a message, and the status again inside data.', 'beltoft-services' ); ?></p>
-				<table class="beltoft-services-apiref__table">
-					<thead><tr>
-						<th scope="col"><?php esc_html_e( 'Status', 'beltoft-services' ); ?></th>
-						<th scope="col"><?php esc_html_e( 'Meaning', 'beltoft-services' ); ?></th>
-					</tr></thead>
-					<tbody>
-					<?php foreach ( $errors as $beltoft_services_status => $beltoft_services_meaning ) : ?>
-						<tr>
-							<td data-label="<?php esc_attr_e( 'Status', 'beltoft-services' ); ?>"><code><?php echo esc_html( (string) $beltoft_services_status ); ?></code></td>
-							<td data-label="<?php esc_attr_e( 'Meaning', 'beltoft-services' ); ?>"><?php echo esc_html( $beltoft_services_meaning ); ?></td>
-						</tr>
-					<?php endforeach; ?>
-					</tbody>
-				</table>
-				<p>
-					<?php
-					echo esc_html(
-						$rate > 0
-							/* translators: %d: requests per minute. */
-							? sprintf( __( 'Rate limit: %d requests a minute for each token. Some requests have lower limits of their own. A reply of 429 means wait a minute and try again.', 'beltoft-services' ), $rate )
-							: __( 'Some requests have rate limits of their own. A reply of 429 means wait a minute and try again.', 'beltoft-services' )
-					);
-					?>
-				</p>
+<?php require BELTOFT_SERVICES_PATH . 'templates/parts/api-reference/errors-table.php'; ?>
+<?php require BELTOFT_SERVICES_PATH . 'templates/parts/api-reference/rate-note.php'; ?>
 			</div>
 			<div class="beltoft-services-apiref__codes">
 				<?php $beltoft_services_panel( __( 'Error reply', 'beltoft-services' ), '{"code":"rest_forbidden","message":"...","data":{"status":403}}', __( 'Copy the example error reply', 'beltoft-services' ) ); ?>
@@ -264,21 +179,7 @@ $beltoft_services_methods = array(
 					continue;
 				}
 				?>
-				<table class="beltoft-services-apiref__table beltoft-services-apiref__tools">
-					<caption><?php echo esc_html( $beltoft_services_label ); ?></caption>
-					<thead><tr>
-						<th scope="col"><?php esc_html_e( 'Tool', 'beltoft-services' ); ?></th>
-						<th scope="col"><?php esc_html_e( 'What it does', 'beltoft-services' ); ?></th>
-					</tr></thead>
-					<tbody>
-					<?php foreach ( $beltoft_services_rows as $beltoft_services_tool ) : ?>
-						<tr>
-							<td data-label="<?php esc_attr_e( 'Tool', 'beltoft-services' ); ?>"><code><?php echo esc_html( $beltoft_services_tool['name'] ); ?></code></td>
-							<td data-label="<?php esc_attr_e( 'What it does', 'beltoft-services' ); ?>"><?php echo esc_html( $beltoft_services_tool['description'] ); ?></td>
-						</tr>
-					<?php endforeach; ?>
-					</tbody>
-				</table>
+<?php require BELTOFT_SERVICES_PATH . 'templates/parts/api-reference/tools-table.php'; ?>
 			<?php endforeach; ?>
 		</section>
 	<?php endif; ?>
