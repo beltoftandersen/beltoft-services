@@ -532,6 +532,10 @@
 				handle.button.disabled = false;
 			}
 		}
+
+		if ( handle.focused && document.body === document.activeElement && document.contains( handle.focused ) && ! handle.focused.disabled && handle.focused.focus ) {
+			handle.focused.focus( { preventScroll: true } );
+		}
 	}
 
 	function isLocked( scope ) {
@@ -605,6 +609,11 @@
 		} );
 
 		clearFields();
+
+		// A disabled focused button drops focus to the page top: remember it and give it back in release().
+		if ( lock && document.activeElement && document.activeElement !== document.body && area.contains( document.activeElement ) ) {
+			handle.focused = document.activeElement;
+		}
 
 		if ( lock ) {
 			if ( el && ( area.contains( el ) || 'page' === key ) ) {

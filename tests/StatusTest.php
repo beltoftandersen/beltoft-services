@@ -96,4 +96,19 @@ class StatusTest extends TestCase {
 		$this->assertStringContainsString( 'LOADER OK', $out, $out );
 		$this->assertStringNotContainsString( 'FAIL', $out, $out );
 	}
+
+	public function test_focus_goes_back_to_the_clicked_button_and_the_console_and_charts_keep_names(): void {
+		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/status.js' );
+		$this->assertStringContainsString( 'handle.focused', $js );
+		$this->assertStringContainsString( 'handle.focused.focus(', $js );
+
+		$console = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/console.js' );
+		$this->assertStringContainsString( 'button.focus()', $console );
+		$this->assertStringContainsString( 'rfb.focus()', $console );
+
+		$monitoring = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'templates/account/monitoring.php' );
+		$this->assertDoesNotMatchRegularExpression( '/beltoft-vm-usage__plot"[^>]*aria-label/', $monitoring );
+		$tokens = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'templates/account/api-tokens.php' );
+		$this->assertStringContainsString( 'role="group" aria-labelledby', $tokens );
+	}
 }

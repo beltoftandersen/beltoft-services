@@ -28,7 +28,9 @@
 	function close( message ) {
 		stopTimers();
 		if ( rfb ) { var old = rfb; rfb = null; old.disconnect(); }
+		var hadFocus = screen.contains( document.activeElement ) || toolbar.contains( document.activeElement ) || document.body === document.activeElement;
 		screen.hidden = true; toolbar.hidden = true; button.hidden = false; button.disabled = false;
+		if ( hadFocus ) { button.focus(); }
 		if ( message ) { say( message ); }
 	}
 	function activity() {
@@ -55,7 +57,7 @@
 					var url = new URL( data.path, window.location.origin ); url.protocol = 'https:' === window.location.protocol ? 'wss:' : 'ws:';
 					rfb = new module.default( screen, url.href, { credentials: { password: data.password } } );
 					rfb.scaleViewport = true; rfb.clipViewport = true;
-					rfb.addEventListener( 'connect', function () { say( 'connected' ); activity(); } );
+					rfb.addEventListener( 'connect', function () { say( 'connected' ); activity(); rfb.focus(); } );
 					rfb.addEventListener( 'disconnect', function () { rfb = null; close( 'disconnected' ); } );
 					rfb.addEventListener( 'credentialsrequired', function () { close( 'failed' ); } );
 				} );

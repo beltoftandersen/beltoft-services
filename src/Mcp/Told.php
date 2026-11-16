@@ -167,7 +167,7 @@ final class Told {
 	 * @param int                  $user_id Customer.
 	 */
 	public static function done( string $name, array $args, int $user_id ): void {
-		self::send( $user_id, self::service_of( $user_id, $args ), 'app_action', self::phrase( $name, $args ), $args );
+		self::send( $user_id, self::service_of( $user_id, $args ), 'app_action', self::phrase( $name, $args ) );
 	}
 
 	/**
@@ -178,9 +178,8 @@ final class Told {
 	 * @param Resource|null        $r       The service, if any.
 	 * @param string               $kind    Notice kind.
 	 * @param string               $what    What the app did, for kind app_action.
-	 * @param array<string, mixed> $args    Arguments, for the trail.
 	 */
-	public static function send( int $user_id, ?Resource $r, string $kind, string $what, array $args = array() ): void {
+	public static function send( int $user_id, ?Resource $r, string $kind, string $what ): void {
 		$sent = false;
 
 		try {
@@ -212,6 +211,5 @@ final class Told {
 			}
 		}
 
-		unset( $args );
 	}
 }

@@ -22,9 +22,9 @@ use BeltoftServices\Resource;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * One virtual machine per unit, cloned from a template on a configured cluster. This task covers
- * provisioning; pause, resume, delete and the plan change arrive with the next task, and until
- * then they refuse without touching Proxmox. No sign-in link: a VM has none (no Drivers\Opens).
+ * One virtual machine per unit, cloned from a template on a configured cluster. Provisioning,
+ * power, the plan change and deletion run through Provision and Operations, and every write to
+ * Proxmox is behind Ownership::verify. No sign-in link: a VM has none (no Drivers\Opens).
  */
 class ProxmoxDriver implements Driver, StopsOnDelete, NeedsBilling, InternalActions, ProvisionSteps {
 

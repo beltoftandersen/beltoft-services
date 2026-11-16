@@ -226,7 +226,7 @@ $beltoft_services_fmt = (string) get_option( 'date_format' );
 				<div class="beltoft-services-api__copyrow">
 					<span class="beltoft-services-api__copylabel" id="<?php echo esc_attr( $id ); ?>"><?php echo esc_html( $label ); ?></span>
 					<div class="beltoft-services-api__block">
-						<code class="beltoft-services-api__secret" aria-labelledby="<?php echo esc_attr( $id ); ?>"><?php echo esc_html( $text ); ?></code>
+						<code class="beltoft-services-api__secret" role="group" aria-labelledby="<?php echo esc_attr( $id ); ?>"><?php echo esc_html( $text ); ?></code>
 						<button type="button" class="button woocommerce-button beltoft-services-vm__copy" data-api-copy="<?php echo esc_attr( $text ); ?>" data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" aria-describedby="<?php echo esc_attr( $id ); ?>"><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button>
 					</div>
 				</div>
