@@ -334,8 +334,13 @@ final class IpPool {
 	 * @return string The kind that was released ('failed' or 'closed'), or '' when this address is not a leftover.
 	 */
 	public static function release_leftover( string $address ): string {
-		foreach ( self::rows() as $row ) {
-			if ( $row['address'] === $address && '' !== $row['leftover'] ) {
+		// One address is looked up, not the whole pool.
+		$row = self::find( $address );
+
+		if ( null !== $row ) {
+			$row['leftover'] = self::leftover( $row );
+
+			if ( '' !== $row['leftover'] ) {
 				if ( ! self::release( (int) $row['resource_id'] ) ) {
 					return '';
 				}
