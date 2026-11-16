@@ -45,6 +45,28 @@ class NodesTest extends HostingCase {
 		$this->assertSame( self::AGENT_KEY, $node['agent_key'] );
 	}
 
+	public function test_saving_a_node_again_without_the_optional_fields_keeps_what_was_stored(): void {
+		$pin = base64_encode( str_repeat( 'a', 32 ) );
+		$this->save_node( array( 'pin_sha256' => $pin, 'agent_pin' => $pin, 'ca_file' => __FILE__, 'backup_storage' => 'pbs-store', 'edge_ip' => '198.51.100.7', 'edge_ipv6' => '2001:db8::7' ) );
+
+		$keys  = array( 'pin_sha256', 'agent_pin', 'ca_file', 'backup_storage', 'client', 'edge_ip', 'edge_ipv6' );
+		$input = array_diff_key( (array) Nodes::get( 'n1' ), array_flip( $keys ) );
+		$this->assertTrue( Nodes::save( 'n1', $input ) );
+
+		$node = Nodes::get( 'n1' );
+		$this->assertSame( $pin, $node['pin_sha256'] );
+		$this->assertSame( $pin, $node['agent_pin'] );
+		$this->assertSame( __FILE__, $node['ca_file'] );
+		$this->assertSame( 'pbs-store', $node['backup_storage'] );
+		$this->assertSame( '198.51.100.7', $node['edge_ip'] );
+		$this->assertSame( '2001:db8::7', $node['edge_ipv6'] );
+
+		// A posted empty value still clears: the admin form posts every field.
+		$this->assertTrue( Nodes::save( 'n1', array_merge( $input, array( 'pin_sha256' => '', 'backup_storage' => '' ) ) ) );
+		$this->assertSame( '', Nodes::get( 'n1' )['pin_sha256'] );
+		$this->assertSame( '', Nodes::get( 'n1' )['backup_storage'] );
+	}
+
 	public function test_a_new_node_needs_both_secrets(): void {
 		$result = Nodes::save( 'n2', $this->valid( array( 'token_secret' => '', 'agent_key' => '' ) ) );
 
