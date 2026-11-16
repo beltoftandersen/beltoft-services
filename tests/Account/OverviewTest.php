@@ -931,6 +931,41 @@ class OverviewTest extends MonitoringTestCase {
 
 		$this->assertTrue( wp_style_is( \BeltoftServices\Account\Panel::HANDLE, 'enqueued' ) );
 	}
+	public function test_overview_reads_the_live_resources_of_all_licenses_in_one_query(): void {
+		$user = self::factory()->user->create();
+		$this->as_user( $user );
+
+		for ( $n = 0; $n < 4; $n++ ) {
+			$this->dns( $user, 'bulk' . $n . '-example.dk' );
+		}
+
+		// The first visit gives each service its address slug, a write that empties the memo: measure the second one.
+		Overview::data();
+
+		$single = 0;
+		$bulk   = 0;
+		$count  = static function ( $sql ) use ( &$single, &$bulk ) {
+			if ( preg_match( '/WHERE license_id = \d+ AND deactivated_at IS NULL/', $sql ) && false !== strpos( wp_debug_backtrace_summary(), 'Resource::for_license' ) ) {
+				++$single;
+			} elseif ( preg_match( '/license_id IN \(/', $sql ) && false !== strpos( $sql, "kind <> 'site'" ) ) {
+				++$bulk;
+			}
+
+			return $sql;
+		};
+
+		Overview::reset();
+		Resource::memo_begin();
+		add_filter( 'query', $count );
+		Overview::data();
+		remove_filter( 'query', $count );
+		Resource::memo_end();
+
+		$this->assertSame( 0, $single, 'No live-resource query per license.' );
+		$this->assertGreaterThanOrEqual( 1, $bulk );
+		$this->assertLessThanOrEqual( 2, $bulk );
+	}
+
 	public function test_overview_loads_each_service_once_with_the_request_memo(): void {
 		global $wpdb;
 

@@ -116,6 +116,9 @@ final class OverviewData {
 			return $data;
 		}
 
+		// One query for the live resources of all the customer's licenses; for_license() and the splitting below read the memo.
+		Resource::preload( array_map( static fn( $license ) => (int) ( $license['id'] ?? 0 ), $licenses ) );
+
 		$groups  = Endpoint::split( $licenses );
 		$domains = array_slice( (array) ( $groups['domains'] ?? array() ), 0, 50 );
 		$tab     = array_slice( (array) ( $groups[ ServerLinks::slug() ] ?? array() ), 0, 50 );

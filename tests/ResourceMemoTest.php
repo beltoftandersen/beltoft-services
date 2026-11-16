@@ -95,4 +95,50 @@ final class ResourceMemoTest extends TestCase {
 		$r->queue_desire( 'paused', 'test' );
 		$this->assertSame( 'paused', $r->pending_desire()['state'] );
 	}
+
+	public function test_preload_reads_the_resources_of_many_licenses_in_one_query(): void {
+		global $wpdb;
+
+		$ids = array();
+		for ( $n = 0; $n < 4; $n++ ) {
+			$ids[] = (int) $this->resource()->license()['id'];
+		}
+		$ids[] = 999999; // A license with no resource.
+		Resource::memo_begin();
+
+		$before = $wpdb->num_queries;
+		Resource::preload( $ids );
+		$found = array();
+		foreach ( $ids as $id ) {
+			$found[ $id ] = Resource::for_license( $id );
+		}
+
+		$this->assertLessThanOrEqual( 1, $wpdb->num_queries - $before, 'One query for all, none per license.' );
+		$this->assertNull( $found[999999] );
+		$this->assertSame( 4, count( array_filter( $found ) ) );
+	}
+
+	public function test_preloaded_resources_are_not_stale_after_a_write_or_a_close(): void {
+		$r  = $this->resource();
+		$id = (int) $r->license()['id'];
+		Resource::memo_begin();
+		Resource::preload( array( $id ) );
+
+		$this->assertSame( 'requested', Resource::for_license( $id )->get( 'state' ) );
+		$r->set( array( 'state' => 'ready' ) );
+		$this->assertSame( 'ready', Resource::for_license( $id )->get( 'state' ) );
+
+		Resource::preload( array( $id ) );
+		$r->close();
+		$this->assertNull( Resource::for_license( $id ) );
+	}
+
+	public function test_preload_with_the_memo_off_reads_nothing(): void {
+		global $wpdb;
+
+		$before = $wpdb->num_queries;
+		Resource::preload( array( 1, 2, 3 ) );
+
+		$this->assertSame( 0, $wpdb->num_queries - $before );
+	}
 }
