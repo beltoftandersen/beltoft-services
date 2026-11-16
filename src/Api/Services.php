@@ -81,7 +81,12 @@ final class Services {
 
 		$out = array();
 
-		foreach ( array_slice( Endpoint::licenses_for_user( $user_id ), 0, self::MAX ) as $license ) {
+		// Newest first, so a customer with many old deleted services still sees the current ones; the cap counts what is shown.
+		foreach ( array_reverse( array_values( Endpoint::licenses_for_user( $user_id ) ) ) as $license ) {
+			if ( count( $out ) >= self::MAX ) {
+				break;
+			}
+
 			if ( (int) ( $license['user_id'] ?? 0 ) !== $user_id ) {
 				continue;
 			}
@@ -107,6 +112,6 @@ final class Services {
 			);
 		}
 
-		return $out;
+		return array_reverse( $out );
 	}
 }
