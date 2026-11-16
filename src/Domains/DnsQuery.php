@@ -35,14 +35,8 @@ final class DnsQuery {
 			if ( 48 === $type ) { return ! empty( $zone['secured'] ) ? 1 : new \WP_Error( 'dns_missing', 'Fake zone has no DNSKEY.' ); }
 			return 6 === $type ? (int) ( $zone['serial'] ?? 1 ) : time() + 30 * DAY_IN_SECONDS;
 		}
-		$id = random_int( 1, 65535 );
-		$wire = self::packet( $id, $domain, $type );
-		$socket = @fsockopen( 'udp://' . self::address( $server ), 53, $errno, $message, 3 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged,WordPress.WP.AlternativeFunctions.file_system_operations_fsockopen -- UDP DNS query, not file I/O; transport error returned below.
-		if ( ! $socket ) { return new \WP_Error( 'dns_transport', 'Name server did not answer.' ); }
-		stream_set_timeout( $socket, 3 );
-		fwrite( $socket, $wire ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- UDP DNS socket, not file I/O.
-		$data = fread( $socket, 4096 ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fread -- UDP DNS socket, not file I/O.
-		fclose( $socket ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- UDP DNS socket, not file I/O.
+		$id   = random_int( 1, 65535 );
+		$data = DnsTransport::exchange( self::address( $server ), self::packet( $id, $domain, $type ) );
 		if ( ! is_string( $data ) || strlen( $data ) < 12 ) { return new \WP_Error( 'dns_transport', 'Name server did not answer.' ); }
 		return self::parse_answer( $data, $id, $type );
 	}
@@ -134,10 +128,11 @@ final class DnsQuery {
 	 */
 	public static function packet( int $id, string $domain, int $type ): string {
 		$signed = 46 === $type;
-		$wire   = pack( 'nnnnnn', $id, 0x0100, 1, 0, 0, $signed ? 1 : 0 );
+		$edns   = $signed || 48 === $type; // A key set can be larger than 512 bytes: ask with a larger UDP size.
+		$wire   = pack( 'nnnnnn', $id, 0x0100, 1, 0, 0, $edns ? 1 : 0 );
 		foreach ( explode( '.', rtrim( $domain, '.' ) ) as $label ) { $wire .= chr( strlen( $label ) ) . $label; }
 		$wire .= "\0" . pack( 'nn', $signed ? 6 : $type, 1 );
-		if ( $signed ) { $wire .= "\0" . pack( 'nnNn', 41, 4096, 0x8000, 0 ); }
+		if ( $edns ) { $wire .= "\0" . pack( 'nnNn', 41, 4096, $signed ? 0x8000 : 0, 0 ); }
 		return $wire;
 	}
 
