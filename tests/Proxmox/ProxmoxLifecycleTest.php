@@ -786,6 +786,50 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->assertSame( '', apply_filters( 'woocommerce_subscriptions_switch_error_message', '', $small->get_id(), 1, 0, $other, null ), 'A subscription with no VM.' );
 	}
 
+	public function test_an_extra_disk_switch_to_a_smaller_size_is_refused_and_equal_or_larger_is_let_through(): void {
+		Switches::register();
+		$disk = static fn( int $gb ): array => array( 'disk_gb' => $gb );
+		$now  = $this->service_product( 'proxmox-disk', $disk( 50 ), array( 'slug' => 'disk-now' ) );
+		$license = $this->service_license( $now, array( 'fire' => false, 'subscription_id' => 7171 ) );
+		$this->assertInstanceOf( Resource::class, Resource::create( $license, Registry::get( 'proxmox-disk' ), Product::plan( $now->get_id() ) ) );
+		$subscription = new class() {
+			public function get_id() {
+				return 7171;
+			}
+		};
+
+		$cases = array( 'smaller' => array( 20, true ), 'equal' => array( 50, false ), 'larger' => array( 100, false ) );
+		foreach ( $cases as $name => $case ) {
+			$target = $this->service_product( 'proxmox-disk', $disk( $case[0] ), array( 'slug' => 'disk-target-' . $name ) );
+			$result = apply_filters( 'woocommerce_subscriptions_switch_error_message', '', $target->get_id(), 1, 0, $subscription, null );
+			$this->assertSame( $case[1] ? "Disks can't be made smaller. Choose a size at least as large as your current disk." : '', $result, $name );
+		}
+	}
+
+	public function test_an_extra_disk_switch_of_a_subscription_without_a_disk_resource_is_refused(): void {
+		Switches::register();
+		$target = $this->service_product( 'proxmox-disk', array( 'disk_gb' => 50 ), array( 'slug' => 'disk-orphan' ) );
+		$none   = new class() {
+			public function get_id() {
+				return 7272;
+			}
+		};
+
+		$this->assertSame( 'The disk for this subscription could not be found.', apply_filters( 'woocommerce_subscriptions_switch_error_message', '', $target->get_id(), 1, 0, $none, null ) );
+	}
+
+	public function test_the_switch_guard_lets_a_switch_through_when_it_cannot_tell(): void {
+		Switches::register();
+		$target = $this->service_product( 'proxmox-disk', array( 'disk_gb' => 50 ), array( 'slug' => 'disk-broken' ) );
+		$broken = new class() {
+			public function get_id() {
+				throw new \RuntimeException( 'cannot read the subscription' );
+			}
+		};
+
+		$this->assertSame( '', apply_filters( 'woocommerce_subscriptions_switch_error_message', '', $target->get_id(), 1, 0, $broken, null ), 'Fail open: update_plan keeps the disk anyway.' );
+	}
+
 	public function test_cpu_ram_downgrade_applies_and_disk_is_kept_with_one_alert(): void {
 		$r = $this->built();
 		$r->set( array( 'plan' => array_merge( (array) $r->get( 'plan' ), array( 'cores' => 1, 'memory_mb' => 2048, 'disk_gb' => 20 ) ) ) );
