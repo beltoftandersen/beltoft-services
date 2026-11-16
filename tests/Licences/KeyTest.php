@@ -448,6 +448,18 @@ final class KeyTest extends TestCase {
 		$this->assertTrue( KeyOrder::release( Resource::find( $r2->id() ) ) );
 	}
 
+	public function test_delete_is_not_done_while_the_vendor_licence_is_still_there(): void {
+		$r = $this->licence();
+		$this->build( $r );
+		$r = Resource::find( $r->id() );
+		$this->op->reply( 'DELETE', '/licenses/plesk/' . (int) $r->get( 'lic_key_id' ), new \WP_Error( 'http_500', 'down', array( 'status' => 500 ) ) );
+
+		$result = ( new KeyDriver() )->delete( $r );
+
+		$this->assertFalse( $result->is_done(), 'The resource is not closed while the vendor licence keeps billing.' );
+		$this->assertTrue( $result->is_retry() );
+	}
+
 	public function test_used_up_key_asks_do_not_stop_the_deletion_of_an_ended_licence(): void {
 		$r = $this->licence();
 		$this->build( $r );

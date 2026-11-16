@@ -70,7 +70,10 @@ final class KeyDriver implements Driver {
 	}
 
 	public function delete( Resource $r ): StepResult {
-		KeyOrder::release( $r );
+		// Done only when the vendor licence is gone: the reconciler repeats the deletion and alerts when it keeps failing.
+		if ( ! KeyOrder::release( $r ) ) {
+			return StepResult::retry( 3600, 'Openprovider did not delete the licence yet.' );
+		}
 
 		return StepResult::done();
 	}
