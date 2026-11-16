@@ -21,12 +21,28 @@ final class Zone {
 		foreach ( array( 'domain', 'dns' ) as $kind ) {
 			foreach ( Resource::live_ids( $kind ) as $id ) {
 				$other = Resource::find( $id );
-				if ( ! $other || $other->id() === $r->id() || 'deleted' === $other->get( 'state' ) || $other->get( 'domain' ) !== $name ) { continue; }
+				if ( ! $other || $other->id() === $r->id() || ! self::holds( $other ) || $other->get( 'domain' ) !== $name ) { continue; }
 				if ( (int) ( $other->license()['user_id'] ?? 0 ) !== (int) ( $r->license()['user_id'] ?? 0 ) ) { return 'other'; }
 				return $kind;
 			}
 		}
 		return 'none';
+	}
+
+	/**
+	 * Does this service hold its name? The one rule for "who holds a name" (the cart, the zone and the DNS claim all use it):
+	 * a deleted or failed service does not, and neither does one paused after its license ended (waiting out retention).
+	 *
+	 * @param Resource $other A domain or DNS service.
+	 */
+	public static function holds( Resource $other ): bool {
+		$state = $other->get( 'state' );
+		if ( in_array( $state, array( 'deleted', 'failed' ), true ) ) { return false; }
+		if ( 'paused' === $state ) {
+			$license = $other->license();
+			if ( ! $license || \BeltoftLicenses\Licenses::STATUS_ACTIVE !== \BeltoftLicenses\Licenses::effective_status( $license ) ) { return false; }
+		}
+		return true;
 	}
 
 	/** Does our DNS already serve this name for this customer (a verified DNS-only service holds it)? Then a transfer leaves the DNS as it is. */
