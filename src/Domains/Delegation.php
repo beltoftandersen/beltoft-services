@@ -12,7 +12,7 @@ final class Delegation {
 		if ( count( $expected ) < 2 ) { return 'unknown'; }
 		$answer = apply_filters( 'beltoft_services_domains_ns_answer', null, $domain );
 		if ( null === $answer ) {
-			$answer = dns_get_record( $domain, DNS_NS );
+			$answer = PublicDns::records( $domain, DNS_NS );
 			if ( false === $answer || array() === $answer ) { return 'unknown'; }
 			$answer = array_column( $answer, 'target' );
 		}

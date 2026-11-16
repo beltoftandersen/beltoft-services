@@ -52,7 +52,7 @@ final class DnsAddress {
 		if ( ! is_array( $found ) ) {
 			$found = array();
 			foreach ( array( DNS_A => 'ip', DNS_AAAA => 'ipv6' ) as $type => $field ) {
-				$records = @dns_get_record( $host, $type ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- The resolver warns on a failed lookup; false is handled.
+				$records = PublicDns::records( $host, $type );
 				foreach ( is_array( $records ) ? $records : array() as $record ) {
 					if ( isset( $record[ $field ] ) ) { $found[] = (string) $record[ $field ]; }
 				}
@@ -91,7 +91,7 @@ final class DnsAddress {
 		$found = apply_filters( 'beltoft_services_dns_zone_ns', null, $zone );
 		if ( ! is_array( $found ) ) {
 			$found   = array();
-			$records = '' === $zone ? false : @dns_get_record( $zone, DNS_NS ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- The resolver warns on a failed lookup; false is handled.
+			$records = '' === $zone ? false : PublicDns::records( $zone, DNS_NS );
 			foreach ( is_array( $records ) ? $records : array() as $record ) {
 				if ( isset( $record['target'] ) ) { $found[] = (string) $record['target']; }
 			}

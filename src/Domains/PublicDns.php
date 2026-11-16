@@ -15,6 +15,16 @@ defined( 'ABSPATH' ) || exit;
  */
 final class PublicDns {
 
+	/** Tests only: replaces the system resolver call, callable( string $fqdn, int $type_flag ): array|false. Null reads for real. */
+	public static $reader = null;
+
+	/** The one call to the system resolver. The name always leaves lowercase with exactly one trailing dot, so the resolver search list never applies. */
+	public static function records( string $name, int $flag ): array|false {
+		$fqdn = strtolower( rtrim( trim( $name ), '.' ) ) . '.';
+		if ( is_callable( self::$reader ) ) { return ( self::$reader )( $fqdn, $flag ); }
+		return @dns_get_record( $fqdn, $flag ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- a failed lookup is false and handled by the caller.
+	}
+
 	/**
 	 * What public DNS answers for a name. Tests answer through the filter beltoft_services_mail_dns_lookup; nothing in a
 	 * test run reaches the network.
@@ -38,7 +48,7 @@ final class PublicDns {
 		}
 
 		$flag    = array( 'MX' => DNS_MX, 'TXT' => DNS_TXT, 'CNAME' => DNS_CNAME )[ $type ] ?? DNS_TXT;
-		$records = @dns_get_record( rtrim( $fqdn, '.' ) . '.', $flag ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- a failed lookup is returned as an error below.
+		$records = self::records( $fqdn, $flag );
 
 		if ( false === $records ) {
 			return new \WP_Error( 'dns_transport', __( 'The name did not resolve.', 'beltoft-services' ) );
