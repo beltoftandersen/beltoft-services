@@ -133,6 +133,24 @@ class CheckoutTest extends TestCase {
 		$this->assertSame( array(), $errors->get_error_codes() );
 	}
 
+	public function test_a_second_trial_is_refused_for_a_tagged_or_dotted_variation_of_the_email(): void {
+		$this->fake_driver();
+		$product = $this->as_subscription( $this->service_product( 'fake', array(), array( 'slug' => 'trial-norm' ) ), 7 );
+		$this->cart( $product );
+		$this->service_license( $product, array( 'user_id' => self::factory()->user->create(), 'email' => 'name@gmail.com' ) );
+		wp_set_current_user( 0 );
+
+		foreach ( array( 'name+2@gmail.com', 'n.ame@googlemail.com', 'Name@Gmail.com' ) as $email ) {
+			$errors = new \WP_Error();
+			Checkout::validate( array( 'billing_email' => $email ), $errors );
+			$this->assertSame( array( 'beltoft_services_trial_used' ), $errors->get_error_codes(), $email );
+		}
+
+		$errors = new \WP_Error();
+		Checkout::validate( array( 'billing_email' => 'other@gmail.com' ), $errors );
+		$this->assertSame( array(), $errors->get_error_codes() );
+	}
+
 	public function test_hooks_are_registered(): void {
 		$this->assertNotFalse( has_filter( 'woocommerce_cart_needs_payment', array( Checkout::class, 'cart_needs_payment' ) ) );
 		$this->assertNotFalse( has_action( 'woocommerce_after_checkout_validation', array( Checkout::class, 'validate' ) ) );

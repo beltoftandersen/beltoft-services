@@ -147,23 +147,13 @@ final class Checkout {
 		$user_id = get_current_user_id();
 		$email   = sanitize_email( $email );
 
-		$licenses = $user_id > 0 ? \BeltoftLicenses\Licenses::where( 'user_id', $user_id ) : array();
-		if ( '' !== $email ) {
-			$licenses = array_merge( $licenses, \BeltoftLicenses\Licenses::where( 'email', $email ) );
-		}
-
-		if ( ! $licenses ) {
-			return;
-		}
-
-		$held     = array_column( $licenses, 'product_slug' );
 		$reported = array();
 
 		foreach ( $trials as $product ) {
 			$parent = $product->is_type( 'variation' ) ? wc_get_product( $product->get_parent_id() ) : $product;
 			$slug   = $parent ? sanitize_title( (string) $parent->get_meta( \BeltoftLicenses\Software::META_SLUG ) ) : '';
 
-			if ( '' !== $slug && ! isset( $reported[ $slug ] ) && in_array( $slug, $held, true ) ) {
+			if ( '' !== $slug && ! isset( $reported[ $slug ] ) && IntroCoupon::held( $product->get_id(), $user_id, $email ) ) {
 				$reported[ $slug ] = true;
 				$errors->add(
 					'beltoft_services_trial_used',
