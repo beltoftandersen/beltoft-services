@@ -10,6 +10,7 @@ namespace BeltoftServices\Tests;
 use BeltoftServices\Api\Routes;
 use BeltoftServices\Background;
 use BeltoftServices\Drivers\StepResult;
+use BeltoftServices\JobFailures;
 use BeltoftServices\Jobs;
 use BeltoftServices\Locks;
 use BeltoftServices\Progress;
@@ -242,7 +243,7 @@ final class ReviewFixesSharedTest extends TestCase {
 		Progress::clear( Resource::find( $r->id() ) );
 		Progress::mark( Resource::find( $r->id() ), 'restart', 'Restart' );
 
-		Jobs::lapsed( $stale, 'reboot', $old );
+		JobFailures::lapsed( $stale, 'reboot', $old );
 
 		$this->assertSame( 'restart', Resource::find( $r->id() )->get( Progress::MARKER )['action'], 'The new marker stands.' );
 		$this->assertNull( Resource::find( $r->id() )->get( Jobs::RESULT ) );
@@ -251,8 +252,8 @@ final class ReviewFixesSharedTest extends TestCase {
 		// An old marker lapses once; a second call from a stale copy does nothing more.
 		$this->marker( $r, 'reboot', $old );
 		$stale = Resource::find( $r->id() );
-		Jobs::lapsed( $stale, 'reboot', $old );
-		Jobs::lapsed( $stale, 'reboot', $old );
+		JobFailures::lapsed( $stale, 'reboot', $old );
+		JobFailures::lapsed( $stale, 'reboot', $old );
 		$this->assertSame( 1, $this->mails, 'One staff mail.' );
 		$this->assertNull( Resource::find( $r->id() )->get( Progress::MARKER ) );
 	}

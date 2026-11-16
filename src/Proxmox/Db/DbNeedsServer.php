@@ -30,7 +30,7 @@ final class DbNeedsServer {
 	 */
 	public static function register(): void {
 		// Owner 2026-10-30: never refused, only told. The checkout says how the database is reached when the
-		// customer has no server with us (validate() and store_api_errors() remain for a site that wants a refusal).
+		// customer has no server with us.
 		add_action( 'woocommerce_check_cart_items', array( __CLASS__, 'cart_notice' ) );
 	}
 
@@ -147,7 +147,7 @@ final class DbNeedsServer {
 	 * @param \WC_Cart|null $cart Cart; the current one when null.
 	 * @return string[]
 	 */
-	private static function clusters_in_cart( ?\WC_Cart $cart = null ): array {
+	public static function clusters_in_cart( ?\WC_Cart $cart = null ): array {
 		$cart     = $cart ? $cart : ( function_exists( 'WC' ) ? WC()->cart : null );
 		$clusters = array();
 
@@ -216,30 +216,6 @@ final class DbNeedsServer {
 	}
 
 	/**
-	 * Add to cart: the same notice, and the database is not added.
-	 *
-	 * @param mixed $valid        Whether it is valid so far.
-	 * @param mixed $product_id   Product id.
-	 * @param mixed $quantity     Quantity.
-	 * @param mixed $variation_id Variation id.
-	 */
-	public static function add_to_cart( $valid, $product_id = 0, $quantity = 1, $variation_id = 0 ): bool { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed, Generic.CodeAnalysis.UnusedFunctionParameter.Found -- filter signature.
-		if ( ! $valid ) {
-			return false;
-		}
-
-		$cluster = self::database_cluster( (int) $product_id, (int) $variation_id );
-
-		if ( null !== $cluster && self::refused( get_current_user_id(), array( $cluster ) ) ) {
-			wc_add_notice( self::message( true ), 'error' );
-
-			return false;
-		}
-
-		return true;
-	}
-
-	/**
 	 * Shows the rule on the cart and checkout pages: an error for a customer without a server (the order is refused
 	 * at checkout anyway), a notice for a visitor who still has to sign in.
 	 */
@@ -258,30 +234,6 @@ final class DbNeedsServer {
 
 		if ( self::refused( get_current_user_id(), $clusters ) && ! wc_has_notice( self::message( true ), 'notice' ) ) {
 			wc_add_notice( self::message( true ), 'notice' );
-		}
-	}
-
-	/**
-	 * Classic checkout. WooCommerce has verified the checkout nonce.
-	 *
-	 * @param mixed $data   Posted checkout data.
-	 * @param mixed $errors Validation errors.
-	 */
-	public static function validate( $data, $errors ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- action signature.
-		if ( $errors instanceof \WP_Error && self::refused( get_current_user_id(), self::clusters_in_cart() ) ) {
-			$errors->add( 'beltoft_services_db_needs_server', self::message( true ) );
-		}
-	}
-
-	/**
-	 * Block checkout (Store API): the same rule.
-	 *
-	 * @param mixed $errors Cart errors.
-	 * @param mixed $cart   Cart.
-	 */
-	public static function store_api_errors( $errors, $cart = null ): void {
-		if ( $errors instanceof \WP_Error && self::refused( get_current_user_id(), self::clusters_in_cart( $cart instanceof \WC_Cart ? $cart : null ) ) ) {
-			$errors->add( 'beltoft_services_db_needs_server', self::message( false ) );
 		}
 	}
 }

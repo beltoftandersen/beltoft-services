@@ -185,7 +185,7 @@ final class MailDomains {
 		$name  = (string) $r->get( 'domain' );
 		$user  = (int) ( $r->license()['user_id'] ?? 0 );
 		$root  = self::attach_check( $root_id, $user );
-		$added = $root instanceof Resource ? self::add( $root, $name, array( 'mail_mode_hint' => 'ours' ) ) : null;
+		$added = $root instanceof Resource ? self::add( $root, $name ) : null;
 
 		// The domain is already in the plan (another run got there first): joined, nothing to tell.
 		$already = is_wp_error( $added ) && 'bad_domain' === $added->get_error_code() && self::in_plan( $root, $name );
