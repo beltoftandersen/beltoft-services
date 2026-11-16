@@ -1044,4 +1044,52 @@ final class KeyTest extends TestCase {
 		$this->assertSame( array(), $this->calls( 'POST', '/licenses/plesk' ) );
 		$this->assertSame( 'active', wcs_get_subscription( $sub->get_id() )->get_status(), 'Today nothing cancels the subscription of a key that was never delivered (APPS-08).' );
 	}
+
+	/**
+	 * One cost (10 EUR) against nine paid lines: below, equal, inside the one cent tolerance, above, another currency with and
+	 * without a guard rate (both sides of the cost), no line at all, and an unknown cost on the fake and on the sandbox client.
+	 *
+	 * @return array<int, array{0: string, 1: string, 2: float, 3: ?string}> label, currency, paid, expected message part (null: covered)
+	 */
+	private function spend_table(): array {
+		return array(
+			array( 'below', 'EUR', 9.98, 'paid below the Openprovider cost' ),
+			array( 'equal', 'EUR', 10.0, null ),
+			array( 'inside the tolerance', 'EUR', 9.995, null ),
+			array( 'above', 'EUR', 12.0, null ),
+			array( 'DKK without a guard rate', 'DKK', 100.0, 'not in EUR' ),
+			array( 'DKK above at the guard rate', 'DKK', 100.0, null ),
+			array( 'DKK below at the guard rate', 'DKK', 70.0, 'paid below the Openprovider cost' ),
+		);
+	}
+
+	public function test_s3_the_spend_check_table_for_the_key_family(): void {
+		$this->settings( array( 'licence_costs' => 'pro=10', 'currency_guard_rates' => '' ) );
+		$r = $this->licence();
+
+		foreach ( $this->spend_table() as $i => list( $label, $currency, $paid, $expected ) ) {
+			$item = \BeltoftServices\Domains\SpendGuard::item_of_resource( Resource::find( $r->id() ) );
+			$item->set_total( $paid );
+			$item->save();
+			$order = $item->get_order();
+			$order->set_currency( $currency );
+			$order->save();
+			$this->settings( array( 'currency_guard_rates' => 'DKK' === $currency && $i >= 5 ? 'DKK=8' : '' ) );
+			$problem = KeyOrder::spend_problem( Resource::find( $r->id() ), 'pro' );
+
+			if ( null === $expected ) {
+				$this->assertNull( $problem, $label );
+			} else {
+				$this->assertStringContainsString( $expected, (string) $problem, $label );
+			}
+		}
+
+		$r->set( array( 'order_item_id' => 0 ) );
+		$this->assertSame( 'The paid order line for this licence is unavailable.', KeyOrder::spend_problem( Resource::find( $r->id() ), 'pro' ) );
+
+		$this->settings( array( 'licence_costs' => '', 'domain_api_mode' => 'fake' ) );
+		$this->assertNull( KeyOrder::spend_problem( Resource::find( $r->id() ), 'pro' ) );
+		$this->settings( array( 'domain_api_mode' => 'sandbox' ) );
+		$this->assertSame( 'The Openprovider cost of this licence is not set.', KeyOrder::spend_problem( Resource::find( $r->id() ), 'pro' ) );
+	}
 }

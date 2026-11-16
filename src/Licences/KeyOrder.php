@@ -159,15 +159,7 @@ final class KeyOrder {
 	 * @param Resource $r Licence resource.
 	 */
 	private static function title( Resource $r ): string {
-		$stored = (string) $r->get( 'lic_title' );
-
-		if ( '' !== $stored ) {
-			return $stored;
-		}
-
-		$title = sprintf( 'licence %d %s', (int) ( $r->license()['id'] ?? 0 ), (string) $r->get( 'lic_ip' ) );
-
-		return substr( preg_replace( '/[^A-Za-z0-9 ._-]/', '', $title ) ?? $title, 0, 100 );
+		return LicenceVendor::title( $r, new KeyFamily(), (string) $r->get( 'lic_ip' ) );
 	}
 
 	/**
@@ -177,27 +169,7 @@ final class KeyOrder {
 	 * @param string   $key Catalogue key.
 	 */
 	public static function spend_problem( Resource $r, string $key ): ?string {
-		$cost = KeyCatalog::costs()[ $key ] ?? null;
-
-		if ( null === $cost ) {
-			return 'fake' === RegistrarClients::mode() ? null : 'The Openprovider cost of this licence is not set.';
-		}
-
-		$item = SpendGuard::item_of_resource( $r );
-
-		if ( ! $item instanceof \WC_Order_Item_Product ) {
-			return 'The paid order line for this licence is unavailable.';
-		}
-
-		$order = $item->get_order();
-
-		$paid = $order ? \BeltoftServices\Currency::to_cost( \BeltoftServices\Domains\SpendGuard::paid( $item ), (string) $order->get_currency() ) : null;
-
-		if ( null === $paid ) {
-			return 'The order is not in EUR; the Openprovider cost cannot be compared.';
-		}
-
-		return $paid + 0.01 < $cost ? 'The order was paid below the Openprovider cost.' : null;
+		return LicenceVendor::spend_problem( $r, new KeyFamily(), $key, KeyCatalog::costs() );
 	}
 
 	/**
@@ -207,16 +179,7 @@ final class KeyOrder {
 	 * @param \WC_Product|false|null  $variation The new variation.
 	 */
 	private static function switch_problem( string $key, $variation ): ?string {
-		$cost = KeyCatalog::costs()[ $key ] ?? null;
-
-		if ( null === $cost ) {
-			return 'fake' === RegistrarClients::mode() ? null : 'The Openprovider cost of this licence is not set.';
-		}
-
-		// The variation's price is read in the request's currency; in another one it is compared at the guard rate, and refused without one.
-		$price = $variation instanceof \WC_Product ? \BeltoftServices\Currency::price_to_cost( (float) wc_get_price_excluding_tax( $variation ), \BeltoftServices\Currency::current() ) : null;
-
-		return null !== $price && $price + 0.01 >= $cost ? null : 'The price of this licence is below the Openprovider cost.';
+		return LicenceVendor::switch_problem( new KeyFamily(), $key, KeyCatalog::costs(), $variation );
 	}
 
 	/**
@@ -227,14 +190,7 @@ final class KeyOrder {
 	 * @param string    $text  What was tried.
 	 */
 	private static function failure( Resource $r, \WP_Error $error, string $text ): StepResult {
-		if ( self::transient( $error ) ) {
-			return StepResult::retry( 300, $text );
-		}
-
-		$data = $error->get_error_data();
-		Alerts::admin( $r, $text . ' (' . $error->get_error_code() . ( is_array( $data ) && ! empty( $data['desc'] ) ? ': ' . $data['desc'] : '' ) . ')' );
-
-		return StepResult::retry( 3600, $text );
+		return LicenceVendor::failure( $r, $error, $text );
 	}
 
 	// -- The parent ------------------------------------------------------------------------------

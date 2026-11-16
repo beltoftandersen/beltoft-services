@@ -1042,4 +1042,55 @@ final class PleskLicenceTest extends PaidAppCase {
 		$this->assertSame( array( $long, 'admin', 'pro', 'host' ), array_keys( PleskLicence::items() ), 'The setting comes first, as before.' );
 		$this->assertSame( \BeltoftServices\Licences\KeyCatalog::lines( "x=1\n" . $long . '=2' ), \BeltoftServices\Domains\LicenceCatalog::lines( "x=1\n" . $long . '=2' ) );
 	}
+
+	/**
+	 * One cost (10 EUR) against nine paid lines: below, equal, inside the one cent tolerance, above, another currency with and
+	 * without a guard rate (both sides of the cost), no line at all, and an unknown cost on the fake and on the sandbox client.
+	 *
+	 * @return array<int, array{0: string, 1: string, 2: float, 3: ?string}> label, currency, paid, expected message part (null: covered)
+	 */
+	private function spend_table(): array {
+		return array(
+			array( 'below', 'EUR', 9.98, 'paid below the Openprovider cost' ),
+			array( 'equal', 'EUR', 10.0, null ),
+			array( 'inside the tolerance', 'EUR', 9.995, null ),
+			array( 'above', 'EUR', 12.0, null ),
+			array( 'DKK without a guard rate', 'DKK', 100.0, 'not in EUR' ),
+			array( 'DKK above at the guard rate', 'DKK', 100.0, null ),
+			array( 'DKK below at the guard rate', 'DKK', 70.0, 'paid below the Openprovider cost' ),
+		);
+	}
+
+	public function test_s3_the_spend_check_table_for_the_plesk_family(): void {
+		$o = $this->plesk_order( 'pro' );
+		$this->settings( array( 'plesk_costs' => 'pro=10', 'currency_guard_rates' => '' ) );
+		add_filter( 'pre_wp_mail', '__return_true' );
+
+		foreach ( $this->spend_table() as $i => list( $label, $currency, $paid, $expected ) ) {
+			$licence = $this->fresh( $o['licence'] );
+			$item    = \BeltoftServices\Domains\SpendGuard::item_of_resource( $licence );
+			$item->set_total( $paid );
+			$item->save();
+			$order = $item->get_order();
+			$order->set_currency( $currency );
+			$order->save();
+			$this->settings( array( 'currency_guard_rates' => 'DKK' === $currency && $i >= 5 ? 'DKK=8' : '' ) );
+			$problem = PleskLicence::spend_problem( $licence, 'pro' );
+
+			if ( null === $expected ) {
+				$this->assertNull( $problem, $label );
+			} else {
+				$this->assertStringContainsString( $expected, (string) $problem, $label );
+			}
+		}
+
+		$this->assertTrue( $this->fresh( $o['licence'] )->set( array( 'order_item_id' => 0 ) ) );
+		$this->assertSame( 'The paid order line for this Plesk licence is unavailable.', PleskLicence::spend_problem( $this->fresh( $o['licence'] ), 'pro' ) );
+
+		$this->settings( array( 'plesk_costs' => '', 'domain_api_mode' => 'fake' ) );
+		$this->assertNull( PleskLicence::spend_problem( $this->fresh( $o['licence'] ), 'pro' ) );
+		$this->settings( array( 'domain_api_mode' => 'sandbox' ) );
+		$this->assertSame( 'The Openprovider cost of this Plesk tier is not set.', PleskLicence::spend_problem( $this->fresh( $o['licence'] ), 'pro' ) );
+		remove_filter( 'pre_wp_mail', '__return_true' );
+	}
 }

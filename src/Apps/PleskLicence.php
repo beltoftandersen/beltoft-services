@@ -20,7 +20,6 @@ use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Vm\ServerName;
 use BeltoftServices\Resource;
-use BeltoftServices\Usage\Rates;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -221,16 +220,9 @@ final class PleskLicence {
 	 * @param Resource $server  Server.
 	 */
 	private static function title( Resource $licence, Resource $server ): string {
-		$stored = (string) $licence->get( 'plesk_title' );
+		$name = ServerName::of( $server );
 
-		if ( '' !== $stored ) {
-			return $stored;
-		}
-
-		$name  = ServerName::of( $server );
-		$title = trim( sprintf( 'licence %d %s', (int) ( $licence->license()['id'] ?? 0 ), '' !== $name ? $name : 'server' ) );
-
-		return substr( preg_replace( '/[^A-Za-z0-9 ._-]/', '', $title ) ?? $title, 0, 100 );
+		return LicenceVendor::title( $licence, new PleskFamily(), '' !== $name ? $name : 'server' );
 	}
 
 	/**
@@ -240,50 +232,7 @@ final class PleskLicence {
 	 * @param string   $tier    Tier key.
 	 */
 	public static function spend_problem( Resource $licence, string $tier ): ?string {
-		$cost = self::costs()[ $tier ] ?? null;
-
-		if ( null === $cost ) {
-			return 'fake' === RegistrarClients::mode() ? null : 'The Openprovider cost of this Plesk tier is not set.';
-		}
-
-		if ( AppLicence::usage_billed( $licence ) ) {
-			// Billed by the hour with the server: the most a month can bring in is the cap, read in the currency of the usage account
-			// and compared at the guard rate when that is not the cost currency.
-			$code = self::account_currency( $licence );
-			list( $ok, $items ) = \BeltoftServices\Currency::with( $code, static fn() => Rates::items( $licence ) );
-			$cap  = $ok && $items ? \BeltoftServices\Currency::price_to_cost( (float) $items[0]['rate'] * Rates::HOURS, $code ) : null;
-
-			return null !== $cap && $cap + 0.01 >= $cost ? null : 'The pay as you go cap of this Plesk tier is below the Openprovider cost.';
-		}
-
-		$item = \BeltoftServices\Domains\SpendGuard::item_of_resource( $licence );
-
-		if ( ! $item instanceof \WC_Order_Item_Product ) {
-			return 'The paid order line for this Plesk licence is unavailable.';
-		}
-
-		$order = $item->get_order();
-
-		$paid = $order ? \BeltoftServices\Currency::to_cost( \BeltoftServices\Domains\SpendGuard::paid( $item ), (string) $order->get_currency() ) : null;
-
-		if ( null === $paid ) {
-			return 'The order is not in EUR; the Openprovider cost cannot be compared.';
-		}
-
-		return $paid + 0.01 < $cost ? 'The order was paid below the Openprovider cost.' : null;
-	}
-
-	/**
-	 * The currency a pay as you go licence is billed in: that of the usage account its licence is on, else the shop's.
-	 *
-	 * @param Resource $licence Licence resource.
-	 */
-	private static function account_currency( Resource $licence ): string {
-		$id  = (int) ( $licence->license()['subscription_id'] ?? 0 );
-		$sub = $id > 0 && function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( $id ) : false;
-		$code = $sub instanceof \WC_Subscription ? \BeltoftServices\Currency::clean( $sub->get_currency() ) : '';
-
-		return '' !== $code ? $code : \BeltoftServices\Currency::base();
+		return LicenceVendor::spend_problem( $licence, new PleskFamily(), $tier, self::costs() );
 	}
 
 	/**
@@ -293,21 +242,9 @@ final class PleskLicence {
 	 * @param string   $tier    New tier key.
 	 */
 	private static function switch_problem( Resource $licence, string $tier ): ?string {
-		$cost = self::costs()[ $tier ] ?? null;
-
-		if ( null === $cost ) {
-			return 'fake' === RegistrarClients::mode() ? null : 'The Openprovider cost of this Plesk tier is not set.';
-		}
-
-		if ( AppLicence::usage_billed( $licence ) ) {
-			return self::spend_problem( $licence, $tier );
-		}
-
 		$found = AppLicence::tier( self::APP, $tier, false );
 
-		$price = null !== $found ? \BeltoftServices\Currency::price_to_cost( (float) wc_get_price_excluding_tax( $found['variation'] ), \BeltoftServices\Currency::current() ) : null;
-
-		return null !== $price && $price + 0.01 >= $cost ? null : 'The price of this Plesk tier is below the Openprovider cost.';
+		return LicenceVendor::switch_problem( new PleskFamily(), $tier, self::costs(), null !== $found ? $found['variation'] : null, $licence );
 	}
 
 	/**
@@ -460,14 +397,7 @@ final class PleskLicence {
 	 * @param string    $text    What was tried.
 	 */
 	private static function failure( Resource $licence, \WP_Error $error, string $text ): StepResult {
-		if ( self::transient( $error ) ) {
-			return StepResult::retry( 300, $text );
-		}
-
-		$data = $error->get_error_data();
-		self::alert( $licence, $text . ' (' . $error->get_error_code() . ( is_array( $data ) && ! empty( $data['desc'] ) ? ': ' . $data['desc'] : '' ) . ')' );
-
-		return StepResult::retry( 3600, $text );
+		return LicenceVendor::failure( $licence, $error, $text );
 	}
 
 	/**
