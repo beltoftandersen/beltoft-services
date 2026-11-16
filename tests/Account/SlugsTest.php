@@ -133,6 +133,11 @@ class SlugsTest extends TestCase {
 		$this->assertSame( 'web1', $this->slug( $db ), 'Another type has its own web1.' );
 	}
 
+	public function test_a_domain_name_with_a_label_over_63_characters_is_not_kept_as_a_host_name(): void {
+		$long = str_repeat( 'a', 64 ) . '.example';
+		$this->assertSame( str_repeat( 'a', 64 ) . '-example', Slugs::slugify( $long, 'domains' ), 'HostName refuses the label, so the dot goes.' );
+	}
+
 	public function test_names_are_made_into_safe_slugs(): void {
 		$this->assertSame( 'my-orders-db', Slugs::slugify( 'My Orders_DB!', 'databases' ) );
 		$this->assertSame( 'example.dk', Slugs::slugify( 'Example.DK', 'domains' ) );
