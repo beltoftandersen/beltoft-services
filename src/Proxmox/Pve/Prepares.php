@@ -39,6 +39,11 @@ trait Prepares {
 			return StepResult::retry( 0, $gate );
 		}
 
+		// Stored as live but read as fake (the constant is missing): the fake would find no VM and let a delete or wipe finish.
+		if ( Clusters::stored_live( (string) $record['cluster'] ) && 'live' !== Clients::kind( $cluster, Clients::live_allowed() ) ) {
+			return StepResult::retry( 0, 'The cluster is stored as live but live calls are switched off (BELTOFT_SERVICES_PROXMOX_LIVE)' );
+		}
+
 		try {
 			$this->client = Clients::for( $cluster );
 		} catch ( \Throwable $e ) {

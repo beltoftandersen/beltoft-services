@@ -496,6 +496,21 @@ class ProxmoxLifecycleTest extends TestCase {
 		$this->assertEmpty( Resource::find( $r->id() )->get( Access::META_REVEAL ) );
 	}
 
+	public function test_a_cluster_stored_as_live_is_never_served_by_the_fake_when_the_live_constant_is_missing(): void {
+		$r = $this->built();
+		$this->assertFalse( \BeltoftServices\Proxmox\Pve\Clients::live_allowed(), 'The test site has no live constant.' );
+		$all                  = get_option( Clusters::OPTION );
+		$all['lab']['client'] = 'live';
+		update_option( Clusters::OPTION, $all, false );
+
+		$result = $this->op( 'delete', $r );
+
+		$this->assertTrue( $result->is_retry(), 'Nothing is deleted and nothing is cleaned up against a fake.' );
+		$this->assertNotNull( IpPool::for_resource( $r->id() ), 'The address stays with the server.' );
+		$this->assertNotNull( VmRecords::for_resource( $r->id() ) );
+		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
+	}
+
 	public function test_a_delete_that_died_after_the_cleanup_is_finished_by_the_next_run(): void {
 		$r = $this->built();
 		$this->assert_done( $this->op( 'delete', $r ) );
