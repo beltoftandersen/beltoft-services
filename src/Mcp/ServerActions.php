@@ -12,6 +12,7 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Mail\MailClients;
 use BeltoftServices\Mail\MailGuard;
 use BeltoftServices\Mail\MailRoutes;
+use BeltoftServices\Proxmox\Snapshot\Policy;
 use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Apps\AppReinstallPaid;
 use BeltoftServices\Proxmox\Backup\Backups;
@@ -274,7 +275,7 @@ final class ServerActions {
 	private static function summary_snapshot( Resource $r, string $name, string $snapshot, string $label ) {
 		$rollback = 'rollback_snapshot' === $name;
 		$action   = $rollback ? 'snapshot_rollback' : 'snapshot_delete';
-		$entry    = Snapshots::entry( $r, $snapshot );
+		$entry    = Policy::entry( $r, $snapshot );
 		$known    = null !== $entry;
 		$title    = $known && '' !== (string) ( $entry['label'] ?? '' ) ? (string) $entry['label'] : $snapshot;
 		$taken    = $known && (int) ( $entry['taken_at'] ?? 0 ) > 0 ? wp_date( (string) get_option( 'date_format' ) . ' ' . (string) get_option( 'time_format' ), (int) $entry['taken_at'] ) : '';

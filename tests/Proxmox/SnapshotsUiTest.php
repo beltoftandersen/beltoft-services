@@ -8,6 +8,7 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Progress;
+use BeltoftServices\Proxmox\Snapshot\Policy;
 use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Proxmox\Vm\Panels;
 use BeltoftServices\Resource;
@@ -49,13 +50,13 @@ class SnapshotsUiTest extends SnapshotsTestCase {
 		$this->assertStringNotContainsString( 'data-action="snapshot_take"', $html );
 		$this->assertStringNotContainsString( 'data-snapshot-dialog', $html );
 		$this->assertStringNotContainsString( 'data-snapshot-working', $html );
-		$this->assertArrayHasKey( 'snapshot_delete', Snapshots::offered( $this->fresh( $r ) ) );
-		$this->assertArrayNotHasKey( 'snapshot_take', Snapshots::offered( $this->fresh( $r ) ) );
-		$this->assertArrayNotHasKey( 'snapshot_rollback', Snapshots::offered( $this->fresh( $r ) ) );
-		$this->assertNull( Snapshots::check( $this->fresh( $r ), 'snapshot_delete', array( 'id' => $e['id'] ) ) );
+		$this->assertArrayHasKey( 'snapshot_delete', Policy::offered( $this->fresh( $r ) ) );
+		$this->assertArrayNotHasKey( 'snapshot_take', Policy::offered( $this->fresh( $r ) ) );
+		$this->assertArrayNotHasKey( 'snapshot_rollback', Policy::offered( $this->fresh( $r ) ) );
+		$this->assertNull( Policy::check( $this->fresh( $r ), 'snapshot_delete', array( 'id' => $e['id'] ) ) );
 
 		$this->act( $r, 'snapshot_delete', array( 'id' => $e['id'] ) );
-		$this->assertSame( 0, Snapshots::used( $this->fresh( $r ) ) );
+		$this->assertSame( 0, Policy::used( $this->fresh( $r ) ) );
 		$this->assertStringNotContainsString( 'data-snapshots', $this->card( $r ) );
 	}
 
@@ -77,7 +78,7 @@ class SnapshotsUiTest extends SnapshotsTestCase {
 		$html = $this->card( $r );
 		$this->assertStringContainsString( 'data-snapshot-working', $html );
 		$this->assertStringNotContainsString( 'data-snapshot-delete', $html );
-		$this->assertNotNull( Snapshots::check( $this->fresh( $r ), 'snapshot_delete', array( 'id' => $e['id'] ) ), 'An open operation refuses a delete.' );
+		$this->assertNotNull( Policy::check( $this->fresh( $r ), 'snapshot_delete', array( 'id' => $e['id'] ) ), 'An open operation refuses a delete.' );
 	}
 
 	public function test_an_empty_list_shows_the_slot_line_and_the_take_form(): void {
@@ -127,7 +128,7 @@ class SnapshotsUiTest extends SnapshotsTestCase {
 	public function test_a_snapshot_taken_without_the_agent_says_so(): void {
 		$r = $this->server();
 		$entry = $this->take( $r, 'plain' );
-		$list = Snapshots::entries( $this->fresh( $r ) );
+		$list = Policy::entries( $this->fresh( $r ) );
 		$list[0]['consistent'] = false;
 		$this->assertTrue( $this->fresh( $r )->set( array( Snapshots::LIST => $list ) ) );
 
@@ -152,7 +153,7 @@ class SnapshotsUiTest extends SnapshotsTestCase {
 	public function test_an_entry_that_is_being_made_or_deleted_has_no_buttons(): void {
 		$r = $this->server();
 		$this->take( $r, 'busy' );
-		$list = Snapshots::entries( $this->fresh( $r ) );
+		$list = Policy::entries( $this->fresh( $r ) );
 		$list[0]['state'] = 'deleting';
 		$this->assertTrue( $this->fresh( $r )->set( array( Snapshots::LIST => $list ) ) );
 

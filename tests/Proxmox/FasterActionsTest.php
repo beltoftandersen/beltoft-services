@@ -9,6 +9,7 @@
 namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Jobs;
+use BeltoftServices\Proxmox\Snapshot\Policy;
 use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
@@ -167,7 +168,7 @@ class FasterActionsTest extends SnapshotsTestCase {
 		add_filter( 'beltoft_services_run_budget', static fn() => 6 );
 		$this->act( $server, 'snapshot_take', array( 'label' => 'slow' ) );
 
-		$this->assertSame( 'creating', Snapshots::entries( $this->fresh( $server ) )[0]['state'], 'Six seconds of the budget are not enough: not finished.' );
+		$this->assertSame( 'creating', Policy::entries( $this->fresh( $server ) )[0]['state'], 'Six seconds of the budget are not enough: not finished.' );
 		$this->assertNotSame( '', (string) $this->fresh( $server )->get( 'waiting' ) );
 		$this->assertSame( '', (string) $this->fresh( $server )->get( 'last_error' ) );
 		$this->assertLessThanOrEqual( 6, $this->run_pending_act_in() );
@@ -178,7 +179,7 @@ class FasterActionsTest extends SnapshotsTestCase {
 			$this->run_pending_act();
 		}
 
-		$this->assertNotSame( 'creating', Snapshots::entries( $this->fresh( $server ) )[0]['state'] );
+		$this->assertNotSame( 'creating', Policy::entries( $this->fresh( $server ) )[0]['state'] );
 		$this->assertCount( 1, $this->calls( 'POST', '/snapshot' ), 'The task was followed, not started again.' );
 	}
 

@@ -25,6 +25,7 @@ use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\Ownership;
 use BeltoftServices\Proxmox\Pve\Placement;
 use BeltoftServices\Proxmox\Pve\Steps;
+use BeltoftServices\Proxmox\Snapshot\Policy;
 use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Reconciler;
 use BeltoftServices\Resource;
@@ -450,7 +451,7 @@ final class Provision {
 			return null;
 		}
 
-		if ( Snapshots::tracked( $this->r ) ) {
+		if ( Policy::tracked( $this->r ) ) {
 			$purged = ( new Snapshots( $this->r ) )->purge_all();
 
 			if ( ! $purged->is_done() ) {
@@ -775,7 +776,7 @@ final class Provision {
 	 */
 	private function wiped_boot( string $volid ): array {
 		return array(
-			'boot_format'     => Snapshots::format_of( $volid ),
+			'boot_format'     => Policy::format_of( $volid ),
 			'wipe'            => null,
 			'wipe_old_boot'   => null,
 			'wipe_boot_phase' => null,
@@ -797,7 +798,7 @@ final class Provision {
 	 */
 	private function wiped( bool $gone = false ): array {
 		$keep = array_values( array_intersect( $this->r->get( 'steps' ), array( 'ip', 'vmid' ) ) );
-		$lost = $gone && Snapshots::tracked( $this->r )
+		$lost = $gone && Policy::tracked( $this->r )
 			? array( Snapshots::LIST => array(), Snapshots::OP => null, Snapshots::ROLLBACK => null )
 			: array();
 
@@ -1140,7 +1141,7 @@ final class Provision {
 		}
 
 		// What the boot volume is (snapshots need qcow2), read from the config the build already has.
-		return array( 'boot_format' => Snapshots::format_of( explode( ',', (string) ( $config[ (string) $this->cluster['boot_disk'] ] ?? '' ) )[0] ) );
+		return array( 'boot_format' => Policy::format_of( explode( ',', (string) ( $config[ (string) $this->cluster['boot_disk'] ] ?? '' ) )[0] ) );
 	}
 
 	/**

@@ -12,6 +12,7 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Snapshot\Policy;
 use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Proxmox\Snapshot\Snapshots;
@@ -35,7 +36,7 @@ class SnapshotsTest extends SnapshotsTestCase {
 
 		$this->settings( array( 'task_wait' => 5, 'admin_email' => 'admin@example.com' ) );
 		$r = $this->ready_vm();
-		$this->assertFalse( Snapshots::enabled( $r ) );
+		$this->assertFalse( Policy::enabled( $r ) );
 		$this->assertSame( array(), array_filter( array_keys( Actions::offered( $r ) ), static fn( $a ) => 0 === strpos( $a, 'snapshot_' ) ) );
 		$this->assertNotNull( Actions::check( $r, 'snapshot_take', array( 'label' => 'x' ) ) );
 	}
@@ -51,7 +52,7 @@ class SnapshotsTest extends SnapshotsTestCase {
 	public function test_a_new_server_gets_snapshots_and_its_boot_volume_is_recorded_as_qcow2(): void {
 		$r = $this->server();
 		$this->assertSame( 'qcow2', $r->get( 'boot_format' ) );
-		$this->assertTrue( Snapshots::enabled( $r ) );
+		$this->assertTrue( Policy::enabled( $r ) );
 		$this->assertArrayHasKey( 'snapshot_take', Actions::offered( $r ) );
 		$this->assertArrayNotHasKey( 'snapshot_delete', Actions::offered( $r ), 'Nothing to delete yet.' );
 		$this->assertArrayNotHasKey( 'snapshot_rollback', Actions::offered( $r ), 'Nothing to roll back to yet.' );
@@ -64,7 +65,7 @@ class SnapshotsTest extends SnapshotsTestCase {
 		$raw = $this->ready_vm();
 		remove_all_filters( 'beltoft_services_proxmox_disk_format' );
 		$this->assertSame( 'raw', $raw->get( 'boot_format' ) );
-		$this->assertFalse( Snapshots::enabled( $raw ) );
+		$this->assertFalse( Policy::enabled( $raw ) );
 		$this->assertArrayNotHasKey( 'snapshot_take', Actions::offered( $raw ) );
 		$this->assertNotNull( Actions::check( $raw, 'snapshot_take', array( 'label' => 'x' ) ) );
 		$calls = count( $this->fake->calls() );
@@ -72,40 +73,40 @@ class SnapshotsTest extends SnapshotsTestCase {
 		$this->assertSame( array(), array_filter( array_slice( $this->lines(), $calls ), static fn( $l ) => false !== strpos( $l, '/snapshot' ) ), 'No snapshot call for a raw server.' );
 
 		$server = $this->ready_vm();
-		$this->assertTrue( Snapshots::enabled( $server ) );
+		$this->assertTrue( Policy::enabled( $server ) );
 		add_filter( 'beltoft_services_proxmox_disk_format', static fn() => 'raw' );
 		$disk = $this->disk_for( $server );
 		remove_all_filters( 'beltoft_services_proxmox_disk_format' );
 		$this->assertStringEndsWith( '.raw', (string) $disk->get( 'volname' ) );
-		$this->assertFalse( Snapshots::enabled( $this->fresh( $server ) ) );
+		$this->assertFalse( Policy::enabled( $this->fresh( $server ) ) );
 	}
 
 	public function test_an_unknown_boot_format_and_a_linked_server_get_none(): void {
 		$r = $this->server();
 		$r->set( array( 'boot_format' => null ) );
-		$this->assertFalse( Snapshots::enabled( $this->fresh( $r ) ), 'A server built before the format was recorded is raw until proved otherwise.' );
+		$this->assertFalse( Policy::enabled( $this->fresh( $r ) ), 'A server built before the format was recorded is raw until proved otherwise.' );
 		$r->set( array( 'boot_format' => 'qcow2', 'linked' => true ) );
-		$this->assertFalse( Snapshots::enabled( $this->fresh( $r ) ) );
+		$this->assertFalse( Policy::enabled( $this->fresh( $r ) ) );
 		$this->assertArrayNotHasKey( 'snapshot_take', Actions::offered( $this->fresh( $r ) ) );
 	}
 
 	public function test_slots_days_and_the_paid_seam(): void {
 		$r = $this->server();
 		$this->on( array( 'snapshot_free_slots' => 1, 'snapshot_max_slots' => 2 ) );
-		$this->assertSame( 1, Snapshots::slots( $r ) );
-		$this->assertSame( 7, Snapshots::days_for( $r ) );
+		$this->assertSame( 1, Policy::slots( $r ) );
+		$this->assertSame( 7, Policy::days_for( $r ) );
 		add_filter( 'beltoft_services_snapshot_paid_slots', static fn() => 5 );
-		$this->assertSame( 2, Snapshots::slots( $r ), 'Free and paid slots never go above the maximum.' );
-		$this->assertSame( 30, Snapshots::days_for( $r ), 'A server with a paid slot keeps its snapshots longer.' );
+		$this->assertSame( 2, Policy::slots( $r ), 'Free and paid slots never go above the maximum.' );
+		$this->assertSame( 30, Policy::days_for( $r ), 'A server with a paid slot keeps its snapshots longer.' );
 	}
 
 	public function test_the_label_is_cleaned_and_must_be_unique_and_the_slots_must_not_be_full(): void {
 		$r = $this->server();
 		$this->on( array( 'snapshot_free_slots' => 2 ) );
-		$this->assertSame( 'Before the upgrade 2.0_a-b', Snapshots::label_from( array( 'label' => "  Before the\n upgrade 2.0_a-b!! " ) ) );
-		$this->assertSame( 40, strlen( Snapshots::label_from( array( 'label' => str_repeat( 'a', 90 ) ) ) ) );
-		$this->assertMatchesRegularExpression( '/^Snapshot \d{4}-\d\d-\d\d \d\d:\d\d$/', Snapshots::label_from( array( 'label' => '!!!' ) ) );
-		$this->assertMatchesRegularExpression( '/^Snapshot /', Snapshots::label_from( array() ) );
+		$this->assertSame( 'Before the upgrade 2.0_a-b', Policy::label_from( array( 'label' => "  Before the\n upgrade 2.0_a-b!! " ) ) );
+		$this->assertSame( 40, strlen( Policy::label_from( array( 'label' => str_repeat( 'a', 90 ) ) ) ) );
+		$this->assertMatchesRegularExpression( '/^Snapshot \d{4}-\d\d-\d\d \d\d:\d\d$/', Policy::label_from( array( 'label' => '!!!' ) ) );
+		$this->assertMatchesRegularExpression( '/^Snapshot /', Policy::label_from( array() ) );
 
 		$this->take( $r, 'One' );
 		$r = $this->fresh( $r );
@@ -123,8 +124,8 @@ class SnapshotsTest extends SnapshotsTestCase {
 		$this->assertNotNull( Actions::check( $r, 'snapshot_delete', array( 'id' => 'bs0123456789' ) ) );
 		$this->assertNotNull( Actions::check( $r, 'snapshot_delete', array( 'id' => array( 'x' ) ) ) );
 		$this->assertNotNull( Actions::check( $r, 'snapshot_delete', array() ) );
-		$this->assertTrue( Snapshots::owns( $r, $entry['id'] ) );
-		$this->assertFalse( Snapshots::owns( $r, $entry['snap'] ), 'A Proxmox name is not an id.' );
+		$this->assertTrue( Policy::owns( $r, $entry['id'] ) );
+		$this->assertFalse( Policy::owns( $r, $entry['snap'] ), 'A Proxmox name is not an id.' );
 		$this->assertStringContainsString( 'Type ROLLBACK', (string) Actions::check( $r, 'snapshot_rollback', array( 'id' => $entry['id'] ) ) );
 		$this->assertStringContainsString( 'Type ROLLBACK', (string) Actions::check( $r, 'snapshot_rollback', array( 'id' => $entry['id'], 'confirm' => 'rollback' ) ) );
 		$this->assertNull( Actions::check( $r, 'snapshot_rollback', array( 'id' => $entry['id'], 'confirm' => 'ROLLBACK' ) ) );
@@ -209,7 +210,7 @@ class SnapshotsTest extends SnapshotsTestCase {
 		$this->mails = array();
 		$this->act( $r, 'snapshot_take', array( 'label' => 'big' ) );
 
-		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertSame( array(), Policy::entries( $this->fresh( $r ) ) );
 		$this->assertSame( array(), $this->calls( 'POST', '/qemu/5000/snapshot' ) );
 		$this->assertCount( 1, $this->admin_mails() );
 		$this->assertStringContainsString( 'less than 5000 GB free', $this->events_of( $r ) );
@@ -217,14 +218,14 @@ class SnapshotsTest extends SnapshotsTestCase {
 
 	public function test_the_space_guard_defaults_to_the_disk_reserve_and_fails_closed(): void {
 		$r = $this->server();
-		$this->assertSame( (int) Settings::get( 'disk_reserve_gb' ), Snapshots::reserve_gb() );
+		$this->assertSame( (int) Settings::get( 'disk_reserve_gb' ), Policy::reserve_gb() );
 		$this->on( array( 'snapshot_reserve_gb' => 12 ) );
-		$this->assertSame( 12, Snapshots::reserve_gb() );
+		$this->assertSame( 12, Policy::reserve_gb() );
 
 		$this->fake->fail_next( 'GET', '#/storage/disk-store/status$#', array( 'status' => 500, 'message' => 'storage offline' ) );
 		$this->act( $r, 'snapshot_take', array( 'label' => 'blind' ) );
 		$this->assertSame( array(), $this->calls( 'POST', '/qemu/5000/snapshot' ), 'A storage that cannot be read gives no snapshot.' );
-		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertSame( array(), Policy::entries( $this->fresh( $r ) ) );
 	}
 
 	public function test_the_capacity_reading_is_wanted_when_snapshots_are_on(): void {
@@ -240,7 +241,7 @@ class SnapshotsTest extends SnapshotsTestCase {
 		$this->fake->set_lock( 5000, 'backup' );
 		$this->act( $r, 'snapshot_take', array( 'label' => 'locked' ) );
 		$this->assertSame( array(), $this->calls( 'POST', '/qemu/5000/snapshot' ) );
-		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertSame( array(), Policy::entries( $this->fresh( $r ) ) );
 
 		$this->fake->set_lock( 5000, '' );
 		$this->assertSame( 'ok', $this->take( $r, 'locked' )['state'] );
@@ -254,24 +255,24 @@ class SnapshotsTest extends SnapshotsTestCase {
 		$r->set( array( 'backup_task' => array( 'upid' => $upid, 'node' => 'node-a', 'started' => time() ) ) );
 		$this->act( $r, 'snapshot_take', array( 'label' => 'busy' ) );
 		$this->assertSame( array(), $this->calls( 'POST', '/qemu/5000/snapshot' ) );
-		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertSame( array(), Policy::entries( $this->fresh( $r ) ) );
 	}
 
 	public function test_a_task_that_is_still_running_is_waited_for_and_one_snapshot_is_made(): void {
 		$r = $this->server();
 		$this->fake->next_task( array( 'polls' => 10 ) );
 		$this->act( $r, 'snapshot_take', array( 'label' => 'slow' ) );
-		$mid = Snapshots::entries( $this->fresh( $r ) );
+		$mid = Policy::entries( $this->fresh( $r ) );
 		$this->assertCount( 1, $mid );
 		$this->assertSame( 'creating', $mid[0]['state'], 'Written down before Proxmox is asked, and not final while the task runs.' );
 		$this->assertSame( 'take', $this->fresh( $r )->get( Snapshots::OP )['op'] );
 		$this->assertArrayHasKey( 'snapshot_take', Actions::offered( $this->fresh( $r ) ), 'The retry of a take in flight stays offered.' );
 
-		for ( $i = 0; $i < 4 && 'ok' !== ( Snapshots::entries( $this->fresh( $r ) )[0]['state'] ?? '' ); $i++ ) {
+		for ( $i = 0; $i < 4 && 'ok' !== ( Policy::entries( $this->fresh( $r ) )[0]['state'] ?? '' ); $i++ ) {
 			$this->act( $r, 'snapshot_take', array( 'label' => 'slow' ) );
 		}
 
-		$this->assertSame( 'ok', Snapshots::entries( $this->fresh( $r ) )[0]['state'] );
+		$this->assertSame( 'ok', Policy::entries( $this->fresh( $r ) )[0]['state'] );
 		$this->assertCount( 1, $this->calls( 'POST', '/qemu/5000/snapshot' ), 'One snapshot, however many rounds.' );
 		$this->assertNull( $this->fresh( $r )->get( Snapshots::OP ) );
 	}
@@ -282,7 +283,7 @@ class SnapshotsTest extends SnapshotsTestCase {
 		// The marker survived a crash after the snapshot was made: the retry finds it listed and finishes.
 		$this->fresh( $r )->set( array( Snapshots::LIST => array( array_merge( $entry, array( 'state' => 'creating' ) ) ), Snapshots::OP => array( 'op' => 'take', 'id' => $entry['id'], 'phase' => 'sent', 'at' => time() ) ) );
 		$this->act( $r, 'snapshot_take', array( 'label' => 'once' ) );
-		$this->assertSame( 'ok', Snapshots::entries( $this->fresh( $r ) )[0]['state'] );
+		$this->assertSame( 'ok', Policy::entries( $this->fresh( $r ) )[0]['state'] );
 		$this->assertCount( 1, $this->calls( 'POST', '/qemu/5000/snapshot' ) );
 		$this->assertNull( $this->fresh( $r )->get( Snapshots::OP ) );
 	}
@@ -295,7 +296,7 @@ class SnapshotsTest extends SnapshotsTestCase {
 		$this->act( $r, 'snapshot_take', array( 'label' => 'nope' ) );
 
 		$fresh = $this->fresh( $r );
-		$this->assertSame( array(), Snapshots::entries( $fresh ) );
+		$this->assertSame( array(), Policy::entries( $fresh ) );
 		$this->assertNull( $fresh->get( Snapshots::OP ) );
 		$this->assertSame( 'ready', $fresh->get( 'state' ), 'A failed action never changes the service state.' );
 		$this->assertNotEmpty( $this->admin_mails() );
@@ -316,7 +317,7 @@ class SnapshotsTest extends SnapshotsTestCase {
 		$this->mails = array();
 		$asked = count( $this->calls( 'POST', '/qemu/5000/snapshot' ) );
 		$this->act( $r, 'snapshot_take', array( 'label' => 'raw' ) );
-		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertSame( array(), Policy::entries( $this->fresh( $r ) ) );
 		$this->assertCount( $asked, $this->calls( 'POST', '/qemu/5000/snapshot' ), 'The plugin never asks Proxmox for it.' );
 		$this->assertNotEmpty( $this->admin_mails() );
 	}
@@ -331,7 +332,7 @@ class SnapshotsTest extends SnapshotsTestCase {
 
 		$this->act( $r, 'snapshot_delete', array( 'id' => $entry['id'] ) );
 
-		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertSame( array(), Policy::entries( $this->fresh( $r ) ) );
 		$this->assertSame( array(), $this->fake->snapshots( 5000 ) );
 		$this->assertCount( 1, $this->calls( 'DELETE', '/snapshot/' . $entry['snap'] ) );
 		$this->assertNull( Actions::check( $this->fresh( $r ), 'snapshot_take', array( 'label' => 'other' ) ) );
@@ -342,7 +343,7 @@ class SnapshotsTest extends SnapshotsTestCase {
 		$entry = $this->take( $r, 'vanished' );
 		$this->fake->task( 'DELETE', '/nodes/node-a/qemu/5000/snapshot/' . $entry['snap'] );
 		$this->act( $r, 'snapshot_delete', array( 'id' => $entry['id'] ) );
-		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertSame( array(), Policy::entries( $this->fresh( $r ) ) );
 		$this->assertCount( 1, $this->calls( 'DELETE', '/snapshot/' . $entry['snap'] ), 'Only the one that made it vanish: no second delete.' );
 	}
 
@@ -366,7 +367,7 @@ class SnapshotsTest extends SnapshotsTestCase {
 		$this->assertSame( array(), $this->calls( 'DELETE', '/snapshot/bs0123456789' ) );
 		$this->assertArrayHasKey( 'manual', $this->fake->snapshots( 5000 ) );
 		$this->assertArrayHasKey( 'bs0123456789', $this->fake->snapshots( 5000 ) );
-		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ), 'Purge deleted the one that is ours.' );
+		$this->assertSame( array(), Policy::entries( $this->fresh( $r ) ), 'Purge deleted the one that is ours.' );
 		$this->assertArrayNotHasKey( $entry['snap'], $this->fake->snapshots( 5000 ) );
 		$this->assertNotEmpty( $this->admin_mails(), 'A bs snapshot nobody knows about is reported, not deleted.' );
 	}
@@ -381,13 +382,13 @@ class SnapshotsTest extends SnapshotsTestCase {
 		$r   = $this->server();
 		$old = $this->take( $r, 'old' );
 		$new = $this->take( $r, 'new' );
-		$list = Snapshots::entries( $this->fresh( $r ) );
+		$list = Policy::entries( $this->fresh( $r ) );
 		$list[0]['expires_at'] = time() - 10;
 		$this->fresh( $r )->set( array( Snapshots::LIST => $list ) );
 
 		$this->act( $r, 'snapshot_expire' );
 
-		$left = Snapshots::entries( $this->fresh( $r ) );
+		$left = Policy::entries( $this->fresh( $r ) );
 		$this->assertCount( 1, $left );
 		$this->assertSame( $new['id'], $left[0]['id'] );
 		$this->assertSame( array( $new['snap'] ), array_keys( $this->fake->snapshots( 5000 ) ) );
@@ -397,13 +398,13 @@ class SnapshotsTest extends SnapshotsTestCase {
 	public function test_the_internal_actions_also_run_on_a_paused_server_and_not_on_a_deleted_one(): void {
 		$r     = $this->server();
 		$entry = $this->take( $r, 'kept' );
-		$list  = Snapshots::entries( $this->fresh( $r ) );
+		$list  = Policy::entries( $this->fresh( $r ) );
 		$list[0]['expires_at'] = time() - 10;
 		$this->fresh( $r )->set( array( Snapshots::LIST => $list ) );
 		$this->assertTrue( $this->fresh( $r )->transition( 'paused', 'test' ) );
 
 		$this->act( $r, 'snapshot_expire' );
-		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ), 'Expiry runs while the server is paused.' );
+		$this->assertSame( array(), Policy::entries( $this->fresh( $r ) ), 'Expiry runs while the server is paused.' );
 		$this->assertSame( array(), $this->fake->snapshots( 5000 ) );
 		unset( $entry );
 	}
@@ -417,15 +418,15 @@ class SnapshotsTest extends SnapshotsTestCase {
 
 		$result = ( new Snapshots( $this->fresh( $r ) ) )->drop_covering( 'disk-store:5000/' . $disk->get( 'volname' ) );
 		$this->assertTrue( $result->is_done(), $result->error() );
-		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ), 'Both snapshots cover the extra disk.' );
+		$this->assertSame( array(), Policy::entries( $this->fresh( $r ) ), 'Both snapshots cover the extra disk.' );
 
 		$three = $this->take( $r, 'three' );
 		$this->assertSame( array(), ( new Snapshots( $this->fresh( $r ) ) )->drop_covering( 'disk-store:5000/vm-5000-nothing.qcow2' )->meta() );
-		$this->assertCount( 1, Snapshots::entries( $this->fresh( $r ) ), 'A volume nothing covers deletes nothing.' );
+		$this->assertCount( 1, Policy::entries( $this->fresh( $r ) ), 'A volume nothing covers deletes nothing.' );
 
 		$result = ( new Snapshots( $this->fresh( $r ) ) )->purge_all();
 		$this->assertTrue( $result->is_done(), $result->error() );
-		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertSame( array(), Policy::entries( $this->fresh( $r ) ) );
 		$this->assertSame( array(), $this->fake->snapshots( 5000 ) );
 		unset( $two, $three, $boot );
 	}
@@ -434,9 +435,9 @@ class SnapshotsTest extends SnapshotsTestCase {
 		$r     = $this->server();
 		$entry = $this->take( $r, 'lost' );
 		$this->fake->task( 'DELETE', '/nodes/node-a/qemu/5000/snapshot/' . $entry['snap'] );
-		$this->assertCount( 1, Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertCount( 1, Policy::entries( $this->fresh( $r ) ) );
 		$this->act( $r, 'snapshot_sync' );
-		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertSame( array(), Policy::entries( $this->fresh( $r ) ) );
 	}
 
 	public function test_forget_all_clears_the_list_and_reads_the_remote_list(): void {
@@ -444,7 +445,7 @@ class SnapshotsTest extends SnapshotsTestCase {
 		$this->take( $r, 'a' );
 		$result = ( new Snapshots( $this->fresh( $r ) ) )->forget_all();
 		$this->assertTrue( $result->is_done(), $result->error() );
-		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertSame( array(), Policy::entries( $this->fresh( $r ) ) );
 	}
 
 	// -- FakeClient: the live facts --------------------------------------------------------------
@@ -579,7 +580,7 @@ class SnapshotsTest extends SnapshotsTestCase {
 		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'], 'Started again: it was running before.' );
 		$this->assertStringContainsString( 'size=40G', $config['scsi0'], 'The boot disk is back at the paid size.' );
 		$this->assertSame( array( $a['snap'], $b['snap'] ), array_keys( $this->fake->snapshots( 5000 ) ), 'Both snapshots survive the rollback to the older one.' );
-		$this->assertCount( 2, Snapshots::entries( $this->fresh( $server ) ) );
+		$this->assertCount( 2, Policy::entries( $this->fresh( $server ) ) );
 		$this->assertSame( 'ready', $this->fresh( $one )->get( 'state' ) );
 		$this->assertSame( 'ready', $this->fresh( $two )->get( 'state' ) );
 
@@ -664,7 +665,7 @@ class SnapshotsTest extends SnapshotsTestCase {
 		foreach ( array_filter( $this->mails, static fn( $m ) => 'admin@example.com' !== ( (array) $m['to'] )[0] ) as $mail ) {
 			$this->assertStringNotContainsString( 'storage error', (string) $mail['message'], 'Proxmox text never reaches the customer.' );
 		}
-		$this->assertCount( 1, Snapshots::entries( $fresh ), 'The snapshot is still there.' );
+		$this->assertCount( 1, Policy::entries( $fresh ), 'The snapshot is still there.' );
 	}
 
 	public function test_a_rollback_is_refused_while_an_extra_disk_is_detached_and_works_again_after(): void {
@@ -702,7 +703,7 @@ class SnapshotsTest extends SnapshotsTestCase {
 		$a      = $this->take( $server, 'A' );
 		$this->fake->task( 'DELETE', '/nodes/node-a/qemu/5000/snapshot/' . $a['snap'] );
 		$this->rollback( $server, $a );
-		$this->assertSame( array(), Snapshots::entries( $this->fresh( $server ) ) );
+		$this->assertSame( array(), Policy::entries( $this->fresh( $server ) ) );
 		$this->assertSame( array(), $this->calls( 'POST', '/rollback' ) );
 		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'], 'Nothing was stopped.' );
 	}
@@ -764,19 +765,19 @@ class SnapshotsTest extends SnapshotsTestCase {
 		$r = $this->ready_vm();
 		$this->fake->next_task( array( 'polls' => 10 ) );
 		$this->act( $r, 'snapshot_take' );
-		$entries = Snapshots::entries( $this->fresh( $r ) );
+		$entries = Policy::entries( $this->fresh( $r ) );
 		$this->assertCount( 1, $entries );
 
 		// The retry minutes later makes another date label: the op still owns the entry.
 		$this->fresh( $r )->set( array( Snapshots::LIST => array( array_merge( $entries[0], array( 'label' => 'Snapshot 2001-01-01 00:00' ) ) ) ) );
-		$this->assertNull( Snapshots::check( $this->fresh( $r ), 'snapshot_take', array() ) );
+		$this->assertNull( Policy::check( $this->fresh( $r ), 'snapshot_take', array() ) );
 
-		for ( $i = 0; $i < 4 && 'ok' !== ( Snapshots::entries( $this->fresh( $r ) )[0]['state'] ?? '' ); $i++ ) {
+		for ( $i = 0; $i < 4 && 'ok' !== ( Policy::entries( $this->fresh( $r ) )[0]['state'] ?? '' ); $i++ ) {
 			$this->act( $r, 'snapshot_take' );
 		}
 
-		$this->assertCount( 1, Snapshots::entries( $this->fresh( $r ) ) );
-		$this->assertSame( 'ok', Snapshots::entries( $this->fresh( $r ) )[0]['state'] );
+		$this->assertCount( 1, Policy::entries( $this->fresh( $r ) ) );
+		$this->assertSame( 'ok', Policy::entries( $this->fresh( $r ) )[0]['state'] );
 		$this->assertCount( 1, $this->calls( 'POST', '/qemu/5000/snapshot' ) );
 	}
 
@@ -805,18 +806,18 @@ class SnapshotsTest extends SnapshotsTestCase {
 		$this->fake->next_task( array( 'polls' => 10 ) );
 		$this->act( $r, 'snapshot_take', array( 'label' => 'slow' ) );
 		$open  = $this->fresh( $r );
-		$slow  = array_values( array_filter( Snapshots::entries( $open ), static fn( $e ) => 'slow' === $e['label'] ) )[0];
+		$slow  = array_values( array_filter( Policy::entries( $open ), static fn( $e ) => 'slow' === $e['label'] ) )[0];
 		$busy  = 'Another snapshot action is still running on this server. Try again in a few minutes.';
 		$roll  = array( 'id' => $a['id'], 'confirm' => 'ROLLBACK' );
 
 		$this->assertSame( 'creating', $slow['state'] );
-		$this->assertSame( $busy, Snapshots::check( $open, 'snapshot_delete', array( 'id' => $a['id'] ) ) );
-		$this->assertSame( $busy, Snapshots::check( $open, 'snapshot_rollback', $roll ) );
-		$this->assertSame( $busy, Snapshots::check( $open, 'snapshot_delete', array( 'id' => $slow['id'] ) ), 'An entry that is still being made is not deleted either.' );
-		$this->assertNull( Snapshots::check( $open, 'snapshot_take', array( 'label' => 'slow' ) ), 'The take that owns the op resumes.' );
+		$this->assertSame( $busy, Policy::check( $open, 'snapshot_delete', array( 'id' => $a['id'] ) ) );
+		$this->assertSame( $busy, Policy::check( $open, 'snapshot_rollback', $roll ) );
+		$this->assertSame( $busy, Policy::check( $open, 'snapshot_delete', array( 'id' => $slow['id'] ) ), 'An entry that is still being made is not deleted either.' );
+		$this->assertNull( Policy::check( $open, 'snapshot_take', array( 'label' => 'slow' ) ), 'The take that owns the op resumes.' );
 
 		$this->act( $r, 'snapshot_delete', array( 'id' => $a['id'] ) );
-		$this->assertCount( 2, Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertCount( 2, Policy::entries( $this->fresh( $r ) ) );
 		$this->assertSame( array(), $this->calls( 'DELETE', '/snapshot/' ) );
 
 		// A rollback in flight: another id, a take and a delete are refused; its own id resumes.
@@ -824,10 +825,10 @@ class SnapshotsTest extends SnapshotsTestCase {
 		unset( $b );
 		$this->fresh( $r )->set( array( Snapshots::OP => null, Snapshots::LIST => array( $a ), Snapshots::ROLLBACK => array( 'id' => $a['id'], 'phase' => 'rolling', 'was_running' => true, 'at' => time() ) ) );
 		$mid = $this->fresh( $r );
-		$this->assertSame( $busy, Snapshots::check( $mid, 'snapshot_rollback', array( 'id' => 'deadbeef', 'confirm' => 'ROLLBACK' ) ) );
-		$this->assertSame( $busy, Snapshots::check( $mid, 'snapshot_take', array( 'label' => 'x' ) ) );
-		$this->assertSame( $busy, Snapshots::check( $mid, 'snapshot_delete', array( 'id' => $a['id'] ) ) );
-		$this->assertNull( Snapshots::check( $mid, 'snapshot_rollback', $roll ) );
+		$this->assertSame( $busy, Policy::check( $mid, 'snapshot_rollback', array( 'id' => 'deadbeef', 'confirm' => 'ROLLBACK' ) ) );
+		$this->assertSame( $busy, Policy::check( $mid, 'snapshot_take', array( 'label' => 'x' ) ) );
+		$this->assertSame( $busy, Policy::check( $mid, 'snapshot_delete', array( 'id' => $a['id'] ) ) );
+		$this->assertNull( Policy::check( $mid, 'snapshot_rollback', $roll ) );
 		$this->assertSame( $a['id'], $this->fresh( $r )->get( Snapshots::ROLLBACK )['id'], 'The marker was not overwritten.' );
 	}
 
@@ -835,10 +836,10 @@ class SnapshotsTest extends SnapshotsTestCase {
 		$r     = $this->server();
 		$entry = $this->take( $r, 'A' );
 		$this->fresh( $r )->set( array( Snapshots::LIST => array( array_merge( $entry, array( 'state' => 'creating' ) ) ), Snapshots::OP => null ) );
-		$this->assertSame( 'Choose one of your snapshots.', Snapshots::check( $this->fresh( $r ), 'snapshot_delete', array( 'id' => $entry['id'] ) ) );
+		$this->assertSame( 'Choose one of your snapshots.', Policy::check( $this->fresh( $r ), 'snapshot_delete', array( 'id' => $entry['id'] ) ) );
 		$this->act( $r, 'snapshot_delete', array( 'id' => $entry['id'] ) );
 		$this->assertSame( array(), $this->calls( 'DELETE', '/snapshot/' ) );
-		$this->assertCount( 1, Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertCount( 1, Policy::entries( $this->fresh( $r ) ) );
 	}
 
 	public function test_a_snapshot_action_never_takes_over_the_task_of_another_job(): void {
@@ -854,7 +855,7 @@ class SnapshotsTest extends SnapshotsTestCase {
 		$this->assertSame( $foreign, $this->fresh( $r )->get( 'task' ), 'The other job\'s task is neither polled to the end nor cleared.' );
 		$this->assertSame( $polls, count( $this->calls( 'GET', '/tasks/' ) ), 'It was not even polled.' );
 		$this->assertSame( array(), $this->calls( 'POST', '/qemu/5000/snapshot' ) );
-		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertSame( array(), Policy::entries( $this->fresh( $r ) ) );
 
 		// Once the owner has cleared its task, the snapshot goes ahead.
 		$this->fresh( $r )->set( array( 'task' => null ) );
@@ -873,7 +874,7 @@ class SnapshotsTest extends SnapshotsTestCase {
 
 		$fresh = $this->fresh( $r );
 		$this->assertNull( $fresh->get( Snapshots::OP ) );
-		$this->assertNull( Snapshots::entry( $fresh, 'abcdef01' ), 'A creating entry whose snapshot does not exist is dropped.' );
+		$this->assertNull( Policy::entry( $fresh, 'abcdef01' ), 'A creating entry whose snapshot does not exist is dropped.' );
 		$this->assertCount( 1, $this->admin_mails(), 'The admin hears about it once.' );
 	}
 
@@ -888,7 +889,7 @@ class SnapshotsTest extends SnapshotsTestCase {
 
 		$fresh = $this->fresh( $r );
 		$this->assertNull( $fresh->get( Snapshots::OP ) );
-		$this->assertSame( 'ok', Snapshots::entry( $fresh, $entry['id'] )['state'] );
+		$this->assertSame( 'ok', Policy::entry( $fresh, $entry['id'] )['state'] );
 		$this->assertCount( 1, $this->admin_mails() );
 
 		$this->act( $r, 'snapshot_sync' );
@@ -906,8 +907,8 @@ class SnapshotsTest extends SnapshotsTestCase {
 	public function test_snapshots_are_not_offered_while_something_else_changes_the_server(): void {
 		$r = $this->server();
 		$this->take( $r, 'A' );
-		$a = Snapshots::entries( $this->fresh( $r ) )[0];
-		$this->assertTrue( Snapshots::enabled( $this->fresh( $r ) ) );
+		$a = Policy::entries( $this->fresh( $r ) )[0];
+		$this->assertTrue( Policy::enabled( $this->fresh( $r ) ) );
 
 		$cases = array(
 			'restore marker' => array( 'restore' => array( 'volid' => 'x', 'phase' => 'task' ) ),
@@ -926,15 +927,15 @@ class SnapshotsTest extends SnapshotsTestCase {
 			}
 			$this->assertTrue( $r->set( $meta ), $name );
 			$busy = $this->fresh( $r );
-			$this->assertFalse( Snapshots::enabled( $busy ), $name );
-			$this->assertArrayNotHasKey( 'snapshot_take', Snapshots::offered( $busy ), $name );
-			$this->assertArrayNotHasKey( 'snapshot_rollback', Snapshots::offered( $busy ), $name );
-			$this->assertNotNull( Snapshots::check( $busy, 'snapshot_take', array( 'label' => 'n' ) ), $name );
-			$this->assertNotNull( Snapshots::check( $busy, 'snapshot_rollback', array( 'id' => $a['id'], 'confirm' => 'ROLLBACK' ) ), $name );
+			$this->assertFalse( Policy::enabled( $busy ), $name );
+			$this->assertArrayNotHasKey( 'snapshot_take', Policy::offered( $busy ), $name );
+			$this->assertArrayNotHasKey( 'snapshot_rollback', Policy::offered( $busy ), $name );
+			$this->assertNotNull( Policy::check( $busy, 'snapshot_take', array( 'label' => 'n' ) ), $name );
+			$this->assertNotNull( Policy::check( $busy, 'snapshot_rollback', array( 'id' => $a['id'], 'confirm' => 'ROLLBACK' ) ), $name );
 			$this->assertTrue( $this->fresh( $r )->set( $old ), $name );
 		}
 
-		$this->assertTrue( Snapshots::enabled( $this->fresh( $r ) ) );
+		$this->assertTrue( Policy::enabled( $this->fresh( $r ) ) );
 	}
 
 	public function test_the_disk_block_texts_are_whole_sentences_per_action(): void {

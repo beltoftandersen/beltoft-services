@@ -11,7 +11,7 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
-use BeltoftServices\Proxmox\Snapshot\Snapshots;
+use BeltoftServices\Proxmox\Snapshot\Policy;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
@@ -77,7 +77,7 @@ abstract class SnapshotsTestCase extends BackupTestCase {
 	protected function take( Resource $r, string $label = 'first' ): array {
 		$this->act( $r, 'snapshot_take', array( 'label' => $label ) );
 
-		foreach ( Snapshots::entries( $this->fresh( $r ) ) as $entry ) {
+		foreach ( Policy::entries( $this->fresh( $r ) ) as $entry ) {
 			if ( $entry['label'] === $label ) {
 				return $entry;
 			}

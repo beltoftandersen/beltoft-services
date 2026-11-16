@@ -8,11 +8,11 @@ use BeltoftServices\Jobs;
 use BeltoftServices\Lifecycle;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Disk\DiskCascade;
+use BeltoftServices\Proxmox\Snapshot\Policy;
 use BeltoftServices\Proxmox\Snapshot\SnapshotCart;
 use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
 use BeltoftServices\Proxmox\Snapshot\SnapshotExpiry;
 use BeltoftServices\Proxmox\Snapshot\SnapshotMeta;
-use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Proxmox\Vm\Panels;
 use BeltoftServices\Proxmox\Vm\Stock;
 use BeltoftServices\Resource;
@@ -118,16 +118,16 @@ class SnapshotAddonTest extends SnapshotsTestCase {
 	public function test_slots_are_the_free_slots_plus_the_active_packs(): void {
 		$this->on( array( 'snapshot_free_slots' => 1 ) );
 		$server = $this->ready_vm();
-		$this->assertSame( 1, Snapshots::slots( $server ) );
-		$this->assertSame( 0, Snapshots::paid_slots( $server ) );
-		$this->assertSame( 7, Snapshots::days_for( $server ) );
+		$this->assertSame( 1, Policy::slots( $server ) );
+		$this->assertSame( 0, Policy::paid_slots( $server ) );
+		$this->assertSame( 7, Policy::days_for( $server ) );
 
 		$this->pack( $server, 2 );
 		$this->pack( $server, 5 );
 
-		$this->assertSame( 7, Snapshots::paid_slots( $server ) );
-		$this->assertSame( 8, Snapshots::slots( $server ) );
-		$this->assertSame( 30, Snapshots::days_for( $server ), 'The setting for paid slots.' );
+		$this->assertSame( 7, Policy::paid_slots( $server ) );
+		$this->assertSame( 8, Policy::slots( $server ) );
+		$this->assertSame( 30, Policy::days_for( $server ), 'The setting for paid slots.' );
 		$panel = Panels::snapshots( $this->fresh( $server ) );
 		$this->assertSame( 1, $panel['included'] );
 		$this->assertSame( 7, $panel['added'] );
@@ -137,14 +137,14 @@ class SnapshotAddonTest extends SnapshotsTestCase {
 		$this->on( array( 'snapshot_free_slots' => 1, 'snapshot_max_slots' => 4 ) );
 		$server = $this->ready_vm();
 		$this->pack( $server, 5 );
-		$this->assertSame( 4, Snapshots::slots( $server ) );
+		$this->assertSame( 4, Policy::slots( $server ) );
 	}
 
 	public function test_a_pack_keeps_snapshots_for_its_own_days_when_it_sets_them(): void {
 		$this->on();
 		$server = $this->ready_vm();
 		$this->pack( $server, 2, array( 'snapshot_days' => 45 ) );
-		$this->assertSame( 45, Snapshots::days_for( $server ) );
+		$this->assertSame( 45, Policy::days_for( $server ) );
 		$entry = $this->take( $server, 'a' );
 		$this->assertSame( 45, (int) round( ( $entry['expires_at'] - time() ) / DAY_IN_SECONDS ) );
 	}
@@ -155,24 +155,24 @@ class SnapshotAddonTest extends SnapshotsTestCase {
 		$other  = $this->ready_vm();
 		$pack   = $this->pack( $server, 2 );
 		$this->pack( $other, 5 );
-		$this->assertSame( 3, Snapshots::slots( $server ) );
+		$this->assertSame( 3, Policy::slots( $server ) );
 
 		$this->assertTrue( $pack->desire( 'paused', 'test' ) );
-		$this->assertSame( 1, Snapshots::slots( $this->fresh( $server ) ), 'A pack that is meant to be paused no longer counts.' );
+		$this->assertSame( 1, Policy::slots( $this->fresh( $server ) ), 'A pack that is meant to be paused no longer counts.' );
 		Jobs::run( $pack->id() );
 		$this->assertSame( 'paused', $this->fresh( $pack )->get( 'state' ) );
-		$this->assertSame( 1, Snapshots::slots( $this->fresh( $server ) ) );
-		$this->assertSame( 6, Snapshots::slots( $other ) );
+		$this->assertSame( 1, Policy::slots( $this->fresh( $server ) ) );
+		$this->assertSame( 6, Policy::slots( $other ) );
 	}
 
 	public function test_a_lapsed_license_stops_the_slots(): void {
 		$this->on( array( 'snapshot_free_slots' => 1 ) );
 		$server = $this->ready_vm();
 		$pack   = $this->pack( $server, 2 );
-		$this->assertSame( 3, Snapshots::slots( $server ) );
+		$this->assertSame( 3, Policy::slots( $server ) );
 		$this->assertTrue( \BeltoftLicenses\Licenses::update( (int) $pack->license()['id'], array( 'status' => 'revoked' ) ) );
 		$this->assertFalse( Lifecycle::is_active( $this->fresh( $pack )->license() ) );
-		$this->assertSame( 1, Snapshots::slots( $server ) );
+		$this->assertSame( 1, Policy::slots( $server ) );
 	}
 
 	public function test_a_pack_without_a_server_fails_to_provision(): void {
@@ -564,13 +564,13 @@ class SnapshotAddonTest extends SnapshotsTestCase {
 
 	public function test_a_pack_pausing_clamps_the_snapshots_and_tells_the_customer(): void {
 		list( $server, $pack ) = $this->three_snapshots();
-		$this->assertSame( 30, (int) round( ( Snapshots::entries( $server )[0]['expires_at'] - time() ) / DAY_IN_SECONDS ) );
+		$this->assertSame( 30, (int) round( ( Policy::entries( $server )[0]['expires_at'] - time() ) / DAY_IN_SECONDS ) );
 
 		$this->assertTrue( $pack->desire( 'paused', 'test' ) );
 		Jobs::run( $pack->id() );
 
 		$this->assertSame( 'paused', $this->fresh( $pack )->get( 'state' ) );
-		$list = Snapshots::entries( $this->fresh( $server ) );
+		$list = Policy::entries( $this->fresh( $server ) );
 		$this->assertCount( 3, $list, 'Nothing is deleted.' );
 		foreach ( $list as $entry ) {
 			$this->assertLessThan( time() + 8 * DAY_IN_SECONDS, $entry['expires_at'] );
@@ -587,7 +587,7 @@ class SnapshotAddonTest extends SnapshotsTestCase {
 
 		$this->assertSame( 'deleted', $this->fresh( $pack )->get( 'state' ) );
 		$this->assertCount( 1, $this->mails_about( 'allowance went down' ) );
-		$this->assertSame( 1, Snapshots::slots( $this->fresh( $server ) ) );
+		$this->assertSame( 1, Policy::slots( $this->fresh( $server ) ) );
 		$this->assertTrue( SnapshotExpiry::needs_clamp( $this->fresh( $server ) ) || array() !== (array) $this->fresh( $server )->get( SnapshotExpiry::NOTICE ) );
 	}
 
@@ -608,7 +608,7 @@ class SnapshotAddonTest extends SnapshotsTestCase {
 		$this->assertTrue( $this->fresh( $pack )->desire( 'ready', 'back' ) );
 		Jobs::run( $pack->id() );
 		$this->assertSame( 'ready', $this->fresh( $pack )->get( 'state' ) );
-		$this->assertSame( 3, Snapshots::slots( $this->fresh( $server ) ) );
+		$this->assertSame( 3, Policy::slots( $this->fresh( $server ) ) );
 		$this->assertCount( 0, $this->mails_about( 'allowance went down' ) );
 	}
 

@@ -122,7 +122,7 @@ final class SnapshotMeta {
 	/** Check the server's snapshots against the slots left (D7). Never fails: a busy lock is left to the hourly job. */
 	public static function clamp_server( Resource $pack ): void {
 		$server = self::server_of( $pack );
-		if ( $server && true !== $server->get( 'linked' ) && Snapshots::tracked( $server ) ) {
+		if ( $server && true !== $server->get( 'linked' ) && Policy::tracked( $server ) ) {
 			SnapshotExpiry::clamp( $server );
 		}
 	}

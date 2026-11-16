@@ -10,6 +10,7 @@ namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
+use BeltoftServices\Proxmox\Snapshot\Policy;
 use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Resource;
@@ -48,7 +49,7 @@ class SnapshotsInteractionTest extends SnapshotsTestCase {
 		$this->reinstall( $r );
 		$this->rebuild( $r->id() );
 
-		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertSame( array(), Policy::entries( $this->fresh( $r ) ) );
 		$this->assertSame( array(), $this->fake->snapshots( 5000 ) );
 		$lines = array_slice( $this->lines(), $seen );
 		$flat  = implode( "\n", $lines );
@@ -119,7 +120,7 @@ class SnapshotsInteractionTest extends SnapshotsTestCase {
 
 		$after = array_slice( $this->lines(), $seen );
 		$this->assertSame( array(), array_filter( $after, static fn( $l ) => 'DELETE /nodes/node-a/qemu/5000' === $l || false !== strpos( $l, '/status/' ) || 0 === strpos( $l, 'PUT ' ) || 0 === strpos( $l, 'POST /nodes/node-a/qemu/5000/config' ) ), 'The wipe never ran.' );
-		$this->assertCount( 1, Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertCount( 1, Policy::entries( $this->fresh( $r ) ) );
 		$told = array_filter( $this->admin_mails(), static fn( $m ) => false !== strpos( (string) $m['message'], 'reinstall waits' ) );
 		$this->assertCount( 1, $told, 'Once, not every round.' );
 
@@ -148,11 +149,11 @@ class SnapshotsInteractionTest extends SnapshotsTestCase {
 
 		$fresh = $this->fresh( $r );
 		$this->assertNull( $fresh->get( 'restore' ), (string) $fresh->get( 'last_error' ) );
-		$this->assertSame( array(), Snapshots::entries( $fresh ) );
+		$this->assertSame( array(), Policy::entries( $fresh ) );
 		$this->assertNull( $fresh->get( Snapshots::OP ) );
 		$this->assertSame( array(), $this->fake->snapshots( 5000 ) );
 		Jobs::run( $r->id() );
-		$this->assertSame( 0, Snapshots::used( $this->fresh( $r ) ) );
+		$this->assertSame( 0, Policy::used( $this->fresh( $r ) ) );
 		$this->assertSame( 'after', $this->take( $this->fresh( $r ), 'after' )['label'] );
 	}
 
@@ -167,18 +168,18 @@ class SnapshotsInteractionTest extends SnapshotsTestCase {
 	public function test_the_restore_form_text_warns_about_the_snapshots(): void {
 		$r = $this->server();
 		$this->take( $r, 'x' );
-		$this->assertStringContainsString( 'snapshots', strtolower( Snapshots::restore_warning( $this->fresh( $r ) ) ) );
-		$this->assertSame( '', Snapshots::restore_warning( $this->server() ) );
+		$this->assertStringContainsString( 'snapshots', strtolower( Policy::restore_warning( $this->fresh( $r ) ) ) );
+		$this->assertSame( '', Policy::restore_warning( $this->server() ) );
 	}
 
 	public function test_the_reinstall_form_text_names_the_number_of_snapshots_that_go(): void {
 		$r = $this->server();
-		$this->assertSame( '', Snapshots::reinstall_warning( $r ) );
+		$this->assertSame( '', Policy::reinstall_warning( $r ) );
 		$this->take( $r, 'one' );
-		$this->assertStringContainsString( '1 snapshot', Snapshots::reinstall_warning( $this->fresh( $r ) ) );
+		$this->assertStringContainsString( '1 snapshot', Policy::reinstall_warning( $this->fresh( $r ) ) );
 		$this->take( $r, 'two' );
-		$this->assertStringContainsString( '2 snapshots', Snapshots::reinstall_warning( $this->fresh( $r ) ) );
-		$this->assertStringNotContainsString( '—', Snapshots::reinstall_warning( $this->fresh( $r ) ) . Snapshots::restore_warning( $this->fresh( $r ) ) );
+		$this->assertStringContainsString( '2 snapshots', Policy::reinstall_warning( $this->fresh( $r ) ) );
+		$this->assertStringNotContainsString( '—', Policy::reinstall_warning( $this->fresh( $r ) ) . Policy::restore_warning( $this->fresh( $r ) ) );
 	}
 
 	// -- Extra disk (D10, D11) -------------------------------------------------------------------
@@ -191,12 +192,12 @@ class SnapshotsInteractionTest extends SnapshotsTestCase {
 		$this->settings( array( 'deletion_mode' => 'on' ) );
 		$this->mails = array();
 
-		$this->assertSame( array( 'with the disk' ), array_column( Snapshots::covering( $this->fresh( $r ), 'disk-store:5000/' . $disk->get( 'volname' ) ), 'label' ) );
+		$this->assertSame( array( 'with the disk' ), array_column( Policy::covering( $this->fresh( $r ), 'disk-store:5000/' . $disk->get( 'volname' ) ), 'label' ) );
 
 		$done = Registry::get( 'proxmox-disk' )->delete( $this->fresh( $disk ) );
 		$this->assertTrue( $done->is_done(), $done->error() );
 
-		$left = Snapshots::entries( $this->fresh( $r ) );
+		$left = Policy::entries( $this->fresh( $r ) );
 		$this->assertSame( array( $before['id'] ), array_column( $left, 'id' ), 'Only the snapshot that covered the disk went.' );
 		$this->assertArrayNotHasKey( $after['snap'], $this->fake->snapshots( 5000 ) );
 		$this->assertArrayHasKey( $before['snap'], $this->fake->snapshots( 5000 ) );
@@ -256,7 +257,7 @@ class SnapshotsInteractionTest extends SnapshotsTestCase {
 		$this->fresh( $disk )->set( $paused->meta() );
 		$this->assertTrue( $this->fresh( $disk )->transition( 'paused', 'test' ) );
 
-		$this->assertSame( array( $a['id'] ), array_column( Snapshots::entries( $this->fresh( $r ) ), 'id' ) );
+		$this->assertSame( array( $a['id'] ), array_column( Policy::entries( $this->fresh( $r ) ), 'id' ) );
 		$this->assertArrayHasKey( $a['snap'], $this->fake->snapshots( 5000 ) );
 		$this->assertSame( array(), $this->disk_mails() );
 		$this->assertNotNull( Actions::check( $this->fresh( $r ), 'snapshot_rollback', array( 'id' => $a['id'], 'confirm' => 'ROLLBACK' ) ) );
@@ -332,7 +333,7 @@ class SnapshotsInteractionTest extends SnapshotsTestCase {
 		$this->assertTrue( $grown->is_done(), $grown->error() );
 		$this->assertStringContainsString( 'size=100G', $this->config()['scsi1'] );
 		$this->assertArrayHasKey( $a['snap'], $this->fake->snapshots( 5000 ) );
-		$this->assertSame( array( $a['id'] ), array_column( Snapshots::entries( $this->fresh( $r ) ), 'id' ) );
+		$this->assertSame( array( $a['id'] ), array_column( Policy::entries( $this->fresh( $r ) ), 'id' ) );
 	}
 
 	// -- Review fixes ----------------------------------------------------------------------------
@@ -413,7 +414,7 @@ class SnapshotsInteractionTest extends SnapshotsTestCase {
 		$this->take( $r, 'a' );
 		$this->fake->set_lock( 5000, 'backup' );
 		$this->reinstall( $r );
-		$this->assertCount( 1, Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertCount( 1, Policy::entries( $this->fresh( $r ) ) );
 
 		// The VM is destroyed outside the plugin (its snapshots with it).
 		$this->fake->set_lock( 5000, '' );
@@ -422,7 +423,7 @@ class SnapshotsInteractionTest extends SnapshotsTestCase {
 		$this->assertNull( $this->fake->vm( 5000 ) );
 
 		$this->rebuild( $r->id() );
-		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertSame( array(), Policy::entries( $this->fresh( $r ) ) );
 		$this->assertNull( $this->fresh( $r )->get( Snapshots::OP ) );
 	}
 }

@@ -19,12 +19,12 @@ use BeltoftServices\Proxmox\Db\DbCard;
 use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\Proxmox\Network\Firewall;
 use BeltoftServices\Proxmox\Network\FirewallRules;
+use BeltoftServices\Proxmox\Snapshot\PanelData;
 use BeltoftServices\Proxmox\Vm\GuestDisk;
 use BeltoftServices\Monitoring\LiveUsage;
 use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Proxmox\Network\PrivateAttach;
 use BeltoftServices\Proxmox\Network\PrivateNets;
-use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -157,7 +157,7 @@ final class Details {
 			);
 		}
 
-		$snapshots = Snapshots::panel( $r );
+		$snapshots = PanelData::panel( $r );
 
 		if ( null !== $snapshots ) {
 			$out['snapshots'] = array( 'enabled' => $snapshots['enabled'], 'slots' => $snapshots['slots'], 'used' => $snapshots['used'] );

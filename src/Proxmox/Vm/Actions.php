@@ -18,6 +18,7 @@ use BeltoftServices\Proxmox\Network\PrivateAttach;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\Prepares;
 use BeltoftServices\Proxmox\Pve\Steps;
+use BeltoftServices\Proxmox\Snapshot\Policy;
 use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
@@ -169,7 +170,7 @@ final class Actions {
 		}
 
 		$out[ ServerName::ACTION ] = __( 'Rename', 'beltoft-services' );
-		$out = array_merge( $out, Snapshots::offered( $r ), FirewallRules::offered( $r ), PrivateAttach::offered( $r ) );
+		$out = array_merge( $out, Policy::offered( $r ), FirewallRules::offered( $r ), PrivateAttach::offered( $r ) );
 
 		// A restore that has begun is finished even when the plan lost its backups meanwhile.
 		if ( Backups::enabled( $r ) || is_array( $r->get( 'restore' ) ) ) {
@@ -300,7 +301,7 @@ final class Actions {
 	 */
 	public static function check( Resource $r, string $action, array $args ): ?string {
 		if ( in_array( $action, Snapshots::ACTIONS, true ) ) {
-			return Snapshots::check( $r, $action, $args );
+			return Policy::check( $r, $action, $args );
 		}
 
 		if ( in_array( $action, Firewall::ACTIONS, true ) ) {

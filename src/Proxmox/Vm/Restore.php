@@ -11,6 +11,7 @@ use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Pve\Prepares;
+use BeltoftServices\Proxmox\Snapshot\Policy;
 use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Proxmox\Pve\Steps;
 use BeltoftServices\Resource;
@@ -100,7 +101,7 @@ final class Restore {
 
 		if ( 'restored' === $phase ) {
 			// The restore recreated the VM: its snapshots are gone (D9). Nothing is asked of Proxmox when none were listed.
-			$forgot = Snapshots::tracked( $this->r ) ? ( new Snapshots( $this->r ) )->forget_all() : null;
+			$forgot = Policy::tracked( $this->r ) ? ( new Snapshots( $this->r ) )->forget_all() : null;
 
 			if ( null !== $forgot && ! $forgot->is_done() ) {
 				return $forgot;
