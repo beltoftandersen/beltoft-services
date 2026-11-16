@@ -250,8 +250,9 @@ final class Server {
 			return self::oauth_error( 'invalid_client', 'Unknown client.', 401 );
 		}
 
-		// Claude's requests all come from a few addresses, so each app is counted as well.
-		if ( RateLimit::exceeded( 'c_' . $client['client_id'], 'beltoft-oauth:token-client', (int) apply_filters( 'beltoft_services_oauth_client_token_limit', 60 ) ) ) {
+		// Claude's requests all come from a few addresses, so each app is counted as well, per address: a client id is public, and
+		// junk sent in its name from one address must not make the real app's exchanges answer 429 for everyone.
+		if ( RateLimit::exceeded( 'c_' . $client['client_id'] . '_' . RateLimit::visitor(), 'beltoft-oauth:token-client', (int) apply_filters( 'beltoft_services_oauth_client_token_limit', 60 ) ) ) {
 			return self::oauth_error( 'temporarily_unavailable', 'Too many requests.', 429 );
 		}
 

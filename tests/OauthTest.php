@@ -887,11 +887,39 @@ final class OauthTest extends TestCase {
 		// A full table: the oldest idle clients make room instead of the registration being refused.
 		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i WHERE client_id <> %s', $t['clients'], $used ) );
 		for ( $i = 0; $i < Clients::MAX; $i++ ) {
-			$wpdb->insert( $t['clients'], array( 'client_id' => 'bsc_' . str_pad( dechex( $i ), 32, '0', STR_PAD_LEFT ), 'name' => 'x', 'redirect_uris' => '[]', 'created_at' => time() - 600 + ( $i % 500 ) ) );
+			$wpdb->insert( $t['clients'], array( 'client_id' => 'bsc_' . str_pad( dechex( $i ), 32, '0', STR_PAD_LEFT ), 'name' => 'x', 'redirect_uris' => '[]', 'created_at' => time() - 2400 + ( $i % 500 ) ) );
 		}
 		$this->assertIsArray( Clients::register( array( 'redirect_uris' => array( self::REDIRECT ) ) ) );
 		$this->assertNotNull( Clients::find( $used ) );
 		$this->assertLessThanOrEqual( Clients::MAX, (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $t['clients'] ) ) );
+	}
+
+	public function test_a_full_table_of_young_clients_refuses_new_registrations_and_keeps_the_young_ones(): void {
+		global $wpdb;
+		$t = Schema::tables();
+
+		$wpdb->query( "DELETE FROM {$t['clients']}" ); // phpcs:ignore WordPress.DB.PreparedSQL -- test fixture.
+		$genuine = $this->client();
+		for ( $i = 0; $i < Clients::MAX - 1; $i++ ) {
+			$wpdb->insert( $t['clients'], array( 'client_id' => 'bsc_' . str_pad( dechex( $i ), 32, '0', STR_PAD_LEFT ), 'name' => 'x', 'redirect_uris' => '[]', 'created_at' => time() - 120 ) );
+		}
+
+		$this->assertWPError( Clients::register( array( 'redirect_uris' => array( self::REDIRECT ) ) ) );
+		$this->assertNotNull( Clients::find( $genuine ), 'A client still on the consent page is not evicted.' );
+	}
+
+	public function test_a_junk_flood_from_one_address_does_not_lock_the_app_out_for_other_addresses(): void {
+		$client = $this->client();
+		add_filter( 'beltoft_services_oauth_client_token_limit', static fn() => 2 );
+		$_SERVER['REMOTE_ADDR'] = '203.0.113.9';
+
+		for ( $i = 0; $i < 3; $i++ ) {
+			$this->token( array( 'grant_type' => 'refresh_token', 'refresh_token' => 'junk', 'client_id' => $client ) );
+		}
+
+		$_SERVER['REMOTE_ADDR'] = '198.51.100.7';
+		$this->assertSame( 400, $this->token( array( 'grant_type' => 'refresh_token', 'refresh_token' => 'nope', 'client_id' => $client ) )->get_status(), 'The real app is not counted with the flood.' );
+		remove_all_filters( 'beltoft_services_oauth_client_token_limit' );
 	}
 
 	public function test_the_limits_are_per_address_and_per_client(): void {

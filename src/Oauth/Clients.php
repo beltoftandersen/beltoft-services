@@ -23,6 +23,9 @@ final class Clients {
 	 */
 	public const MAX = 500;
 
+	/** Seconds an idle client is kept from eviction after it registered. */
+	public const EVICT_AFTER = 1800;
+
 	/**
 	 * Registers a client.
 	 *
@@ -145,8 +148,8 @@ final class Clients {
 	}
 
 	/**
-	 * Makes room when the table is full: removes the oldest clients that never connected. A client that has a
-	 * grant is never removed here.
+	 * Makes room when the table is full: removes the oldest clients that never connected and are over half an hour
+	 * old (a person may still be on the consent page). A client that has a grant is never removed here.
 	 *
 	 * @return bool Whether anything was removed.
 	 */
@@ -156,7 +159,7 @@ final class Clients {
 		$t = Schema::tables();
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own tables.
-		$ids = $wpdb->get_col( $wpdb->prepare( 'SELECT c.client_id FROM %i c LEFT JOIN %i g ON g.client_id = c.client_id WHERE g.id IS NULL ORDER BY c.created_at ASC LIMIT %d', $t['clients'], $t['grants'], max( 1, intdiv( self::MAX, 10 ) ) ) );
+		$ids = $wpdb->get_col( $wpdb->prepare( 'SELECT c.client_id FROM %i c LEFT JOIN %i g ON g.client_id = c.client_id WHERE g.id IS NULL AND c.created_at < %d ORDER BY c.created_at ASC LIMIT %d', $t['clients'], $t['grants'], time() - self::EVICT_AFTER, max( 1, intdiv( self::MAX, 10 ) ) ) );
 
 		foreach ( (array) $ids as $id ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
