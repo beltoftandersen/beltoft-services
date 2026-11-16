@@ -269,16 +269,16 @@ final class DbDiskField {
 	 * @return array{0: array<string, mixed>, 1: int} The reply and its HTTP status.
 	 */
 	public static function respond(): array {
-		if ( false === check_ajax_referer( self::NONCE, 'nonce', false ) ) {
-			return array( array( 'ok' => false ), 403 );
-		}
+		return CartSwap::answer(
+			self::NONCE,
+			static function (): array {
+				$posted = isset( $_POST['extra'] ) ? sanitize_text_field( wp_unslash( $_POST['extra'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in CartSwap::answer().
+				$extra  = 1 === preg_match( '/^[0-9]{1,6}$/D', $posted ) ? (int) $posted : -1;
 
-		$posted = isset( $_POST['extra'] ) ? sanitize_text_field( wp_unslash( $_POST['extra'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
-		$extra  = 1 === preg_match( '/^[0-9]{1,6}$/D', $posted ) ? (int) $posted : -1;
-		// Alone on the session's latest cart, saved before the lock is let go (CartSwap): two quick changes never drop one.
-		$result = CartSwap::locked( static fn(): array => self::swap( $extra ) ) ?? array( 'ok' => false, 'extra' => $extra, 'variation_id' => 0 );
-
-		return array( $result, $result['ok'] ? 200 : 409 );
+				// Alone on the session's latest cart, saved before the lock is let go (CartSwap): two quick changes never drop one.
+				return CartSwap::locked( static fn(): array => self::swap( $extra ) ) ?? array( 'ok' => false, 'extra' => $extra, 'variation_id' => 0 );
+			}
+		);
 	}
 
 	/**

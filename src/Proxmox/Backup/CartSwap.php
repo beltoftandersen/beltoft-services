@@ -44,6 +44,24 @@ final class CartSwap {
 	}
 
 	/**
+	 * The reply of a checkout swap call: the nonce is checked first (403 without it), then the swap runs, and its answer is
+	 * 200 when it worked and 409 when it did not. The one place of that rule for the swap calls of the add-ons.
+	 *
+	 * @param string   $nonce Nonce action of the field.
+	 * @param callable $swap  Reads the posted choice and applies it; gives an array with an 'ok' key.
+	 * @return array{0: array<string, mixed>, 1: int} Body and HTTP status.
+	 */
+	public static function answer( string $nonce, callable $swap ): array {
+		if ( false === check_ajax_referer( $nonce, 'nonce', false ) ) {
+			return array( array( 'ok' => false ), 403 );
+		}
+
+		$result = $swap();
+
+		return array( $result, $result['ok'] ? 200 : 409 );
+	}
+
+	/**
 	 * Runs a callback on the session's latest cart, alone, and saves the session before the lock is released.
 	 *
 	 * @param callable $callback Work to do.

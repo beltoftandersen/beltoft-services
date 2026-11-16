@@ -263,15 +263,15 @@ final class DbIpField {
 	 * @return array{0: array<string, mixed>, 1: int} The reply and its HTTP status.
 	 */
 	public static function respond(): array {
-		if ( false === check_ajax_referer( self::NONCE, 'nonce', false ) ) {
-			return array( array( 'ok' => false ), 403 );
-		}
+		return CartSwap::answer(
+			self::NONCE,
+			static function (): array {
+				$with = isset( $_POST['with'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['with'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in CartSwap::answer().
 
-		$with   = isset( $_POST['with'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['with'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
-		// Alone on the session's latest cart, saved before the lock is let go (CartSwap): two quick changes never drop one.
-		$result = CartSwap::locked( static fn(): array => self::swap( $with ) ) ?? array( 'ok' => false, 'with' => $with, 'variation_id' => 0 );
-
-		return array( $result, $result['ok'] ? 200 : 409 );
+				// Alone on the session's latest cart, saved before the lock is let go (CartSwap): two quick changes never drop one.
+				return CartSwap::locked( static fn(): array => self::swap( $with ) ) ?? array( 'ok' => false, 'with' => $with, 'variation_id' => 0 );
+			}
+		);
 	}
 
 	/**
