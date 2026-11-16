@@ -396,4 +396,31 @@ class SlugsTest extends TestCase {
 		$this->assertSame( (int) $box->license()['id'], Slugs::resolve( 'box-b', 'servers' ) );
 		Resource::memo_end();
 	}
+
+	public function test_parse_of_a_slug_address_repeats_no_query_per_call(): void {
+		global $wpdb;
+
+		for ( $n = 0; $n < 5; $n++ ) {
+			$box = $this->server( $this->user, 'rack-' . $n );
+			Slugs::for_license( $box->license() );
+		}
+		$this->database( $this->user );
+		$slug                             = Slugs::stored( Resource::find( $box->id() ) );
+		$license_id                       = (int) $box->license()['id'];
+		$GLOBALS['wp']->query_vars['vps'] = $slug . '/disks';
+		Resource::memo_begin();
+
+		Slugs::parse( 'vps', 'servers' );
+		$before     = $wpdb->num_queries;
+
+		for ( $i = 0; $i < 10; $i++ ) {
+			$parsed = Slugs::parse( 'vps', 'servers' );
+			$this->assertSame( $license_id, $parsed['id'] );
+		}
+
+		$used = $wpdb->num_queries - $before;
+		Resource::memo_end();
+
+		$this->assertSame( 0, $used, 'Ten more parse calls read nothing after the first.' );
+	}
 }
