@@ -54,4 +54,26 @@ final class ChildrenSpawnTest extends MailTestCase {
 		$this->assertSame( Licenses::STATUS_REVOKED, $found[0]['status'] );
 		$this->assertSame( array(), Children::ids( Resource::find( $parent->id() ) ) );
 	}
+
+	public function test_spawn_closes_the_child_activation_when_the_link_cannot_be_stored(): void {
+		$parent = $this->ready_mail( 'parent3.example' );
+		$slug   = 'child-nolink-slug';
+
+		// Storing the parent link fails: the child must end closed, not live in state deleted.
+		$block = static function ( $sql ) {
+			return false !== strpos( (string) $sql, Children::PARENT ) && 0 === stripos( ltrim( (string) $sql ), 'update' ) ? 'SELECT 1 WHERE 1 = 0' : $sql;
+		};
+		add_filter( 'query', $block );
+		$res = Children::spawn( $parent, $slug, Registry::get( MailDriver::ID ), array(), array( MailDomain::META_DOMAIN => 'nolink.example' ), 'no license', 'no link' );
+		remove_filter( 'query', $block );
+
+		$this->assertWPError( $res );
+		$found = $this->child_licenses( $parent, $slug );
+		$this->assertCount( 1, $found );
+		$this->assertSame( Licenses::STATUS_REVOKED, $found[0]['status'] );
+
+		global $wpdb;
+		$live = $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . \BeltoftLicenses\Install::tables()['activations'] . ' WHERE license_id = %d AND live_domain IS NOT NULL', (int) $found[0]['id'] ) );
+		$this->assertSame( 0, (int) $live, 'The child activation is closed.' );
+	}
 }
