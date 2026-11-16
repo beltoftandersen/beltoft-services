@@ -9,6 +9,7 @@ namespace BeltoftServices\Account;
 
 use BeltoftLicenses\Licenses;
 use BeltoftLicenses\Account\View;
+use BeltoftServices\Domains\HostName;
 use BeltoftServices\Locks;
 use BeltoftServices\Proxmox\Vm\ServerName;
 use BeltoftServices\Resource;
@@ -200,7 +201,7 @@ final class Slugs {
 	public static function slugify( string $name, string $type ): string {
 		$name = strtolower( trim( $name ) );
 
-		if ( in_array( $type, array( 'domains', 'email', 'ssl' ), true ) && 1 === preg_match( '/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/D', $name ) ) {
+		if ( in_array( $type, array( 'domains', 'email', 'ssl' ), true ) && HostName::is_host( $name ) ) {
 			return substr( $name, 0, self::MAX );
 		}
 

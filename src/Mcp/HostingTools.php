@@ -35,9 +35,6 @@ final class HostingTools {
 	/** Read tools. */
 	public const READS = array( 'hosting_info', 'hosting_usage', 'list_hosting_backups' );
 
-	/** Everyday action tools. */
-	public const ACTS = array( 'add_site_domain', 'set_php_version', 'clear_site_cache', 'create_hosting_backup' );
-
 	/** Full access tools, each with a confirmation. */
 	public const FULL = array( 'restore_hosting_backup', 'delete_site' );
 

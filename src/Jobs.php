@@ -791,16 +791,6 @@ final class Jobs {
 	}
 
 	/**
-	 * The refusal of a second action while one of the service is pending (see JobActions::busy()).
-	 *
-	 * @param Resource $r Resource.
-	 * @return \WP_Error|null Error code busy, or null when nothing is pending.
-	 */
-	public static function busy( Resource $r ): ?\WP_Error {
-		return JobActions::busy( $r );
-	}
-
-	/**
 	 * The one way a route starts a customer action that a driver carries out in a job (see JobActions::start_action()).
 	 *
 	 * @param Resource             $r       Resource.
@@ -834,27 +824,6 @@ final class Jobs {
 	 */
 	public static function job_failed( $action_id, $error = null ): void {
 		JobFailures::job_failed( $action_id, $error );
-	}
-
-	/**
-	 * May a customer action whose job was lost be queued again? (see JobFailures::resumable()).
-	 *
-	 * @param Resource $r      Resource.
-	 * @param string   $action Action name.
-	 */
-	public static function resumable( Resource $r, string $action ): bool {
-		return JobFailures::resumable( $r, $action );
-	}
-
-	/**
-	 * A Progress marker that nothing works on any more: the action ends failed (see JobFailures::lapsed()).
-	 *
-	 * @param Resource $r      Resource.
-	 * @param string   $action Action name from the marker.
-	 * @param int|null $at     The marker's click time as the caller read it.
-	 */
-	public static function lapsed( Resource $r, string $action, ?int $at = null ): void {
-		JobFailures::lapsed( $r, $action, $at );
 	}
 
 	/**

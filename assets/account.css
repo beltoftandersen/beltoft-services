@@ -506,9 +506,6 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .bs-inline.is-fail .bs-inline__text { overflow: visible; text-overflow: clip; white-space: normal; }
 .bs-inline.is-done, .bs-inline.is-info { color: var(--ink-mid, #2d4060); }
 .bs-inline.is-fail { color: var(--bs-status-fail); font-weight: var(--bs-fw-medium); }
-.bs-inline__close { flex: none; width: var(--bs-btn-h); height: var(--bs-btn-h); margin: -10px -10px -10px 0; padding: 0; border: 0; background: none; box-shadow: none; color: inherit; font-size: 22px; line-height: 1; cursor: pointer; }
-.bs-inline__close[hidden] { display: none; }
-.bs-inline__close:focus-visible { outline: 2px solid var(--bs-focus); outline-offset: -2px; }
 .beltoft-services-page__billing { margin: var(--bs-space-2) 0 0; }
 .beltoft-services-panel__head[hidden], .beltoft-services-badge[hidden], .beltoft-services-panel__message[hidden], .beltoft-services-btn[hidden], .beltoft-services-tab[hidden] { display: none !important; }
 .beltoft-services-panel--page .beltoft-services-progress { margin-top: 16px; }
@@ -859,9 +856,6 @@ div.beltoft-services-domain ul.beltoft-services-domain__import-list > li { displ
 .beltoft-services-oauth__facts > div { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--rule, #d6d2c8); }
 .beltoft-services-oauth__facts dt { margin: 0; color: var(--ink-soft, #5e7080); }
 .beltoft-services-oauth__facts dd { margin: 0; overflow-wrap: anywhere; }
-.beltoft-services-oauth__verified, .beltoft-services-oauth__unverified { display: block; font-size: 14px; }
-.beltoft-services-oauth__verified { color: var(--green, #28513e); }
-.beltoft-services-oauth__unverified { color: var(--bs-status-fail); }
 .beltoft-services-oauth__choices { margin: 0 0 16px; padding: 0; border: 0; min-width: 0; }
 .beltoft-services-oauth__choices legend { margin: 0 0 12px; padding: 0; font-weight: 600; }
 .beltoft-services-oauth__stepup { display: grid; gap: 8px; justify-items: start; margin: 12px 0 0; }
@@ -1006,7 +1000,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dnse__danger { 
 @media (max-width: 767px) {
 	body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-vm__copy, .beltoft-services-console__action, .beltoft-services-mail__actions .button, .beltoft-services-mail__actions summary, [data-snapshot-rollback], [data-snapshot-delete], [data-db-access-remove], [data-db-access-mine], .beltoft-services-vm__password + .button),
 	.beltoft-vm-usage__ranges button { min-height: var(--bs-btn-h); }
-	body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-fw__link, .beltoft-services-vm .beltoft-services-vm__link, div.beltoft-services-domain button.beltoft-services-domain__link, .beltoft-services-vm__disk a, .beltoft-services-vm__disks p a, .beltoft-services-ov__head a, .beltoft-services-server__back a, .beltoft-services-ov__attention a, table.shop_table td .button, .beltoft-licenses__copy, a.acct-edit-link) { min-height: var(--bs-btn-h); display: inline-flex; align-items: center; }
+	body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-fw__link, .beltoft-services-vm .beltoft-services-vm__link, div.beltoft-services-domain button.beltoft-services-domain__link, .beltoft-services-vm__disk a, .beltoft-services-vm__disks p a, .beltoft-services-ov__head a, .beltoft-services-server__back a, .beltoft-services-ov__attention a, table.shop_table td .button, .beltoft-licenses__copy{ min-height: var(--bs-btn-h); display: inline-flex; align-items: center; }
 	.beltoft-services-vm__disk p { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--bs-space-4); }
 }
 

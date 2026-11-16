@@ -55,10 +55,17 @@ class DbNeedsServerTest extends BackupTestCase {
 		return $resource;
 	}
 
+	/** What a refused cart would say: the rule alone, as the cart notice applies it. */
+	private function probe( \WP_Error $errors ): void {
+		if ( DbNeedsServer::refused( get_current_user_id(), DbNeedsServer::clusters_in_cart() ) ) {
+			$errors->add( 'beltoft_services_db_needs_server', DbNeedsServer::message( true ) );
+		}
+	}
+
 	private function errors_for( \WC_Product $db ): \WP_Error {
 		$this->assertNotFalse( WC()->cart->add_to_cart( $db->get_id() ) );
 		$errors = new \WP_Error();
-		DbNeedsServer::validate( array(), $errors );
+		$this->probe( $errors );
 
 		return $errors;
 	}
@@ -150,7 +157,7 @@ class DbNeedsServerTest extends BackupTestCase {
 		$this->assertTrue( apply_filters( 'woocommerce_add_to_cart_validation', true, $db->get_id(), 1 ) );
 		$this->assertSame( 0, wc_notice_count( 'error' ) );
 		$errors = new \WP_Error();
-		DbNeedsServer::validate( array(), $errors );
+		$this->probe( $errors );
 		$this->assertSame( array(), $errors->get_error_codes() );
 	}
 
@@ -168,7 +175,7 @@ class DbNeedsServerTest extends BackupTestCase {
 
 		$this->assertNotFalse( WC()->cart->add_to_cart( $db->get_id() ) );
 		$errors = new \WP_Error();
-		DbNeedsServer::validate( array(), $errors );
+		$this->probe( $errors );
 		$this->assertSame( array(), $errors->get_error_codes() );
 	}
 
@@ -185,7 +192,7 @@ class DbNeedsServerTest extends BackupTestCase {
 
 		$this->assertNotFalse( WC()->cart->add_to_cart( $vm->get_id() ) );
 		$errors = new \WP_Error();
-		DbNeedsServer::validate( array(), $errors );
+		$this->probe( $errors );
 		$this->assertSame( array(), $errors->get_error_codes() );
 	}
 

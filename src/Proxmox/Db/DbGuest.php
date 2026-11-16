@@ -31,9 +31,6 @@ final class DbGuest {
 	public const ROLE     = 'app_user';
 	public const PORT     = 5432;
 
-	/** Largest file the plugin reads from a guest. */
-	private const LIMIT = 65536;
-
 	/**
 	 * Writes a JSON file into the guest.
 	 *

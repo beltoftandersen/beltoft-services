@@ -169,50 +169,12 @@
   min-width: 0;
 }
 
-:where(.beltoft-domain-transfer__help, .beltoft-domain-transfer__choices) {
+:where(.beltoft-domain-transfer__help) {
   grid-column: 1 / -1;
 }
 
 :where(.beltoft-domain-transfer input) {
   width: 100%;
-}
-
-:where(.beltoft-domain-transfer__dns) {
-  display: grid;
-  gap: .5rem;
-}
-
-:where(.beltoft-domain-transfer__dns) {
-  margin-bottom: .5rem;
-}
-
-:where(.beltoft-domain-transfer__choice) {
-  display: flex;
-  align-items: flex-start;
-  gap: .625rem;
-  max-width: 36rem;
-  font-weight: 400;
-  cursor: pointer;
-}
-
-:where(.beltoft-domain-transfer__choice input) {
-  width: auto;
-  flex: none;
-  margin: .2em 0 0;
-}
-
-:where(.beltoft-domain-transfer__choice-text) {
-  display: grid;
-  gap: .125rem;
-}
-
-:where(.beltoft-domain-transfer__choice-title) {
-  font-weight: 600;
-}
-
-:where(.beltoft-domain-transfer__choice-desc) {
-  font-weight: 400;
-  opacity: .8;
 }
 
 @media (max-width: 767px) {

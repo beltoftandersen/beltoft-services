@@ -15,6 +15,7 @@ use BeltoftServices\Hosting\Records;
 use BeltoftServices\Hosting\Runs;
 use BeltoftServices\Hosting\SiteDns;
 use BeltoftServices\Hosting\Sites;
+use BeltoftServices\JobActions;
 use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
@@ -123,7 +124,7 @@ trait Base {
 	 */
 	public function queue( string $method, array $args, ?string $secret = null ) {
 		// One change at a time, as for servers: the Progress marker. Asked again under the account's lock (locked()).
-		$busy = Jobs::busy( Resource::find( $this->r->id() ) ?? $this->r );
+		$busy = JobActions::busy( Resource::find( $this->r->id() ) ?? $this->r );
 
 		if ( null !== $busy ) {
 			return $busy;
@@ -165,7 +166,7 @@ trait Base {
 	private function locked( callable $change ) {
 		$guarded = function () use ( $change ) {
 			// A request that makes a change asks again under the lock, so two clicks at once cannot both do their local work.
-			$busy = 'request' === $this->mode ? Jobs::busy( Resource::find( $this->r->id() ) ?? $this->r ) : null;
+			$busy = 'request' === $this->mode ? JobActions::busy( Resource::find( $this->r->id() ) ?? $this->r ) : null;
 
 			return null !== $busy ? $busy : $change();
 		};
