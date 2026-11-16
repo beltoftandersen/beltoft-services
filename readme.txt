@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.33.0
+Stable tag: 0.33.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,16 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.33.1 =
+* Third round from the November review: the smaller findings, each with a test.
+* Security: a step-up check runs under a lock and allows 30 tries in 10 minutes over all codes; lookups of registry data use the safe request function; transfer names are normalised before any lookup; the transfer DNS answer is cached for 5 minutes; a new connected app is not pushed out while it is younger than 30 minutes and the token limit counts per address; the Network tab lists other servers only for the network's owner; removing the plugin with its data also removes the registrar login option and the memory table.
+* Smaller corrections in the reconciler, lifecycle, apps, hosting, domains, mail, servers and the account scripts (see the review report for the list); an empty price list from the registrar keeps the saved prices; a child service whose link cannot be stored is closed.
+* Accessibility: keyboard focus returns to the button after an action; copy rows and the console have proper roles and focus.
+* Less code: unused styles, constants and methods removed; one host name rule in the address helper.
+* Speed: fewer database reads on the mail and network pages; expired checkout name holds are deleted daily.
+* Tests: boundary tests for usage billing, tests that asserted nothing now assert, a missing sibling plugin is a visible skip (or a failure with BELTOFT_TESTS_STRICT=1).
+* Requires Beltoft Licenses 0.8.8 and WooCommerce 9.0.
 
 = 0.33.0 =
 * Second round of fixes from the November review, each with a test.
