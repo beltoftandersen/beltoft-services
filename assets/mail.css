@@ -5,7 +5,6 @@
 .beltoft-services-mail .beltoft-services-mail__table td { padding: 8px 8px; border: 0; border-bottom: 1px solid var(--bsm-rule); background: none; vertical-align: middle; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .beltoft-services-mail .beltoft-services-mail__table tr:last-child td { border-bottom: 0; }
 .beltoft-services-mail .beltoft-services-mail__table code { padding: 0; border: 0; background: none; color: var(--bsm-navy); font: inherit; font-weight: 500; overflow-wrap: anywhere; word-break: normal; }
-.beltoft-services-mail .beltoft-services-mail__table td.beltoft-services-mail__value code { font-weight: 400; word-break: break-all; }
 .beltoft-services-mail .beltoft-services-mail__table td.beltoft-services-mail__actions { width: 1%; min-width: 430px; white-space: normal; text-align: right; }
 /* The theme's account buttons are filled navy with a stronger selector: the outline look is forced here, inside the email area only. */
 .beltoft-services-mail .beltoft-services-mail__actions .button { margin: 4px 0 4px 8px; white-space: nowrap; }

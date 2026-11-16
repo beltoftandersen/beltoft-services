@@ -9,11 +9,6 @@
 .beltoft-services-net p.description code { white-space: nowrap; overflow-wrap: normal; }
 .beltoft-services-net__notice { padding: 8px 12px; background: var(--bg-warm, #eeece6); max-width: 640px; }
 .beltoft-services-net__others { margin: 0 0 12px; padding-left: 1.25em; }
-/* Like the Reboot dialog: title and text on one left edge. */
-.beltoft-services-net__dialog h5 { margin: 0; font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); }
-.beltoft-services-net__dialog p { margin: 0 0 12px; }
-.beltoft-services-net__dialog .beltoft-services-vm__buttons { margin: 0; }
-
 /* The facts are the shared facts card; Detach outlined. */
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net .beltoft-services-net__buttons { margin: 16px 0 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net button[data-net-detach] { border: 1px solid var(--navy, #10221b); background: transparent; color: var(--navy, #10221b); }
