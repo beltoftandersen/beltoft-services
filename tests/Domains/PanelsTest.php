@@ -16,8 +16,10 @@ class PanelsTest extends TestCase {
 		$r = Resource::create( $license, $driver, array(), $meta );
 		$this->assertInstanceOf( Resource::class, $r );
 		if ( $ready ) { $r->set( array( 'state' => 'ready' ) ); }
+		// The domain's page: the card is gone, every pane is in the HTML.
+		$d = \BeltoftServices\Account\DomainPage::build( $r, array( 'license' => $r->license(), 'tab' => 'dns' ) );
 		ob_start();
-		Panels::account( $r );
+		include BELTOFT_SERVICES_PATH . 'templates/account/domain-page.php';
 		return (string) ob_get_clean();
 	}
 
@@ -30,7 +32,7 @@ class PanelsTest extends TestCase {
 
 	public function test_domain_name_is_not_repeated_in_the_panel(): void {
 		$html = $this->render( new DomainDriver(), array( 'domain' => 'only-in-heading.com', 'mode' => 'register' ), true );
-		$this->assertStringNotContainsString( 'only-in-heading.com', $html, 'The card heading shows the name.' );
+		$this->assertStringNotContainsString( '>only-in-heading.com<', $html, 'The page head shows the name.' );
 	}
 
 	public function test_card_heading_is_the_domain_name_for_domains_and_dns_hosting_only(): void {
@@ -69,7 +71,7 @@ class PanelsTest extends TestCase {
 		$this->assertStringContainsString( '<li>ns2.old-host.example</li>', $html );
 		$this->assertStringNotContainsString( 'ns1.example.net', $html );
 		$this->assertStringContainsString( '(DNS is hosted elsewhere)', $html );
-		$this->assertStringNotContainsString( 'beltoft-dns-editor', $html );
+		$this->assertStringNotContainsString( 'data-dns-editor', $html );
 		$this->assertStringNotContainsString( 'Save DNS records', $html );
 		$this->assertStringNotContainsString( 'value="ours"', $html, 'Moving the DNS here is not offered.' );
 		$this->assertStringContainsString( 'value="custom"', $html );
@@ -79,12 +81,12 @@ class PanelsTest extends TestCase {
 
 	public function test_a_domain_with_our_dns_keeps_its_records_editor_and_ours_choice(): void {
 		$html = $this->render( new DomainDriver(), array( 'domain' => 'ours-card-2.com', 'mode' => 'transfer' ), true );
-		$this->assertStringContainsString( 'beltoft-dns-editor', $html );
+		$this->assertStringContainsString( 'data-dns-editor', $html );
 		$this->assertStringContainsString( 'value="ours"', $html );
 		$this->assertStringNotContainsString( '(DNS is hosted elsewhere)', $html );
 	}
 
-	public function test_the_dns_only_card_keeps_the_transfer_note_about_its_records(): void {
+	public function test_the_dns_only_page_keeps_the_transfer_note_about_its_records(): void {
 		update_option( \BeltoftServices\Domains\Prices::OPTION, array( 'com' => array( 'price' => 22, 'restricted' => false ) ) );
 		$html = $this->render( new DnsDriver(), array( 'domain' => 'note-here.com', 'mode' => 'dns' ), true );
 		$this->assertStringContainsString( 'Your DNS records here stay as they are.', $html );
@@ -94,12 +96,12 @@ class PanelsTest extends TestCase {
 		$html = $this->render( new DnsDriver(), array( 'domain' => 'dns-panel-test.com', 'mode' => 'dns' ), true );
 		$this->assertStringContainsString( '<li>ns1.example.net</li>', $html );
 		$this->assertStringContainsString( '<li>ns2.example.net</li>', $html );
-		$this->assertStringContainsString( 'beltoft-dns-editor', $html, 'Records are edited row by row, not as JSON.' );
+		$this->assertStringContainsString( 'data-dns-editor', $html, 'Records are edited row by row, not as JSON.' );
 		$this->assertStringContainsString( 'data-rows="[', $html );
 		$this->assertStringNotContainsString( '<textarea', $html );
 	}
 
-	public function test_active_dns_card_offers_to_move_the_registration_here(): void {
+	public function test_active_dns_page_offers_to_move_the_registration_here(): void {
 		update_option( \BeltoftServices\Domains\Prices::OPTION, array( 'com' => array( 'price' => 22, 'restricted' => false ) ) );
 		$html = $this->render( new DnsDriver(), array( 'domain' => 'move-here.com', 'mode' => 'dns' ), true );
 		$this->assertStringContainsString( 'Move the registration here', $html );
@@ -117,12 +119,12 @@ class PanelsTest extends TestCase {
 		$this->assertStringNotContainsString( 'data-domain-transfer', $this->render( new DomainDriver(), array( 'domain' => 'mine.com', 'mode' => 'register' ), true ) );
 	}
 
-	public function test_dns_card_status_lines_and_notes(): void {
+	public function test_dns_page_status_lines_and_notes(): void {
 		$ours = $this->render( new DnsDriver(), array( 'domain' => 'a.example.com', 'mode' => 'dns', 'delegation' => 'ours', 'parent_ds' => true ), true );
 		$this->assertStringContainsString( 'Pointing at our name servers', $ours );
 		$this->assertStringNotContainsString( 'DNSSEC', $ours, 'The DS note is only for a domain not pointing here.' );
 		$this->assertStringContainsString( 'data-domain-action="check_delegation"', $ours );
-		$this->assertStringContainsString( 'Save DNS records', $ours );
+		$this->assertStringContainsString( 'data-dns-editor', $ours );
 
 		$other = $this->render( new DnsDriver(), array( 'domain' => 'b.example.com', 'mode' => 'dns', 'delegation' => 'other', 'parent_ds' => true ), true );
 		$this->assertStringContainsString( 'Not pointing here yet', $other );
@@ -134,13 +136,13 @@ class PanelsTest extends TestCase {
 		$this->assertStringNotContainsString( 'paused', $none );
 
 		$error = $this->render( new DnsDriver(), array( 'domain' => 'd.example.com', 'mode' => 'dns', 'import_error' => 'MX was invalid <b>' ), true );
-		$this->assertStringContainsString( 'Some imported records could not be added: MX was invalid &lt;b&gt;. Add them below.', $error );
+		$this->assertStringContainsString( 'Some imported records could not be added: MX was invalid &lt;b&gt;. Add them in DNS records.', $error );
 	}
 
-	public function test_dns_card_is_read_only_while_records_are_off(): void {
+	public function test_dns_page_is_read_only_while_records_are_off(): void {
 		$off = $this->render( new DnsDriver(), array( 'domain' => 'e.example.com', 'mode' => 'dns', 'records_off' => true, 'state' => 'paused' ) );
 		$this->assertStringContainsString( 'DNS hosting is paused. Your records are kept but not answered.', $off );
-		$this->assertStringContainsString( 'beltoft-dns-editor', $off );
+		$this->assertStringContainsString( 'data-dns-editor', $off );
 		$this->assertStringContainsString( 'data-readonly="1"', $off );
 		$this->assertStringNotContainsString( 'Save DNS records', $off );
 		$this->assertStringNotContainsString( 'beltoft-dns-add', $off );
@@ -178,12 +180,12 @@ class PanelsTest extends TestCase {
 		add_filter( 'beltoft_services_domains_dns', static fn() => $down );
 		$html = $this->render( new DomainDriver(), array( 'domain' => 'down-test.com', 'mode' => 'register' ), true );
 		$this->assertStringContainsString( 'cannot be shown right now', $html );
-		$this->assertStringNotContainsString( 'beltoft-dns-editor', $html, 'An empty editor could be saved over the real records.' );
+		$this->assertStringNotContainsString( 'data-dns-editor', $html, 'An empty editor could be saved over the real records.' );
 		$up = new \BeltoftServices\Domains\FakeDns();
 		$up->create_zone( 'up-test.com', array( 'ns1.example.net', 'ns2.example.net' ) );
 		remove_all_filters( 'beltoft_services_domains_dns' );
 		add_filter( 'beltoft_services_domains_dns', static fn() => $up );
 		$html = $this->render( new DomainDriver(), array( 'domain' => 'up-test.com', 'mode' => 'register' ), true );
-		$this->assertStringContainsString( 'beltoft-dns-editor', $html );
+		$this->assertStringContainsString( 'data-dns-editor', $html );
 	}
 }

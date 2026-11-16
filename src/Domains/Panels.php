@@ -51,17 +51,11 @@ final class Panels {
 			include \BeltoftServices\Account\ServiceArea::file( 'domain-page.php' );
 			return;
 		}
-		$domain = (string) $r->get( 'domain' );
-		$dns_only = 'dns' === $r->get( 'driver' );
-		$client = Clients::dns();
-		// A page a customer waits for gets a few seconds, not the thirty a background job may take.
-		if ( $client instanceof LiveDns ) { $client = $client->with_timeout( self::PAGE_TIMEOUT ); }
-		$zone = $dns_only || ( 'custom' !== $r->get( 'ns_mode' ) && ! $r->get( 'dns_external' ) ) ? $client->zone( $domain ) : null;
-		// Without the zone the editor would show no records, and saving would delete them: it is not shown.
-		$zone_unavailable = is_wp_error( $zone );
-		$rrsets = is_array( $zone ) ? (array) ( $zone['rrsets'] ?? array() ) : array();
-		$rows = Records::to_rows( $domain, $rrsets );
-		include BELTOFT_SERVICES_PATH . 'templates/account/domain.php';
+		// Anywhere else (a license card, when a site keeps every service on the Licenses tab) the card is a link to the domain's page.
+		$url = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Domains::class )->url( $r->license() );
+		if ( '' !== $url ) {
+			printf( '<p class="beltoft-services-domain__manage"><a href="%s">%s</a></p>', esc_url( $url ), esc_html__( 'Manage', 'beltoft-services' ) );
+		}
 	}
 	/**
 	 * Read-only rows for a DNS-only resource: claim, assignment, order, parent DS, records off, import error.
