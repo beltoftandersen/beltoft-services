@@ -790,4 +790,36 @@ final class EmailsTest extends TestCase {
 
 		$this->assertSame( $added, $have );
 	}
+
+	public function test_the_deletion_date_is_formatted_in_the_order_language(): void {
+		$this->fake_driver();
+		$this->settings( array( 'usage_order_language_meta' => '_bs_test_lang' ) );
+		add_filter( 'get_available_languages', static fn( $l ) => array_merge( (array) $l, array( 'da_DK' ) ) );
+		$old_switcher                  = $GLOBALS['wp_locale_switcher'];
+		$GLOBALS['wp_locale_switcher'] = new \WP_Locale_Switcher();
+		$GLOBALS['wp_locale_switcher']->init();
+
+		$order = wc_create_order();
+		$order->update_meta_data( '_bs_test_lang', 'da' );
+		$order->save();
+
+		$product  = $this->service_product( 'fake' );
+		$license  = $this->service_license( $product, array( 'fire' => false, 'order_id' => $order->get_id() ) );
+		$resource = Resource::find( Resource::create( $license, Registry::get( 'fake' ), array(), array( 'state' => 'ready' ) )->id() );
+
+		$locale = '';
+		$spy    = static function ( $date, $format ) use ( &$locale ) {
+			if ( \BeltoftServices\Emails\ServiceEmail::DATE === $format ) {
+				$locale = determine_locale();
+			}
+
+			return $date;
+		};
+		add_filter( 'wp_date', $spy, 10, 2 );
+		Emails::get( 'beltoft_services_deletion_warning' )->trigger( $resource, array( 'deletes_at' => time() + DAY_IN_SECONDS ) );
+		remove_filter( 'wp_date', $spy, 10 );
+		$GLOBALS['wp_locale_switcher'] = $old_switcher;
+
+		$this->assertSame( 'da_DK', $locale );
+	}
 }
