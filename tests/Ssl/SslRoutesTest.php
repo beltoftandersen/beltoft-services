@@ -113,6 +113,23 @@ class SslRoutesTest extends SslTestCase {
 		$this->assertNotSame( '', (string) Resource::find( $fresh->id() )->get( Keys::META_KEY ) );
 	}
 
+	public function test_the_daily_job_goes_on_after_the_certificates_it_queued_the_day_before(): void {
+		delete_option( SslJobs::CURSOR_OPTION );
+		$a = $this->built( array( 'meta' => array( 'ssl_name' => 'a.example.com' ) ) );
+		$b = $this->built( array( 'meta' => array( 'ssl_name' => 'b.example.com' ) ) );
+		add_filter( 'beltoft_services_ssl_refresh_limit', static fn() => 1 );
+		as_unschedule_all_actions( \BeltoftServices\Jobs::ACT, array( $a->id(), 'refresh', array() ), 'beltoft-services' );
+		as_unschedule_all_actions( \BeltoftServices\Jobs::ACT, array( $b->id(), 'refresh', array() ), 'beltoft-services' );
+
+		$this->assertSame( 1, SslJobs::run() );
+		$first = (int) get_option( SslJobs::CURSOR_OPTION );
+		$this->assertGreaterThan( 0, $first );
+
+		$this->assertSame( 1, SslJobs::run() );
+		$second = (int) get_option( SslJobs::CURSOR_OPTION );
+		$this->assertGreaterThan( $first, $second, 'The second run took the next certificate, not the first one again.' );
+	}
+
 	public function test_a_deleted_service_keeps_no_key(): void {
 		$r = $this->built();
 		Keys::on_state_changed( $r, 'ready', 'deleted' );

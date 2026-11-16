@@ -56,4 +56,14 @@ class PricesTest extends TestCase {
 		$this->assertNull( Prices::price( 'missing' ) );
 		$this->assertSame( 13, Prices::price( 'com' ) );
 	}
+
+	public function test_an_empty_list_from_the_registrar_keeps_the_saved_table(): void {
+		update_option( Prices::OPTION, array( 'com' => array( 'price' => 14, 'restricted' => false ) ) );
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/tlds', array( 'results' => array() ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+
+		$this->assertWPError( Prices::sync() );
+		$this->assertSame( 14, Prices::price( 'com' ), 'The prices are not wiped by an empty answer.' );
+	}
 }

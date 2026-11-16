@@ -37,8 +37,12 @@ final class SslJobs {
 		}
 	}
 
+	/** Where the last run stopped, so the next one goes on from there. */
+	public const CURSOR_OPTION = 'beltoft_services_ssl_refresh_cursor';
+
 	/**
-	 * Queues a refresh for each built certificate and wipes old keys.
+	 * Queues a refresh for each built certificate and wipes old keys. A run queues at most LIMIT of them and the next run goes
+	 * on after the last one, so with more certificates than that every one is still read.
 	 *
 	 * @return int Refreshes queued.
 	 */
@@ -46,18 +50,25 @@ final class SslJobs {
 		Keys::sweep();
 
 		$queued = 0;
+		$limit  = max( 1, (int) apply_filters( 'beltoft_services_ssl_refresh_limit', self::LIMIT ) );
+		$after  = (int) get_option( self::CURSOR_OPTION, 0 );
+		$last   = 0;
 
-		foreach ( Resource::live_ids( SslDriver::KIND ) as $id ) {
+		foreach ( Resource::live_ids( SslDriver::KIND, $after ) as $id ) {
 			$r = Resource::find( $id );
 
 			if ( $r && SslDriver::ID === $r->get( 'driver' ) && Operations::built( $r ) ) {
 				Jobs::queue_act( $r->id(), 'refresh' );
 
-				if ( ++$queued >= self::LIMIT ) {
+				if ( ++$queued >= $limit ) {
+					$last = (int) $id;
 					break;
 				}
 			}
 		}
+
+		// Stopped at the limit: the next run starts after this one. Reached the end: it starts from the first again.
+		update_option( self::CURSOR_OPTION, $last, false );
 
 		return $queued;
 	}
