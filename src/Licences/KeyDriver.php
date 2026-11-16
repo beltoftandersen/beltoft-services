@@ -11,15 +11,12 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * One subscription and resource per licence. Provision orders the vendor licence for the customer's server address
- * (KeyOrder), pausing keeps it (billed monthly whatever happens), a plan change switches its item, and delete removes it.
+ * (KeyOrder), pausing keeps it while on hold and deletes it once the licence lapsed, a plan change switches its item, and delete removes it.
  * The customer sees the key in My Account (KeyPanel); there are no customer actions.
  */
 final class KeyDriver implements Driver {
 	public const ID   = 'licence-key';
 	public const KIND = 'lickey';
-
-	/** Days a lapsed key is kept before retention deletes it (the vendor bills it monthly meanwhile). */
-	public const DEFAULT_RETENTION_DAYS = 3;
 
 	public function id(): string {
 		return self::ID;
@@ -50,26 +47,12 @@ final class KeyDriver implements Driver {
 		);
 	}
 
-	/**
-	 * Keys have no retention of their own: the server default applies, so a cancelled key is deleted at the vendor after it
-	 * (an explicit 0 on the product still means never). Deletion mode decides whether retention deletes or only reports.
-	 *
-	 * @param mixed $days       Days so far.
-	 * @param mixed $product_id Product or variation id.
-	 * @return mixed
-	 */
-	public static function default_retention( $days, $product_id ) {
-		$driver = \BeltoftServices\Product::driver_for( (int) $product_id );
-
-		return $driver && self::ID === $driver->id() ? self::DEFAULT_RETENTION_DAYS : $days;
-	}
-
 	public function provision( Resource $r ): StepResult {
 		return KeyOrder::provision( $r );
 	}
 
 	public function pause( Resource $r ): StepResult {
-		// A licence on hold or lapsed is kept until retention deletes it: a deleted one would have to be bought again. A revoked one is gone for good.
+		// A licence on hold is kept; one that lapsed (expired, cancelled) or was revoked is deleted at once, a later payment orders a new key.
 		if ( KeyOrder::release_due( $r ) ) {
 			KeyOrder::release( $r );
 		}
@@ -78,7 +61,7 @@ final class KeyDriver implements Driver {
 	}
 
 	public function resume( Resource $r ): StepResult {
-		// The licence was kept while paused; only one that never got its key is looked at again.
+		// A licence kept while on hold is still there; one deleted at the lapse (or without a key) is ordered again.
 		return '' === (string) $r->get( 'lic_key' ) ? $this->provision( $r ) : StepResult::done();
 	}
 

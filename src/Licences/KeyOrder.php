@@ -64,7 +64,6 @@ final class KeyOrder {
 	public static function register(): void {
 		add_action( self::KEY_HOOK, array( __CLASS__, 'run_key' ) );
 		add_action( self::SYNC_HOOK, array( __CLASS__, 'run_sync' ) );
-		add_filter( 'beltoft_services_default_retention', array( KeyDriver::class, 'default_retention' ), 10, 2 );
 		Background::declare(
 			self::KEY_HOOK,
 			array(
@@ -121,10 +120,11 @@ final class KeyOrder {
 	}
 
 	/**
-	 * Must the vendor's licence go now? Only when the licence is gone for good: its resource is being or was deleted, its
-	 * provision failed after the order or its delete failed, or its licence was revoked. A lapse (expired, on hold) keeps
-	 * the vendor licence until retention deletes the resource, and a failed plan change, pause or resume never deletes the
-	 * licence of a customer who still has it paid.
+	 * Must the vendor's licence go now? When the licence lapsed or is gone for good: its resource is being or was deleted,
+	 * its provision failed after the order or its delete failed, or its licence expired or was revoked (owner decision
+	 * 2026-11-16: no grace days, a customer who pays later gets a new key). A licence on hold for a payment retry
+	 * (suspended) is kept, and a failed plan change, pause or resume never deletes the licence of a customer who still
+	 * has it paid.
 	 *
 	 * @param Resource $r Licence resource.
 	 */
@@ -139,7 +139,7 @@ final class KeyOrder {
 			return true;
 		}
 
-		return Licenses::STATUS_REVOKED === Licenses::effective_status( $r->license() );
+		return in_array( Licenses::effective_status( $r->license() ), array( Licenses::STATUS_EXPIRED, Licenses::STATUS_REVOKED ), true );
 	}
 
 	/**

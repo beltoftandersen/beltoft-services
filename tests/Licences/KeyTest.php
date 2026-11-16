@@ -617,7 +617,14 @@ final class KeyTest extends TestCase {
 		$this->assertCount( 1, $this->calls( 'DELETE' ) );
 	}
 
-	public function test_a_revoked_licence_is_deleted_at_the_vendor_and_an_expired_one_is_kept_for_retention(): void {
+	public function test_a_revoked_or_expired_licence_is_deleted_at_once_but_one_on_hold_is_kept(): void {
+		$hold = $this->licence( array( 'ip' => '203.0.113.30' ) );
+		$this->build( $hold );
+		\BeltoftLicenses\Licenses::update( (int) Resource::find( $hold->id() )->license()['id'], array( 'status' => \BeltoftLicenses\Licenses::STATUS_SUSPENDED ) );
+		$this->assertTrue( ( new KeyDriver() )->pause( Resource::find( $hold->id() ) )->is_done() );
+		$this->assertSame( array(), $this->calls( 'DELETE' ), 'A licence on hold for a payment retry is kept.' );
+		$this->assertSame( array(), KeyOrder::sync_due() );
+
 		$expired = $this->licence();
 		$this->build( $expired );
 		$revoked = $this->licence( array( 'ip' => '203.0.113.20' ) );
@@ -626,19 +633,37 @@ final class KeyTest extends TestCase {
 		$revoked = Resource::find( $revoked->id() );
 
 		\BeltoftLicenses\Licenses::update( (int) $expired->license()['id'], array( 'status' => \BeltoftLicenses\Licenses::STATUS_EXPIRED ) );
+		$this->assertSame( array( array( $expired->id() ) ), KeyOrder::sync_due(), 'The watchdog finds an expired licence.' );
 		$this->assertTrue( ( new KeyDriver() )->pause( Resource::find( $expired->id() ) )->is_done() );
-		$this->assertSame( array(), $this->calls( 'DELETE' ), 'A lapse is kept until retention ends.' );
-		$this->assertSame( array(), KeyOrder::sync_due() );
+		$this->assertCount( 1, $this->calls( 'DELETE' ), 'A lapse deletes the vendor licence at once.' );
+		$this->assertSame( 0, (int) Resource::find( $expired->id() )->get( 'lic_key_id' ) );
 
 		\BeltoftLicenses\Licenses::update( (int) $revoked->license()['id'], array( 'status' => \BeltoftLicenses\Licenses::STATUS_REVOKED ) );
 		$this->assertSame( array( array( $revoked->id() ) ), KeyOrder::sync_due(), 'The watchdog finds a revoked licence.' );
 		$this->assertTrue( ( new KeyDriver() )->pause( Resource::find( $revoked->id() ) )->is_done() );
-		$this->assertCount( 1, $this->calls( 'DELETE' ) );
+		$this->assertCount( 2, $this->calls( 'DELETE' ) );
 		$this->assertSame( 0, (int) Resource::find( $revoked->id() )->get( 'lic_key_id' ) );
 	}
 
-	public function test_a_licence_key_product_has_a_default_retention_so_a_cancelled_key_is_deleted_by_retention(): void {
+	public function test_a_customer_who_pays_after_the_licence_was_deleted_gets_a_new_key(): void {
 		$r = $this->licence();
-		$this->assertGreaterThan( 0, Product::retention_days( (int) $r->license()['product_id'] ) );
+		$this->build( $r );
+		$old = (int) Resource::find( $r->id() )->get( 'lic_key_id' );
+		\BeltoftLicenses\Licenses::update( (int) $r->license()['id'], array( 'status' => \BeltoftLicenses\Licenses::STATUS_EXPIRED ) );
+		( new KeyDriver() )->pause( Resource::find( $r->id() ) );
+		$this->assertCount( 1, $this->calls( 'DELETE' ) );
+
+		\BeltoftLicenses\Licenses::update( (int) $r->license()['id'], array( 'status' => \BeltoftLicenses\Licenses::STATUS_ACTIVE ) );
+		$this->assertTrue( ( new KeyDriver() )->resume( Resource::find( $r->id() ) )->is_done() );
+		$again = Resource::find( $r->id() );
+		$this->assertGreaterThan( 0, (int) $again->get( 'lic_key_id' ) );
+		$this->assertNotSame( '', KeyOrder::key_text( $again ) );
+		$this->assertCount( 2, $this->calls( 'POST', '/licenses/plesk' ), 'A second licence was ordered.' );
+		unset( $old );
+	}
+
+	public function test_a_licence_key_product_has_no_default_retention(): void {
+		$r = $this->licence();
+		$this->assertSame( 0, Product::retention_days( (int) $r->license()['product_id'] ) );
 	}
 }
