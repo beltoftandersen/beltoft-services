@@ -235,12 +235,8 @@ final class DnsGuide {
 		$servers = apply_filters( 'beltoft_services_hosting_dns_nameservers', null, $domain );
 
 		if ( null === $servers ) {
-			$found   = @dns_get_record( $domain . '.', DNS_NS ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- a failed lookup is an expected result.
-			$servers = array();
-
-			foreach ( is_array( $found ) ? $found : array() as $ns ) {
-				$servers[] = strtolower( (string) ( $ns['target'] ?? '' ) );
-			}
+			$found   = \BeltoftServices\Domains\PublicDns::resolve( $domain, 'NS' );
+			$servers = is_array( $found ) ? array_map( 'strtolower', $found ) : array();
 		}
 
 		/**

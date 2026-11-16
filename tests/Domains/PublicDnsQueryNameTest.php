@@ -47,4 +47,38 @@ class PublicDnsQueryNameTest extends TestCase {
 		PublicDns::$reader = static fn() => false;
 		$this->assertSame( 'unknown', Delegation::check( 'example.com' ) );
 	}
+
+	public function test_shape_reads_each_type_from_a_canned_resolver_result(): void {
+		$records = array(
+			array( 'type' => 'A', 'ip' => '192.0.2.1' ),
+			array( 'type' => 'AAAA', 'ipv6' => '2001:DB8::1' ),
+			array( 'type' => 'MX', 'pri' => 10, 'target' => 'mail.example.com' ),
+			array( 'type' => 'TXT', 'txt' => 'joined', 'entries' => array( 'v=spf1 ', 'include:x ~all' ) ),
+			array( 'type' => 'TXT', 'txt' => 'plain' ),
+			array( 'type' => 'CNAME', 'target' => 'host.example.net' ),
+			array( 'type' => 'NS', 'target' => 'ns1.example.net' ),
+		);
+		$this->assertSame( array( '192.0.2.1' ), PublicDns::shape( $records, 'A' ) );
+		$this->assertSame( array( '2001:db8::1' ), PublicDns::shape( $records, 'AAAA' ) );
+		$this->assertSame( array( '10 mail.example.com' ), PublicDns::shape( $records, 'MX' ) );
+		$this->assertSame( array( 'v=spf1 include:x ~all', 'plain' ), PublicDns::shape( $records, 'TXT' ) );
+		$this->assertSame( array( 'host.example.net' ), PublicDns::shape( $records, 'CNAME' ) );
+		$this->assertSame( array( 'ns1.example.net' ), PublicDns::shape( $records, 'NS' ) );
+		$this->assertSame( array(), PublicDns::shape( array(), 'A' ) );
+	}
+
+	public function test_resolve_asks_with_a_dot_for_every_type_and_a_failed_lookup_is_dns_transport(): void {
+		foreach ( array( 'A', 'AAAA', 'TXT', 'MX', 'CNAME', 'NS' ) as $type ) {
+			PublicDns::resolve( 'Example.COM', $type );
+		}
+		$this->assertSame( array_fill( 0, 6, 'example.com.' ), $this->asked );
+		PublicDns::$reader = static fn() => false;
+		$this->assertSame( 'dns_transport', PublicDns::resolve( 'example.com', 'TXT' )->get_error_code() );
+	}
+
+	public function test_the_visitor_view_readers_ask_through_the_one_reader(): void {
+		\BeltoftServices\Domains\DnsQuery::addresses( 'Site.Example.com', 'AAAA' );
+		\BeltoftServices\Domains\DnsQuery::texts( 'site.example.com.' );
+		$this->assertSame( array( 'site.example.com.', 'site.example.com.' ), $this->asked );
+	}
 }

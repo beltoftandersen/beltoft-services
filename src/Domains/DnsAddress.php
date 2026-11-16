@@ -51,11 +51,9 @@ final class DnsAddress {
 		$found = apply_filters( 'beltoft_services_dns_resolve', null, $host );
 		if ( ! is_array( $found ) ) {
 			$found = array();
-			foreach ( array( DNS_A => 'ip', DNS_AAAA => 'ipv6' ) as $type => $field ) {
-				$records = PublicDns::records( $host, $type );
-				foreach ( is_array( $records ) ? $records : array() as $record ) {
-					if ( isset( $record[ $field ] ) ) { $found[] = (string) $record[ $field ]; }
-				}
+			foreach ( array( 'A', 'AAAA' ) as $type ) {
+				$values = PublicDns::resolve( $host, $type );
+				$found  = array_merge( $found, is_array( $values ) ? $values : array() );
 			}
 		}
 		$ips = array();
@@ -90,11 +88,8 @@ final class DnsAddress {
 		/** Tests: a non-null array of name server names replaces the system lookup for this zone. */
 		$found = apply_filters( 'beltoft_services_dns_zone_ns', null, $zone );
 		if ( ! is_array( $found ) ) {
-			$found   = array();
-			$records = '' === $zone ? false : PublicDns::records( $zone, DNS_NS );
-			foreach ( is_array( $records ) ? $records : array() as $record ) {
-				if ( isset( $record['target'] ) ) { $found[] = (string) $record['target']; }
-			}
+			$values = '' === $zone ? array() : PublicDns::resolve( $zone, 'NS' );
+			$found  = is_array( $values ) ? $values : array();
 		}
 		$names = array();
 		foreach ( $found as $name ) {

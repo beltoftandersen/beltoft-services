@@ -95,17 +95,9 @@ final class DnsQuery {
 			if ( is_wp_error( $test ) ) { return $test; }
 			return is_array( $test ) ? array_values( array_map( 'strval', $test ) ) : new \WP_Error( 'bad_query', 'Invalid DNS query result.' );
 		}
-		$records = @dns_get_record( rtrim( $name, '.' ) . '.', 'AAAA' === $type ? DNS_AAAA : DNS_A ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- a failed lookup is returned as an error below.
-		if ( false === $records ) {
-			// The system resolver reports "no such name" and "cannot reach a resolver" the same way; both mean not yet.
-			return new \WP_Error( 'dns_transport', 'The name did not resolve.' );
-		}
-		$out = array();
-		foreach ( $records as $record ) {
-			$value = 'AAAA' === $type ? ( $record['ipv6'] ?? '' ) : ( $record['ip'] ?? '' );
-			if ( is_string( $value ) && '' !== $value && $type === ( $record['type'] ?? '' ) ) { $out[] = strtolower( $value ); }
-		}
-		return array_values( array_unique( $out ) );
+		// The system resolver reports "no such name" and "cannot reach a resolver" the same way; both mean not yet.
+		$values = PublicDns::resolve( $name, $type );
+		return is_wp_error( $values ) ? $values : array_values( array_unique( $values ) );
 	}
 
 	/**
@@ -121,14 +113,7 @@ final class DnsQuery {
 			if ( is_wp_error( $test ) ) { return $test; }
 			return is_array( $test ) ? array_values( array_map( 'strval', $test ) ) : new \WP_Error( 'bad_query', 'Invalid DNS query result.' );
 		}
-		$records = @dns_get_record( rtrim( $name, '.' ) . '.', DNS_TXT ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- a failed lookup is returned as an error below.
-		if ( false === $records ) {
-			return new \WP_Error( 'dns_transport', 'The name did not resolve.' );
-		}
-		$out = array();
-		foreach ( $records as $record ) {
-			if ( 'TXT' === ( $record['type'] ?? '' ) && isset( $record['txt'] ) && is_string( $record['txt'] ) ) { $out[] = $record['txt']; }
-		}
-		return array_values( array_unique( $out ) );
+		$values = PublicDns::resolve( $name, 'TXT' );
+		return is_wp_error( $values ) ? $values : array_values( array_unique( $values ) );
 	}
 }
