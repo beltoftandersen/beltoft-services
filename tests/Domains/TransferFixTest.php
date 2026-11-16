@@ -244,11 +244,9 @@ class TransferFixTest extends TestCase {
 	}
 
 	private function render( Resource $r ): string {
-		$dns_only         = false;
-		$zone_unavailable = false;
-		$rows             = array();
+		$d = \BeltoftServices\Account\DomainPage::build( $r, array( 'license' => $r->license(), 'tab' => '' ) );
 		ob_start();
-		include BELTOFT_SERVICES_PATH . 'templates/account/domain.php';
+		include BELTOFT_SERVICES_PATH . 'templates/account/domain-page.php';
 		return (string) ob_get_clean();
 	}
 

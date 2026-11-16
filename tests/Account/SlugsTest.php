@@ -153,8 +153,8 @@ class SlugsTest extends TestCase {
 		$domain = $this->domain( $this->user, 'Example.dk' );
 
 		$this->assertSame( 'example.dk', $this->slug( $domain ) );
-		$this->assertMatchesRegularExpression( '#domains(/|=)example\.dk/?$#', rawurldecode( Domains::url( $domain->license() ) ) );
-		$this->assertMatchesRegularExpression( '#domains(/|=)example\.dk(/|%2F)dns/?$#', Domains::url( $domain->license(), 'dns' ) );
+		$this->assertMatchesRegularExpression( '#domains(/|=)example\.dk/?$#', rawurldecode( ServiceArea::get( Domains::class )->url( $domain->license() ) ) );
+		$this->assertMatchesRegularExpression( '#domains(/|=)example\.dk(/|%2F)dns/?$#', ServiceArea::get( Domains::class )->url( $domain->license(), 'dns' ) );
 	}
 
 	public function test_reserved_words_and_numbers_are_skipped(): void {
@@ -179,7 +179,7 @@ class SlugsTest extends TestCase {
 
 	public function test_a_license_that_is_not_a_service_with_a_page_has_no_slug_and_uses_its_id(): void {
 		$this->assertSame( '', Slugs::for_license( array( 'id' => 424242 ) ) );
-		$this->assertMatchesRegularExpression( '#domains(/|=)42/?$#', rawurldecode( Domains::url( array( 'id' => 42 ) ) ) );
+		$this->assertMatchesRegularExpression( '#domains(/|=)42/?$#', rawurldecode( ServiceArea::get( Domains::class )->url( array( 'id' => 42 ) ) ) );
 	}
 
 	// -- Resolution ----------------------------------------------------------------------------
@@ -209,7 +209,7 @@ class SlugsTest extends TestCase {
 		$this->go( 'databases', 'new' );
 		$this->assertTrue( ServiceArea::get( Databases::class )->is_new() );
 		$this->go( 'domains', 'add' );
-		$this->assertTrue( Domains::requested()['add'] );
+		$this->assertTrue( ServiceArea::get( Domains::class )->requested()['add'] );
 	}
 
 	public function test_a_slug_of_another_customers_service_is_not_found(): void {
@@ -259,7 +259,7 @@ class SlugsTest extends TestCase {
 		$domain = $this->domain( $this->user, 'example.dk' );
 		$this->slug( $domain );
 		$this->go( 'domains', 'example.dk/dns' );
-		$this->assertSame( array( (int) $domain->license()['id'], 'dns' ), array( Domains::requested()['id'], Domains::requested()['tab'] ) );
+		$this->assertSame( array( (int) $domain->license()['id'], 'dns' ), array( ServiceArea::get( Domains::class )->requested()['id'], ServiceArea::get( Domains::class )->requested()['tab'] ) );
 
 		$this->go( 'databases', 'nope' );
 		ob_start();
@@ -297,7 +297,7 @@ class SlugsTest extends TestCase {
 		$this->assertStringContainsString( 'orders-db', $area->url( $db->license() ) );
 
 		$this->go( 'domains', (string) $domain->license()['id'] );
-		$this->assertSame( Domains::url( $domain->license() ), Slugs::redirect_target( 'domains', 'domains', array( Domains::class, 'url' ) ) );
+		$this->assertSame( ServiceArea::get( Domains::class )->url( $domain->license() ), Slugs::redirect_target( 'domains', 'domains', array( ServiceArea::get( Domains::class ), 'url' ) ) );
 	}
 
 	// -- Links ---------------------------------------------------------------------------------
@@ -309,7 +309,7 @@ class SlugsTest extends TestCase {
 		$area   = ServiceArea::get( Databases::class );
 
 		$this->assertSame( $area->url( $db->license() ), $area->row( $this->views( $db )[0], $db )['url'] );
-		$this->assertSame( Domains::url( $domain->license() ), DomainRows::row( $this->views( $domain )[0], $domain )['url'] );
+		$this->assertSame( ServiceArea::get( Domains::class )->url( $domain->license() ), DomainRows::row( $this->views( $domain )[0], $domain )['url'] );
 
 		// The link of the email's "view in your account" button, as the email's template values carry it.
 		$property = new \ReflectionProperty( ServiceEmail::class, 'values' );
@@ -323,7 +323,7 @@ class SlugsTest extends TestCase {
 
 		$this->assertSame( ServerLinks::url( $server->license() ), $link( $server ) );
 		$this->assertSame( $area->url( $db->license() ), $link( $db ) );
-		$this->assertSame( Domains::url( $domain->license() ), $link( $domain ) );
+		$this->assertSame( ServiceArea::get( Domains::class )->url( $domain->license() ), $link( $domain ) );
 		$this->assertStringNotContainsString( '/' . $server->license()['id'] . '/', ServerLinks::url( $server->license() ) );
 	}
 

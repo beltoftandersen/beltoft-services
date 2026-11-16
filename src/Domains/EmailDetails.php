@@ -75,7 +75,7 @@ final class EmailDetails {
 	private static function domains_url( Resource $r, $license ): string {
 		// A deleted service has no page: its email sends to the list.
 		if ( is_array( $license ) && ! empty( $license['id'] ) && in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
-			return \BeltoftServices\Account\Domains::url( $license );
+			return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Domains::class )->url( $license );
 		}
 
 		return function_exists( 'wc_get_account_endpoint_url' ) ? wc_get_account_endpoint_url( 'domains' ) : '';

@@ -13,4 +13,4 @@
 
 defined( 'ABSPATH' ) || exit;
 
-\BeltoftServices\Account\Domains::render( $licenses, isset( $empty ) ? (string) $empty : '' );
+\BeltoftServices\Account\ServiceArea::render_active( $licenses, isset( $empty ) ? (string) $empty : '' );

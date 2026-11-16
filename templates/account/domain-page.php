@@ -22,7 +22,7 @@ $beltoft_tabs   = $d['tabs'];
 $beltoft_active = $d['active'];
 $beltoft_next   = \BeltoftServices\Account\DomainPage::next_step( $d );
 $beltoft_link   = static function ( string $slug ) use ( $d ): string {
-	return \BeltoftServices\Account\Domains::url( $d['license'], 'overview' === $slug ? '' : $slug );
+	return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Domains::class )->url( $d['license'], 'overview' === $slug ? '' : $slug );
 };
 $beltoft_open   = static function ( string $slug ) use ( $beltoft_active, $r ): void {
 	?>
@@ -76,7 +76,7 @@ if ( $d['dns_only'] ) {
 			<p class="beltoft-services-domain__note"><?php esc_html_e( 'This domain uses DNSSEC at your registrar. Remove the DS record there before you change the name servers, then wait a day.', 'beltoft-services' ); ?></p>
 		<?php endif; ?>
 		<?php if ( $d['fix'] ) : ?>
-			<?php $beltoft_fix = $d['fix']; include \BeltoftServices\Account\Domains::file( 'domain-fix.php' ); ?>
+			<?php $beltoft_fix = $d['fix']; include \BeltoftServices\Account\ServiceArea::file( 'domain-fix.php' ); ?>
 		<?php endif; ?>
 		<?php if ( $d['transfer'] && ! $d['transfer']['in_use'] ) : ?>
 			<p class="beltoft-services-domain__note">
@@ -308,7 +308,7 @@ if ( $d['dns_only'] ) {
 							<form class="beltoft-services-domain-form" data-domain-action="lock"><button type="submit" class="beltoft-services-domain__link"><?php esc_html_e( 'Lock again', 'beltoft-services' ); ?></button></form>
 						<?php endif; ?>
 					</div>
-					<?php include \BeltoftServices\Account\Domains::file( 'domain-stepup.php' ); ?>
+					<?php include \BeltoftServices\Account\ServiceArea::file( 'domain-stepup.php' ); ?>
 					<div class="beltoft-services-domain__code" hidden>
 						<label class="screen-reader-text" for="beltoft-domain-code-<?php echo esc_attr( (string) $r->id() ); ?>"><?php esc_html_e( 'Transfer code', 'beltoft-services' ); ?></label>
 						<input type="text" readonly class="beltoft-services-domain-code" id="beltoft-domain-code-<?php echo esc_attr( (string) $r->id() ); ?>" value="" autocomplete="off" spellcheck="false">

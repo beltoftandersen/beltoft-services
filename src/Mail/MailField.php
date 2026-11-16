@@ -314,7 +314,7 @@ final class MailField {
 		echo '<span class="woocommerce-input-wrapper"><input type="text" class="input-text" name="' . esc_attr( $name ) . '[own]" id="' . esc_attr( $id ) . '_own" maxlength="253" autocomplete="off" spellcheck="false" placeholder="' . esc_attr( /* translators: example domain shown in an empty field; use the usual example for your language. */ __( 'example.com', 'beltoft-services' ) ) . '" value="' . esc_attr( $own ) . '"></span>';
 		echo '<span class="description">' . esc_html__( 'You add the DNS records where the domain is hosted. We show you which ones after the order, and we first ask for a TXT record that proves the domain is yours.', 'beltoft-services' ) . '</span></p>';
 
-		$find = $news ? '' : (string) \BeltoftServices\Account\Domains::url_register();
+		$find = $news ? '' : (string) \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Domains::class )->url_register();
 
 		if ( '' !== $find ) {
 			echo '<p class="beltoft-services-mail-field__find">' . esc_html__( 'No domain yet?', 'beltoft-services' ) . ' <a href="' . esc_url( $find ) . '">' . esc_html__( 'Find one', 'beltoft-services' ) . '</a></p>';

@@ -6,6 +6,7 @@ namespace BeltoftServices\Apps;
 use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\ServerTabHooks;
 use BeltoftServices\Account\Domains;
+use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Resource;
 use BeltoftServices\Domains\ZoneAccess;
 
@@ -233,7 +234,7 @@ final class AppTab {
 			foreach ( \BeltoftLicenses\Licenses::where( 'user_id', $user ) as $license ) {
 				$domain_resource = Resource::for_license( (int) $license['id'] );
 				if ( $domain_resource && strtolower( (string) $domain_resource->get( 'domain' ) ) === $left['zone'] && ZoneAccess::editable( $domain_resource, $user ) ) {
-					$left_url = Domains::url( $license, 'dns' );
+					$left_url = ServiceArea::get( Domains::class )->url( $license, 'dns' );
 					break;
 				}
 			}
@@ -301,7 +302,7 @@ final class AppTab {
 				foreach ( \BeltoftLicenses\Licenses::where( 'user_id', $user ) as $license ) {
 					$domain = Resource::for_license( (int) $license['id'] );
 					if ( $domain && strtolower( (string) $domain->get( 'domain' ) ) === (string) ( $left['zone'] ?? '' ) && ZoneAccess::editable( $domain, $user ) ) {
-						$url = Domains::url( $license, 'dns' );
+						$url = ServiceArea::get( Domains::class )->url( $license, 'dns' );
 						break;
 					}
 				}

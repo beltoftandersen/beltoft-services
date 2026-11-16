@@ -29,7 +29,7 @@ final class Email extends ServiceArea {
 	 * @return mixed
 	 */
 	public static function menu( $items ) {
-		return self::move_after( $items, ServiceArea::get( self::class )->slug(), Domains::slug() );
+		return self::move_after( $items, ServiceArea::get( self::class )->slug(), ServiceArea::get( Domains::class )->slug() );
 	}
 
 	/**

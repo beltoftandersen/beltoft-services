@@ -166,8 +166,6 @@ final class Plugin {
 		Account\Tabs::register();
 		Account\Slugs::register();
 		Account\Servers::register();
-		Account\Domains::register();
-		Account\DomainPage::register();
 		Account\ServiceArea::register();
 		Account\DomainDanger::register();
 		Account\ServerPicker::register();

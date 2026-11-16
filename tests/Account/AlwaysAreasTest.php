@@ -56,7 +56,7 @@ class AlwaysAreasTest extends TestCase {
 				Servers::render( array() );
 				break;
 			case 'domains':
-				Domains::render( array() );
+				ServiceArea::get( Domains::class )->render( array() );
 				break;
 			case 'databases':
 				ServiceArea::get( Databases::class )->render( array() );
@@ -128,7 +128,7 @@ class AlwaysAreasTest extends TestCase {
 		$this->product( 'domain' );
 		$this->settings( array( 'domain_search_url' => '/domains/' ) );
 
-		$this->assertSame( home_url( '/domains/' ), Domains::url_register() );
+		$this->assertSame( home_url( '/domains/' ), ServiceArea::get( Domains::class )->url_register() );
 	}
 
 	public function test_the_overview_shows_every_area_empty_with_its_button(): void {

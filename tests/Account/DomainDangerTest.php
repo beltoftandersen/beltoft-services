@@ -5,6 +5,7 @@ namespace BeltoftServices\Tests\Account;
 use BeltoftLicenses\Account\View;
 use BeltoftServices\Account\DomainDanger;
 use BeltoftServices\Account\Domains;
+use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Domains\DnsDriver;
 use BeltoftServices\Domains\DomainDriver;
 use BeltoftServices\Domains\FakeDns;
@@ -73,7 +74,7 @@ class DomainDangerTest extends TestCase {
 	private function page( Resource $r, string $tab = 'danger' ): string {
 		$GLOBALS['wp']->query_vars['domains'] = (string) $r->license()['id'] . '/' . $tab;
 		ob_start();
-		Domains::render( array( View::license( $r->license() ) ) );
+		ServiceArea::get( Domains::class )->render( array( View::license( $r->license() ) ) );
 		return (string) ob_get_clean();
 	}
 
@@ -177,7 +178,7 @@ class DomainDangerTest extends TestCase {
 		$this->assertContains( wcs_get_subscription( $sub->get_id() )->get_status(), array( 'cancelled', 'pending-cancel' ) );
 		$notes = implode( ' ', array_map( static fn( $n ) => $n->content, wc_get_order_notes( array( 'order_id' => $sub->get_id() ) ) ) );
 		$this->assertStringContainsString( 'cancelled by the subscriber from their account page', $notes );
-		$this->assertSame( Domains::url_list(), $done['redirect'] );
+		$this->assertSame( ServiceArea::get( Domains::class )->url_list(), $done['redirect'] );
 	}
 
 	public function test_stop_hosting_accepts_the_unicode_or_the_punycode_name(): void {
@@ -210,8 +211,8 @@ class DomainDangerTest extends TestCase {
 		$r    = $this->service( $this->user, 'one.example', 'domain', $sub );
 		$lic  = \BeltoftLicenses\Licenses::find( (int) $r->license()['id'] );
 		\BeltoftLicenses\Licenses::update( (int) $lic['id'], array( 'order_id' => 4242 ) );
-		$this->assertSame( Domains::url( $r->license() ), Domains::url_for_order( 4242, array( 'one.example' ) ) );
-		$this->assertSame( Domains::url_list(), Domains::url_for_order( 4242, array( 'one.example', 'two.example' ) ) );
-		$this->assertSame( Domains::url_list(), Domains::url_for_order( 4242, array( 'nope.example' ) ) );
+		$this->assertSame( ServiceArea::get( Domains::class )->url( $r->license() ), ServiceArea::get( Domains::class )->url_for_order( 4242, array( 'one.example' ) ) );
+		$this->assertSame( ServiceArea::get( Domains::class )->url_list(), ServiceArea::get( Domains::class )->url_for_order( 4242, array( 'one.example', 'two.example' ) ) );
+		$this->assertSame( ServiceArea::get( Domains::class )->url_list(), ServiceArea::get( Domains::class )->url_for_order( 4242, array( 'nope.example' ) ) );
 	}
 }

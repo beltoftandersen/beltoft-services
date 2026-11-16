@@ -64,10 +64,6 @@ final class Slugs {
 			return 'servers';
 		}
 
-		if ( Domains::is_domain( $license ) ) {
-			return 'domains';
-		}
-
 		foreach ( ServiceArea::all() as $area ) {
 			if ( $area->is_member( $license ) ) {
 				return $area->key_name();
@@ -261,10 +257,6 @@ final class Slugs {
 	private static function tabs_of( string $type ): array {
 		if ( 'servers' === $type ) {
 			return array_merge( ServerLinks::tabs(), array( 'overview' ) );
-		}
-
-		if ( 'domains' === $type ) {
-			return array_merge( Domains::tabs(), array( 'overview' ) );
 		}
 
 		foreach ( ServiceArea::all() as $area ) {
