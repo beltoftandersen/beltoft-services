@@ -13,12 +13,11 @@ use BeltoftServices\Background;
 use BeltoftServices\Crypto;
 use BeltoftServices\Domains\Client as RegistrarClient;
 use BeltoftServices\Domains\Clients as RegistrarClients;
-use BeltoftServices\Domains\LiveClient;
+use BeltoftServices\Domains\LicenceVendor;
 use BeltoftServices\Domains\SpendGuard;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\Apps\AppLicence;
-use BeltoftServices\Apps\PleskLicence;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
 
@@ -97,11 +96,11 @@ final class KeyOrder {
 	}
 
 	private static function client(): RegistrarClient {
-		return RegistrarClients::registrar();
+		return LicenceVendor::client();
 	}
 
 	private static function transient( \WP_Error $error ): bool {
-		return LiveClient::is_transient( $error ) || 'credentials_missing' === $error->get_error_code();
+		return LicenceVendor::transient( $error );
 	}
 
 	/**
@@ -151,7 +150,7 @@ final class KeyOrder {
 		$stored = (string) $r->get( 'lic_key' );
 		$plain  = '' === $stored ? null : Crypto::decrypt( $stored );
 
-		return is_string( $plain ) ? PleskLicence::normalise_key( $plain ) : '';
+		return is_string( $plain ) ? LicenceVendor::normalise_key( $plain ) : '';
 	}
 
 	/**
@@ -492,7 +491,7 @@ final class KeyOrder {
 			}
 		}
 
-		$key = is_array( $reply ) ? PleskLicence::normalise_key( (string) ( $reply['key'] ?? '' ) ) : '';
+		$key = is_array( $reply ) ? LicenceVendor::normalise_key( (string) ( $reply['key'] ?? '' ) ) : '';
 
 		if ( '' === $key && is_array( $info ) && is_string( $info['activation_code'] ?? null ) ) {
 			$key = trim( $info['activation_code'] );
@@ -633,7 +632,7 @@ final class KeyOrder {
 
 		$reply = self::client()->request( 'DELETE', '/licenses/plesk/' . $id );
 
-		if ( ! is_wp_error( $reply ) || PleskLicence::gone( $reply ) ) {
+		if ( ! is_wp_error( $reply ) || LicenceVendor::gone( $reply ) ) {
 			$r->set( array( 'lic_key_id' => null, 'lic_key' => null, 'lic_state' => null, 'lic_deleted' => time(), 'lic_tries' => null, 'lic_delete_tries' => null ) );
 
 			return true;

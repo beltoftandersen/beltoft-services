@@ -14,7 +14,7 @@ use BeltoftServices\Domains\Client as RegistrarClient;
 use BeltoftServices\Domains\Clients as RegistrarClients;
 use BeltoftServices\Domains\DomainSettings;
 use BeltoftServices\Domains\LicenceCatalog;
-use BeltoftServices\Domains\LiveClient;
+use BeltoftServices\Domains\LicenceVendor;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Network\IpPool;
@@ -177,23 +177,20 @@ final class PleskLicence {
 	}
 
 	/**
-	 * Does an error say the licence does not exist? Openprovider answers HTTP 404 with its own code op_3108 ("License not
-	 * found"), which the client reports as op_3108, never as http_404.
+	 * Does an error say the licence does not exist? (Kept for callers and tests; the rule is LicenceVendor::gone().)
 	 *
 	 * @param \WP_Error $error Error.
 	 */
 	public static function gone( \WP_Error $error ): bool {
-		$data = $error->get_error_data();
-
-		return 'op_3108' === $error->get_error_code() || 'http_404' === $error->get_error_code() || ( is_array( $data ) && 404 === (int) ( $data['status'] ?? 0 ) );
+		return LicenceVendor::gone( $error );
 	}
 
 	private static function client(): RegistrarClient {
-		return RegistrarClients::registrar();
+		return LicenceVendor::client();
 	}
 
 	private static function transient( \WP_Error $error ): bool {
-		return LiveClient::is_transient( $error ) || 'credentials_missing' === $error->get_error_code();
+		return LicenceVendor::transient( $error );
 	}
 
 	/**
@@ -205,27 +202,16 @@ final class PleskLicence {
 		$stored = (string) $licence->get( 'plesk_key' );
 		$plain  = '' === $stored ? null : Crypto::decrypt( $stored );
 
-		return is_string( $plain ) ? self::normalise_key( $plain ) : '';
+		return is_string( $plain ) ? LicenceVendor::normalise_key( $plain ) : '';
 	}
 
 	/**
-	 * The key as the guest can install it. Openprovider answers with the Plesk key FILE base64 encoded (one long line of
-	 * about 17 000 characters, no markup), which `plesk bin license --install` cannot read and the guest script refused
-	 * (it takes the XML itself, or an activation code of up to 64 characters): a Plesk that stayed on its trial although
-	 * the licence was paid. The XML is what is stored and sent; an activation code is left alone.
+	 * The key as the guest can install it (the rule is LicenceVendor::normalise_key(); kept as the public entry tests call).
 	 *
 	 * @param string $key What Openprovider sent, or what was stored earlier.
 	 */
 	public static function normalise_key( string $key ): string {
-		$key = trim( $key );
-
-		if ( '' === $key || '<' === $key[0] || strlen( $key ) <= 64 || 1 !== preg_match( '/^[A-Za-z0-9+\/=\r\n]+$/D', $key ) ) {
-			return $key;
-		}
-
-		$decoded = base64_decode( (string) preg_replace( '/\s+/', '', $key ), true );
-
-		return false !== $decoded && 1 === preg_match( '/^\s*</', $decoded ) ? trim( $decoded ) : $key;
+		return LicenceVendor::normalise_key( $key );
 	}
 
 	/**
@@ -497,7 +483,7 @@ final class PleskLicence {
 		}
 
 		$reply = self::client()->request( 'GET', '/licenses/plesk/key/' . $key_id );
-		$key   = is_wp_error( $reply ) ? '' : self::normalise_key( (string) ( $reply['key'] ?? '' ) );
+		$key   = is_wp_error( $reply ) ? '' : LicenceVendor::normalise_key( (string) ( $reply['key'] ?? '' ) );
 
 		if ( '' === $key || strlen( $key ) > 60000 ) {
 			return false;

@@ -11,7 +11,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Core (src/*.php) must not depend on feature namespaces; Mail not on Proxmox; Proxmox not on Mcp;
- * Domains not on Proxmox, Mail or Mcp. Today's violations are listed in ALLOWED so the test passes now
+ * Domains not on Proxmox, Mail, Mcp, Apps or Licences. Today's violations are listed in ALLOWED so the test passes now
  * and stops new ones (Plugin.php, the composition root, is exempt); remove an entry when the leak is fixed (a stale entry fails the test).
  *
  * FEATURES lists every feature folder (widened 2026-11 to Hosting, Ssl, Licences, Credit (since removed), Card, Admin and Cli; the widening found no new leak).
@@ -35,7 +35,7 @@ class DependencyDirectionTest extends TestCase {
 		'Mail'    => array( 'Proxmox', 'Hosting' ),
 		'Ssl'     => array( 'Mail' ),
 		'Proxmox' => array( 'Mcp' ),
-		'Domains' => array( 'Proxmox', 'Mail', 'Mcp' ),
+		'Domains' => array( 'Proxmox', 'Mail', 'Mcp', 'Apps', 'Licences' ),
 	);
 
 	/**
