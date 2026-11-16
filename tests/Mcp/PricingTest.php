@@ -185,7 +185,7 @@ final class PricingTest extends UsageTestCase {
 
 	public function test_billing_summary_says_card_credit_and_usage(): void {
 		if ( ! class_exists( '\Bgca\Plugin' ) || ! \Bgca\Plugin::requirements_met() ) {
-			$this->markTestSkipped( 'The gift card plugin and its add-on are not loaded.' );
+			$this->environment_missing( 'The gift card plugin and its add-on are not loaded.' );
 		}
 
 		$none = $this->call( 'billing_summary' )['account'];

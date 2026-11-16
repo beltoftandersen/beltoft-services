@@ -180,11 +180,16 @@ class DiskCapacityTest extends BackupTestCase {
 	public function test_a_failing_mailer_never_fails_a_wait(): void {
 		$server = $this->ready_vm();
 		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
-		add_filter( 'pre_wp_mail', static function () {
-			throw new \RuntimeException( 'mailer down' );
-		} );
+		$tried = 0;
+		add_filter(
+			'pre_wp_mail',
+			static function () use ( &$tried ) {
+				++$tried;
+				throw new \RuntimeException( 'mailer down' );
+			}
+		);
 		$disk = $this->disk_resource( $server );
 		DiskCapacity::wait_alert( $disk, 'create', 'lab', 'node-a', 'disk-store', 50 );
-		$this->assertTrue( true );
+		$this->assertSame( 1, $tried, 'The mail was tried, and its failure was swallowed.' );
 	}
 }

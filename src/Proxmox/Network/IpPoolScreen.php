@@ -82,10 +82,11 @@ final class IpPoolScreen {
 	 * @return array{0: string, 1: string}
 	 */
 	private static function release( string $address, string $confirm ): array {
-		foreach ( IpPool::rows() as $row ) {
-			if ( $row['address'] !== $address ) {
-				continue;
-			}
+		// One address is looked up, not the whole pool.
+		$row = IpPool::find( $address );
+
+		if ( null !== $row ) {
+			$row['leftover'] = IpPool::leftover( $row );
 
 			if ( '' === $row['leftover'] ) {
 				return array( 'error', __( 'That address is not a leftover of a failed or closed service.', 'beltoft-services' ) );

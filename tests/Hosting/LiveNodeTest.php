@@ -52,8 +52,7 @@ class LiveNodeTest extends HostingCase {
 	public function test_the_live_client_refuses_bad_settings_and_no_allowance(): void {
 		$base = array( 'api_url' => 'https://node.example.invalid:8006', 'token_id' => 'svc@pve!hosting', 'token_secret' => self::NODE_SECRET );
 
-		new LiveClient( $base, true );
-		$this->assertTrue( true );
+		$this->assertInstanceOf( LiveClient::class, new LiveClient( $base, true ), 'Good settings with the allowance build a client.' );
 
 		foreach ( array( 'allowance' => array( $base, false ), 'http' => array( array_merge( $base, array( 'api_url' => 'http://x.invalid' ) ), true ), 'token' => array( array_merge( $base, array( 'token_id' => 'nope' ) ), true ), 'secret' => array( array_merge( $base, array( 'token_secret' => '' ) ), true ), 'pin' => array( array_merge( $base, array( 'pin_sha256' => 'abc' ) ), true ) ) as $name => $case ) {
 			try {

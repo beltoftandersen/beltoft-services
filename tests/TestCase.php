@@ -37,6 +37,21 @@ abstract class TestCase extends \WP_UnitTestCase {
 	 */
 	protected $pauses = array();
 
+	/**
+	 * A test that needs something outside this repository (a sibling plugin, a node, a file) that is not there.
+	 * Skips with the reason in the output; with BELTOFT_TESTS_STRICT=1 (a release check, CI) it fails instead, so a
+	 * green run cannot hide that a whole area was not exercised.
+	 *
+	 * @param string $why What is missing.
+	 */
+	protected function environment_missing( string $why ): void {
+		if ( getenv( 'BELTOFT_TESTS_STRICT' ) ) {
+			$this->fail( 'Missing test environment (BELTOFT_TESTS_STRICT is set): ' . $why );
+		}
+
+		$this->markTestSkipped( 'MISSING ENVIRONMENT: ' . $why );
+	}
+
 	public function set_up(): void {
 		parent::set_up();
 		// The hosting usage memo outlives a test; the tables and options behind it are reset around each one.

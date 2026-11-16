@@ -82,6 +82,20 @@ final class MailDriverTest extends MailTestCase {
 		$this->assertSame( 'That domain already has email here.', \BeltoftServices\Mail\MailDomain::refusal( 'claim.example' ) );
 	}
 
+	public function test_asking_whether_a_name_is_taken_does_not_load_every_mail_service(): void {
+		global $wpdb;
+
+		for ( $i = 0; $i < 12; $i++ ) {
+			$this->ready_mail( 'other' . $i . '.example' );
+		}
+		$this->ready_mail( 'wanted.example' );
+
+		$before = $wpdb->num_queries;
+		$this->assertTrue( \BeltoftServices\Mail\MailDomain::taken( 'wanted.example' ) );
+		$this->assertFalse( \BeltoftServices\Mail\MailDomain::taken( 'nobody.example' ) );
+		$this->assertLessThan( 12, $wpdb->num_queries - $before, 'Two lookups cost a few queries, not one per mail service.' );
+	}
+
 	public function test_the_second_claim_fails_once_the_first_has_proved(): void {
 		$first  = $this->mail_resource( 'race.example' );
 		$second = $this->mail_resource( 'race.example' );

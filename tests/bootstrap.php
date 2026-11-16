@@ -26,6 +26,12 @@ $beltoft_services_giftcards = file_exists( $beltoft_services_giftcards . '/belto
 $beltoft_services_account = getenv( 'BELTOFT_GIFT_CARDS_ACCOUNT_DIR' ) ? getenv( 'BELTOFT_GIFT_CARDS_ACCOUNT_DIR' ) : dirname( __DIR__, 2 ) . '/beltoft-gift-cards-account';
 $beltoft_services_account = '' !== $beltoft_services_giftcards && file_exists( $beltoft_services_account . '/beltoft-gift-cards-account.php' ) ? $beltoft_services_account : '';
 
+// BELTOFT_TESTS_STRICT=1 (release check, CI): a missing optional sibling plugin stops the run instead of skipping its tests.
+if ( getenv( 'BELTOFT_TESTS_STRICT' ) && ( '' === $beltoft_services_giftcards || '' === $beltoft_services_account ) ) {
+	fwrite( STDERR, "Test bootstrap: BELTOFT_TESTS_STRICT is set and beltoft-gift-cards or its account add-on was not found (BELTOFT_GIFT_CARDS_DIR, BELTOFT_GIFT_CARDS_ACCOUNT_DIR).\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite
+	exit( 1 );
+}
+
 require_once $beltoft_services_tests_dir . '/includes/functions.php';
 
 foreach ( array( 'woocommerce/woocommerce.php', 'woocommerce-subscriptions/woocommerce-subscriptions.php' ) as $beltoft_services_required ) {

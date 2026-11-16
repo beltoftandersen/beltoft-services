@@ -62,6 +62,14 @@ class AddonsTest extends HostingCase {
 	}
 
 	public function tear_down(): void {
+		foreach ( $this->held_connections as $c ) {
+			try {
+				$c->close();
+			} catch ( \Throwable $e ) { // Already closed by the test.
+				unset( $e );
+			}
+		}
+		$this->held_connections = array();
 		$this->fake_currency_down();
 		remove_all_filters( 'beltoft_services_mail_client' );
 		remove_all_filters( 'beltoft_services_dns_proof_result' );
@@ -829,23 +837,65 @@ class AddonsTest extends HostingCase {
 	 */
 	private function hold_elsewhere( string $name ): \mysqli {
 		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection holds the lock.
-		$held  = $other->query( "SELECT GET_LOCK('" . $other->real_escape_string( $name ) . "', 0)" );
+		// MySQL locks are server wide: a connection of an earlier run may still be going away, so wait a moment for it.
+		$held = $other->query( "SELECT GET_LOCK('" . $other->real_escape_string( $name ) . "', 3)" );
 		$this->assertSame( '1', $held->fetch_row()[0], 'The second connection holds the lock.' );
+
+		// A failing assertion must not leave the lock held for the next test.
+		$this->track_connection( $other );
 
 		return $other;
 	}
+
+	/**
+	 * Lets the second connection go and waits until the server has released its lock (it does that after close(), not at it).
+	 *
+	 * @param \mysqli $other The connection from hold_elsewhere().
+	 * @param string  $name  Lock name.
+	 */
+	private function release_elsewhere( \mysqli $other, string $name ): void {
+		$other->close();
+
+		global $wpdb;
+		for ( $i = 0; $i < 50; $i++ ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- named lock probe.
+			if ( '1' === (string) $wpdb->get_var( $wpdb->prepare( 'SELECT IS_FREE_LOCK(%s)', $name ) ) ) {
+				return;
+			}
+			usleep( 100000 );
+		}
+
+		$this->fail( 'The server did not release the lock after the second connection closed.' );
+	}
+
+	/**
+	 * Closes a held connection at the end of the test if the test did not.
+	 *
+	 * @param \mysqli $other Connection.
+	 */
+	private function track_connection( \mysqli $other ): void {
+		$this->held_connections[] = $other;
+	}
+
+	/**
+	 * Second connections still open.
+	 *
+	 * @var \mysqli[]
+	 */
+	private $held_connections = array();
 
 	public function test_an_order_being_activated_elsewhere_is_not_activated_here_too(): void {
 		add_filter( 'beltoft_services_addon_lock_wait', '__return_zero' );
 		$r      = $this->account();
 		$bought = Addons::buy( $r, Addons::KIND_DOMAIN, 'second.example' );
-		$other  = $this->hold_elsewhere( \BeltoftServices\Locks::name( 'addon_order', $bought['order'] ) );
+		$name   = \BeltoftServices\Locks::name( 'addon_order', $bought['order'] );
+		$other  = $this->hold_elsewhere( $name );
 
 		wc_get_order( $bought['order'] )->payment_complete();
 		$this->assertSame( array(), Addons::lines( $r, Addons::KIND_DOMAIN ), 'The other process owns this order, so no line is added here.' );
 		$this->assertTrue( \BeltoftServices\Jobs::pending_action( Addons::ACTIVATE_RETRY_HOOK, array( (int) $bought['order'] ) ), 'One retry is queued in case the other process stops half way.' );
 
-		$other->close();
+		$this->release_elsewhere( $other, $name );
 		do_action( Addons::ACTIVATE_RETRY_HOOK, (int) $bought['order'] );
 		$this->assertCount( 1, Addons::lines( $r, Addons::KIND_DOMAIN ), 'Free again: it is added once.' );
 		remove_filter( 'beltoft_services_addon_lock_wait', '__return_zero' );
@@ -854,12 +904,13 @@ class AddonsTest extends HostingCase {
 	public function test_a_purchase_that_is_being_made_elsewhere_makes_no_second_order(): void {
 		add_filter( 'beltoft_services_addon_lock_wait', '__return_zero' );
 		$r     = $this->account();
-		$other = $this->hold_elsewhere( \BeltoftServices\Locks::name( 'addon_buy', $r->id() ) );
+		$name  = \BeltoftServices\Locks::name( 'addon_buy', $r->id() );
+		$other = $this->hold_elsewhere( $name );
 
 		$this->assertSame( 'busy', Addons::buy( $r, Addons::KIND_DOMAIN, 'second.example' )->get_error_code() );
 		$this->assertCount( 0, wc_get_orders( array( 'limit' => -1, 'created_via' => 'beltoft_services_addon' ) ) );
 
-		$other->close();
+		$this->release_elsewhere( $other, $name );
 		$this->assertSame( 'pay', Addons::buy( $r, Addons::KIND_DOMAIN, 'second.example' )['status'] );
 		remove_filter( 'beltoft_services_addon_lock_wait', '__return_zero' );
 	}

@@ -69,7 +69,8 @@ final class MailDomain {
 	 * @param int    $resource  The resource asking, left out of the search.
 	 */
 	public static function taken( string $name, int $resource = 0 ): bool {
-		foreach ( Resource::live_ids( MailDriver::KIND ) as $id ) {
+		// Only the few that carry the name are loaded, not every live mail service.
+		foreach ( Resource::find_by_meta( MailDriver::KIND, self::META_DOMAIN, $name ) as $id ) {
 			if ( $id === $resource ) {
 				continue;
 			}

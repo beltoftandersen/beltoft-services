@@ -87,7 +87,7 @@ class StatusTest extends TestCase {
 		$pw   = getenv( 'BELTOFT_PLAYWRIGHT_DIR' ) ? (string) getenv( 'BELTOFT_PLAYWRIGHT_DIR' ) : '/root/e2e-tools/node_modules/playwright';
 
 		if ( '' === $node || ! is_dir( $pw ) ) {
-			$this->markTestSkipped( 'node or Playwright is not installed.' );
+			$this->environment_missing( 'node or Playwright is not installed.' );
 		}
 
 		$cmd = escapeshellarg( $node ) . ' ' . escapeshellarg( __DIR__ . '/js/loader-check.js' ) . ' ' . escapeshellarg( $pw ) . ' ' . escapeshellarg( BELTOFT_SERVICES_PATH ) . ' 2>&1';

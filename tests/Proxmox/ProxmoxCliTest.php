@@ -472,6 +472,19 @@ class ProxmoxCliTest extends TestCase {
 		$this->assertTrue( VmRecords::owned( $record['cluster'], $record['vmid'], $resource->id() ) === false );
 	}
 
+	public function test_releasing_one_address_does_not_look_up_every_address_of_the_pool(): void {
+		global $wpdb;
+
+		IpPool::add( '198.51.100.0/27' );
+		// Thirty addresses held by services that do not exist (each would cost a lookup if the whole pool were walked).
+		$wpdb->query( $wpdb->prepare( "UPDATE %i SET state = 'held', resource_id = 900000 + id WHERE address LIKE '198.51.100.%%' AND address <> '198.51.100.5'", Schema::tables()['ips'] ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test setup.
+
+		$before = $wpdb->num_queries;
+		$result = IpPoolScreen::apply( 'release', array( 'address' => '198.51.100.9', 'confirm' => 'RELEASE 198.51.100.9' ) );
+		$this->assertContains( $result[0], array( 'success', 'error' ) );
+		$this->assertLessThan( 15, $wpdb->num_queries - $before, 'One address is looked up, not the whole pool.' );
+	}
+
 	public function test_ip_pool_screen_releases_a_held_address_of_a_failed_resource_and_blocks_and_adds(): void {
 		$license  = $this->license();
 		$resource = Resource::create( $license, \BeltoftServices\Drivers\Registry::get( 'proxmox' ), \BeltoftServices\Product::plan( (int) $license['product_id'] ) );

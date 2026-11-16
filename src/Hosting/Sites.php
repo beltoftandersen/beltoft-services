@@ -140,6 +140,31 @@ final class Sites {
 	}
 
 	/**
+	 * Deletes the holds whose two hours are over (the daily sweep). A hold is replaced when the same name is reserved
+	 * again and deleted when the site is made, so the ones of names that were typed and never bought stayed for ever.
+	 *
+	 * @return int How many were deleted.
+	 */
+	public static function purge_expired_holds(): int {
+		global $wpdb;
+
+		$rows    = $wpdb->get_results( $wpdb->prepare( 'SELECT option_name FROM %i WHERE option_name LIKE %s', $wpdb->options, $wpdb->esc_like( 'beltoft_services_slug_hold_' ) . '%' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- the holds of the checkout, read fresh.
+		$deleted = 0;
+
+		foreach ( (array) $rows as $row ) {
+			wp_cache_delete( $row->option_name, 'options' );
+			$held = get_option( $row->option_name );
+
+			if ( ! is_array( $held ) || (int) ( $held['t'] ?? 0 ) <= time() ) {
+				delete_option( $row->option_name );
+				++$deleted;
+			}
+		}
+
+		return $deleted;
+	}
+
+	/**
 	 * Hands the holds of a guest cart to the customer the checkout has just made of that guest. The cart's session id
 	 * changes when the account is created, so without this the person's own hold would count as another person's.
 	 * Only the guest's own holds move; a signed-in customer never takes a hold of somebody else.
