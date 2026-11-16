@@ -601,7 +601,7 @@ final class PleskLicence {
 		$client = self::client();
 		$error  = null;
 
-		if ( 'ended' === AppLicence::state( $licence ) ) {
+		if ( AppLicence::release_due( $licence ) ) {
 			$reply = $client->request( 'DELETE', '/licenses/plesk/' . $key_id );
 
 			// A licence that is gone already is a deleted one.
@@ -612,7 +612,8 @@ final class PleskLicence {
 			}
 
 			$error = $reply;
-		} else {
+		} elseif ( 'ended' !== AppLicence::state( $licence ) ) {
+			// Not for a lapsed licence: nothing is bought or changed at the vendor for one that is not paid.
 			$tier = self::tier_of( $licence );
 			$item = self::items()[ $tier ] ?? '';
 
@@ -676,15 +677,15 @@ final class PleskLicence {
 
 	/**
 	 * The watchdog's list (Background): an ended licence whose deletion at Openprovider has not gone through. Narrowed in SQL to
-	 * licences that still hold a vendor key id (a finished deletion clears it) and are ended by their own state or the ended mark.
+	 * licences that still hold a vendor key id (a finished deletion clears it); a revoked licence has no mark of its own.
 	 *
 	 * @return array<int, array<int, int>>
 	 */
 	public static function sync_due(): array {
 		$sets = array();
 
-		foreach ( Resource::find_many( Resource::ids_with_meta_value( 'plesk_key_id', array_merge( Resource::ended_state_fragments(), array( wp_json_encode( AppLicence::ENDED ) . ':"' ) ) ) ) as $id => $licence ) {
-			if ( self::is_plesk( $licence ) && (int) $licence->get( 'plesk_key_id' ) > 0 && 'ended' === AppLicence::state( $licence ) && (int) $licence->get( 'plesk_sync_tries' ) < 3 * self::TRIES ) {
+		foreach ( Resource::find_many( Resource::ids_with_meta_value( 'plesk_key_id' ) ) as $id => $licence ) {
+			if ( self::is_plesk( $licence ) && (int) $licence->get( 'plesk_key_id' ) > 0 && AppLicence::release_due( $licence ) && (int) $licence->get( 'plesk_sync_tries' ) < 3 * self::TRIES ) {
 				$sets[] = array( (int) $id );
 			}
 		}
