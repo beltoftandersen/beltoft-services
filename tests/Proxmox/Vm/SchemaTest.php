@@ -237,6 +237,7 @@ class SchemaTest extends TestCase {
 		update_option( 'beltoft_services_db_version', '1' );
 		update_option( 'beltoft_services_proxmox_clusters', array( 'lab' => array() ) );
 		update_option( 'beltoft_services_fake_proxmox', array( 'x' => 1 ) );
+		update_option( 'beltoft_services_domains_account', array( 'password' => 'ciphertext' ) );
 		set_transient( 'beltoft_services_proxmox_power_5', 'running', 60 );
 		update_option( 'beltoft_services_breach_7', array( 'at' => 1, 'reason' => 'x', 'alerted' => 0 ), false );
 
@@ -264,6 +265,7 @@ class SchemaTest extends TestCase {
 		$this->assertSame( array(), preg_grep( '/DROP TABLE/i', $queries ), 'nothing dropped without the setting' );
 		$this->assertSame( '1', get_option( 'beltoft_services_db_version' ) );
 		$this->assertNotFalse( get_option( 'beltoft_services_proxmox_clusters' ) );
+		$this->assertNotFalse( get_option( 'beltoft_services_domains_account' ) );
 		$this->assertSame( 4, get_transient( 'beltoft_services_proxmox_ip_free' ) );
 		$this->assertNotFalse( get_option( 'beltoft_services_breach_7' ), 'The breach marks stay without the setting.' );
 
@@ -279,13 +281,15 @@ class SchemaTest extends TestCase {
 
 		$queries = $this->uninstall( 1 );
 		$drops   = array_values( preg_grep( '/DROP TABLE/i', $queries ) );
-		$this->assertCount( 15, $drops );
+		$this->assertCount( 16, $drops );
+		$this->assertStringContainsString( $wpdb->prefix . 'bs_guest_memory', implode( ' ', $drops ) );
 		$this->assertStringContainsString( $t['ips'], implode( ' ', $drops ) );
 		$this->assertStringContainsString( $t['vms'], implode( ' ', $drops ) );
 		wp_cache_flush(); // The uninstall script deletes straight from the database.
 		$this->assertFalse( get_option( 'beltoft_services_db_version' ) );
 		$this->assertFalse( get_option( 'beltoft_services_proxmox_clusters' ) );
 		$this->assertFalse( get_option( 'beltoft_services_fake_proxmox' ) );
+		$this->assertFalse( get_option( 'beltoft_services_domains_account' ), 'The registrar login goes too.' );
 		$this->assertFalse( get_transient( 'beltoft_services_proxmox_ip_free' ) );
 		$this->assertFalse( get_transient( 'beltoft_services_proxmox_power_5' ) );
 		$this->assertFalse( get_option( 'beltoft_services_breach_7' ), 'The breach marks go with the rest.' );

@@ -34,6 +34,10 @@ $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LI
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- one-time cleanup of the plugin's own options.
 $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s", $wpdb->esc_like( 'beltoft_services_breach_' ) . '%' ) );
 delete_option( 'beltoft_services_connections' );
+// The registrar login (encrypted, useless without the key, but a site that deletes its data should not keep it), and the other settings rows.
+foreach ( array( 'domains_account', 'domains_sync_cursor', 'ssl_costs', 'domain_prices', 'background_failures', 'usage_product' ) as $beltoft_services_option ) {
+	delete_option( 'beltoft_services_' . $beltoft_services_option );
+}
 delete_option( 'beltoft_services_proxmox_clusters' );
 delete_option( 'beltoft_services_hosting_nodes' );
 delete_option( 'beltoft_services_hosting_settings' );
@@ -63,7 +67,10 @@ $beltoft_services_no_live = ( '' === $beltoft_services_live_error && '0' === (st
 // bs_credit is the old account credit ledger: no code writes it since 0.25.0, and it is dropped here only when the data is deleted by choice (or by hand after an export).
 $beltoft_services_tables = array( 'bs_usage', 'bs_credit', 'beltoft_services_oauth_clients', 'beltoft_services_oauth_grants', 'beltoft_services_mcp_confirms' );
 if ( $beltoft_services_no_live ) {
-	$beltoft_services_tables = array_merge( array( 'beltoft_services_ips', 'beltoft_services_vms', 'beltoft_services_private_ips', 'beltoft_services_private_nets', 'beltoft_services_ip_log', 'beltoft_services_hosting', 'beltoft_services_hosting_sites', 'beltoft_services_hosting_domains' ), $beltoft_services_tables );
+	$beltoft_services_tables = array_merge( array( 'beltoft_services_ips', 'beltoft_services_vms', 'beltoft_services_private_ips', 'beltoft_services_private_nets', 'beltoft_services_ip_log', 'beltoft_services_hosting', 'beltoft_services_hosting_sites', 'beltoft_services_hosting_domains', 'bs_guest_memory' ), $beltoft_services_tables );
+	// Like the machine records, these two are the only link to machines that may still exist.
+	delete_option( 'beltoft_services_orphaned_backups' );
+	delete_option( 'beltoft_services_disk_reservations' );
 }
 foreach ( $beltoft_services_tables as $beltoft_services_table ) {
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- removing the plugin's own tables.
