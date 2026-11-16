@@ -650,4 +650,40 @@ final class AdminPanelTest extends TestCase {
 
 		remove_all_filters( 'gettext' );
 	}
+
+	public function test_the_services_list_does_not_load_resources_one_by_one(): void {
+		global $wpdb;
+
+		$mine = array();
+		for ( $n = 0; $n < 12; $n++ ) {
+			list( $r ) = $this->resource( array( 'state' => 0 === $n % 3 ? 'paused' : 'ready' ) );
+			$mine[]    = $r->id();
+		}
+
+		$before = $wpdb->num_queries;
+		$all    = Screen::resources( array() );
+		$used   = $wpdb->num_queries - $before;
+
+		$this->assertGreaterThanOrEqual( 12, count( $all ) );
+		// One id query per kind and one read per 500 ids: independent of the number of resources.
+		$this->assertLessThanOrEqual( count( \BeltoftServices\Drivers\Registry::kinds() ) + 3, $used );
+
+		$before = $wpdb->num_queries;
+		$page   = Screen::page( array(), 0, 5 );
+		$used   = $wpdb->num_queries - $before;
+
+		$this->assertCount( 5, $page['items'] );
+		$this->assertSame( count( $all ), $page['total'] );
+		$this->assertSame( array_slice( array_map( static fn( Resource $r ) => $r->id(), $all ), 0, 5 ), array_map( static fn( Resource $r ) => $r->id(), $page['items'] ) );
+		$this->assertLessThanOrEqual( count( \BeltoftServices\Drivers\Registry::kinds() ) + 1, $used );
+
+		$second = Screen::page( array(), 5, 5 );
+		$this->assertSame( array_slice( array_map( static fn( Resource $r ) => $r->id(), $all ), 5, 5 ), array_map( static fn( Resource $r ) => $r->id(), $second['items'] ) );
+
+		$paused = Screen::page( array( 'state' => 'paused' ), 0, 100 );
+		$this->assertSame( count( $paused['items'] ), $paused['total'] );
+		foreach ( $paused['items'] as $r ) {
+			$this->assertSame( 'paused', $r->get( 'state' ) );
+		}
+	}
 }

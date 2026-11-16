@@ -65,11 +65,11 @@ final class ListTable extends \WP_List_Table {
 	 */
 	public function prepare_items(): void {
 		$per   = $this->get_items_per_page( Screen::PER_PAGE_OPTION, 20 );
-		$all   = Screen::resources( Screen::filters() );
-		$total = count( $all );
+		$page  = Screen::page( Screen::filters(), ( $this->get_pagenum() - 1 ) * $per, $per );
+		$total = $page['total'];
 
 		$this->problems        = Alerts::problems();
-		$this->items           = array_slice( $all, ( $this->get_pagenum() - 1 ) * $per, $per );
+		$this->items           = $page['items'];
 		$this->_column_headers = array( $this->get_columns(), array(), array() );
 		$this->set_pagination_args(
 			array(

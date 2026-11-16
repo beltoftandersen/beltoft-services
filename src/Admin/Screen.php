@@ -128,13 +128,8 @@ final class Screen {
 		$resources = array();
 
 		foreach ( $kinds as $kind ) {
-			foreach ( Resource::live_ids( $kind, 0, 0, 'DESC' ) as $id ) {
-				$r = Resource::find( $id );
-
-				if ( ! $r ) {
-					continue;
-				}
-
+			// One read per 500 ids (Resource::find_many), not one per resource.
+			foreach ( Resource::find_many( Resource::live_ids( $kind, 0, 0, 'DESC' ) ) as $id => $r ) {
 				if ( '' !== $driver && $r->is_valid() && $r->get( 'driver' ) !== $driver ) {
 					continue;
 				}
@@ -154,6 +149,41 @@ final class Screen {
 		krsort( $resources );
 
 		return array_values( $resources );
+	}
+
+	/**
+	 * One page of the list and the total. With no filter only the ids are read for the count and the page, and only the
+	 * resources of the page are loaded; a filter reads them all (resources()).
+	 *
+	 * @param array<string, mixed> $filters  driver, state, failed.
+	 * @param int                  $offset   First row.
+	 * @param int                  $per_page Rows.
+	 * @return array{items: Resource[], total: int}
+	 */
+	public static function page( array $filters, int $offset, int $per_page ): array {
+		if ( '' !== (string) ( $filters['driver'] ?? '' ) || '' !== (string) ( $filters['state'] ?? '' ) || ! empty( $filters['failed'] ) ) {
+			$all = self::resources( $filters );
+
+			return array(
+				'items' => array_slice( $all, $offset, $per_page ),
+				'total' => count( $all ),
+			);
+		}
+
+		$ids = array();
+
+		foreach ( Registry::kinds() as $kind ) {
+			foreach ( Resource::live_ids( $kind, 0, 0, 'DESC' ) as $id ) {
+				$ids[ (int) $id ] = (int) $id;
+			}
+		}
+
+		krsort( $ids );
+
+		return array(
+			'items' => array_values( Resource::find_many( array_slice( array_values( $ids ), $offset, $per_page ) ) ),
+			'total' => count( $ids ),
+		);
 	}
 
 	/**
