@@ -136,4 +136,13 @@ interface LicenceFamily {
 	 * @return array<string, mixed>
 	 */
 	public function released_meta(): array;
+
+	/**
+	 * Ends the paid subscription of a licence that was never delivered (nothing was ordered at the vendor). The family
+	 * decides which lines of the subscription may be cancelled; no refund is made here.
+	 *
+	 * @param Resource $r      Licence resource.
+	 * @param string   $reason Admin note, names the order.
+	 */
+	public function undelivered( Resource $r, string $reason ): void;
 }

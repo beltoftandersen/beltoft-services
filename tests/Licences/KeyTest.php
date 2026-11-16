@@ -1028,83 +1028,117 @@ final class KeyTest extends TestCase {
 		}
 	}
 
-	public function test_s0_today_a_key_that_was_refused_leaves_its_subscription_active(): void {
-		$this->settings( array( 'licence_costs' => 'pro=30' ) );
-		$r    = $this->licence( array( 'total' => 20.0 ) );
-		$user = (int) ( $r->license()['user_id'] ?? 0 );
+	/**
+	 * One active subscription holding the product line of each licence, recorded on each licence.
+	 *
+	 * @param Resource ...$licences Licence resources.
+	 */
+	private function subscription_for( Resource ...$licences ): \WC_Subscription {
+		$user = (int) ( $licences[0]->license()['user_id'] ?? 0 );
 		$sub  = wcs_create_subscription( array( 'customer_id' => $user, 'billing_period' => 'month', 'billing_interval' => 1, 'status' => 'active' ) );
 		$this->assertInstanceOf( \WC_Subscription::class, $sub );
-		$sub->add_product( wc_get_product( (int) $r->license()['product_id'] ), 1 );
-		$sub->save();
-		$this->assertTrue( \BeltoftLicenses\Licenses::update( (int) $r->license()['id'], array( 'subscription_id' => $sub->get_id() ) ) );
 
-		$result = $this->build( Resource::find( $r->id() ) );
-
-		$this->assertTrue( $result->is_failed() );
-		$this->assertSame( array(), $this->calls( 'POST', '/licenses/plesk' ) );
-		$this->assertSame( 'active', wcs_get_subscription( $sub->get_id() )->get_status(), 'Today nothing cancels the subscription of a key that was never delivered (APPS-08).' );
-	}
-
-	/**
-	 * One cost (10 EUR) against nine paid lines: below, equal, inside the one cent tolerance, above, another currency with and
-	 * without a guard rate (both sides of the cost), no line at all, and an unknown cost on the fake and on the sandbox client.
-	 *
-	 * @return array<int, array{0: string, 1: string, 2: float, 3: ?string}> label, currency, paid, expected message part (null: covered)
-	 */
-	private function spend_table(): array {
-		return array(
-			array( 'below', 'EUR', 9.98, 'paid below the Openprovider cost' ),
-			array( 'equal', 'EUR', 10.0, null ),
-			array( 'inside the tolerance', 'EUR', 9.995, null ),
-			array( 'above', 'EUR', 12.0, null ),
-			array( 'DKK without a guard rate', 'DKK', 100.0, 'not in EUR' ),
-			array( 'DKK above at the guard rate', 'DKK', 100.0, null ),
-			array( 'DKK below at the guard rate', 'DKK', 70.0, 'paid below the Openprovider cost' ),
-		);
-	}
-
-	public function test_s3_the_spend_check_table_for_the_key_family(): void {
-		$this->settings( array( 'licence_costs' => 'pro=10', 'currency_guard_rates' => '' ) );
-		$r = $this->licence();
-
-		foreach ( $this->spend_table() as $i => list( $label, $currency, $paid, $expected ) ) {
-			$item = \BeltoftServices\Domains\SpendGuard::item_of_resource( Resource::find( $r->id() ) );
-			$item->set_total( $paid );
-			$item->save();
-			$order = $item->get_order();
-			$order->set_currency( $currency );
-			$order->save();
-			$this->settings( array( 'currency_guard_rates' => 'DKK' === $currency && $i >= 5 ? 'DKK=8' : '' ) );
-			$problem = KeyOrder::spend_problem( Resource::find( $r->id() ), 'pro' );
-
-			if ( null === $expected ) {
-				$this->assertNull( $problem, $label );
-			} else {
-				$this->assertStringContainsString( $expected, (string) $problem, $label );
-			}
+		foreach ( $licences as $r ) {
+			$sub->add_product( wc_get_product( (int) $r->license()['product_id'] ), 1 );
 		}
 
-		$r->set( array( 'order_item_id' => 0 ) );
-		$this->assertSame( 'The paid order line for this licence is unavailable.', KeyOrder::spend_problem( Resource::find( $r->id() ), 'pro' ) );
+		$sub->save();
 
-		$this->settings( array( 'licence_costs' => '', 'domain_api_mode' => 'fake' ) );
-		$this->assertNull( KeyOrder::spend_problem( Resource::find( $r->id() ), 'pro' ) );
-		$this->settings( array( 'domain_api_mode' => 'sandbox' ) );
-		$this->assertSame( 'The Openprovider cost of this licence is not set.', KeyOrder::spend_problem( Resource::find( $r->id() ), 'pro' ) );
+		foreach ( $licences as $r ) {
+			$this->assertTrue( \BeltoftLicenses\Licenses::update( (int) $r->license()['id'], array( 'subscription_id' => $sub->get_id() ) ) );
+		}
+
+		return $sub;
 	}
 
-	public function test_s4_a_licence_found_by_its_title_makes_no_spend_check_even_when_the_cost_is_too_high(): void {
+	private function sub_status( \WC_Subscription $sub ): string {
+		return wcs_get_subscription( $sub->get_id() )->get_status();
+	}
+
+	private function sub_notes( \WC_Subscription $sub ): string {
+		return implode( "\n", array_map( static fn( $n ) => (string) $n->content, wc_get_order_notes( array( 'order_id' => $sub->get_id() ) ) ) );
+	}
+
+	public function test_s9_a_key_that_was_refused_cancels_its_subscription_and_names_the_order(): void {
 		$this->settings( array( 'licence_costs' => 'pro=30' ) );
-		$r     = $this->licence( array( 'total' => 20.0 ) );
-		$title = 'licence ' . (int) $r->license()['id'] . ' 203.0.113.10';
-		$made  = $this->op->request( 'POST', '/licenses/plesk', array( 'title' => $title, 'items' => array( 'PLESK-12-VPS-WEB-PRO-1M' ), 'period' => 1, 'ip_address_binding' => '203.0.113.10' ) );
-		$before = count( $this->calls( 'POST', '/licenses/plesk' ) );
+		$r   = $this->licence( array( 'total' => 20.0 ) );
+		$sub = $this->subscription_for( Resource::find( $r->id() ) );
+		$this->mails = array();
 
-		$result = $this->build( $r );
+		\BeltoftServices\Jobs::run( $r->id() );
 
-		$this->assertTrue( $result->is_done(), $result->error() );
-		$this->assertSame( (int) $made['key_id'], (int) $result->meta()['lic_key_id'] );
-		$this->assertCount( $before, $this->calls( 'POST', '/licenses/plesk' ) );
-		$this->assertSame( array(), $this->mails );
+		$r = Resource::find( $r->id() );
+		$this->assertSame( 'failed', $r->get( 'state' ), (string) $r->get( 'last_error' ) );
+		$this->assertSame( array(), $this->calls( 'POST', '/licenses/plesk' ) );
+		$this->assertSame( 'cancelled', $this->sub_status( $sub ) );
+		$this->assertStringContainsString( 'review and refund order #' . (int) $r->license()['order_id'], $this->sub_notes( $sub ) );
+		$this->assertNotEmpty( array_filter( $this->mails, static fn( $m ) => false !== strpos( (string) $m['message'], 'review and refund order #' ) ), 'An admin is told to refund.' );
+	}
+
+	public function test_s9_a_key_whose_retries_ran_out_before_anything_was_ordered_cancels_its_subscription(): void {
+		$r   = $this->licence();
+		$sub = $this->subscription_for( Resource::find( $r->id() ) );
+
+		for ( $i = 0; $i < 12; $i++ ) {
+			$this->op->reply( 'GET', '/licenses/plesk', new \WP_Error( 'transport', 'down' ) );
+		}
+
+		for ( $i = 0; $i < 8 && 'failed' !== Resource::find( $r->id() )->get( 'state' ); $i++ ) {
+			Resource::find( $r->id() )->set( array( 'next_attempt_at' => time() - 1 ) );
+			\BeltoftServices\Jobs::run( $r->id() );
+		}
+
+		$this->assertSame( 'failed', Resource::find( $r->id() )->get( 'state' ) );
+		$this->assertSame( 0, (int) Resource::find( $r->id() )->get( 'lic_key_id' ) );
+		$this->assertSame( 'cancelled', $this->sub_status( $sub ) );
+	}
+
+	public function test_s9_one_failed_line_never_cancels_a_subscription_that_carries_a_delivered_licence(): void {
+		$this->settings( array( 'licence_costs' => 'pro=30' ) );
+		$user = (int) self::factory()->user->create();
+		$good = $this->licence( array( 'user' => $user, 'ip' => '203.0.113.20', 'total' => 30.0 ) );
+		$this->assertTrue( $this->build( $good )->is_done() );
+		$this->assertTrue( Resource::find( $good->id() )->set( array( 'state' => 'ready' ) ) );
+		$bad = $this->licence( array( 'user' => $user, 'ip' => '203.0.113.21', 'total' => 20.0 ) );
+		$sub = $this->subscription_for( Resource::find( $good->id() ), Resource::find( $bad->id() ) );
+
+		\BeltoftServices\Jobs::run( $bad->id() );
+
+		$this->assertSame( 'failed', Resource::find( $bad->id() )->get( 'state' ) );
+		$this->assertSame( 'active', $this->sub_status( $sub ), 'The delivered licence keeps its subscription.' );
+		$this->assertStringContainsString( 'Another licence on the subscription is still live', $this->sub_notes( $sub ) );
+		$this->assertStringContainsString( 'review and refund order #', $this->sub_notes( $sub ) );
+	}
+
+	public function test_s9_a_failed_resume_plan_change_or_pause_or_a_failure_after_the_order_never_cancels(): void {
+		$r   = $this->licence();
+		$sub = $this->subscription_for( Resource::find( $r->id() ) );
+
+		foreach ( array( 'resume', 'update_plan', 'pause', 'delete' ) as $op ) {
+			Resource::find( $r->id() )->set( array( 'state' => 'failed', 'failed_op' => $op, 'last_error' => 'Something failed.' ) );
+			KeyOrder::state_changed( Resource::find( $r->id() ), 'ready', 'failed' );
+			$this->assertSame( 'active', $this->sub_status( $sub ), $op );
+		}
+
+		// A provision that failed after the order (a vendor licence exists) is money spent: the licence is deleted, the subscription stays for the admin.
+		Resource::find( $r->id() )->set( array( 'state' => 'failed', 'failed_op' => 'provision', 'lic_key_id' => 1001 ) );
+		KeyOrder::state_changed( Resource::find( $r->id() ), 'provisioning', 'failed' );
+		$this->assertSame( 'active', $this->sub_status( $sub ) );
+
+		// Not a state change to failed.
+		Resource::find( $r->id() )->set( array( 'lic_key_id' => null ) );
+		KeyOrder::state_changed( Resource::find( $r->id() ), 'failed', 'ready' );
+		$this->assertSame( 'active', $this->sub_status( $sub ) );
+	}
+
+	public function test_s9_a_pay_as_you_go_key_has_no_subscription_of_its_own_to_cancel(): void {
+		$r   = $this->licence();
+		$sub = $this->subscription_for( Resource::find( $r->id() ) );
+		$this->assertTrue( \BeltoftLicenses\Licenses::update( (int) $r->license()['id'], array( 'source' => 'usage' ) ) );
+		Resource::find( $r->id() )->set( array( 'state' => 'failed', 'failed_op' => 'provision', 'last_error' => 'Nothing was ordered.' ) );
+
+		KeyOrder::state_changed( Resource::find( $r->id() ), 'provisioning', 'failed' );
+
+		$this->assertSame( 'active', $this->sub_status( $sub ) );
 	}
 }

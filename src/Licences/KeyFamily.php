@@ -9,6 +9,7 @@ namespace BeltoftServices\Licences;
 
 use BeltoftServices\Domains\LicenceFamily;
 use BeltoftServices\Domains\LicenceVendor;
+use BeltoftServices\Proxmox\Disk\DiskCascade;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -105,5 +106,9 @@ final class KeyFamily implements LicenceFamily {
 
 	public function released_meta(): array {
 		return array( 'lic_key_id' => null, 'lic_key' => null, 'lic_state' => null, 'lic_deleted' => time(), 'lic_tries' => null, 'lic_delete_tries' => null );
+	}
+
+	public function undelivered( Resource $r, string $reason ): void {
+		DiskCascade::cancel_undelivered( $r, $reason, array( KeyDriver::ID ) );
 	}
 }

@@ -84,6 +84,7 @@ final class PleskLicence {
 		add_filter( 'beltoft_services_app_licence_admin_rows', array( __CLASS__, 'admin_rows' ), 10, 2 );
 		add_action( 'beltoft_services_app_installed', array( __CLASS__, 'installed' ) );
 		add_action( 'beltoft_services_reinstall_started', array( __CLASS__, 'reinstall_started' ), 5, 2 );
+		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'state_changed' ), 20, 3 );
 		add_action( self::KEY_HOOK, array( __CLASS__, 'run_key' ) );
 		add_action( self::SYNC_HOOK, array( __CLASS__, 'run_sync' ) );
 		Background::declare(
@@ -103,6 +104,21 @@ final class PleskLicence {
 			)
 		);
 		add_filter( 'beltoft_services_settings_fields', array( __CLASS__, 'fields' ) );
+	}
+
+	/**
+	 * A licence went to failed before anything was ordered: its subscription is cancelled (LicenceVendor::on_state).
+	 *
+	 * @param mixed $r   Resource.
+	 * @param mixed $old Old state.
+	 * @param mixed $new New state.
+	 */
+	public static function state_changed( $r, $old, $new ): void {
+		unset( $old );
+
+		if ( $r instanceof Resource && is_string( $new ) ) {
+			LicenceVendor::on_state( $r, $new, new PleskFamily() );
+		}
 	}
 
 	// -- Settings --------------------------------------------------------------------------------

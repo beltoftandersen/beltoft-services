@@ -981,8 +981,8 @@ final class PleskLicenceTest extends PaidAppCase {
 		$this->assertSame( '', (string) $this->fresh( $o['licence'] )->get( 'plesk_shape' ) );
 	}
 
-	public function test_s0_today_a_licence_whose_retries_ran_out_is_not_cancelled(): void {
-		// Retries that run out (APPS-08, the part that is open for both): the licence fails, the subscription lives on.
+	public function test_s9_a_licence_whose_retries_ran_out_before_anything_was_ordered_cancels_its_subscription(): void {
+		// Retries that run out (APPS-08): the licence fails and, as nothing was ordered, the subscription is cancelled.
 		$o  = $this->plesk_order( 'pro' );
 		$id = (int) ( $o['licence']->license()['subscription_id'] ?? 0 );
 		for ( $i = 0; $i < 12; $i++ ) {
@@ -996,7 +996,7 @@ final class PleskLicenceTest extends PaidAppCase {
 
 		$this->assertSame( 'failed', $this->fresh( $o['licence'] )->get( 'state' ) );
 		$this->assertSame( 0, (int) $this->fresh( $o['licence'] )->get( 'plesk_key_id' ) );
-		$this->assertNotSame( 'cancelled', wcs_get_subscription( $id )->get_status(), 'Today only an explicit failure cancels.' );
+		$this->assertSame( 'cancelled', wcs_get_subscription( $id )->get_status() );
 	}
 
 	public function test_s0_release_due_for_every_resource_state_and_licence_status(): void {

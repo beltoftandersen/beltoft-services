@@ -58,6 +58,7 @@ final class KeyOrder {
 	 * Hooks.
 	 */
 	public static function register(): void {
+		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'state_changed' ), 20, 3 );
 		add_action( self::KEY_HOOK, array( __CLASS__, 'run_key' ) );
 		add_action( self::SYNC_HOOK, array( __CLASS__, 'run_sync' ) );
 		Background::declare(
@@ -76,6 +77,21 @@ final class KeyOrder {
 				'label'    => 'Licence deletion at the vendor',
 			)
 		);
+	}
+
+	/**
+	 * A licence went to failed before anything was ordered: its subscription is cancelled (LicenceVendor::on_state).
+	 *
+	 * @param mixed $r   Resource.
+	 * @param mixed $old Old state.
+	 * @param mixed $new New state.
+	 */
+	public static function state_changed( $r, $old, $new ): void {
+		unset( $old );
+
+		if ( $r instanceof Resource && is_string( $new ) ) {
+			LicenceVendor::on_state( $r, $new, new KeyFamily() );
+		}
 	}
 
 	// -- Helpers ---------------------------------------------------------------------------------

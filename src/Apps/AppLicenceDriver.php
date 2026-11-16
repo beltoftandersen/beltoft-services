@@ -147,9 +147,8 @@ final class AppLicenceDriver implements Driver {
 
 			if ( $vendor instanceof StepResult ) {
 				if ( $vendor->is_failed() ) {
-					// A vendor step that failed for good: nothing was delivered, so the paid subscription does not keep renewing.
-					DiskCascade::cancel_undelivered( $r, $vendor->error() . ' The app licence was not delivered.' );
-
+					// A vendor step that failed for good: nothing was delivered. The subscription is cancelled when the licence reaches
+					// failed (LicenceVendor::on_state, with a vendor that ran out of retries too), so it does not keep renewing.
 					return StepResult::fail( $vendor->error() . ' App licence not delivered: review and refund order #' . (int) ( $license['order_id'] ?? 0 ) . '; the subscription was cancelled.', $vendor->meta() );
 				}
 

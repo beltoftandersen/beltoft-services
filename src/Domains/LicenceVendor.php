@@ -468,4 +468,30 @@ final class LicenceVendor {
 
 		return $sets;
 	}
+
+	/**
+	 * A licence went to failed. When its provision failed for good and nothing was ordered at the vendor (no vendor id: no
+	 * money was spent), the paid subscription is cancelled and an admin is told to review and refund the order. It covers an
+	 * explicit failure and retries that ran out. It never fires for a failed resume, plan change or pause (the customer has
+	 * paid and had the licence), nor when a vendor licence exists (then money was spent; the licence is deleted by the release
+	 * rule and the admin alert of the failure stays). No refund is made here.
+	 *
+	 * @param Resource      $r      Resource that changed state.
+	 * @param string        $new    New state.
+	 * @param LicenceFamily $family Family.
+	 */
+	public static function on_state( Resource $r, string $new, LicenceFamily $family ): void {
+		if ( 'failed' !== $new || 'provision' !== (string) $r->get( 'failed_op' ) || ! $family->owns( $r ) || (int) $r->get( $family->meta( 'key_id' ) ) > 0 ) {
+			return;
+		}
+
+		$reason = trim( (string) $r->get( 'last_error' ) );
+
+		if ( false === strpos( $reason, 'review and refund order #' ) ) {
+			$reason .= ' The licence was not delivered: review and refund order #' . (int) ( $r->license()['order_id'] ?? 0 ) . '.';
+		}
+
+		$family->undelivered( $r, trim( $reason ) );
+		Alerts::admin( $r, trim( $reason ) );
+	}
 }

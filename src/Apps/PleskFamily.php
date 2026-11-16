@@ -11,6 +11,7 @@ use BeltoftServices\Currency;
 use BeltoftServices\Domains\LicenceFamily;
 use BeltoftServices\Domains\LicenceVendor;
 use BeltoftServices\Jobs;
+use BeltoftServices\Proxmox\Disk\DiskCascade;
 use BeltoftServices\Resource;
 use BeltoftServices\Usage\Rates;
 
@@ -126,5 +127,9 @@ final class PleskFamily implements LicenceFamily {
 
 	public function released_meta(): array {
 		return array( 'plesk_key_id' => null, 'plesk_key' => null, 'plesk_key_job' => null, 'plesk_key_state' => null, 'plesk_deleted' => time(), 'plesk_sync_tries' => null, 'plesk_delete_tries' => null );
+	}
+
+	public function undelivered( Resource $r, string $reason ): void {
+		DiskCascade::cancel_undelivered( $r, $reason );
 	}
 }

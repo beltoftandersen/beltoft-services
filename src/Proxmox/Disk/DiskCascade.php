@@ -47,10 +47,13 @@ final class DiskCascade {
 	 * way a server ending does: only when every line on it is an add-on product, else a note and the admin decide.
 	 * No refund is made here.
 	 *
-	 * @param Resource $addon  The add-on resource.
-	 * @param string   $reason Admin note.
+	 * @param Resource $addon        The add-on resource.
+	 * @param string   $reason       Admin note.
+	 * @param string[] $also_drivers More driver ids whose lines count as lines that may be cancelled (a licence key). When given,
+	 *                               the subscription is also left alone while another licence on it is still live, because one
+	 *                               subscription can carry several lines and the one that failed must not cancel the one that was delivered.
 	 */
-	public static function cancel_undelivered( Resource $addon, string $reason ): void {
+	public static function cancel_undelivered( Resource $addon, string $reason, array $also_drivers = array() ): void {
 		// A pay as you go add-on sits on the usage account's subscription, which is never ended for one add-on.
 		if ( 'usage' === (string) ( $addon->license()['source'] ?? '' ) ) {
 			return;
@@ -63,11 +66,22 @@ final class DiskCascade {
 		if ( ! $subscription instanceof \WC_Subscription || in_array( $subscription->get_status(), array( 'cancelled', 'expired', 'trash' ), true ) ) {
 			return;
 		}
+		$drivers = array_merge( Stock::addon_drivers(), $also_drivers );
 		foreach ( $subscription->get_items() as $item ) {
 			$driver = Product::driver_for( (int) $item->get_product_id() );
-			if ( ! $driver || ! in_array( $driver->id(), Stock::addon_drivers(), true ) ) {
+			if ( ! $driver || ! in_array( $driver->id(), $drivers, true ) ) {
 				$subscription->add_order_note( $reason . ' The subscription also holds other lines and was not cancelled.' );
 				return;
+			}
+		}
+		if ( array() !== $also_drivers ) {
+			$mine = (int) ( $addon->license()['id'] ?? 0 );
+			foreach ( Licenses::where( 'subscription_id', $id ) as $license ) {
+				$other = (int) $license['id'] === $mine ? null : Resource::for_license( (int) $license['id'] );
+				if ( $other && ! in_array( (string) $other->get( 'state' ), array( 'failed', 'deleting', 'deleted' ), true ) ) {
+					$subscription->add_order_note( $reason . ' Another licence on the subscription is still live, so it was not cancelled: review and refund order #' . (int) ( $addon->license()['order_id'] ?? 0 ) . '.' );
+					return;
+				}
 			}
 		}
 		$subscription->update_status( 'cancelled', $reason );
