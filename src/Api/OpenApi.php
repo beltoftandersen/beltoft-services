@@ -18,8 +18,10 @@ defined( 'ABSPATH' ) || exit;
  * is left out, and a route a token can reach (Tokens::reachable) that is missing from the table fails the tests, so
  * the document cannot drift from the code.
  *
- * Left out on purpose: every route that reveals or opens something (password reveals, console, the CA download, transfer
- * codes, the signed Open link) and the dashboard's own helpers. Tokens cannot reach them either.
+ * Left out on purpose: every route that reveals or opens something (password reveals, console, transfer codes, the signed
+ * Open link) and the dashboard's own helpers. Tokens cannot reach them either. The one exception is the CA download
+ * (db-ca): a public certificate that a read token may fetch, left out of the document only to keep it short; the MCP tool
+ * asks for more (Full access and a confirmation), so the two surfaces differ on purpose until the owner decides.
  */
 final class OpenApi {
 
@@ -128,7 +130,7 @@ final class OpenApi {
 					'message' => $text,
 				),
 				'status'  => 202,
-				'errors'  => array( 401, 403, 422, 429 ),
+				'errors'  => array( 401, 403, 409, 422, 429 ),
 			),
 			'GET /resources/{id}/metrics'                => array(
 				'summary' => 'Usage figures of a server or a hosting account over an hour, a day or a month.',
