@@ -79,7 +79,7 @@ final class ApiScriptTest extends TestCase {
 		$node = trim( (string) shell_exec( 'command -v node' ) );
 
 		if ( '' === $node ) {
-			$this->markTestSkipped( 'node is not installed.' );
+			$this->environment_missing( 'node is not installed.' );
 		}
 
 		$js  = 'global.window = { setTimeout: function ( fn, ms ) { waits.push( ms ); setImmediate( fn ); }, beltoftServicesAccount: { root: "/r/", nonce: "n" } };' . "\n";

@@ -71,7 +71,7 @@ class AgentContractTest extends TestCase {
 		$contract = $this->contract();
 
 		if ( null === $contract ) {
-			$this->markTestSkipped( 'The agent contract file is not present.' );
+			$this->environment_missing( 'The agent contract file is not present.' );
 		}
 
 		foreach ( $contract as $op => $args ) {
@@ -89,7 +89,7 @@ class AgentContractTest extends TestCase {
 		$contract = $this->contract();
 
 		if ( null === $contract ) {
-			$this->markTestSkipped( 'The agent contract file is not present.' );
+			$this->environment_missing( 'The agent contract file is not present.' );
 		}
 
 		$this->addToAssertionCount( 1 );

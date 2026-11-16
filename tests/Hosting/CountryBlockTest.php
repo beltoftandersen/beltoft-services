@@ -243,7 +243,7 @@ class CountryBlockTest extends HostingCase {
 		$file = '/var/www/wordpress/workspaces/hosting-agent-cb/hosting_agent/ops/geo.py';
 
 		if ( ! is_readable( $file ) ) {
-			$this->markTestSkipped( 'The agent sources are not next to this plugin.' );
+			$this->environment_missing( 'The agent sources are not next to this plugin.' );
 		}
 
 		preg_match( '/COUNTRY_CODES = frozenset\("""(.*?)"""/s', (string) file_get_contents( $file ), $m );

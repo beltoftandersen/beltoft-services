@@ -33,7 +33,7 @@ class SingleMessageTest extends TestCase {
 
 	public function test_a_refused_credit_code_is_in_the_page_once(): void {
 		if ( ! class_exists( '\Bgca\Plugin' ) || ! \Bgca\Plugin::requirements_met() ) {
-			$this->markTestSkipped( 'The gift card plugin and its add-on are not loaded.' );
+			$this->environment_missing( 'The gift card plugin and its add-on are not loaded.' );
 		}
 
 		$this->settings( array( 'gift_credit' => 1 ) );

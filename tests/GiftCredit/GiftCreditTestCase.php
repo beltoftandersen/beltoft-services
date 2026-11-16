@@ -23,7 +23,7 @@ abstract class GiftCreditTestCase extends UsageTestCase {
 
 	public function set_up(): void {
 		if ( ! class_exists( '\Bgca\Plugin' ) || ! \Bgca\Plugin::requirements_met() ) {
-			$this->markTestSkipped( 'The gift card plugin and its add-on are not loaded (set BELTOFT_GIFT_CARDS_DIR and BELTOFT_GIFT_CARDS_ACCOUNT_DIR).' );
+			$this->environment_missing( 'The gift card plugin and its add-on are not loaded (set BELTOFT_GIFT_CARDS_DIR and BELTOFT_GIFT_CARDS_ACCOUNT_DIR).' );
 		}
 
 		parent::set_up();

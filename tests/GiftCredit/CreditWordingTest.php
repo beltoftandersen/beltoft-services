@@ -18,7 +18,7 @@ class CreditWordingTest extends GiftCreditTestCase {
 	public function set_up(): void {
 		parent::set_up();
 		if ( ! class_exists( '\Bgca\Wording' ) ) {
-			$this->markTestSkipped( 'The add-on is older than 0.3.1.' );
+			$this->environment_missing( 'The add-on is older than 0.3.1.' );
 		}
 	}
 
