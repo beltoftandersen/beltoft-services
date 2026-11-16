@@ -8,7 +8,9 @@
 namespace BeltoftServices\Tests;
 
 use BeltoftServices\Jobs;
+use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Progress;
+use BeltoftServices\Reconciler;
 use BeltoftServices\Resource;
 
 /**
@@ -55,5 +57,60 @@ final class ReviewLow3l3CoreTest extends TestCase {
 		Jobs::sweep();
 
 		$this->assertTrue( as_has_scheduled_action( Jobs::HOOK, array( $second->id() ), Jobs::GROUP ), 'The later resource is still queued.' );
+	}
+
+	/**
+	 * A ready resource with a customer action 'reboot' on a fake driver.
+	 *
+	 * @return array{0: Resource, 1: \BeltoftServices\Tests\Support\FakeDriver}
+	 */
+	private function acting(): array {
+		$driver                    = $this->fake_driver();
+		$driver->customer_actions = array( 'reboot' => 'Reboot' );
+		$product                   = $this->service_product( 'fake', array(), array( 'max' => 3 ) );
+		$license                   = $this->service_license( $product, array( 'fire' => false ) );
+		$resource                  = Resource::create( $license, $driver, array(), array( 'state' => 'ready', 'desired' => 'ready' ) );
+
+		$this->assertInstanceOf( Resource::class, $resource );
+
+		return array( $resource, $driver );
+	}
+
+	public function test_core_03_the_same_customer_action_failure_is_mailed_again_after_a_success(): void {
+		list( $r, $driver ) = $this->acting();
+		$mails              = 0;
+		add_filter(
+			'pre_wp_mail',
+			static function () use ( &$mails ) {
+				++$mails;
+				return true;
+			}
+		);
+
+		$driver->will( 'act', StepResult::fail( 'Proxmox timeout' ) );
+		Jobs::act( $r->id(), 'reboot', array() );
+		$this->assertSame( 1, $mails );
+
+		Jobs::act( $r->id(), 'reboot', array() );
+		$this->assertSame( 1, $mails, 'The same failure in a row is one mail.' );
+
+		$driver->will( 'act', StepResult::done() );
+		$driver->will( 'act', StepResult::fail( 'Proxmox timeout' ) );
+		Jobs::act( $r->id(), 'reboot', array() ); // The old failure repeats, still one mail.
+		Jobs::act( $r->id(), 'reboot', array() ); // Done.
+		Jobs::act( $r->id(), 'reboot', array() ); // Fails again.
+		$this->assertSame( 2, $mails, 'After a success the next failure is news again.' );
+	}
+
+	public function test_core_06_an_action_that_used_up_its_retries_does_not_say_the_server_was_not_changed(): void {
+		list( $r, $driver ) = $this->acting();
+		$driver->will( 'act', StepResult::retry( 1, 'timeout after the request was accepted' ) );
+		$r->set( array( 'act_attempts' => count( Reconciler::BACKOFF ) ) );
+
+		Jobs::act( $r->id(), 'reboot', array() );
+
+		$result = Resource::find( $r->id() )->get( Jobs::RESULT );
+		$this->assertFalse( $result['ok'] );
+		$this->assertStringContainsString( 'We have been told', $result['text'] );
 	}
 }

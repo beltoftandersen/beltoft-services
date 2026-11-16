@@ -255,6 +255,8 @@ final class JobActions {
 	private static function acted( Resource $r, string $action, array $args, StepResult $result ): void {
 		$meta     = array_diff_key( $result->meta(), array_flip( Reconciler::RESERVED ) );
 		$attempts = (int) $r->get( 'act_attempts' ) + 1;
+		// A done action closes the staff alert slot: the same failure after a success is news again (Alerts::admin dedupes a failure in a row).
+		$meta     = $result->is_done() ? array_merge( $meta, array( 'alerted' => '' ) ) : $meta;
 		$backoff  = Reconciler::BACKOFF;
 
 		if ( $result->is_poll() && self::polled( $r, $action, $args, $result, $meta ) ) {
@@ -292,7 +294,7 @@ final class JobActions {
 			$refused = true;
 		}
 
-		if ( ! $r->set( array_merge( $meta, array( 'act_attempts' => 0, 'waiting' => '', 'act_wait_since' => $episodes ? $episodes : null, Progress::MARKER => null, Jobs::RESULT => self::result( $action, $ok, $result->is_failed() && ! $refused, $said ) ) ) ) ) {
+		if ( ! $r->set( array_merge( $meta, array( 'act_attempts' => 0, 'waiting' => '', 'act_wait_since' => $episodes ? $episodes : null, Progress::MARKER => null, Jobs::RESULT => self::result( $action, $ok, ( $result->is_failed() || $result->is_retry() ) && ! $refused, $said ) ) ) ) ) {
 			Alerts::write_failed( $r, 'Resource could not be updated' );
 		}
 
