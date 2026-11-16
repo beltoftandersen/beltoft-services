@@ -7,6 +7,7 @@ use BeltoftServices\Crypto;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Drivers\InternalActions;
 use BeltoftServices\Drivers\NeedsBilling;
+use BeltoftServices\Drivers\NeedsPhone;
 use BeltoftServices\Drivers\ProvisionSteps;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Drivers\StopsOnDelete;
@@ -15,7 +16,7 @@ use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
 
-final class DomainDriver implements Driver, StopsOnDelete, InternalActions, NeedsBilling, ProvisionSteps {
+final class DomainDriver implements Driver, StopsOnDelete, InternalActions, NeedsBilling, NeedsPhone, ProvisionSteps {
 	public function id(): string { return 'domain'; }
 
 	/**

@@ -9,6 +9,7 @@ namespace BeltoftServices;
 
 use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Drivers\NeedsBilling;
+use BeltoftServices\Drivers\NeedsPhone;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -63,6 +64,32 @@ final class BillingRequirements {
 			}
 
 			if ( Product::driver_for( (int) ( $item['product_id'] ?? 0 ) ) instanceof NeedsBilling ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Does the cart hold a new service that cannot be delivered without the customer's phone number (a driver marked
+	 * NeedsPhone)? A site that shows the phone field only when it is needed asks this, so it never has to list the kinds.
+	 *
+	 * @param \WC_Cart|null $cart Cart, the session's when null.
+	 */
+	public static function cart_needs_phone( ?\WC_Cart $cart = null ): bool {
+		$cart = $cart ? $cart : ( function_exists( 'WC' ) ? WC()->cart : null );
+
+		if ( ! $cart ) {
+			return false;
+		}
+
+		foreach ( $cart->get_cart() as $item ) {
+			if ( CartFlow::has( $item, CartFlow::EXISTING_SERVICE ) ) {
+				continue;
+			}
+
+			if ( Product::driver_for( (int) ( $item['product_id'] ?? 0 ) ) instanceof NeedsPhone ) {
 				return true;
 			}
 		}
