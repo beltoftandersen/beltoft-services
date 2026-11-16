@@ -338,11 +338,10 @@ final class Routes {
 		}
 
 		$resource = Resource::find( (int) $request['id'] );
-		$license  = $resource ? $resource->license() : array();
 		$user_id  = get_current_user_id();
 
 		// The same answer whether the service is someone else's, gone or not a pay as you go one.
-		if ( ! $resource || $user_id < 1 || empty( $license['user_id'] ) || (int) $license['user_id'] !== $user_id || ! $resource->is_live() ) {
+		if ( ! $resource || ! $resource->owned_by( $user_id ) || ! $resource->is_live() ) {
 			return self::error( 'beltoft_services_forbidden', __( 'This service is not available.', 'beltoft-services' ), 403 );
 		}
 
@@ -379,10 +378,9 @@ final class Routes {
 		}
 
 		$resource = Resource::find( (int) $request['id'] );
-		$license  = $resource ? $resource->license() : array();
 		$user_id  = get_current_user_id();
 
-		if ( ! $resource || $user_id < 1 || empty( $license['user_id'] ) || (int) $license['user_id'] !== $user_id || ! $resource->is_live() ) {
+		if ( ! $resource || ! $resource->owned_by( $user_id ) || ! $resource->is_live() ) {
 			return self::error( 'beltoft_services_forbidden', __( 'This service is not available.', 'beltoft-services' ), 403 );
 		}
 
@@ -486,8 +484,7 @@ final class Routes {
 		}
 
 		$resource = Resource::find( (int) $request['id'] );
-		$license  = $resource ? $resource->license() : array();
-		$owned    = $user_id > 0 && ! empty( $license['user_id'] ) && (int) $license['user_id'] === $user_id;
+		$owned    = $resource && $resource->owned_by( $user_id );
 		$allowed  = $owned && ( $ready ? $resource->accepts_actions() : $resource->shows_status() );
 
 		// The same answer whether the resource is someone else's, gone or paused.

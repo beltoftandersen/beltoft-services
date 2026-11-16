@@ -13,6 +13,7 @@ use BeltoftServices\Mcp\Audit;
 use BeltoftServices\Mcp\Endpoint;
 use BeltoftServices\Oauth\Grants;
 use BeltoftServices\Api\Tokens;
+use BeltoftServices\RateLimit;
 use BeltoftServices\StepUp;
 
 defined( 'ABSPATH' ) || exit;
@@ -215,14 +216,12 @@ final class ApiTokens {
 		$stepped = false;
 
 		if ( Tokens::FULL === ( $post['scope'] ?? '' ) ) {
-			$key = 'beltoft_services_tokfail_' . $user_id;
-
-			if ( (int) get_transient( $key ) >= self::MAX_FAILS ) {
+			if ( RateLimit::count( $user_id, 'token_code_fails', self::FAIL_WINDOW ) >= self::MAX_FAILS ) {
 				return array( 'ok' => false, 'message' => __( 'Too many wrong attempts. Please wait a few minutes and try again.', 'beltoft-services' ), 'password' => '' );
 			}
 
 			if ( ! StepUp::verify( $user_id, (string) ( $post['secret'] ?? '' ), self::PURPOSE ) ) {
-				set_transient( $key, (int) get_transient( $key ) + 1, self::FAIL_WINDOW );
+				RateLimit::hit( $user_id, 'token_code_fails', self::FAIL_WINDOW );
 				self::$prefill = array( 'name' => (string) ( $post['name'] ?? '' ), 'scope' => (string) ( $post['scope'] ?? '' ), 'sent' => false );
 
 				return array(
@@ -232,7 +231,7 @@ final class ApiTokens {
 				);
 			}
 
-			delete_transient( $key );
+			RateLimit::reset( $user_id, 'token_code_fails', self::FAIL_WINDOW );
 			$stepped = true;
 		}
 

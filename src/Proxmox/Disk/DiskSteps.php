@@ -11,6 +11,7 @@ use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
 use BeltoftServices\Proxmox\Pve\Ownership;
 use BeltoftServices\Proxmox\Pve\Steps;
+use BeltoftServices\Proxmox\Snapshot\Policy;
 use BeltoftServices\Proxmox\Snapshot\SnapshotExpiry;
 use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Proxmox\Vm\Provision;
@@ -651,7 +652,7 @@ final class DiskSteps {
 	 */
 	private function drop_snapshots( Resource $server, string $volid ): ?StepResult {
 		// Meta only, outside the lock: no snapshot covers this volume, so nothing to drop or to lock for.
-		if ( array() === Snapshots::covering( $server, $volid ) ) {
+		if ( array() === Policy::covering( $server, $volid ) ) {
 			return null;
 		}
 		$disk   = $this->r->id();

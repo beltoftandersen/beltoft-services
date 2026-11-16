@@ -591,6 +591,34 @@ final class JobsTest extends TestCase {
 		$this->assertNull( $fresh->get( Jobs::TEXT ), 'The sentence is not resource meta.' );
 	}
 
+	public function test_a_refusal_is_what_the_driver_says_not_a_word_in_the_event_text(): void {
+		list( $r, $driver ) = $this->resource( array( 'state' => 'ready', 'desired' => 'ready' ) );
+		$driver->customer_actions = array( 'tidy' => 'Tidy up' );
+		$seen                     = array();
+		add_action(
+			'beltoft_services_action_done',
+			static function ( $res, $action ) use ( &$seen ) {
+				$seen[] = $action;
+			},
+			10,
+			2
+		);
+
+		// Done, with a site called "refused.example" in its event: it worked.
+		$driver->will( 'act', StepResult::done( array(), 'Address of refused.example changed' ) )->will( 'act', StepResult::refused( array(), 'Tidy refused: nothing to tidy' ) );
+		Progress::mark( $r, 'tidy', 'Tidy up' );
+		Jobs::act( $r->id(), 'tidy', array() );
+		$this->assertTrue( Resource::find( $r->id() )->get( Jobs::RESULT )['ok'] );
+		$this->assertSame( array( 'tidy' ), $seen, 'The follow-ups of a done action run.' );
+
+		// Done as a refusal (the driver says so): not ok, and no follow-ups.
+		$seen = array();
+		Progress::mark( $r, 'tidy', 'Tidy up' );
+		Jobs::act( $r->id(), 'tidy', array() );
+		$this->assertFalse( Resource::find( $r->id() )->get( Jobs::RESULT )['ok'] );
+		$this->assertSame( array(), $seen );
+	}
+
 	public function test_a_customer_action_that_ended_well_fires_the_done_hook_after_its_marker_is_gone_and_a_failure_does_not(): void {
 		list( $r, $driver ) = $this->resource( array( 'state' => 'ready', 'desired' => 'ready' ) );
 		$driver->customer_actions = array( 'tidy' => 'Tidy up' );

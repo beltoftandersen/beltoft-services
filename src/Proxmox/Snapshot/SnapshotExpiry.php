@@ -39,7 +39,7 @@ final class SnapshotExpiry {
 	 * @param int      $now Time.
 	 */
 	public static function due( Resource $r, int $now ): bool {
-		foreach ( Snapshots::entries( $r ) as $entry ) {
+		foreach ( Policy::entries( $r ) as $entry ) {
 			if ( self::is_due( $entry, $now ) ) {
 				return true;
 			}
@@ -66,7 +66,7 @@ final class SnapshotExpiry {
 	public static function next( Resource $r ): int {
 		$next = 0;
 
-		foreach ( Snapshots::entries( $r ) as $entry ) {
+		foreach ( Policy::entries( $r ) as $entry ) {
 			$at = (int) ( $entry['expires_at'] ?? 0 );
 
 			if ( $at > 0 && ( 0 === $next || $at < $next ) ) {
@@ -84,13 +84,13 @@ final class SnapshotExpiry {
 	 * @param Resource $r Server resource.
 	 */
 	public static function needs_clamp( Resource $r ): bool {
-		$entries = Snapshots::entries( $r );
+		$entries = Policy::entries( $r );
 
-		if ( count( $entries ) > Snapshots::slots( $r ) || isset( ( (array) $r->get( self::NOTICE ) )['slots_reduced'] ) ) {
+		if ( count( $entries ) > Policy::slots( $r ) || isset( ( (array) $r->get( self::NOTICE ) )['slots_reduced'] ) ) {
 			return true;
 		}
 
-		if ( 0 === Snapshots::paid_slots( $r ) ) {
+		if ( 0 === Policy::paid_slots( $r ) ) {
 			foreach ( $entries as $entry ) {
 				if ( ! empty( $entry['paid'] ) ) {
 					return true;
@@ -117,10 +117,10 @@ final class SnapshotExpiry {
 
 		$r->locked(
 			static function () use ( $r, $now, &$changed ): bool {
-				$entries = Snapshots::entries( $r );
-				$paid    = Snapshots::paid_slots( $r );
+				$entries = Policy::entries( $r );
+				$paid    = Policy::paid_slots( $r );
 				$free    = max( 1, (int) Settings::get( 'snapshot_free_days' ) ) * DAY_IN_SECONDS;
-				$over    = max( 0, count( $entries ) - Snapshots::slots( $r ) );
+				$over    = max( 0, count( $entries ) - Policy::slots( $r ) );
 				$ids     = array();
 				$until   = 0;
 

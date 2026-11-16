@@ -9,6 +9,7 @@
 namespace BeltoftServices\Tests\Proxmox\Snapshot;
 
 use BeltoftServices\Jobs;
+use BeltoftServices\Proxmox\Snapshot\Policy;
 use BeltoftServices\Proxmox\Vm\Panels;
 use BeltoftServices\Proxmox\Vm\ProxmoxJobs;
 use BeltoftServices\Proxmox\Snapshot\SnapshotExpiry;
@@ -59,7 +60,7 @@ class SnapshotsExpiryTest extends SnapshotsTestCase {
 	 * @param array    $patch Values.
 	 */
 	private function change( Resource $r, int $index, array $patch ): void {
-		$list = Snapshots::entries( $this->fresh( $r ) );
+		$list = Policy::entries( $this->fresh( $r ) );
 		$list[ $index ] = array_merge( $list[ $index ], $patch );
 		$this->assertTrue( $this->fresh( $r )->set( array( Snapshots::LIST => $list ) ) );
 	}
@@ -124,7 +125,7 @@ class SnapshotsExpiryTest extends SnapshotsTestCase {
 		$this->assertCount( 1, $this->queued() );
 
 		$this->run_jobs();
-		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ), 'It ran on the paused server, with the customer switch off.' );
+		$this->assertSame( array(), Policy::entries( $this->fresh( $r ) ), 'It ran on the paused server, with the customer switch off.' );
 		$this->assertSame( array(), $this->fake->snapshots( 5000 ) );
 	}
 
@@ -136,7 +137,7 @@ class SnapshotsExpiryTest extends SnapshotsTestCase {
 		SnapshotJobs::snapshots();
 		$this->assertSame( array( 'snapshot_sync' ), array_column( $this->queued(), 'action' ) );
 		$this->run_jobs();
-		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertSame( array(), Policy::entries( $this->fresh( $r ) ) );
 
 		$this->take( $r, 'again' );
 		SnapshotJobs::snapshots();
@@ -162,7 +163,7 @@ class SnapshotsExpiryTest extends SnapshotsTestCase {
 		$this->change( $r, 0, array( 'expires_at' => time() - 5 ) );
 		$this->act( $r, 'snapshot_expire' );
 		$this->assertCount( 1, $this->mails_about( 'reached the end of its keeping time' ) );
-		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertSame( array(), Policy::entries( $this->fresh( $r ) ) );
 	}
 
 	// -- The clamp -------------------------------------------------------------------------------
@@ -179,7 +180,7 @@ class SnapshotsExpiryTest extends SnapshotsTestCase {
 		$this->take( $r, 'a' );
 		$this->take( $r, 'b' );
 		$this->take( $r, 'c' );
-		$this->assertSame( 30, (int) round( ( Snapshots::entries( $this->fresh( $r ) )[0]['expires_at'] - time() ) / DAY_IN_SECONDS ), 'Taken with paid time.' );
+		$this->assertSame( 30, (int) round( ( Policy::entries( $this->fresh( $r ) )[0]['expires_at'] - time() ) / DAY_IN_SECONDS ), 'Taken with paid time.' );
 
 		// "a" is 10 days old: past its free week.
 		$this->change( $r, 0, array( 'taken_at' => time() - 10 * DAY_IN_SECONDS ) );
@@ -189,7 +190,7 @@ class SnapshotsExpiryTest extends SnapshotsTestCase {
 
 		$this->assertSame( 3, SnapshotExpiry::clamp( $this->fresh( $r ), $now ) );
 
-		$list = Snapshots::entries( $this->fresh( $r ) );
+		$list = Policy::entries( $this->fresh( $r ) );
 		$this->assertCount( 3, $list, 'Nothing is deleted.' );
 		$this->assertSame( $now + 3 * DAY_IN_SECONDS, $list[0]['expires_at'], 'Past the free window: at least 3 days from now.' );
 		$this->assertSame( $list[1]['taken_at'] + 7 * DAY_IN_SECONDS, $list[1]['expires_at'], 'Within the free window: the free time.' );
@@ -213,11 +214,11 @@ class SnapshotsExpiryTest extends SnapshotsTestCase {
 		$this->take( $r, 'b' );
 		$this->take( $r, 'c' );
 		$this->paid( 1 ); // Two slots now; three snapshots; still paid time.
-		$before = Snapshots::entries( $this->fresh( $r ) );
+		$before = Policy::entries( $this->fresh( $r ) );
 
 		$this->assertSame( 1, SnapshotExpiry::clamp( $this->fresh( $r ), time() ) );
 
-		$after = Snapshots::entries( $this->fresh( $r ) );
+		$after = Policy::entries( $this->fresh( $r ) );
 		$this->assertLessThan( $before[0]['expires_at'], $after[0]['expires_at'] );
 		$this->assertSame( $before[1]['expires_at'], $after[1]['expires_at'] );
 		$this->assertSame( $before[2]['expires_at'], $after[2]['expires_at'] );
@@ -233,7 +234,7 @@ class SnapshotsExpiryTest extends SnapshotsTestCase {
 
 		SnapshotExpiry::clamp( $this->fresh( $r ), time() );
 
-		$this->assertLessThanOrEqual( time() + HOUR_IN_SECONDS + 5, Snapshots::entries( $this->fresh( $r ) )[0]['expires_at'] );
+		$this->assertLessThanOrEqual( time() + HOUR_IN_SECONDS + 5, Policy::entries( $this->fresh( $r ) )[0]['expires_at'] );
 		$this->assertSame( array(), $this->mails_about( 'allowance went down' ), 'Nothing was shortened.' );
 	}
 
@@ -248,7 +249,7 @@ class SnapshotsExpiryTest extends SnapshotsTestCase {
 
 		SnapshotJobs::snapshots();
 
-		$this->assertEqualsWithDelta( time() + 3 * DAY_IN_SECONDS, Snapshots::entries( $this->fresh( $r ) )[0]['expires_at'], 5 );
+		$this->assertEqualsWithDelta( time() + 3 * DAY_IN_SECONDS, Policy::entries( $this->fresh( $r ) )[0]['expires_at'], 5 );
 		$this->assertSame( array(), $this->queued(), 'Shortened, not due yet.' );
 	}
 
@@ -291,7 +292,7 @@ class SnapshotsExpiryTest extends SnapshotsTestCase {
 	public function test_the_admin_shows_the_last_snapshot_refusal_keeps_it_through_a_retry_and_clears_it_on_a_success(): void {
 		$r = $this->server();
 		$this->take( $r, 'a' );
-		$entry = Snapshots::entries( $this->fresh( $r ) )[0];
+		$entry = Policy::entries( $this->fresh( $r ) )[0];
 		$this->settings( array( 'snapshot_reserve_gb' => 100000 ) );
 		$this->act( $r, 'snapshot_take', array( 'label' => 'b' ) );
 		$this->assertStringContainsString( 'refused', (string) $this->fresh( $r )->get( Snapshots::ERROR ) );
@@ -337,13 +338,13 @@ class SnapshotsExpiryTest extends SnapshotsTestCase {
 		$this->fake->next_task( array( 'polls' => 50 ) );
 
 		$this->act( $r, 'snapshot_expire' );
-		$this->assertSame( 'deleting', Snapshots::entries( $this->fresh( $r ) )[0]['state'] );
+		$this->assertSame( 'deleting', Policy::entries( $this->fresh( $r ) )[0]['state'] );
 
-		for ( $i = 0; $i < 60 && Snapshots::entries( $this->fresh( $r ) ); $i++ ) {
+		for ( $i = 0; $i < 60 && Policy::entries( $this->fresh( $r ) ); $i++ ) {
 			$this->act( $r, 'snapshot_expire' );
 		}
 
-		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertSame( array(), Policy::entries( $this->fresh( $r ) ) );
 		$this->assertCount( 1, $this->mails_about( 'reached the end of its keeping time' ) );
 	}
 
@@ -358,7 +359,7 @@ class SnapshotsExpiryTest extends SnapshotsTestCase {
 
 		$this->act( $r, 'snapshot_expire' );
 
-		$this->assertSame( array(), Snapshots::entries( $this->fresh( $r ) ) );
+		$this->assertSame( array(), Policy::entries( $this->fresh( $r ) ) );
 		$this->assertCount( 1, $this->mails_about( 'reached the end of its keeping time' ) );
 	}
 
@@ -366,12 +367,12 @@ class SnapshotsExpiryTest extends SnapshotsTestCase {
 		$this->on( array( 'snapshot_free_days' => 7 ) );
 		$r = $this->ready_vm();
 		$this->take( $r, 'a' );
-		$before = Snapshots::entries( $this->fresh( $r ) )[0]['expires_at'];
+		$before = Policy::entries( $this->fresh( $r ) )[0]['expires_at'];
 		$this->mails = array();
 		$this->settings( array( 'snapshot_free_days' => 1 ) );
 
 		$this->assertSame( 0, SnapshotExpiry::clamp( $this->fresh( $r ), time() ) );
-		$this->assertSame( $before, Snapshots::entries( $this->fresh( $r ) )[0]['expires_at'] );
+		$this->assertSame( $before, Policy::entries( $this->fresh( $r ) )[0]['expires_at'] );
 		$this->assertSame( array(), $this->mails_about( 'allowance went down' ) );
 	}
 

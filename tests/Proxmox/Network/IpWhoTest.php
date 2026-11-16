@@ -13,10 +13,13 @@ use BeltoftServices\Proxmox\Network\IpHistory;
 use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Network\IpWho;
 use BeltoftServices\Proxmox\Network\PrivateNets;
+use BeltoftServices\Tests\Support\PrivateNetsHarness;
 use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\Support\FakeDriver;
 use BeltoftServices\Tests\TestCase;
+
+require_once dirname( __DIR__, 2 ) . '/Support/PrivateNetsHarness.php';
 
 require_once dirname( __DIR__, 2 ) . '/Support/WpCliStub.php';
 
@@ -96,8 +99,8 @@ class IpWhoTest extends TestCase {
 	public function test_a_private_address_names_its_holder(): void {
 		PrivateNets::add( 1000, '10.64.0.0/28' );
 		list( $resource, $user_id ) = $this->resource();
-		PrivateNets::hold( $user_id );
-		$address = PrivateNets::address( $user_id, $resource->id() );
+		PrivateNetsHarness::hold( $user_id );
+		$address = PrivateNetsHarness::address( $user_id, $resource->id() );
 
 		$rows = IpWho::lookup( $address );
 
@@ -144,8 +147,8 @@ class IpWhoTest extends TestCase {
 		$this->assertSame( array(), IpWho::lookup( '192.0.2.30', time() + 60 ) );
 
 		PrivateNets::add( 1000, '10.64.0.0/28' );
-		PrivateNets::hold( $user_id );
-		$address = PrivateNets::address( $user_id, $resource->id() );
+		PrivateNetsHarness::hold( $user_id );
+		$address = PrivateNetsHarness::address( $user_id, $resource->id() );
 		PrivateNets::release_and_retire( $resource->id() );
 		$this->assertNotNull( IpHistory::for_address( $address )[0]['ended_at'] );
 	}

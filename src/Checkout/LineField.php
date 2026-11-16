@@ -7,7 +7,9 @@
 
 namespace BeltoftServices\Checkout;
 
+use BeltoftLicenses\Licenses;
 use BeltoftServices\Billing\CartFlow;
+use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -91,5 +93,56 @@ final class LineField {
 		}
 
 		return $out;
+	}
+
+	/**
+	 * The order lines a new license of a multi line order may take, and what its sibling licenses of the same driver took
+	 * already: the order's product lines of the license's product (and variation), and the keys the siblings hold. The caller
+	 * picks the first line whose data is not yet taken.
+	 *
+	 * @param array<string, mixed> $license   License row.
+	 * @param string               $driver_id Driver of the field.
+	 * @param callable             $key_of    Takes a sibling Resource, gives the key it holds (null: it holds none).
+	 * @return array{used: array<int, mixed>, items: array<int, \WC_Order_Item_Product>}|null Null when the license has no order.
+	 */
+	public static function siblings( array $license, string $driver_id, callable $key_of ): ?array {
+		$order_id = (int) ( $license['order_id'] ?? 0 );
+		$order    = $order_id > 0 ? wc_get_order( $order_id ) : false;
+
+		if ( ! $order instanceof \WC_Order ) {
+			return null;
+		}
+
+		$product_id = (int) ( $license['product_id'] ?? 0 );
+		$variation  = (int) ( $license['variation_id'] ?? 0 );
+		$used       = array();
+
+		foreach ( Licenses::where( 'order_id', $order_id ) as $other ) {
+			if ( (int) $other['id'] === (int) ( $license['id'] ?? 0 ) ) {
+				continue;
+			}
+
+			$resource = Resource::for_license( (int) $other['id'] );
+
+			if ( ! $resource || $driver_id !== $resource->get( 'driver' ) ) {
+				continue;
+			}
+
+			$key = $key_of( $resource );
+
+			if ( null !== $key ) {
+				$used[] = $key;
+			}
+		}
+
+		$items = array();
+
+		foreach ( $order->get_items() as $item ) {
+			if ( $item instanceof \WC_Order_Item_Product && (int) $item->get_product_id() === $product_id && ( 0 === $variation || (int) $item->get_variation_id() === $variation ) ) {
+				$items[] = $item;
+			}
+		}
+
+		return array( 'used' => $used, 'items' => $items );
 	}
 }

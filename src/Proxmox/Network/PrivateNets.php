@@ -54,29 +54,6 @@ final class PrivateNets {
 	}
 
 	/**
-	 * Get the customer's network, or atomically assign the lowest free one.
-	 *
-	 * @return ?array<string,mixed> Null when the seeded pool is empty.
-	 */
-	public static function hold( int $user_id ): ?array {
-		if ( $user_id < 1 || ! self::db_ready() ) {
-			return null;
-		}
-
-		list( $locked, $row ) = Locks::with(
-			Locks::name( 'privnet', 0 ),
-			Locks::allocation_wait(),
-			static fn() => self::hold_locked( $user_id )
-		);
-
-		if ( ! $locked ) {
-			throw new \RuntimeException( 'The private network pool is busy.' );
-		}
-
-		return $row;
-	}
-
-	/**
 	 * The one network+address reservation operation used by attach.
 	 *
 	 * A resource that already holds an address keeps its network (a retry, a rebuild), whatever is asked. Otherwise:
@@ -486,35 +463,6 @@ final class PrivateNets {
 		return (bool) $done;
 	}
 
-	/**
-	 * Assign an address to a resource owned by this customer. .0 is the network, .1 is reserved
-	 * for a possible gateway, and .15 is broadcast. No default gateway is put on this NIC.
-	 */
-	public static function address( int $user_id, int $resource_id ): ?string {
-		if ( ! self::valid_resource_owner( $user_id, $resource_id ) || ! self::db_ready() ) {
-			return null;
-		}
-
-		list( $locked, $address ) = Locks::with(
-			Locks::name( 'privnet', 0 ),
-			Locks::allocation_wait(),
-			static function () use ( $user_id, $resource_id ) {
-				$net = self::for_user( $user_id );
-				if ( null === $net || ! in_array( $net['state'], array( 'held', 'held_return' ), true ) ) {
-					return null;
-				}
-				return self::address_locked( $net, $resource_id );
-			}
-		);
-
-		if ( ! $locked ) {
-			throw new \RuntimeException( 'The private network pool is busy.' );
-		}
-
-		return $address;
-	}
-
-	/** Caller holds the privnet lock. */
 	private static function address_locked( array $net, int $resource_id ): ?string {
 		global $wpdb;
 		$table = Schema::tables()['private_ips'];
@@ -570,34 +518,6 @@ final class PrivateNets {
 			throw new \RuntimeException( 'The private network pool is busy.' );
 		}
 		return (bool) $done;
-	}
-
-	/**
-	 * Mark an empty customer's network for 30-day quarantine. Existing addresses keep it held.
-	 */
-	public static function retire( int $user_id ): bool {
-		global $wpdb;
-		list( $locked, $retired ) = Locks::with(
-			Locks::name( 'privnet', 0 ),
-			Locks::allocation_wait(),
-			static function () use ( $wpdb, $user_id ) {
-				$net = self::for_user( $user_id );
-				if ( null === $net || ! in_array( $net['state'], array( 'held', 'held_return' ), true ) ) {
-					return false;
-				}
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- fresh allocation state.
-				$count = $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE net_id = %d', Schema::tables()['private_ips'], $net['id'] ) );
-				if ( 0 !== (int) $count ) {
-					return false;
-				}
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- our own allocation table.
-				return 1 === $wpdb->update( Schema::tables()['private_nets'], array( 'state' => 'quarantine', 'updated_at' => gmdate( 'Y-m-d H:i:s' ) ), array( 'id' => $net['id'], 'state' => $net['state'] ) );
-			}
-		);
-		if ( ! $locked ) {
-			throw new \RuntimeException( 'The private network pool is busy.' );
-		}
-		return (bool) $retired;
 	}
 
 	/** Reclaim quarantined rows only after 30 days, and only if still empty. */

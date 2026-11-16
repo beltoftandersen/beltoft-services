@@ -58,7 +58,7 @@ final class SnapshotDriver implements Driver {
 			$why = 'An adopted server cannot receive snapshot slots.';
 		} elseif ( in_array( $server->get( 'state' ), array( 'failed', 'deleted', 'deleting' ), true ) ) {
 			$why = 'The server failed or was deleted.';
-		} elseif ( 'ready' === $server->get( 'state' ) && ! Snapshots::eligible( $server ) ) {
+		} elseif ( 'ready' === $server->get( 'state' ) && ! Policy::eligible( $server ) ) {
 			$why = 'The server does not get snapshots (switch off, or it is not on qcow2).';
 		}
 

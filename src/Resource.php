@@ -507,6 +507,16 @@ final class Resource {
 	}
 
 	/**
+	 * Is the service the customer's own? The one rule for "this service belongs to the signed-in customer": a missing
+	 * customer (0) owns nothing. Callers add their own state check (is_live, accepts_actions, shows_status).
+	 *
+	 * @param int $user_id Customer.
+	 */
+	public function owned_by( int $user_id ): bool {
+		return $user_id > 0 && (int) ( $this->license()['user_id'] ?? 0 ) === $user_id;
+	}
+
+	/**
 	 * May its customer see its state? While it is live, its license is active and it is
 	 * meant to run: not when it is paused or on its way out. A failed resource shows (as
 	 * failed), so the customer knows to get in touch.

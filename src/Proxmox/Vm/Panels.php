@@ -17,6 +17,8 @@ use BeltoftServices\Proxmox\Network\FirewallRules;
 use BeltoftServices\Proxmox\Network\Monitor;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\Ownership;
+use BeltoftServices\Proxmox\Snapshot\PanelData;
+use BeltoftServices\Proxmox\Snapshot\Policy;
 use BeltoftServices\Proxmox\Snapshot\SnapshotCart;
 use BeltoftServices\Proxmox\Snapshot\SnapshotExpiry;
 use BeltoftServices\Proxmox\Snapshot\SnapshotMeta;
@@ -278,8 +280,8 @@ final class Panels {
 			'can_rename'  => $r->accepts_actions() && true !== $r->get( 'linked' ),
 			'hostname_pending' => is_string( $r->get( ServerName::PENDING ) ) ? (string) $r->get( ServerName::PENDING ) : '',
 			'snapshot_warnings' => array(
-				'reinstall' => Snapshots::reinstall_warning( $r ),
-				'restore'   => Snapshots::restore_warning( $r ),
+				'reinstall' => Policy::reinstall_warning( $r ),
+				'restore'   => Policy::restore_warning( $r ),
 			),
 		);
 
@@ -298,7 +300,7 @@ final class Panels {
 	 * @return array<string, mixed>|null
 	 */
 	public static function snapshots( Resource $r, bool $forms = true ): ?array {
-		$panel = Snapshots::panel( $r );
+		$panel = PanelData::panel( $r );
 
 		// Absent only when there are no snapshots and none can be taken.
 		if ( null === $panel ) {
@@ -307,7 +309,7 @@ final class Panels {
 
 		// full: every action. working: the server is busy or not accepting actions, the list only.
 		// delete: not available any more, the customer may still remove what exists. readonly: an adopted machine, the list only.
-		$working = ! $forms || ! Snapshots::idle( $r ) || $panel['rolling'] || array() !== (array) $r->get( Snapshots::OP );
+		$working = ! $forms || ! Policy::idle( $r ) || $panel['rolling'] || array() !== (array) $r->get( Snapshots::OP );
 
 		// Paused or on hold with no job running: nothing is in flight, the actions just are not offered.
 		$inactive = ! $panel['rolling'] && array() === (array) $r->get( Snapshots::OP ) && ! $r->get( 'plan_dirty' ) && ! is_array( $r->get( 'restore' ) ) && ! $r->get( 'wipe' )
@@ -345,7 +347,7 @@ final class Panels {
 		);
 
 		if ( $panel['added'] > 0 ) {
-			$panel['paid_days'] = Snapshots::days_for( $r );
+			$panel['paid_days'] = Policy::days_for( $r );
 		}
 
 		return $panel;
@@ -470,12 +472,12 @@ final class Panels {
 	 * @return array<string, string|null>
 	 */
 	private static function with_snapshots( array $rows, Resource $r ): array {
-		if ( ! Snapshots::tracked( $r ) && ! Snapshots::switched_on() ) {
+		if ( ! Policy::tracked( $r ) && ! Policy::switched_on() ) {
 			return $rows;
 		}
 
 		$format  = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
-		$entries = Snapshots::entries( $r );
+		$entries = Policy::entries( $r );
 		$taken   = array_filter( array_map( static fn( $e ) => (int) ( $e['taken_at'] ?? 0 ), $entries ) );
 		$next    = SnapshotExpiry::next( $r );
 		$op      = (array) $r->get( Snapshots::OP );
@@ -495,8 +497,8 @@ final class Panels {
 				/* translators: 1: snapshots in use, 2: slots, 3: on or off */
 				__( '%1$d of %2$d slots, %3$s', 'beltoft-services' ),
 				count( $entries ),
-				Snapshots::slots( $r ),
-				Snapshots::enabled( $r ) ? __( 'on', 'beltoft-services' ) : __( 'off', 'beltoft-services' )
+				Policy::slots( $r ),
+				Policy::enabled( $r ) ? __( 'on', 'beltoft-services' ) : __( 'off', 'beltoft-services' )
 			),
 			__( 'Oldest snapshot', 'beltoft-services' )  => $taken ? wp_date( $format, min( $taken ) ) : '',
 			__( 'Next snapshot expiry', 'beltoft-services' ) => $next > 0 ? wp_date( $format, $next ) : '',

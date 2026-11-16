@@ -51,6 +51,28 @@ class CliTest extends TestCase {
 		$this->assertNull( $this->link( 'linked-name.com', '446', $fake2 ) );
 	}
 
+	public function test_link_domain_dry_run_checks_everything_and_links_nothing(): void {
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains/448', array( 'id' => 448, 'full_name' => 'linked-dry.com' ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		$product = $this->service_product( 'domain', array(), array( 'slug' => 'link-domain-dry' ) );
+		$license = $this->service_license( $product, array( 'fire' => false ) );
+		\WP_CLI::reset();
+
+		( new Commands() )->link_domain( array( (string) $license['id'], 'linked-dry.com' ), array( 'registrar-id' => '448', 'dry-run' => true ) );
+
+		$this->assertStringContainsString( 'Dry run', \WP_CLI::text() );
+		$this->assertNull( \BeltoftServices\Resource::for_license( (int) $license['id'] ), 'Nothing was linked.' );
+
+		// The checks still run: a wrong id is refused in a dry run too.
+		$wrong = new FakeClient();
+		$wrong->reply( 'GET', '/domains/449', array( 'id' => 449, 'full_name' => 'someone-else.com' ) );
+		remove_all_filters( 'beltoft_services_domains_client' );
+		add_filter( 'beltoft_services_domains_client', static fn() => $wrong );
+		$this->expectException( \RuntimeException::class );
+		( new Commands() )->link_domain( array( (string) $license['id'], 'linked-dry.com' ), array( 'registrar-id' => '449', 'dry-run' => true ) );
+	}
+
 	public function test_link_domain_stops_when_the_registrar_cannot_confirm(): void {
 		$fake = new FakeClient();
 		$fake->reply( 'GET', '/domains/447', new \WP_Error( 'transport', 'down' ) );

@@ -107,6 +107,7 @@ class HostingCommand {
 	 * <action> : scan.
 	 * <resource> : The hosting resource id.
 	 * [--now] : Ask the node to scan the websites now (about 20 seconds a website, only one scan runs on a node at a time) before the result is read.
+	 * [--dry-run] : Read the node's scan and print it. No website flag is saved and nobody is mailed.
 	 *
 	 * ## EXAMPLES
 	 *     wp beltoft-services hosting scan 12
@@ -127,11 +128,12 @@ class HostingCommand {
 		}
 
 		$job = new \BeltoftServices\Hosting\MalwareScan( $r );
-		$out = $job->check( ! empty( $assoc_args['now'] ) );
+		$dry = ! empty( $assoc_args['dry-run'] );
+		$out = $job->check( ! empty( $assoc_args['now'] ), $dry );
 
 		for ( $i = 0; $out instanceof \BeltoftServices\Drivers\StepResult && $out->is_poll() && $i < 120; $i++ ) {
 			sleep( 2 );
-			$out = $job->check( ! empty( $assoc_args['now'] ) );
+			$out = $job->check( ! empty( $assoc_args['now'] ), $dry );
 		}
 
 		if ( $out instanceof \BeltoftServices\Drivers\StepResult ) {
@@ -142,7 +144,7 @@ class HostingCommand {
 			\WP_CLI::log( $line );
 		}
 
-		\WP_CLI::success( sprintf( '%d website(s) read, %d with files found, %d new file(s)%s.', $out['sites'], $out['found'], $out['new'], $out['told'] ? ', the customer and the admin were told' : '' ) );
+		\WP_CLI::success( ( $dry ? 'Dry run, nothing saved and nobody told: ' : '' ) . sprintf( '%d website(s) read, %d with files found, %d new file(s)%s.', $out['sites'], $out['found'], $out['new'], $out['told'] ? ', the customer and the admin were told' : '' ) );
 	}
 
 	/**

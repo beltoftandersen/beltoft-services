@@ -242,15 +242,15 @@ final class BackupField {
 	 * @return array{0: array<string, mixed>, 1: int} The reply and its HTTP status.
 	 */
 	public static function respond(): array {
-		if ( false === check_ajax_referer( self::NONCE, 'nonce', false ) ) {
-			return array( array( 'ok' => false ), 403 );
-		}
+		return CartSwap::answer(
+			self::NONCE,
+			static function (): array {
+				$with = isset( $_POST['with'] ) ? '1' === sanitize_text_field( wp_unslash( $_POST['with'] ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in CartSwap::answer().
+				$disk = isset( $_POST['disk'] ) ? absint( wp_unslash( $_POST['disk'] ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in CartSwap::answer().
 
-		$with   = isset( $_POST['with'] ) ? '1' === sanitize_text_field( wp_unslash( $_POST['with'] ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
-		$disk   = isset( $_POST['disk'] ) ? absint( wp_unslash( $_POST['disk'] ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
-		$result = CartSwap::apply( $with, $disk );
-
-		return array( $result, $result['ok'] ? 200 : 409 );
+				return CartSwap::apply( $with, $disk );
+			}
+		);
 	}
 
 	/**

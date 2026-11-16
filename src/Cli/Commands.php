@@ -246,6 +246,13 @@ final class Commands {
 	/**
 	 * Link an existing registration or DNS zone to an active license, without ordering anything.
 	 *
+	 * ## OPTIONS
+	 * <license> : License id.
+	 * <domain> : Domain name.
+	 * [--registrar-id=<id>] : The registrar's numeric domain id (not for --dns-only).
+	 * [--dns-only] : Link a DNS zone on our servers instead of a registration.
+	 * [--dry-run] : Run every check and print what would be linked, change nothing.
+	 *
 	 * @subcommand link-domain
 	 */
 	public function link_domain( array $args, array $assoc_args ): void {
@@ -276,6 +283,10 @@ final class Commands {
 		if ( $dns_only ) {
 			$zone = DomainClients::dns()->zone( $domain );
 			if ( is_wp_error( $zone ) || null === $zone ) { \WP_CLI::error( 'The DNS zone must exist before linking.' ); }
+		}
+		if ( ! empty( $assoc_args['dry-run'] ) ) {
+			\WP_CLI::success( sprintf( 'Dry run: %s would be linked to license %d as a %s. Nothing was changed.', $domain, (int) $license['id'], $dns_only ? 'DNS zone' : 'registration' ) );
+			return;
 		}
 		$meta = array( 'state' => 'ready', 'desired' => 'ready', 'domain' => $domain, 'mode' => $dns_only ? 'dns' : 'register', 'protected' => true, 'notified' => 'ready', 'steps' => array( 'claim', 'zone', 'delegation' ), 'zone_claimed' => true );
 		if ( ! $dns_only ) { $meta['remote_id'] = $remote_id; $meta['steps'] = array( 'contact', 'zone_prepared', 'order', 'active', 'zone', 'dates' ); }

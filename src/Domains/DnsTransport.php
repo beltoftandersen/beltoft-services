@@ -19,6 +19,21 @@ final class DnsTransport {
 		return self::once( $ip, $name, $type, 'tcp' );
 	}
 
+	/**
+	 * One prepared question to a name server, read over UDP and, when the answer is truncated (TC bit), again over TCP.
+	 * No address check and no parsing: the caller trusts its server and reads the packet (DnsQuery).
+	 *
+	 * @param string $host Server address or name (an IPv6 address in brackets).
+	 * @param string $wire The question packet.
+	 * @param int    $port Port.
+	 * @return string|\WP_Error The answer packet.
+	 */
+	public static function exchange( string $host, string $wire, int $port = 53 ): string|\WP_Error {
+		$data = self::udp( $host, $wire, $port );
+		if ( ! is_string( $data ) || strlen( $data ) < 12 || ( ord( $data[2] ) & 0x02 ) === 0 ) { return $data; }
+		return self::tcp( $host, $wire, $port );
+	}
+
 	private static function once( string $ip, string $name, int $type, string $protocol ): array|\WP_Error {
 		$id = random_int( 0, 65535 );
 		/**
@@ -38,8 +53,8 @@ final class DnsTransport {
 		return is_string( $data ) ? DnsWire::parse( $data, $id, $name, $type ) : $data;
 	}
 
-	private static function udp( string $host, string $wire ): string|\WP_Error {
-		$socket = @fsockopen( 'udp://' . $host, 53, $errno, $message, self::TIMEOUT ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged,WordPress.WP.AlternativeFunctions.file_system_operations_fsockopen -- UDP DNS query, not file I/O; transport error returned below.
+	private static function udp( string $host, string $wire, int $port = 53 ): string|\WP_Error {
+		$socket = @fsockopen( 'udp://' . $host, $port, $errno, $message, self::TIMEOUT ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged,WordPress.WP.AlternativeFunctions.file_system_operations_fsockopen -- UDP DNS query, not file I/O; transport error returned below.
 		if ( ! $socket ) { return new \WP_Error( 'dns_unreachable', 'Name server could not be reached.' ); }
 		stream_set_timeout( $socket, self::TIMEOUT );
 		fwrite( $socket, $wire ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- UDP DNS socket, not file I/O.
@@ -50,8 +65,8 @@ final class DnsTransport {
 		return new \WP_Error( $timed_out ? 'dns_timeout' : 'dns_unreachable', 'Name server did not answer.' );
 	}
 
-	private static function tcp( string $host, string $wire ): string|\WP_Error {
-		$socket = @fsockopen( 'tcp://' . $host, 53, $errno, $message, self::TIMEOUT ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged,WordPress.WP.AlternativeFunctions.file_system_operations_fsockopen -- TCP DNS query, not file I/O; transport error returned below.
+	private static function tcp( string $host, string $wire, int $port = 53 ): string|\WP_Error {
+		$socket = @fsockopen( 'tcp://' . $host, $port, $errno, $message, self::TIMEOUT ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged,WordPress.WP.AlternativeFunctions.file_system_operations_fsockopen -- TCP DNS query, not file I/O; transport error returned below.
 		if ( ! $socket ) { return new \WP_Error( 110 === $errno ? 'dns_timeout' : 'dns_unreachable', 'Name server could not be reached.' ); }
 		stream_set_timeout( $socket, self::TIMEOUT );
 		fwrite( $socket, pack( 'n', strlen( $wire ) ) . $wire ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- TCP DNS socket, not file I/O.

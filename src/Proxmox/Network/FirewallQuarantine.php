@@ -80,7 +80,7 @@ trait FirewallQuarantine {
 		$flag = $this->r->get( Quarantine::META );
 
 		if ( ! is_array( $flag ) ) {
-			return StepResult::done( array(), 'Network quarantine refused: the server is not quarantined any more' );
+			return StepResult::refused( array(), 'Network quarantine refused: the server is not quarantined any more' );
 		}
 
 		$base    = self::base( $record, $v );

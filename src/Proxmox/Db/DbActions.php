@@ -213,7 +213,7 @@ final class DbActions {
 
 		// The guest answers only while the VM runs: a stopped database is refused at once, not waited for.
 		if ( 'running' !== $v['status'] ) {
-			return '' === $request ? StepResult::done( array(), 'New database password refused: the database is stopped' ) : $this->give_up( 'The database was stopped while the new password was being made' );
+			return '' === $request ? StepResult::refused( array(), 'New database password refused: the database is stopped' ) : $this->give_up( 'The database was stopped while the new password was being made' );
 		}
 
 		if ( '' === $request ) {

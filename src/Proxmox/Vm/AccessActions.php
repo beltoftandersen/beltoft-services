@@ -40,7 +40,7 @@ final class AccessActions {
 		$clean = ServerName::normalise( $name );
 
 		if ( null === $clean || '' === $clean ) {
-			return StepResult::done( array(), 'Rename refused: the name is not valid' );
+			return StepResult::refused( array(), 'Rename refused: the name is not valid' );
 		}
 
 		// Another operation holds the VM or the server: wait for it, no error, no counted attempt.
@@ -170,7 +170,7 @@ final class AccessActions {
 		$clean = SshKeyField::normalise( $key );
 
 		if ( null === $clean ) {
-			return StepResult::done( array(), 'SSH key change refused: the key is not valid' );
+			return StepResult::refused( array(), 'SSH key change refused: the key is not valid' );
 		}
 
 		if ( ! $this->r->set( array( 'ssh_key' => $clean ) ) ) {

@@ -23,9 +23,9 @@ use BeltoftServices\Proxmox\Db\DbDisk;
 use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\Proxmox\Db\DbIp;
 use BeltoftServices\Proxmox\Disk\DiskField;
+use BeltoftServices\Proxmox\Snapshot\PanelData;
 use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Proxmox\Vm\OsField;
-use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Proxmox\Snapshot\SnapshotCart;
 use BeltoftServices\Resource;
 use BeltoftServices\Usage\Estimate;
@@ -299,7 +299,7 @@ final class Reads {
 		);
 
 		if ( ProxmoxDriver::ID === $driver ) {
-			$panel = Snapshots::panel( $r );
+			$panel = PanelData::panel( $r );
 
 			$out['snapshots'] = null === $panel ? null : array(
 				'enabled' => $panel['enabled'],

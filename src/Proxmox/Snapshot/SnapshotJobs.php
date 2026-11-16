@@ -50,7 +50,7 @@ final class SnapshotJobs {
 		foreach ( Resource::live_ids( $driver->kind() ) as $id ) {
 			$resource = Resource::find( $id );
 
-			if ( ! $resource || ProxmoxDriver::ID !== $resource->get( 'driver' ) || true === $resource->get( 'linked' ) || ! Snapshots::tracked( $resource ) ) {
+			if ( ! $resource || ProxmoxDriver::ID !== $resource->get( 'driver' ) || true === $resource->get( 'linked' ) || ! Policy::tracked( $resource ) ) {
 				continue;
 			}
 

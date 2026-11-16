@@ -136,7 +136,7 @@ final class PowerActions {
 		if ( 'running' !== $v['status'] ) {
 			Operations::remember_power( $this->r->id(), 'stopped' );
 
-			return StepResult::done( array(), 'Reboot refused: the server is not running' );
+			return StepResult::refused( array(), 'Reboot refused: the server is not running' );
 		}
 		$this->r->set( array( 'stopped_by_customer' => time() ) );
 

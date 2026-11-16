@@ -97,7 +97,7 @@ class DbDriver extends ProxmoxDriver {
 			$why = DbPower::block( $r, false );
 
 			if ( null !== $why ) {
-				return StepResult::done( array(), ucfirst( $action ) . ' refused: ' . $why );
+				return StepResult::refused( array(), ucfirst( $action ) . ' refused: ' . $why );
 			}
 
 			$result = ( new Actions( $r ) )->run( $action, $args );

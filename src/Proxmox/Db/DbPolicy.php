@@ -184,7 +184,7 @@ final class DbPolicy {
 		if ( 'running' !== $v['status'] ) {
 			$this->clear();
 
-			return StepResult::done( array(), 'Memory policy change refused: the database is stopped' );
+			return StepResult::refused( array(), 'Memory policy change refused: the database is stopped' );
 		}
 
 		if ( '' === $request ) {

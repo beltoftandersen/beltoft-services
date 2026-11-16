@@ -11,6 +11,7 @@ use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Pve\Prepares;
+use BeltoftServices\Proxmox\Snapshot\Policy;
 use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Proxmox\Pve\Steps;
 use BeltoftServices\Resource;
@@ -71,7 +72,7 @@ final class Restore {
 
 		if ( '' === $phase && null !== Actions::disk_block( $this->r ) ) {
 			// Checked again here: a disk paused after the request must stop the restore before the VM is touched.
-			return StepResult::fail( 'Restore refused: an extra disk is detached or needs attention; the server was not touched', array( 'restore' => null ) );
+			return StepResult::fail( 'Restore refused: an extra disk is detached or needs attention; the server was not touched', array( 'restore' => null ) )->as_refusal();
 		}
 
 		if ( '' === $phase ) {
@@ -100,7 +101,7 @@ final class Restore {
 
 		if ( 'restored' === $phase ) {
 			// The restore recreated the VM: its snapshots are gone (D9). Nothing is asked of Proxmox when none were listed.
-			$forgot = Snapshots::tracked( $this->r ) ? ( new Snapshots( $this->r ) )->forget_all() : null;
+			$forgot = Policy::tracked( $this->r ) ? ( new Snapshots( $this->r ) )->forget_all() : null;
 
 			if ( null !== $forgot && ! $forgot->is_done() ) {
 				return $forgot;
@@ -148,7 +149,7 @@ final class Restore {
 		}
 
 		if ( null === $ctime ) {
-			return StepResult::done( array( 'restore' => null ), 'Restore refused: that backup is not available for this server' );
+			return StepResult::refused( array( 'restore' => null ), 'Restore refused: that backup is not available for this server' );
 		}
 
 		// A backup in progress holds the VM (lock=backup): wait for it before anything is switched off.

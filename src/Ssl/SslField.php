@@ -7,7 +7,6 @@
 
 namespace BeltoftServices\Ssl;
 
-use BeltoftLicenses\Licenses;
 use BeltoftServices\Checkout\LineField;
 use BeltoftServices\Crypto;
 use BeltoftServices\Domains\ZoneAccess;
@@ -646,31 +645,16 @@ final class SslField {
 			return $meta;
 		}
 
-		$order_id = (int) ( $license['order_id'] ?? 0 );
-		$order    = $order_id > 0 ? wc_get_order( $order_id ) : false;
+		$sibling = LineField::siblings( $license, SslDriver::ID, static fn( Resource $r ) => (int) $r->get( 'order_item_id' ) );
 
-		if ( ! $order instanceof \WC_Order ) {
+		if ( null === $sibling ) {
 			return $meta;
 		}
 
-		$product_id = (int) ( $license['product_id'] ?? 0 );
-		$variation  = (int) ( $license['variation_id'] ?? 0 );
-		$used       = array();
+		$used = $sibling['used'];
 
-		foreach ( Licenses::where( 'order_id', $order_id ) as $other ) {
-			if ( (int) $other['id'] === (int) ( $license['id'] ?? 0 ) ) {
-				continue;
-			}
-
-			$resource = Resource::for_license( (int) $other['id'] );
-
-			if ( $resource && SslDriver::ID === $resource->get( 'driver' ) ) {
-				$used[] = (int) $resource->get( 'order_item_id' );
-			}
-		}
-
-		foreach ( $order->get_items() as $item ) {
-			if ( ! $item instanceof \WC_Order_Item_Product || (int) $item->get_product_id() !== $product_id || ( 0 !== $variation && (int) $item->get_variation_id() !== $variation ) || in_array( (int) $item->get_id(), $used, true ) ) {
+		foreach ( $sibling['items'] as $item ) {
+			if ( in_array( (int) $item->get_id(), $used, true ) ) {
 				continue;
 			}
 

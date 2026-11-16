@@ -190,15 +190,19 @@ final class DiskField {
 	}
 
 	public static function ajax(): void {
-		if ( false === check_ajax_referer( self::NONCE, 'nonce', false ) ) {
-			wp_send_json( array( 'ok' => false ), 403 );
-		}
-		// The disk and, when the box is on the page, the backups choice: both are applied (CartSwap).
-		$raw  = $_POST['disk'] ?? $_POST['variation_id'] ?? null; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- checked above.
-		$disk = null === $raw ? null : absint( wp_unslash( $raw ) );
-		$with = isset( $_POST['with'] ) ? '1' === sanitize_text_field( wp_unslash( $_POST['with'] ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- checked above.
-		$result = CartSwap::apply( $with, $disk );
-		wp_send_json( $result, $result['ok'] ? 200 : 409 );
+		$answer = CartSwap::answer(
+			self::NONCE,
+			static function (): array {
+				// The disk and, when the box is on the page, the backups choice: both are applied (CartSwap).
+				$raw  = $_POST['disk'] ?? $_POST['variation_id'] ?? null; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- checked in CartSwap::answer().
+				$disk = null === $raw ? null : absint( wp_unslash( $raw ) );
+				$with = isset( $_POST['with'] ) ? '1' === sanitize_text_field( wp_unslash( $_POST['with'] ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- checked in CartSwap::answer().
+
+				return CartSwap::apply( $with, $disk );
+			}
+		);
+
+		wp_send_json( $answer[0], $answer[1] );
 	}
 
 	public static function choose( int $variation_id ): bool {

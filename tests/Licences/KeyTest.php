@@ -531,6 +531,34 @@ final class KeyTest extends TestCase {
 		$this->assertSame( '203.0.113.10', $row['details'] );
 	}
 
+	public function test_two_lines_of_one_order_go_to_two_licences_one_each(): void {
+		$product = $this->service_product( KeyDriver::ID, array( 'lic_kind' => 'edition', 'lic_tier' => 'pro', 'lic_server' => 'physical' ), array( 'slug' => 'lic-two' ) );
+		$user    = (int) self::factory()->user->create();
+		$order   = wc_create_order( array( 'customer_id' => $user ) );
+
+		foreach ( array( '203.0.113.71', '203.0.113.72' ) as $ip ) {
+			$line = new \WC_Order_Item_Product();
+			$line->set_props( array( 'product_id' => $product->get_id(), 'name' => 'Licence', 'quantity' => 1, 'total' => 30 ) );
+			$line->add_meta_data( KeyField::ITEM_META, array( 'ip' => $ip, 'attach' => 0, 'key' => 'pro-physical', 'server' => 'physical' ), true );
+			$order->add_item( $line );
+		}
+
+		$order->save();
+		$first  = $this->service_license( $product, array( 'fire' => false, 'user_id' => $user, 'order_id' => $order->get_id() ) );
+		$second = $this->service_license( $product, array( 'fire' => false, 'user_id' => $user, 'order_id' => $order->get_id() ) );
+
+		$one = KeyField::initial_meta( array(), $first, new KeyDriver() );
+		$this->assertSame( '203.0.113.71', $one['lic_ip'] );
+		Resource::create( $first, new KeyDriver(), array(), $one );
+		$two = KeyField::initial_meta( array(), $second, new KeyDriver() );
+		$this->assertSame( '203.0.113.72', $two['lic_ip'] );
+		$this->assertNotSame( $one['order_item_id'], $two['order_item_id'] );
+		Resource::create( $second, new KeyDriver(), array(), $two );
+
+		$third = $this->service_license( $product, array( 'fire' => false, 'user_id' => $user, 'order_id' => $order->get_id() ) );
+		$this->assertSame( array(), KeyField::initial_meta( array(), $third, new KeyDriver() ), 'No line is left for a third licence.' );
+	}
+
 	public function test_the_choices_on_the_order_line_become_the_resources_meta(): void {
 		$product = $this->service_product( KeyDriver::ID, array( 'lic_kind' => 'edition', 'lic_tier' => 'pro', 'lic_server' => 'physical' ), array( 'slug' => 'lic-meta' ) );
 		$user    = (int) self::factory()->user->create();

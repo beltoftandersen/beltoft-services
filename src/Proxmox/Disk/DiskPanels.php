@@ -7,7 +7,7 @@ use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;
-use BeltoftServices\Proxmox\Snapshot\Snapshots;
+use BeltoftServices\Proxmox\Snapshot\Policy;
 use BeltoftServices\Proxmox\Vm\Panels;
 use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
@@ -43,7 +43,7 @@ final class DiskPanels {
 		$volumes = array();
 		$located = VmRecords::for_resource( $server->id() );
 		$where = $located ? Clusters::get( $located['cluster'] ) : null;
-		$kept = Snapshots::entries( $server );
+		$kept = Policy::entries( $server );
 		if ( $located && $where && $kept ) {
 			foreach ( DiskSteps::volumes( $server, (string) $where['storage'], (int) $located['vmid'], false ) as $volume ) {
 				$volumes[ $volume['id'] ] = $volume['volid'];

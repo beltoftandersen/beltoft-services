@@ -12,9 +12,12 @@ use BeltoftServices\Account\DbPicker;
 use BeltoftServices\Alerts;
 use BeltoftServices\Proxmox\Db\DbNetGuard;
 use BeltoftServices\Proxmox\Network\PrivateNets;
+use BeltoftServices\Tests\Support\PrivateNetsHarness;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
+
+require_once dirname( __DIR__, 2 ) . '/Support/PrivateNetsHarness.php';
 
 require_once dirname( __DIR__ ) . '/Backup/BackupTestCase.php';
 
@@ -43,7 +46,7 @@ class PrivateNetGuardTest extends BackupTestCase {
 	/** Take every free network for users 9001, 9002, ... and return the number taken. */
 	private function take_all(): void {
 		$user = 9001;
-		while ( null !== PrivateNets::hold( $user ) ) {
+		while ( null !== PrivateNetsHarness::hold( $user ) ) {
 			++$user;
 		}
 	}
@@ -58,7 +61,7 @@ class PrivateNetGuardTest extends BackupTestCase {
 
 	public function test_a_customer_with_a_network_needs_a_free_address_on_it_not_a_free_network(): void {
 		$this->seed_private_nets( 1 );
-		$this->assertNotNull( PrivateNets::hold( 11 ) );
+		$this->assertNotNull( PrivateNetsHarness::hold( 11 ) );
 		$this->assertSame( 0, PrivateNets::free_count() );
 		$this->assertTrue( PrivateNets::available_for( 11 ), 'Their own network has addresses.' );
 		$this->assertFalse( PrivateNets::available_for( 12 ) );
@@ -77,8 +80,8 @@ class PrivateNetGuardTest extends BackupTestCase {
 
 	public function test_a_quarantined_network_of_the_customer_counts(): void {
 		$this->seed_private_nets( 1 );
-		PrivateNets::hold( 11 );
-		$this->assertTrue( PrivateNets::retire( 11 ) );
+		PrivateNetsHarness::hold( 11 );
+		$this->assertTrue( PrivateNetsHarness::retire( 11 ) );
 		$this->assertSame( 'quarantine', PrivateNets::for_user( 11 )['state'] );
 		$this->assertTrue( PrivateNets::available_for( 11 ) );
 		$this->assertFalse( PrivateNets::available_for( 12 ) );
@@ -146,7 +149,7 @@ class PrivateNetGuardTest extends BackupTestCase {
 		$this->assertCount( 0, $this->mails, '12 free is above the default threshold of 10.' );
 
 		for ( $user = 9001; $user <= 9003; $user++ ) {
-			PrivateNets::hold( $user );
+			PrivateNetsHarness::hold( $user );
 		}
 		PrivateNets::check_pool();
 		$this->assertCount( 1, $this->mails );
@@ -154,7 +157,7 @@ class PrivateNetGuardTest extends BackupTestCase {
 		$this->assertStringContainsString( 'wp beltoft-services private-net add <vlan> <cidr>', $this->mails[0]['message'] );
 		$this->assertStringContainsString( '9 free', $this->mails[0]['message'] );
 
-		PrivateNets::hold( 9004 );
+		PrivateNetsHarness::hold( 9004 );
 		PrivateNets::check_pool();
 		PrivateNets::check_pool();
 		$this->assertCount( 1, $this->mails, 'Deduped.' );
@@ -199,7 +202,7 @@ class PrivateNetGuardTest extends BackupTestCase {
 
 	public function test_the_texts_have_no_em_dash_or_middle_dot(): void {
 		$this->seed_private_nets( 1 );
-		PrivateNets::hold( 9001 );
+		PrivateNetsHarness::hold( 9001 );
 		PrivateNets::check_pool();
 		foreach ( array_merge( array( PrivateNets::unavailable_message() ), array_column( $this->mails, 'message' ), array_column( $this->mails, 'subject' ) ) as $text ) {
 			$this->assertStringNotContainsString( "\u{2014}", $text );
