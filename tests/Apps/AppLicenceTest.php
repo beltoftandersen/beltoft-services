@@ -7,6 +7,7 @@ use BeltoftLicenses\Licenses;
 use BeltoftServices\Jobs;
 use BeltoftServices\Apps\AppInstall;
 use BeltoftServices\Apps\AppLicence;
+use BeltoftServices\Apps\AppLicenceKeep;
 use BeltoftServices\Apps\AppReinstall;
 use BeltoftServices\Apps\AppTab;
 use BeltoftServices\Apps\Apps;
@@ -238,19 +239,40 @@ final class AppLicenceTest extends PaidAppCase {
 
 	// -- The end of the server or of the app -------------------------------------------------------------
 
-	public function test_deleting_the_server_ends_the_app_licence_and_its_subscription(): void {
+	public function test_deleting_the_server_keeps_the_app_licence_to_the_end_of_the_paid_period(): void {
 		$o            = $this->with_licence();
 		$subscription = (int) $o['licence']->license()['subscription_id'];
+		$paid_until   = (int) wcs_get_subscription( $subscription )->get_time( 'next_payment' );
 		$this->events = array();
 		$this->mails  = array();
 		$this->assertSame( 'active', wcs_get_subscription( $subscription )->get_status() );
 
 		do_action( 'beltoft_services_state_changed', $this->fresh( $o['server'] ), 'ready', 'deleted' );
 
-		$this->assertSame( 'cancelled', wcs_get_subscription( $subscription )->get_status() );
+		$kept = $this->fresh( $o['licence'] );
+		$this->assertSame( 'pending-cancel', wcs_get_subscription( $subscription )->get_status(), 'It is not renewed.' );
+		$this->assertSame( $paid_until, (int) wcs_get_subscription( $subscription )->get_time( 'end' ), 'It runs to the end of the paid period.' );
+		$this->assertSame( 'ready', $kept->get( 'state' ), 'The resource stays alive.' );
+		$this->assertTrue( AppLicenceKeep::kept( $kept ) );
+		$this->assertSame( 0, (int) $kept->get( 'server_license' ), 'Unlinked from the server.' );
+		$this->assertSame( (int) $o['server']->license()['id'], (int) $kept->get( AppLicenceKeep::PREV ), 'The old server is remembered for the admin.' );
+		$this->assertSame( '', (string) $kept->get( AppLicence::ENDED ) );
+		$this->assertSame( 'active', AppLicence::state( $kept ) );
+		$this->assertSame( array(), $this->events, 'Nothing is announced to the vendor driver: the vendor licence stays.' );
+		$this->assertCount( 0, $this->mails );
+	}
+
+	public function test_a_licence_with_less_than_a_few_hours_paid_is_not_kept_and_ends_with_the_server_as_before(): void {
+		$o            = $this->with_licence();
+		$subscription = wcs_get_subscription( (int) $o['licence']->license()['subscription_id'] );
+		$subscription->update_dates( array( 'next_payment' => gmdate( 'Y-m-d H:i:s', time() + HOUR_IN_SECONDS ) ) );
+		$this->events = array();
+
+		do_action( 'beltoft_services_state_changed', $this->fresh( $o['server'] ), 'ready', 'deleted' );
+
+		$this->assertSame( 'cancelled', wcs_get_subscription( $subscription->get_id() )->get_status() );
 		$this->assertSame( 'deleted', $this->fresh( $o['licence'] )->get( 'state' ) );
 		$this->assertSame( 'cancelled', $this->events[0]['event'] );
-		$this->assertCount( 0, $this->mails, 'The subscription ended, so there is nothing to alert.' );
 	}
 
 	public function test_a_server_subscription_that_ends_takes_the_app_licence_subscription_with_it(): void {
@@ -265,7 +287,7 @@ final class AppLicenceTest extends PaidAppCase {
 		$this->assertStringContainsString( 'App licence subscription #' . $licence_sub . ' ends with this server.', implode( "\n", array_map( static fn( $n ) => $n->content, wc_get_order_notes( array( 'order_id' => $server_sub->get_id() ) ) ) ) );
 	}
 
-	public function test_reinstalling_without_the_app_or_with_another_ends_the_licence_but_the_same_app_keeps_it(): void {
+	public function test_reinstalling_without_the_app_or_with_another_keeps_the_licence_and_the_same_app_keeps_it_linked(): void {
 		$o            = $this->with_licence();
 		$subscription = (int) $o['licence']->license()['subscription_id'];
 
@@ -274,12 +296,12 @@ final class AppLicenceTest extends PaidAppCase {
 		$this->assertSame( 'active', wcs_get_subscription( $subscription )->get_status() );
 		$this->assertSame( '', (string) $this->fresh( $o['licence'] )->get( AppLicence::ENDED ) );
 
-		// Another app (here none): the licence ends, the server is not touched.
+		// Another app (here none): the licence is kept to the end of the paid month, the server is not touched.
 		$this->assertTrue( $o['server']->set( array( 'app_id' => '', 'app_version' => '' ) ) );
 		do_action( 'beltoft_services_reinstall_started', $this->fresh( $o['server'] ), array() );
-		$this->assertSame( 'cancelled', wcs_get_subscription( $subscription )->get_status() );
-		$this->assertNotSame( '', (string) $this->fresh( $o['licence'] )->get( AppLicence::ENDED ) );
-		$this->assertSame( 'ended', AppLicence::state( $this->fresh( $o['licence'] ) ) );
+		$this->assertSame( 'pending-cancel', wcs_get_subscription( $subscription )->get_status() );
+		$this->assertSame( '', (string) $this->fresh( $o['licence'] )->get( AppLicence::ENDED ) );
+		$this->assertTrue( AppLicenceKeep::kept( $this->fresh( $o['licence'] ) ) );
 		$this->assertSame( 'ready', $this->fresh( $o['server'] )->get( 'state' ) );
 	}
 

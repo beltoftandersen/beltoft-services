@@ -513,9 +513,23 @@ final class PleskLicenceTest extends PaidAppCase {
 		$this->assertSame( array( array( $o['licence']->id() ) ), PleskLicence::sync_due(), 'A provision that failed after the order is still released.' );
 	}
 
-	public function test_deleting_the_server_deletes_the_licence(): void {
+	public function test_deleting_the_server_keeps_the_vendor_licence_while_the_licence_is_kept(): void {
 		$o      = $this->provisioned( 'pro' );
 		$key_id = (int) $o['licence']->get( 'plesk_key_id' );
+
+		do_action( 'beltoft_services_state_changed', $this->fresh( $o['server'] ), 'ready', 'deleted' );
+
+		$this->assertCount( 0, $this->op_calls( 'DELETE' ), 'The vendor licence is not released while the licence is kept.' );
+		$this->assertArrayHasKey( $key_id, $this->licences() );
+		$this->assertSame( $key_id, (int) $this->fresh( $o['licence'] )->get( 'plesk_key_id' ) );
+		$this->assertFalse( AppLicence::release_due( $this->fresh( $o['licence'] ) ) );
+		$this->assertSame( array(), PleskLicence::sync_due() );
+	}
+
+	public function test_a_licence_that_cannot_be_kept_still_deletes_the_vendor_licence_with_its_server(): void {
+		$o      = $this->provisioned( 'pro' );
+		$key_id = (int) $o['licence']->get( 'plesk_key_id' );
+		wcs_get_subscription( (int) $o['licence']->license()['subscription_id'] )->update_dates( array( 'next_payment' => gmdate( 'Y-m-d H:i:s', time() + HOUR_IN_SECONDS ) ) );
 
 		do_action( 'beltoft_services_state_changed', $this->fresh( $o['server'] ), 'ready', 'deleted' );
 

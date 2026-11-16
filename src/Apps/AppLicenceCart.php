@@ -106,6 +106,17 @@ final class AppLicenceCart {
 			return true;
 		}
 
+		// A kept licence of the customer's own is used, not bought: no licence line (the server's order line carries the choice).
+		$use = AppLicenceKeep::use_choice( $tier );
+
+		if ( null !== $use ) {
+			if ( $line ) {
+				$cart->remove_cart_item( $line['key'] );
+			}
+
+			return null !== AppLicenceKeep::offered( $app_id, $use, get_current_user_id() );
+		}
+
 		$wanted    = AppLicence::tier( $app_id, $tier );
 		$variation = null === $wanted ? null : AppLicence::line_variation( $wanted, self::server_usage() );
 

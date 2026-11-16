@@ -238,6 +238,7 @@ final class AppReinstall {
 			'app_queue_until'    => null,
 			'app_recipe'         => null,
 			'app_tier'           => null,
+			AppLicenceKeep::USE  => null,
 			'app_upstream'       => null,
 			'app_reveal'         => '',
 			'app_reveal_until'   => 0,
@@ -360,7 +361,7 @@ final class AppReinstall {
 
 		foreach ( $apps as $app_id => $entry ) {
 			// A paid app with no tier that can be bought now is not offered.
-			if ( AppLicence::paid( (string) $app_id ) && array() === self::tiers( (string) $app_id, $usage ) ) {
+			if ( AppLicence::paid( (string) $app_id ) && array() === self::tiers( (string) $app_id, $usage ) && array() === AppLicenceKeep::usable( get_current_user_id(), (string) $app_id ) ) {
 				continue;
 			}
 
@@ -427,8 +428,9 @@ final class AppReinstall {
 
 		foreach ( $apps as $app_id => $entry ) {
 			$tiers = AppLicence::paid( (string) $app_id ) ? self::tiers( (string) $app_id, $usage ) : array();
+			$kept  = AppLicence::paid( (string) $app_id ) ? AppLicenceKeep::usable( get_current_user_id(), (string) $app_id ) : array();
 
-			if ( array() === $tiers ) {
+			if ( array() === $tiers && array() === $kept ) {
 				continue;
 			}
 
@@ -436,6 +438,11 @@ final class AppReinstall {
 			echo '<fieldset class="beltoft-services-app__domain beltoft-services-app__tiers" data-reinstall-tiers="' . esc_attr( (string) $app_id ) . '" hidden>';
 			/* translators: %s: app name */
 			echo '<legend>' . esc_html( sprintf( __( '%s tier', 'beltoft-services' ), (string) ( $entry['def']['name'] ?? $app_id ) ) ) . '</legend>';
+
+			// A kept licence of the customer's own, first: no checkout, the server is reinstalled at once (see AppLicenceKeep).
+			foreach ( $kept as $licence ) {
+				echo '<label class="beltoft-services-app__domain-choice"><input type="radio" class="input-radio" name="app_tier" value="' . esc_attr( AppLicenceKeep::value_of( $licence ) ) . '" data-app-kept disabled> <span>' . esc_html( AppLicenceKeep::choice_label( $licence ) ) . '</span></label>';
+			}
 
 			foreach ( $tiers as $key => $tier ) {
 				echo '<label class="beltoft-services-app__domain-choice"><input type="radio" class="input-radio" name="app_tier" value="' . esc_attr( (string) $key ) . '" disabled> <span>' . esc_html( $tier['label'] ) . '</span> <span class="description">' . esc_html( $tier['price'] ) . '</span></label>';
@@ -446,8 +453,8 @@ final class AppReinstall {
 
 		if ( $any ) {
 			echo '<p class="description" data-reinstall-paid-note hidden>' . esc_html( $usage
-				? __( 'This app has a monthly licence. A whole month is charged in advance at checkout and again each month you keep it, while your server stays billed by the hour. A month that has started is not refunded. The server is reinstalled when the licence is paid. The licence ends when you reinstall without this app.', 'beltoft-services' )
-				: __( 'This app has a monthly licence. You pay for it at checkout first, and the server is reinstalled when the licence is paid. The licence ends when you reinstall without this app.', 'beltoft-services' )
+				? __( 'This app has a monthly licence. A whole month is charged in advance at checkout and again each month you keep it, while your server stays billed by the hour. A month that has started is not refunded. The server is reinstalled when the licence is paid. If you reinstall without this app, the licence stays on your account until the end of the month you paid for and can be used on another server. It is not renewed unless it is used.', 'beltoft-services' )
+				: __( 'This app has a monthly licence. You pay for it at checkout first, and the server is reinstalled when the licence is paid. If you reinstall without this app, the licence stays on your account until the end of the month you paid for and can be used on another server. It is not renewed unless it is used.', 'beltoft-services' )
 			) . '</p>';
 		}
 	}
@@ -742,6 +749,13 @@ final class AppReinstall {
 			return sprintf( __( '%s has a licence. Choose a tier, or no app.', 'beltoft-services' ), (string) ( $def['name'] ?? $app_id ) );
 		}
 
+		// A kept licence of the customer's own is used, not bought: nothing is quoted or paid, and the licence is linked when the install starts.
+		$use = AppLicenceKeep::use_choice( $tier );
+
+		if ( null !== $use ) {
+			return null !== AppLicenceKeep::offered( $app_id, $use, (int) ( $r->license()['user_id'] ?? 0 ) ) ? null : __( 'The licence you chose can no longer be used. Choose a tier, or no app.', 'beltoft-services' );
+		}
+
 		$found = AppLicence::tier( $app_id, $tier, false );
 
 		if ( null === $found ) {
@@ -845,7 +859,14 @@ final class AppReinstall {
 			}
 
 			// The app runs on its own system, as at checkout: the posted one when the version runs on it, else the version's.
-			$paid = AppLicence::paid( $pick[0] ) ? array( 'app_tier' => sanitize_key( (string) ( $args['app_tier'] ?? '' ) ) ) : array();
+			$paid = AppLicence::paid( $pick[0] ) ? array( 'app_tier' => sanitize_key( (string) ( $args['app_tier'] ?? '' ) ), AppLicenceKeep::USE => null ) : array();
+			$use  = AppLicence::paid( $pick[0] ) ? AppLicenceKeep::use_choice( sanitize_key( (string) ( $args['app_tier'] ?? '' ) ) ) : null;
+			$kept = null === $use ? null : AppLicenceKeep::offered( $pick[0], $use, (int) ( $r->license()['user_id'] ?? 0 ), false );
+
+			if ( null !== $kept ) {
+				// The licence's own tier, and the licence to link when the install starts (AppLicenceKeep::claim_chosen).
+				$paid = array( 'app_tier' => (string) ( ( (array) $kept->get( 'plan' ) )['tier'] ?? '' ), AppLicenceKeep::USE => $use );
+			}
 
 			return array_merge( $meta, self::fresh(), self::domain_meta( $r, $args, (array) Apps::definition( $pick[0] ) ), array( 'app_id' => $pick[0], 'app_version' => $pick[1], OsField::META => $os ), $paid );
 		}

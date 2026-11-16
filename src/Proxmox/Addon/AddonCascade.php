@@ -35,6 +35,11 @@ final class AddonCascade {
 					continue;
 				}
 
+				// An add-on that keeps itself (a paid app licence with paid time left) is not ended with its server.
+				if ( null !== $a->keeps && ( $a->keeps )( $addon, $resource ) ) {
+					continue;
+				}
+
 				if ( $addon->transition( 'deleted', $a->parent_deleted_event ) ) {
 					( $a->after_parent_deleted )( $addon );
 				}

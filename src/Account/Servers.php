@@ -613,7 +613,8 @@ final class Servers {
 
 		return array(
 			'name'  => (string) ( $view['product'] ?? '' ),
-			'state' => Panel::label( (string) $resource->get( 'state' ), $resource ),
+			// A kept app licence has no server: it says so, not "Ready" (its text says until when).
+			'state' => \BeltoftServices\Apps\AppLicenceKeep::kept( $resource ) ? __( 'Kept', 'beltoft-services' ) : Panel::label( (string) $resource->get( 'state' ), $resource ),
 			'body'  => $body,
 		);
 	}

@@ -307,7 +307,7 @@ final class PaidAppReinstallTest extends PaidAppCase {
 
 	// -- Leaving the app --------------------------------------------------------------------------
 
-	public function test_switching_from_a_paid_app_to_another_ends_the_old_licence_as_before(): void {
+	public function test_switching_from_a_paid_app_to_another_keeps_the_old_licence(): void {
 		$o = $this->ordered( $this->tiers['basic'], 'basic' );
 		Jobs::run( $o['licence']->id() );
 		$subscription = (int) $o['licence']->license()['subscription_id'];
@@ -315,8 +315,9 @@ final class PaidAppReinstallTest extends PaidAppCase {
 		$this->assertTrue( $o['server']->set( array( 'app_id' => 'wordpress', 'app_version' => '6' ) ) );
 		do_action( 'beltoft_services_reinstall_started', $this->fresh( $o['server'] ), array() );
 
-		$this->assertSame( 'cancelled', wcs_get_subscription( $subscription )->get_status() );
-		$this->assertSame( 'ended', AppLicence::state( $this->fresh( $o['licence'] ) ) );
+		$this->assertSame( 'pending-cancel', wcs_get_subscription( $subscription )->get_status() );
+		$this->assertSame( 'active', AppLicence::state( $this->fresh( $o['licence'] ) ) );
+		$this->assertTrue( \BeltoftServices\Apps\AppLicenceKeep::kept( $this->fresh( $o['licence'] ) ) );
 	}
 
 	public function test_a_server_busy_with_another_change_keeps_the_reinstall_request_and_marks_nothing(): void {

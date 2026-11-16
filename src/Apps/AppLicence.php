@@ -47,6 +47,9 @@ defined( 'ABSPATH' ) || exit;
  * does. A tier change is billed by WooCommerce Subscriptions (a switch on the tier subscription; the App tab
  * offers the other tiers); the plugin only reads the new variation afterwards.
  *
+ * Keeping. A licence with its own subscription is not ended with its server or by a reinstall without the app: it is kept until its paid
+ * month is over and can be used on another server (AppLicenceKeep). Only a licence that cannot be kept ends as described next.
+ *
  * Ending. When the licence ends the server keeps running and nothing is uninstalled: the App tab says the
  * licence ended. Deleting the server, or reinstalling it without this app, ends the tier subscription
  * (DiskCascade::cancel_undelivered, the way the other add-ons end); a server subscription that ends takes the
@@ -59,6 +62,9 @@ final class AppLicence {
 
 	/** Action fired when the licence of a server's app changes. */
 	public const EVENT = 'beltoft_services_app_licence_changed';
+
+	/** Action fired when a licence with no server ends: ( Resource $licence, string $app_id, string $tier, string $event ). */
+	public const LOOSE_EVENT = 'beltoft_services_app_licence_loose';
 
 	/** Order line meta: this line is an app licence for the server of the same order. */
 	public const ITEM_UID    = '_beltoft_services_applic_uid';
@@ -161,7 +167,7 @@ final class AppLicence {
 			$plan = Product::plan( $id, (int) $variation_id );
 			$key  = (string) ( $plan['tier'] ?? '' );
 
-			if ( 1 !== preg_match( '/^[a-z0-9_-]{1,32}$/D', $key ) || isset( $out[ $key ] ) || ( $buyable && ( ! $variation->is_purchasable() || ! $variation->is_in_stock() ) ) ) {
+			if ( 1 !== preg_match( '/^[a-z0-9_-]{1,32}$/D', $key ) || null !== AppLicenceKeep::use_choice( $key ) || isset( $out[ $key ] ) || ( $buyable && ( ! $variation->is_purchasable() || ! $variation->is_in_stock() ) ) ) {
 				continue;
 			}
 
@@ -392,7 +398,23 @@ final class AppLicence {
 	public static function announce( Resource $licence, string $event ): void {
 		$server = self::server_of( $licence );
 
+		// A licence with no server (it was kept, see AppLicenceKeep) has no server to tell the vendor driver about; only its end is passed on.
 		if ( ! $server ) {
+			if ( 'cancelled' === $event && $event !== (string) $licence->get( 'applic_event' ) ) {
+				$licence->set( array( 'applic_event' => $event ) );
+				$plan = (array) $licence->get( 'plan' );
+
+				/**
+				 * A licence with no server ended (a kept licence ran out). A vendor driver ends the vendor's licence here.
+				 *
+				 * @param Resource $licence The licence resource.
+				 * @param string   $app_id  App id.
+				 * @param string   $tier    Tier key.
+				 * @param string   $event   cancelled.
+				 */
+				do_action( self::LOOSE_EVENT, $licence, (string) ( $plan['app'] ?? '' ), (string) ( $plan['tier'] ?? '' ), $event );
+			}
+
 			return;
 		}
 
@@ -500,6 +522,13 @@ final class AppLicence {
 	 * @return array{tier: string, licence: array<string, mixed>}|\BeltoftServices\Drivers\StepResult
 	 */
 	public static function for_install( Resource $server ) {
+		// A kept licence the customer chose is linked to the server first (it fails the install when it can no longer be used).
+		$claim = AppLicenceKeep::claim_chosen( $server );
+
+		if ( null !== $claim ) {
+			return $claim;
+		}
+
 		$licence = self::current( $server );
 		$state   = $licence ? self::state( $licence ) : 'none';
 
@@ -592,7 +621,7 @@ final class AppLicence {
 		$app = (string) $r->get( 'app_id' );
 
 		foreach ( self::for_server( $r ) as $licence ) {
-			if ( 'ended' !== self::state( $licence ) && (string) ( ( (array) $licence->get( 'plan' ) )['app'] ?? '' ) !== $app ) {
+			if ( 'ended' !== self::state( $licence ) && (string) ( ( (array) $licence->get( 'plan' ) )['app'] ?? '' ) !== $app && ! AppLicenceKeep::keep( $licence, $r, 'The server was reinstalled without this app.' ) ) {
 				self::end( $licence, 'The server was reinstalled without this app, so its licence ends.' );
 			}
 		}
