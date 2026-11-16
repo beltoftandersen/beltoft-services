@@ -112,15 +112,8 @@
 				copy.textContent = t.copied;
 				window.setTimeout( function () { copy.textContent = t.copy; }, 2000 );
 			}
-			function fallback() {
-				input.select();
-				try { if ( document.execCommand( 'copy' ) ) { done(); } } catch ( e ) {}
-			}
-			if ( window.navigator.clipboard && window.isSecureContext ) {
-				window.navigator.clipboard.writeText( value ).then( done ).catch( fallback );
-			} else {
-				fallback();
-			}
+			// When copying is not possible the field is selected, so the customer can copy it by hand.
+			window.beltoftApi.copy( value ).then( done ).catch( function () { input.select(); } );
 		} );
 		row.appendChild( el( 'span', 'beltoft-dns-claim__label', label ) );
 		row.appendChild( input );

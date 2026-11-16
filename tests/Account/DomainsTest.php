@@ -404,6 +404,28 @@ class DomainsTest extends TestCase {
 		$this->assertStringNotContainsString( 'beltoft-dns-editor', $html );
 	}
 
+	public function test_the_zone_is_read_for_the_records_tab_only_and_the_editor_loads_the_rows_itself_otherwise(): void {
+		$r       = $this->service( $this->user, 'lazy.example' );
+		$counter = new class() extends FakeDns {
+			public int $zone_reads = 0;
+			public function zone( string $name ): array|\WP_Error|null { ++$this->zone_reads; return parent::zone( $name ); }
+		};
+		remove_all_filters( 'beltoft_services_domains_dns' );
+		add_filter( 'beltoft_services_domains_dns', static fn() => $counter );
+
+		foreach ( array( '', 'nameservers', 'transfer', 'danger' ) as $tab ) {
+			$html = $this->page( $r, $tab );
+			$this->assertStringContainsString( 'data-dns-editor', $html, $tab );
+			$this->assertStringContainsString( 'data-rows-lazy', $html, $tab );
+		}
+
+		$this->assertSame( 0, $counter->zone_reads, 'No tab but the records tab waits for the DNS server.' );
+
+		$html = $this->page( $r, 'dns' );
+		$this->assertSame( 1, $counter->zone_reads );
+		$this->assertStringNotContainsString( 'data-rows-lazy', $html );
+	}
+
 	public function test_a_domain_on_other_dns_has_no_records_tab(): void {
 		foreach ( array( array( 'dns_external' => true ), array( 'ns_mode' => 'custom', 'nameservers' => array( 'ns1.other.example', 'ns2.other.example' ) ) ) as $meta ) {
 			$r    = $this->service( $this->user, 'elsewhere' . wp_rand( 100, 999 ) . '.example', 'domain', $meta );

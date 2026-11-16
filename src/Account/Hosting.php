@@ -8,7 +8,6 @@
 namespace BeltoftServices\Account;
 
 use BeltoftServices\Resource;
-use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -25,10 +24,7 @@ final class Hosting extends ServiceArea {
 	 * there is none (then there is no button).
 	 */
 	public function url_add(): string {
-		$url = trim( (string) Settings::get( 'hosting_order_url' ) );
-
-		// A path on this site, or a full address; a scheme-less //host is neither.
-		$url = '' === $url || 0 === strpos( $url, '//' ) ? '' : esc_url_raw( 0 === strpos( $url, '/' ) ? home_url( $url ) : $url );
+		$url = self::setting_url( 'hosting_order_url' );
 
 		if ( '' === $url ) {
 			$url = self::product_url( array( 'hosting' ) );

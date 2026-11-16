@@ -21,16 +21,7 @@ defined( 'ABSPATH' ) || exit;
 do_action( 'woocommerce_email_header', $email_heading, $email ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own hook.
 ?>
 
-<p>
-<?php
-if ( '' !== $customer_name ) {
-	/* translators: %s: customer's first name. */
-	printf( esc_html__( 'Hi %s,', 'beltoft-services' ), esc_html( $customer_name ) );
-} else {
-	esc_html_e( 'Hi,', 'beltoft-services' );
-}
-?>
-</p>
+<?php require BELTOFT_SERVICES_PATH . 'templates/parts/emails/html-greeting.php'; ?>
 <p><?php echo esc_html( sprintf( /* translators: %s: domain name. */ __( 'Your domain %s is registered.', 'beltoft-services' ), $domain_name ) ); ?></p>
 <?php if ( $nameservers_shown ) : ?>
 <p><?php echo esc_html( sprintf( /* translators: %s: name servers, comma separated. */ __( 'Name servers: %s', 'beltoft-services' ), implode( ', ', array_map( 'strval', $nameservers_shown ) ) ) ); ?></p>
@@ -41,8 +32,4 @@ if ( '' !== $customer_name ) {
 <p><a href="<?php echo esc_url( $domains_url ); ?>"><?php esc_html_e( 'Manage your domains in your account', 'beltoft-services' ); ?></a></p>
 <?php
 
-if ( $additional_content ) {
-	echo wp_kses_post( wpautop( wptexturize( $additional_content ) ) );
-}
-
-do_action( 'woocommerce_email_footer', $email ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own hook.
+require BELTOFT_SERVICES_PATH . 'templates/parts/emails/html-footer.php';

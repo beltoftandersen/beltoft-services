@@ -211,6 +211,48 @@ class DbPickerTest extends BackupTestCase {
 		$this->assertCount( 0, WC()->cart->get_cart() );
 	}
 
+	public function test_the_refusal_texts_of_the_guard_the_cart_rule_and_the_shop_stay_as_they_are(): void {
+		$this->assertSame( 'Your session has expired. Reload the page and try again.', DbPicker::process( $this->post( array( DbPicker::FIELD => 'nope' ) ), $this->user )['errors']['form'] );
+		$this->assertSame( 'Your session has expired. Reload the page and try again.', DbPicker::process( $this->post(), 0 )['errors']['form'] );
+
+		add_filter( 'beltoft_services_picker_rate_limit', static fn() => 1 );
+		$this->assertSame( array(), DbPicker::process( $this->post(), $this->user )['errors'] );
+		$this->assertSame( 'Too many tries. Please wait a while and try again.', DbPicker::process( $this->post(), $this->user )['errors']['form'] );
+		remove_all_filters( 'beltoft_services_picker_rate_limit' );
+		WC()->cart->empty_cart();
+
+		$simple = new \WC_Product_Simple();
+		$simple->set_name( 'Other' );
+		$simple->set_regular_price( '5' );
+		$simple->set_status( 'publish' );
+		$simple->save();
+
+		foreach ( array( 'subscription_renewal', 'subscription_switch', 'subscription_resubscribe' ) as $kind ) {
+			WC()->cart->empty_cart();
+			$item = array( 'product_id' => $simple->get_id(), $kind => array( 'subscription_id' => 1 ) );
+			$key  = md5( wp_json_encode( $item ) );
+			$cart = WC()->cart->get_cart_contents();
+			$cart[ $key ] = array_merge( array( 'key' => $key, 'variation_id' => 0, 'variation' => array(), 'quantity' => 1, 'data' => wc_get_product( $simple->get_id() ) ), $item );
+			WC()->cart->set_cart_contents( $cart );
+
+			$result = DbPicker::process( $this->post(), $this->user );
+			$this->assertSame( 'Finish or remove the subscription payment in your cart first.', $result['errors']['form'], $kind );
+			$this->assertSame( array( $key ), array_keys( WC()->cart->get_cart() ), $kind );
+		}
+
+		WC()->cart->empty_cart();
+		add_filter(
+			'woocommerce_add_cart_item_data',
+			static function () {
+				throw new \Exception( 'No room for that.' );
+			}
+		);
+		$result = DbPicker::process( $this->post(), $this->user );
+		remove_all_filters( 'woocommerce_add_cart_item_data' );
+		$this->assertSame( array( 'form' => 'No room for that.' ), $result['errors'] );
+		$this->assertCount( 0, WC()->cart->get_cart() );
+	}
+
 	public function test_an_out_of_stock_plan_is_refused(): void {
 		$this->v['Small']->set_stock_status( 'outofstock' );
 		$this->v['Small']->save();

@@ -21,16 +21,7 @@ $beltoft_services_h = is_array( $hosting ?? null ) ? $hosting : array();
 do_action( 'woocommerce_email_header', $email_heading, $email ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own hook.
 ?>
 
-<p>
-<?php
-if ( '' !== $customer_name ) {
-	/* translators: %s: customer's first name. */
-	printf( esc_html__( 'Hi %s,', 'beltoft-services' ), esc_html( $customer_name ) );
-} else {
-	esc_html_e( 'Hi,', 'beltoft-services' );
-}
-?>
-</p>
+<?php require BELTOFT_SERVICES_PATH . 'templates/parts/emails/html-greeting.php'; ?>
 <p><?php esc_html_e( 'Your hosting is set up and your website is online.', 'beltoft-services' ); ?></p>
 <?php if ( ! empty( $beltoft_services_h['site_url'] ) ) : ?>
 <table cellspacing="0" cellpadding="6" style="width:100%;margin-bottom:16px" border="1">
@@ -86,8 +77,4 @@ esc_html_e( 'You can also set a WordPress password there. A password is never se
 <?php endif; ?>
 <?php
 
-if ( $additional_content ) {
-	echo wp_kses_post( wpautop( wptexturize( $additional_content ) ) );
-}
-
-do_action( 'woocommerce_email_footer', $email ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own hook.
+require BELTOFT_SERVICES_PATH . 'templates/parts/emails/html-footer.php';

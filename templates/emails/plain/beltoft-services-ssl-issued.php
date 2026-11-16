@@ -19,16 +19,9 @@ defined( 'ABSPATH' ) || exit;
 // A plain text email: tags are stripped, and HTML-escaping would show entities such as &amp; in the text.
 // phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped
 
-echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
-echo wp_strip_all_tags( $email_heading );
-echo "\n=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n\n";
+require BELTOFT_SERVICES_PATH . 'templates/parts/emails/plain-heading.php';
 
-if ( '' !== $customer_name ) {
-	/* translators: %s: customer's first name. */
-	echo wp_strip_all_tags( sprintf( __( 'Hi %s,', 'beltoft-services' ), $customer_name ) ) . "\n\n";
-} else {
-	echo __( 'Hi,', 'beltoft-services' ) . "\n\n";
-}
+require BELTOFT_SERVICES_PATH . 'templates/parts/emails/plain-greeting.php';
 
 /* translators: %s: name on the certificate. */
 echo wp_strip_all_tags( sprintf( $ssl['smime'] ? __( 'Your S/MIME certificate for %s is issued.', 'beltoft-services' ) : __( 'Your SSL certificate for %s is issued.', 'beltoft-services' ), $ssl['name'] ) );
@@ -47,10 +40,4 @@ if ( $ssl['smime'] ) {
 }
 echo __( 'Your certificate:', 'beltoft-services' ) . ' ' . esc_url_raw( $account_url ) . "\n\n";
 
-if ( $additional_content ) {
-	echo wp_strip_all_tags( wptexturize( $additional_content ) );
-	echo "\n\n----------------------------------------\n\n";
-}
-
-echo wp_strip_all_tags( (string) preg_replace( '#<br\s*/?>#i', "\n", (string) apply_filters( 'woocommerce_email_footer_text', get_option( 'woocommerce_email_footer_text' ) ) ) ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own filter.
-// phpcs:enable
+require BELTOFT_SERVICES_PATH . 'templates/parts/emails/plain-footer.php';

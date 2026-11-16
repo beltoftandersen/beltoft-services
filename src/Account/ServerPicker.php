@@ -13,7 +13,6 @@ use BeltoftServices\Apps\AppField;
 use BeltoftServices\Apps\AppLicence;
 use BeltoftServices\Apps\AppLicenceCart;
 use BeltoftServices\Proxmox\Backup\BackupField;
-use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Proxmox\Vm\OsField;
@@ -22,7 +21,6 @@ use BeltoftServices\Proxmox\Vm\ServerName;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Proxmox\Vm\SshKeyField;
 use BeltoftServices\Proxmox\Vm\Tiles;
-use BeltoftServices\RateLimit;
 use BeltoftServices\Usage\BillingField;
 use BeltoftServices\Usage\Rates;
 
@@ -166,17 +164,10 @@ final class ServerPicker {
 			);
 		};
 
-		if ( $user <= 0 || false === wp_verify_nonce( isset( $post[ self::FIELD ] ) && is_string( $post[ self::FIELD ] ) ? $post[ self::FIELD ] : '', self::NONCE ) ) {
-			return $fail( 'form', __( 'Your session has expired. Reload the page and try again.', 'beltoft-services' ) );
-		}
+		$refused = PickerCart::guard( $post, $user, self::FIELD, self::NONCE );
 
-		/**
-		 * Most posts of the picker a customer can make in an hour (0 turns the limit off).
-		 *
-		 * @param int $limit Default 20.
-		 */
-		if ( RateLimit::exceeded( $user, 'beltoft-services:picker', (int) apply_filters( 'beltoft_services_picker_rate_limit', 20 ), HOUR_IN_SECONDS ) ) {
-			return $fail( 'form', __( 'Too many tries. Please wait a while and try again.', 'beltoft-services' ) );
+		if ( null !== $refused ) {
+			return $fail( 'form', $refused );
 		}
 
 		$checked = self::check( $values, $user );
@@ -386,19 +377,18 @@ final class ServerPicker {
 		}
 
 		// A payment for a subscription that exists (renewal, switch, resubscribe) is never touched or mixed with a new server.
-		$old = array();
+		$old = PickerCart::old_lines(
+			$cart,
+			static function ( array $item ): bool {
+				$driver = Product::driver_for( (int) ( $item['product_id'] ?? 0 ) );
 
-		foreach ( $cart->get_cart() as $key => $item ) {
-			if ( CartFlow::has_value( (array) $item, CartFlow::ALL ) ) {
-				return __( 'Finish or remove the subscription payment in your cart first.', 'beltoft-services' );
+				// The earlier try's server, and the extra disk or app licence that was tied to it.
+				return ( $driver && ProxmoxDriver::ID === $driver->id() ) || 'cart_server' === ( $item['beltoft_services_disk_for'] ?? null ) || isset( $item[ AppLicence::CART_UID ] );
 			}
+		);
 
-			$driver = Product::driver_for( (int) ( $item['product_id'] ?? 0 ) );
-
-			// The earlier try's server, and the extra disk or app licence that was tied to it.
-			if ( ( $driver && ProxmoxDriver::ID === $driver->id() ) || 'cart_server' === ( $item['beltoft_services_disk_for'] ?? null ) || isset( $item[ AppLicence::CART_UID ] ) ) {
-				$old[] = (string) $key;
-			}
+		if ( null === $old ) {
+			return PickerCart::payment_in_cart();
 		}
 
 		wc_clear_notices();
@@ -432,19 +422,9 @@ final class ServerPicker {
 			return null;
 		}
 
-		$notes = array();
+		$refusal = PickerCart::shop_refusal();
 
-		foreach ( (array) wc_get_notices( 'error' ) as $notice ) {
-			$text = is_array( $notice ) ? (string) ( $notice['notice'] ?? '' ) : (string) $notice;
-
-			if ( '' !== $text ) {
-				$notes[] = wp_strip_all_tags( $text );
-			}
-		}
-
-		wc_clear_notices();
-
-		return array() !== $notes ? implode( ' ', $notes ) : __( 'The server could not be added. Please try again.', 'beltoft-services' );
+		return '' !== $refusal ? $refusal : __( 'The server could not be added. Please try again.', 'beltoft-services' );
 	}
 
 	// -- Assets ------------------------------------------------------------------------------------

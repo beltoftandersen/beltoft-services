@@ -103,11 +103,14 @@ final class DomainPage {
 			$hosts = $ours ? Zone::nameservers() : (array) $r->get( 'nameservers' );
 		}
 
-		// One zone read for the page, with a few seconds of patience, not the thirty a background job may take.
+		// One zone read, with a few seconds of patience, not the thirty a background job may take. Only the records tab
+		// waits for the DNS server: on another tab the editor reads the rows itself (the records route) when it is opened.
 		$zone_unavailable = false;
 		$rows             = array();
+		$has_editor       = ( $ours && ( $can || $off ) ) || $zone_here;
+		$rows_lazy        = $has_editor && 'dns' !== (string) ( $page['tab'] ?? '' );
 
-		if ( ( $ours && ( $can || $off ) ) || $zone_here ) {
+		if ( $has_editor && ! $rows_lazy ) {
 			$client = Clients::dns();
 
 			if ( $client instanceof LiveDns ) {
@@ -148,6 +151,7 @@ final class DomainPage {
 			'import_error'     => (string) $r->get( 'import_error' ),
 			'zone_unavailable' => $zone_unavailable,
 			'rows'             => $rows,
+			'rows_lazy'        => $rows_lazy,
 			'transfer_price'   => $price,
 			'transfer'         => $transfer,
 			'fix'              => $dns_only ? null : TransferFix::view( $r ),

@@ -12,6 +12,7 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
 use BeltoftServices\Progress;
 use BeltoftServices\Resource;
+use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -144,6 +145,45 @@ abstract class ServiceArea {
 	 */
 	public function buttons(): array {
 		return array();
+	}
+
+	/**
+	 * Takes a menu item out and puts it back right after another item. Items or either slug missing: left alone.
+	 *
+	 * @param mixed  $items Menu items.
+	 * @param string $slug  The item to move.
+	 * @param string $after The item it goes after.
+	 * @return mixed
+	 */
+	public static function move_after( $items, string $slug, string $after ) {
+		if ( ! is_array( $items ) || ! isset( $items[ $slug ] ) || ! isset( $items[ $after ] ) ) {
+			return $items;
+		}
+
+		$label = $items[ $slug ];
+		unset( $items[ $slug ] );
+		$out = array();
+
+		foreach ( $items as $key => $value ) {
+			$out[ $key ] = $value;
+
+			if ( $after === $key ) {
+				$out[ $slug ] = $label;
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * A page address kept in a setting: a path on this site, or a full address; a scheme-less //host is neither ('' then).
+	 *
+	 * @param string $key Setting key.
+	 */
+	public static function setting_url( string $key ): string {
+		$url = trim( (string) Settings::get( $key ) );
+
+		return '' === $url || 0 === strpos( $url, '//' ) ? '' : esc_url_raw( 0 === strpos( $url, '/' ) ? home_url( $url ) : $url );
 	}
 
 	/**

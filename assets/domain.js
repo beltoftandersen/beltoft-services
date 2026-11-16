@@ -257,15 +257,8 @@
 			copy.textContent = copy.getAttribute( 'data-copied' );
 			window.setTimeout( function () { copy.textContent = label; }, 2000 );
 		}
-		function fallback() {
-			input.select();
-			try { if ( document.execCommand( 'copy' ) ) { done(); } } catch ( e ) {}
-		}
-		if ( window.navigator.clipboard && window.isSecureContext ) {
-			window.navigator.clipboard.writeText( input.value ).then( done ).catch( fallback );
-		} else {
-			fallback();
-		}
+		// When copying is not possible the field is selected, so the customer can copy it by hand.
+		window.beltoftApi.copy( input.value ).then( done ).catch( function () { input.select(); } );
 	} );
 	// After unlocking, the transfer code is what the customer came for: open its check once the page is back.
 	( function () {

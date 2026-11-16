@@ -12,7 +12,6 @@ use BeltoftServices\Mail\MailDriver;
 use BeltoftServices\Mail\MailGuard;
 use BeltoftServices\Mail\MailPlan;
 use BeltoftServices\Resource;
-use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -30,25 +29,7 @@ final class Email extends ServiceArea {
 	 * @return mixed
 	 */
 	public static function menu( $items ) {
-		$slug = ServiceArea::get( self::class )->slug();
-
-		if ( ! is_array( $items ) || ! isset( $items[ $slug ] ) || ! isset( $items[ Domains::slug() ] ) ) {
-			return $items;
-		}
-
-		$label = $items[ $slug ];
-		unset( $items[ $slug ] );
-		$out = array();
-
-		foreach ( $items as $key => $value ) {
-			$out[ $key ] = $value;
-
-			if ( Domains::slug() === $key ) {
-				$out[ $slug ] = $label;
-			}
-		}
-
-		return $out;
+		return self::move_after( $items, ServiceArea::get( self::class )->slug(), Domains::slug() );
 	}
 
 	/**
@@ -57,10 +38,7 @@ final class Email extends ServiceArea {
 	 * beltoft_services_email_add_url says. '' when there is none (then there is no button).
 	 */
 	public function url_add(): string {
-		$url = trim( (string) Settings::get( 'mail_order_url' ) );
-
-		// A path on this site, or a full address; a scheme-less //host is neither.
-		$url = '' === $url || 0 === strpos( $url, '//' ) ? '' : esc_url_raw( 0 === strpos( $url, '/' ) ? home_url( $url ) : $url );
+		$url = self::setting_url( 'mail_order_url' );
 
 		// Only when there is something to sell: the setting alone does not make a button.
 		if ( '' === self::product_url( array( 'mail' ) ) ) {

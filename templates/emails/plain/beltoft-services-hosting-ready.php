@@ -21,16 +21,9 @@ defined( 'ABSPATH' ) || exit;
 
 $beltoft_services_h = is_array( $hosting ?? null ) ? $hosting : array();
 
-echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
-echo wp_strip_all_tags( $email_heading );
-echo "\n=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n\n";
+require BELTOFT_SERVICES_PATH . 'templates/parts/emails/plain-heading.php';
 
-if ( '' !== $customer_name ) {
-	/* translators: %s: customer's first name. */
-	echo wp_strip_all_tags( sprintf( __( 'Hi %s,', 'beltoft-services' ), $customer_name ) ) . "\n\n";
-} else {
-	echo __( 'Hi,', 'beltoft-services' ) . "\n\n";
-}
+require BELTOFT_SERVICES_PATH . 'templates/parts/emails/plain-greeting.php';
 
 echo __( 'Your hosting is set up and your website is online.', 'beltoft-services' ) . "\n\n";
 
@@ -72,10 +65,4 @@ if ( empty( $beltoft_services_h['has_email'] ) ) {
 	echo __( 'Set up Email lite in My Account so your websites can send mail. Email is included with your plan; without it a website cannot send mail.', 'beltoft-services' ) . "\n\n";
 }
 
-if ( $additional_content ) {
-	echo wp_strip_all_tags( wptexturize( $additional_content ) );
-	echo "\n\n----------------------------------------\n\n";
-}
-
-echo wp_strip_all_tags( (string) preg_replace( '#<br\s*/?>#i', "\n", (string) apply_filters( 'woocommerce_email_footer_text', get_option( 'woocommerce_email_footer_text' ) ) ) ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own filter.
-// phpcs:enable
+require BELTOFT_SERVICES_PATH . 'templates/parts/emails/plain-footer.php';

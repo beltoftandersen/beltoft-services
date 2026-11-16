@@ -44,8 +44,4 @@ echo esc_html( sprintf( __( 'Unlock the domain at %s (the setting is called tran
 <?php endif; ?>
 <p><a href="<?php echo esc_url( $account_url ); ?>"><?php esc_html_e( 'View your domain in your account', 'beltoft-services' ); ?></a></p>
 <?php
-if ( $additional_content ) {
-	echo wp_kses_post( wpautop( wptexturize( $additional_content ) ) );
-}
-
-do_action( 'woocommerce_email_footer', $email ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own hook.
+require BELTOFT_SERVICES_PATH . 'templates/parts/emails/html-footer.php';

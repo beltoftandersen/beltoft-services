@@ -23,6 +23,15 @@ class DnsClaimPanelTest extends TestCase {
 		return \BeltoftServices\Domains\DnsClaimPanel::menu( $items );
 	}
 
+	public function test_the_heading_uses_the_shared_page_heading_part(): void {
+		ob_start();
+		\BeltoftServices\Domains\DnsClaimPanel::render();
+		$html = (string) ob_get_clean();
+
+		$this->assertMatchesRegularExpression( '#<div class="beltoft-services-ov__head">\s*<h2 id="beltoft-dns-claim-title">Add a domain for DNS hosting</h2>#', $html );
+		$this->assertStringNotContainsString( '<h3', $html );
+	}
+
 	public function test_the_tab_is_added_before_licenses_and_logout(): void {
 		$items = $this->menu( array( 'dashboard' => 'Dashboard', Endpoint::slug() => 'Licenses', 'customer-logout' => 'Log out' ) );
 

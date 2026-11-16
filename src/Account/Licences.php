@@ -25,26 +25,7 @@ final class Licences extends ServiceArea {
 	 * @return mixed
 	 */
 	public static function menu( $items ) {
-		$slug  = ServiceArea::get( self::class )->slug();
-		$after = ServiceArea::get( Ssl::class )->slug();
-
-		if ( ! is_array( $items ) || ! isset( $items[ $slug ] ) || ! isset( $items[ $after ] ) ) {
-			return $items;
-		}
-
-		$label = $items[ $slug ];
-		unset( $items[ $slug ] );
-		$out = array();
-
-		foreach ( $items as $key => $value ) {
-			$out[ $key ] = $value;
-
-			if ( $after === $key ) {
-				$out[ $slug ] = $label;
-			}
-		}
-
-		return $out;
+		return self::move_after( $items, ServiceArea::get( self::class )->slug(), ServiceArea::get( Ssl::class )->slug() );
 	}
 
 	/**

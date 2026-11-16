@@ -23,16 +23,9 @@ $beltoft_services_r  = is_array( $hosting_restore ?? null ) ? $hosting_restore :
 $beltoft_services_ok = ! empty( $beltoft_services_r['ok'] );
 $beltoft_services_k  = (string) ( $beltoft_services_r['kind'] ?? 'account' );
 
-echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
-echo wp_strip_all_tags( $email_heading );
-echo "\n=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n\n";
+require BELTOFT_SERVICES_PATH . 'templates/parts/emails/plain-heading.php';
 
-if ( '' !== $customer_name ) {
-	/* translators: %s: customer's first name. */
-	echo wp_strip_all_tags( sprintf( __( 'Hi %s,', 'beltoft-services' ), $customer_name ) ) . "\n\n";
-} else {
-	echo __( 'Hi,', 'beltoft-services' ) . "\n\n";
-}
+require BELTOFT_SERVICES_PATH . 'templates/parts/emails/plain-greeting.php';
 
 if ( $beltoft_services_ok ) {
 	if ( 'undo' === $beltoft_services_k ) {
@@ -58,10 +51,4 @@ if ( $beltoft_services_ok ) {
 
 echo __( 'Open your hosting in My Account:', 'beltoft-services' ) . ' ' . esc_url_raw( $account_url ) . "\n\n";
 
-if ( $additional_content ) {
-	echo wp_strip_all_tags( wptexturize( $additional_content ) );
-	echo "\n\n----------------------------------------\n\n";
-}
-
-echo wp_strip_all_tags( (string) preg_replace( '#<br\s*/?>#i', "\n", (string) apply_filters( 'woocommerce_email_footer_text', get_option( 'woocommerce_email_footer_text' ) ) ) ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own filter.
-// phpcs:enable
+require BELTOFT_SERVICES_PATH . 'templates/parts/emails/plain-footer.php';

@@ -14,7 +14,6 @@ use BeltoftServices\Domains\DnsClaimPanel;
 use BeltoftServices\Domains\DnsSchema;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
-use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -158,10 +157,7 @@ final class Domains {
 	 * The site's page for registering a new domain (setting domain_search_url), else the first domain product, or '' when there is none.
 	 */
 	public static function url_register(): string {
-		$url = trim( (string) Settings::get( 'domain_search_url' ) );
-
-		// A path on this site, or a full address; a scheme-less //host is neither.
-		$url = '' === $url || 0 === strpos( $url, '//' ) ? '' : esc_url_raw( 0 === strpos( $url, '/' ) ? home_url( $url ) : $url );
+		$url = ServiceArea::setting_url( 'domain_search_url' );
 
 		if ( '' === $url ) {
 			$url = ServiceArea::product_url( array( 'domain' ) );

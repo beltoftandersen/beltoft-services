@@ -23,16 +23,7 @@ $beltoft_services_k = (string) ( $beltoft_services_n['kind'] ?? 'storage_warning
 do_action( 'woocommerce_email_header', $email_heading, $email ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own hook.
 ?>
 
-<p>
-<?php
-if ( '' !== $customer_name ) {
-	/* translators: %s: customer's first name. */
-	printf( esc_html__( 'Hi %s,', 'beltoft-services' ), esc_html( $customer_name ) );
-} else {
-	esc_html_e( 'Hi,', 'beltoft-services' );
-}
-?>
-</p>
+<?php require BELTOFT_SERVICES_PATH . 'templates/parts/emails/html-greeting.php'; ?>
 <?php if ( 'storage_warning' === $beltoft_services_k ) : ?>
 <p><?php echo esc_html( sprintf( /* translators: 1: percent, 2: used GB, 3: plan GB. */ __( 'Your hosting storage is %1$d%% full (%2$d GB of %3$d GB). Files and databases count together.', 'beltoft-services' ), (int) $beltoft_services_n['percent'], (int) $beltoft_services_n['used'], (int) $beltoft_services_n['limit'] ) ); ?></p>
 <p><?php esc_html_e( 'Nothing has been stopped. Free some space, or change to a larger plan in My Account.', 'beltoft-services' ); ?></p>
@@ -54,8 +45,4 @@ if ( '' !== $customer_name ) {
 <p><a href="<?php echo esc_url( $account_url ); ?>"><?php esc_html_e( 'Open your hosting in My Account', 'beltoft-services' ); ?></a></p>
 <?php
 
-if ( $additional_content ) {
-	echo wp_kses_post( wpautop( wptexturize( $additional_content ) ) );
-}
-
-do_action( 'woocommerce_email_footer', $email ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own hook.
+require BELTOFT_SERVICES_PATH . 'templates/parts/emails/html-footer.php';
