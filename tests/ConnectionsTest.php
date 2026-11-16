@@ -254,6 +254,24 @@ class ConnectionsTest extends TestCase {
 		$this->assertNull( Connections::get( 's' ) );
 	}
 
+	public function test_a_connection_a_live_service_remembers_is_not_deleted_even_when_no_product_uses_it(): void {
+		Connections::save( 's', $this->input() );
+		$product  = $this->service_product( 'http', array(), array( 'connection' => 's' ) );
+		$license  = $this->service_license( $product, array( 'fire' => false ) );
+		$resource = \BeltoftServices\Resource::create( $license, new \BeltoftServices\Http\HttpDriver(), \BeltoftServices\Product::plan( $product->get_id() ), array( 'connection' => 's' ) );
+		$this->assertInstanceOf( \BeltoftServices\Resource::class, $resource );
+
+		// The product is repointed (or trashed): the service still uses the connection it was made with.
+		wp_trash_post( $product->get_id() );
+		$this->assertSame( 0, Connections::in_use( 's' ) );
+		$this->assertSame( 1, Connections::services_using( 's' ) );
+		$this->assertFalse( Connections::delete( 's' ) );
+		$this->assertNotNull( Connections::get( 's' ) );
+
+		$resource->set( array( 'state' => 'deleted' ) );
+		$this->assertTrue( Connections::delete( 's' ) );
+	}
+
 	public function test_connection_filter_returns_decrypted_settings(): void {
 		$this->assertTrue( Connections::save( 's', $this->input() ) );
 
