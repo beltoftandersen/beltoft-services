@@ -166,10 +166,41 @@ final class Prices {
 			}
 			if ( count( $page['results'] ) < self::PAGE_SIZE ) {
 				update_option( self::OPTION, $table, false );
+				\BeltoftServices\Alerts::quietly( array( __CLASS__, 'alert_below_cost' ) );
 				return count( $table );
 			}
 		}
 		return new \WP_Error( 'too_many_pages', 'Registrar TLD list exceeded the page limit.' );
+	}
+
+	/**
+	 * Override lines (a fixed public price, in any currency) that are below the registrar cost of the extension now, at the guard
+	 * rate for other currencies. Such a price is sold under cost, and a paid order below cost is refused at fulfilment.
+	 *
+	 * @return string[] One line per extension and currency.
+	 */
+	public static function below_cost(): array {
+		$table = get_option( self::OPTION, array() );
+		$found = array();
+		if ( ! is_array( $table ) ) { return $found; }
+		foreach ( Currency::known_codes() as $code ) {
+			foreach ( self::overrides( $code ) as $tld => $amount ) {
+				if ( ! isset( $table[ $tld ] ) ) { continue; }
+				$cost = max( (float) ( $table[ $tld ]['create'] ?? 0 ), (float) ( $table[ $tld ]['renew'] ?? 0 ) );
+				$paid = Currency::clean( $code ) === Currency::base() ? (float) $amount : Currency::to_cost( (float) $amount, $code );
+				if ( null !== $paid && $paid + 0.01 < $cost ) {
+					$found[] = sprintf( '.%1$s: price %2$s %3$s is below the registrar cost %4$s %5$s', $tld, $amount, $code, number_format( $cost, 2, '.', '' ), Currency::COST );
+				}
+			}
+		}
+		return $found;
+	}
+
+	/** Tells the admin (once a day for the same list) about override prices below the registrar cost after a price refresh. */
+	public static function alert_below_cost(): void {
+		$lines = self::below_cost();
+		if ( ! $lines ) { return; }
+		\BeltoftServices\Alerts::notify( 'Domain prices below the registrar cost', array_merge( array( 'These fixed domain prices (setting domain_price_overrides) are below the registrar cost after the last price refresh. Orders at them are refused at fulfilment and renewals are not bought.' ), $lines ), null, 'beltoft_services_domain_below_cost_' . md5( implode( '|', $lines ) ) );
 	}
 
 	/** @return array{0:string,1:array}|\WP_Error|null */

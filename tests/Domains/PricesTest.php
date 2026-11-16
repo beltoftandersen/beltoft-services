@@ -56,4 +56,19 @@ class PricesTest extends TestCase {
 		$this->assertNull( Prices::price( 'missing' ) );
 		$this->assertSame( 13, Prices::price( 'com' ) );
 	}
+
+	public function test_an_override_below_the_registrar_cost_is_found_and_the_admin_is_told_after_a_refresh(): void {
+		$this->settings( array( 'domain_price_overrides' => "com=15\nnet=30", 'admin_email' => 'christian.beltoft@gmail.com' ) );
+		update_option( Prices::OPTION, array( 'com' => array( 'price' => 21, 'create' => 12.0, 'renew' => 16.0, 'restricted' => false ), 'net' => array( 'price' => 30, 'create' => 12.0, 'renew' => 16.0, 'restricted' => false ) ) );
+
+		$found = Prices::below_cost();
+		$this->assertCount( 1, $found );
+		$this->assertStringContainsString( '.com', $found[0] );
+
+		Prices::alert_below_cost();
+		Prices::alert_below_cost();
+		$mails = array_filter( $GLOBALS['phpmailer']->mock_sent ?? array(), static fn( $m ) => false !== strpos( (string) $m['subject'], 'below the registrar cost' ) );
+		$this->assertCount( 1, $mails, 'One mail for the same list.' );
+		$this->assertStringContainsString( '.com', $mails[ array_key_first( $mails ) ]['body'] );
+	}
 }
