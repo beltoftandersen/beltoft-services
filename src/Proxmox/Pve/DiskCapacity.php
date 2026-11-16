@@ -15,6 +15,9 @@ defined( 'ABSPATH' ) || exit;
 
 final class DiskCapacity {
 	public const RESERVATIONS = 'beltoft_services_disk_reservations';
+
+	/** Disk ids whose reservation could not be freed at release time (the lock was busy). */
+	public const RELEASED = 'beltoft_services_disk_released';
 	private const PREFIX = 'beltoft_services_disk_capacity_';
 
 	private static function cache_key( string $cluster, string $node, string $storage ): string {
@@ -118,6 +121,11 @@ final class DiskCapacity {
 	/** Reserve one disk or grow delta atomically across all nodes and storages. */
 	public static function reserve( Resource $disk, string $cluster, string $node, string $storage, int $gb ): bool {
 		list( $locked, $ok ) = Locks::with( Locks::name( 'disk_capacity', 0 ), Locks::allocation_wait(), static function () use ( $disk, $cluster, $node, $storage, $gb ): bool {
+			// A new reservation of a disk is no longer one that was released.
+			$released = array_map( 'intval', (array) get_option( self::RELEASED, array() ) );
+			if ( in_array( $disk->id(), $released, true ) ) {
+				update_option( self::RELEASED, array_values( array_diff( $released, array( $disk->id() ) ) ), false );
+			}
 			$entries = (array) get_option( self::RESERVATIONS, array() );
 			$existing = $entries[ $disk->id() ] ?? null;
 			if ( is_array( $existing ) && $existing['cluster'] === $cluster && $existing['node'] === $node && $existing['storage'] === $storage && (int) $existing['gb'] === $gb ) {
@@ -189,11 +197,19 @@ final class DiskCapacity {
 			delete_transient( self::wait_key( $disk, $op ) );
 		}
 
-		Locks::with( Locks::name( 'disk_capacity', 0 ), Locks::allocation_wait(), static function () use ( $disk ): void {
+		list( $locked ) = Locks::with( Locks::name( 'disk_capacity', 0 ), Locks::allocation_wait(), static function () use ( $disk ): void {
 			$entries = (array) get_option( self::RESERVATIONS, array() );
 			unset( $entries[ $disk->id() ] );
 			update_option( self::RESERVATIONS, $entries, false );
 		} );
+
+		// The lock was busy for the whole wait: the disk is remembered as released and the next sweep drops its entry (a live disk's old entry
+		// is otherwise kept for a long grow), so its space is not counted twice.
+		if ( ! $locked ) {
+			$released   = (array) get_option( self::RELEASED, array() );
+			$released[] = $disk->id();
+			update_option( self::RELEASED, array_values( array_unique( array_map( 'intval', $released ) ) ), false );
+		}
 	}
 
 	/** Current reservation for the admin panel; never a remote request. */
@@ -206,10 +222,19 @@ final class DiskCapacity {
 	/** Remove reservations left by resources that no longer exist or are closed. */
 	public static function sweep(): void {
 		Locks::with( Locks::name( 'disk_capacity', 0 ), Locks::allocation_wait(), static function (): void {
-			$entries = (array) get_option( self::RESERVATIONS, array() );
-			$changed = false;
+			$entries  = (array) get_option( self::RESERVATIONS, array() );
+			$released = array_map( 'intval', (array) get_option( self::RELEASED, array() ) );
+			$changed  = false;
+			if ( array() !== $released ) {
+				delete_option( self::RELEASED );
+			}
 			foreach ( $entries as $id => $entry ) {
 				$resource = Resource::find( (int) $id );
+				if ( in_array( (int) $id, $released, true ) ) {
+					unset( $entries[ $id ] );
+					$changed = true;
+					continue;
+				}
 				if ( ! is_array( $entry ) || ( time() - (int) ( $entry['at'] ?? 0 ) > DAY_IN_SECONDS && ( ! $resource || ! $resource->is_live() ) ) ) {
 					unset( $entries[ $id ] );
 					$changed = true;
