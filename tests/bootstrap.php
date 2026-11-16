@@ -118,5 +118,6 @@ tests_add_filter(
 require $beltoft_services_tests_dir . '/includes/bootstrap.php';
 require __DIR__ . '/Support/FakeDriver.php';
 require __DIR__ . '/Support/DnsPackets.php';
+require __DIR__ . '/Support/CannedChannel.php';
 require __DIR__ . '/Support/FakeCurrency.php';
 require __DIR__ . '/TestCase.php';

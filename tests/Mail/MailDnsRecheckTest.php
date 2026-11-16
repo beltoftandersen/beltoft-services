@@ -246,4 +246,75 @@ final class MailDnsRecheckTest extends MailTestCase {
 		MailDns::recheck( $ok->id() );
 		$this->assertSame( 0, (int) Resource::find( $ok->id() )->get( 'mail_dns_rechecked' ) );
 	}
+
+	/**
+	 * A domain on our servers with its records found and a mailbox that can send; returns the mail resource and the zone resource.
+	 *
+	 * @return array{0: Resource, 1: Resource}
+	 */
+	private function ours_with_mailbox( string $domain ): array {
+		$user = self::factory()->user->create();
+		$zone = $this->our_zone( $user, $domain );
+		$r    = $this->ready_mail( $domain, array(), $user );
+		\BeltoftLicenses\Licenses::update( (int) $r->license()['id'], array( 'email' => 'christian.beltoft@gmail.com' ) );
+		$rows = array();
+
+		foreach ( (array) $r->get( 'mail_records' ) as $row ) {
+			$row['status'] = 'ok';
+			$rows[]        = $row;
+		}
+
+		$r->set( array( 'mail_dns' => 'ok', 'mail_mode' => 'ours', 'mail_records' => $rows ) );
+		$r = Resource::find( $r->id() );
+		$this->assertIsArray( $this->create_box( $r, 'anna' ) );
+		$this->assertSame( 'ours', MailHold::mode( Resource::find( $r->id() ) ) );
+		$this->assertFalse( MailHold::held( Resource::find( $r->id() ) ) );
+		$this->mails = array();
+
+		return array( Resource::find( $r->id() ), $zone );
+	}
+
+	public function test_the_mode_is_worked_out_live_not_read_from_the_stored_value(): void {
+		list( $r, $zone ) = $this->ours_with_mailbox( 'moved.example' );
+		$zone->set( array( 'state' => 'deleted' ) );
+
+		$this->assertSame( 'ours', (string) Resource::find( $r->id() )->get( 'mail_mode' ), 'Stored as ours.' );
+		$this->assertSame( 'external', MailHold::mode( Resource::find( $r->id() ) ), 'The zone is gone, so the name is not on our servers.' );
+	}
+
+	public function test_a_domain_whose_zone_is_gone_and_whose_records_are_gone_is_held_and_the_customer_is_told(): void {
+		list( $r, $zone ) = $this->ours_with_mailbox( 'moved.example' );
+		$zone->set( array( 'state' => 'deleted' ) );
+		$this->dns = array();
+
+		MailDns::recheck( $r->id() );
+
+		$r = Resource::find( $r->id() );
+		$this->assertSame( 'external', $r->get( 'mail_mode' ), 'Stored again from the live answer.' );
+		$this->assertSame( 'waiting', $r->get( 'mail_dns' ) );
+		$this->assertTrue( MailHold::held( $r ) );
+		$this->assertSame( 'held', $r->get( 'mail_hold' ) );
+		$this->assertFalse( $this->mailcow->mailbox( 'anna@moved.example' )['smtp'], 'Sending is held.' );
+		$subjects = array_column( $this->mails, 'subject' );
+		$this->assertCount( 1, array_keys( $subjects, 'DNS records are still missing for moved.example', true ), 'One mail to the customer.' );
+		$this->assertCount( 1, array_filter( $subjects, static fn( $x ) => str_contains( (string) $x, 'Mail domain left our name servers: moved.example' ) ), 'One mail to staff.' );
+
+		MailDns::recheck( $r->id() );
+		$this->assertCount( 2, $this->mails, 'The next look sends no second pair.' );
+	}
+
+	public function test_a_domain_that_left_our_servers_with_its_records_intact_is_not_held(): void {
+		list( $r, $zone ) = $this->ours_with_mailbox( 'kept.example' );
+		$zone->set( array( 'state' => 'deleted' ) );
+		$this->found( $r, array( 'mx', 'spf', 'dkim' ) );
+
+		MailDns::recheck( $r->id() );
+
+		$r = Resource::find( $r->id() );
+		$this->assertSame( 'external', $r->get( 'mail_mode' ) );
+		$this->assertSame( 'ok', $r->get( 'mail_dns' ) );
+		$this->assertFalse( MailHold::held( $r ) );
+		$this->assertTrue( $this->mailcow->mailbox( 'anna@kept.example' )['smtp'] );
+		$this->assertCount( 0, array_filter( array_column( $this->mails, 'subject' ), static fn( $x ) => str_contains( (string) $x, 'DNS records are still missing' ) ), 'No mail to the customer.' );
+	}
 }

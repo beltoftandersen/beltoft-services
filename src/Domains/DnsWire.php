@@ -15,19 +15,36 @@ final class DnsWire {
 	public const SRV   = 33;
 	public const OPT   = 41;
 	public const DS    = 43;
+	public const RRSIG  = 46;
+	public const DNSKEY = 48;
 	public const CAA   = 257;
 
 	private const MAX_JUMPS = 20;
 
-	/** A question with RD off, class IN, and an EDNS0 OPT record (UDP size 1232, DO off). */
-	public static function query( string $name, int $type, int $id ): string {
-		$wire = pack( 'nnnnnn', $id & 0xffff, 0, 1, 0, 0, 1 );
-		foreach ( explode( '.', rtrim( $name, '.' ) ) as $label ) {
-			if ( '' === $label ) { continue; }
-			$wire .= chr( min( 63, strlen( $label ) ) ) . substr( $label, 0, 63 );
+	/** The wire form of a name: labels of 1 to 63 bytes, at most 253 bytes in text form; one trailing dot is allowed. Anything else is refused, never cut. */
+	public static function encode_name( string $name ): string|\WP_Error {
+		$name = rtrim( $name, '.' ) === $name ? $name : substr( $name, 0, -1 );
+		if ( '' === $name || strlen( $name ) > 253 ) { return new \WP_Error( 'dns_bad_name', 'The name cannot be asked as a DNS question.' ); }
+		$wire = '';
+		foreach ( explode( '.', $name ) as $label ) {
+			if ( '' === $label || strlen( $label ) > 63 ) { return new \WP_Error( 'dns_bad_name', 'The name cannot be asked as a DNS question.' ); }
+			$wire .= chr( strlen( $label ) ) . $label;
 		}
-		$wire .= "\0" . pack( 'nn', $type, 1 );
-		return $wire . "\0" . pack( 'nnNn', self::OPT, 1232, 0, 0 );
+		return $wire . "\0";
+	}
+
+	/**
+	 * A question, class IN, with an EDNS0 OPT record. Options: rd (recursion desired, default off: a name server that is
+	 * authoritative ignores it), do (DNSSEC OK, default off), size (the UDP size told to the server, default 1232).
+	 * A name that cannot be encoded gives dns_bad_name and no packet.
+	 *
+	 * @param array{rd?: bool, do?: bool, size?: int} $options Options.
+	 */
+	public static function query( string $name, int $type, int $id, array $options = array() ): string|\WP_Error {
+		$qname = self::encode_name( $name );
+		if ( is_wp_error( $qname ) ) { return $qname; }
+		$wire = pack( 'nnnnnn', $id & 0xffff, ! empty( $options['rd'] ) ? 0x0100 : 0, 1, 0, 0, 1 ) . $qname . pack( 'nn', $type, 1 );
+		return $wire . "\0" . pack( 'nnNn', self::OPT, (int) ( $options['size'] ?? 1232 ), ! empty( $options['do'] ) ? 0x8000 : 0, 0 );
 	}
 
 	/**
@@ -48,11 +65,12 @@ final class DnsWire {
 		$question = unpack( 'ntype/nclass', substr( $packet, $offset, 4 ) );
 		$offset  += 4;
 		if ( $qname !== strtolower( rtrim( $expected_name, '.' ) ) || (int) $question['type'] !== $expected_type ) { return new \WP_Error( 'dns_mismatch', 'DNS response does not match the question.' ); }
-		$out = array( 'rcode' => $head['flags'] & 15, 'aa' => ( $head['flags'] & 0x0400 ) !== 0, 'tc' => ( $head['flags'] & 0x0200 ) !== 0, 'answer' => array(), 'authority' => array(), 'additional' => array() );
+		$out = array( 'rcode' => $head['flags'] & 15, 'aa' => ( $head['flags'] & 0x0400 ) !== 0, 'tc' => ( $head['flags'] & 0x0200 ) !== 0, 'ad' => ( $head['flags'] & 0x0020 ) !== 0, 'ra' => ( $head['flags'] & 0x0080 ) !== 0, 'opt' => null, 'answer' => array(), 'authority' => array(), 'additional' => array() );
 		foreach ( array( 'answer' => 'an', 'authority' => 'ns', 'additional' => 'ar' ) as $section => $key ) {
 			for ( $i = 0; $i < $head[ $key ]; ++$i ) {
 				$rr = self::record( $packet, $offset );
 				if ( null === $rr ) { return $bad; }
+				if ( is_array( $rr ) && isset( $rr['opt'] ) ) { if ( 'additional' === $section ) { $out['opt'] = $rr['opt']; } continue; }
 				if ( false !== $rr ) { $out[ $section ][] = $rr; }
 			}
 		}
@@ -70,6 +88,7 @@ final class DnsWire {
 		$start = $offset;
 		$offset = $end;
 		$type = (int) $fields['type'];
+		if ( self::OPT === $type ) { return array( 'opt' => array( 'size' => (int) $fields['class'], 'do' => ( ( (int) $fields['ttl'] >> 15 ) & 1 ) === 1 ) ); }
 		if ( 1 !== (int) $fields['class'] ) { return false; }
 		$pos  = $start;
 		$data = null;
@@ -120,6 +139,18 @@ final class DnsWire {
 				$ds   = unpack( 'nkey_tag/Calgorithm/Cdigest_type', substr( $packet, $start, 4 ) );
 				$data = $ds + array( 'digest' => bin2hex( substr( $packet, $start + 4, $fields['length'] - 4 ) ) );
 				break;
+			case self::DNSKEY:
+				if ( $fields['length'] < 4 ) { break; }
+				$key  = unpack( 'nflags/Cprotocol/Calgorithm', substr( $packet, $start, 4 ) );
+				$data = $key + array( 'key' => base64_encode( substr( $packet, $start + 4, $fields['length'] - 4 ) ) );
+				break;
+			case self::RRSIG:
+				if ( $fields['length'] < 19 ) { break; }
+				$sig    = unpack( 'ncovered/Calgorithm/Clabels/Noriginal_ttl/Nexpiration/Ninception/nkey_tag', substr( $packet, $start, 18 ) );
+				$pos    = $start + 18;
+				$signer = self::name( $packet, $pos );
+				$data   = null !== $signer && $pos <= $end ? $sig + array( 'signer' => $signer ) : null;
+				break;
 			case self::SOA:
 				$mname = self::name( $packet, $pos );
 				$rname = null === $mname ? null : self::name( $packet, $pos );
@@ -135,7 +166,7 @@ final class DnsWire {
 	}
 
 	/** A possibly compressed name at $offset, lowercase without the trailing dot; null when malformed. Moves $offset past it. */
-	private static function name( string $packet, int &$offset ): ?string {
+	public static function name( string $packet, int &$offset ): ?string {
 		$length = strlen( $packet );
 		$pos    = $offset;
 		$next   = null;

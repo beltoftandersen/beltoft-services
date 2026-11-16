@@ -361,44 +361,16 @@ class FakeClient extends FakePve {
 		$this->record( $method, $path, $params );
 		$this->load();
 
-		$matched = null;
+		$route = $this->match_call( array_merge( self::routes(), self::snapshot_routes() ), $method, $path, $params );
 
-		foreach ( array_merge( self::routes(), self::snapshot_routes() ) as $route ) {
-			if ( $route[0] === $method && 1 === preg_match( $route[1], $path, $m ) ) {
-				$matched = array( $route, $m );
-				break;
-			}
+		if ( is_wp_error( $route ) ) {
+			return $route;
 		}
 
-		if ( null === $matched ) {
-			return $this->error( 501, 'Method not implemented' );
-		}
-
-		$checked = $this->validate( $matched[0][3], $params );
-
-		if ( is_wp_error( $checked ) ) {
-			return $checked;
-		}
-
-		foreach ( $this->failures as $i => $failure ) {
-			if ( $failure[0] === $method && 1 === preg_match( $failure[1], $path ) ) {
-				array_splice( $this->failures, $i, 1 );
-				return $this->scripted_error( $failure[2] );
-			}
-		}
-
-		$result = $this->{$matched[0][2]}( array_slice( $matched[1], 1 ), $checked );
+		$result = $this->{$route['handler']}( $route['args'], $route['params'] );
 		$this->save();
 
 		return $result;
-	}
-
-	/**
-	 * No sleeping: a poll counts as 2 seconds of the timeout.
-	 *
-	 * @param int $seconds Seconds.
-	 */
-	protected function pause( int $seconds ): void {
 	}
 
 	// Routes: method, path regex, handler, schema (name => [type, required, options]).
@@ -663,7 +635,7 @@ class FakeClient extends FakePve {
 	 * @param array<string, mixed> $params Parameters.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	private function validate( array $schema, array $params ) {
+	protected function validate( array $schema, array $params ) {
 		$out = array();
 
 		foreach ( $params as $name => $value ) {
@@ -2613,7 +2585,7 @@ class FakeClient extends FakePve {
 	 * @param int    $status  Status.
 	 * @param string $message Message.
 	 */
-	private function error( int $status, string $message ): \WP_Error {
+	protected function error( int $status, string $message ): \WP_Error {
 		return new \WP_Error( 'http_' . $status, $message, array( 'status' => $status ) );
 	}
 
@@ -2622,7 +2594,7 @@ class FakeClient extends FakePve {
 	 *
 	 * @param \WP_Error|array $result Scripted.
 	 */
-	private function scripted_error( $result ): \WP_Error {
+	protected function scripted_error( $result ): \WP_Error {
 		if ( $result instanceof \WP_Error ) {
 			return $result;
 		}

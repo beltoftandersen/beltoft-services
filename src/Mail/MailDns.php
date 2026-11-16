@@ -815,6 +815,13 @@ final class MailDns {
 		$lost = ! self::complete( $rows );
 		$meta = array( 'mail_records' => $rows, 'mail_dns_rechecked' => $now );
 
+		// The domain was ours when it was set up and is not on our servers any more: the stored mode follows the live one.
+		$left = 'external' !== (string) $r->get( 'mail_mode' );
+
+		if ( $left ) {
+			$meta['mail_mode'] = 'external';
+		}
+
 		if ( $lost ) {
 			// Waiting again, as if just set up; the reminder mail is the one sent below, so the ten minute look sends none.
 			$meta += array( 'mail_dns' => 'waiting', 'mail_dns_since' => $now, 'mail_dns_checked' => $now, 'mail_dns_reminded' => $now );
@@ -835,6 +842,10 @@ final class MailDns {
 		$fresh = Resource::find( $id ) ?? $r;
 
 		MailHold::sync( $fresh );
+
+		if ( $left ) {
+			\BeltoftServices\Alerts::mail_domain_left( $fresh, $domain, $lost );
+		}
 
 		if ( $lost ) {
 			self::schedule( $id, self::INTERVAL );

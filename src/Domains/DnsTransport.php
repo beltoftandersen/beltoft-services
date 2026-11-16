@@ -5,37 +5,39 @@ namespace BeltoftServices\Domains;
 defined( 'ABSPATH' ) || exit;
 
 final class DnsTransport {
-	private const TIMEOUT = 3;
+	/** @var DnsChannel|null The channel that moves the bytes; null is the socket one. Tests swap it. */
+	private static ?DnsChannel $channel = null;
+
+	/** Swaps the channel that moves bytes (tests); null restores the socket channel. */
+	public static function use( ?DnsChannel $channel ): void {
+		self::$channel = $channel;
+	}
+
+	private static function channel(): DnsChannel {
+		return self::$channel ?? new SocketChannel();
+	}
 
 	/**
 	 * The parsed response of $ip for $name and $type. The address must already be checked with
 	 * DnsAddress::is_public(); it is checked again here, and used for the socket as it is (no second lookup).
 	 *
-	 * @return array{rcode: int, aa: bool, tc: bool, answer: array, authority: array, additional: array}|\WP_Error
-	 */
-	public static function ask( string $ip, string $name, int $type ): array|\WP_Error {
-		$first = self::once( $ip, $name, $type, 'udp' );
-		if ( is_wp_error( $first ) || ! $first['tc'] ) { return $first; }
-		return self::once( $ip, $name, $type, 'tcp' );
-	}
-
-	/**
-	 * One prepared question to a name server, read over UDP and, when the answer is truncated (TC bit), again over TCP.
-	 * No address check and no parsing: the caller trusts its server and reads the packet (DnsQuery).
+	 * Options: do, size, rd (the question, see DnsWire::query), and the two that only our own name servers use:
+	 * trusted (skips the public address check: the server is named in our settings, never by a customer) and port.
+	 * Nothing that takes a customer's name passes them; port is ignored without trusted.
 	 *
-	 * @param string $host Server address or name (an IPv6 address in brackets).
-	 * @param string $wire The question packet.
-	 * @param int    $port Port.
-	 * @return string|\WP_Error The answer packet.
+	 * @param array{trusted?: bool, port?: int, rd?: bool, do?: bool, size?: int} $options Options.
+	 * @return array{rcode: int, aa: bool, tc: bool, ad: bool, ra: bool, opt: ?array, answer: array, authority: array, additional: array}|\WP_Error
 	 */
-	public static function exchange( string $host, string $wire, int $port = 53 ): string|\WP_Error {
-		$data = self::udp( $host, $wire, $port );
-		if ( ! is_string( $data ) || strlen( $data ) < 12 || ( ord( $data[2] ) & 0x02 ) === 0 ) { return $data; }
-		return self::tcp( $host, $wire, $port );
+	public static function ask( string $ip, string $name, int $type, array $options = array() ): array|\WP_Error {
+		$first = self::once( $ip, $name, $type, 'udp', $options );
+		if ( is_wp_error( $first ) || ! $first['tc'] ) { return $first; }
+		return self::once( $ip, $name, $type, 'tcp', $options );
 	}
 
-	private static function once( string $ip, string $name, int $type, string $protocol ): array|\WP_Error {
-		$id = random_int( 0, 65535 );
+	private static function once( string $ip, string $name, int $type, string $protocol, array $options = array() ): array|\WP_Error {
+		$id   = random_int( 0, 65535 );
+		$wire = DnsWire::query( $name, $type, $id, array_intersect_key( $options, array( 'rd' => 1, 'do' => 1, 'size' => 1 ) ) );
+		if ( is_wp_error( $wire ) ) { return $wire; }
 		/**
 		 * Tests: a non-null return replaces the network, a raw response packet or a WP_Error. The fifth argument
 		 * is the protocol ('udp' or 'tcp'). A packet from here carries its own id, which is then the one expected.
@@ -46,46 +48,10 @@ final class DnsTransport {
 			if ( ! is_string( $test ) ) { return new \WP_Error( 'dns_malformed', 'Malformed DNS message.' ); }
 			return DnsWire::parse( $test, strlen( $test ) >= 2 ? unpack( 'n', $test )[1] : 0, $name, $type );
 		}
-		if ( ! DnsAddress::is_public( $ip ) ) { return new \WP_Error( 'dns_unreachable', 'The address is not a public one.' ); }
+		$trusted = ! empty( $options['trusted'] );
+		if ( ! $trusted && ! DnsAddress::is_public( $ip ) ) { return new \WP_Error( 'dns_unreachable', 'The address is not a public one.' ); }
 		$host = str_contains( $ip, ':' ) ? '[' . $ip . ']' : $ip;
-		$wire = DnsWire::query( $name, $type, $id );
-		$data = 'tcp' === $protocol ? self::tcp( $host, $wire ) : self::udp( $host, $wire );
+		$data = self::channel()->send( $host, $trusted ? (int) ( $options['port'] ?? 53 ) : 53, $wire, 'tcp' === $protocol ? 'tcp' : 'udp' );
 		return is_string( $data ) ? DnsWire::parse( $data, $id, $name, $type ) : $data;
-	}
-
-	private static function udp( string $host, string $wire, int $port = 53 ): string|\WP_Error {
-		$socket = @fsockopen( 'udp://' . $host, $port, $errno, $message, self::TIMEOUT ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged,WordPress.WP.AlternativeFunctions.file_system_operations_fsockopen -- UDP DNS query, not file I/O; transport error returned below.
-		if ( ! $socket ) { return new \WP_Error( 'dns_unreachable', 'Name server could not be reached.' ); }
-		stream_set_timeout( $socket, self::TIMEOUT );
-		fwrite( $socket, $wire ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- UDP DNS socket, not file I/O.
-		$data = fread( $socket, 4096 ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fread -- UDP DNS socket, not file I/O.
-		$timed_out = (bool) ( stream_get_meta_data( $socket )['timed_out'] ?? false );
-		fclose( $socket ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- UDP DNS socket, not file I/O.
-		if ( is_string( $data ) && '' !== $data ) { return $data; }
-		return new \WP_Error( $timed_out ? 'dns_timeout' : 'dns_unreachable', 'Name server did not answer.' );
-	}
-
-	private static function tcp( string $host, string $wire, int $port = 53 ): string|\WP_Error {
-		$socket = @fsockopen( 'tcp://' . $host, $port, $errno, $message, self::TIMEOUT ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged,WordPress.WP.AlternativeFunctions.file_system_operations_fsockopen -- TCP DNS query, not file I/O; transport error returned below.
-		if ( ! $socket ) { return new \WP_Error( 110 === $errno ? 'dns_timeout' : 'dns_unreachable', 'Name server could not be reached.' ); }
-		stream_set_timeout( $socket, self::TIMEOUT );
-		fwrite( $socket, pack( 'n', strlen( $wire ) ) . $wire ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- TCP DNS socket, not file I/O.
-		$deadline = microtime( true ) + self::TIMEOUT;
-		$head     = self::read_exactly( $socket, 2, $deadline );
-		$data     = null === $head ? null : self::read_exactly( $socket, unpack( 'n', $head )[1], $deadline );
-		fclose( $socket ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- TCP DNS socket, not file I/O.
-		return null === $data ? new \WP_Error( 'dns_timeout', 'Name server did not answer.' ) : $data;
-	}
-
-	/** @param resource $socket */
-	private static function read_exactly( $socket, int $length, float $deadline ): ?string {
-		$buffer = '';
-		while ( strlen( $buffer ) < $length ) {
-			if ( microtime( true ) > $deadline || feof( $socket ) ) { return null; }
-			$chunk = fread( $socket, $length - strlen( $buffer ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fread -- TCP DNS socket, not file I/O.
-			if ( false === $chunk || '' === $chunk ) { return null; }
-			$buffer .= $chunk;
-		}
-		return $buffer;
 	}
 }
