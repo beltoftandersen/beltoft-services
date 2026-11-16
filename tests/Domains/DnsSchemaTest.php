@@ -53,4 +53,37 @@ class DnsSchemaTest extends TestCase {
 		$this->settings( array( 'domain_dns_claims_enabled' => 1, 'domain_nameservers' => 'ns1.example.net,ns2.example.net' ) );
 		$this->assertTrue( DnsClaimsFeature::enabled() );
 	}
+
+	public function test_ready_runs_the_index_check_once_and_checks_again_when_told(): void {
+		global $wpdb;
+
+		DnsSchema::forget_verified();
+		$before = $wpdb->num_queries;
+
+		for ( $i = 0; $i < 7; $i++ ) {
+			$this->assertTrue( DnsSchema::ready() );
+		}
+
+		$this->assertLessThanOrEqual( 1, $wpdb->num_queries - $before );
+
+		DnsSchema::forget_verified();
+		$before = $wpdb->num_queries;
+		DnsSchema::ready();
+		$this->assertSame( 1, $wpdb->num_queries - $before, 'Forgotten: the check runs again.' );
+
+		$before = $wpdb->num_queries;
+		DnsSchema::create_tables();
+		DnsSchema::ready();
+		$this->assertGreaterThanOrEqual( 2, $wpdb->num_queries - $before, 'create_tables() verifies afresh.' );
+	}
+
+	public function test_a_failed_check_is_never_remembered(): void {
+		DnsSchema::forget_verified();
+		$this->assertSame( array(), DnsSchema::missing_keys() );
+
+		add_filter( 'beltoft_services_dns_missing_keys', static fn() => array( 'assignments.PRIMARY' ) );
+		$this->assertSame( array( 'assignments.PRIMARY' ), DnsSchema::missing_keys() );
+		remove_all_filters( 'beltoft_services_dns_missing_keys' );
+		$this->assertSame( array(), DnsSchema::missing_keys() );
+	}
 }

@@ -60,7 +60,7 @@ final class DnsSchema {
 	 * @return string[]
 	 */
 	public static function missing_keys(): array {
-		$missing = self::unique_keys_missing();
+		$missing = self::verified_keys_missing();
 
 		/**
 		 * Filters the keys reported missing (lets a test simulate a failed verification).
@@ -68,6 +68,43 @@ final class DnsSchema {
 		 * @param string[] $missing "table.key" names.
 		 */
 		return (array) apply_filters( 'beltoft_services_dns_missing_keys', $missing );
+	}
+
+	/**
+	 * When the keys were last found in place (unix time), 0 when not verified in this process.
+	 *
+	 * @var int
+	 */
+	private static int $verified_at = 0;
+
+	/**
+	 * How long a pass of the key check holds, in seconds. A job process that lives long checks again after this.
+	 */
+	private const VERIFIED_FOR = 60;
+
+	/**
+	 * The keys missing, from SHOW INDEX. A pass (nothing missing) is remembered for a minute, so a page that asks ready()
+	 * several times runs the statement once; a failure is never remembered. create_tables() and forget_verified() reset it.
+	 *
+	 * @return string[]
+	 */
+	private static function verified_keys_missing(): array {
+		if ( self::$verified_at > 0 && time() - self::$verified_at < self::VERIFIED_FOR ) {
+			return array();
+		}
+
+		$missing = self::unique_keys_missing();
+
+		self::$verified_at = array() === $missing ? time() : 0;
+
+		return $missing;
+	}
+
+	/**
+	 * Forgets that the keys were verified (the table changed, or a test did).
+	 */
+	public static function forget_verified(): void {
+		self::$verified_at = 0;
 	}
 
 	/**
@@ -86,6 +123,7 @@ final class DnsSchema {
 
 		// Errors here would be printed during activation; a failure shows as a missing key below.
 		$suppress = $wpdb->suppress_errors( true );
+		self::forget_verified();
 
 		dbDelta(
 			"CREATE TABLE {$t['claims']} (
