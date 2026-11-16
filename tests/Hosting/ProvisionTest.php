@@ -351,6 +351,21 @@ class ProvisionTest extends HostingCase {
 		$this->assertCount( 1, $jobs, 'Every look is the same job, so it ran once.' );
 	}
 
+	public function test_a_step_with_three_agent_calls_submits_each_one_once_while_the_agent_is_slow(): void {
+		$this->agent->pending( 'site.create', 2 );
+		$this->agent->pending( 'site.wp_install', 2 );
+		$this->agent->pending( 'site.cache_setup', 2 );
+		$r = $this->resource( array( 'woocommerce_default' => true, 'valkey_mb' => 64 ) );
+
+		$this->provision_fully( $r );
+
+		foreach ( array( 'site.create', 'site.wp_install', 'site.cache_setup' ) as $op ) {
+			$this->assertCount( 1, array_unique( array_column( $this->agent->calls_of( $op ), 'job_id' ) ), $op . ' is one job, not restarted on every look.' );
+		}
+
+		$this->assertContains( 'site', Resource::find( $r->id() )->get( 'steps' ) );
+	}
+
 	public function test_an_invalid_preview_zone_is_refused_before_anything_is_sent(): void {
 		add_filter( 'beltoft_services_hosting_setting', fn( $v, $k ) => 'preview_zone' === $k ? 'bad_zone.example.test' : $v, 10, 2 );
 

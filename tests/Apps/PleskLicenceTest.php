@@ -405,6 +405,54 @@ final class PleskLicenceTest extends PaidAppCase {
 		$this->assertCount( 1, $this->op_calls( 'DELETE' ) );
 	}
 
+	public function test_a_lapsed_licence_keeps_the_vendor_licence_and_a_paid_renewal_needs_no_new_order(): void {
+		$o      = $this->provisioned( 'pro' );
+		$key_id = (int) $o['licence']->get( 'plesk_key_id' );
+		$license = (int) $o['licence']->license()['id'];
+
+		$this->assertTrue( Licenses::update( $license, array( 'status' => Licenses::STATUS_EXPIRED ) ) );
+		Jobs::run( $o['licence']->id() );
+		$this->assertCount( 0, $this->op_calls( 'DELETE' ), 'A lapse keeps the licence until retention.' );
+		$this->assertSame( array(), PleskLicence::sync_due() );
+		$this->assertSame( $key_id, (int) $this->fresh( $o['licence'] )->get( 'plesk_key_id' ) );
+
+		$this->assertTrue( Licenses::update( $license, array( 'status' => Licenses::STATUS_ACTIVE ) ) );
+		Jobs::run( $o['licence']->id() );
+		$this->assertCount( 0, $this->op_calls( 'DELETE' ) );
+		$this->assertCount( 1, $this->op_calls( 'POST', '/licenses/plesk' ), 'No second order.' );
+		$this->assertSame( $key_id, (int) $this->fresh( $o['licence'] )->get( 'plesk_key_id' ) );
+	}
+
+	public function test_a_revoked_licence_that_is_given_back_orders_the_vendor_licence_again_on_resume(): void {
+		$o      = $this->provisioned( 'pro' );
+		$license = (int) $o['licence']->license()['id'];
+
+		$this->assertTrue( Licenses::update( $license, array( 'status' => Licenses::STATUS_REVOKED ) ) );
+		Jobs::run( $o['licence']->id() );
+		$this->assertSame( 0, (int) $this->fresh( $o['licence'] )->get( 'plesk_key_id' ) );
+
+		$this->assertTrue( Licenses::update( $license, array( 'status' => Licenses::STATUS_ACTIVE ) ) );
+		Jobs::run( $o['licence']->id() );
+		$licence = $this->fresh( $o['licence'] );
+		$this->assertGreaterThan( 0, (int) $licence->get( 'plesk_key_id' ), (string) $licence->get( 'last_error' ) );
+		$this->assertCount( 2, $this->op_calls( 'POST', '/licenses/plesk' ) );
+		$this->assertSame( 'ready', $licence->get( 'state' ) );
+	}
+
+	public function test_a_failed_change_on_an_active_licence_never_deletes_the_vendor_licence(): void {
+		$o      = $this->provisioned( 'pro' );
+		$key_id = (int) $o['licence']->get( 'plesk_key_id' );
+		$o['licence']->set( array( 'state' => 'failed', 'failed_op' => 'update_plan' ) );
+
+		$this->assertSame( array(), PleskLicence::sync_due() );
+		PleskLicence::sync( $this->fresh( $o['licence'] ) );
+		$this->assertCount( 0, $this->op_calls( 'DELETE' ) );
+		$this->assertSame( $key_id, (int) $this->fresh( $o['licence'] )->get( 'plesk_key_id' ) );
+
+		$this->fresh( $o['licence'] )->set( array( 'failed_op' => 'provision' ) );
+		$this->assertSame( array( array( $o['licence']->id() ) ), PleskLicence::sync_due(), 'A provision that failed after the order is still released.' );
+	}
+
 	public function test_deleting_the_server_deletes_the_licence(): void {
 		$o      = $this->provisioned( 'pro' );
 		$key_id = (int) $o['licence']->get( 'plesk_key_id' );

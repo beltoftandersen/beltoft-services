@@ -356,6 +356,28 @@ final class AppLicence {
 	}
 
 	/**
+	 * Must the vendor's licence be deleted now? Only when the licence is gone for good: marked ended (server deleted, reinstall
+	 * away), its resource is being or was deleted, its provision or delete failed, or it was revoked. A lapse (expired, on hold)
+	 * keeps the vendor licence until retention deletes the resource, and a failed plan change, pause or resume never deletes the
+	 * licence of a customer who still has it paid. (state() is what the customer is told: a lapse reads as ended there.)
+	 *
+	 * @param Resource $licence Licence resource.
+	 */
+	public static function release_due( Resource $licence ): bool {
+		$state = (string) $licence->get( 'state' );
+
+		if ( '' !== (string) $licence->get( self::ENDED ) || in_array( $state, array( 'deleting', 'deleted' ), true ) ) {
+			return true;
+		}
+
+		if ( 'failed' === $state && in_array( (string) $licence->get( 'failed_op' ), array( 'provision', 'delete' ), true ) ) {
+			return true;
+		}
+
+		return Licenses::STATUS_REVOKED === Licenses::effective_status( (array) $licence->license() );
+	}
+
+	/**
 	 * The tier of a licence as the customer reads it.
 	 *
 	 * @param Resource $licence Licence resource.

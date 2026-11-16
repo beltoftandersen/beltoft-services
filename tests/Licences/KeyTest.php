@@ -593,4 +593,52 @@ final class KeyTest extends TestCase {
 		$this->assertTrue( KeyOrder::release( Resource::find( $gone->id() ) ) );
 		$this->assertSame( array(), KeyOrder::sync_due() );
 	}
+
+	public function test_a_failed_plan_change_on_a_paid_licence_never_deletes_its_vendor_licence(): void {
+		$r = $this->licence();
+		$this->build( $r );
+		$r = Resource::find( $r->id() );
+		$r->set( array( 'state' => 'failed', 'failed_op' => 'update_plan' ) );
+
+		$this->assertSame( array(), KeyOrder::sync_due() );
+		KeyOrder::run_sync( $r->id() );
+		$this->assertSame( array(), $this->calls( 'DELETE' ) );
+		$this->assertGreaterThan( 0, (int) Resource::find( $r->id() )->get( 'lic_key_id' ) );
+	}
+
+	public function test_a_licence_whose_provision_failed_after_the_order_is_still_deleted(): void {
+		$r = $this->licence();
+		$this->build( $r );
+		$r = Resource::find( $r->id() );
+		$r->set( array( 'state' => 'failed', 'failed_op' => 'provision' ) );
+
+		$this->assertSame( array( array( $r->id() ) ), KeyOrder::sync_due() );
+		KeyOrder::run_sync( $r->id() );
+		$this->assertCount( 1, $this->calls( 'DELETE' ) );
+	}
+
+	public function test_a_revoked_licence_is_deleted_at_the_vendor_and_an_expired_one_is_kept_for_retention(): void {
+		$expired = $this->licence();
+		$this->build( $expired );
+		$revoked = $this->licence( array( 'ip' => '203.0.113.20' ) );
+		$this->build( $revoked );
+		$expired = Resource::find( $expired->id() );
+		$revoked = Resource::find( $revoked->id() );
+
+		\BeltoftLicenses\Licenses::update( (int) $expired->license()['id'], array( 'status' => \BeltoftLicenses\Licenses::STATUS_EXPIRED ) );
+		$this->assertTrue( ( new KeyDriver() )->pause( Resource::find( $expired->id() ) )->is_done() );
+		$this->assertSame( array(), $this->calls( 'DELETE' ), 'A lapse is kept until retention ends.' );
+		$this->assertSame( array(), KeyOrder::sync_due() );
+
+		\BeltoftLicenses\Licenses::update( (int) $revoked->license()['id'], array( 'status' => \BeltoftLicenses\Licenses::STATUS_REVOKED ) );
+		$this->assertSame( array( array( $revoked->id() ) ), KeyOrder::sync_due(), 'The watchdog finds a revoked licence.' );
+		$this->assertTrue( ( new KeyDriver() )->pause( Resource::find( $revoked->id() ) )->is_done() );
+		$this->assertCount( 1, $this->calls( 'DELETE' ) );
+		$this->assertSame( 0, (int) Resource::find( $revoked->id() )->get( 'lic_key_id' ) );
+	}
+
+	public function test_a_licence_key_product_has_a_default_retention_so_a_cancelled_key_is_deleted_by_retention(): void {
+		$r = $this->licence();
+		$this->assertGreaterThan( 0, Product::retention_days( (int) $r->license()['product_id'] ) );
+	}
 }

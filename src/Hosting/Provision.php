@@ -581,50 +581,74 @@ final class Provision {
 		$record = Records::for_resource( $this->r->id() );
 		$vmid   = (int) $record['vmid'];
 
-		$created = $this->agent_call(
-			'site_create',
-			'site.create',
-			array(
-				'vmid'    => $vmid,
-				'slug'    => $spec['slug'],
-				'php'     => $spec['php'],
-				'workers' => Plan::workers_per_site( $this->plan, 1 ),
-				'host'    => EdgeMap::preview_host( $spec['slug'] ),
-			)
-		);
+		// Every call of this step is remembered once it ended: the step is run again from its top after each poll, and a finished
+		// call would otherwise be asked for again under a new job id (a second create, a second WordPress install).
+		$done = array_values( array_filter( (array) $this->r->get( 'site_calls' ), 'is_string' ) );
 
-		if ( $created instanceof StepResult ) {
-			return $created;
-		}
-
-		if ( $spec['install'] ) {
-			$installed = $this->agent_call(
-				'site_install',
-				'site.wp_install',
+		if ( ! in_array( 'site_create', $done, true ) ) {
+			$created = $this->agent_call(
+				'site_create',
+				'site.create',
 				array(
-					'vmid'        => $vmid,
-					'slug'        => $spec['slug'],
-					'title'       => '' !== $spec['label'] ? $spec['label'] : $spec['slug'],
-					'admin_user'  => $spec['admin_user'],
-					'admin_email' => $spec['admin_email'],
-					'locale'      => $spec['language'],
-					'woocommerce' => 'woocommerce' === $spec['install_kind'],
+					'vmid'    => $vmid,
+					'slug'    => $spec['slug'],
+					'php'     => $spec['php'],
+					'workers' => Plan::workers_per_site( $this->plan, 1 ),
+					'host'    => EdgeMap::preview_host( $spec['slug'] ),
 				)
 			);
 
-			if ( $installed instanceof StepResult ) {
-				return $installed;
+			if ( $created instanceof StepResult ) {
+				return $created;
+			}
+
+			$done[] = 'site_create';
+
+			if ( ! $this->r->set( array( 'site_calls' => $done ) ) ) {
+				return StepResult::retry( 0, 'site: the progress could not be stored' );
+			}
+		}
+
+		if ( $spec['install'] ) {
+			if ( ! in_array( 'site_install', $done, true ) ) {
+				$installed = $this->agent_call(
+					'site_install',
+					'site.wp_install',
+					array(
+						'vmid'        => $vmid,
+						'slug'        => $spec['slug'],
+						'title'       => '' !== $spec['label'] ? $spec['label'] : $spec['slug'],
+						'admin_user'  => $spec['admin_user'],
+						'admin_email' => $spec['admin_email'],
+						'locale'      => $spec['language'],
+						'woocommerce' => 'woocommerce' === $spec['install_kind'],
+					)
+				);
+
+				if ( $installed instanceof StepResult ) {
+					return $installed;
+				}
+
+				$done[] = 'site_install';
+
+				if ( ! $this->r->set( array( 'site_calls' => $done ) ) ) {
+					return StepResult::retry( 0, 'site: the progress could not be stored' );
+				}
 			}
 
 			// A node whose agent has the cache set-up already put the page cache in place with the install. Shop plans with an
 			// object cache also get it switched on. Best effort: a node whose agent does not know the operation, or a failed
 			// job, does not stop the website (the cache-setup command repairs it later). Only a job still running is waited for.
-			if ( ! empty( $this->plan['woocommerce_default'] ) && (int) $this->plan['valkey_mb'] > 0 ) {
+			if ( ! in_array( 'site_cache', $done, true ) && ! empty( $this->plan['woocommerce_default'] ) && (int) $this->plan['valkey_mb'] > 0 ) {
 				$cache = $this->agent_call( 'site_cache', 'site.cache_setup', array( 'vmid' => $vmid, 'slug' => $spec['slug'], 'object_cache' => true ) );
 
 				if ( $cache instanceof StepResult && $cache->is_poll() ) {
 					return $cache;
 				}
+
+				// Ended, well or not: it is not asked for again.
+				$done[] = 'site_cache';
+				$this->r->set( array( 'site_calls' => $done ) );
 			}
 
 			// Who the install made the administrator, so My Account can say which user the sign-in link uses.

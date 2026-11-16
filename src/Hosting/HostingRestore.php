@@ -308,7 +308,7 @@ final class HostingRestore {
 		}
 
 		$this->r = Resource::find( $this->r->id() ) ?? $this->r;
-		$this->r->set( array( 'restore' => null, 'restore_last' => array( 'kind' => $round['kind'], 'at' => Jobs::now(), 'ok' => true ) ) );
+		$this->r->set( array( 'restore' => null, 'restore_last' => array( 'kind' => $round['kind'], 'at' => Jobs::now(), 'ok' => true, 'not_in_backup' => array_values( (array) ( $round['not_in_backup'] ?? array() ) ) ) ) );
 		$this->tell( $round, true );
 
 		// A restored container or website may have lost the node's copy of a country block: the stored one is sent again by the change
@@ -687,16 +687,65 @@ final class HostingRestore {
 	 * @param array<string, mixed> $round Round.
 	 * @return true|StepResult
 	 */
-	private function phase_databases( array $round ) {
+	private function phase_databases( array &$round ) {
+		$done_dbs = array_values( array_filter( (array) ( $round['dbs_done'] ?? array() ), 'is_string' ) );
+		$missing  = array_values( array_filter( (array) ( $round['not_in_backup'] ?? array() ), 'is_string' ) );
+
 		foreach ( $this->databases() as $slug => $database ) {
+			// A website made after the backup has no dump in it; one already imported by an earlier run of this phase is not imported again.
+			if ( in_array( $slug, $done_dbs, true ) || in_array( $slug, $missing, true ) ) {
+				continue;
+			}
+
+			if ( $this->made_after_backup( $round, (string) $slug ) ) {
+				$missing[] = $slug;
+				continue;
+			}
+
 			$done = $this->agent_call( 'restore_db_' . $slug, 'backup.db_restore', array( 'account' => Config::account( $this->r->id() ), 'database' => $database, 'snapshot' => $round['snapshot'] ) );
 
 			if ( $done instanceof StepResult ) {
+				if ( $done->is_retry() && str_contains( $done->error(), 'holds no dump of this database' ) ) {
+					$missing[] = $slug;
+					continue;
+				}
+
 				return $done;
+			}
+
+			$done_dbs[] = $slug;
+
+			// Remembered at once: a repeat of the phase (a later website failed or is still running) starts at the first one not done.
+			$round['dbs_done']      = $done_dbs;
+			$round['not_in_backup'] = $missing;
+			$this->r                = Resource::find( $this->r->id() ) ?? $this->r;
+
+			if ( ! $this->r->set( array( 'restore' => $round ) ) ) {
+				return StepResult::retry( 0, 'restore: the database progress could not be stored' );
 			}
 		}
 
+		$round['dbs_done']      = $done_dbs;
+		$round['not_in_backup'] = $missing;
+
 		return true;
+	}
+
+	/**
+	 * Was this website made after the backup the round restores? Then the backup holds no dump of its database. Only a backup
+	 * (snapshot b<ctime>) can tell; a safety point is made just before the restore and holds every website.
+	 *
+	 * @param array<string, mixed> $round Round.
+	 * @param string               $slug  Site.
+	 */
+	private function made_after_backup( array $round, string $slug ): bool {
+		if ( 1 !== preg_match( '/^b(\d+)$/D', (string) ( $round['snapshot'] ?? '' ), $m ) ) {
+			return false;
+		}
+
+		$site = Sites::find( $this->r->id(), $slug );
+
+		return null !== $site && (int) ( $site['created'] ?? 0 ) > (int) $m[1];
 	}
 
 	/**

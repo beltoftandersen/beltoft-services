@@ -18,6 +18,9 @@ final class KeyDriver implements Driver {
 	public const ID   = 'licence-key';
 	public const KIND = 'lickey';
 
+	/** Days a lapsed key is kept before retention deletes it (the vendor bills it monthly meanwhile). */
+	public const DEFAULT_RETENTION_DAYS = 3;
+
 	public function id(): string {
 		return self::ID;
 	}
@@ -47,13 +50,29 @@ final class KeyDriver implements Driver {
 		);
 	}
 
+	/**
+	 * Keys have no retention of their own: the server default applies, so a cancelled key is deleted at the vendor after it
+	 * (an explicit 0 on the product still means never). Deletion mode decides whether retention deletes or only reports.
+	 *
+	 * @param mixed $days       Days so far.
+	 * @param mixed $product_id Product or variation id.
+	 * @return mixed
+	 */
+	public static function default_retention( $days, $product_id ) {
+		$driver = \BeltoftServices\Product::driver_for( (int) $product_id );
+
+		return $driver && self::ID === $driver->id() ? self::DEFAULT_RETENTION_DAYS : $days;
+	}
+
 	public function provision( Resource $r ): StepResult {
 		return KeyOrder::provision( $r );
 	}
 
 	public function pause( Resource $r ): StepResult {
-		// A licence on hold is kept: a deleted one would have to be bought again, and it is billed monthly anyway.
-		unset( $r );
+		// A licence on hold or lapsed is kept until retention deletes it: a deleted one would have to be bought again. A revoked one is gone for good.
+		if ( KeyOrder::release_due( $r ) ) {
+			KeyOrder::release( $r );
+		}
 
 		return StepResult::done();
 	}

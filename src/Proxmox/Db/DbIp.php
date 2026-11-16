@@ -45,6 +45,9 @@ final class DbIp {
 	/** Meta: the operation in progress (action, phase, flags). */
 	public const OP = 'db_ip_op';
 
+	/** Meta: a restore put the backup's guest layers back; the listen addresses and the allow-list are sent again. */
+	public const RESYNC = 'db_resync';
+
 	/** Seconds the guest has for a listen job. */
 	private const LISTEN_BUDGET = 600;
 
@@ -65,14 +68,14 @@ final class DbIp {
 	}
 
 	/**
-	 * The action in progress: add, remove, or ''.
+	 * The action in progress: add, remove, sync (after a restore), or ''.
 	 *
 	 * @param Resource $r Resource.
 	 */
 	public static function action( Resource $r ): string {
 		$op = $r->get( self::OP );
 
-		return is_array( $op ) && in_array( $op['action'] ?? '', array( 'add', 'remove' ), true ) ? (string) $op['action'] : '';
+		return is_array( $op ) && in_array( $op['action'] ?? '', array( 'add', 'remove', 'sync' ), true ) ? (string) $op['action'] : '';
 	}
 
 	/**
@@ -99,10 +102,50 @@ final class DbIp {
 		$row = IpPool::for_resource( $r->id() );
 
 		if ( self::plan_wants( (array) $r->get( 'plan' ) ) ) {
-			return null === $row || 'assigned' !== $row['state'] ? 'add' : '';
+			$change = null === $row || 'assigned' !== $row['state'] ? 'add' : '';
+		} else {
+			$change = null !== $row ? 'remove' : '';
 		}
 
-		return null !== $row ? 'remove' : '';
+		// A restore put the backup's guest layers back (listen addresses, allow-list): the stored ones are sent again.
+		return '' === $change && true === $r->get( self::RESYNC ) ? 'sync' : $change;
+	}
+
+	/**
+	 * What a restored VM's net0 and ipconfig0 must be changed to so that they match the address pool: the public NIC when the
+	 * pool holds an address for this database, none when it does not (the backup may carry an address that was given back and
+	 * handed to someone else). Null: nothing to change. An address in the middle of an add or a remove is left to DbIp::run.
+	 *
+	 * @param Resource             $r       Resource.
+	 * @param array<string, mixed> $cluster Cluster.
+	 * @param array<string, mixed> $config  The VM's config now.
+	 * @return array<string, string>|null PUT parameters (without digest), or null.
+	 */
+	public static function nic_repair( Resource $r, array $cluster, array $config ): ?array {
+		if ( '' !== self::action( $r ) ) {
+			return null;
+		}
+
+		$row = IpPool::for_resource( $r->id() );
+
+		if ( null !== $row && 'assigned' === $row['state'] ) {
+			$want = self::public_params( $cluster, $row, (string) ( $config['net0'] ?? '' ) );
+
+			return self::matches( $config, $want ) ? null : $want;
+		}
+
+		if ( null !== $row || ( empty( $config['net0'] ) && empty( $config['ipconfig0'] ) ) ) {
+			return null;
+		}
+
+		// A net0 on the private bridge is not ours to remove.
+		$props = NetConfig::parse( (string) ( $config['net0'] ?? '' ) );
+
+		if ( '' !== (string) ( $cluster['private_bridge'] ?? '' ) && ( $props['bridge'] ?? '' ) === (string) $cluster['private_bridge'] ) {
+			return null;
+		}
+
+		return array( 'delete' => 'net0,ipconfig0' );
 	}
 
 	/**
@@ -247,7 +290,7 @@ final class DbIp {
 				return StepResult::done( array(), 'No public IP address change was needed' );
 			}
 
-			$op = array( 'action' => $action, 'phase' => 'add' === $action ? 'hold' : 'clear' );
+			$op = array( 'action' => $action, 'phase' => 'add' === $action ? 'hold' : ( 'sync' === $action ? 'listen' : 'clear' ) );
 
 			if ( ! $this->r->set( array( self::OP => $op, DbAccess::STATE => '' ) ) ) {
 				return StepResult::retry( 0, 'db_ip: progress could not be stored' );
@@ -267,7 +310,11 @@ final class DbIp {
 			return StepResult::fail( (string) $op['abort'] );
 		}
 
-		$order = 'add' === $op['action'] ? array( 'hold', 'stop', 'nic', 'start', 'listen', 'access', 'firewall' ) : array( 'clear', 'stop', 'nic', 'start', 'listen', 'firewall' );
+		$order = array(
+			'add'    => array( 'hold', 'stop', 'nic', 'start', 'listen', 'access', 'firewall' ),
+			'remove' => array( 'clear', 'stop', 'nic', 'start', 'listen', 'firewall' ),
+			'sync'   => array( 'listen', 'resync', 'firewall' ),
+		)[ (string) $op['action'] ];
 		$at    = array_search( (string) $op['phase'], $order, true );
 		$at    = false === $at ? 0 : $at;
 
@@ -291,7 +338,11 @@ final class DbIp {
 		}
 
 		$added = 'add' === $op['action'];
-		$this->r->set( array( self::OP => null ) );
+		$this->r->set( array( self::OP => null, self::RESYNC => null ) );
+
+		if ( 'sync' === $op['action'] ) {
+			return StepResult::done( array(), 'Database listen addresses and access list sent again after the restore' );
+		}
 
 		return StepResult::done( array( 'ip' => $added ? DbAccess::public_address( $this->r ) : null ), $added ? 'Public IP address added to the database' : 'Public IP address removed from the database' );
 	}
@@ -449,6 +500,13 @@ final class DbIp {
 			return null;
 		}
 
+		// After a restore: the database came back and works, so a guest that cannot be told is reported, not failed.
+		if ( 'sync' === ( $op['action'] ?? '' ) ) {
+			\BeltoftServices\Alerts::admin( $this->r, $why . '. The restored database may still listen on the addresses of the backup.' );
+
+			return null;
+		}
+
 		unset( $op['listen_request'], $op['listen_sent'], $op['listen_at'] );
 		$this->r->set( array( self::OP => $op ) );
 
@@ -466,6 +524,35 @@ final class DbIp {
 		unset( $record );
 
 		return $this->apply_empty_list( false );
+	}
+
+	/**
+	 * Phase resync (sync, after a restore): the stored allow-list, not an empty one, goes to the guest and the firewall. The
+	 * revision is raised once per operation, so the layers are brought to the stored list even though they were applied before.
+	 *
+	 * @param array<string, mixed> $record VM record.
+	 * @return StepResult|null
+	 */
+	private function phase_resync( array $record ) {
+		unset( $record );
+		$op = $this->op();
+
+		if ( empty( $op['resynced'] ) ) {
+			$meta = array(
+				DbAccess::REV   => (int) $this->r->get( DbAccess::REV ) + 1,
+				DbAccess::STATE => 'applying',
+				DbAccess::OP    => null,
+				self::OP        => array_merge( $op, array( 'resynced' => true ) ),
+			);
+
+			if ( ! $this->r->set( $meta ) ) {
+				return StepResult::retry( 0, 'db_ip: progress could not be stored' );
+			}
+		}
+
+		$done = ( new DbAccess( $this->r ) )->run( true, true );
+
+		return $done->is_done() ? null : $done;
 	}
 
 	/**

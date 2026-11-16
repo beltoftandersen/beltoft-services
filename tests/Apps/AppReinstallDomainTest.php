@@ -253,6 +253,49 @@ final class AppReinstallDomainTest extends MonitoringTestCase {
 		$this->assertSame( array(), DnsClients::dns()->zone( 'mine.example' )['rrsets'] );
 	}
 
+	public function test_deleting_the_server_removes_the_a_and_www_records_we_made_while_they_are_still_ours(): void {
+		$r    = $this->server();
+		$user = (int) $r->license()['user_id'];
+		$this->zone( $user );
+		$r->set( array( 'app_zone' => 'mine.example', 'app_domain_want' => 'mine.example' ) );
+		$this->assertSame( 'mine.example', ( new \ReflectionMethod( AppInstall::class, 'domain' ) )->invoke( null, $r, '192.0.2.10', $user ) );
+		$wrote = false;
+		$this->assertTrue( \BeltoftServices\Apps\AppDomains::publish( $user, 'mine.example', 'www.mine.example', '192.0.2.10', $wrote, true ) );
+		$r->set( array( 'app_www_made' => true, 'app_www_ip' => '192.0.2.10' ) );
+		$this->assertCount( 2, DnsClients::dns()->zone( 'mine.example' )['rrsets'] );
+
+		// The server is deleted: its address is freed, the resource is closed, then listeners are told.
+		IpPool::release( $r->id() );
+		$r = Resource::find( $r->id() );
+		$r->transition( 'deleted', 'Deleted' );
+		$r->close();
+		do_action( 'beltoft_services_state_changed', Resource::find( $r->id() ), 'deleting', 'deleted' );
+
+		$this->assertNotFalse( as_has_scheduled_action( AppDomainRelease::HOOK, array( $r->id() ), \BeltoftServices\Jobs::GROUP ) );
+		AppDomainRelease::run( $r->id() );
+		AppDomainRelease::run( $r->id() );
+		$this->assertSame( array(), DnsClients::dns()->zone( 'mine.example' )['rrsets'] );
+		$this->assertSame( array(), (array) Resource::find( $r->id() )->get( 'app_domain_old' ) );
+	}
+
+	public function test_deleting_a_server_never_removes_a_record_the_customer_changed_or_one_we_did_not_make(): void {
+		$r    = $this->server( 'wordpress', array( 'app_domain' => 'shop.mine.example', 'app_domain_made' => true, 'app_zone' => 'mine.example' ) );
+		$this->zone( (int) $r->license()['user_id'] );
+		$this->assertTrue( Records::replace( 'mine.example', array( array( 'name' => 'shop', 'type' => 'A', 'ttl' => 300, 'value' => '198.51.100.7' ) ) ) );
+		$own = $this->server( 'wordpress', array( 'app_domain' => 'own.example', 'app_domain_made' => false ), 5001 );
+
+		foreach ( array( $r, $own ) as $server ) {
+			$server = Resource::find( $server->id() );
+			$server->transition( 'deleted', 'Deleted' );
+			$server->close();
+			do_action( 'beltoft_services_state_changed', Resource::find( $server->id() ), 'deleting', 'deleted' );
+			AppDomainRelease::run( $server->id() );
+		}
+
+		$this->assertCount( 1, DnsClients::dns()->zone( 'mine.example' )['rrsets'], 'The changed record stays.' );
+		$this->assertFalse( as_has_scheduled_action( AppDomainRelease::HOOK, array( $own->id() ), \BeltoftServices\Jobs::GROUP ), 'Nothing of ours to remove.' );
+	}
+
 	public function test_customer_edit_to_app_record_is_kept(): void {
 		$r = $this->server( 'wordpress', array( 'app_domain_old' => array( array( 'zone' => 'mine.example', 'name' => 'old.mine.example', 'ip' => '192.0.2.10', 'tries' => 0 ) ) ) );
 		$this->zone( (int) $r->license()['user_id'] );

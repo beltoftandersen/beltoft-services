@@ -158,14 +158,29 @@ final class AppLicenceDriver implements Driver {
 	}
 
 	public function pause( Resource $r ): StepResult {
-		// A licence on hold is "paused"; one that expired or was revoked or cancelled has ended.
-		AppLicence::announce( $r, Licenses::STATUS_SUSPENDED === Licenses::effective_status( (array) $r->license() ) ? 'paused' : 'cancelled' );
+		// A licence on hold or lapsed (expired) is "paused": the vendor licence is kept until retention deletes the resource,
+		// and a paid renewal resumes it. Only a revoked one has ended.
+		AppLicence::announce( $r, Licenses::STATUS_REVOKED === Licenses::effective_status( (array) $r->license() ) ? 'cancelled' : 'paused' );
 
 		return StepResult::done();
 	}
 
 	public function resume( Resource $r ): StepResult {
 		AppLicence::announce( $r, 'resumed' );
+
+		// A vendor licence that was deleted while this one was revoked is ordered again; one that was kept is only checked
+		// (the vendor step is safe to repeat and finds the licence by its title).
+		$server = Resource::for_license( (int) $r->get( 'server_license' ) );
+		$app    = (string) ( ( (array) $r->get( 'plan' ) )['app'] ?? '' );
+
+		if ( $server && '' !== $app && ProxmoxDriver::ID === $server->get( 'driver' ) && ! in_array( $server->get( 'state' ), array( 'failed', 'deleting', 'deleted' ), true ) && 'active' === AppLicence::state( $r ) ) {
+			// Documented at the call in provision().
+			$vendor = apply_filters( 'beltoft_services_app_licence_provision', null, $r, $server, $app );
+
+			if ( $vendor instanceof StepResult ) {
+				return $vendor->is_done() ? StepResult::done( $vendor->meta() ) : $vendor;
+			}
+		}
 
 		return StepResult::done();
 	}
