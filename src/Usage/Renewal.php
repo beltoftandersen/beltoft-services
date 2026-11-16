@@ -92,7 +92,8 @@ final class Renewal {
 
 		foreach ( $groups as $group ) {
 			$end    = (int) strtotime( gmdate( 'Y-m-01 00:00:00', $group['month'] + 32 * DAY_IN_SECONDS ) . ' UTC' );
-			$cap    = round( $group['peak'] * Rates::HOURS, 2 );
+			// The cap follows the month's peak, also of the rows earlier orders billed (a later price cut does not lower it).
+			$cap    = round( max( $group['peak'], Ledger::billed_peak( $group['resource_id'], $group['item'], $group['month'], $end, $except, $group['currency'] ) ) * Rates::HOURS, 2 );
 			$prior  = min( $cap, Ledger::billed( $group['resource_id'], $group['item'], $group['month'], $end, $except, $group['currency'] ) );
 			$room   = max( 0.0, $cap - $prior );
 			$raw    = round( $group['raw'], 4 );
