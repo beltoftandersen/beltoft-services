@@ -19,8 +19,22 @@ class SchemaTest extends TestCase {
 	 * The test suite turns CREATE TABLE into CREATE TEMPORARY TABLE, so tables built here are
 	 * temporary copies that hide the real ones. Drop them, and put the version back.
 	 */
+	/**
+	 * Settings as they were before a test that changes them ahead of table statements; null when untouched.
+	 *
+	 * @var array|null
+	 */
+	private $settings_before = null;
+
 	public function tear_down(): void {
 		global $wpdb;
+
+		if ( null !== $this->settings_before ) {
+			update_option( \BeltoftServices\Settings::OPTION, $this->settings_before );
+			delete_option( 'beltoft_services_schema_alerted' );
+			$wpdb->query( 'COMMIT' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- the earlier write was committed by a table statement.
+			$this->settings_before = null;
+		}
 
 		foreach ( Schema::tables() as $table ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test schema.
@@ -169,6 +183,8 @@ class SchemaTest extends TestCase {
 	public function test_a_failed_upgrade_tells_the_admin_once_per_version(): void {
 		delete_option( Schema::OPTION_DB_VERSION );
 		delete_option( 'beltoft_services_schema_alerted' );
+		// The upgrade runs table statements, which commit what was written before them: the settings are put back by hand in tear_down.
+		$this->settings_before = get_option( \BeltoftServices\Settings::OPTION, array() );
 		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
 		$mails = array();
 		add_filter(
