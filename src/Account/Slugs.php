@@ -529,6 +529,7 @@ final class Slugs {
 	 */
 	public static function register(): void {
 		add_action( 'init', array( __CLASS__, 'maybe_migrate' ), 20 );
+		Resource::memo_hooks();
 	}
 
 	/**
