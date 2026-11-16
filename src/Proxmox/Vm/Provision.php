@@ -359,6 +359,15 @@ final class Provision {
 	private function step_wipe() {
 		$record = VmRecords::for_resource( $this->r->id() );
 
+		// The wipe destroys the customer's data: the replacement must exist first, with the VM untouched when it does not.
+		if ( null !== $record && 'boot' !== $this->r->get( 'wipe' ) ) {
+			$usable = $this->template_usable();
+
+			if ( null !== $usable ) {
+				return $usable;
+			}
+		}
+
 		if ( 'boot' === $this->r->get( 'wipe' ) ) {
 			return $this->step_wipe_boot( $record );
 		}
@@ -562,6 +571,15 @@ final class Provision {
 
 		$extra_ids = array_column( $extra, 'volid' );
 
+		// Before the old boot volume is touched: the template must be there with a disk in the boot slot.
+		if ( null === $this->r->get( 'wipe_boot_phase' ) && null === $this->r->get( 'wipe_old_boot' ) ) {
+			$volume = $this->template_boot_volume( $boot );
+
+			if ( $volume instanceof StepResult ) {
+				return $volume;
+			}
+		}
+
 		for ( $round = 0; $round < 8; $round++ ) {
 			$v = Ownership::verify( $this->client, $record, $this->r );
 
@@ -692,6 +710,27 @@ final class Provision {
 		}
 
 		return StepResult::retry( 0, 'wipe: the boot disk did not reach the wanted state' );
+	}
+
+	/**
+	 * Is the template of the reinstall listed on the cluster and still a template? Null when it is.
+	 *
+	 * @return StepResult|null
+	 */
+	private function template_usable(): ?StepResult {
+		$list = Ownership::listing( $this->client );
+
+		if ( is_wp_error( $list ) ) {
+			return $this->classify( $list, 'wipe' );
+		}
+
+		$template = Ownership::entry( $list, $this->plan['template'] );
+
+		if ( null === $template || 'qemu' !== (string) ( $template['type'] ?? 'qemu' ) || empty( $template['template'] ) ) {
+			return StepResult::fail( sprintf( 'wipe: VMID %d is not a template on this cluster; the server was not touched', $this->plan['template'] ) );
+		}
+
+		return null;
 	}
 
 	/**

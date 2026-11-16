@@ -278,6 +278,22 @@ class PowerLagTest extends BackupTestCase {
 		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
 	}
 
+	public function test_a_reinstall_whose_template_is_gone_leaves_the_server_untouched(): void {
+		$server = $this->ready_vm();
+		$this->assertNotNull( $this->fake->vm( 9000 ), 'The template exists in the fake.' );
+		$this->fake->request( 'DELETE', '/nodes/node-a/qemu/9000', array() );
+		$this->assertNull( $this->fake->vm( 9000 ) );
+		$seen = count( $this->fake->calls() );
+
+		Jobs::act( $server->id(), 'reinstall', array( 'confirm' => 'REINSTALL' ) );
+		Jobs::run( $server->id() );
+
+		$this->assertCount( 0, $this->calls( 'DELETE', '/qemu/5000' ), 'The customer VM is not destroyed for a template that is not there.' );
+		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
+		$this->assertSame( 'failed', Resource::find( $server->id() )->get( 'state' ) );
+		$this->assertStringContainsString( 'is not a template', (string) Resource::find( $server->id() )->get( 'last_error' ) );
+	}
+
 	public function test_reinstall_without_disks_with_a_status_that_lags_is_one_clean_run(): void {
 		$server = $this->ready_vm();
 		$this->fake->lag_status( 5000, 2 );
