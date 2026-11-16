@@ -60,7 +60,6 @@ class NamespaceMoveTest extends TestCase {
 		'Picked' => array( 'Proxmox', 'Proxmox\\Vm' ),
 		'Tiles' => array( 'Proxmox', 'Proxmox\\Vm' ),
 		'GuestDisk' => array( 'Proxmox', 'Proxmox\\Vm' ),
-		'Usage' => array( 'Proxmox', 'Proxmox\\Vm' ),
 		'Credentials' => array( 'Proxmox', 'Proxmox\\Vm' ),
 		'CoreHooks' => array( 'Proxmox', 'Proxmox\\Vm' ),
 		'PasswordJobs' => array( 'Proxmox\\Jobs', 'Proxmox\\Vm' ),

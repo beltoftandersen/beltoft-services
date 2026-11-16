@@ -10,6 +10,7 @@ namespace BeltoftServices\Proxmox\Vm;
 use BeltoftLicenses\Events;
 use BeltoftServices\Alerts;
 use BeltoftServices\Jobs;
+use BeltoftServices\Monitoring\Samples;
 use BeltoftServices\Proxmox\Pve\Client;
 use BeltoftServices\Proxmox\Network\Monitor;
 use BeltoftServices\Proxmox\Pve\JobScope;
@@ -193,7 +194,7 @@ final class AbuseJobs {
 	 */
 	private static function check_abuse( Resource $resource, array $samples ): void {
 		$threshold = (int) Settings::get( 'abuse_cpu' );
-		$reading   = self::analyse( $samples, (float) $threshold );
+		$reading   = Samples::analyse( $samples, (float) $threshold );
 
 		if ( null === $reading ) {
 			self::note_impossible( $resource );
@@ -211,20 +212,6 @@ final class AbuseJobs {
 	}
 
 	/**
-	 * Reads the samples of one hour. The CPU of a sample is PVE's fraction, so 0.9 is 90 percent
-	 * (not documented in the API viewer: the keys `cpu` and `time` are read defensively). A
-	 * sample without a numeric `cpu` and `time` is a gap: it ends a run, and an unfinished
-	 * newest sample does not count. The interval between samples is not assumed.
-	 *
-	 * @param array<int, mixed> $samples   Rows of rrddata.
-	 * @param float             $threshold CPU percent.
-	 * @return array{first: int, last: int, longest: int, trailing: ?int}|null Seconds. `trailing` is where the run that reaches the newest sample began. Null: no usable sample.
-	 */
-	public static function analyse( array $samples, float $threshold ): ?array {
-		return \BeltoftServices\Monitoring\Samples::analyse( $samples, $threshold );
-	}
-
-	/**
 	 * Since when the VM has been above the threshold, over several hourly readings. One reading
 	 * covers an hour only, so `abuse_hours` of 2 or more is judged on this value (a design of this
 	 * plugin, not something the docs describe). It is reset by a reading that ends below the threshold, and
@@ -235,7 +222,7 @@ final class AbuseJobs {
 	 * @return int|null Timestamp, or null when the newest sample is below the threshold.
 	 */
 	private static function since( int $resource_id, array $reading ): ?int {
-		return Usage::since( ProxmoxJobs::SINCE_PREFIX, $resource_id, $reading, max( 1, (int) Settings::get( 'abuse_hours' ) ) + 24 );
+		return Samples::since( ProxmoxJobs::SINCE_PREFIX, $resource_id, $reading, max( 1, (int) Settings::get( 'abuse_hours' ) ) + 24 );
 	}
 
 	/**

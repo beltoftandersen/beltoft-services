@@ -4,7 +4,6 @@ namespace BeltoftServices\Tests\Proxmox\Network;
 
 use BeltoftServices\Proxmox\Vm\GuestDisk;
 use BeltoftServices\Proxmox\Network\Monitor;
-use BeltoftServices\Proxmox\Vm\Usage;
 use BeltoftServices\Resource;
 
 require_once __DIR__ . '/MonitoringTestCase.php';

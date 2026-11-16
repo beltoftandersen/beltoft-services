@@ -598,14 +598,14 @@ class ProxmoxJobsTest extends TestCase {
 	public function test_a_gap_ends_a_run_and_an_unfinished_newest_sample_does_not(): void {
 		// 30 low minutes, a gap, 38 high minutes, and an unfinished last sample: the run is under an hour.
 		$rows = $this->samples( fn( $m ) => $m < 30 ? 0.1 : ( 30 === $m ? null : ( 69 === $m ? null : 0.95 ) ) );
-		$out  = AbuseJobs::analyse( $rows, 90.0 );
+		$out  = \BeltoftServices\Monitoring\Samples::analyse( $rows, 90.0 );
 
 		$this->assertSame( 37 * 60, $out['longest'], 'Minutes 31 to 68.' );
 		$this->assertNotNull( $out['trailing'], 'The newest unfinished sample is ignored: the run reaches the end.' );
 
-		$low = AbuseJobs::analyse( $this->samples( fn() => 0.2 ), 90.0 );
+		$low = \BeltoftServices\Monitoring\Samples::analyse( $this->samples( fn() => 0.2 ), 90.0 );
 		$this->assertNull( $low['trailing'] );
-		$this->assertNull( AbuseJobs::analyse( array( array( 'cpu' => 0.9 ) ), 90.0 ) );
+		$this->assertNull( \BeltoftServices\Monitoring\Samples::analyse( array( array( 'cpu' => 0.9 ) ), 90.0 ) );
 	}
 
 	public function test_abuse_high_since_spans_several_hourly_runs(): void {
