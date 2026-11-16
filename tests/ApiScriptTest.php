@@ -75,19 +75,20 @@ final class ApiScriptTest extends TestCase {
 	 * @param string                           $options JS object literal of follow() options.
 	 * @return array<string, mixed>
 	 */
-	private function run_follow( array $replies, string $options ): array {
+	private function run_follow( array $replies, string $options, bool $hidden = false ): array {
 		$node = trim( (string) shell_exec( 'command -v node' ) );
 
 		if ( '' === $node ) {
 			$this->environment_missing( 'node is not installed.' );
 		}
 
-		$js  = 'global.window = { setTimeout: function ( fn, ms ) { waits.push( ms ); setImmediate( fn ); }, beltoftServicesAccount: { root: "/r/", nonce: "n" } };' . "\n";
+		$js  = 'var paused = 0; global.document = { hidden: ' . ( $hidden ? 'true' : 'false' ) . ', addEventListener: function ( type, fn ) { paused += 1; setImmediate( function () { document.hidden = false; fn(); } ); }, removeEventListener: function () {} };' . "\n";
+		$js .= 'global.window = { setTimeout: function ( fn, ms ) { waits.push( ms ); setImmediate( fn ); }, beltoftServicesAccount: { root: "/r/", nonce: "n" } };' . "\n";
 		$js  = 'var waits = [], reads = 0, replies = ' . wp_json_encode( $replies ) . ";\n" . $js;
 		$js .= 'window.fetch = function () { var r = replies[ Math.min( reads, replies.length - 1 ) ]; reads += 1; return Promise.resolve( { ok: r.status < 400, status: r.status, headers: { get: function ( k ) { return "Retry-After" === k ? ( r.retry || null ) : null; } }, json: function () { return Promise.resolve( r.body ); } } ); };' . "\n";
 		$js .= 'Date.now = ( function ( real ) { var t = 0; return function () { t += 1000; return t; }; }() );' . "\n";
 		$js .= file_get_contents( dirname( __DIR__ ) . '/assets/api.js' ) . "\n";
-		$js .= 'window.beltoftApi.follow( { status: "/resources/5", action: "x", at: 1 }, ' . $options . ' ).then( function ( out ) { console.log( JSON.stringify( { out: out, reads: reads, waits: waits } ) ); } );';
+		$js .= 'window.beltoftApi.follow( { status: "/resources/5", action: "x", at: 1 }, ' . $options . ' ).then( function ( out ) { console.log( JSON.stringify( { out: out, reads: reads, waits: waits, paused: paused } ) ); } );';
 
 		$file = wp_tempnam( 'follow.js' );
 		file_put_contents( $file, $js );
@@ -121,6 +122,19 @@ final class ApiScriptTest extends TestCase {
 		$out = $this->run_follow( array( $idle, array( 'status' => 200, 'body' => array( 'working' => false, 'last_result' => array( 'action' => 'x', 'ok' => true, 'at' => 2 ) ) ) ), '{}' );
 		$this->assertSame( 'x', $out['out']['action'] );
 		$this->assertSame( 2, $out['reads'] );
+	}
+
+	public function test_follow_waits_for_the_tab_to_be_shown_before_each_look_after_the_first(): void {
+		$busy = array( 'status' => 200, 'body' => array( 'working' => true ) );
+		$done = array( 'status' => 200, 'body' => array( 'working' => false, 'last_result' => array( 'action' => 'x', 'ok' => true, 'at' => 2 ) ) );
+
+		$shown = $this->run_follow( array( $busy, $done ), '{}' );
+		$this->assertSame( 0, $shown['paused'], 'A visible tab is never held back.' );
+
+		$hidden = $this->run_follow( array( $busy, $done ), '{}', true );
+		$this->assertSame( 'x', $hidden['out']['action'] );
+		$this->assertSame( 2, $hidden['reads'] );
+		$this->assertSame( 1, $hidden['paused'], 'The look after the first read waited for the tab to be shown.' );
 	}
 
 	public function test_follow_until_idle_waits_for_retry_after_and_never_calls_a_timeout_success(): void {

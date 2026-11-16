@@ -2,8 +2,8 @@
  * My Account → Licenses: the service panels.
  *
  * Asks for each panel's state once (which also lets the server refresh usage in the
- * background), then every 10 seconds while the state differs from the desired one; once it
- * settles the page reloads to show the service's controls. Action buttons queue the action.
+ * background), then every 10 seconds while the state differs from the desired one (not while the browser tab is hidden: it looks
+ * again at once when the tab is shown); once it settles the page reloads to show the service's controls. Action buttons queue the action.
  * Uses the WordPress REST API with the wp_rest nonce, kept fresh from each response's
  * X-WP-Nonce header; after a queued action the button stays off for about ten seconds, then the page reloads; an Open link gets a fresh nonce from WordPress's rest-nonce action when it
  * is clicked, so a page left open for a day still works. Needs assets/api.js (window.beltoftApi).
@@ -188,13 +188,13 @@
 					return;
 				}
 
-				window.setTimeout( again, 4000 );
+				later( again, 4000 );
 			} ).catch( function () {
-				window.setTimeout( again, 4000 );
+				later( again, 4000 );
 			} );
 		}
 
-		window.setTimeout( again, 4000 );
+		later( again, 4000 );
 	}
 
 	function act( panel, button ) {
