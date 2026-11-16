@@ -135,7 +135,7 @@ final class DnsWire {
 	}
 
 	/** A possibly compressed name at $offset, lowercase without the trailing dot; null when malformed. Moves $offset past it. */
-	private static function name( string $packet, int &$offset ): ?string {
+	public static function name( string $packet, int &$offset ): ?string {
 		$length = strlen( $packet );
 		$pos    = $offset;
 		$next   = null;

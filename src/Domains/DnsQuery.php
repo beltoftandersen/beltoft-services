@@ -38,24 +38,34 @@ final class DnsQuery {
 		$id   = random_int( 1, 65535 );
 		$data = DnsTransport::exchange( self::address( $server ), self::packet( $id, $domain, $type ) );
 		if ( ! is_string( $data ) || strlen( $data ) < 12 ) { return new \WP_Error( 'dns_transport', 'Name server did not answer.' ); }
-		return self::parse_answer( $data, $id, $type );
+		return self::parse_answer( $data, $id, $type, $domain );
 	}
 
 	/** The value in an authoritative answer packet: the SOA serial (6), the earliest RRSIG expiry (46) or the number of DNSKEY records (48). Pure, so a canned packet tests it. */
-	public static function parse_answer( string $data, int $id, int $type ): int|\WP_Error {
+	public static function parse_answer( string $data, int $id, int $type, string $domain ): int|\WP_Error {
 		$head = unpack( 'nid/nflags/nquestions/nanswers/nauthority/nadditional', substr( $data, 0, 12 ) );
 		if ( (int) $head['id'] === $id && ( $head['flags'] & 0x8000 ) !== 0 && ( $head['flags'] & 0x0400 ) === 0 && in_array( $head['flags'] & 15, array( 3, 5 ), true ) ) { return new \WP_Error( 'dns_not_authoritative', 'Name server does not serve this zone.' ); }
 		if ( (int) $head['id'] !== $id || ( $head['flags'] & 0x8000 ) === 0 || ( $head['flags'] & 0x0400 ) === 0 || ( $head['flags'] & 0x0200 ) !== 0 || ( $head['flags'] & 15 ) !== 0 ) { return new \WP_Error( 'dns_response', 'Name server did not return an authoritative answer.' ); }
 		$offset = 12;
-		for ( $q = 0; $q < $head['questions']; ++$q ) { if ( ! self::skip_name( $data, $offset ) || $offset + 4 > strlen( $data ) ) { return new \WP_Error( 'dns_response', 'Invalid DNS question.' ); } $offset += 4; }
+		// The answer must echo the one question asked (a signature check asks for the SOA) and every record used must belong to the zone asked about.
+		$domain = strtolower( rtrim( $domain, '.' ) );
+		if ( 1 !== (int) $head['questions'] ) { return new \WP_Error( 'dns_response', 'The answer does not repeat the question.' ); }
+		$qname = DnsWire::name( $data, $offset );
+		if ( null === $qname || $offset + 4 > strlen( $data ) ) { return new \WP_Error( 'dns_response', 'Invalid DNS question.' ); }
+		$asked = unpack( 'ntype/nclass', substr( $data, $offset, 4 ) );
+		$offset += 4;
+		if ( $qname !== $domain || (int) $asked['type'] !== ( 46 === $type ? 6 : $type ) ) { return new \WP_Error( 'dns_response', 'The answer does not repeat the question.' ); }
 		$values = array();
 		for ( $a = 0; $a < $head['answers']; ++$a ) {
-			if ( ! self::skip_name( $data, $offset ) || $offset + 10 > strlen( $data ) ) { return new \WP_Error( 'dns_response', 'Invalid DNS answer.' ); }
+			$owner = DnsWire::name( $data, $offset );
+			if ( null === $owner || $offset + 10 > strlen( $data ) ) { return new \WP_Error( 'dns_response', 'Invalid DNS answer.' ); }
 			$fields = unpack( 'ntype/nclass/Nttl/nlength', substr( $data, $offset, 10 ) );
 			$offset += 10;
 			$end = $offset + $fields['length'];
 			if ( $end > strlen( $data ) ) { return new \WP_Error( 'dns_response', 'Invalid DNS answer.' ); }
 			if ( $fields['type'] === $type && 1 === $fields['class'] ) {
+				// Not dns_missing: Zone::remove reads that as "the zone is gone", and a wrong answer says nothing about that.
+				if ( $owner !== $domain ) { return new \WP_Error( 'dns_response', 'The answer is for another name.' ); }
 				if ( 6 === $type ) {
 					$pos = $offset;
 					if ( self::skip_name( $data, $pos ) && self::skip_name( $data, $pos ) && $pos + 4 <= $end ) { $values[] = unpack( 'Nserial', substr( $data, $pos, 4 ) )['serial']; }

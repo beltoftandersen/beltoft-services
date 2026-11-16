@@ -28,6 +28,6 @@ class DnsExchangeTest extends TestCase {
 		proc_close( $proc );
 
 		$this->assertIsString( $data );
-		$this->assertSame( 40, DnsQuery::parse_answer( $data, 7, 48 ), 'The full answer came over TCP, all forty keys.' );
+		$this->assertSame( 40, DnsQuery::parse_answer( $data, 7, 48, 'example.com' ), 'The full answer came over TCP, all forty keys.' );
 	}
 }
