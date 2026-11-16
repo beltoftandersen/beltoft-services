@@ -29,12 +29,17 @@ final class RestoreTest {
 	public const HOOK   = 'beltoft_services_hosting_restore_test';
 	public const CRON   = '30 6 * * 0';
 	public const OPTION = 'beltoft_services_hosting_restore_test';
+	public const READ   = 'beltoft_services_hosting_restore_test_read';
+
+	/** Looks at a restore test that was still running, five minutes apart. */
+	public const TRIES = 24;
 
 	/**
 	 * Hooks the job and its weekly schedule.
 	 */
 	public static function register(): void {
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
+		add_action( self::READ, array( __CLASS__, 'read' ), 10, 5 );
 		Jobs::recurring( array( __CLASS__, 'schedule' ) );
 	}
 
@@ -114,25 +119,107 @@ final class RestoreTest {
 			return self::fail( $id, 'The agent client could not be built.' );
 		}
 
-		$record = (array) Records::for_resource( $r->id() );
-		$job    = $agent->submit(
-			'backup.restore_test',
-			array(
-				'vmid'         => (int) $record['vmid'],
-				'snapshot'     => 'b' . (int) $backup['ctime'],
-				'scratch_vmid' => (int) $node['scratch_vmid'],
-			),
-			'restoretest-' . gmdate( 'oW', Jobs::now() ) . '-' . $r->id() . '-' . (int) $backup['ctime']
-		);
+		$job = self::submit( $agent, $node, $r, (int) $backup['ctime'] );
 
 		if ( is_wp_error( $job ) ) {
 			return self::fail( $id, 'The agent refused the test: ' . $job->get_error_code() . '.' );
 		}
 
-		if ( 'done' !== ( $job['status'] ?? '' ) ) {
-			return 'failed' === ( $job['status'] ?? '' )
-				? self::fail( $id, 'The restore test failed: ' . mb_substr( sanitize_text_field( (string) ( $job['error'] ?? '' ) ), 0, 200 ), $r )
-				: array( 'ok' => true, 'pending' => true, 'resource' => $r->id() ); // Still running: the next look reads it (same job id).
+		if ( in_array( (string) ( $job['status'] ?? '' ), array( 'queued', 'running' ), true ) ) {
+			// A restore takes minutes: the same job is read again later and its result is judged then.
+			Jobs::schedule_once( Jobs::now() + 5 * MINUTE_IN_SECONDS, self::READ, array( $id, $r->id(), (int) $backup['ctime'], 1, gmdate( 'oW', Jobs::now() ) ) );
+
+			return array( 'ok' => true, 'pending' => true, 'resource' => $r->id() );
+		}
+
+		return self::judge( $id, $job, $r, (int) $backup['ctime'] );
+	}
+
+	/**
+	 * Reads a restore test that was still running and records what it says.
+	 *
+	 * @param string $id          Node id.
+	 * @param int    $resource_id Account tested.
+	 * @param int    $ctime       Backup time, part of the job id.
+	 * @param int    $try         Look, from 1.
+	 * @param string $week        ISO year and week of the job id.
+	 */
+	public static function read( string $id, int $resource_id, int $ctime, int $try = 1, string $week = '' ): void {
+		$node = Nodes::get( $id );
+		$r    = Resource::find( $resource_id );
+
+		if ( Settings::get( 'pause_all' ) || null === $node || ! $r || $ctime <= 0 ) {
+			return;
+		}
+
+		try {
+			$agent = Clients::agent_for( $node );
+		} catch ( \Throwable $e ) {
+			unset( $e );
+
+			return;
+		}
+
+		// The same job id, with the week it was started in: the agent answers with the job it has.
+		$job = self::submit( $agent, $node, $r, $ctime, $week );
+
+		if ( is_wp_error( $job ) ) {
+			self::record( $id, self::fail( $id, 'The agent refused the test: ' . $job->get_error_code() . '.' ) );
+
+			return;
+		}
+
+		if ( in_array( (string) ( $job['status'] ?? '' ), array( 'queued', 'running' ), true ) ) {
+			if ( $try < self::TRIES ) {
+				Jobs::schedule_once( Jobs::now() + 5 * MINUTE_IN_SECONDS, self::READ, array( $id, $resource_id, $ctime, $try + 1, $week ) );
+
+				return;
+			}
+
+			self::record( $id, self::fail( $id, 'The restore test did not finish in two hours.', $r ) );
+
+			return;
+		}
+
+		self::record( $id, self::judge( $id, $job, $r, $ctime ) );
+	}
+
+	/**
+	 * Sends (or, with the same id, asks for) the agent's restore test of a backup.
+	 *
+	 * @param Agent                $agent Client.
+	 * @param array<string, mixed> $node  Node settings.
+	 * @param Resource             $r     Account.
+	 * @param int                  $ctime Backup time.
+	 * @param string               $week  ISO year and week in the job id (empty: this week).
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function submit( $agent, array $node, Resource $r, int $ctime, string $week = '' ) {
+		$record = (array) Records::for_resource( $r->id() );
+
+		return $agent->submit(
+			'backup.restore_test',
+			array(
+				'vmid'         => (int) $record['vmid'],
+				'snapshot'     => 'b' . $ctime,
+				'scratch_vmid' => (int) $node['scratch_vmid'],
+			),
+			'restoretest-' . ( '' !== $week ? $week : gmdate( 'oW', Jobs::now() ) ) . '-' . $r->id() . '-' . $ctime
+		);
+	}
+
+	/**
+	 * What a finished job says.
+	 *
+	 * @param string               $id    Node id.
+	 * @param array<string, mixed> $job   The job.
+	 * @param Resource             $r     Account.
+	 * @param int                  $ctime Backup time.
+	 * @return array<string, mixed>
+	 */
+	private static function judge( string $id, array $job, Resource $r, int $ctime ): array {
+		if ( 'failed' === ( $job['status'] ?? '' ) ) {
+			return self::fail( $id, 'The restore test failed: ' . mb_substr( sanitize_text_field( (string) ( $job['error'] ?? '' ) ), 0, 200 ), $r );
 		}
 
 		$result = (array) ( $job['result'] ?? array() );
@@ -141,7 +228,20 @@ final class RestoreTest {
 			return self::fail( $id, sprintf( 'The restore test did not pass (HTTP %d, title %s).', (int) ( $result['status'] ?? 0 ), ! empty( $result['title_match'] ) ? 'matches' : 'differs' ), $r );
 		}
 
-		return array( 'ok' => true, 'resource' => $r->id(), 'backup' => (int) $backup['ctime'] );
+		return array( 'ok' => true, 'resource' => $r->id(), 'backup' => $ctime );
+	}
+
+	/**
+	 * Keeps the result of one node in the last result.
+	 *
+	 * @param string               $id     Node id.
+	 * @param array<string, mixed> $result Result.
+	 */
+	private static function record( string $id, array $result ): void {
+		$last                 = self::last();
+		$last['at']           = Jobs::now();
+		$last['nodes'][ $id ] = $result;
+		update_option( self::OPTION, $last, false );
 	}
 
 	/**

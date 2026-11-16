@@ -181,6 +181,24 @@ class OpsTest extends HostingCase {
 		$this->assertCount( 3, $this->admin_mails( 'attention' ) );
 	}
 
+	public function test_a_health_job_still_running_is_read_again_by_the_same_id_and_its_alerts_are_mailed(): void {
+		$this->agent->set_health_extra( array( 'alerts' => array( array( 'message' => 'db-shared CPU above 80 percent for 15 minutes' ) ) ) );
+		$this->agent->pending( 'agent.health', 3 );
+
+		$this->assertSame( array(), NodeHealth::run() );
+		$this->assertSame( array(), $this->admin_mails( 'attention' ) );
+		$ids = array_unique( array_column( $this->agent->calls_of( 'agent.health' ), 'job_id' ) );
+		$this->assertCount( 1, $ids );
+		$this->assertTrue( \BeltoftServices\Jobs::pending_action( NodeHealth::READ, array( 'n1', $ids[0], 1 ) ), 'A follow-up read is queued.' );
+
+		for ( $i = 1; $i <= 4 && array() === $this->admin_mails( 'attention' ); $i++ ) {
+			NodeHealth::read( 'n1', $ids[0], $i );
+		}
+
+		$this->assertStringContainsString( 'db-shared CPU above 80 percent', implode( ' ', $this->admin_mails( 'attention' ) ) );
+		$this->assertCount( 1, array_unique( array_column( $this->agent->calls_of( 'agent.health' ), 'job_id' ) ), 'Never a second job.' );
+	}
+
 	public function test_a_disabled_node_is_skipped_and_the_kill_switch_stops_the_job(): void {
 		$this->save_node( array( 'enabled' => '' ) );
 		$this->assertSame( array(), NodeHealth::run() );
@@ -308,6 +326,40 @@ class OpsTest extends HostingCase {
 		$done = RestoreTest::run();
 		$this->assertTrue( $done['n1']['ok'] );
 		$this->assertArrayNotHasKey( 'pending', $done['n1'] );
+	}
+
+	public function test_a_restore_test_still_running_is_read_again_and_a_failure_then_is_mailed(): void {
+		$this->with_backup();
+		$this->save_node( array( 'scratch_vmid' => 9500 ) );
+		$this->agent->set_restore_test_result( array( 'status' => 502, 'title_match' => false ) );
+		$this->agent->pending( 'backup.restore_test', 3 );
+
+		$pending = RestoreTest::run();
+		$this->assertTrue( $pending['n1']['pending'] );
+		$call = $this->agent->calls_of( 'backup.restore_test' )[0];
+		$week = gmdate( 'oW', \BeltoftServices\Jobs::now() );
+		$this->assertSame( array( 'n1', (int) $pending['n1']['resource'], (int) substr( $call['args']['snapshot'], 1 ), 1, $week ), $this->queued_read( RestoreTest::READ ), 'A follow-up read is queued.' );
+
+		$args = $this->queued_read( RestoreTest::READ );
+		RestoreTest::read( ...$args );
+		RestoreTest::read( 'n1', $args[1], $args[2], 2, $week );
+		RestoreTest::read( 'n1', $args[1], $args[2], 3, $week );
+
+		$this->assertCount( 1, $this->admin_mails( 'restore test failed' ), 'The failure of a job that was running is reported.' );
+		$this->assertFalse( RestoreTest::last()['nodes']['n1']['ok'] );
+		$this->assertCount( 1, array_unique( array_column( $this->agent->calls_of( 'backup.restore_test' ), 'job_id' ) ), 'Always the same job.' );
+	}
+
+	/**
+	 * Arguments of the one waiting follow-up of a hook.
+	 *
+	 * @return array<int, mixed>
+	 */
+	private function queued_read( string $hook ): array {
+		$ids = as_get_scheduled_actions( array( 'hook' => $hook, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => 5 ), 'ids' );
+		$this->assertCount( 1, $ids );
+
+		return \ActionScheduler::store()->fetch_action( (int) $ids[0] )->get_args();
 	}
 
 	public function test_a_scratch_id_inside_the_customer_range_is_refused_and_nothing_is_sent(): void {

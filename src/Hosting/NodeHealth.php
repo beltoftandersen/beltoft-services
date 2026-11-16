@@ -33,6 +33,10 @@ defined( 'ABSPATH' ) || exit;
 final class NodeHealth {
 
 	public const HOOK = 'beltoft_services_hosting_health';
+	public const READ = 'beltoft_services_hosting_health_read';
+
+	/** Looks at a health job that was still running, a minute apart. */
+	public const TRIES = 10;
 	public const CRON = '17 * * * *';
 
 	/**
@@ -40,6 +44,7 @@ final class NodeHealth {
 	 */
 	public static function register(): void {
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
+		add_action( self::READ, array( __CLASS__, 'read' ), 10, 3 );
 		Jobs::recurring( array( __CLASS__, 'schedule' ) );
 	}
 
@@ -99,7 +104,8 @@ final class NodeHealth {
 			return array( self::notify( $id, 'client', 'The agent client could not be built for this node.' ) );
 		}
 
-		$job = $agent->submit( 'agent.health', array(), 'health-' . $id . '-' . gmdate( 'YmdH', Jobs::now() ) );
+		$job_id = 'health-' . $id . '-' . gmdate( 'YmdH', Jobs::now() );
+		$job    = $agent->submit( 'agent.health', array(), $job_id );
 
 		if ( is_wp_error( $job ) || 'failed' === ( $job['status'] ?? '' ) ) {
 			$why = is_wp_error( $job ) ? $job->get_error_code() : 'the health job failed';
@@ -108,9 +114,69 @@ final class NodeHealth {
 		}
 
 		if ( 'done' !== ( $job['status'] ?? '' ) ) {
-			return array(); // Still running: the next hour reads it.
+			// Still running (the normal answer of a busy agent): the same job is read again in a minute, not a new one next hour.
+			Jobs::schedule_once( Jobs::now() + MINUTE_IN_SECONDS, self::READ, array( $id, $job_id, 1 ) );
+
+			return array();
 		}
 
+		return self::judge( $id, $job );
+	}
+
+	/**
+	 * Reads a health job that was still running.
+	 *
+	 * @param string $id     Node id.
+	 * @param string $job_id The job's id.
+	 * @param int    $try    Look, from 1.
+	 */
+	public static function read( string $id, string $job_id, int $try = 1 ): void {
+		$node = Nodes::get( $id );
+
+		if ( Settings::get( 'pause_all' ) || null === $node || ! $node['enabled'] || 1 !== preg_match( '/^health-[A-Za-z0-9_.-]+-\d{10}$/D', $job_id ) ) {
+			return;
+		}
+
+		try {
+			$agent = Clients::agent_for( $node );
+		} catch ( \Throwable $e ) {
+			unset( $e );
+
+			return;
+		}
+
+		$job = $agent->submit( 'agent.health', array(), $job_id ); // The same id: the agent answers with the job it has.
+
+		if ( is_wp_error( $job ) || 'failed' === ( $job['status'] ?? '' ) ) {
+			self::notify( $id, 'unreachable', 'The node agent did not answer: ' . ( is_wp_error( $job ) ? $job->get_error_code() : 'the health job failed' ) . '.' );
+
+			return;
+		}
+
+		if ( 'done' === ( $job['status'] ?? '' ) ) {
+			self::judge( $id, $job );
+
+			return;
+		}
+
+		if ( $try < self::TRIES ) {
+			Jobs::schedule_once( Jobs::now() + MINUTE_IN_SECONDS, self::READ, array( $id, $job_id, $try + 1 ) );
+
+			return;
+		}
+
+		self::notify( $id, 'unreachable', 'The node agent did not finish the health job in ' . self::TRIES . ' minutes.' );
+	}
+
+	/**
+	 * What a finished health job says.
+	 *
+	 * @param string               $id  Node id.
+	 * @param array<string, mixed> $job The job.
+	 * @return string[] Problem texts.
+	 */
+	private static function judge( string $id, array $job ): array {
+		$problems = array();
 		$result = (array) ( $job['result'] ?? array() );
 
 		if ( is_array( $result['host'] ?? null ) ) {
