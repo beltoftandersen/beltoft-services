@@ -372,6 +372,51 @@ final class PleskLicenceTest extends PaidAppCase {
 		$this->assertCount( 0, $this->op_calls( 'PUT' ) );
 	}
 
+	public function test_a_switch_refused_by_the_cost_guard_is_tried_again_after_the_costs_are_fixed(): void {
+		$o      = $this->provisioned( 'admin' );
+		$key_id = (int) $o['licence']->get( 'plesk_key_id' );
+		$this->settings( array( 'plesk_costs' => "admin=6\nhost=99" ) );
+
+		$this->assertTrue( Licenses::update( (int) $o['licence']->license()['id'], array( 'variation_id' => $o['tiers']['host']->get_id() ) ) );
+		Jobs::run( $o['licence']->id() );
+		$this->assertCount( 0, $this->op_calls( 'PUT' ) );
+		$this->assertTrue( Jobs::pending_action( PleskLicence::SYNC_HOOK, array( $o['licence']->id() ) ), 'The refused switch is retried later.' );
+		$this->assertSame( array( array( $o['licence']->id() ) ), PleskLicence::sync_due(), 'The watchdog lists a licence whose tier item differs.' );
+
+		$this->settings( array( 'plesk_costs' => "admin=6\nhost=1" ) );
+		PleskLicence::run_sync( $o['licence']->id() );
+		$this->assertCount( 1, $this->op_calls( 'PUT', '/licenses/plesk/' . $key_id ) );
+		$this->assertSame( array(), PleskLicence::sync_due() );
+	}
+
+	public function test_a_key_that_is_not_refetched_after_a_tier_switch_is_cleared_and_asked_again(): void {
+		$o      = $this->provisioned( 'admin' );
+		$key_id = (int) $o['licence']->get( 'plesk_key_id' );
+		$this->assertNotSame( '', (string) $this->fresh( $o['licence'] )->get( 'plesk_key' ) );
+		$this->op->reply( 'GET', '/licenses/plesk/key/' . $key_id, new \WP_Error( 'http_500', 'down', array( 'status' => 500 ) ) );
+
+		$this->assertTrue( Licenses::update( (int) $o['licence']->license()['id'], array( 'variation_id' => $o['tiers']['host']->get_id() ) ) );
+		Jobs::run( $o['licence']->id() );
+
+		$this->assertCount( 1, $this->op_calls( 'PUT', '/licenses/plesk/' . $key_id ) );
+		$this->assertSame( '', (string) $this->fresh( $o['licence'] )->get( 'plesk_key' ), 'The old edition key is not kept as the new one.' );
+		$this->assertTrue( Jobs::pending_action( PleskLicence::KEY_HOOK, array( $o['licence']->id() ) ), 'The key is asked again.' );
+		$this->assertSame( array( array( $o['licence']->id() ) ), PleskLicence::key_due() );
+	}
+
+	public function test_used_up_key_fetches_do_not_stop_the_deletion_of_a_ended_licence(): void {
+		$o      = $this->provisioned( 'pro' );
+		$key_id = (int) $o['licence']->get( 'plesk_key_id' );
+		$this->assertTrue( $this->fresh( $o['licence'] )->set( array( 'plesk_key_tries' => 36 ) ) );
+		$this->op->reply( 'DELETE', '/licenses/plesk/' . $key_id, new \WP_Error( 'transport', 'down' ) );
+		$this->assertTrue( Licenses::update( (int) $o['licence']->license()['id'], array( 'status' => Licenses::STATUS_REVOKED ) ) );
+		Jobs::run( $o['licence']->id() );
+
+		$this->assertSame( 1, (int) $this->fresh( $o['licence'] )->get( 'plesk_delete_tries' ) );
+		$this->assertTrue( Jobs::pending_action( PleskLicence::SYNC_HOOK, array( $o['licence']->id() ) ), 'The deletion is retried.' );
+		$this->assertSame( array( array( $o['licence']->id() ) ), PleskLicence::sync_due() );
+	}
+
 	public function test_a_hold_keeps_the_licence_and_a_resume_changes_nothing(): void {
 		$o      = $this->provisioned( 'pro' );
 		$key_id = (int) $o['licence']->get( 'plesk_key_id' );
@@ -480,7 +525,7 @@ final class PleskLicenceTest extends PaidAppCase {
 		$this->assertTrue( Licenses::update( (int) $o2['licence']->license()['id'], array( 'status' => Licenses::STATUS_REVOKED ) ) );
 		Jobs::run( $o2['licence']->id() );
 		$this->assertSame( $key_id2, (int) $this->fresh( $o2['licence'] )->get( 'plesk_key_id' ), 'Still known: it is tried again.' );
-		$this->assertSame( 1, (int) $this->fresh( $o2['licence'] )->get( 'plesk_sync_tries' ) );
+		$this->assertSame( 1, (int) $this->fresh( $o2['licence'] )->get( 'plesk_delete_tries' ) );
 		PleskLicence::run_sync( $o2['licence']->id() );
 		$this->assertSame( 0, (int) $this->fresh( $o2['licence'] )->get( 'plesk_key_id' ) );
 	}

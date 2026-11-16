@@ -56,7 +56,7 @@ defined( 'ABSPATH' ) || exit;
  *
  * Meta on the licence resource: plesk_key_id, plesk_title, plesk_item, plesk_key (encrypted), plesk_key_state
  * (applying, installed, failed), plesk_key_job (hash of the key the guest confirmed), plesk_key_pushes,
- * plesk_hwid_reset, plesk_deleted, plesk_sync_tries, plesk_wait_until.
+ * plesk_hwid_reset, plesk_deleted, plesk_sync_tries (changes), plesk_delete_tries, plesk_key_tries, plesk_wait_until.
  */
 final class PleskLicence {
 
@@ -606,7 +606,7 @@ final class PleskLicence {
 
 			// A licence that is gone already is a deleted one.
 			if ( ! is_wp_error( $reply ) || self::gone( $reply ) ) {
-				$licence->set( array( 'plesk_key_id' => null, 'plesk_key' => null, 'plesk_key_job' => null, 'plesk_key_state' => null, 'plesk_deleted' => time(), 'plesk_sync_tries' => null ) );
+				$licence->set( array( 'plesk_key_id' => null, 'plesk_key' => null, 'plesk_key_job' => null, 'plesk_key_state' => null, 'plesk_deleted' => time(), 'plesk_sync_tries' => null, 'plesk_delete_tries' => null ) );
 
 				return true;
 			}
@@ -621,7 +621,17 @@ final class PleskLicence {
 				$problem = self::switch_problem( $licence, $tier );
 
 				if ( null !== $problem ) {
-					self::alert( $licence, $problem . ' The Plesk licence was not changed.' );
+					$tries = (int) $licence->get( 'plesk_sync_tries' ) + 1;
+					$licence->set( array( 'plesk_sync_tries' => $tries ) );
+
+					// Told once; the switch is tried again every hour (until the costs are fixed), then daily.
+					if ( 1 === $tries ) {
+						self::alert( $licence, $problem . ' The Plesk licence was not changed; it is tried again.' );
+					}
+
+					if ( $tries < 3 * self::TRIES ) {
+						self::schedule( self::SYNC_HOOK, $licence->id(), $tries < self::TRIES ? HOUR_IN_SECONDS : DAY_IN_SECONDS );
+					}
 
 					return false;
 				}
@@ -631,9 +641,12 @@ final class PleskLicence {
 				if ( is_wp_error( $reply ) ) {
 					$error = $reply;
 				} else {
-					$licence->set( array( 'plesk_item' => $item, 'plesk_sync_tries' => null ) );
-					// The edition changed: the key does too.
-					self::fetch_key( $licence );
+					// The edition changed: the key does too. The old key goes first, so it is never kept as the new one.
+					$licence->set( array( 'plesk_item' => $item, 'plesk_sync_tries' => null, 'plesk_key' => null, 'plesk_key_tries' => null ) );
+
+					if ( ! self::fetch_key( $licence ) ) {
+						self::schedule( self::KEY_HOOK, $licence->id(), 120 );
+					}
 				}
 			}
 		}
@@ -642,8 +655,10 @@ final class PleskLicence {
 			return true;
 		}
 
-		$tries = (int) $licence->get( 'plesk_sync_tries' ) + 1;
-		$licence->set( array( 'plesk_sync_tries' => $tries ) );
+		// Deleting and changing count apart from fetching the key, so a licence that used up its key fetches is still deleted.
+		$counter = AppLicence::release_due( $licence ) ? 'plesk_delete_tries' : 'plesk_sync_tries';
+		$tries   = (int) $licence->get( $counter ) + 1;
+		$licence->set( array( $counter => $tries ) );
 
 		if ( self::TRIES === $tries ) {
 			self::alert( $licence, 'Openprovider did not answer the Plesk licence change after ' . self::TRIES . ' tries (' . $error->get_error_code() . '). Check the licence at Openprovider.' );
@@ -667,7 +682,7 @@ final class PleskLicence {
 
 		// Every licence with a vendor key id, in one query; only the ones still without a key pass.
 		foreach ( Resource::find_many( Resource::ids_with_meta_value( 'plesk_key_id' ) ) as $id => $licence ) {
-			if ( $licence->is_live() && self::is_plesk( $licence ) && (int) $licence->get( 'plesk_key_id' ) > 0 && '' === (string) $licence->get( 'plesk_key' ) && 'ended' !== AppLicence::state( $licence ) && (int) $licence->get( 'plesk_sync_tries' ) < 3 * self::TRIES ) {
+			if ( $licence->is_live() && self::is_plesk( $licence ) && (int) $licence->get( 'plesk_key_id' ) > 0 && '' === (string) $licence->get( 'plesk_key' ) && 'ended' !== AppLicence::state( $licence ) && (int) $licence->get( 'plesk_key_tries' ) < 3 * self::TRIES ) {
 				$sets[] = array( (int) $id );
 			}
 		}
@@ -685,8 +700,21 @@ final class PleskLicence {
 		$sets = array();
 
 		foreach ( Resource::find_many( Resource::ids_with_meta_value( 'plesk_key_id' ) ) as $id => $licence ) {
-			if ( self::is_plesk( $licence ) && (int) $licence->get( 'plesk_key_id' ) > 0 && AppLicence::release_due( $licence ) && (int) $licence->get( 'plesk_sync_tries' ) < 3 * self::TRIES ) {
-				$sets[] = array( (int) $id );
+			if ( ! self::is_plesk( $licence ) || (int) $licence->get( 'plesk_key_id' ) < 1 ) {
+				continue;
+			}
+
+			if ( AppLicence::release_due( $licence ) ) {
+				if ( (int) $licence->get( 'plesk_delete_tries' ) < 3 * self::TRIES ) {
+					$sets[] = array( (int) $id );
+				}
+			} elseif ( $licence->is_live() && 'ended' !== AppLicence::state( $licence ) && (int) $licence->get( 'plesk_sync_tries' ) < 3 * self::TRIES ) {
+				// A tier switch the cost guard refused (or that failed) is looked at again.
+				$item = self::items()[ self::tier_of( $licence ) ] ?? '';
+
+				if ( '' !== $item && $item !== (string) $licence->get( 'plesk_item' ) ) {
+					$sets[] = array( (int) $id );
+				}
 			}
 		}
 
@@ -791,12 +819,12 @@ final class PleskLicence {
 			return;
 		}
 
-		$tries = (int) $licence->get( 'plesk_sync_tries' );
+		$tries = (int) $licence->get( 'plesk_key_tries' );
 		$key   = self::key_of( $licence );
 
 		if ( '' === $key ) {
 			if ( ! self::fetch_key( $licence ) ) {
-				$licence->set( array( 'plesk_sync_tries' => $tries + 1 ) );
+				$licence->set( array( 'plesk_key_tries' => $tries + 1 ) );
 
 				if ( $tries + 1 === self::TRIES ) {
 					self::alert( $licence, 'The Plesk key could not be fetched from Openprovider after ' . self::TRIES . ' tries.' );
@@ -822,7 +850,7 @@ final class PleskLicence {
 		$tried = (string) $licence->get( 'plesk_key_tried' );
 
 		if ( '' !== $tried && $tried !== $hash ) {
-			$licence->set( array( 'plesk_key_pushes' => 0, 'plesk_key_state' => null, 'plesk_key_job' => null, 'plesk_sync_tries' => null ) );
+			$licence->set( array( 'plesk_key_pushes' => 0, 'plesk_key_state' => null, 'plesk_key_job' => null, 'plesk_key_tries' => null ) );
 		}
 
 		$app_state = (string) $server->get( 'app_state' );

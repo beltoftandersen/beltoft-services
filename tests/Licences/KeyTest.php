@@ -448,6 +448,19 @@ final class KeyTest extends TestCase {
 		$this->assertTrue( KeyOrder::release( Resource::find( $r2->id() ) ) );
 	}
 
+	public function test_used_up_key_asks_do_not_stop_the_deletion_of_an_ended_licence(): void {
+		$r = $this->licence();
+		$this->build( $r );
+		$r = Resource::find( $r->id() );
+		$r->set( array( 'lic_tries' => 36 ) );
+		$this->op->reply( 'DELETE', '/licenses/plesk/' . (int) $r->get( 'lic_key_id' ), new \WP_Error( 'http_500', 'down', array( 'status' => 500 ) ) );
+		\BeltoftLicenses\Licenses::update( (int) $r->license()['id'], array( 'status' => \BeltoftLicenses\Licenses::STATUS_REVOKED ) );
+
+		$this->assertFalse( KeyOrder::release( Resource::find( $r->id() ) ) );
+		$this->assertTrue( \BeltoftServices\Jobs::pending_action( KeyOrder::SYNC_HOOK, array( $r->id() ) ), 'The deletion is retried.' );
+		$this->assertSame( array( array( $r->id() ) ), KeyOrder::sync_due() );
+	}
+
 	// -- Account ---------------------------------------------------------------------------------
 
 	public function test_the_owner_sees_the_key_and_nobody_else_does(): void {

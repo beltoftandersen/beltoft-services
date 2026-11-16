@@ -44,7 +44,7 @@ defined( 'ABSPATH' ) || exit;
  * TRIES asks staff are told with the NAMES of the fields the vendor answered (never their values).
  *
  * Meta: lic_ip, lic_attach, lic_server (from checkout); lic_key_id, lic_title, lic_item, lic_parent, lic_key (encrypted),
- * lic_key_kind (file or code), lic_state (ordering, waiting, ready), lic_shape, lic_tries, lic_deleted, lic_wait_until.
+ * lic_key_kind (file or code), lic_state (ordering, waiting, ready), lic_shape, lic_tries (key asks), lic_delete_tries, lic_deleted, lic_wait_until.
  */
 final class KeyOrder {
 
@@ -542,7 +542,7 @@ final class KeyOrder {
 		$sets = array();
 
 		foreach ( Resource::find_many( Resource::ids_with_meta_value( 'lic_key_id', array(), KeyDriver::KIND ) ) as $id => $r ) {
-			if ( KeyDriver::ID === $r->get( 'driver' ) && (int) $r->get( 'lic_key_id' ) > 0 && self::release_due( $r ) && (int) $r->get( 'lic_tries' ) < 3 * self::TRIES ) {
+			if ( KeyDriver::ID === $r->get( 'driver' ) && (int) $r->get( 'lic_key_id' ) > 0 && self::release_due( $r ) && (int) $r->get( 'lic_delete_tries' ) < 3 * self::TRIES ) {
 				$sets[] = array( (int) $id );
 			}
 		}
@@ -634,13 +634,14 @@ final class KeyOrder {
 		$reply = self::client()->request( 'DELETE', '/licenses/plesk/' . $id );
 
 		if ( ! is_wp_error( $reply ) || PleskLicence::gone( $reply ) ) {
-			$r->set( array( 'lic_key_id' => null, 'lic_key' => null, 'lic_state' => null, 'lic_deleted' => time(), 'lic_tries' => null ) );
+			$r->set( array( 'lic_key_id' => null, 'lic_key' => null, 'lic_state' => null, 'lic_deleted' => time(), 'lic_tries' => null, 'lic_delete_tries' => null ) );
 
 			return true;
 		}
 
-		$tries = (int) $r->get( 'lic_tries' ) + 1;
-		$r->set( array( 'lic_tries' => $tries ) );
+		// Its own counter: a licence that used up its key asks (lic_tries) is still deleted.
+		$tries = (int) $r->get( 'lic_delete_tries' ) + 1;
+		$r->set( array( 'lic_delete_tries' => $tries ) );
 
 		if ( self::TRIES === $tries ) {
 			Alerts::admin( $r, 'Openprovider did not answer the licence deletion after ' . self::TRIES . ' tries (' . $reply->get_error_code() . '). Delete the licence at Openprovider, or it keeps billing.' );
