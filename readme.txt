@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.33.1
+Stable tag: 0.34.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,16 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.34.0 =
+* Fourth round from the November review: three decisions of the shop owner, the hosting database limit, and the larger clean-ups.
+* Domain renewals: a paid renewal whose price is below the registrar's cost is bought when the loss is at most the new setting "Renewal loss cap" (5 by default, 0 keeps the old refusal), and the administrator gets one email with the domain, the price, the cost and the loss. Above the cap the renewal waits for the staff and the customer sees a plain sentence. Registrations and transfers are unchanged.
+* Mailbox passwords and SSL private keys: resetting or showing a mailbox password and showing a private key or its .p12 file ask for the emailed code, as other secrets do. The two assistant (MCP) tools for mailbox passwords are removed; both actions stay on the account page.
+* A switch to a longer billing period charges the add-on lines of the same subscription for the extra months in the switch order (with Beltoft Subscription Switching 0.3.0).
+* Hosting: the plan's database size limit is sent to the node (with a hosting agent that knows it; an older agent is left alone), and node health reports low free space on the node and on the shared database server and a tripped database guard.
+* Account pages: follow-up requests pause while the browser tab is hidden; the Overview reads its services in one query (with Beltoft Licenses 0.8.10); the DNS zone is read only on the DNS tab.
+* One rule for who owns a resource (`Resource::owned_by`), one rate limit helper, one refusal result for drivers; shared email template parts, one API reference script, one copy helper; unused server usage and private network code removed.
+* A deleted child service has its licence revoked; who holds a domain name is one indexed lookup.
 
 = 0.33.1 =
 * Third round from the November review: the smaller findings, each with a test.
