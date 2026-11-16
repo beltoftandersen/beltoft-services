@@ -8,7 +8,8 @@
 namespace BeltoftServices\Domains;
 
 use BeltoftLicenses\Account\Endpoint;
-use BeltoftServices\Account\Domains;
+use BeltoftServices\Account\DomainArea;
+use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Api\Routes;
 
 defined( 'ABSPATH' ) || exit;
@@ -46,7 +47,7 @@ final class DnsClaimPanel {
 	 * @return mixed
 	 */
 	public static function menu( $items ) {
-		if ( ! is_array( $items ) || isset( $items[ Domains::slug() ] ) || ! self::active() ) {
+		if ( ! is_array( $items ) || isset( $items[ ServiceArea::get( DomainArea::class )->slug() ] ) || ! self::active() ) {
 			return $items;
 		}
 
@@ -56,21 +57,21 @@ final class DnsClaimPanel {
 
 		foreach ( $items as $key => $label ) {
 			if ( ! $placed && in_array( $key, $before, true ) ) {
-				$out[ Domains::slug() ] = __( 'Domains', 'beltoft-services' );
+				$out[ ServiceArea::get( DomainArea::class )->slug() ] = __( 'Domains', 'beltoft-services' );
 				$placed           = true;
 			}
 			$out[ $key ] = $label;
 		}
 
 		if ( ! $placed ) {
-			$out[ Domains::slug() ] = __( 'Domains', 'beltoft-services' );
+			$out[ ServiceArea::get( DomainArea::class )->slug() ] = __( 'Domains', 'beltoft-services' );
 		}
 
 		return $out;
 	}
 
 	/**
-	 * Prints the section. Called by the add page of the Domains tab (Account\Domains).
+	 * Prints the section. Called by the add page of the Domains tab (Account\DomainArea).
 	 */
 	public static function render(): void {
 		if ( ! self::active() ) {
@@ -90,7 +91,7 @@ final class DnsClaimPanel {
 	 */
 	public static function assets(): void {
 		// Only on the add page: the list and a domain's page do not use the claim script.
-		if ( ! self::active() || ! function_exists( 'is_wc_endpoint_url' ) || ! is_wc_endpoint_url( Domains::slug() ) || ! Domains::requested()['add'] ) {
+		if ( ! self::active() || ! function_exists( 'is_wc_endpoint_url' ) || ! is_wc_endpoint_url( ServiceArea::get( DomainArea::class )->slug() ) || ! ServiceArea::get( DomainArea::class )->requested()['add'] ) {
 			return;
 		}
 

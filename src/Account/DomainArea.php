@@ -42,6 +42,17 @@ final class DomainArea extends ServiceArea {
 	public const ADD_VALUE = 'add';
 
 	/**
+	 * The domain page being printed (license row, requested tab, resource, area), or null outside a domain page.
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public static function on_page(): ?array {
+		$page = ServiceArea::page();
+
+		return null !== $page && ( $page['area'] ?? null ) instanceof self ? $page : null;
+	}
+
+	/**
 	 * {@inheritDoc}
 	 */
 	protected function default_slug(): string {

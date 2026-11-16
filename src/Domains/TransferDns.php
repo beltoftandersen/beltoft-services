@@ -775,7 +775,7 @@ final class TransferDns {
 		);
 
 		if ( $review ) {
-			$page = \BeltoftServices\Account\Domains::url( $r->license(), 'dns' );
+			$page = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\DomainArea::class )->url( $r->license(), 'dns' );
 
 			return array_merge( $out, array(
 				'text'  => __( 'Action needed: import your DNS records.', 'beltoft-services' ),
@@ -787,7 +787,7 @@ final class TransferDns {
 		}
 
 		if ( $ns_wait ) {
-			$page = \BeltoftServices\Account\Domains::url( $r->license(), 'nameservers' );
+			$page = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\DomainArea::class )->url( $r->license(), 'nameservers' );
 
 			return array_merge( $out, array(
 				/* translators: %s: the current registrar. */
@@ -800,7 +800,7 @@ final class TransferDns {
 		}
 
 		if ( $ordered && ! $active ) {
-			$page = \BeltoftServices\Account\Domains::url( $r->license(), 'nameservers' );
+			$page = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\DomainArea::class )->url( $r->license(), 'nameservers' );
 
 			return array_merge( $out, array(
 				/* translators: %s: the current registrar. */

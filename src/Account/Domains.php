@@ -98,9 +98,7 @@ final class Domains {
 	 * @return array<string, mixed>|null
 	 */
 	public static function page(): ?array {
-		$page = ServiceArea::page();
-
-		return null !== $page && ( $page['area'] ?? null ) instanceof DomainArea ? $page : null;
+		return DomainArea::on_page();
 	}
 
 	/**
