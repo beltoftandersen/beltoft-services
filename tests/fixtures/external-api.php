@@ -14,6 +14,7 @@ return array(
 	'Account\\Servers' => array( 'requested()', 'slug()' ),
 	'Account\\ServiceArea' => array( 'tab_nav()', 'url_for_license()' ),
 	'BillingRequirements' => array( 'cart_needs_billing()' ),
+	'CartCompanion' => array( 'keeps()' ),
 	'Credit\\CheckoutCredit' => array( 'preview()' ),
 	'Credit\\Topup' => array( 'CART_KEY', 'available()', 'is_product()', 'max()', 'min()' ),
 	'Crypto' => array( 'available()', 'decrypt()', 'encrypt()' ),

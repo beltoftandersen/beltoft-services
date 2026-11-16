@@ -231,6 +231,8 @@ final class Plugin {
 		Proxmox\Disk\DiskMeta::register();
 		// The cascade runs after the server's own clean-up (CoreHooks, Credentials), as the three old cascades did.
 		Proxmox\Addon\AddonCascade::register();
+		Proxmox\Addon\AddonCompanion::register();
+		Domains\CartPair::register();
 		Proxmox\Disk\DiskCascade::register();
 		add_action( Jobs::SWEEP, array( Proxmox\Pve\DiskCapacity::class, 'sweep' ) );
 		Proxmox\Disk\DiskCart::register();

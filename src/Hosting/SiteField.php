@@ -58,6 +58,7 @@ final class SiteField {
 		add_action( 'woocommerce_created_customer', array( __CLASS__, 'customer_made' ), 5 );
 		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'save_on_item' ), 30, 4 );
 		add_filter( 'beltoft_services_initial_meta', array( __CLASS__, 'initial_meta' ), 30, 3 );
+		add_filter( 'beltoft_services_domain_service_product', static fn( $is, $id = 0 ) => true === $is || self::is_hosting_product( (int) $id ), 10, 2 );
 	}
 
 	/**
