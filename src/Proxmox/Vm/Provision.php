@@ -56,6 +56,9 @@ final class Provision {
 	 */
 	public const LOGIN_USER = 'root';
 
+	/** Seconds a paid order waits for a free address before it fails. */
+	private const IP_WAIT = 7 * DAY_IN_SECONDS;
+
 	/** The disk format of new volumes: qcow2 (snapshots need it). Existing raw volumes are left as they are. */
 	public const DISK_FORMAT = 'qcow2';
 
@@ -818,7 +821,21 @@ final class Provision {
 		}
 
 		if ( null === $ip ) {
-			return StepResult::fail( 'No free IP address' );
+			// Another order may have taken the last address after this one was paid; one can come back (a server deleted, a quarantine over).
+			$until = (int) $this->r->get( 'ip_wait_until' );
+			$until = $until > 0 ? $until : time() + self::IP_WAIT;
+
+			if ( ! $this->r->set( array( 'ip_wait_until' => $until ) ) ) {
+				return StepResult::retry( 60, 'ip: the wait deadline could not be stored' );
+			}
+
+			if ( time() >= $until ) {
+				return StepResult::fail( 'No free IP address' );
+			}
+
+			Alerts::admin( $this->r, 'ip: the IP pool is empty, the order waits for an address' );
+
+			return StepResult::wait( 600, 'Waiting for a free IP address.', $until );
 		}
 
 		return array();

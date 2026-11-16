@@ -1110,16 +1110,32 @@ class ProvisionTest extends TestCase {
 		$this->assertSame( array(), $this->fake->vm( 5001 )['firewall_rules'] );
 	}
 
-	public function test_no_free_ip_fails_and_no_clone_call(): void {
+	public function test_no_free_ip_waits_with_an_alert_and_no_clone_call(): void {
 		$this->wipe_tables(); // An empty pool.
 		$resource = $this->resource();
 
 		$result = $this->run_provision( $resource );
 
-		$this->assertTrue( $result->is_failed() );
-		$this->assertSame( 'No free IP address', $result->error() );
+		$this->assertFalse( $result->is_failed(), 'An empty pool is a wait, not a failure.' );
+		$this->assertGreaterThan( time() + 6 * DAY_IN_SECONDS, $result->wait_until() );
 		$this->assertSame( array(), $this->fake->calls() );
 		$this->assertNull( VmRecords::for_resource( $resource->id() ) );
+		$this->assertNotEmpty( Resource::find( $resource->id() )->get( 'alerted' ) );
+	}
+
+	public function test_no_free_ip_fails_after_the_wait_deadline_and_goes_on_when_an_address_returns(): void {
+		$this->wipe_tables();
+		$resource = $this->resource();
+		$resource->set( array( 'ip_wait_until' => time() - 1 ) );
+
+		$result = $this->run_provision( Resource::find( $resource->id() ) );
+		$this->assertTrue( $result->is_failed() );
+		$this->assertSame( 'No free IP address', $result->error() );
+
+		$resource->set( array( 'ip_wait_until' => time() + HOUR_IN_SECONDS ) );
+		IpPool::add( '192.0.2.77' );
+		$this->assertFalse( $this->run_provision( Resource::find( $resource->id() ) )->is_failed() );
+		$this->assertNotNull( IpPool::for_resource( $resource->id() ) );
 	}
 
 	public function test_missing_encryption_key_fails_before_any_call(): void {
