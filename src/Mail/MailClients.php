@@ -42,13 +42,25 @@ final class MailClients {
 			$url = MailSettings::api_url();
 			$key = MailSettings::api_key();
 
+			$client = new UnavailableMailcowClient();
+
 			if ( '' !== $url && '' !== $key ) {
 				try {
 					$client = new LiveMailcowClient( $url, $key );
 					$live   = true;
 				} catch ( \InvalidArgumentException $e ) {
-					$client = new FakeMailcowClient( true );
+					$client = new UnavailableMailcowClient();
 				}
+			}
+
+			if ( ! $live ) {
+				// Never the fake here: it would record steps as done that never happened on the real server.
+				\BeltoftServices\Alerts::notify(
+					'Mail server connection is not usable',
+					array( 'Live mail is switched on, but the mail server address or API key is missing, not https or cannot be read. Mail jobs wait and retry until it is fixed in Settings, Services, Mail.' ),
+					null,
+					'beltoft_services_mail_unavailable_alert'
+				);
 			}
 		}
 

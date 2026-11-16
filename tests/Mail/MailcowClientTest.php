@@ -185,10 +185,11 @@ final class MailcowClientTest extends TestCase {
 		$this->assertInstanceOf( FakeMailcowClient::class, MailClients::build( true ), 'Allowed but not chosen.' );
 
 		$this->settings( array( 'mail_client' => 'live', 'mail_api_url' => 'http://mail.example.net' ) );
-		$this->assertInstanceOf( FakeMailcowClient::class, MailClients::build( true ), 'A plain http address is never used.' );
+		$this->assertNotInstanceOf( LiveMailcowClient::class, MailClients::build( true ), 'A plain http address is never used.' );
+		$this->assertNotInstanceOf( FakeMailcowClient::class, MailClients::build( true ) );
 
 		$this->settings( array( 'mail_api_url' => 'https://mail.example.net', 'mail_api_key' => '' ) );
-		$this->assertInstanceOf( FakeMailcowClient::class, MailClients::build( true ), 'No key.' );
+		$this->assertNotInstanceOf( FakeMailcowClient::class, MailClients::build( true ), 'No key: live was chosen and allowed, so never the fake.' );
 		$this->assertSame( array(), $this->http_calls(), 'Nothing was called.' );
 		remove_all_filters( 'beltoft_services_key' );
 	}
@@ -250,5 +251,33 @@ final class MailcowClientTest extends TestCase {
 		$res = ( new LiveMailcowClient( 'https://mail.example', self::KEY ) )->add_domain( array( 'domain' => 'a.example', 'restart_sogo' => '1' ) );
 		$this->assertInstanceOf( \WP_Error::class, $res );
 		$this->assertSame( 'mailcow_sogo_failed', $res->get_error_code() );
+	}
+
+	public function test_live_chosen_and_allowed_but_not_buildable_fails_every_call_and_tells_the_admin(): void {
+		$this->settings( array( 'mail_client' => 'live', 'mail_api_url' => 'https://mail.example.net', 'mail_api_key' => '', 'admin_email' => 'christian.beltoft@gmail.com' ) );
+		$sent = array();
+		add_filter(
+			'pre_wp_mail',
+			static function ( $pre, $atts ) use ( &$sent ) {
+				$sent[] = $atts['subject'];
+
+				return true;
+			},
+			10,
+			2
+		);
+
+		$client = MailClients::build( true );
+		$this->assertNotInstanceOf( FakeMailcowClient::class, $client );
+
+		foreach ( array( $client->add_domain( array( 'domain' => 'a.example' ) ), $client->get_domain( 'a.example' ), $client->list_mailboxes( 'a.example' ), $client->add_dkim( 'a.example', 'dkim', 2048 ) ) as $answer ) {
+			$this->assertWPError( $answer );
+			$this->assertSame( 'mailcow_transport', $answer->get_error_code() );
+		}
+
+		MailClients::build( true );
+		$this->assertCount( 1, $sent, 'One admin mail, not one per call.' );
+		$this->assertSame( array(), get_option( 'beltoft_services_fake_mailcow', array() ) );
+		remove_all_filters( 'pre_wp_mail' );
 	}
 }
