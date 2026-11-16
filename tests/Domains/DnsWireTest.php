@@ -202,4 +202,41 @@ class DnsWireTest extends TestCase {
 		$packet = DnsPackets::response( 'example.com', 1, array( 'id' => 3, 'answer' => array( array( 'name' => 'WWW.Example.COM', 'type' => 1, 'data' => '192.0.2.1' ) ) ) );
 		$this->assertSame( 'www.example.com', DnsWire::parse( $packet, 3, 'EXAMPLE.com', 1 )['answer'][0]['name'] );
 	}
+
+	public function test_the_default_query_bytes_are_the_ones_the_proof_resolver_has_always_sent(): void {
+		// Captured from the builder before it got options: RD off, one question, one OPT record (1232, DO off).
+		$expected = hex2bin( '1234' . '0000' . '0001' . '0000' . '0000' . '0001' . '076578616d706c6503636f6d00' . '0010' . '0001' . '00' . '0029' . '04d0' . '00000000' . '0000' );
+		$this->assertSame( $expected, DnsWire::query( 'example.com', DnsWire::TXT, 0x1234 ) );
+	}
+
+	public function test_query_options_set_rd_do_and_the_udp_size(): void {
+		$wire = DnsWire::query( 'example.com', DnsWire::DNSKEY, 7, array( 'rd' => true, 'do' => true, 'size' => 4096 ) );
+		$head = unpack( 'nid/nflags', $wire );
+		$this->assertSame( 0x0100, $head['flags'] );
+		$opt = unpack( 'ctype_root/ntype/nsize/Nflags/nlength', substr( $wire, -11 ) );
+		$this->assertSame( array( 0, 41, 4096, 0x8000, 0 ), array( $opt['type_root'], $opt['type'], $opt['size'], $opt['flags'], $opt['length'] ) );
+		$this->assertSame( "\x07example\x03com\x00" . pack( 'nn', 48, 1 ), substr( $wire, 12, 17 ) );
+	}
+
+	public function test_dnskey_and_rrsig_records_are_parsed(): void {
+		$key = pack( 'nCC', 257, 3, 13 ) . 'KEYBYTES';
+		$sig = pack( 'nCCNNNn', 6, 13, 2, 3600, 1800000000, 1700000000, 4242 ) . "\x07example\x03com\x00" . 'SIGNATURE';
+		$p   = $this->head( 1, 2 ) . "\xc0\x0c" . pack( 'nnNn', 48, 1, 60, strlen( $key ) ) . $key . "\xc0\x0c" . pack( 'nnNn', 46, 1, 60, strlen( $sig ) ) . $sig;
+		$r   = DnsWire::parse( $p, 3, 'example.com', 1 );
+		$this->assertSame( array( 'flags' => 257, 'protocol' => 3, 'algorithm' => 13, 'key' => base64_encode( 'KEYBYTES' ) ), $r['answer'][0]['data'] );
+		$this->assertSame( array( 'covered' => 6, 'algorithm' => 13, 'labels' => 2, 'original_ttl' => 3600, 'expiration' => 1800000000, 'inception' => 1700000000, 'key_tag' => 4242, 'signer' => 'example.com' ), $r['answer'][1]['data'] );
+		$bad = $this->head( 1, 1 ) . "\xc0\x0c" . pack( 'nnNn', 48, 1, 60, 3 ) . 'abc';
+		$this->assertSame( 'dns_malformed', $this->code( $bad ), 'A key record under 4 bytes is malformed.' );
+	}
+
+	public function test_the_ad_and_ra_bits_and_the_opt_record_are_read(): void {
+		$p = pack( 'nnnnnn', 3, 0x8400 | 0x0020 | 0x0080, 1, 0, 0, 1 ) . DnsPackets::name( 'example.com' ) . pack( 'nn', 1, 1 ) . "\0" . pack( 'nnNn', 41, 1400, 0x8000, 0 );
+		$r = DnsWire::parse( $p, 3, 'example.com', 1 );
+		$this->assertTrue( $r['ad'] );
+		$this->assertTrue( $r['ra'] );
+		$this->assertSame( array( 'size' => 1400, 'do' => true ), $r['opt'] );
+		$plain = DnsWire::parse( $this->head(), 3, 'example.com', 1 );
+		$this->assertFalse( $plain['ad'] );
+		$this->assertNull( $plain['opt'] );
+	}
 }
