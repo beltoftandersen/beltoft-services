@@ -65,6 +65,13 @@ final class OpenApi {
 	 * @return array<string, array<string, mixed>>
 	 */
 	public static function operations(): array {
+		// A literal table: it depends on nothing that changes, so one build per request cannot go stale.
+		static $table = null;
+
+		if ( null !== $table ) {
+			return $table;
+		}
+
 		$text = array( 'type' => 'string' );
 		$int  = array( 'type' => 'integer' );
 		$bool = array( 'type' => 'boolean' );
@@ -81,7 +88,7 @@ final class OpenApi {
 			),
 		);
 
-		return array(
+		$table = array(
 			'GET /resources'                             => array(
 				'summary' => 'List your services: servers, databases, domains and apps.',
 				'scope'   => 'read',
@@ -256,6 +263,8 @@ final class OpenApi {
 				'errors'  => array(),
 			),
 		);
+
+		return $table;
 	}
 
 	/**
@@ -276,9 +285,11 @@ final class OpenApi {
 			503 => 'Not available right now.',
 		);
 
+		$ops = self::operations();
+
 		foreach ( self::registered() as $path => $methods ) {
 			foreach ( $methods as $method => $args ) {
-				$op = self::operations()[ $method . ' ' . $path ] ?? null;
+				$op = $ops[ $method . ' ' . $path ] ?? null;
 
 				if ( null === $op ) {
 					continue;

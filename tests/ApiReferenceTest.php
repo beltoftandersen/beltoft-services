@@ -63,6 +63,15 @@ final class ApiReferenceTest extends TestCase {
 		$this->assertSame( 1, $built, 'The route table is walked once for the operations and the errors.' );
 	}
 
+	public function test_the_openapi_document_is_the_same_on_every_build(): void {
+		$first = \BeltoftServices\Api\OpenApi::document();
+
+		$this->assertEquals( $first, \BeltoftServices\Api\OpenApi::document() );
+		$this->assertSame( \BeltoftServices\Api\OpenApi::operations(), \BeltoftServices\Api\OpenApi::operations() );
+		// The document as it was before the operations table was built once (md5 taken on the old code).
+		$this->assertSame( '95d9c2f83348221fe96361edc4c6930f', md5( (string) wp_json_encode( $first ) ) );
+	}
+
 	public function test_endpoints_are_grouped_by_resource_with_anchors_and_navigation(): void {
 		$html   = Reference::html();
 		$groups = Reference::groups( Reference::operations() );
