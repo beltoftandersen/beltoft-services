@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.32.2
+Stable tag: 0.33.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,18 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.33.0 =
+* Second round of fixes from the November review, each with a test.
+* Licence keys: the vendor licence is deleted as soon as the licence expires (not while a payment is being retried); a later payment orders a new key. A refused Plesk edition change is tried again, a failed key refetch no longer leaves the old key in place, and key fetch and deletion count their tries apart.
+* Money: a domain transfer paid in full with account credit is no longer treated as a free transfer; a paid early usage bill marks the account as charged; a usage invoice cannot be cancelled; a usage line shows the average hourly price when the price changed during the month; an early renewal order keeps ending add-on lines; a refunded usage invoice does not cancel the pay as you go account; the trial rule compares the normalised email address.
+* Domains: a hosting name that was added without proof gives way to the account that proves ownership, and the refusal no longer says who holds a name; one rule decides who holds a name (failed and lapsed services do not); a registrar set to live without its constant refuses and alerts instead of using the test registrar; the administrator is told about fixed prices below the registrar cost.
+* Mail and SSL: the certificate cancel window follows the registrar refund period; the alias limit is shown as the plan total; the alias list of the mail server is read once per few seconds.
+* API: the token gate judges the same cleaned arguments the route runs; a connection in use cannot be deleted; the services list drops deleted services before it caps the list; the API page says by access level what a connected assistant can do; OpenAPI lists each query parameter once.
+* Hosting: a malware scan step no longer restarts on every poll and its notice is marked sent only after the mail went out; the nightly backup waits for a running restore; deleting an account also drops its staging copy databases; node health and the restore test read the result of a job that was still running; a domain whose DNS write failed once is tried again; saving a node keeps stored certificate pins and storage settings when a field is absent.
+* Servers and databases: the address of a deleted server is held until the records made for its app domain are removed; an empty address pool after payment is a wait with an alert, not a failed server; a reinstall checks its template before anything is destroyed; a pause during a reinstall stops the old server; a public address cannot be added to a stopped database; a live cluster without its constant makes the job wait instead of using the test client.
+* Jobs: a job whose process keeps dying is counted, slowed down and failed after five crashes; the deploy hold stops every job of the plugin; a failed database upgrade sends one email per version.
+* Speed: on My Account pages the licence and resource rows are read once per request; the admin Services list reads only the page it shows.
 
 = 0.32.2 =
 * Fixes from the November review, each with a test.
