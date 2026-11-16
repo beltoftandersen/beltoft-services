@@ -64,6 +64,7 @@ final class KeyOrder {
 	public static function register(): void {
 		add_action( self::KEY_HOOK, array( __CLASS__, 'run_key' ) );
 		add_action( self::SYNC_HOOK, array( __CLASS__, 'run_sync' ) );
+		add_filter( 'beltoft_services_default_retention', array( KeyDriver::class, 'default_retention' ), 10, 2 );
 		Background::declare(
 			self::KEY_HOOK,
 			array(
@@ -117,6 +118,28 @@ final class KeyOrder {
 		$status = Licenses::effective_status( $r->license() );
 
 		return Licenses::STATUS_ACTIVE !== $status && Licenses::STATUS_SUSPENDED !== $status;
+	}
+
+	/**
+	 * Must the vendor's licence go now? Only when the licence is gone for good: its resource is being or was deleted, its
+	 * provision failed after the order or its delete failed, or its licence was revoked. A lapse (expired, on hold) keeps
+	 * the vendor licence until retention deletes the resource, and a failed plan change, pause or resume never deletes the
+	 * licence of a customer who still has it paid.
+	 *
+	 * @param Resource $r Licence resource.
+	 */
+	public static function release_due( Resource $r ): bool {
+		$state = (string) $r->get( 'state' );
+
+		if ( in_array( $state, array( 'deleting', 'deleted' ), true ) ) {
+			return true;
+		}
+
+		if ( 'failed' === $state && in_array( (string) $r->get( 'failed_op' ), array( 'provision', 'delete' ), true ) ) {
+			return true;
+		}
+
+		return Licenses::STATUS_REVOKED === Licenses::effective_status( $r->license() );
 	}
 
 	/**
@@ -510,17 +533,16 @@ final class KeyOrder {
 	}
 
 	/**
-	 * The watchdog's list (Background): an ended licence whose deletion at the vendor has not gone through. Narrowed in SQL to
-	 * licences that still hold a vendor key id (a finished deletion clears it) and whose own state is an ended one; a licence
-	 * that is ended only by its licence status reaches that state first (the reconciler deletes it).
+	 * The watchdog's list (Background): a licence whose vendor licence must go (release_due) and whose deletion has not gone
+	 * through. Narrowed in SQL to licences that still hold a vendor key id (a finished deletion clears it).
 	 *
 	 * @return array<int, array<int, int>>
 	 */
 	public static function sync_due(): array {
 		$sets = array();
 
-		foreach ( Resource::find_many( Resource::ids_with_meta_value( 'lic_key_id', Resource::ended_state_fragments(), KeyDriver::KIND ) ) as $id => $r ) {
-			if ( KeyDriver::ID === $r->get( 'driver' ) && (int) $r->get( 'lic_key_id' ) > 0 && self::ended( $r ) && (int) $r->get( 'lic_tries' ) < 3 * self::TRIES ) {
+		foreach ( Resource::find_many( Resource::ids_with_meta_value( 'lic_key_id', array(), KeyDriver::KIND ) ) as $id => $r ) {
+			if ( KeyDriver::ID === $r->get( 'driver' ) && (int) $r->get( 'lic_key_id' ) > 0 && self::release_due( $r ) && (int) $r->get( 'lic_tries' ) < 3 * self::TRIES ) {
 				$sets[] = array( (int) $id );
 			}
 		}
@@ -639,7 +661,7 @@ final class KeyOrder {
 	public static function run_sync( int $id ): void {
 		$r = Resource::find( $id );
 
-		if ( $r && KeyDriver::ID === $r->get( 'driver' ) && self::ended( $r ) ) {
+		if ( $r && KeyDriver::ID === $r->get( 'driver' ) && self::release_due( $r ) ) {
 			self::release( $r );
 		}
 	}
