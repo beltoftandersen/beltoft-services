@@ -113,4 +113,20 @@ final class ReviewLow3l3CoreTest extends TestCase {
 		$this->assertFalse( $result['ok'] );
 		$this->assertStringContainsString( 'We have been told', $result['text'] );
 	}
+
+	public function test_core_04_a_changed_cron_string_replaces_the_scheduled_one(): void {
+		$hook = 'beltoft_services_test_cron_change';
+		as_unschedule_all_actions( $hook, array(), Jobs::GROUP );
+		as_schedule_cron_action( time() + 60, '30 3 * * *', $hook, array(), Jobs::GROUP );
+
+		Jobs::ensure_cron( $hook, '30 3 * * *' );
+		$this->assertCount( 1, as_get_scheduled_actions( array( 'hook' => $hook, 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING ) ) );
+
+		Jobs::ensure_cron( $hook, '45 4 * * *' );
+
+		$actions = as_get_scheduled_actions( array( 'hook' => $hook, 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING ) );
+		$this->assertCount( 1, $actions );
+		$this->assertSame( '45 4 * * *', reset( $actions )->get_schedule()->get_recurrence() );
+		as_unschedule_all_actions( $hook, array(), Jobs::GROUP );
+	}
 }

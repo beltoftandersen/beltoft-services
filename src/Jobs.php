@@ -381,8 +381,23 @@ final class Jobs {
 			'args' => $args,
 		);
 
-		if ( function_exists( 'as_has_scheduled_action' ) && ! as_has_scheduled_action( $hook, $args, self::GROUP ) ) {
+		if ( ! function_exists( 'as_has_scheduled_action' ) ) {
+			return;
+		}
+
+		if ( ! as_has_scheduled_action( $hook, $args, self::GROUP ) ) {
 			as_schedule_cron_action( time() + $delay, $cron, $hook, $args, self::GROUP );
+			return;
+		}
+
+		// A cron string changed in code reaches a site that has the action already: the pending one is replaced.
+		foreach ( as_get_scheduled_actions( array( 'hook' => $hook, 'args' => $args, 'group' => self::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => 1 ) ) as $action ) {
+			$schedule = $action->get_schedule();
+
+			if ( $schedule instanceof \ActionScheduler_CronSchedule && class_exists( '\CronExpression' ) && $schedule->get_recurrence() !== (string) \CronExpression::factory( $cron ) ) {
+				as_unschedule_all_actions( $hook, $args, self::GROUP );
+				as_schedule_cron_action( time() + $delay, $cron, $hook, $args, self::GROUP );
+			}
 		}
 	}
 
