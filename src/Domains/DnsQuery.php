@@ -35,44 +35,45 @@ final class DnsQuery {
 			if ( 48 === $type ) { return ! empty( $zone['secured'] ) ? 1 : new \WP_Error( 'dns_missing', 'Fake zone has no DNSKEY.' ); }
 			return 6 === $type ? (int) ( $zone['serial'] ?? 1 ) : time() + 30 * DAY_IN_SECONDS;
 		}
-		$id   = random_int( 1, 65535 );
-		$data = DnsTransport::exchange( self::address( $server ), self::packet( $id, $domain, $type ) );
-		if ( ! is_string( $data ) || strlen( $data ) < 12 ) { return new \WP_Error( 'dns_transport', 'Name server did not answer.' ); }
-		return self::parse_answer( $data, $id, $type, $domain );
+		return self::read_wire( self::address( $server ), $domain, $type );
 	}
 
-	/** The value in an authoritative answer packet: the SOA serial (6), the earliest RRSIG expiry (46) or the number of DNSKEY records (48). Pure, so a canned packet tests it. */
-	public static function parse_answer( string $data, int $id, int $type, string $domain ): int|\WP_Error {
-		$head = unpack( 'nid/nflags/nquestions/nanswers/nauthority/nadditional', substr( $data, 0, 12 ) );
-		if ( (int) $head['id'] === $id && ( $head['flags'] & 0x8000 ) !== 0 && ( $head['flags'] & 0x0400 ) === 0 && in_array( $head['flags'] & 15, array( 3, 5 ), true ) ) { return new \WP_Error( 'dns_not_authoritative', 'Name server does not serve this zone.' ); }
-		if ( (int) $head['id'] !== $id || ( $head['flags'] & 0x8000 ) === 0 || ( $head['flags'] & 0x0400 ) === 0 || ( $head['flags'] & 0x0200 ) !== 0 || ( $head['flags'] & 15 ) !== 0 ) { return new \WP_Error( 'dns_response', 'Name server did not return an authoritative answer.' ); }
-		$offset = 12;
-		// The answer must echo the one question asked (a signature check asks for the SOA) and every record used must belong to the zone asked about.
+	/**
+	 * The question to one of our own name servers over the strict wire layer, and the value in its answer. The server is named in
+	 * our settings (or is its private address), so the public address check is skipped (option trusted); nothing that takes a
+	 * customer's name passes that option. The signature check (46) asks for the zone's SOA with signatures requested (DO) because a
+	 * name server refuses a direct RRSIG question; a key check (48) asks with a larger UDP size so the key set fits.
+	 *
+	 * @param string $host   Address or name of the server.
+	 * @param string $domain Zone.
+	 * @param int    $type   6, 46 or 48.
+	 * @param int    $port   Port (tests use a high one).
+	 */
+	public static function read_wire( string $host, string $domain, int $type, int $port = 53 ): int|\WP_Error {
+		$options = array( 'trusted' => true, 'port' => $port ) + ( 46 === $type ? array( 'do' => true, 'size' => 4096 ) : array() ) + ( 48 === $type ? array( 'size' => 4096 ) : array() );
+		$answer  = DnsTransport::ask( $host, $domain, 46 === $type ? DnsWire::SOA : $type, $options );
+		if ( is_wp_error( $answer ) ) {
+			return in_array( $answer->get_error_code(), array( 'dns_malformed', 'dns_mismatch', 'dns_bad_name' ), true ) ? new \WP_Error( 'dns_response', 'Name server did not return an authoritative answer.' ) : new \WP_Error( 'dns_transport', 'Name server did not answer.' );
+		}
+		return self::value_of( $answer, $type, $domain );
+	}
+
+	/**
+	 * The value in a parsed authoritative answer: the SOA serial (6), the earliest RRSIG expiry (46) or the number of DNSKEY
+	 * records (48). Records of another owner name are refused (dns_response, not dns_missing: Zone::remove reads dns_missing as
+	 * "the zone is gone"). Pure, so a canned response tests it.
+	 *
+	 * @param array $response A DnsWire::parse() result.
+	 */
+	public static function value_of( array $response, int $type, string $domain ): int|\WP_Error {
 		$domain = strtolower( rtrim( $domain, '.' ) );
-		if ( 1 !== (int) $head['questions'] ) { return new \WP_Error( 'dns_response', 'The answer does not repeat the question.' ); }
-		$qname = DnsWire::name( $data, $offset );
-		if ( null === $qname || $offset + 4 > strlen( $data ) ) { return new \WP_Error( 'dns_response', 'Invalid DNS question.' ); }
-		$asked = unpack( 'ntype/nclass', substr( $data, $offset, 4 ) );
-		$offset += 4;
-		if ( $qname !== $domain || (int) $asked['type'] !== ( 46 === $type ? 6 : $type ) ) { return new \WP_Error( 'dns_response', 'The answer does not repeat the question.' ); }
+		if ( ! $response['aa'] && in_array( $response['rcode'], array( 3, 5 ), true ) ) { return new \WP_Error( 'dns_not_authoritative', 'Name server does not serve this zone.' ); }
+		if ( ! $response['aa'] || $response['tc'] || 0 !== $response['rcode'] ) { return new \WP_Error( 'dns_response', 'Name server did not return an authoritative answer.' ); }
 		$values = array();
-		for ( $a = 0; $a < $head['answers']; ++$a ) {
-			$owner = DnsWire::name( $data, $offset );
-			if ( null === $owner || $offset + 10 > strlen( $data ) ) { return new \WP_Error( 'dns_response', 'Invalid DNS answer.' ); }
-			$fields = unpack( 'ntype/nclass/Nttl/nlength', substr( $data, $offset, 10 ) );
-			$offset += 10;
-			$end = $offset + $fields['length'];
-			if ( $end > strlen( $data ) ) { return new \WP_Error( 'dns_response', 'Invalid DNS answer.' ); }
-			if ( $fields['type'] === $type && 1 === $fields['class'] ) {
-				// Not dns_missing: Zone::remove reads that as "the zone is gone", and a wrong answer says nothing about that.
-				if ( $owner !== $domain ) { return new \WP_Error( 'dns_response', 'The answer is for another name.' ); }
-				if ( 6 === $type ) {
-					$pos = $offset;
-					if ( self::skip_name( $data, $pos ) && self::skip_name( $data, $pos ) && $pos + 4 <= $end ) { $values[] = unpack( 'Nserial', substr( $data, $pos, 4 ) )['serial']; }
-				} elseif ( 48 === $type ) { $values[] = 1;
-				} elseif ( 46 === $type && $offset + 12 <= $end ) { $values[] = unpack( 'Nexpiry', substr( $data, $offset + 8, 4 ) )['expiry']; }
-			}
-			$offset = $end;
+		foreach ( $response['answer'] as $rr ) {
+			if ( $rr['type'] !== $type ) { continue; }
+			if ( $rr['name'] !== $domain ) { return new \WP_Error( 'dns_response', 'The answer is for another name.' ); }
+			if ( 6 === $type ) { $values[] = (int) $rr['data']['serial']; } elseif ( 48 === $type ) { $values[] = 1; } else { $values[] = (int) $rr['data']['expiration']; }
 		}
 		return $values ? ( 48 === $type ? count( $values ) : min( $values ) ) : new \WP_Error( 'dns_missing', 'Name server did not return the requested record.' );
 	}
@@ -129,34 +130,5 @@ final class DnsQuery {
 			if ( 'TXT' === ( $record['type'] ?? '' ) && isset( $record['txt'] ) && is_string( $record['txt'] ) ) { $out[] = $record['txt']; }
 		}
 		return array_values( array_unique( $out ) );
-	}
-
-	/**
-	 * The question sent to a name server. A name server refuses a direct question for the record
-	 * type RRSIG, so the signature check (type 46) asks for the zone's SOA with signatures
-	 * requested (EDNS0, DO bit) and reads the RRSIG that comes back with it.
-	 */
-	public static function packet( int $id, string $domain, int $type ): string {
-		$signed = 46 === $type;
-		$edns   = $signed || 48 === $type; // A key set can be larger than 512 bytes: ask with a larger UDP size.
-		$wire   = pack( 'nnnnnn', $id, 0x0100, 1, 0, 0, $edns ? 1 : 0 );
-		foreach ( explode( '.', rtrim( $domain, '.' ) ) as $label ) { $wire .= chr( strlen( $label ) ) . $label; }
-		$wire .= "\0" . pack( 'nn', $signed ? 6 : $type, 1 );
-		if ( $edns ) { $wire .= "\0" . pack( 'nnNn', 41, 4096, $signed ? 0x8000 : 0, 0 ); }
-		return $wire;
-	}
-
-	/** Advance over wire-format labels, including a compressed pointer. */
-	private static function skip_name( string $data, int &$offset ): bool {
-		$length = strlen( $data );
-		for ( $part = 0; $part < 128; ++$part ) {
-			if ( $offset >= $length ) { return false; }
-			$size = ord( $data[ $offset++ ] );
-			if ( 0 === $size ) { return true; }
-			if ( 0xc0 === ( $size & 0xc0 ) ) { if ( $offset >= $length ) { return false; } ++$offset; return true; }
-			if ( $size > 63 || $offset + $size > $length ) { return false; }
-			$offset += $size;
-		}
-		return false;
 	}
 }

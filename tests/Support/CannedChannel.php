@@ -9,12 +9,12 @@ class CannedChannel implements DnsChannel {
 	public array $sent = array();
 
 	/** @param array<string, string|\WP_Error> $answers protocol => packet or error. */
-	public function __construct( private array $answers ) {}
+	public function __construct( private array $answers, private bool $echo_id = true ) {}
 
 	public function send( string $host, int $port, string $wire, string $protocol ): string|\WP_Error {
 		$this->sent[] = array( $host, $port, $wire, $protocol );
 		$answer       = $this->answers[ $protocol ] ?? new \WP_Error( 'dns_unreachable', 'No scripted answer.' );
-		if ( is_string( $answer ) && strlen( $answer ) >= 2 ) {
+		if ( $this->echo_id && is_string( $answer ) && strlen( $answer ) >= 2 ) {
 			// Echo the id of the question, like a server does.
 			$answer = substr( $wire, 0, 2 ) . substr( $answer, 2 );
 		}

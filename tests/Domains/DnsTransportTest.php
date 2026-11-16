@@ -84,6 +84,14 @@ class DnsTransportTest extends TestCase {
 		$this->assertSame( array( 'udp' ), $channel->protocols() );
 	}
 
+	public function test_the_port_and_the_trusted_option_are_ignored_without_trusted(): void {
+		$channel = new CannedChannel( array( 'udp' => $this->full( 'example.com', DnsWire::TXT ) ) );
+		DnsTransport::use( $channel );
+		DnsTransport::ask( '192.5.6.30', 'example.com', DnsWire::TXT, array( 'port' => 5353 ) );
+		$this->assertSame( 53, $channel->sent[0][1] );
+		$this->assertSame( 'dns_unreachable', DnsTransport::ask( '10.0.0.5', 'example.com', DnsWire::TXT, array( 'port' => 5353 ) )->get_error_code() );
+	}
+
 	public function test_a_private_address_never_reaches_the_channel(): void {
 		$channel = new CannedChannel( array( 'udp' => $this->full( 'example.com', DnsWire::TXT ) ) );
 		DnsTransport::use( $channel );
@@ -91,11 +99,11 @@ class DnsTransportTest extends TestCase {
 		$this->assertSame( array(), $channel->sent );
 	}
 
-	public function test_exchange_goes_through_the_channel_and_asks_tcp_when_the_truncated_bit_is_set(): void {
+	public function test_a_trusted_ask_uses_its_port_and_a_name_as_host_and_asks_tcp_when_truncated(): void {
 		$channel = new CannedChannel( array( 'udp' => $this->full( 'example.com', DnsWire::TXT, true ), 'tcp' => $this->full( 'example.com', DnsWire::TXT ) ) );
 		DnsTransport::use( $channel );
-		$data = DnsTransport::exchange( 'ns1.example.net', 'wire', 5353 );
-		$this->assertIsString( $data );
+		$data = DnsTransport::ask( 'ns1.example.net', 'example.com', DnsWire::TXT, array( 'trusted' => true, 'port' => 5353 ) );
+		$this->assertIsArray( $data );
 		$this->assertSame( array( 'udp', 'tcp' ), $channel->protocols() );
 		$this->assertSame( 5353, $channel->sent[1][1] );
 	}
@@ -105,7 +113,7 @@ class DnsTransportTest extends TestCase {
 		$this->assertIsResource( $proc );
 		$port = (int) trim( (string) fgets( $pipes[1] ) );
 		$old  = SocketChannel::timeout( 0.3 );
-		$r    = DnsTransport::exchange( '127.0.0.1', DnsWire::query( 'example.com', DnsWire::TXT, 1 ), $port );
+		$r    = DnsTransport::ask( '127.0.0.1', 'example.com', DnsWire::TXT, array( 'trusted' => true, 'port' => $port ) );
 		SocketChannel::timeout( $old );
 		proc_terminate( $proc );
 		proc_close( $proc );
