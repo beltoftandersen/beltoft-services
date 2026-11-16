@@ -173,6 +173,23 @@ final class ApiTokensTest extends TestCase {
 		}
 	}
 
+	public function test_risky_check_sees_the_args_the_route_will_run(): void {
+		list( $resource, $user ) = $this->resource();
+
+		$token = $this->token( $user, Tokens::ACTIONS );
+		$route = '/resources/' . $resource->id() . '/actions/set_nameservers';
+
+		foreach ( array(
+			array( 'Mode' => 'custom', 'hosts' => 'a.example.com b.example.com' ),
+			array( 'mode' => ' custom', 'hosts' => 'a.example.com b.example.com' ),
+			array( 'mode' => 'ours', 'Mode' => 'custom', 'hosts' => 'a.example.com b.example.com' ),
+		) as $args ) {
+			$response = $this->call( 'POST', $route, $user, $token, array( 'args' => $args ) );
+			$this->assertSame( 403, $response->get_status(), wp_json_encode( $args ) );
+			$this->assertSame( 'beltoft_services_token_action', $response->get_data()['code'] );
+		}
+	}
+
 	public function test_risky_and_dashboard_only_actions_are_refused_for_actions_and_full_tokens(): void {
 		list( $resource, $user ) = $this->resource();
 

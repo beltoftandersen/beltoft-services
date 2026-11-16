@@ -393,8 +393,10 @@ final class Server {
 		$result = self::authorize( $params, get_current_user_id(), $post );
 
 		nocache_headers();
-		header( 'X-Frame-Options: DENY' );
-		header( "Content-Security-Policy: frame-ancestors 'none'" );
+
+		foreach ( self::page_headers() as $line ) {
+			header( $line );
+		}
 
 		if ( 'redirect' === $result['type'] ) {
 			// An external address on purpose: it is the client's registered redirect address, checked by authorize().
@@ -421,6 +423,15 @@ final class Server {
 		self::print_page( $result, $params );
 		get_footer();
 		exit;
+	}
+
+	/**
+	 * Headers of the authorization page: it may never be shown inside another page (clickjacking of the consent button).
+	 *
+	 * @return string[]
+	 */
+	public static function page_headers(): array {
+		return array( 'X-Frame-Options: DENY', "Content-Security-Policy: frame-ancestors 'none'" );
 	}
 
 	/**

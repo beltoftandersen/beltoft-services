@@ -327,10 +327,8 @@ final class Cart {
 		foreach ( Resource::live_ids( 'domain' ) as $id ) {
 			$other = Resource::find( $id );
 			if ( ! $other || strtolower( (string) $other->get( 'domain' ) ) !== strtolower( $domain ) ) { continue; }
-			$state   = $other->get( 'state' );
+			if ( ! Zone::holds( $other ) ) { continue; }
 			$license = $other->license();
-			if ( in_array( $state, array( 'deleted', 'failed' ), true ) ) { continue; }
-			if ( 'paused' === $state && ( ! $license || \BeltoftLicenses\Licenses::STATUS_ACTIVE !== \BeltoftLicenses\Licenses::effective_status( $license ) ) ) { continue; }
 			return (int) ( $license['user_id'] ?? 0 );
 		}
 		return null;

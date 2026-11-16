@@ -1011,4 +1011,113 @@ final class OauthTest extends TestCase {
 		$this->assertWPError( Clients::register( array( 'redirect_uris' => array( 'http://claude.ai/cb' ) ) ) );
 		$this->assertIsArray( Clients::register( array( 'redirect_uris' => array( 'https://ok.example/cb' ) ) ) );
 	}
+
+	/**
+	 * Runs the template_redirect listener of the consent page for a request and returns what it printed, or the address it
+	 * redirected to. The exits of the listener are turned into exceptions.
+	 *
+	 * @param array<string, string> $query  Query or form values.
+	 * @param string                $method GET or POST.
+	 * @return array{html: string, redirect: string}
+	 */
+	private function page( array $query, string $method = 'GET' ): array {
+		global $wp;
+
+		$stop     = new \RuntimeException( 'stop' );
+		$redirect = '';
+		$wp       = new \stdClass();
+		$wp->request = Server::AUTHORIZE_PATH;
+		$_SERVER['REQUEST_METHOD'] = $method;
+		$_GET  = 'GET' === $method ? $query : array();
+		$_POST = 'POST' === $method ? $query : array();
+
+		add_filter(
+			'wp_redirect',
+			static function ( $location ) use ( &$redirect, $stop ) {
+				$redirect = (string) $location;
+				throw $stop;
+			}
+		);
+		add_action(
+			'get_footer',
+			static function () use ( $stop ) {
+				throw $stop;
+			}
+		);
+
+		// The test runner has printed already, so the header calls of the listener warn; that is not what is tested here.
+		set_error_handler( static fn( $no, $text ) => false !== strpos( (string) $text, 'headers already sent' ) );
+
+		$level = ob_get_level();
+		ob_start();
+
+		try {
+			Server::authorize_page();
+		} catch ( \RuntimeException $e ) {
+			$this->assertSame( 'stop', $e->getMessage() );
+		} finally {
+			restore_error_handler();
+		}
+
+		$html = (string) ob_get_clean();
+
+		while ( ob_get_level() > $level ) {
+			ob_end_clean();
+		}
+
+		$_GET = $_POST = array();
+		unset( $_SERVER['REQUEST_METHOD'] );
+		remove_all_filters( 'wp_redirect' );
+		remove_all_actions( 'get_footer' );
+
+		return array( 'html' => $html, 'redirect' => $redirect );
+	}
+
+	private function consent_query( string $client, array $extra = array() ): array {
+		return $extra + array(
+			'client_id'             => $client,
+			'redirect_uri'          => self::REDIRECT,
+			'response_type'         => 'code',
+			'code_challenge'        => $this->pkce()[1],
+			'code_challenge_method' => 'S256',
+			'state'                 => 'xyz',
+		);
+	}
+
+	public function test_the_consent_page_is_never_shown_inside_another_page(): void {
+		$this->assertContains( 'X-Frame-Options: DENY', Server::page_headers() );
+		$this->assertContains( "Content-Security-Policy: frame-ancestors 'none'", Server::page_headers() );
+	}
+
+	public function test_a_guest_is_sent_to_log_in_and_comes_back_to_the_same_request(): void {
+		$seen = $this->page( $this->consent_query( $this->client() ) );
+
+		$this->assertStringContainsString( 'wp-login.php', $seen['redirect'] );
+		$this->assertStringContainsString( rawurlencode( Server::AUTHORIZE_PATH ), $seen['redirect'] );
+		$this->assertStringContainsString( 'state', $seen['redirect'] );
+		$this->assertSame( '', $seen['html'] );
+	}
+
+	public function test_a_signed_in_customer_gets_the_consent_page_with_the_state_escaped(): void {
+		wp_set_current_user( $this->customer() );
+		$client = $this->client();
+		$seen   = $this->page( $this->consent_query( $client, array( 'state' => '"><script>alert(1)</script>' ) ) );
+
+		$this->assertSame( '', $seen['redirect'] );
+		$this->assertStringContainsString( 'beltoft-services-oauth', $seen['html'] );
+		$this->assertStringNotContainsString( '<script>alert(1)</script>', $seen['html'] );
+		$this->assertStringContainsString( 'value="&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;"', $seen['html'] );
+	}
+
+	public function test_a_long_value_or_one_with_control_characters_is_refused_before_anything_is_looked_up(): void {
+		wp_set_current_user( $this->customer() );
+		$client = $this->client();
+
+		foreach ( array( str_repeat( 'a', 5000 ), "ab\x00cd", "line\nbreak" ) as $bad ) {
+			$seen = $this->page( $this->consent_query( $client, array( 'state' => $bad ) ) );
+
+			$this->assertSame( '', $seen['redirect'], 'Nothing is sent to the redirect address.' );
+			$this->assertStringNotContainsString( 'name="decision"', $seen['html'], 'No consent form for an invalid request.' );
+		}
+	}
 }

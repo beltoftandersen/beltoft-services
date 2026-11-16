@@ -171,7 +171,10 @@ final class ApiReferenceTest extends TestCase {
 
 		$this->assertStringContainsString( esc_html( \BeltoftServices\Mcp\Endpoint::url() ), $html, 'The connector address.' );
 		$this->assertStringContainsString( 'Add custom connector', $html );
-		$this->assertStringContainsString( 'Domain transfers are never possible through Claude', $html );
+		$this->assertStringContainsString( 'Domain transfers, transfer codes and the console are never possible through Claude', $html );
+		$this->assertStringNotContainsString( 'Claude never sees passwords', $html, 'Full access shows a password once.' );
+		$this->assertStringNotContainsString( 'only possible in your dashboard. Every', $html, 'Full access restores, reinstalls and deletes.' );
+		$this->assertStringContainsString( 'Full access can do those things', $html );
 		$this->assertStringContainsString( 'Use with Claude (MCP)', $html );
 	}
 

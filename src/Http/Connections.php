@@ -9,6 +9,7 @@ namespace BeltoftServices\Http;
 
 use BeltoftServices\Crypto;
 use BeltoftServices\Product;
+use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -392,14 +393,38 @@ final class Connections {
 	}
 
 	/**
-	 * Deletes a connection. A connection a product uses is kept.
+	 * How many services (not deleted) were made through a connection. A service remembers its connection and keeps using it for
+	 * every later pause, resume, plan change and delete, whatever its product points at now.
+	 *
+	 * @param string $id Connection id.
+	 */
+	public static function services_using( string $id ): int {
+		if ( '' === $id ) {
+			return 0;
+		}
+
+		$count = 0;
+
+		foreach ( Resource::find_by_meta( 'http', 'connection', $id ) as $resource_id ) {
+			$resource = Resource::find( (int) $resource_id );
+
+			if ( $resource && 'deleted' !== $resource->get( 'state' ) ) {
+				++$count;
+			}
+		}
+
+		return $count;
+	}
+
+	/**
+	 * Deletes a connection. A connection a product or a service uses is kept.
 	 *
 	 * @param string $id Connection id.
 	 */
 	public static function delete( string $id ): bool {
 		$all = self::all();
 
-		if ( ! isset( $all[ $id ] ) || self::in_use( $id ) > 0 ) {
+		if ( ! isset( $all[ $id ] ) || self::in_use( $id ) > 0 || self::services_using( $id ) > 0 ) {
 			return false;
 		}
 

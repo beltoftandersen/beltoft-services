@@ -46,7 +46,7 @@ final class Operations {
 		// The window counts from the FIRST issue and never moves: a reissue or the authority's own reissue must not reopen it.
 		$issued = (int) $r->get( 'ssl_first_issued_at' );
 
-		return 0 === $issued || time() < $issued + SslSettings::refund_days() * DAY_IN_SECONDS;
+		return 0 === $issued || time() < $issued + SslSettings::refund_days_for( $r ) * DAY_IN_SECONDS;
 	}
 
 	/**

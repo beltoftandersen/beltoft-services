@@ -296,7 +296,7 @@ final class DnsClaimRoutes {
 			foreach ( Resource::live_ids( $kind ) as $resource_id ) {
 				$resource = Resource::find( $resource_id );
 
-				if ( ! $resource || strtolower( (string) $resource->get( 'domain' ) ) !== $domain ) {
+				if ( ! $resource || strtolower( (string) $resource->get( 'domain' ) ) !== $domain || ! Zone::holds( $resource ) ) {
 					continue;
 				}
 
@@ -458,7 +458,7 @@ final class DnsClaimRoutes {
 			foreach ( Resource::live_ids( $kind ) as $resource_id ) {
 				$resource = Resource::find( $resource_id );
 
-				if ( ! $resource || strtolower( (string) $resource->get( 'domain' ) ) !== $domain ) {
+				if ( ! $resource || strtolower( (string) $resource->get( 'domain' ) ) !== $domain || ! Zone::holds( $resource ) ) {
 					continue;
 				}
 

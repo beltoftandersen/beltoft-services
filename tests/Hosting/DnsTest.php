@@ -428,7 +428,7 @@ class DnsTest extends HostingCase {
 		// Someone else's domain: no free pass, and a name another account holds is refused.
 		list( $other ) = $this->account();
 		$this->assertFalse( SiteDns::under_verified_domain( $other->id(), 'www.outside.example' ) );
-		$this->assertStringContainsString( 'another account', (string) SiteDns::add_domain( $other, 'w' . $other->id(), $under, $node ) );
+		$this->assertStringContainsString( 'cannot be used', (string) SiteDns::add_domain( $other, 'w' . $other->id(), $under, $node ) );
 		$this->lookups( array( '198.51.100.7' ), array() );
 		SiteDns::add_domain( $other, 'w' . $other->id(), 'www.outside.example', $node );
 		$this->assertSame( 'waiting', SiteDns::check_external( 'www.outside.example', $node ), 'The other account never proved outside.example.' );
@@ -539,9 +539,35 @@ class DnsTest extends HostingCase {
 		list( $b )          = $this->account();
 
 		$this->assertIsArray( SiteDns::add_domain( $a, 'w' . $a->id(), 'www.shared.example', $node ) );
-		$this->assertStringContainsString( 'another account', (string) SiteDns::add_domain( $b, 'w' . $b->id(), 'www.shared.example', $node ) );
+		$this->assertStringContainsString( 'cannot be used', (string) SiteDns::add_domain( $b, 'w' . $b->id(), 'www.shared.example', $node ) );
+		$this->assertStringNotContainsString( 'another account', (string) SiteDns::add_domain( $b, 'w' . $b->id(), 'www.shared.example', $node ), 'No answer on who holds a name.' );
 		$this->assertIsArray( SiteDns::add_domain( $a, 'w' . $a->id(), 'www.shared.example', $node ), 'The same account again is fine.' );
 		$this->assertCount( 2, SiteDomains::for_resource( $a->id() ), 'The preview name and the new one.' );
+	}
+
+	public function test_an_unproven_outside_name_of_one_account_gives_way_to_the_account_that_proves_it(): void {
+		list( $a, , $node ) = $this->account();
+		list( $b, $ub )     = $this->account();
+		$host = 'www.victim.example';
+
+		$this->assertIsArray( SiteDns::add_domain( $a, 'w' . $a->id(), $host, $node ) );
+
+		// B has not proven the name: A keeps the waiting row.
+		$this->lookups( array(), array() );
+		$this->assertIsString( SiteDns::add_domain( $b, 'w' . $b->id(), $host, $node ) );
+		$this->assertSame( $a->id(), SiteDomains::find( $host )['resource_id'] );
+
+		// B shows the ownership record: the name moves to B.
+		$this->lookups( array(), array( \BeltoftServices\Domains\Ownership::token( $ub, $host ) ) );
+		$this->assertSame( array( 'kind' => 'external', 'state' => 'waiting' ), SiteDns::add_domain( $b, 'w' . $b->id(), $host, $node ) );
+		$this->assertSame( $b->id(), SiteDomains::find( $host )['resource_id'] );
+
+		// A live name (active) is never taken this way.
+		SiteDomains::set_state( $host, 'active' );
+		list( $c, $uc ) = $this->account();
+		$this->lookups( array(), array( \BeltoftServices\Domains\Ownership::token( $uc, $host ) ) );
+		$this->assertIsString( SiteDns::add_domain( $c, 'w' . $c->id(), $host, $node ) );
+		$this->assertSame( $b->id(), SiteDomains::find( $host )['resource_id'] );
 	}
 
 	public function test_removing_a_name_removes_only_what_we_wrote(): void {

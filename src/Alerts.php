@@ -497,6 +497,31 @@ final class Alerts {
 		);
 	}
 
+	/**
+	 * Tells the admin, once a day, that the domain registrar is set to live but wp-config.php does not allow it, so
+	 * domain orders wait.
+	 *
+	 * @return bool Whether a mail was sent.
+	 */
+	public static function domains_not_live(): bool {
+		$transient = 'beltoft_services_domains_not_live_alert';
+		$to        = (string) Settings::get( 'admin_email' );
+
+		if ( false !== get_transient( $transient ) || ! is_email( $to ) ) {
+			return false;
+		}
+
+		set_transient( $transient, 1, DAY_IN_SECONDS );
+
+		$site = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+
+		return (bool) wp_mail(
+			$to,
+			sprintf( '[%s] The registrar is set to live but not allowed', $site ),
+			"The domain registrar setting is live, but BELTOFT_SERVICES_DOMAINS_LIVE is not exactly true in wp-config.php.\nDomain search and orders wait (nothing is made up) until the constant is fixed.\n"
+		);
+	}
+
 	/** Option holding the level of the last private network pool alert: low or zero. */
 	public const POOL_OPTION = 'beltoft_services_private_pool_alert';
 

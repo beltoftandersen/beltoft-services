@@ -201,4 +201,19 @@ class ZoneTest extends TestCase {
 		$this->assertTrue( \BeltoftServices\Domains\DnsAssignments::reserve( (int) $r->license()['user_id'], 5, 'mine-example.com' ) );
 		$this->assertSame( 'none', Zone::owner( $r ) );
 	}
+
+	public function test_a_failed_or_lapsed_service_of_another_customer_does_not_hold_the_name(): void {
+		$old = $this->resource( 'again-example.com' );
+		$this->assertTrue( $old->set( array( 'state' => 'failed' ) ) );
+		$new = $this->resource( 'again-example.com' );
+		$this->assertSame( 'none', Zone::owner( $new ), 'A failed order does not block the next buyer.' );
+
+		$lapsed = $this->resource( 'lapsed-example.com' );
+		$this->assertTrue( $lapsed->set( array( 'state' => 'paused' ) ) );
+		$this->assertTrue( \BeltoftLicenses\Licenses::update( (int) $lapsed->license()['id'], array( 'status' => 'expired' ) ) );
+		$this->assertSame( 'none', Zone::owner( $this->resource( 'lapsed-example.com' ) ) );
+
+		$this->resource( 'live-example.com' );
+		$this->assertSame( 'other', Zone::owner( $this->resource( 'live-example.com' ) ), 'A live service still holds it.' );
+	}
 }

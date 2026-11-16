@@ -137,6 +137,15 @@ final class ConnectionsScreen {
 					$products
 				)
 			);
+		} elseif ( Connections::services_using( $id ) > 0 ) {
+			self::flash(
+				'error',
+				sprintf(
+					/* translators: %d: number of services. */
+					_n( 'This connection is still used by %d service. It cannot be deleted until that service is deleted.', 'This connection is still used by %d services. It cannot be deleted until those services are deleted.', Connections::services_using( $id ), 'beltoft-services' ),
+					Connections::services_using( $id )
+				)
+			);
 		} elseif ( Connections::delete( $id ) ) {
 			self::flash( 'success', __( 'Connection deleted.', 'beltoft-services' ) );
 		} else {

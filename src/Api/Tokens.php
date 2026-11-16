@@ -128,7 +128,8 @@ final class Tokens {
 			return false;
 		}
 
-		$args = is_array( $args ) ? $args : array();
+		// The route runs the cleaned args, so the gate must judge those (key case, spaces, duplicate keys).
+		$args = Routes::clean_args( $args, $action );
 
 		return \BeltoftServices\Mcp\Tools::risky( $tool, $args + array( 'action' => $action ) );
 	}

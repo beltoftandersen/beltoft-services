@@ -542,7 +542,7 @@ final class Routes {
 	 * @param string $action The action they are for.
 	 * @return array<string, string>
 	 */
-	private static function clean_args( $args, string $action = '' ): array {
+	public static function clean_args( $args, string $action = '' ): array {
 		$clean = array();
 
 		foreach ( is_array( $args ) ? array_slice( $args, 0, 20, true ) : array() as $key => $value ) {

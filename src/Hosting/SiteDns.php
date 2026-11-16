@@ -350,11 +350,17 @@ final class SiteDns {
 
 		$existing = SiteDomains::find( $host );
 
+		$user = (int) ( $r->license()['user_id'] ?? 0 );
+
 		if ( null !== $existing && $existing['resource_id'] !== $r->id() ) {
-			return __( 'The domain is already used by another account.', 'beltoft-services' );
+			// The same answer whether the name is held or not allowed: it must not tell who holds a name.
+			if ( ! self::yields( $existing, $user, $r->id(), $host ) ) {
+				return __( 'That domain cannot be used for hosting here. If it is yours, add the ownership record for it in your DNS and try again.', 'beltoft-services' );
+			}
+
+			SiteDomains::remove( $host );
 		}
 
-		$user = (int) ( $r->license()['user_id'] ?? 0 );
 		$ours = null !== self::zone_for( $user, $host );
 		$kind = $ours ? 'ours' : 'external';
 
@@ -381,6 +387,25 @@ final class SiteDns {
 			'kind'  => 'external',
 			'state' => (string) SiteDomains::find( $host )['state'],
 		);
+	}
+
+	/**
+	 * Does another account's row give way to this customer? Only an outside name that never went live (waiting) does, and
+	 * only when this customer shows the ownership record now: a name nobody proved cannot be reserved by adding it first.
+	 *
+	 * @param array<string, mixed> $existing    The row of the other account.
+	 * @param int                  $user        The customer asking.
+	 * @param int                  $resource_id The asking hosting resource.
+	 * @param string               $host        Host name.
+	 */
+	public static function yields( array $existing, int $user, int $resource_id, string $host ): bool {
+		if ( 'external' !== $existing['kind'] || 'waiting' !== $existing['state'] ) {
+			return false;
+		}
+
+		$check = Ownership::check( $user, $host, array( self::proof_token( $resource_id, $host ) ), true );
+
+		return 'found' === $check['status'];
 	}
 
 	/**

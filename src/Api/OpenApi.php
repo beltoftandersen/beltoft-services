@@ -392,6 +392,8 @@ final class OpenApi {
 		}
 
 		foreach ( (array) ( $op['query'] ?? array() ) as $name => $schema ) {
+			// The table's description of a query field replaces the one made from the route's own argument: a name is listed once.
+			$params = array_values( array_filter( $params, static fn( $p ) => ! ( 'query' === $p['in'] && $p['name'] === (string) $name ) ) );
 			$params[] = array( 'name' => $name, 'in' => 'query', 'required' => false, 'schema' => $schema );
 		}
 

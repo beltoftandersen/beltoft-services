@@ -289,11 +289,11 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 						<?php endforeach; ?>
 					</ul>
 				<?php endif; ?>
-				<p class="description"><?php echo esc_html( sprintf( /* translators: 1: aliases in use, 2: aliases the plan allows */ _n( '%1$d of %2$d alias used.', '%1$d of %2$d aliases used.', (int) $beltoft_services_limits['aliases'], 'beltoft-services' ), (int) $view['counts']['aliases'], (int) $beltoft_services_limits['aliases'] ) ); ?></p>
+				<p class="description"><?php echo esc_html( sprintf( /* translators: 1: aliases in use over all domains of the plan, 2: aliases the plan allows */ _n( '%1$d of %2$d alias used.', '%1$d of %2$d aliases used.', (int) $beltoft_services_limits['aliases'], 'beltoft-services' ), (int) $view['plan']['used']['aliases'], (int) $beltoft_services_limits['aliases'] ) ); ?></p>
 			</div>
 			<div class="beltoft-services-vm__more">
 				<h4><?php esc_html_e( 'New alias', 'beltoft-services' ); ?></h4>
-				<?php if ( (int) $view['counts']['aliases'] >= (int) $beltoft_services_limits['aliases'] ) : ?>
+				<?php if ( (int) $view['plan']['used']['aliases'] >= (int) $beltoft_services_limits['aliases'] ) : ?>
 					<p><?php esc_html_e( 'Your plan has no room for more aliases.', 'beltoft-services' ); ?></p>
 				<?php else : ?>
 					<div class="beltoft-services-db__form" data-mail-alias-create>

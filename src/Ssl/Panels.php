@@ -389,7 +389,7 @@ final class Panels {
 
 		if ( isset( $actions['ssl_cancel'] ) ) {
 			/* translators: %d: days. */
-			$note  = (int) $r->get( 'ssl_first_issued_at' ) > 0 ? sprintf( _n( 'You can cancel for a refund until %d day after the certificate was issued.', 'You can cancel for a refund until %d days after the certificate was issued.', SslSettings::refund_days(), 'beltoft-services' ), SslSettings::refund_days() ) : '';
+			$note  = (int) $r->get( 'ssl_first_issued_at' ) > 0 ? sprintf( _n( 'You can cancel for a refund until %d day after the certificate was issued.', 'You can cancel for a refund until %d days after the certificate was issued.', SslSettings::refund_days_for( $r ), 'beltoft-services' ), SslSettings::refund_days_for( $r ) ) : '';
 			$field = 'beltoft-ssl-cancel-' . $r->id();
 			// The same danger block as deleting a server: what happens, the typed word, the red button.
 			echo '<details class="bs-danger beltoft-services-ssl-cancel"><summary class="bs-danger__row">' . esc_html( $actions['ssl_cancel'] ) . '</summary><div class="bs-danger__body">';

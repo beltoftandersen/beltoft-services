@@ -141,6 +141,7 @@ final class LiveMailcowClient implements MailcowClient {
 	}
 
 	public function add_alias( string $address, string $goto ) {
+		self::forget_aliases();
 		$reply = $this->post( 'add/alias', array( 'address' => $address, 'goto' => $goto, 'active' => '1' ) );
 
 		if ( is_wp_error( $reply ) ) {
@@ -159,12 +160,31 @@ final class LiveMailcowClient implements MailcowClient {
 		return 0;
 	}
 
+	/**
+	 * The whole alias list of the server, kept for a few seconds: mailcow has no list per domain, so every look at a domain would
+	 * download every customer's aliases again (once per domain of the plan). Any alias write and the plan lock forget it.
+	 *
+	 * @var array<string, array{0:int,1:array<mixed>}>
+	 */
+	private static array $alias_memo = array();
+
+	/** Seconds the whole alias list is reused. */
+	private const ALIAS_MEMO_SECONDS = 5;
+
+	/** Forgets the remembered alias list (after an alias write, and when a plan lock is taken so a count is fresh). */
+	public static function forget_aliases(): void {
+		self::$alias_memo = array();
+	}
+
 	public function list_aliases( string $domain ) {
-		$rows = $this->request( 'GET', 'get/alias/all' );
+		$memo = hash( 'sha256', $this->base . '|' . $this->key );
+		$rows = isset( self::$alias_memo[ $memo ] ) && time() - self::$alias_memo[ $memo ][0] < self::ALIAS_MEMO_SECONDS ? self::$alias_memo[ $memo ][1] : $this->request( 'GET', 'get/alias/all' );
 
 		if ( is_wp_error( $rows ) ) {
 			return $rows;
 		}
+
+		self::$alias_memo[ $memo ] = array( time(), $rows );
 
 		$out = array();
 
@@ -178,6 +198,7 @@ final class LiveMailcowClient implements MailcowClient {
 	}
 
 	public function delete_alias( int $id ) {
+		self::forget_aliases();
 		return $this->post( 'delete/alias', array( (string) $id ) );
 	}
 
