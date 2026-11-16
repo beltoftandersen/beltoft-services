@@ -43,7 +43,7 @@ final class Meta {
 			if ( 'transfer' === $mode && is_string( $auth ) ) { $meta['auth'] = $auth; }
 			if ( 'transfer' === $mode && in_array( $data['dns'] ?? '', TransferDns::CHOICES, true ) ) { $meta['transfer_dns'] = (string) $data['dns']; }
 			// A free transfer: the line carries the promise and was paid 0. A paid line never takes the free path, whatever its stamp says.
-			if ( 'transfer' === $mode && ! empty( $data['free_transfer'] ) && 0.0 === round( (float) $item->get_total(), 2 ) ) { $meta['transfer_free'] = true; }
+			if ( 'transfer' === $mode && ! empty( $data['free_transfer'] ) && 0.0 === round( SpendGuard::paid( $item ), 2 ) ) { $meta['transfer_free'] = true; }
 			$meta['order_item_id'] = (int) $item->get_id();
 			break;
 		}

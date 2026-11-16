@@ -520,4 +520,23 @@ class FreeTransferTest extends TestCase {
 		\BeltoftServices\Domains\Panels::admin( Resource::find( $r->id() ) );
 		$this->assertStringContainsString( 'is due on', (string) ob_get_clean() );
 	}
+
+	public function test_a_transfer_paid_in_full_by_account_credit_is_not_a_free_transfer(): void {
+		$product = $this->domain_product();
+		$order   = wc_create_order();
+		$item    = new \WC_Order_Item_Product();
+		$item->set_product( $product );
+		$item->set_quantity( 1 );
+		$item->set_subtotal( 20.0 );
+		$item->set_total( 0.0 );
+		$item->add_meta_data( '_beltoft_services_domain', array( 'domain' => 'credit.dk', 'mode' => 'transfer', 'free_transfer' => true ), true );
+		$order->add_item( $item );
+		$order->save();
+		$credit = static fn() => 2000;
+		add_filter( 'beltoft_services_order_credit_cents', $credit );
+		$meta = Meta::initial_meta( array(), array( 'id' => 977, 'order_id' => $order->get_id(), 'product_id' => $product->get_id() ), new FakeDriver( 'domain' ) );
+		$this->assertEmpty( $meta['transfer_free'] ?? false, 'Paid by credit is a paid transfer.' );
+		$this->assertSame( array(), ThankYou::free_transfers( $order ) );
+		remove_filter( 'beltoft_services_order_credit_cents', $credit );
+	}
 }

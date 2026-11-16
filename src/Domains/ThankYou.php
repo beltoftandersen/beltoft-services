@@ -111,7 +111,7 @@ final class ThankYou {
 		foreach ( $order->get_items() as $item ) {
 			$data = $item->get_meta( '_beltoft_services_domain', true );
 
-			if ( is_array( $data ) && 'transfer' === ( $data['mode'] ?? '' ) && ! empty( $data['domain'] ) && ! empty( $data['free_transfer'] ) && 0.0 === round( (float) $item->get_total(), 2 ) ) {
+			if ( is_array( $data ) && 'transfer' === ( $data['mode'] ?? '' ) && ! empty( $data['domain'] ) && ! empty( $data['free_transfer'] ) && 0.0 === round( SpendGuard::paid( $item ), 2 ) ) {
 				$domains[ (string) $data['domain'] ] = true;
 			}
 		}
