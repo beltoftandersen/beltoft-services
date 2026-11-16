@@ -99,6 +99,21 @@ final class AddonLink {
 			return $out;
 		}
 
+		// Read once per My Account request (the memo is off for jobs and emptied by every resource write): the candidate
+		// query is a LIKE on the meta text, so a server page must not repeat it.
+		return Resource::remembered( 'addons:' . $a->kind . ':' . $license_id, static fn() => self::load_for_server( $a, $license_id ) );
+	}
+
+	/**
+	 * Reads the add-ons of one kind linked to a server license from the database.
+	 *
+	 * @param Addon $a          Add-on kind.
+	 * @param int   $license_id Server license id.
+	 * @return Resource[]
+	 */
+	private static function load_for_server( Addon $a, int $license_id ): array {
+		$out = array();
+
 		// One query for the candidates (the license id is in the meta text, as a number or a string), then the exact check on each.
 		foreach ( Resource::find_by_meta( $a->kind, 'server_license', array( $license_id, (string) $license_id ), $a->list_order ) as $id ) {
 			$resource = Resource::find( (int) $id );
