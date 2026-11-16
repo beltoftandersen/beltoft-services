@@ -47,7 +47,7 @@ final class DomainPage {
 	public static function head( $handled, $resource, $license = array(), $view = array(), $page = array() ) {
 		unset( $license, $view );
 
-		if ( $handled || ! $resource instanceof Resource || ! in_array( $resource->get( 'driver' ), array( 'domain', 'dns' ), true ) || ! is_array( $page ) || ! Domains::page() ) {
+		if ( $handled || ! $resource instanceof Resource || ! in_array( $resource->get( 'driver' ), array( 'domain', 'dns' ), true ) || ! is_array( $page ) || ! DomainArea::on_page() ) {
 			return $handled;
 		}
 
@@ -67,7 +67,7 @@ final class DomainPage {
 		( static function ( array $vars ): void {
 			// phpcs:ignore WordPress.PHP.DontExtract.extract_extract -- Template variables, a fixed list built above.
 			extract( $vars, EXTR_SKIP );
-			include Domains::file( 'domain-head.php' );
+			include ServiceArea::file( 'domain-head.php' );
 		} )( $vars );
 
 		return true;

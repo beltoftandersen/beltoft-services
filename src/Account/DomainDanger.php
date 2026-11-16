@@ -88,7 +88,7 @@ final class DomainDanger {
 			'r'       => $r,
 			'domain'  => (string) $r->get( 'domain' ),
 			'shown'   => \BeltoftServices\Domains\HostName::display( (string) $r->get( 'domain' ) ),
-			'action'  => Domains::url( $license, 'danger' ),
+			'action'  => ServiceArea::get( DomainArea::class )->url( $license, 'danger' ),
 			'nonce'   => wp_create_nonce( self::nonce_action( (int) $license['id'] ) ),
 			'expires' => self::date( (string) $r->get( 'expires_at' ), true ),
 			'license' => (int) $license['id'],
@@ -97,7 +97,7 @@ final class DomainDanger {
 		( static function ( array $vars ): void {
 			// phpcs:ignore WordPress.PHP.DontExtract.extract_extract -- Template variables, a fixed list built above.
 			extract( $vars, EXTR_SKIP );
-			include Domains::file( 'domain-danger.php' );
+			include ServiceArea::file( 'domain-danger.php' );
 		} )( $vars );
 	}
 
@@ -193,7 +193,7 @@ final class DomainDanger {
 
 		if ( $license_id <= 0 || ! wp_verify_nonce( $nonce, self::nonce_action( $license_id ) ) ) {
 			wc_add_notice( __( 'This page expired. Reload it and try again.', 'beltoft-services' ), 'error' );
-			wp_safe_redirect( Domains::url_list() );
+			wp_safe_redirect( ServiceArea::get( DomainArea::class )->url_list() );
 			exit;
 		}
 
@@ -217,13 +217,13 @@ final class DomainDanger {
 	public static function process( int $user_id, array $post ): array {
 		$license  = Licenses::find( (int) ( $post['license'] ?? 0 ) );
 		$resource = $license ? Resource::for_license( (int) $license['id'] ) : null;
-		$list     = Domains::url_list();
+		$list     = ServiceArea::get( DomainArea::class )->url_list();
 
-		if ( ! $license || ! $resource || ! Domains::is_domain( $license ) || (int) ( $license['user_id'] ?? 0 ) !== $user_id ) {
+		if ( ! $license || ! $resource || ! ServiceArea::get( DomainArea::class )->is_member( $license ) || (int) ( $license['user_id'] ?? 0 ) !== $user_id ) {
 			return array( 'ok' => false, 'message' => __( 'That domain was not found.', 'beltoft-services' ), 'redirect' => $list );
 		}
 
-		$back  = Domains::url( $license, 'danger' );
+		$back  = ServiceArea::get( DomainArea::class )->url( $license, 'danger' );
 		$offer = self::offer( $resource, $user_id );
 		$what  = (string) ( $post['action'] ?? '' );
 
@@ -238,7 +238,7 @@ final class DomainDanger {
 		);
 
 		if ( null === $offer || ! isset( $kinds[ $what ] ) || $kinds[ $what ] !== $offer['kind'] ) {
-			return array( 'ok' => false, 'message' => __( 'That is not available for this domain.', 'beltoft-services' ), 'redirect' => Domains::url( $license ) );
+			return array( 'ok' => false, 'message' => __( 'That is not available for this domain.', 'beltoft-services' ), 'redirect' => ServiceArea::get( DomainArea::class )->url( $license ) );
 		}
 
 		$subscription = $offer['subscription'];

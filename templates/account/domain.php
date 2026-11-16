@@ -25,7 +25,7 @@ if ( $beltoft_time ) {
 <div class="beltoft-services-domain" data-domain-resource="<?php echo esc_attr( (string) $r->id() ); ?>" data-bs-scope="<?php echo esc_attr( (string) $r->id() ); ?>" data-updating="<?php echo esc_attr__( 'Updating…', 'beltoft-services' ); ?>" data-updating-note="<?php echo esc_attr__( 'This can take up to a minute.', 'beltoft-services' ); ?>">
 	<?php $beltoft_fix = $dns_only ? null : \BeltoftServices\Domains\TransferFix::view( $r ); ?>
 	<?php if ( $beltoft_fix ) : ?>
-		<?php include \BeltoftServices\Account\Domains::file( 'domain-fix.php' ); ?>
+		<?php include \BeltoftServices\Account\ServiceArea::file( 'domain-fix.php' ); ?>
 	<?php endif; ?>
 	<?php if ( $dns_only ) : ?>
 		<?php
@@ -155,7 +155,7 @@ if ( $beltoft_time ) {
 					<form class="beltoft-services-domain-form" data-domain-action="lock"><button type="submit" class="beltoft-services-domain__link"><?php esc_html_e( 'Lock again', 'beltoft-services' ); ?></button></form>
 				<?php endif; ?>
 			</div>
-			<?php include \BeltoftServices\Account\Domains::file( 'domain-stepup.php' ); ?>
+			<?php include \BeltoftServices\Account\ServiceArea::file( 'domain-stepup.php' ); ?>
 			<div class="beltoft-services-domain__code" hidden>
 				<label class="screen-reader-text" for="beltoft-domain-code-<?php echo esc_attr( (string) $r->id() ); ?>"><?php esc_html_e( 'Transfer code', 'beltoft-services' ); ?></label>
 				<input type="text" readonly class="beltoft-services-domain-code" id="beltoft-domain-code-<?php echo esc_attr( (string) $r->id() ); ?>" value="" autocomplete="off" spellcheck="false">

@@ -218,7 +218,7 @@ final class OverviewData {
 			$data['licenses'][] = self::license_row( $view );
 		}
 
-		$data['domains_url']  = $domains ? Domains::url_list() : '';
+		$data['domains_url']  = $domains ? ServiceArea::get( DomainArea::class )->url_list() : '';
 		$data['licenses_url'] = $plain ? Endpoint::url_for_license( $plain[0] ) : '';
 
 		$subscriptions = self::subscriptions( $user_id );
@@ -359,10 +359,6 @@ final class OverviewData {
 	private static function follow_url( array $license ): string {
 		if ( Servers::is_server( $license ) || self::in_servers_tab( $license ) ) {
 			return ServerLinks::url( $license );
-		}
-
-		if ( Domains::is_domain( $license ) ) {
-			return Domains::url( $license );
 		}
 
 		foreach ( ServiceArea::all() as $area ) {
