@@ -137,13 +137,18 @@ final class Domains extends ServiceArea {
 	}
 
 	/**
-	 * A domain without a resource, and a DNS service folded into a registration, are history: not listed, not opened,
+	 * A domain without a resource, one whose licence ended and whose service is deleted, and a DNS service folded into a registration, are history: not listed, not opened,
 	 * and the address says "not found". A domain in state deleted is still listed (its state says Removed).
 	 *
 	 * {@inheritDoc}
 	 */
 	protected function visibility( ?Resource $resource ): string {
-		return ! $resource || $resource->folded_into() > 0 ? self::HIDDEN : self::SHOWN;
+		// Also an ended licence whose service is deleted (ServiceArea::ended_and_gone()): history, the address says "not found".
+		if ( ! $resource || $resource->folded_into() > 0 || self::ended_and_gone( $resource->license(), $resource ) ) {
+			return self::HIDDEN;
+		}
+
+		return self::SHOWN;
 	}
 
 	/**

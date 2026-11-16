@@ -180,7 +180,7 @@ final class OverviewData {
 		foreach ( $domain_views as $view ) {
 			$resource = Resource::for_license( (int) $view['license']['id'] );
 
-			if ( $resource ) {
+			if ( $resource && ! ServiceArea::ended_and_gone( $view['license'], $resource ) ) {
 				$domain_resources[ (int) $view['id'] ] = $resource;
 				$data['domains'][]                     = DomainRows::row( $view, $resource );
 			}

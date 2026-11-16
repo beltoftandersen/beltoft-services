@@ -164,4 +164,61 @@ final class EndedServicesTest extends TestCase {
 		$this->assertStringContainsString( 'That server was not found. Here are your servers.', $html );
 		$this->assertSame( '', Servers::redirect_target() );
 	}
+
+	private function domain( int $user, string $name, string $status, string $state = 'ready', bool $closed = false ): int {
+		$product = $this->service_product( 'domain', array(), array( 'slug' => 'domain-' . wp_generate_password( 6, false ) ) );
+		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $user ) );
+		$r       = Resource::create( $license, new \BeltoftServices\Domains\DomainDriver(), array(), array( 'domain' => $name, 'mode' => 'register', 'zone_ready' => true ) );
+		$this->assertInstanceOf( Resource::class, $r );
+		$r->set( array( 'state' => $state, 'desired' => 'deleted' === $state ? 'deleted' : 'ready' ) );
+
+		if ( $closed ) {
+			Resource::find( $r->id() )->close();
+		}
+
+		Licenses::update( (int) $license['id'], array( 'status' => $status ) );
+
+		return (int) $license['id'];
+	}
+
+	public function test_an_ended_and_removed_domain_is_hidden_and_not_counted_a_removed_one_with_a_live_licence_stays(): void {
+		$user = $this->user();
+		$this->domain( $user, 'ended-removed.example', 'expired', 'deleted' );
+		$this->domain( $user, 'ended-closed.example', 'revoked', 'deleted', true );
+		$removed = $this->domain( $user, 'removed-live.example', 'active', 'deleted' );
+		$paused  = $this->domain( $user, 'lapsed.example', 'expired', 'paused' );
+		$live    = $this->domain( $user, 'live.example', 'active' );
+
+		$area   = ServiceArea::get( \BeltoftServices\Account\Domains::class );
+		$sorted = $area->sort( $this->views( $user ) );
+
+		$this->assertEqualsCanonicalizing( array( $removed, $paused, $live ), array_keys( $sorted['members'] ) );
+		$this->assertSame( 3, $this->counts( $user )['domains'] ?? 0 );
+
+		wp_set_current_user( $user );
+		ob_start();
+		$area->render( $this->views( $user ) );
+		$html = (string) ob_get_clean();
+		$this->assertStringNotContainsString( 'ended-removed.example', $html );
+		$this->assertStringContainsString( 'live.example', $html );
+
+		\BeltoftServices\Account\Overview::reset();
+		$names = array_column( \BeltoftServices\Account\Overview::data()['domains'], 'name' );
+		$this->assertNotContains( 'ended-removed.example', $names );
+		$this->assertContains( 'removed-live.example', $names );
+	}
+
+	public function test_the_address_of_a_hidden_domain_is_the_not_found_line(): void {
+		$user = $this->user();
+		$id   = $this->domain( $user, 'ended-removed.example', 'expired', 'deleted' );
+		wp_set_current_user( $user );
+		$GLOBALS['wp']->query_vars['domains'] = (string) $id;
+
+		ob_start();
+		ServiceArea::get( \BeltoftServices\Account\Domains::class )->render( $this->views( $user ) );
+		$html = (string) ob_get_clean();
+		unset( $GLOBALS['wp']->query_vars['domains'] );
+
+		$this->assertStringContainsString( 'not found', strtolower( $html ) );
+	}
 }
