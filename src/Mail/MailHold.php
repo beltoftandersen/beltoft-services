@@ -85,18 +85,13 @@ final class MailHold {
 	}
 
 	/**
-	 * Where the domain's DNS is: ours (our name servers) or external. The stored mode wins; an older resource without one
-	 * is worked out from the customer's zones.
+	 * Where the domain's DNS is now: ours (the name is a zone of the customer on our name servers) or external. Worked out
+	 * live every time, like MailDns::run does; the stored mail_mode is only what was true at the last look (it shows in the
+	 * account and in emails). A domain whose zone was deleted or moved away therefore stops counting as ours at once.
 	 *
 	 * @param Resource $r Resource.
 	 */
 	public static function mode( Resource $r ): string {
-		$mode = (string) $r->get( 'mail_mode' );
-
-		if ( '' !== $mode ) {
-			return $mode;
-		}
-
 		return MailDomain::on_our_servers( MailGuard::domain( $r ), (int) ( $r->license()['user_id'] ?? 0 ) ) ? 'ours' : 'external';
 	}
 
