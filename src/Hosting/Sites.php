@@ -297,6 +297,7 @@ final class Sites {
 			'php'         => (string) $row['php'],
 			'workers'     => (int) $row['workers'],
 			'flags'       => is_array( $flags ) ? $flags : array(),
+			'created'     => (int) strtotime( (string) ( $row['created'] ?? '' ) . ' UTC' ),
 		);
 	}
 }

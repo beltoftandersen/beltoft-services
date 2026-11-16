@@ -15,6 +15,7 @@ use BeltoftServices\Hosting\HostingActions;
 use BeltoftServices\Hosting\HostingBackups;
 use BeltoftServices\Hosting\HostingRestore;
 use BeltoftServices\Hosting\Records;
+use BeltoftServices\Hosting\Sites;
 use BeltoftServices\Resource;
 
 /**
@@ -431,6 +432,62 @@ class BackupsTest extends HostingCase {
 		$call = $this->node->calls_to( '#/nodes/pve1/lxc$#', 'POST' );
 		$this->assertSame( 1, $call[0]['params']['restore'] );
 		$this->assertSame( 1, $call[0]['params']['force'] );
+	}
+
+	public function test_an_account_restore_skips_the_database_of_a_website_made_after_the_backup_and_finishes(): void {
+		$this->save_node( array( 'restore_safety' => 'snapshot' ) );
+		list( $r, $volid, $label ) = $this->with_backup();
+		$ctime = (int) substr( $label, 1 );
+		$this->assertTrue( Sites::add( $r->id(), 'shop', 'Shop', '8.3', 1 ) );
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test setup: the site was made after the backup.
+		$wpdb->update( \BeltoftServices\Hosting\Schema::tables()['hosting_sites'], array( 'created' => gmdate( 'Y-m-d H:i:s', $ctime + 600 ) ), array( 'resource_id' => $r->id(), 'slug' => 'shop' ) );
+
+		$this->assertTrue( ( new HostingActions( $r ) )->queue( 'restore', array( 'account', $volid, '' ) )['started'] );
+		$this->run_account( $r );
+		$r = Resource::find( $r->id() );
+
+		$this->assertTrue( $r->get( 'restore_last' )['ok'], 'The restore ends well although one website is not in the backup.' );
+		$this->assertSame( array( 'shop' ), $r->get( 'restore_last' )['not_in_backup'] );
+		$restores = array_filter( $this->agent->state()['restores'], static fn( $x ) => 'backup.db_restore' === $x['op'] );
+		$this->assertNotContains( 'c' . $r->id() . '_shop', array_column( $restores, 'database' ) );
+		$this->assertCount( 2, $restores, 'The websites the backup holds are imported.' );
+	}
+
+	public function test_a_database_the_agent_says_the_backup_does_not_hold_is_skipped_not_retried_for_ever(): void {
+		$this->save_node( array( 'restore_safety' => 'snapshot' ) );
+		list( $r, $volid ) = $this->with_backup();
+		$this->agent->fail_next( 'backup.db_restore', 'the backup holds no dump of this database' );
+
+		$this->assertTrue( ( new HostingActions( $r ) )->queue( 'restore', array( 'account', $volid, '' ) )['started'] );
+		$this->run_account( $r );
+		$r = Resource::find( $r->id() );
+
+		$this->assertTrue( $r->get( 'restore_last' )['ok'] );
+		$this->assertCount( 1, $r->get( 'restore_last' )['not_in_backup'] );
+		$this->assertCount( 1, array_filter( $this->agent->state()['restores'], static fn( $x ) => 'backup.db_restore' === $x['op'] ), 'The other database is still imported.' );
+	}
+
+	public function test_a_repeated_databases_phase_imports_each_database_once(): void {
+		$this->save_node( array( 'restore_safety' => 'snapshot' ) );
+		list( $r, $volid ) = $this->with_backup();
+		$this->agent->pending( 'backup.db_restore', 2 );
+		$this->agent->pending( 'backup.db_restore', 2 );
+
+		$this->assertTrue( ( new HostingActions( $r ) )->queue( 'restore', array( 'account', $volid, '' ) )['started'] );
+		$this->run_account( $r );
+
+		$by_db = array();
+
+		foreach ( $this->agent->calls_of( 'backup.db_restore' ) as $call ) {
+			$by_db[ $call['args']['database'] ][ $call['job_id'] ] = true;
+		}
+
+		$this->assertCount( 2, $by_db );
+
+		foreach ( $by_db as $database => $jobs ) {
+			$this->assertCount( 1, $jobs, $database . ' is one job, not imported again on every look.' );
+		}
 	}
 
 	public function test_undo_goes_back_to_the_safety_point_for_files_and_databases(): void {
