@@ -2,7 +2,7 @@
 /** The small helpers the account areas share: moving a menu item, and the setting-to-address rule. @package BeltoftServices */
 namespace BeltoftServices\Tests\Account;
 
-use BeltoftServices\Account\Domains;
+use BeltoftServices\Account\DomainArea;
 use BeltoftServices\Account\Email;
 use BeltoftServices\Account\Hosting;
 use BeltoftServices\Account\Licences;
@@ -12,7 +12,7 @@ use BeltoftServices\Tests\TestCase;
 
 class AreaHelpersTest extends TestCase {
 	public function test_each_menu_item_goes_right_after_its_neighbour_and_is_left_alone_without_it(): void {
-		$d = Domains::slug();
+		$d = ServiceArea::get( DomainArea::class )->slug();
 		$e = ServiceArea::get( Email::class )->slug();
 		$s = ServiceArea::get( Ssl::class )->slug();
 		$l = ServiceArea::get( Licences::class )->slug();

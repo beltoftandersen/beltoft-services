@@ -10,7 +10,7 @@
 namespace BeltoftServices\Tests\Account;
 
 use BeltoftLicenses\Account\View;
-use BeltoftServices\Account\Domains;
+use BeltoftServices\Account\DomainArea;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Account\Slugs;
@@ -277,44 +277,44 @@ final class DomainsGoldenTest extends TestCase {
 		$out = array();
 		$reg = $this->res['reg']->license();
 
-		$out['url|reg']        = $this->normal( Domains::url( $reg ) );
-		$out['url|reg|dns']    = $this->normal( Domains::url( $reg, 'dns' ) );
-		$out['url|reg|bogus']  = $this->normal( Domains::url( $reg, 'bogus' ) );
-		$out['url|reg|danger'] = $this->normal( Domains::url( $reg, 'danger' ) );
-		$out['url_list']       = $this->normal( Domains::url_list() );
-		$out['url_add']        = $this->normal( Domains::url_add() );
-		$out['url_for_order|one']  = $this->normal( Domains::url_for_order( 910001, array( 'golden-reg.example' ) ) );
-		$out['url_for_order|two']  = $this->normal( Domains::url_for_order( 910001, array( 'golden-reg.example', 'x.example' ) ) );
-		$out['url_for_order|wrong'] = $this->normal( Domains::url_for_order( 910001, array( 'golden-other.example' ) ) );
-		$out['url_for_order|none']  = $this->normal( Domains::url_for_order( 0, array( 'golden-reg.example' ) ) );
+		$out['url|reg']        = $this->normal( ServiceArea::get( DomainArea::class )->url( $reg ) );
+		$out['url|reg|dns']    = $this->normal( ServiceArea::get( DomainArea::class )->url( $reg, 'dns' ) );
+		$out['url|reg|bogus']  = $this->normal( ServiceArea::get( DomainArea::class )->url( $reg, 'bogus' ) );
+		$out['url|reg|danger'] = $this->normal( ServiceArea::get( DomainArea::class )->url( $reg, 'danger' ) );
+		$out['url_list']       = $this->normal( ServiceArea::get( DomainArea::class )->url_list() );
+		$out['url_add']        = $this->normal( ServiceArea::get( DomainArea::class )->url_add() );
+		$out['url_for_order|one']  = $this->normal( ServiceArea::get( DomainArea::class )->url_for_order( 910001, array( 'golden-reg.example' ) ) );
+		$out['url_for_order|two']  = $this->normal( ServiceArea::get( DomainArea::class )->url_for_order( 910001, array( 'golden-reg.example', 'x.example' ) ) );
+		$out['url_for_order|wrong'] = $this->normal( ServiceArea::get( DomainArea::class )->url_for_order( 910001, array( 'golden-other.example' ) ) );
+		$out['url_for_order|none']  = $this->normal( ServiceArea::get( DomainArea::class )->url_for_order( 0, array( 'golden-reg.example' ) ) );
 
 		foreach ( array( '', '/domains/', 'https://example.org/find', '//evil.example/x' ) as $setting ) {
 			$this->settings( array( 'domain_search_url' => $setting ) );
-			$out[ 'url_register|' . $setting ] = $this->normal( Domains::url_register() );
+			$out[ 'url_register|' . $setting ] = $this->normal( ServiceArea::get( DomainArea::class )->url_register() );
 		}
 
 		$this->settings( array( 'domain_search_url' => '' ) );
 		add_filter( 'beltoft_services_domains_add_url', static fn() => 'https://example.org/filtered' );
-		$out['url_register|filter'] = Domains::url_register();
+		$out['url_register|filter'] = ServiceArea::get( DomainArea::class )->url_register();
 		remove_all_filters( 'beltoft_services_domains_add_url' );
 
 		add_filter( 'beltoft_services_domains_slug', static fn() => 'names' );
-		$out['slug|filter']     = Domains::slug();
-		$out['url_list|filter'] = $this->normal( Domains::url_list() );
-		$out['url|filter']      = $this->normal( Domains::url( $reg, 'dns' ) );
+		$out['slug|filter']     = ServiceArea::get( DomainArea::class )->slug();
+		$out['url_list|filter'] = $this->normal( ServiceArea::get( DomainArea::class )->url_list() );
+		$out['url|filter']      = $this->normal( ServiceArea::get( DomainArea::class )->url( $reg, 'dns' ) );
 		remove_all_filters( 'beltoft_services_domains_slug' );
 
 		$id = (string) $reg['id'];
 
 		foreach ( array( '', $id, $id . '/dns', $id . '/danger/', $id . '/overview', $id . '/bogus', 'add', 'x/dns', Slugs::value( $reg ), Slugs::value( $reg, 'transfer' ), Slugs::value( $reg, 'nameservers' ), 'add/dns' ) as $value ) {
 			$GLOBALS['wp']->query_vars['domains'] = $value;
-			$r = Domains::requested();
+			$r = ServiceArea::get( DomainArea::class )->requested();
 			$out[ 'requested|' . $this->label( $value ) ] = $this->normal( wp_json_encode( array( $r['id'], $r['tab'], $r['add'] ) ) );
 		}
 
 		unset( $GLOBALS['wp']->query_vars['domains'] );
-		$out['tabs']     = wp_json_encode( Domains::tabs() );
-		$out['buttons|off'] = $this->normal( wp_json_encode( Domains::buttons() ) );
+		$out['tabs']     = wp_json_encode( ServiceArea::get( DomainArea::class )->tabs() );
+		$out['buttons|off'] = $this->normal( wp_json_encode( ServiceArea::get( DomainArea::class )->buttons() ) );
 
 		$groups = Tabs::groups( array() );
 		$out['groups|order'] = implode( ',', array_column( $groups, 'slug' ) );

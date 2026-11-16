@@ -3,7 +3,7 @@
 namespace BeltoftServices\Tests\Account;
 
 use BeltoftServices\Account\Databases;
-use BeltoftServices\Account\Domains;
+use BeltoftServices\Account\DomainArea;
 use BeltoftServices\Account\Email;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\ServerLinks;
@@ -56,7 +56,7 @@ class AlwaysAreasTest extends TestCase {
 				Servers::render( array() );
 				break;
 			case 'domains':
-				Domains::render( array() );
+				ServiceArea::get( DomainArea::class )->render( array() );
 				break;
 			case 'databases':
 				ServiceArea::get( Databases::class )->render( array() );
@@ -128,7 +128,7 @@ class AlwaysAreasTest extends TestCase {
 		$this->product( 'domain' );
 		$this->settings( array( 'domain_search_url' => '/domains/' ) );
 
-		$this->assertSame( home_url( '/domains/' ), Domains::url_register() );
+		$this->assertSame( home_url( '/domains/' ), ServiceArea::get( DomainArea::class )->url_register() );
 	}
 
 	public function test_the_overview_shows_every_area_empty_with_its_button(): void {

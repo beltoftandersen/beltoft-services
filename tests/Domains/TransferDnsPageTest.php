@@ -3,7 +3,8 @@
 namespace BeltoftServices\Tests\Domains;
 
 use BeltoftLicenses\Account\View;
-use BeltoftServices\Account\Domains;
+use BeltoftServices\Account\DomainArea;
+use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Domains\DomainDriver;
 use BeltoftServices\Domains\FakeDns;
@@ -64,7 +65,7 @@ class TransferDnsPageTest extends TestCase {
 	private function page( Resource $r, string $tab = '' ): string {
 		$GLOBALS['wp']->query_vars['domains'] = (string) $r->license()['id'] . ( '' !== $tab ? '/' . $tab : '' );
 		ob_start();
-		Domains::render( array( View::license( $r->license() ) ) );
+		ServiceArea::get( DomainArea::class )->render( array( View::license( $r->license() ) ) );
 		return (string) ob_get_clean();
 	}
 
