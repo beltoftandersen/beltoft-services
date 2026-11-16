@@ -71,6 +71,18 @@ class BackupJobsTest extends BackupTestCase {
 		}
 	}
 
+	public function test_a_server_that_has_had_its_turn_is_not_loaded_again_in_the_same_run(): void {
+		$one = $this->ready_vm();
+		$two = $this->ready_vm();
+
+		BackupJobs::backup();
+		$this->assertCount( 1, $this->calls( 'POST', '/vzdump' ) );
+		$this->assertSame( array( $one->id() ), array_map( 'intval', (array) get_transient( ProxmoxJobs::BACKUP_RUN ) ), 'A server that finished is left out for the rest of the run.' );
+
+		$this->follow_up();
+		$this->assertSame( array( $one->id(), $two->id() ), array_map( 'intval', (array) get_transient( ProxmoxJobs::BACKUP_RUN ) ) );
+	}
+
 	public function test_a_server_that_is_not_due_or_has_no_backups_is_left_alone(): void {
 		$none = $this->ready_vm( array( 'backup_days' => 0 ) );
 		$done = $this->ready_vm();

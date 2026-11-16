@@ -62,9 +62,14 @@ final class BackupJobs {
 			}
 
 			foreach ( Resource::live_ids( $driver->kind() ) as $id ) {
+				// A server left out of the run is not loaded again: the scan would cost N loads for every one of N servers.
+				if ( in_array( $id, $skip, true ) ) {
+					continue;
+				}
+
 				$resource = Resource::find( $id );
 
-				if ( ! $resource || $driver_id !== $resource->get( 'driver' ) || in_array( $id, $skip, true ) ) {
+				if ( ! $resource || $driver_id !== $resource->get( 'driver' ) ) {
 					continue;
 				}
 
@@ -90,7 +95,10 @@ final class BackupJobs {
 		// Still running is fine (it is polled again); any other retry (a poll error, an unreachable cluster) moves on.
 		$stuck = $result->is_retry() && ! in_array( $result->error(), array( Backups::WAITING, Backups::PURGE_PENDING ), true );
 
-		if ( ! $after || $stuck || ( ! ( is_array( $task ) && ! empty( $task['upid'] ) ) && ( Backups::purge_due( $after ) || Backups::due( $after, time() ) ) ) ) {
+		$running = is_array( $task ) && ! empty( $task['upid'] );
+
+		// Left out for the rest of the run: stuck, still wanted without a running backup, or finished (nothing more to do tonight).
+		if ( ! $after || $stuck || ( ! $running && ! $result->is_retry() ) || ( ! $running && ( Backups::purge_due( $after ) || Backups::due( $after, time() ) ) ) ) {
 			$skip[] = $picked->id();
 			set_transient( ProxmoxJobs::BACKUP_RUN, $skip, 6 * HOUR_IN_SECONDS );
 		}
