@@ -289,6 +289,15 @@ final class Jobs {
 		if ( function_exists( 'as_unschedule_all_actions' ) ) {
 			as_unschedule_all_actions( self::SWEEP, array(), self::GROUP );
 		}
+
+		// Every other recurring job of the plugin (each feature keeps its own, not all have a deactivation hook): single jobs keep their place.
+		if ( function_exists( 'as_get_scheduled_actions' ) ) {
+			foreach ( as_get_scheduled_actions( array( 'group' => self::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => -1, 'orderby' => 'none' ) ) as $action ) {
+				if ( $action->get_schedule()->is_recurring() ) {
+					as_unschedule_all_actions( $action->get_hook(), $action->get_args(), self::GROUP );
+				}
+			}
+		}
 	}
 
 	/**

@@ -129,4 +129,24 @@ final class ReviewLow3l3CoreTest extends TestCase {
 		$this->assertSame( '45 4 * * *', reset( $actions )->get_schedule()->get_recurrence() );
 		as_unschedule_all_actions( $hook, array(), Jobs::GROUP );
 	}
+
+	public function test_compat_06_the_gate_names_the_tested_minimum_versions(): void {
+		$this->assertSame( '0.8.8', \BeltoftServices\Plugin::MIN_LICENSES );
+		$this->assertTrue( version_compare( (string) BELTOFT_LICENSES_VERSION, \BeltoftServices\Plugin::MIN_LICENSES, '>=' ), 'The suite runs on a version the gate accepts.' );
+		$this->assertTrue( version_compare( (string) WC_VERSION, \BeltoftServices\Plugin::MIN_WOOCOMMERCE, '>=' ) );
+		$this->assertSame( array(), \BeltoftServices\Plugin::missing() );
+	}
+
+	public function test_compat_03_deactivation_removes_every_recurring_job_of_the_plugin(): void {
+		$hook = 'beltoft_services_test_some_recurring_hook';
+		as_schedule_cron_action( time() + 600, '*/5 * * * *', $hook, array(), Jobs::GROUP );
+		$single = as_schedule_single_action( time() + 600, 'beltoft_services_test_single_job', array( 5 ), Jobs::GROUP );
+
+		Jobs::unschedule();
+
+		$this->assertFalse( as_has_scheduled_action( $hook, array(), Jobs::GROUP ), 'A recurring job nobody lists is removed too.' );
+		$this->assertTrue( as_has_scheduled_action( 'beltoft_services_test_single_job', array( 5 ), Jobs::GROUP ), 'A single job keeps its place.' );
+		unset( $single );
+		as_unschedule_all_actions( 'beltoft_services_test_single_job', array( 5 ), Jobs::GROUP );
+	}
 }
