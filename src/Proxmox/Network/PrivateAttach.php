@@ -417,7 +417,8 @@ final class PrivateAttach {
 				}
 			}
 
-			foreach ( PrivateNets::members( (int) $row['net_id'] ) as $id => $address ) {
+			// Only the owner of the network sees the other servers on it (a licence moved to another customer keeps the old reservation until the next attach).
+			foreach ( $user === (int) $row['user_id'] ? PrivateNets::members( (int) $row['net_id'] ) : array() as $id => $address ) {
 				$other = Resource::find( (int) $id );
 				if ( $id === $r->id() || ! $other || 'deleted' === $other->get( 'state' ) ) {
 					continue;

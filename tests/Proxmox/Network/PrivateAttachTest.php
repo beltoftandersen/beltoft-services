@@ -337,6 +337,13 @@ class PrivateAttachTest extends TestCase {
 		$view = PrivateAttach::view( Resource::find( $two->id() ) );
 		$this->assertCount( 1, $view['others'] );
 		$this->assertSame( '10.64.0.2', $view['others'][0]['address'] );
+
+		// The network belongs to another customer (the licence moved in the admin): the viewer sees none of its servers.
+		global $wpdb;
+		$wpdb->update( Schema::tables()['private_nets'], array( 'user_id' => $owner + 1000 ), array( 'id' => PrivateNets::for_resource( $two->id() )['net_id'] ) );
+		$this->assertSame( array(), PrivateAttach::view( Resource::find( $two->id() ) )['others'], 'No member of a foreign network is listed.' );
+		$wpdb->update( Schema::tables()['private_nets'], array( 'user_id' => $owner ), array( 'id' => PrivateNets::for_resource( $two->id() )['net_id'] ) );
+
 		Jobs::act( $one->id(), 'private_detach', array() );
 		$row = PrivateNets::for_resource( $two->id() );
 		$this->assertSame( 'held', $row['state'], 'The network stays with its owner.' );

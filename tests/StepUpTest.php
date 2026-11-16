@@ -178,6 +178,20 @@ final class StepUpTest extends TestCase {
 		$this->assertFalse( StepUp::verify( $user, $code, ApiTokens::PURPOSE ) );
 	}
 
+	public function test_wrong_guesses_across_many_codes_hit_a_verify_limit_per_customer_and_purpose(): void {
+		$user = $this->customer();
+		StepUp::send( $user, ApiTokens::PURPOSE );
+		$code = $this->code();
+
+		for ( $i = 0; $i < StepUp::VERIFY_LIMIT; $i++ ) {
+			StepUp::verify( $user, $this->wrong( $code ), ApiTokens::PURPOSE );
+		}
+
+		// The code was burnt by wrong tries; a fresh one is sent, but the verify budget of this window is spent.
+		StepUp::send( $user, ApiTokens::PURPOSE );
+		$this->assertFalse( StepUp::verify( $user, $this->code(), ApiTokens::PURPOSE ), 'The right code is refused over the verify limit.' );
+	}
+
 	public function test_four_wrong_tries_leave_the_code_working(): void {
 		$user = $this->customer();
 		StepUp::send( $user, ApiTokens::PURPOSE );

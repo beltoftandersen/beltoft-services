@@ -97,14 +97,14 @@ final class Clients {
 			: new FakeClient( ! empty( $cluster['persist'] ) );
 
 		$public = $cluster;
-		unset( $public['token_secret'] );
+		unset( $public['token_secret'], $public['console_token_secret'] );
 
 		/**
 		 * Lets tests inject a client (a FakeClient). It does not receive the allowance or the token
 		 * secret, and a LiveClient it returns is ignored unless the constant already allows live calls.
 		 *
 		 * @param Client               $client  The client.
-		 * @param array<string, mixed> $cluster Cluster settings without the token secret.
+		 * @param array<string, mixed> $cluster Cluster settings without the token secrets.
 		 */
 		$filtered = apply_filters( 'beltoft_services_proxmox_client', $client, $public );
 

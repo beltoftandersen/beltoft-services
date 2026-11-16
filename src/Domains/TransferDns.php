@@ -243,7 +243,7 @@ final class TransferDns {
 			return $cached ? array( 'name' => (string) ( $cached['name'] ?? '' ), 'url' => (string) ( $cached['url'] ?? '' ) ) + ( ! empty( $cached['locked'] ) ? array( 'locked' => true ) : array() ) : null;
 		}
 
-		$reply = wp_remote_get(
+		$reply = wp_safe_remote_get(
 			'https://rdap.org/domain/' . rawurlencode( strtolower( $domain ) ),
 			array(
 				'timeout'     => 4,
@@ -274,7 +274,7 @@ final class TransferDns {
 			return self::cached_registrar( $domain );
 		}
 
-		$reply = wp_remote_get(
+		$reply = wp_safe_remote_get(
 			'https://rdap.org/domain/' . rawurlencode( strtolower( $domain ) ),
 			array(
 				'timeout'     => 3,
@@ -488,11 +488,19 @@ final class TransferDns {
 			return $domain;
 		}
 
-		$advice            = self::recommend( $domain, get_current_user_id() );
-		$known             = self::registrar( $domain );
-		$advice['registrar'] = $known ? (string) $known['name'] : '';
-		$advice['locked']    = ! empty( $known['locked'] );
-		$response          = new \WP_REST_Response( $advice, 200 );
+		// The answer for the order form is kept for a few minutes per domain and customer: an anonymous caller cannot make one slow name server cost a lookup per request.
+		$cache  = 'beltoft_services_tdns_' . md5( $domain . '|' . get_current_user_id() );
+		$advice = get_transient( $cache );
+
+		if ( ! is_array( $advice ) ) {
+			$advice              = self::recommend( $domain, get_current_user_id() );
+			$known               = self::registrar( $domain );
+			$advice['registrar'] = $known ? (string) $known['name'] : '';
+			$advice['locked']    = ! empty( $known['locked'] );
+			set_transient( $cache, $advice, 5 * MINUTE_IN_SECONDS );
+		}
+
+		$response = new \WP_REST_Response( $advice, 200 );
 		$response->header( 'Cache-Control', 'no-store' );
 
 		return $response;
