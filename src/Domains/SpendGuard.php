@@ -44,7 +44,13 @@ final class SpendGuard {
 	public static function paid( \WC_Order_Item_Product $item ): float {
 		$total = (float) $item->get_total();
 		$order = $item->get_order();
-		$cents = $order ? (int) $order->get_meta( '_bgca_applied_cents' ) : 0;
+		/**
+		 * Account credit, in cents of the order currency including tax, that paid part of this order.
+		 *
+		 * @param int       $cents Credit applied.
+		 * @param \WC_Order $order The order.
+		 */
+		$cents = $order ? (int) apply_filters( 'beltoft_services_order_credit_cents', 0, $order ) : 0;
 		if ( ! $order || $cents < 1 ) { return $total; }
 		$sub = 0.0;
 		$tax = 0.0;

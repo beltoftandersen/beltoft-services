@@ -68,6 +68,7 @@ final class GiftCredit {
 		add_filter( 'bgca_credit_wording', array( __CLASS__, 'credit_wording' ) );
 		add_filter( 'bgca_account_url', array( Page::class, 'url_filter' ) );
 		add_filter( 'bgca_account_currency', array( Rules::class, 'account_currency' ), 10, 2 );
+		add_filter( 'beltoft_services_order_credit_cents', array( __CLASS__, 'order_credit_cents' ), 10, 2 );
 		add_filter( 'bgca_card_may_pay_line', array( PromoFlag::class, 'card_may_pay_line' ), 10, 4 );
 		add_filter( 'bgca_card_may_pay_fee', array( Rules::class, 'card_may_pay_fee' ), 10, 3 );
 		add_filter( 'bgca_allow_partial_use', array( Rules::class, 'allow_partial_use' ), 10, 4 );
@@ -120,5 +121,16 @@ final class GiftCredit {
 	 */
 	public static function balance( int $user_id, string $currency ): int {
 		return self::active() ? Wallet::totals( $user_id, $currency )['total'] : 0;
+	}
+
+	/**
+	 * Account credit the add-on put on an order, for the spend guards.
+	 *
+	 * @param mixed $cents Credit so far.
+	 * @param mixed $order The order.
+	 * @return int
+	 */
+	public static function order_credit_cents( $cents, $order = null ): int {
+		return $order instanceof \WC_Order ? max( (int) $cents, (int) $order->get_meta( '_bgca_applied_cents' ) ) : (int) $cents;
 	}
 }
