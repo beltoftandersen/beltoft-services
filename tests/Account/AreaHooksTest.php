@@ -49,6 +49,12 @@ class AreaHooksTest extends TestCase {
 	public function test_the_defaults_equal_the_old_behaviour_of_the_existing_areas(): void {
 		foreach ( ServiceArea::all() as $area ) {
 			$name = get_class( $area );
+
+			// The Domains area overrides them on purpose (see DomainAreaTest).
+			if ( $area instanceof \BeltoftServices\Account\DomainArea ) {
+				continue;
+			}
+
 			$this->assertSame( 'area.php', $this->call( $area, 'template_name' ), $name );
 			$this->assertSame( 'area-list.php', $this->call( $area, 'list_name' ), $name );
 			$this->assertTrue( $area->allows_plugin_pages(), $name );

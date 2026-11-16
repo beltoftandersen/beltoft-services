@@ -7,6 +7,7 @@ use BeltoftServices\Account\DomainPage;
 use BeltoftServices\Account\DomainRows;
 use BeltoftServices\Account\Domains;
 use BeltoftServices\Account\Overview;
+use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Domains\DnsClaims;
 use BeltoftServices\Domains\DnsDriver;
 use BeltoftServices\Domains\DomainDriver;
@@ -122,13 +123,13 @@ class DomainsTest extends TestCase {
 		$GLOBALS['wp']->query_vars['domains'] = '';
 		$args = array( 'licenses' => array() );
 
-		$taken = Domains::template( '/default.php', 'myaccount/licenses.php', $args );
+		$taken = ServiceArea::template( '/default.php', 'myaccount/licenses.php', $args );
 		$this->assertStringEndsWith( 'templates/account/domains.php', (string) $taken );
-		$this->assertSame( '/default.php', Domains::template( '/default.php', 'myaccount/other.php', $args ) );
-		$this->assertSame( '/default.php', Domains::template( '/default.php', 'myaccount/licenses.php', array() ) );
+		$this->assertSame( '/default.php', ServiceArea::template( '/default.php', 'myaccount/other.php', $args ) );
+		$this->assertSame( '/default.php', ServiceArea::template( '/default.php', 'myaccount/licenses.php', array() ) );
 		unset( $GLOBALS['wp']->query_vars['domains'] );
 		remove_all_filters( 'woocommerce_is_account_page' );
-		$this->assertSame( '/default.php', Domains::template( '/default.php', 'myaccount/licenses.php', $args ) );
+		$this->assertSame( '/default.php', ServiceArea::template( '/default.php', 'myaccount/licenses.php', $args ) );
 	}
 
 	public function test_a_domain_page_head_says_active_and_has_one_state_line_without_kind_or_renewal(): void {

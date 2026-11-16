@@ -71,7 +71,7 @@ abstract class ServiceArea {
 	 * @return array<int, ServiceArea>
 	 */
 	public static function all(): array {
-		return array( self::get( Databases::class ), self::get( Hosting::class ), self::get( Apps::class ), self::get( Email::class ), self::get( Ssl::class ), self::get( Licences::class ) );
+		return array( self::get( DomainArea::class ), self::get( Databases::class ), self::get( Hosting::class ), self::get( Apps::class ), self::get( Email::class ), self::get( Ssl::class ), self::get( Licences::class ) );
 	}
 
 	/**

@@ -61,7 +61,7 @@ final class DomainsGoldenTest extends TestCase {
 		remove_all_filters( 'beltoft_services_account_page_body' );
 		remove_all_filters( 'beltoft_services_account_page_chrome' );
 		delete_option( 'woocommerce_subscriptions_enable_auto_renewal_toggle' );
-		foreach ( array( 'domains', 'databases', 'email', 'hosting', 'ssl' ) as $slug ) {
+		foreach ( array( 'domains', 'databases', 'email', 'hosting', 'ssl-certificates', 'apps', 'licences' ) as $slug ) {
 			unset( $GLOBALS['wp']->query_vars[ $slug ] );
 		}
 		unset( $_SERVER['QUERY_STRING'] );
@@ -124,6 +124,11 @@ final class DomainsGoldenTest extends TestCase {
 	 * @param array<int, array<string, mixed>> $views Views on the tab.
 	 */
 	private function entry( string $endpoint, array $views, string $value = '', string $empty = '' ): string {
+		// A request has one endpoint: the others must not be left over from an earlier page of this test.
+		foreach ( array( 'domains', 'databases', 'email', 'hosting', 'ssl-certificates', 'apps', 'licences' ) as $other ) {
+			unset( $GLOBALS['wp']->query_vars[ $other ] );
+		}
+
 		$GLOBALS['wp']->query_vars[ $endpoint ] = $value;
 		$args    = array( 'licenses' => $views );
 		$located = apply_filters( 'wc_get_template', '/default.php', 'myaccount/licenses.php', $args, '', '' );
@@ -256,7 +261,7 @@ final class DomainsGoldenTest extends TestCase {
 		}
 
 		// (i) the other areas, so a later step shows it did not move them.
-		foreach ( array( 'databases', 'email', 'hosting', 'ssl' ) as $endpoint ) {
+		foreach ( array( 'databases', 'email', 'hosting', 'ssl-certificates', 'apps', 'licences' ) as $endpoint ) {
 			$out[ 'i|' . $endpoint . '|list' ] = $this->normal( $this->entry( $endpoint, array() ) );
 			$out[ 'i|' . $endpoint . '|unknown' ] = $this->normal( $this->entry( $endpoint, array(), 'no-such' ) );
 		}

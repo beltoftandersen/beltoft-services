@@ -94,7 +94,9 @@ class DomainAreaTest extends TestCase {
 
 		foreach ( array( '', '12', '12/dns', '12/danger/', '12/nonsense', 'add', 'x/dns' ) as $value ) {
 			$wp->query_vars['domains'] = $value;
-			$this->assertSame( Domains::requested(), array_diff_key( $this->area()->requested(), array( 'path' => 1 ) ), 'value ' . $value );
+			$got = $this->area()->requested();
+			$this->assertSame( array( $got['id'], $got['tab'], $got['add'] ), array( Domains::requested()['id'], Domains::requested()['tab'], Domains::requested()['add'] ), 'value ' . $value );
+			$this->assertSame( array( 'id', 'tab', 'add', 'path' ), array_keys( $got ) );
 		}
 	}
 
@@ -170,5 +172,50 @@ class DomainAreaTest extends TestCase {
 		ob_start();
 		$this->area()->render( $this->views( $deleted, $folded ) );
 		$this->assertStringContainsString( 'That domain was not found. Here are your domains.', (string) ob_get_clean() );
+	}
+
+	// -- The switch: one registration, one order of hooks ----------------------------------------
+
+	public function test_the_takeover_and_the_redirect_are_registered_once_and_the_area_is_first(): void {
+		$count = static function ( string $hook ): int {
+			global $wp_filter;
+			$n = 0;
+			foreach ( $wp_filter[ $hook ]->callbacks ?? array() as $callbacks ) {
+				foreach ( $callbacks as $callback ) {
+					$fn = $callback['function'];
+					if ( is_array( $fn ) && ( ServiceArea::class === $fn[0] || ( is_object( $fn[0] ) && $fn[0] instanceof ServiceArea ) ) || is_array( $fn ) && 'BeltoftServices\\Account\\Domains' === $fn[0] ) {
+						++$n;
+					}
+				}
+			}
+
+			return $n;
+		};
+
+		$this->assertSame( 1, $count( 'wc_get_template' ) );
+		$this->assertSame( 1, $count( 'template_redirect' ) );
+		$this->assertInstanceOf( DomainArea::class, ServiceArea::all()[0] );
+		$this->assertSame( array( 'domains', 'vps' ), array_slice( array_column( \BeltoftServices\Account\Tabs::groups( array() ), 'slug' ), 0, 2 ) );
+	}
+
+	public function test_the_head_of_a_domain_page_is_printed_by_the_domain_listener_first(): void {
+		global $wp_filter;
+		$order = array();
+
+		foreach ( $wp_filter['beltoft_services_account_page_head']->callbacks as $priority => $callbacks ) {
+			foreach ( $callbacks as $callback ) {
+				$fn = $callback['function'];
+				$order[] = is_array( $fn ) ? ( is_object( $fn[0] ) ? get_class( $fn[0] ) : $fn[0] ) . '::' . $fn[1] : 'closure';
+			}
+		}
+
+		$this->assertLessThan( array_search( ServiceArea::class . '::head', $order, true ), array_search( \BeltoftServices\Account\DomainPage::class . '::head', $order, true ) );
+	}
+
+	public function test_url_for_license_now_answers_for_a_domain_license(): void {
+		$domain = $this->service( 'portal.example' );
+
+		$this->assertSame( Domains::url( $domain->license() ), ServiceArea::url_for_license( $domain->license() ) );
+		$this->assertSame( Domains::url( $domain->license(), 'dns' ), $this->area()->url( $domain->license(), 'dns' ) );
 	}
 }

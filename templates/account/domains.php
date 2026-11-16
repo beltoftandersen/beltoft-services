@@ -3,7 +3,7 @@
  * My Account → Domains: the list of domains, or one domain's page.
  *
  * Override by copying to yourtheme/beltoft-services/account/domains.php. Reached through the
- * licenses template call of Beltoft Licenses (see BeltoftServices\Account\Domains).
+ * licenses template call of Beltoft Licenses (see BeltoftServices\Account\DomainArea).
  *
  * @package BeltoftServices
  *
@@ -13,4 +13,4 @@
 
 defined( 'ABSPATH' ) || exit;
 
-\BeltoftServices\Account\Domains::render( $licenses, isset( $empty ) ? (string) $empty : '' );
+\BeltoftServices\Account\ServiceArea::render_active( $licenses, isset( $empty ) ? (string) $empty : '' );
