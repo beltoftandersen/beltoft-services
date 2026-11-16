@@ -642,6 +642,17 @@ final class KeyTest extends TestCase {
 		$this->assertCount( 1, $this->calls( 'DELETE' ) );
 	}
 
+	public function test_a_lapsed_licence_no_longer_holds_its_server_address(): void {
+		$r = $this->licence( array( 'ip' => '203.0.113.41' ) );
+		$this->build( $r );
+		$this->assertCount( 1, KeyOrder::live( '203.0.113.41' ) );
+
+		\BeltoftLicenses\Licenses::update( (int) Resource::find( $r->id() )->license()['id'], array( 'status' => \BeltoftLicenses\Licenses::STATUS_EXPIRED ) );
+		( new KeyDriver() )->pause( Resource::find( $r->id() ) );
+
+		$this->assertSame( array(), KeyOrder::live( '203.0.113.41' ), 'A paused, lapsed licence is no reason to refuse a new order for the address.' );
+	}
+
 	public function test_a_revoked_or_expired_licence_is_deleted_at_once_but_one_on_hold_is_kept(): void {
 		$hold = $this->licence( array( 'ip' => '203.0.113.30' ) );
 		$this->build( $hold );

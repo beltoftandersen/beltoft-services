@@ -146,6 +146,13 @@ final class AppLicenceDriver implements Driver {
 			$vendor = apply_filters( 'beltoft_services_app_licence_provision', null, $r, $server, $app );
 
 			if ( $vendor instanceof StepResult ) {
+				if ( $vendor->is_failed() ) {
+					// A vendor step that failed for good: nothing was delivered, so the paid subscription does not keep renewing.
+					DiskCascade::cancel_undelivered( $r, $vendor->error() . ' The app licence was not delivered.' );
+
+					return StepResult::fail( $vendor->error() . ' App licence not delivered: review and refund order #' . (int) ( $license['order_id'] ?? 0 ) . '; the subscription was cancelled.', $vendor->meta() );
+				}
+
 				if ( ! $vendor->is_done() ) {
 					return $vendor;
 				}

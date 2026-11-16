@@ -296,7 +296,7 @@ final class KeyOrder {
 	}
 
 	/**
-	 * Live licence resources of this driver bound to an address (any customer), newest first.
+	 * Live licence resources of this driver bound to an address (any customer), newest first. A licence that has ended (see ended()) does not count.
 	 *
 	 * @param string $ip Address.
 	 * @return Resource[]
@@ -308,7 +308,7 @@ final class KeyOrder {
 		foreach ( Resource::find_by_meta( 'lickey', 'lic_ip', $ip, 'DESC' ) as $id ) {
 			$found = Resource::find( (int) $id );
 
-			if ( $found && KeyDriver::ID === $found->get( 'driver' ) && $ip === (string) $found->get( 'lic_ip' ) && ! in_array( (string) $found->get( 'state' ), array( 'failed', 'deleting', 'deleted' ), true ) ) {
+			if ( $found && KeyDriver::ID === $found->get( 'driver' ) && $ip === (string) $found->get( 'lic_ip' ) && ! self::ended( $found ) ) {
 				$out[] = $found;
 			}
 		}
