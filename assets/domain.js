@@ -154,24 +154,22 @@
 		var radio = event.target.closest ? event.target.closest( '.beltoft-services-domain__ns input[name=mode]' ) : null;
 		if ( radio ) { radio.form.querySelector( '.beltoft-services-domain__custom' ).hidden = 'custom' !== radio.value; }
 	} );
-	// The change runs in the background: the bar says so (and locks the domain's buttons), and the page reloads when it is done so it shows the new state.
-	function settle( panel, form, handle ) {
-		var rounds = 15; // every 4 seconds: well inside the status route's rate limit
+	// The change runs in the background: the bar says so (and locks the domain's buttons). The shared follower reads the outcome
+	// (the resource's last_result): when it worked the page reloads to show the new state; when it did not, the failure text
+	// stays in the status line and the buttons are free (a reload would lose the text).
+	function settle( panel, form, handle, queued ) {
+		var scope = panel.dataset.domainResource;
 		if ( ! handle && bs ) {
-			handle = bs.busy( ( panel.dataset.updating || '' ) + ( panel.dataset.updatingNote ? ' ' + panel.dataset.updatingNote : '' ), panel.dataset.domainResource );
+			handle = bs.busy( ( panel.dataset.updating || '' ) + ( panel.dataset.updatingNote ? ' ' + panel.dataset.updatingNote : '' ), scope );
 		}
-		function next() {
-			rounds -= 1;
-			if ( rounds < 1 ) { window.location.reload(); return; }
-			window.setTimeout( again, 4000 );
-		}
-		function again() {
-			request( 'GET', panel.dataset.domainResource ).then( function ( body ) {
-				if ( ! body.working ) { window.location.reload(); return; }
-				next();
-			} ).catch( next );
-		}
-		again();
+		var job = { action: form.dataset.domainAction, at: queued && queued.at ? queued.at : 0, status: '/resources/' + scope };
+		window.beltoftApi.follow( job, { holder: config, handle: handle } ).then( function ( outcome ) {
+			if ( outcome && ! outcome.ok ) {
+				if ( bs ) { bs.fail( handle, outcome.text || __( 'This did not finish. We have been told and will look into it.', 'beltoft-services' ) ); }
+				return;
+			}
+			window.location.reload();
+		} );
 	}
 	document.addEventListener( 'submit', function ( event ) {
 		var form = event.target.closest( '.beltoft-services-domain-form' );
@@ -187,7 +185,7 @@
 		if ( 'unlock' === form.dataset.domainAction ) {
 			try { window.sessionStorage.setItem( 'beltoftShowCode', scope ); } catch ( e ) {}
 		}
-		request( 'POST', scope + '/actions/' + form.dataset.domainAction, args ).then( function () { settle( panel, form, handle ); } ).catch( function ( error ) { bs.fail( handle, error.message ); } );
+		request( 'POST', scope + '/actions/' + form.dataset.domainAction, args ).then( function ( queued ) { settle( panel, form, handle, queued ); } ).catch( function ( error ) { bs.fail( handle, error.message ); } );
 	} );
 	// The transfer code is shown after a second check: a code emailed to the account address (or a site's own factor).
 	document.addEventListener( 'click', function ( event ) {
