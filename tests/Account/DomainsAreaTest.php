@@ -178,18 +178,30 @@ class DomainsAreaTest extends TestCase {
 		$this->assertSame( array( 'domains', 'vps' ), array_slice( array_column( \BeltoftServices\Account\Tabs::groups( array() ), 'slug' ), 0, 2 ) );
 	}
 
-	public function test_the_head_of_a_domain_page_is_printed_by_the_domain_listener_first(): void {
+	public function test_the_head_of_a_domain_page_comes_from_the_area_with_the_domain_values(): void {
 		global $wp_filter;
-		$order = array();
+		$listeners = array();
 
-		foreach ( $wp_filter['beltoft_services_account_page_head']->callbacks as $priority => $callbacks ) {
+		foreach ( $wp_filter['beltoft_services_account_page_head']->callbacks as $callbacks ) {
 			foreach ( $callbacks as $callback ) {
 				$fn = $callback['function'];
-				$order[] = is_array( $fn ) ? ( is_object( $fn[0] ) ? get_class( $fn[0] ) : $fn[0] ) . '::' . $fn[1] : 'closure';
+				$listeners[] = is_array( $fn ) ? ( is_object( $fn[0] ) ? get_class( $fn[0] ) : $fn[0] ) . '::' . $fn[1] : 'closure';
 			}
 		}
 
-		$this->assertLessThan( array_search( ServiceArea::class . '::head', $order, true ), array_search( \BeltoftServices\Account\DomainPage::class . '::head', $order, true ) );
+		$this->assertNotContains( \BeltoftServices\Account\DomainPage::class . '::head', $listeners );
+		$this->assertContains( ServiceArea::class . '::head', $listeners );
+
+		$domain = $this->service( 'head.example' );
+		$GLOBALS['wp']->query_vars['domains'] = (string) $domain->license()['id'];
+		ob_start();
+		$this->area()->render( $this->views( $domain ) );
+		$html = (string) ob_get_clean();
+
+		$this->assertStringContainsString( '<h2 class="beltoft-services-page__name">head.example</h2>', $html );
+		$this->assertStringContainsString( 'data-badge>Active</span>', $html );
+		$this->assertStringNotContainsString( 'beltoft-services-page__renews', $html );
+		$this->assertStringNotContainsString( 'beltoft-services-page__plan', $html );
 	}
 
 	public function test_url_for_license_now_answers_for_a_domain_license(): void {

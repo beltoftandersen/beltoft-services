@@ -28,52 +28,6 @@ defined( 'ABSPATH' ) || exit;
 final class DomainPage {
 
 	/**
-	 * Hooks.
-	 */
-	public static function register(): void {
-		add_filter( 'beltoft_services_account_page_head', array( __CLASS__, 'head' ), 10, 5 );
-	}
-
-	/**
-	 * Listener of beltoft_services_account_page_head: the head of a domain's page, the domain name as the title.
-	 *
-	 * @param mixed $handled  Whether another listener printed the head.
-	 * @param mixed $resource Resource.
-	 * @param mixed $license  License row.
-	 * @param mixed $view     Display values of the license.
-	 * @param mixed $page     The page being printed.
-	 * @return mixed
-	 */
-	public static function head( $handled, $resource, $license = array(), $view = array(), $page = array() ) {
-		unset( $license, $view );
-
-		if ( $handled || ! $resource instanceof Resource || ! in_array( $resource->get( 'driver' ), array( 'domain', 'dns' ), true ) || ! is_array( $page ) || ! Domains::on_page() ) {
-			return $handled;
-		}
-
-		$state = (string) $resource->get( 'state' );
-		$group = Panel::group( $state, $resource );
-		$vars  = array(
-			'title'        => \BeltoftServices\Domains\HostName::display( (string) $resource->get( 'domain' ) ),
-			'group'        => $group,
-			'badge'        => Panel::label( $state, $resource ),
-			'message'      => Panel::message( $state, $resource ),
-			'show_message' => 'ready' !== $group,
-			// What the service is and when it renews are on the Overview below.
-			'kind'         => '',
-			'renews'       => '',
-		);
-
-		( static function ( array $vars ): void {
-			// phpcs:ignore WordPress.PHP.DontExtract.extract_extract -- Template variables, a fixed list built above.
-			extract( $vars, EXTR_SKIP );
-			include ServiceArea::file( 'domain-head.php' );
-		} )( $vars );
-
-		return true;
-	}
-
-	/**
 	 * Builds the values.
 	 *
 	 * @param Resource             $r    The domain's resource.
