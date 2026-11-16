@@ -797,6 +797,8 @@ final class Provision {
 	private function step_ready(): array {
 		$record = (array) Records::for_resource( $this->r->id() );
 
+		HostingUsage::push_limit( $this->r ); // The agent's database safety net; quiet when the agent is older.
+
 		return array(
 			'hosting' => array(
 				'node'     => $this->node_id,

@@ -183,6 +183,8 @@ final class Operations {
 			$meta['prepared_ssh'] = ! empty( $plan['ssh'] );
 		}
 
+		HostingUsage::push_limit( $this->r ); // The new plan storage is the new database limit; quiet when the agent is older.
+
 		return StepResult::done( $meta, 'Hosting plan applied' );
 	}
 

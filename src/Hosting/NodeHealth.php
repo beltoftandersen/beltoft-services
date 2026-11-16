@@ -21,14 +21,13 @@ defined( 'ABSPATH' ) || exit;
  * - the agent's own monitor alerts (its `alerts` list, for example the database monitor of plan 7.3);
  * - the container bridge missing (`bridge` false) and a background loop of the agent that failed (`loops`, each with `ok`); these
  *   are what the agent's health answer carries today;
- * - isolation problems: a container whose port isolation is not on (the optional `isolation` map vmid => state, the
- *   agent's loop re-asserts it every 30 seconds, so a state other than `ok` that stays is a real problem);
+ * - little free space: `storage.node` (container storage) and `storage.db` (data disk of the shared database server), under 10
+ *   percent or 5 GB; and `db_guard.state` "tripped" (the agent set accounts read only, they are named);
  * - loader problems: sites whose loader file is refused or failed, counted over all accounts of the node (the
  *   customer sees their own in the account);
  * and then the capacity alerts: HostingCapacity::alert() (committed memory or disk over the alert share, once a day) and
- * HostingCapacity::overage_alerts() (over the budget, at 100 percent and each further 10 percent). The agent's health
- * answer may also carry a `host` member (mem_total_mb, mem_free_mb, disk_total_gb, disk_free_gb: what the node really has);
- * when it does, HostingCapacity::cross_check() compares it with what the plugin counts as committed, once a day.
+ * HostingCapacity::overage_alerts() (over the budget, at 100 percent and each further 10 percent). The agent never returned
+ * the `host` and `isolation` members this job once read, so they are not read; the isolation loop shows in `loops`.
  *
  * The mails carry node ids, container ids and states only: no secret, no customer data beyond ids.
  */
@@ -40,6 +39,10 @@ final class NodeHealth {
 	/** Looks at a health job that was still running, a minute apart. */
 	public const TRIES = 10;
 	public const CRON = '17 * * * *';
+
+	/** Free space under 10 percent of the disk, or under 5 GB, is a problem (the agent's own guard floor is its setting). */
+	public const FREE_PERCENT   = 10;
+	public const FREE_MIN_BYTES = 5368709120;
 
 	/**
 	 * Hooks the job and its schedule.
@@ -181,26 +184,12 @@ final class NodeHealth {
 		$problems = array();
 		$result = (array) ( $job['result'] ?? array() );
 
-		if ( is_array( $result['host'] ?? null ) ) {
-			HostingCapacity::cross_check( $id, $result['host'] );
-		}
-
 		foreach ( array_slice( (array) ( $result['alerts'] ?? array() ), 0, 10 ) as $alert ) {
 			$text       = is_array( $alert ) ? (string) ( $alert['message'] ?? $alert['kind'] ?? 'alert' ) : (string) $alert;
 			$problems[] = self::notify( $id, 'alert:' . md5( $text ), 'The agent reports: ' . mb_substr( sanitize_text_field( $text ), 0, 200 ) );
 		}
 
-		$bad = array();
-
-		foreach ( (array) ( $result['isolation'] ?? array() ) as $vmid => $state ) {
-			if ( 'ok' !== (string) $state && 1 === preg_match( '/^\d{3,9}$/D', (string) $vmid ) ) {
-				$bad[] = (string) $vmid . ' (' . mb_substr( sanitize_text_field( (string) $state ), 0, 40 ) . ')';
-			}
-		}
-
-		if ( array() !== $bad ) {
-			$problems[] = self::notify( $id, 'isolation', 'Port isolation is not on for container(s): ' . implode( ', ', array_slice( $bad, 0, 20 ) ) . '.' );
-		}
+		$problems = array_merge( $problems, self::storage_problems( $id, $result ), self::guard_problems( $id, $result ) );
 
 		// What the agent's health answer really carries: the container bridge and the state of each background loop.
 		if ( false === ( $result['bridge'] ?? null ) ) {
@@ -234,6 +223,77 @@ final class NodeHealth {
 		}
 
 		return $problems;
+	}
+
+	/**
+	 * Free space the agent reports: the container storage of the node (`storage.node`) and the data disk of the shared database
+	 * server (`storage.db`). A reading with an `error`, or an older agent without the member, is not a low reading.
+	 *
+	 * @param string               $id     Node id.
+	 * @param array<string, mixed> $result The health result.
+	 * @return string[] Problem texts.
+	 */
+	private static function storage_problems( string $id, array $result ): array {
+		$storage  = (array) ( $result['storage'] ?? array() );
+		$problems = array();
+		$labels   = array(
+			/* translators: 1: free space, 2: total. */
+			'node' => 'Container storage on the node has %1$s free of %2$s.',
+			'db'   => 'The database server has %1$s free of %2$s.',
+		);
+
+		foreach ( $labels as $key => $format ) {
+			$row = is_array( $storage[ $key ] ?? null ) ? $storage[ $key ] : array();
+
+			if ( ! isset( $row['total_bytes'], $row['free_bytes'] ) || (int) $row['total_bytes'] <= 0 ) {
+				continue;
+			}
+
+			$total = (int) $row['total_bytes'];
+			$free  = max( 0, (int) $row['free_bytes'] );
+
+			if ( $free < self::FREE_MIN_BYTES || $free * 100 < $total * self::FREE_PERCENT ) {
+				$problems[] = self::notify( $id, 'storage_' . $key, sprintf( $format, self::gb( $free ), self::gb( $total ) ) );
+			}
+		}
+
+		return $problems;
+	}
+
+	/**
+	 * The database guard of the agent (`db_guard`): when it tripped, the accounts it set read only are named.
+	 *
+	 * @param string               $id     Node id.
+	 * @param array<string, mixed> $result The health result.
+	 * @return string[] Problem texts.
+	 */
+	private static function guard_problems( string $id, array $result ): array {
+		$guard = (array) ( $result['db_guard'] ?? array() );
+
+		if ( 'tripped' !== (string) ( $guard['state'] ?? '' ) ) {
+			return array();
+		}
+
+		$accounts = array();
+
+		foreach ( (array) ( $guard['readonly'] ?? array() ) as $account ) {
+			if ( is_string( $account ) && 1 === preg_match( '/^[a-z0-9_]{1,40}$/D', $account ) ) {
+				$accounts[] = $account;
+			}
+		}
+
+		$text = 'The database guard on the node set these accounts read only: ' . ( array() === $accounts ? 'none' : implode( ', ', array_slice( $accounts, 0, 20 ) ) ) . '. Free space on the database server is under the guard floor. The agent does not lift the flag itself.';
+
+		return array( self::notify( $id, 'db_guard', $text ) );
+	}
+
+	/**
+	 * Bytes as GB with one decimal.
+	 *
+	 * @param int $bytes Bytes.
+	 */
+	private static function gb( int $bytes ): string {
+		return number_format( $bytes / 1073741824, 1, '.', '' ) . ' GB';
 	}
 
 	/**

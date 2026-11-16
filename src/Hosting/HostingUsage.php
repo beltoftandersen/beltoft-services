@@ -98,7 +98,7 @@ final class HostingUsage {
 			return;
 		}
 
-		foreach ( array( 'stats', 'cpu', 'databases', 'storage', 'loaders', 'php' ) as $step ) {
+		foreach ( array( 'stats', 'cpu', 'databases', 'limit', 'storage', 'loaders', 'php' ) as $step ) {
 			try {
 				$this->{'step_' . $step}();
 			} catch ( \Throwable $e ) {
@@ -186,6 +186,54 @@ final class HostingUsage {
 				'db_mb'    => (int) round( array_sum( $sizes ) / 1048576 ),
 			)
 		);
+	}
+
+	/**
+	 * The database limit the node agent keeps for its safety net, in MB: the plan storage times the hard percent.
+	 *
+	 * @param Resource $r Hosting resource.
+	 */
+	public static function limit_mb( Resource $r ): int {
+		$plan = Plan::typed( (array) $r->get( 'plan' ) );
+
+		return (int) round( (int) $plan['disk_gb'] * 1024 * self::HARD_PERCENT / 100 );
+	}
+
+	/**
+	 * Sends the database limit to the agent when it differs from the last one sent. Never throws and never fails the caller:
+	 * an agent that does not know `db.limit` (older than the database guard) is asked again by the next hourly run.
+	 *
+	 * @param Resource $r Hosting resource.
+	 */
+	public static function push_limit( Resource $r ): void {
+		try {
+			$use = new self( $r );
+
+			if ( null === Records::for_resource( $r->id() ) || null !== $use->connect() ) {
+				return;
+			}
+
+			$use->step_limit();
+		} catch ( \Throwable $e ) {
+			unset( $e );
+		}
+	}
+
+	/**
+	 * The database limit for the agent, once per change (the meta `db_limit_sent` is what was sent).
+	 */
+	private function step_limit(): void {
+		$limit = self::limit_mb( $this->r );
+
+		if ( $limit <= 0 || (int) $this->r->get( 'db_limit_sent' ) === $limit ) {
+			return;
+		}
+
+		$done = $this->agent_call( 'usage_dblimit', 'db.limit', array( 'account' => Config::account( $this->r->id() ), 'limit_mb' => $limit ) );
+
+		if ( ! $done instanceof StepResult ) {
+			$this->r->set( array( 'db_limit_sent' => $limit ) );
+		}
 	}
 
 	/**
