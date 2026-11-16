@@ -271,14 +271,8 @@ final class Routes {
 			return self::not_queued( $started );
 		}
 
-		return new \WP_REST_Response(
-			array(
-				'queued'  => true,
-				'at'      => time(),
-				'message' => __( 'Your request is on its way. This can take a minute.', 'beltoft-services' ),
-			),
-			202
-		);
+		// The same answer as every route that queues an action: it names the action and where its outcome is read, so a page can follow the job.
+		return self::queued( $resource, $action );
 	}
 
 	/**

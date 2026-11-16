@@ -9,6 +9,7 @@ namespace BeltoftServices\Usage;
 
 use BeltoftServices\Billing\TaxNote;
 use BeltoftServices\Brand;
+use BeltoftServices\Currency;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -51,6 +52,66 @@ final class Catalog {
 		add_filter( 'bricks/dynamic_data/render_content', array( __CLASS__, 'render' ), 20, 3 );
 		// render_data passes the area of the content, not its context: plain there, as only a text element may take markup.
 		add_filter( 'bricks/frontend/render_data', array( __CLASS__, 'render_data' ), 20, 2 );
+
+		// The figures kept by value() are forgotten when what they come from changes (the same list the site's own tags use).
+		foreach ( array( 'updated_post_meta', 'added_post_meta', 'deleted_post_meta', 'updated_option', 'added_option', 'deleted_option', 'clean_post_cache', 'woocommerce_product_set_stock', 'woocommerce_variation_set_stock', 'woocommerce_product_set_stock_status', 'woocommerce_variation_set_stock_status', 'woocommerce_after_product_object_save', 'woocommerce_tax_rate_added', 'woocommerce_tax_rate_updated', 'woocommerce_tax_rate_deleted', 'set_current_user', 'switch_blog' ) as $hook ) {
+			add_action( $hook, array( __CLASS__, 'forget' ), 1, 0 );
+		}
+	}
+
+	/**
+	 * The figures worked out so far in this request: key => text.
+	 *
+	 * @var array<string, string>
+	 */
+	private static array $memo = array();
+
+	/**
+	 * Counts bumped by forget(): an answer worked out while data changed is not kept.
+	 *
+	 * @var int
+	 */
+	private static int $generation = 0;
+
+	/**
+	 * Forgets every figure (data it may come from changed). Tests call it between cases.
+	 */
+	public static function forget(): void {
+		++self::$generation;
+		self::$memo = array();
+	}
+
+	/**
+	 * Everything the text of a tag depends on besides the tag and the variation: the shop and customer currency, the tax
+	 * display in force (a forced one, a VAT-exempt customer, the shop's setting), the customer's tax address, the user, the
+	 * locale and how a price is printed. Read when the figure is asked for, so a change inside one request is a different key.
+	 */
+	private static function state(): string {
+		$customer = function_exists( 'WC' ) && WC() ? WC()->customer : null;
+		$address  = '';
+
+		if ( $customer instanceof \WC_Customer ) {
+			$address = implode( '/', array( $customer->get_billing_country(), $customer->get_billing_state(), $customer->get_billing_postcode(), $customer->get_shipping_country(), $customer->get_shipping_state(), $customer->get_shipping_postcode(), $customer->get_is_vat_exempt() ? 'exempt' : '' ) );
+		}
+
+		$current = Currency::current();
+
+		return implode(
+			'|',
+			array(
+				Currency::base(),
+				$current,
+				get_woocommerce_currency(),
+				get_woocommerce_currency_symbol( $current ),
+				TaxNote::display(),
+				wc_tax_enabled() ? 'tax' : 'notax',
+				get_current_user_id(),
+				determine_locale(),
+				$address,
+				wc_get_price_decimals(),
+				get_woocommerce_price_format(),
+			)
+		);
 	}
 
 	/**
@@ -171,6 +232,35 @@ final class Catalog {
 	 * @param int    $id  Variation id.
 	 */
 	public static function value( string $tag, int $id ): string {
+		// A page prints the same figure many times, and every one costs a product load, its sibling, a tax figure and a conversion.
+		$slot = $tag . '/' . $id . '/' . self::state();
+
+		if ( array_key_exists( $slot, self::$memo ) ) {
+			return self::$memo[ $slot ];
+		}
+
+		$generation = self::$generation;
+		$text       = self::compute( $tag, $id );
+
+		// Data that changed while the figure was worked out may have changed it: not kept then.
+		if ( $generation === self::$generation ) {
+			if ( count( self::$memo ) >= 2000 ) {
+				self::$memo = array();
+			}
+
+			self::$memo[ $slot ] = $text;
+		}
+
+		return $text;
+	}
+
+	/**
+	 * The text of one tag, worked out.
+	 *
+	 * @param string $tag Tag name without braces.
+	 * @param int    $id  Variation id.
+	 */
+	private static function compute( string $tag, int $id ): string {
 		$v = $id > 0 && function_exists( 'wc_get_product' ) ? wc_get_product( $id ) : null;
 
 		if ( ! $v instanceof \WC_Product_Variation ) {

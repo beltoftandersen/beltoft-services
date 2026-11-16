@@ -29,12 +29,27 @@ final class Cart {
 	public static function register(): void {
 		add_filter( 'woocommerce_is_subscription', array( __CLASS__, 'is_subscription' ), 20, 3 );
 		add_filter( 'woocommerce_attribute_label', array( __CLASS__, 'attribute_label' ), 10, 2 );
+		add_filter( 'beltoft_services_cart_companion', array( __CLASS__, 'companion' ), 10, 3 );
 		add_action( 'woocommerce_add_to_cart', array( __CLASS__, 'sync_account_line' ) );
 		add_action( 'woocommerce_cart_item_removed', array( __CLASS__, 'sync_account_line' ) );
 		add_action( 'woocommerce_check_cart_items', array( __CLASS__, 'sync_account_line' ) );
 		add_filter( 'woocommerce_cart_needs_payment', array( __CLASS__, 'needs_payment' ), 30, 2 );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate' ), 10, 2 );
 		add_action( 'woocommerce_store_api_checkout_update_order_from_request', array( __CLASS__, 'check_store_api' ), 10, 2 );
+	}
+
+	/**
+	 * Filter beltoft_services_cart_companion: the hidden usage account line belongs to the service next to it. It is never
+	 * removed by a new line, and adding it removes nothing.
+	 *
+	 * @param mixed $keep Earlier answer.
+	 * @param mixed $line Existing cart line.
+	 * @param mixed $new  Line being added.
+	 */
+	public static function companion( $keep, $line = array(), $new = array() ): bool {
+		$account = (int) get_option( Account::OPTION_PRODUCT, 0 );
+
+		return true === $keep || ( $account > 0 && ( ( is_array( $line ) && (int) ( $line['product_id'] ?? 0 ) === $account ) || ( is_array( $new ) && (int) ( $new['product_id'] ?? 0 ) === $account ) ) );
 	}
 
 	/**

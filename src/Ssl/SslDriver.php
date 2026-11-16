@@ -5,6 +5,7 @@ namespace BeltoftServices\Ssl;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Drivers\InternalActions;
 use BeltoftServices\Drivers\NeedsBilling;
+use BeltoftServices\Drivers\NeedsPhone;
 use BeltoftServices\Drivers\ProvisionSteps;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Resource;
@@ -16,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
  * keeps working until it ends; an unpaid renewal lets the order expire), a plan change does nothing (a different certificate is
  * a new order), and delete cancels an order that can still be cancelled for a refund. The customer's actions are Operations.
  */
-final class SslDriver implements Driver, InternalActions, NeedsBilling, ProvisionSteps {
+final class SslDriver implements Driver, InternalActions, NeedsBilling, NeedsPhone, ProvisionSteps {
 	public const ID   = 'ssl';
 	public const KIND = 'ssl';
 

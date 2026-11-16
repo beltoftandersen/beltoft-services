@@ -65,6 +65,139 @@ class CatalogTest extends UsageTestCase {
 		$this->assertStringNotContainsString( "\u{2014}", Catalog::value( 'beltoft_usage_line', $id ) );
 	}
 
+	/**
+	 * Counts how often a figure is worked out: every compute reads the parent's children once to find the sibling.
+	 */
+	private function count_computations(): \Closure {
+		$n = 0;
+		add_filter(
+			'woocommerce_get_children',
+			static function ( $children ) use ( &$n ) {
+				++$n;
+				return $children;
+			},
+			1
+		);
+
+		return static function () use ( &$n ) {
+			return $n;
+		};
+	}
+
+	public function test_a_tag_is_worked_out_once_and_the_warm_text_is_the_cold_text(): void {
+		$id    = $this->v['m-None']->get_id();
+		$count = $this->count_computations();
+
+		$cold = array();
+		foreach ( array( 'beltoft_usage_hourly', 'beltoft_usage_cap', 'beltoft_usage_line' ) as $tag ) {
+			$cold[ $tag ] = Catalog::value( $tag, $id );
+		}
+		$after_cold = $count();
+		$this->assertGreaterThan( 0, $after_cold );
+
+		for ( $i = 0; $i < 20; $i++ ) {
+			foreach ( $cold as $tag => $text ) {
+				$this->assertSame( $text, Catalog::value( $tag, $id ) );
+			}
+		}
+
+		$this->assertSame( $after_cold, $count(), 'Sixty more uses worked nothing out.' );
+
+		$html = '<p>{beltoft_usage_hourly} {beltoft_usage_cap:' . $id . '} {beltoft_usage_line}</p>';
+		$post = (object) array( 'ID' => $id );
+		$warm = Catalog::render( $html, $post );
+		Catalog::forget();
+		$this->assertSame( $warm, Catalog::render( $html, $post ), 'Rendered cold and warm is byte for byte the same.' );
+		$this->assertSame( Catalog::render( $html, $post, 'plain' ), Catalog::render( $html, $post, 'plain' ) );
+	}
+
+	public function test_a_changed_price_gives_the_new_text_within_the_request(): void {
+		$id = $this->v['m-None']->get_id();
+		$this->assertSame( "\u{20AC}16.50", Catalog::value( 'beltoft_usage_cap', $id ) );
+
+		$this->v['m-None']->set_regular_price( '20' );
+		$this->v['m-None']->save();
+
+		$this->assertSame( "\u{20AC}22", Catalog::value( 'beltoft_usage_cap', $id ) );
+	}
+
+	public function test_a_changed_premium_gives_the_new_text_within_the_request(): void {
+		$id = $this->v['m-None']->get_id();
+		$this->assertSame( "\u{20AC}16.50", Catalog::value( 'beltoft_usage_cap', $id ) );
+
+		update_post_meta( $this->v['m-None']->get_parent_id(), Rates::META_PREMIUM, '20' );
+
+		$this->assertSame( "\u{20AC}18", Catalog::value( 'beltoft_usage_cap', $id ) );
+	}
+
+	public function test_a_changed_currency_setting_or_symbol_gives_the_new_text(): void {
+		$id = $this->v['m-None']->get_id();
+		$this->assertSame( "\u{20AC}16.50", Catalog::value( 'beltoft_usage_cap', $id ) );
+
+		update_option( 'woocommerce_currency', 'USD' );
+		$this->assertSame( '$16.50', Catalog::value( 'beltoft_usage_cap', $id ) );
+
+		// A filter on the symbol is not an option change: the state is read again every time.
+		add_filter( 'woocommerce_currency_symbol', static fn() => 'kr', 10 );
+		$this->assertSame( 'kr16.50', Catalog::value( 'beltoft_usage_cap', $id ) );
+	}
+
+	public function test_a_changed_tax_display_or_forced_display_gives_the_new_text(): void {
+		update_option( 'woocommerce_calc_taxes', 'yes' );
+		update_option( 'woocommerce_prices_include_tax', 'no' );
+		update_option( 'woocommerce_tax_display_shop', 'excl' );
+		\WC_Tax::_insert_tax_rate( array( 'tax_rate_country' => '', 'tax_rate' => '25.0000', 'tax_rate_name' => 'VAT', 'tax_rate_priority' => 1, 'tax_rate_compound' => 0, 'tax_rate_shipping' => 1, 'tax_rate_order' => 1, 'tax_rate_class' => '' ) );
+
+		$id = $this->v['m-None']->get_id();
+		$this->assertSame( "\u{20AC}16.50", Catalog::value( 'beltoft_usage_cap', $id ) );
+
+		$forced = \BeltoftServices\Billing\TaxNote::in( 'incl', static fn() => Catalog::value( 'beltoft_usage_cap', $id ) );
+		$this->assertSame( "\u{20AC}20.63", $forced, 'Forced display inside the same request.' );
+		$this->assertSame( "\u{20AC}16.50", Catalog::value( 'beltoft_usage_cap', $id ), 'And back.' );
+
+		update_option( 'woocommerce_tax_display_shop', 'incl' );
+		$this->assertSame( "\u{20AC}20.63", Catalog::value( 'beltoft_usage_cap', $id ) );
+
+		WC()->customer = new \WC_Customer( 0, true );
+		WC()->customer->set_is_vat_exempt( true );
+		$this->assertSame( "\u{20AC}16.50", Catalog::value( 'beltoft_usage_cap', $id ), 'A VAT-exempt customer is shown no tax.' );
+		WC()->customer->set_is_vat_exempt( false );
+		$this->assertSame( "\u{20AC}20.63", Catalog::value( 'beltoft_usage_cap', $id ) );
+
+		update_option( 'woocommerce_tax_display_shop', 'excl' );
+		delete_option( 'woocommerce_calc_taxes' );
+		update_option( 'woocommerce_calc_taxes', 'no' );
+	}
+
+	public function test_a_visitor_currency_is_part_of_the_key(): void {
+		$id = $this->v['m-None']->get_id();
+		$this->assertSame( "\u{20AC}16.50", Catalog::value( 'beltoft_usage_cap', $id ) );
+
+		// What a currency add-on does: the current currency changes with the visitor and prices are converted by a filter.
+		$code    = static fn() => 'DKK';
+		$convert = static fn( $price ) => '' === $price ? $price : (string) ( (float) $price * 7 );
+		add_filter( 'woocommerce_currency', $code );
+		add_filter( 'woocommerce_product_variation_get_price', $convert );
+
+		$kroner = Catalog::value( 'beltoft_usage_cap', $id );
+		$this->assertStringContainsString( '115.50', $kroner );
+		$this->assertStringNotContainsString( "\u{20AC}", $kroner );
+
+		remove_filter( 'woocommerce_currency', $code );
+		remove_filter( 'woocommerce_product_variation_get_price', $convert );
+
+		$this->assertSame( "\u{20AC}16.50", Catalog::value( 'beltoft_usage_cap', $id ), 'Back in the shop currency.' );
+	}
+
+	public function test_a_deleted_sibling_is_not_remembered(): void {
+		$id = $this->v['m-None']->get_id();
+		$this->assertNotSame( '', Catalog::value( 'beltoft_usage_line', $id ) );
+
+		wp_delete_post( $this->v['u-None']->get_id(), true );
+
+		$this->assertSame( '', Catalog::value( 'beltoft_usage_line', $id ) );
+	}
+
 	public function test_the_tags_render_in_content_for_the_post_and_for_an_id(): void {
 		$post = (object) array( 'ID' => $this->v['m-Daily']->get_id() );
 

@@ -84,7 +84,8 @@ final class KeyPanel {
 			echo '<h3>' . esc_html__( 'Licence key', 'beltoft-services' ) . '</h3>';
 			echo '<p>' . esc_html( self::how( $r, $edition ) ) . '</p>';
 			echo '<p><textarea readonly rows="6" style="width:100%;font-family:monospace" onclick="this.select()" aria-label="' . esc_attr__( 'Licence key', 'beltoft-services' ) . '">' . esc_textarea( $text ) . '</textarea></p>';
-			echo '<p>' . esc_html__( 'The licence works for the server address above. To use it on another address, order a new licence.', 'beltoft-services' ) . '</p>';
+			echo '<p>' . esc_html__( 'The licence works for the server address above. You can change the address below.', 'beltoft-services' ) . '</p>';
+			KeyMove::form( $r );
 		}
 
 		echo '</div>';
