@@ -19,16 +19,7 @@ defined( 'ABSPATH' ) || exit;
 do_action( 'woocommerce_email_header', $email_heading, $email ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own hook.
 ?>
 
-<p>
-<?php
-if ( '' !== $customer_name ) {
-	/* translators: %s: customer's first name. */
-	printf( esc_html__( 'Hi %s,', 'beltoft-services' ), esc_html( $customer_name ) );
-} else {
-	esc_html_e( 'Hi,', 'beltoft-services' );
-}
-?>
-</p>
+<?php require BELTOFT_SERVICES_PATH . 'templates/parts/emails/html-greeting.php'; ?>
 <?php if ( $ssl['smime'] ) : ?>
 <p><?php echo esc_html( sprintf( /* translators: %s: email address of the certificate. */ __( 'To issue your S/MIME certificate the certificate authority has sent an email with a link to %s. Open it and click the link to confirm that the mailbox is yours.', 'beltoft-services' ), $ssl['name'] ) ); ?></p>
 <p><?php esc_html_e( 'The certificate is issued a few minutes after you click. If the email did not arrive, look in your spam folder, or open the certificate authority page from your certificate page.', 'beltoft-services' ); ?></p>
@@ -58,8 +49,4 @@ if ( '' !== $customer_name ) {
 <?php endif; ?>
 <?php
 
-if ( $additional_content ) {
-	echo wp_kses_post( wpautop( wptexturize( $additional_content ) ) );
-}
-
-do_action( 'woocommerce_email_footer', $email ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own hook.
+require BELTOFT_SERVICES_PATH . 'templates/parts/emails/html-footer.php';
