@@ -18,8 +18,8 @@ defined( 'ABSPATH' ) || exit;
  * other reinstall. Nothing is reinstalled yet: the action route asks this class (filter
  * `beltoft_services_action_redirect`, before the refusal filter) and gets a checkout URL back. The request (the posted
  * arguments, app, version, tier) is kept on the server as `applic_pending`, and the URL adds the tier's licence line to
- * the cart, linked to that server's license id with a nonce (the extra disk's pattern, AppLicenceCart). A pay-as-you-go
- * server gets the tier's usage sibling (billed by the hour, price 0 at checkout), a monthly server the monthly tier.
+ * the cart, linked to that server's license id with a nonce (the extra disk's pattern, AppLicenceCart). Every server,
+ * pay as you go or monthly, gets the tier's monthly line (a whole month in advance, then each month).
  *
  * When the order is paid the licence is created (AppLicence::initial_meta links it to the server) and its provision
  * step (AppLicenceDriver) calls claim(): the reinstall is queued as the customer's own `reinstall` action with the kept

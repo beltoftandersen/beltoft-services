@@ -169,28 +169,16 @@ final class PaidAppUsageTest extends PaidAppCase {
 
 	// -- Checkout ----------------------------------------------------------------------------------
 
-	public function test_a_monthly_server_gets_the_monthly_tier_and_a_usage_server_its_usage_sibling(): void {
-		$this->assertSame( $this->tiers['pro']->get_id(), AppLicence::line_variation( AppLicence::tier( 'docker', 'pro' ), false )->get_id() );
-		$this->assertSame( $this->usage['pro']->get_id(), AppLicence::line_variation( AppLicence::tier( 'docker', 'pro' ), true )->get_id() );
-		$this->assertStringContainsString( 'per hour', AppLicence::usage_price( AppLicence::tier( 'docker', 'pro' ) ) );
+	public function test_every_server_gets_the_monthly_tier_line_and_the_usage_sibling_is_not_sold(): void {
+		$tier = AppLicence::tier( 'docker', 'pro' );
+		$this->assertSame( $this->tiers['pro']->get_id(), AppLicence::line_variation( $tier, false )->get_id() );
+		$this->assertSame( $this->tiers['pro']->get_id(), AppLicence::line_variation( $tier, true )->get_id(), 'A licence is a whole month in advance, also on a pay-as-you-go server.' );
+		$this->assertSame( '$12.00 / month excl. VAT, charged in advance', AppLicence::price_text( $tier, true ) );
+		$this->assertSame( '$12.00 / month excl. VAT', AppLicence::price_text( $tier, false ) );
 		$this->assertCount( 2, AppLicence::tiers( 'docker' ), 'The usage siblings are no tiers of their own.' );
 	}
 
-	public function test_a_tier_with_no_usage_sibling_is_never_sold_to_a_usage_server_as_a_monthly_line(): void {
-		remove_all_filters( 'woocommerce_product_is_in_stock' );
-		$only = $this->usage_siblings( $this->tiers, array( 'basic' ) );
-		$this->assertNotEmpty( $only );
-		wp_delete_post( $this->usage['pro']->get_id(), true );
-		clean_post_cache( $this->tiers['pro']->get_parent_id() );
-		add_filter( 'woocommerce_product_is_in_stock', '__return_true', 99 );
-
-		$pro = AppLicence::tier( 'docker', 'pro' );
-		$this->assertNull( AppLicence::usage_variation( $pro ) );
-		$this->assertNull( AppLicence::line_variation( $pro, true ), 'No fallback to the monthly variation.' );
-		$this->assertSame( '', AppLicence::usage_price( $pro ) );
-	}
-
-	public function test_a_licence_line_for_a_usage_server_must_be_the_usage_variation(): void {
+	public function test_a_licence_line_for_a_usage_server_must_be_the_monthly_variation(): void {
 		$p = $this->usage_pair( 'basic' );
 		$server = $p['server'];
 		wp_set_current_user( $p['user'] );
@@ -205,17 +193,17 @@ final class PaidAppUsageTest extends PaidAppCase {
 		$this->assertStringContainsString( 'add-to-cart', (string) $url );
 		$query = array();
 		wp_parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $query );
-		$this->assertSame( (string) $this->usage['pro']->get_id(), $query['variation_id'], 'The hourly line, never the monthly one.' );
+		$this->assertSame( (string) $this->tiers['pro']->get_id(), $query['variation_id'], 'The monthly line, a month in advance.' );
 
 		$id   = (int) $server->license()['id'];
 		$data = array( AppLicence::CART_FOR => $id, 'beltoft_services_applic_nonce' => wp_create_nonce( 'beltoft-services-applic:' . $id ) );
 		$m    = $this->tiers['pro'];
 		$u    = $this->usage['pro'];
-		$this->assertTrue( AppLicenceCart::validate( true, $u->get_parent_id(), 1, $u->get_id(), array(), $data ) );
-		$this->assertFalse( AppLicenceCart::validate( true, $m->get_parent_id(), 1, $m->get_id(), array(), $data ), 'A pay-as-you-go customer is never given a monthly subscription line.' );
+		$this->assertTrue( AppLicenceCart::validate( true, $m->get_parent_id(), 1, $m->get_id(), array(), $data ) );
+		$this->assertFalse( AppLicenceCart::validate( true, $u->get_parent_id(), 1, $u->get_id(), array(), $data ), 'The hourly line is no longer sold.' );
 	}
 
-	public function test_the_reinstall_form_shows_the_hourly_price_for_a_usage_server(): void {
+	public function test_the_reinstall_form_says_a_month_in_advance_for_a_usage_server(): void {
 		$p = $this->usage_pair( 'basic' );
 		wp_set_current_user( $p['user'] );
 		$this->assertTrue( $p['server']->set( array( 'app_id' => '', 'app_version' => '', 'plan' => array( 'cluster' => 'lab', 'template' => 9001, 'cores' => 4, 'memory_mb' => 8192, 'disk_gb' => 100 ) ) ) );
@@ -223,10 +211,10 @@ final class PaidAppUsageTest extends PaidAppCase {
 		\BeltoftServices\Apps\AppReinstall::fields( $p['server']->id() );
 		$html = (string) ob_get_clean();
 
-		$this->assertStringContainsString( 'per hour', $html );
-		$this->assertStringContainsString( 'billed by the hour', $html );
-		$this->assertStringNotContainsString( 'monthly licence', $html );
-		$this->assertStringNotContainsString( 'excl. VAT</span>', str_replace( 'excluding VAT', '', $html ), 'No monthly price is shown.' );
+		$this->assertStringContainsString( 'charged in advance', $html );
+		$this->assertStringContainsString( 'A whole month is charged in advance', $html );
+		$this->assertStringNotContainsString( 'per hour', $html );
+		$this->assertStringNotContainsString( 'billed by the hour with your server', $html );
 	}
 
 	public function test_a_paid_usage_licence_is_delivered_and_bills_with_no_subscription_of_its_own(): void {
@@ -295,47 +283,39 @@ final class PaidAppUsageTest extends PaidAppCase {
 		return null === $line ? 0 : (int) $line['item']['variation_id'];
 	}
 
-	public function test_the_tier_line_follows_the_servers_billing_in_the_cart(): void {
+	public function test_the_tier_line_is_the_monthly_one_whatever_the_servers_billing(): void {
 		$server = $this->server_variations();
 		$this->put_server_in_cart( $server['m'] );
 		$this->assertFalse( AppLicenceCart::server_usage() );
 		$this->assertTrue( AppLicenceCart::choose( 'docker', 'pro' ) );
-		$this->assertSame( $this->tiers['pro']->get_id(), $this->tier_line_variation(), 'A monthly server: the monthly tier.' );
+		$this->assertSame( $this->tiers['pro']->get_id(), $this->tier_line_variation() );
 
 		$this->assertTrue( BillingField::swap( true )['ok'] );
 		$this->assertTrue( AppLicenceCart::server_usage() );
-		$this->assertSame( $this->usage['pro']->get_id(), $this->tier_line_variation(), 'The server went pay as you go: so did the tier.' );
+		$this->assertSame( $this->tiers['pro']->get_id(), $this->tier_line_variation(), 'The server went pay as you go: the licence stays a month in advance.' );
 
 		$this->assertTrue( BillingField::swap( false )['ok'] );
 		$this->assertSame( $this->tiers['pro']->get_id(), $this->tier_line_variation() );
 	}
 
-	public function test_a_usage_server_in_the_cart_gets_the_usage_tier_at_once_and_it_costs_nothing_at_checkout(): void {
+	public function test_a_usage_server_in_the_cart_gets_the_monthly_tier_and_it_costs_the_month_at_checkout(): void {
 		$server = $this->server_variations();
 		$this->put_server_in_cart( $server['u'] );
 		$this->assertTrue( AppLicenceCart::choose( 'docker', 'basic' ) );
-		$this->assertSame( $this->usage['basic']->get_id(), $this->tier_line_variation() );
-		$this->assertSame( 0.0, (float) wc_get_product( $this->tier_line_variation() )->get_price() );
+		$this->assertSame( $this->tiers['basic']->get_id(), $this->tier_line_variation() );
+		$this->assertSame( 5.0, (float) wc_get_product( $this->tier_line_variation() )->get_price() );
 	}
 
-	public function test_a_tier_with_no_hourly_price_leaves_the_cart_when_the_server_goes_pay_as_you_go(): void {
+	public function test_a_tier_without_an_hourly_sibling_is_still_sold_to_a_usage_server(): void {
 		$server = $this->server_variations();
 		wp_delete_post( $this->usage['pro']->get_id(), true );
 		clean_post_cache( $this->tiers['pro']->get_parent_id() );
-		$this->put_server_in_cart( $server['m'] );
+		$this->put_server_in_cart( $server['u'] );
 		$this->assertTrue( AppLicenceCart::choose( 'docker', 'pro' ) );
-
+		$this->assertSame( $this->tiers['pro']->get_id(), $this->tier_line_variation() );
+		$this->assertTrue( BillingField::swap( false )['ok'] );
 		$this->assertTrue( BillingField::swap( true )['ok'] );
-		$this->assertNull( AppLicenceCart::line(), 'The monthly line is not kept for a pay-as-you-go server.' );
-		$this->assertFalse( AppLicenceCart::choose( 'docker', 'pro' ), 'And it cannot be added.' );
-
-		do_action( 'woocommerce_checkout_process' );
-		$errors = new \WP_Error();
-		$_POST[ \BeltoftServices\Apps\AppField::POST_APP ]  = 'docker';
-		$_POST[ \BeltoftServices\Apps\AppField::POST_TIER ] = 'pro';
-		$_POST[ \BeltoftServices\Apps\AppField::POST_VERSION ] = '29';
-		\BeltoftServices\Apps\AppField::validate_classic( array(), $errors );
-		$this->assertNotEmpty( $errors->get_error_messages(), 'Checkout does not go on without the tier line.' );
+		$this->assertSame( $this->tiers['pro']->get_id(), $this->tier_line_variation(), 'The line stays through a billing change.' );
 	}
 
 	/** The cap of a pay as you go Plesk tier in the usage account's currency is compared with its euro cost at the guard rate. */

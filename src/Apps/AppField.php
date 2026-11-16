@@ -472,12 +472,10 @@ final class AppField {
 		$usage = AppLicenceCart::server_usage();
 
 		foreach ( AppLicence::tiers( $id ) as $key => $tier ) {
-			// Both prices are printed: the script shows the one that fits the billing choice (a pay-as-you-go server is billed by the hour, and only a tier with an hourly price can be bought there).
-			$hourly = AppLicence::usage_price( $tier );
-
-			echo '<label class="beltoft-services-app__domain-choice"><input type="radio" class="input-radio" name="' . esc_attr( self::POST_TIER ) . '" value="' . esc_attr( (string) $key ) . '" data-app-tier' . ( '' === $hourly ? ' data-no-usage' : '' ) . checked( $shown && $selected === (string) $key, true, false ) . ( $shown ? '' : ' disabled' ) . '> <span>' . esc_html( $tier['label'] ) . '</span>';
-			echo '<span class="description" data-price-monthly' . ( $usage ? ' hidden' : '' ) . '>' . esc_html( $tier['price'] ) . '</span>';
-			echo '<span class="description" data-price-usage' . ( $usage ? '' : ' hidden' ) . '>' . esc_html( '' === $hourly ? __( 'Not available with pay as you go', 'beltoft-services' ) : $hourly ) . '</span></label>';
+			// Both prices are printed: the script shows the one that fits the billing choice. The licence is a whole month in advance either way; on a pay-as-you-go server the price says so.
+			echo '<label class="beltoft-services-app__domain-choice"><input type="radio" class="input-radio" name="' . esc_attr( self::POST_TIER ) . '" value="' . esc_attr( (string) $key ) . '" data-app-tier' . checked( $shown && $selected === (string) $key, true, false ) . ( $shown ? '' : ' disabled' ) . '> <span>' . esc_html( $tier['label'] ) . '</span>';
+			echo '<span class="description" data-price-monthly' . ( $usage ? ' hidden' : '' ) . '>' . esc_html( AppLicence::price_text( $tier, false ) ) . '</span>';
+			echo '<span class="description" data-price-usage' . ( $usage ? '' : ' hidden' ) . '>' . esc_html( AppLicence::price_text( $tier, true ) ) . '</span></label>';
 		}
 
 		echo '</fieldset>';
@@ -546,7 +544,7 @@ final class AppField {
 		if ( AppLicence::paid( $why['app'] ) ) {
 			$tier = AppLicence::tier( $why['app'], $why['tier'] );
 
-			// The tier is its own cart line: it must be there once, and be the tier chosen (for a pay-as-you-go server its usage sibling).
+			// The tier is its own cart line: it must be there once, and be the tier chosen (the monthly one, whatever the server's billing).
 			$want = null === $tier ? null : AppLicence::line_variation( $tier, AppLicenceCart::server_usage() );
 
 			if ( null === $want || 1 !== AppLicenceCart::lines() || (int) ( $line['item']['variation_id'] ?? 0 ) !== $want->get_id() ) {
