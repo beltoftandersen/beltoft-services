@@ -213,6 +213,34 @@ class SmimeTest extends SslTestCase {
 		$this->assertSame( 'Test Person', $meta['ssl_person'] );
 	}
 
+	public function test_two_lines_of_one_order_go_to_two_certificates_one_each(): void {
+		$user    = (int) self::factory()->user->create();
+		$product = $this->service_product( 'ssl', array( 'ssl_product' => 60, 'ssl_level' => 'dv' ), array( 'slug' => 'smime-two-' . wp_generate_password( 4, false ) ) );
+		$order   = wc_create_order( array( 'customer_id' => $user ) );
+
+		foreach ( array( 'a', 'b' ) as $n ) {
+			$item = new \WC_Order_Item_Product();
+			$item->set_props( array( 'product_id' => $product->get_id(), 'quantity' => 1, 'total' => 29 ) );
+			$item->add_meta_data( SslField::ITEM_META, array( 'profile' => 'smime', 'domain' => 'gmail.com', 'name' => $n . '.' . self::BOX, 'person' => 'Test Person', 'validation' => 'email', 'approver' => self::BOX, 'key_mode' => 'generate', 'csr' => '' ) );
+			$order->add_item( $item );
+		}
+
+		$order->save();
+		$first  = $this->service_license( $product, array( 'fire' => false, 'user_id' => $user, 'order_id' => $order->get_id() ) );
+		$second = $this->service_license( $product, array( 'fire' => false, 'user_id' => $user, 'order_id' => $order->get_id() ) );
+
+		$one = SslField::initial_meta( array(), $first, new SslDriver() );
+		$this->assertSame( 'a.' . self::BOX, $one['ssl_name'] );
+		Resource::create( $first, new SslDriver(), array(), $one );
+		$two = SslField::initial_meta( array(), $second, new SslDriver() );
+		$this->assertSame( 'b.' . self::BOX, $two['ssl_name'] );
+		$this->assertNotSame( $one['order_item_id'], $two['order_item_id'] );
+		Resource::create( $second, new SslDriver(), array(), $two );
+
+		$third = $this->service_license( $product, array( 'fire' => false, 'user_id' => $user, 'order_id' => $order->get_id() ) );
+		$this->assertSame( array(), SslField::initial_meta( array(), $third, new SslDriver() ) );
+	}
+
 	// -- Build -------------------------------------------------------------------------------------
 
 	public function test_the_order_is_placed_without_host_names_and_started_with_the_mailbox(): void {

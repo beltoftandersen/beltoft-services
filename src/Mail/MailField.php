@@ -7,7 +7,6 @@
 
 namespace BeltoftServices\Mail;
 
-use BeltoftLicenses\Licenses;
 use BeltoftServices\Checkout\LineField;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Product;
@@ -500,34 +499,15 @@ final class MailField {
 			return $meta;
 		}
 
-		$order_id = (int) ( $license['order_id'] ?? 0 );
-		$order    = $order_id > 0 ? wc_get_order( $order_id ) : false;
+		$sibling = LineField::siblings( $license, MailDriver::ID, static fn( Resource $r ) => (string) $r->get( MailDomain::META_DOMAIN ) );
 
-		if ( ! $order instanceof \WC_Order ) {
+		if ( null === $sibling ) {
 			return $meta;
 		}
 
-		$product_id = (int) ( $license['product_id'] ?? 0 );
-		$variation  = (int) ( $license['variation_id'] ?? 0 );
-		$used       = array();
+		$used = $sibling['used'];
 
-		foreach ( Licenses::where( 'order_id', $order_id ) as $other ) {
-			if ( (int) $other['id'] === (int) ( $license['id'] ?? 0 ) ) {
-				continue;
-			}
-
-			$resource = Resource::for_license( (int) $other['id'] );
-
-			if ( $resource && MailDriver::ID === $resource->get( 'driver' ) ) {
-				$used[] = (string) $resource->get( MailDomain::META_DOMAIN );
-			}
-		}
-
-		foreach ( $order->get_items() as $item ) {
-			if ( ! $item instanceof \WC_Order_Item_Product || (int) $item->get_product_id() !== $product_id || ( 0 !== $variation && (int) $item->get_variation_id() !== $variation ) ) {
-				continue;
-			}
-
+		foreach ( $sibling['items'] as $item ) {
 			$name = MailDomain::normalise( $item->get_meta( self::ITEM_META, true ) );
 
 			if ( null !== $name && ! in_array( $name, $used, true ) ) {
