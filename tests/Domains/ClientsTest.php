@@ -15,11 +15,18 @@ class ClientsTest extends TestCase {
 		$this->assertInstanceOf( FakeDns::class, Clients::dns() );
 	}
 
-	public function test_live_mode_without_constant_falls_back_to_fake(): void {
-		$this->settings( array( 'domain_api_mode' => 'live' ) );
+	public function test_live_mode_without_constant_gives_a_client_that_refuses_and_tells_the_admin(): void {
+		$this->settings( array( 'domain_api_mode' => 'live', 'admin_email' => 'christian.beltoft@gmail.com' ) );
 		$this->assertFalse( Clients::live_allowed() );
 		$this->assertSame( 'fake', Clients::mode() );
-		$this->assertInstanceOf( FakeClient::class, Clients::registrar() );
+
+		$client = Clients::registrar();
+		$this->assertNotInstanceOf( FakeClient::class, $client, 'No made-up answers for a live site.' );
+		$this->assertWPError( $client->request( 'POST', '/domains/check', array() ) );
+		$this->assertWPError( Clients::registrar()->request( 'POST', '/domains', array() ) );
+
+		$mails = array_filter( $GLOBALS['phpmailer']->mock_sent ?? array(), static fn( $m ) => false !== strpos( (string) $m['subject'], 'registrar' ) );
+		$this->assertCount( 1, $mails, 'One mail a day.' );
 	}
 
 	public function test_sandbox_mode_uses_sandbox_url_without_constant_and_dns_stays_fake(): void {
