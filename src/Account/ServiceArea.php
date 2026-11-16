@@ -672,6 +672,32 @@ abstract class ServiceArea {
 	}
 
 	/**
+	 * Has the licence ended (expired, also by its date, revoked or cancelled)? Suspended (on hold) and active have not.
+	 *
+	 * @param array<string, mixed> $license License row.
+	 */
+	public static function ended( array $license ): bool {
+		if ( ! isset( $license['status'] ) ) {
+			return false;
+		}
+
+		return in_array( \BeltoftLicenses\Licenses::effective_status( $license ), array( 'expired', 'revoked', 'cancelled' ), true );
+	}
+
+	/**
+	 * The one rule for an ended service in the My Account lists: it is not listed when its licence has ended and no live
+	 * resource is left (every activation deactivated, deleted or never made). A service that still exists stays listed
+	 * (paused after a lapse, within its retention, so the customer can pay and resume), and so does a licence on hold, one
+	 * being set up, failed or being deleted. Used by the Servers list (add-ons) and, through Resource::gone(), by the areas.
+	 *
+	 * @param array<string, mixed> $license  License row.
+	 * @param Resource|null        $resource Its live resource, null when none.
+	 */
+	public static function ended_and_gone( array $license, ?Resource $resource ): bool {
+		return self::ended( $license ) && Resource::gone( $resource );
+	}
+
+	/**
 	 * Which of the license views the area lists, which it knows as deleted, by license id. The one rule of the list (render())
 	 * and of the menu count (MenuCounts): a view that is not a member, or whose visibility is HIDDEN, is in neither.
 	 *
@@ -694,6 +720,11 @@ abstract class ServiceArea {
 			$id         = (int) $view['license']['id'];
 			$resource   = Resource::for_license( $id );
 			$visibility = $this->visibility( $resource );
+
+			// An ended licence with no live service is history: not listed, and its address says it was deleted.
+			if ( self::SHOWN === $visibility && self::ended_and_gone( $view['license'], $resource ) ) {
+				$visibility = self::GONE;
+			}
 
 			if ( self::HIDDEN === $visibility ) {
 				continue;

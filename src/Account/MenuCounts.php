@@ -56,7 +56,8 @@ final class MenuCounts {
 
 	/**
 	 * The number a tab holds: what its page lists (the same code as the page: ServiceArea::sort(), Servers::sort()) among the
-	 * licenses that exist (active or paused). The tab of no area (plain licences) counts its licenses.
+	 * licenses of the tab (an ended one is listed only while a live service is left, see ServiceArea::ended_and_gone()). The tab
+	 * of no area (plain licences) counts its active and suspended licenses.
 	 *
 	 * @param string                           $slug     Menu item slug.
 	 * @param array<int, array<string, mixed>> $licenses The licenses on the tab.
@@ -69,14 +70,14 @@ final class MenuCounts {
 		);
 
 		if ( ServerLinks::slug() === $slug ) {
-			$sorted = Servers::sort( array_map( $view, $live ) );
+			$sorted = Servers::sort( array_map( $view, $licenses ) );
 
 			return count( $sorted['servers'] ) + count( $sorted['others'] );
 		}
 
 		foreach ( ServiceArea::all() as $area ) {
 			if ( $area->slug() === $slug ) {
-				return count( $area->sort( array_map( $view, $live ) )['members'] );
+				return count( $area->sort( array_map( $view, $licenses ) )['members'] );
 			}
 		}
 
