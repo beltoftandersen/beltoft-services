@@ -1218,4 +1218,119 @@ class AddonsTest extends HostingCase {
 		DomainSweep::run();
 		$this->assertNull( SiteDomains::find( 'gone2.example' ), 'The sweep takes the names off once the account is ready.' );
 	}
+
+	/**
+	 * Puts an add-on line of a given monthly-period total on the account's subscription.
+	 *
+	 * @param \WC_Subscription $sub    Subscription.
+	 * @param string           $kind   Kind.
+	 * @param string           $target Target.
+	 * @param float            $total  Line total ex tax for the subscription's period.
+	 * @param bool             $ending Marked ending.
+	 * @return \WC_Order_Item_Product
+	 */
+	private function put_line( \WC_Subscription $sub, string $kind, string $target, float $total, bool $ending = false ) {
+		$id = $sub->add_product( Addons::product( $kind ), 1, array( 'name' => 'Extra ' . $target, 'subtotal' => $total, 'total' => $total ) );
+		$sub->save();
+		$sub  = wcs_get_subscription( $sub->get_id() );
+		$item = $sub->get_item( $id );
+		$item->update_meta_data( Addons::I_KIND, $kind );
+		$item->update_meta_data( Addons::I_TARGET, $target );
+		if ( $ending ) {
+			$item->update_meta_data( Addons::I_ENDING, 'yes' );
+		}
+		$item->save();
+
+		return $item;
+	}
+
+	private function switch_fees( \WC_Subscription $sub, int $from, int $to, array $fees = array() ): array {
+		return apply_filters( 'beltoft_switching_longer_cycle_fees', $fees, wcs_get_subscription( $sub->get_id() ), $from, $to, Addons::product( Addons::KIND_DOMAIN ) );
+	}
+
+	public function test_a_switch_to_a_longer_cycle_charges_each_add_on_line_for_the_months_between(): void {
+		$r   = $this->account();
+		$sub = $this->sub( $r );
+		$this->put_line( $sub, Addons::KIND_DOMAIN, 'a.example', 2.00 );
+		$from = strtotime( '2026-11-26 10:00:00 UTC' );
+		$to   = strtotime( '2027-11-16 10:00:00 UTC' ); // 11 months and 20 days: 12.
+
+		$fees = $this->switch_fees( $sub, $from, $to );
+
+		$this->assertCount( 1, $fees );
+		$this->assertSame( 24.0, (float) $fees[0]['amount'], '2.00 a month for 12 months.' );
+		$this->assertTrue( $fees[0]['taxable'] );
+		$this->assertStringContainsString( 'Extra a.example', $fees[0]['name'] );
+		$this->assertStringContainsString( '12', $fees[0]['name'] );
+		$this->assertStringNotContainsString( '—', $fees[0]['name'] );
+	}
+
+	public function test_the_hand_example_345_days_is_eleven_months_and_vat_is_added_by_the_cart(): void {
+		$r   = $this->account();
+		$sub = $this->sub( $r );
+		$this->put_line( $sub, Addons::KIND_DOMAIN, 'a.example', 2.00 );
+		$from = strtotime( '2026-12-06 00:00:00 UTC' );
+		$to   = $from + 345 * DAY_IN_SECONDS;
+
+		$fees = $this->switch_fees( $sub, $from, $to );
+
+		$this->assertSame( 22.0, (float) $fees[0]['amount'] );
+		$tax = \WC_Tax::calc_tax( (float) $fees[0]['amount'], array( 1 => array( 'rate' => 25.0, 'label' => 'VAT', 'shipping' => 'no', 'compound' => 'no' ) ), false );
+		$this->assertEquals( 5.50, round( array_sum( $tax ), 2 ), '22.00 ex VAT at 25 percent is 5.50 VAT, 27.50 to pay.' );
+	}
+
+	public function test_two_add_ons_give_two_fees_and_an_ending_one_is_left_out(): void {
+		$r   = $this->account();
+		$sub = $this->sub( $r );
+		$this->put_line( $sub, Addons::KIND_DOMAIN, 'a.example', 2.00 );
+		$this->put_line( $sub, Addons::KIND_PACK, 'info@a.example', 1.50 );
+		$this->put_line( $sub, Addons::KIND_DOMAIN, 'gone.example', 2.00, true );
+		$from = strtotime( '2026-12-10 00:00:00 UTC' );
+		$to   = strtotime( '2027-12-10 00:00:00 UTC' ); // Across the year end: 12 months.
+
+		$fees = $this->switch_fees( $sub, $from, $to );
+
+		$this->assertCount( 2, $fees );
+		$this->assertSame( 24.0, (float) $fees[0]['amount'] );
+		$this->assertSame( 18.0, (float) $fees[1]['amount'] );
+		foreach ( $fees as $fee ) {
+			$this->assertStringNotContainsString( 'gone.example', $fee['name'] );
+		}
+	}
+
+	public function test_a_yearly_old_period_divides_by_twelve_and_a_short_span_is_one_month(): void {
+		$r   = $this->account( 'year' );
+		$sub = $this->sub( $r );
+		$this->put_line( $sub, Addons::KIND_DOMAIN, 'a.example', 12.00 );
+		$from = strtotime( '2026-12-20 00:00:00 UTC' );
+
+		$this->assertSame( 1.0, (float) $this->switch_fees( $sub, $from, $from + 3 * DAY_IN_SECONDS )[0]['amount'], 'One month at least: 12 / 12.' );
+		$this->assertSame( 36.0, (float) $this->switch_fees( $sub, $from, strtotime( '2029-12-20 00:00:00 UTC' ) )[0]['amount'] );
+	}
+
+	public function test_a_dkk_subscription_is_charged_the_stored_dkk_total_and_the_recurring_total_is_unchanged(): void {
+		$r   = $this->dkk_account( '8' );
+		$sub = $this->sub( $r );
+		$this->put_line( $sub, Addons::KIND_DOMAIN, 'a.example', 8.00 );
+		$sub   = $this->sub( $r );
+		$total = (string) $sub->get_total();
+		$from  = strtotime( '2026-12-06 00:00:00 UTC' );
+
+		$fees = $this->switch_fees( $sub, $from, strtotime( '2027-06-06 00:00:00 UTC' ) );
+
+		$this->assertSame( 48.0, (float) $fees[0]['amount'], '8 DKK for 6 months, no conversion.' );
+		$this->assertSame( $total, (string) wcs_get_subscription( $sub->get_id() )->get_total(), 'The fee is a one-off: the recurring total does not change.' );
+	}
+
+	public function test_no_fee_without_add_on_lines_and_other_fees_are_kept(): void {
+		$r    = $this->account();
+		$sub  = $this->sub( $r );
+		$from = strtotime( '2026-12-06 00:00:00 UTC' );
+		$mine = array( array( 'name' => 'Other', 'amount' => 3.0, 'taxable' => true, 'tax_class' => '' ) );
+
+		$this->assertSame( $mine, $this->switch_fees( $sub, $from, $from + 300 * DAY_IN_SECONDS, $mine ) );
+
+		$plain = wcs_create_subscription( array( 'customer_id' => 1, 'billing_period' => 'month', 'billing_interval' => 1 ) );
+		$this->assertSame( array(), apply_filters( 'beltoft_switching_longer_cycle_fees', array(), $plain, $from, $from + 300 * DAY_IN_SECONDS, Addons::product( Addons::KIND_DOMAIN ) ) );
+	}
 }

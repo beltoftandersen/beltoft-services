@@ -730,6 +730,61 @@ final class AddonBilling {
 	}
 
 	/**
+	 * A switch to a longer billing cycle: WooCommerce Subscriptions prorates only the switched item, so the add-on lines are
+	 * charged here, one fee for each line that is not ending: the line's price for one month (its total over the months of the
+	 * old period) times the whole months between the old next payment and the next payment after the switch. The fee is a
+	 * one-off of the switch order; the recurring total is not touched (resync_prices sets the lines to the new period after).
+	 *
+	 * @param mixed $fees         Fees so far.
+	 * @param mixed $subscription The subscription, still on its old plan and period.
+	 * @param mixed $from         Timestamp of its current next payment.
+	 * @param mixed $to           Timestamp of the next payment after the switch.
+	 * @return mixed Fees: arrays of name, amount ex tax, taxable, tax_class.
+	 */
+	public static function switch_fees( $fees, $subscription = null, $from = 0, $to = 0 ) {
+		if ( ! is_array( $fees ) || ! $subscription instanceof \WC_Subscription || (int) $to <= (int) $from || (int) $from <= 0 ) {
+			return $fees;
+		}
+
+		$per    = self::period_months( $subscription );
+		$months = self::months_between( (int) $from, (int) $to );
+
+		foreach ( $subscription->get_items() as $item ) {
+			if ( ! $item instanceof \WC_Order_Item_Product || '' === (string) $item->get_meta( Addons::I_KIND ) || '' !== (string) $item->get_meta( Addons::I_ENDING ) ) {
+				continue;
+			}
+
+			$amount = round( (float) $item->get_total() / $per * $months, 2 );
+			if ( $amount <= 0 ) {
+				continue;
+			}
+
+			$fees[] = array(
+				/* translators: 1: add-on name, 2: number of months. */
+				'name'      => sprintf( _n( '%1$s, %2$d month', '%1$s, %2$d months', $months, 'beltoft-services' ), $item->get_name(), $months ),
+				'amount'    => $amount,
+				'taxable'   => true,
+				'tax_class' => (string) $item->get_tax_class(),
+			);
+		}
+
+		return $fees;
+	}
+
+	/**
+	 * Whole months from one time to another, rounded to the nearest (15 days or more of the rest count as a month), at least 1.
+	 *
+	 * @param int $from Start.
+	 * @param int $to   End.
+	 */
+	private static function months_between( int $from, int $to ): int {
+		$diff   = ( new \DateTimeImmutable( '@' . $from ) )->diff( new \DateTimeImmutable( '@' . $to ) );
+		$months = $diff->y * 12 + $diff->m + ( $diff->d >= 15 ? 1 : 0 );
+
+		return max( 1, $months );
+	}
+
+	/**
 	 * Sets each add-on line of a subscription to the unit price times the months of its billing period.
 	 *
 	 * @param \WC_Subscription $sub Subscription.

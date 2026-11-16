@@ -70,6 +70,7 @@ final class Addons {
 		add_action( 'woocommerce_order_status_refunded', array( __CLASS__, 'reverse' ), 20 );
 		add_action( 'woocommerce_order_status_cancelled', array( __CLASS__, 'reverse' ), 20 );
 		add_action( 'woocommerce_subscriptions_switch_completed', array( __CLASS__, 'after_switch' ), 20 );
+		add_filter( 'beltoft_switching_longer_cycle_fees', array( __CLASS__, 'switch_fees' ), 10, 4 );
 		add_action( self::SWEEP_HOOK, array( __CLASS__, 'cancel_stale' ) );
 		add_action( self::SWEEP_HOOK, array( Sites::class, 'purge_expired_holds' ) );
 		add_action( self::ACTIVATE_RETRY_HOOK, array( __CLASS__, 'activate' ) );
@@ -337,6 +338,19 @@ final class Addons {
 	 */
 	public static function after_switch( $order ): void {
 		AddonBilling::after_switch( $order );
+	}
+
+	/**
+	 * Fees for the add-on lines when a switch goes to a longer billing cycle (filter of the switching plugin).
+	 *
+	 * @param mixed $fees         Fees so far.
+	 * @param mixed $subscription Subscription on its old plan.
+	 * @param mixed $from         Old next payment.
+	 * @param mixed $to           Next payment after the switch.
+	 * @return mixed
+	 */
+	public static function switch_fees( $fees, $subscription = null, $from = 0, $to = 0 ) {
+		return AddonBilling::switch_fees( $fees, $subscription, $from, $to );
 	}
 
 	/**
