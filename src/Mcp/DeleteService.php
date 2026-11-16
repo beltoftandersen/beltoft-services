@@ -33,10 +33,9 @@ final class DeleteService {
 	 * @return Resource|\WP_Error
 	 */
 	private static function service( string $name, int $id, int $user_id ) {
-		$r       = Resource::find( $id );
-		$license = $r ? $r->license() : array();
+		$r = Resource::find( $id );
 
-		if ( ! $r || $user_id < 1 || empty( $license['user_id'] ) || (int) $license['user_id'] !== $user_id ) {
+		if ( ! $r || ! $r->owned_by( $user_id ) ) {
 			return new \WP_Error( 'beltoft_services_forbidden', __( 'This service is not available.', 'beltoft-services' ) );
 		}
 

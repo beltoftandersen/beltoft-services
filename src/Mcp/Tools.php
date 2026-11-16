@@ -669,9 +669,7 @@ final class Tools {
 	 */
 	public static function owned( int $id, bool $ready = false ) {
 		$resource = Resource::find( $id );
-		$license  = $resource ? $resource->license() : array();
-		$user_id  = get_current_user_id();
-		$owned    = $user_id > 0 && ! empty( $license['user_id'] ) && (int) $license['user_id'] === $user_id;
+		$owned    = $resource && $resource->owned_by( get_current_user_id() );
 
 		if ( ! $owned || ! ( $ready ? $resource->accepts_actions() : $resource->shows_status() ) ) {
 			return new \WP_Error( 'beltoft_services_forbidden', __( 'This service is not available.', 'beltoft-services' ) );
@@ -688,14 +686,13 @@ final class Tools {
 	 * @param bool   $ok   Whether the call worked.
 	 */
 	public static function log( int $id, string $text, bool $ok ): void {
-		$r       = Resource::find( $id );
-		$license = $r ? $r->license() : array();
+		$r = Resource::find( $id );
 
-		if ( empty( $license['id'] ) || (int) ( $license['user_id'] ?? 0 ) !== get_current_user_id() ) {
+		if ( ! $r || ! $r->owned_by( get_current_user_id() ) ) {
 			return;
 		}
 
-		Events::add( (int) $license['id'], 'api', 'Claude: ' . $text . ( $ok ? '' : ' (refused)' ) );
+		Events::add( (int) $r->license()['id'], 'api', 'Claude: ' . $text . ( $ok ? '' : ' (refused)' ) );
 	}
 
 	/**

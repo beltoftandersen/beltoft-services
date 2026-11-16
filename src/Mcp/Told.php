@@ -133,7 +133,7 @@ final class Told {
 		if ( isset( $args['id'] ) && is_int( $args['id'] ) ) {
 			$r = Resource::find( $args['id'] );
 
-			return $r && (int) ( $r->license()['user_id'] ?? 0 ) === $user_id ? $r : null;
+			return $r && $r->owned_by( $user_id ) ? $r : null;
 		}
 
 		if ( isset( $args['subscription_id'] ) && is_int( $args['subscription_id'] ) ) {

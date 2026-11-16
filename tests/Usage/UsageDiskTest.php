@@ -333,6 +333,27 @@ final class UsageDiskTest extends UsageTestCase {
 
 	// -- Grow -------------------------------------------------------------------------------------
 
+	public function test_the_grow_route_is_for_the_owner_of_the_disk_only(): void {
+		add_filter( 'beltoft_services_rest_rate_limit', '__return_zero' );
+		$disk    = $this->usage_disk( $this->server() );
+		$request = new \WP_REST_Request( 'POST', '/beltoft-services/v1/resources/' . $disk->id() . '/grow' );
+		$request->set_param( 'id', $disk->id() );
+
+		foreach ( array( 0, $this->new_user() ) as $stranger ) {
+			wp_set_current_user( $stranger );
+			$r = \BeltoftServices\Api\Routes::grow( $request );
+			$this->assertSame( 403, $r->get_status() );
+			$this->assertSame( 'beltoft_services_forbidden', $r->get_data()['code'] );
+			$this->assertSame( 50.0, Rates::items( Resource::find( $disk->id() ) )[0]['quantity'], 'Nothing was grown.' );
+		}
+
+		wp_set_current_user( $this->user );
+		$r = \BeltoftServices\Api\Routes::grow( $request );
+		$this->assertSame( 202, $r->get_status() );
+		$this->assertTrue( $r->get_data()['growing'] );
+		remove_filter( 'beltoft_services_rest_rate_limit', '__return_zero' );
+	}
+
 	public function test_grow_makes_the_disk_the_next_size_bills_the_new_rate_and_leaves_the_account_alone(): void {
 		$server = $this->server();
 		$disk   = $this->usage_disk( $server );
