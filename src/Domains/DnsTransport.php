@@ -35,7 +35,9 @@ final class DnsTransport {
 	}
 
 	private static function once( string $ip, string $name, int $type, string $protocol ): array|\WP_Error {
-		$id = random_int( 0, 65535 );
+		$id   = random_int( 0, 65535 );
+		$wire = DnsWire::query( $name, $type, $id );
+		if ( is_wp_error( $wire ) ) { return $wire; }
 		/**
 		 * Tests: a non-null return replaces the network, a raw response packet or a WP_Error. The fifth argument
 		 * is the protocol ('udp' or 'tcp'). A packet from here carries its own id, which is then the one expected.
@@ -48,7 +50,6 @@ final class DnsTransport {
 		}
 		if ( ! DnsAddress::is_public( $ip ) ) { return new \WP_Error( 'dns_unreachable', 'The address is not a public one.' ); }
 		$host = str_contains( $ip, ':' ) ? '[' . $ip . ']' : $ip;
-		$wire = DnsWire::query( $name, $type, $id );
 		$data = 'tcp' === $protocol ? self::tcp( $host, $wire ) : self::udp( $host, $wire );
 		return is_string( $data ) ? DnsWire::parse( $data, $id, $name, $type ) : $data;
 	}

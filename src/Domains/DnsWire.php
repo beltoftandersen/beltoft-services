@@ -19,14 +19,23 @@ final class DnsWire {
 
 	private const MAX_JUMPS = 20;
 
-	/** A question with RD off, class IN, and an EDNS0 OPT record (UDP size 1232, DO off). */
-	public static function query( string $name, int $type, int $id ): string {
-		$wire = pack( 'nnnnnn', $id & 0xffff, 0, 1, 0, 0, 1 );
-		foreach ( explode( '.', rtrim( $name, '.' ) ) as $label ) {
-			if ( '' === $label ) { continue; }
-			$wire .= chr( min( 63, strlen( $label ) ) ) . substr( $label, 0, 63 );
+	/** The wire form of a name: labels of 1 to 63 bytes, at most 253 bytes in text form; one trailing dot is allowed. Anything else is refused, never cut. */
+	public static function encode_name( string $name ): string|\WP_Error {
+		$name = rtrim( $name, '.' ) === $name ? $name : substr( $name, 0, -1 );
+		if ( '' === $name || strlen( $name ) > 253 ) { return new \WP_Error( 'dns_bad_name', 'The name cannot be asked as a DNS question.' ); }
+		$wire = '';
+		foreach ( explode( '.', $name ) as $label ) {
+			if ( '' === $label || strlen( $label ) > 63 ) { return new \WP_Error( 'dns_bad_name', 'The name cannot be asked as a DNS question.' ); }
+			$wire .= chr( strlen( $label ) ) . $label;
 		}
-		$wire .= "\0" . pack( 'nn', $type, 1 );
+		return $wire . "\0";
+	}
+
+	/** A question with RD off, class IN, and an EDNS0 OPT record (UDP size 1232, DO off). A name that cannot be encoded gives dns_bad_name and no packet. */
+	public static function query( string $name, int $type, int $id ): string|\WP_Error {
+		$qname = self::encode_name( $name );
+		if ( is_wp_error( $qname ) ) { return $qname; }
+		$wire = pack( 'nnnnnn', $id & 0xffff, 0, 1, 0, 0, 1 ) . $qname . pack( 'nn', $type, 1 );
 		return $wire . "\0" . pack( 'nnNn', self::OPT, 1232, 0, 0 );
 	}
 

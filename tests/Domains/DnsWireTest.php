@@ -118,4 +118,23 @@ class DnsWireTest extends TestCase {
 		$this->assertTrue( $parsed['tc'] );
 		$this->assertFalse( $parsed['aa'] );
 	}
+
+	public function test_a_name_with_a_label_over_63_bytes_or_over_253_in_all_is_refused_not_cut(): void {
+		$long = str_repeat( 'a', 64 ) . '.example.com';
+		$this->assertSame( 'dns_bad_name', DnsWire::query( $long, DnsWire::A, 1 )->get_error_code() );
+		$this->assertIsString( DnsWire::query( str_repeat( 'a', 63 ) . '.example.com', DnsWire::A, 1 ), 'A label of 63 bytes is fine.' );
+		$name253 = implode( '.', array( str_repeat( 'a', 63 ), str_repeat( 'b', 63 ), str_repeat( 'c', 63 ), str_repeat( 'd', 61 ) ) );
+		$this->assertSame( 253, strlen( $name253 ) );
+		$this->assertIsString( DnsWire::query( $name253, DnsWire::A, 1 ) );
+		$this->assertSame( 'dns_bad_name', DnsWire::query( $name253 . 'x', DnsWire::A, 1 )->get_error_code() );
+		$this->assertSame( 'dns_bad_name', DnsWire::query( 'a..example.com', DnsWire::A, 1 )->get_error_code(), 'An empty label is not skipped either.' );
+	}
+
+	public function test_the_transport_sends_nothing_for_a_name_that_cannot_be_encoded(): void {
+		$seen = 0;
+		add_filter( 'beltoft_services_dns_wire', static function ( $r ) use ( &$seen ) { ++$seen; return $r; }, 10, 1 );
+		$result = \BeltoftServices\Domains\DnsTransport::ask( '203.0.113.5', str_repeat( 'a', 64 ) . '.example.com', DnsWire::TXT );
+		$this->assertSame( 'dns_bad_name', $result->get_error_code() );
+		$this->assertSame( 0, $seen, 'Refused before the network (or its test replacement) is reached.' );
+	}
 }
