@@ -38,7 +38,7 @@ final class MenuCounts {
 
 		foreach ( \BeltoftLicenses\Account\Endpoint::split( \BeltoftLicenses\Account\Endpoint::licenses_for_user( $user_id ) ) as $tab => $licenses ) {
 			$slug = '' === $tab ? \BeltoftLicenses\Account\Endpoint::slug() : (string) $tab;
-			$n    = count( array_filter( $licenses, static fn( $l ) => in_array( (string) ( $l['status'] ?? '' ), array( 'active', 'suspended' ), true ) ) );
+			$n    = self::count( $slug, $licenses );
 
 			if ( $n > 0 ) {
 				$counts[ $slug ] = $n;
@@ -52,6 +52,35 @@ final class MenuCounts {
 		 * @param int                $user_id Customer.
 		 */
 		return self::$cache[ $user_id ] = (array) apply_filters( 'beltoft_services_account_menu_counts', $counts, $user_id );
+	}
+
+	/**
+	 * The number a tab holds: what its page lists (the same code as the page: ServiceArea::sort(), Servers::sort()) among the
+	 * licenses that exist (active or paused). The tab of no area (plain licences) counts its licenses.
+	 *
+	 * @param string                           $slug     Menu item slug.
+	 * @param array<int, array<string, mixed>> $licenses The licenses on the tab.
+	 */
+	private static function count( string $slug, array $licenses ): int {
+		$live = array_values( array_filter( $licenses, static fn( $l ) => in_array( (string) ( $l['status'] ?? '' ), array( 'active', 'suspended' ), true ) ) );
+		$view = static fn( array $license ): array => array(
+			'id'      => (int) $license['id'],
+			'license' => $license,
+		);
+
+		if ( ServerLinks::slug() === $slug ) {
+			$sorted = Servers::sort( array_map( $view, $live ) );
+
+			return count( $sorted['servers'] ) + count( $sorted['others'] );
+		}
+
+		foreach ( ServiceArea::all() as $area ) {
+			if ( $area->slug() === $slug ) {
+				return count( $area->sort( array_map( $view, $live ) )['members'] );
+			}
+		}
+
+		return count( $live );
 	}
 
 	/**

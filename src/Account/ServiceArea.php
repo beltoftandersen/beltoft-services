@@ -672,24 +672,27 @@ abstract class ServiceArea {
 	}
 
 	/**
-	 * Prints the list or the page for the licenses the customer has on the tab.
+	 * Which of the license views the area lists, which it knows as deleted, by license id. The one rule of the list (render())
+	 * and of the menu count (MenuCounts): a view that is not a member, or whose visibility is HIDDEN, is in neither.
 	 *
-	 * @param array<int, array<string, mixed>> $views License views (BeltoftLicenses View::license()).
-	 * @param string                           $empty Text for an empty tab.
+	 * @param array<int, array<string, mixed>> $views License views (each has a 'license' row).
+	 * @return array{members: array<int, array<string, mixed>>, resources: array<int, Resource>, gone: array<int, true>}
 	 */
-	public function render( array $views, string $empty = '' ): void {
+	public function sort( array $views ): array {
 		$members   = array();
 		$resources = array();
 		$gone      = array();
+
+		// One query for the live resources of the whole list (a no-op while the request memo is off).
+		Resource::preload( array_map( static fn( $view ) => is_array( $view ) && isset( $view['license']['id'] ) ? (int) $view['license']['id'] : 0, $views ) );
 
 		foreach ( $views as $view ) {
 			if ( ! is_array( $view ) || ! isset( $view['license'] ) || ! $this->is_member( $view['license'] ) ) {
 				continue;
 			}
 
-			$resource = Resource::for_license( (int) $view['license']['id'] );
-			$id       = (int) $view['license']['id'];
-
+			$id         = (int) $view['license']['id'];
+			$resource   = Resource::for_license( $id );
 			$visibility = $this->visibility( $resource );
 
 			if ( self::HIDDEN === $visibility ) {
@@ -704,6 +707,25 @@ abstract class ServiceArea {
 			$members[ $id ]   = $view;
 			$resources[ $id ] = $resource;
 		}
+
+		return array(
+			'members'   => $members,
+			'resources' => $resources,
+			'gone'      => $gone,
+		);
+	}
+
+	/**
+	 * Prints the list or the page for the licenses the customer has on the tab.
+	 *
+	 * @param array<int, array<string, mixed>> $views License views (BeltoftLicenses View::license()).
+	 * @param string                           $empty Text for an empty tab.
+	 */
+	public function render( array $views, string $empty = '' ): void {
+		$sorted    = $this->sort( $views );
+		$members   = $sorted['members'];
+		$resources = $sorted['resources'];
+		$gone      = $sorted['gone'];
 
 		$asked = $this->requested();
 

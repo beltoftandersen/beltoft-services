@@ -172,14 +172,54 @@ final class Servers {
 			return;
 		}
 
+		$sorted    = self::sort( $views );
+		$servers   = $sorted['servers'];
+		$resources = $sorted['resources'];
+		$others    = $sorted['others'];
+		$gone      = $sorted['gone'];
+
+		$asked = ServerLinks::requested();
+
+		if ( $asked['id'] > 0 && isset( $servers[ $asked['id'] ] ) ) {
+			self::detail( $servers[ $asked['id'] ], $asked['tab'], $resources[ $asked['id'] ] ?? null );
+
+			return;
+		}
+
+		if ( $asked['id'] > 0 && isset( $gone[ $asked['id'] ] ) ) {
+			echo '<div class="beltoft-services-server"><p class="beltoft-services-server__back"><a href="' . esc_url( self::url_list() ) . '">&lsaquo; ' . esc_html__( 'All servers', 'beltoft-services' ) . '</a></p>';
+			echo '<p class="beltoft-services-notice" role="status">' . esc_html__( 'This server was deleted.', 'beltoft-services' ) . '</p></div>';
+
+			return;
+		}
+
+		if ( $asked['id'] > 0 || Slugs::unknown( Slugs::parse( ServerLinks::slug(), 'servers' ) ) ) {
+			echo '<p class="beltoft-services-notice" role="status">' . esc_html__( 'That server was not found. Here are your servers.', 'beltoft-services' ) . '</p>';
+		}
+
+		self::list( $servers, $others, $empty, $resources );
+	}
+
+	/**
+	 * What the Servers tab lists for the license views: the servers that are not deleted, their resources, the other licenses
+	 * (add-ons whose server is not in the list, and anything else on the tab) and the deleted servers, by license id. The one
+	 * rule of the list (render()) and of the menu count (MenuCounts).
+	 *
+	 * @param array<int, array<string, mixed>> $views License views (each has a 'license' row and an 'id').
+	 * @return array{servers: array<int, array<string, mixed>>, resources: array<int, Resource>, others: array<int, array<string, mixed>>, gone: array<int, array<string, mixed>>}
+	 */
+	public static function sort( array $views ): array {
 		$servers   = array();
 		$resources = array();
 		$others    = array();
 		$gone      = array();
 
+		// One query for the live resources of the whole list (a no-op while the request memo is off).
+		Resource::preload( array_map( static fn( $view ) => is_array( $view ) && isset( $view['license']['id'] ) ? (int) $view['license']['id'] : 0, $views ) );
+
 		foreach ( $views as $view ) {
 			if ( is_array( $view ) && isset( $view['license'] ) && self::is_server( $view['license'] ) ) {
-				$id = (int) $view['id'];
+				$id = (int) ( $view['id'] ?? $view['license']['id'] );
 
 				// One lookup per server: the rows and the page take the resource from here.
 				$resource = Resource::for_license( (int) $view['license']['id'] );
@@ -209,26 +249,12 @@ final class Servers {
 			)
 		);
 
-		$asked = ServerLinks::requested();
-
-		if ( $asked['id'] > 0 && isset( $servers[ $asked['id'] ] ) ) {
-			self::detail( $servers[ $asked['id'] ], $asked['tab'], $resources[ $asked['id'] ] ?? null );
-
-			return;
-		}
-
-		if ( $asked['id'] > 0 && isset( $gone[ $asked['id'] ] ) ) {
-			echo '<div class="beltoft-services-server"><p class="beltoft-services-server__back"><a href="' . esc_url( self::url_list() ) . '">&lsaquo; ' . esc_html__( 'All servers', 'beltoft-services' ) . '</a></p>';
-			echo '<p class="beltoft-services-notice" role="status">' . esc_html__( 'This server was deleted.', 'beltoft-services' ) . '</p></div>';
-
-			return;
-		}
-
-		if ( $asked['id'] > 0 || Slugs::unknown( Slugs::parse( ServerLinks::slug(), 'servers' ) ) ) {
-			echo '<p class="beltoft-services-notice" role="status">' . esc_html__( 'That server was not found. Here are your servers.', 'beltoft-services' ) . '</p>';
-		}
-
-		self::list( $servers, $others, $empty, $resources );
+		return array(
+			'servers'   => $servers,
+			'resources' => $resources,
+			'others'    => $others,
+			'gone'      => $gone,
+		);
 	}
 
 	/**
