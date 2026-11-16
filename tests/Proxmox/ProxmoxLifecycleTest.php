@@ -18,6 +18,7 @@ use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Proxmox\Pve\Ownership;
 use BeltoftServices\Proxmox\Network\PrivateNets;
+use BeltoftServices\Tests\Support\PrivateNetsHarness;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Proxmox\Vm\Switches;
@@ -25,6 +26,8 @@ use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 use BeltoftServices\Retention;
 use BeltoftServices\Tests\TestCase;
+
+require_once dirname( __DIR__ ) . '/Support/PrivateNetsHarness.php';
 
 /**
  * A ProxmoxDriver that records its sleeps instead of sleeping.
@@ -544,8 +547,8 @@ class ProxmoxLifecycleTest extends TestCase {
 		$r = $this->built();
 		$owner = (int) $r->license()['user_id'];
 		$this->assertTrue( PrivateNets::add( 1000, '10.64.0.0/28' ) );
-		$this->assertNotNull( PrivateNets::hold( $owner ) );
-		$this->assertSame( '10.64.0.2', PrivateNets::address( $owner, $r->id() ) );
+		$this->assertNotNull( PrivateNetsHarness::hold( $owner ) );
+		$this->assertSame( '10.64.0.2', PrivateNetsHarness::address( $owner, $r->id() ) );
 
 		$this->assert_done( $this->op( 'delete', $r ) );
 		$this->assertNull( PrivateNets::address_for_resource( $r->id() ) );

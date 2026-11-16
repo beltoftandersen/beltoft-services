@@ -10,10 +10,13 @@ namespace BeltoftServices\Tests\Proxmox\Network;
 use BeltoftServices\Product;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Network\PrivateNets;
+use BeltoftServices\Tests\Support\PrivateNetsHarness;
 use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
 use BeltoftServices\Tests\Support\FakeDriver;
+
+require_once dirname( __DIR__, 2 ) . '/Support/PrivateNetsHarness.php';
 
 class PrivateNetsTest extends TestCase {
 
@@ -43,33 +46,33 @@ class PrivateNetsTest extends TestCase {
 		$this->assertFalse( PrivateNets::add( 1000, '10.64.0.16/28' ) );
 		$this->assertTrue( PrivateNets::add( 1001, '10.64.0.16/28' ) );
 
-		$a = PrivateNets::hold( 11 );
-		$this->assertSame( $a, PrivateNets::hold( 11 ) );
+		$a = PrivateNetsHarness::hold( 11 );
+		$this->assertSame( $a, PrivateNetsHarness::hold( 11 ) );
 		$this->assertSame( 1000, $a['vlan'] );
-		$this->assertSame( 1001, PrivateNets::hold( 12 )['vlan'] );
-		$this->assertNull( PrivateNets::hold( 13 ) );
+		$this->assertSame( 1001, PrivateNetsHarness::hold( 12 )['vlan'] );
+		$this->assertNull( PrivateNetsHarness::hold( 13 ) );
 	}
 
 	public function test_addresses_are_bound_to_the_resource_owner_and_network(): void {
 		PrivateNets::add( 1000, '10.64.0.0/28' );
-		PrivateNets::hold( 11 );
+		PrivateNetsHarness::hold( 11 );
 		$one = $this->resource( 11 );
 		$two = $this->resource( 11 );
 		$other = $this->resource( 12 );
 
-		$this->assertSame( '10.64.0.2', PrivateNets::address( 11, $one->id() ) );
-		$this->assertSame( '10.64.0.2', PrivateNets::address( 11, $one->id() ) );
-		$this->assertSame( '10.64.0.3', PrivateNets::address( 11, $two->id() ) );
-		$this->assertNull( PrivateNets::address( 12, $one->id() ) );
-		$this->assertNull( PrivateNets::address( 11, $other->id() ) );
-		$this->assertFalse( PrivateNets::retire( 11 ), 'The network remains held while a VM has an address.' );
+		$this->assertSame( '10.64.0.2', PrivateNetsHarness::address( 11, $one->id() ) );
+		$this->assertSame( '10.64.0.2', PrivateNetsHarness::address( 11, $one->id() ) );
+		$this->assertSame( '10.64.0.3', PrivateNetsHarness::address( 11, $two->id() ) );
+		$this->assertNull( PrivateNetsHarness::address( 12, $one->id() ) );
+		$this->assertNull( PrivateNetsHarness::address( 11, $other->id() ) );
+		$this->assertFalse( PrivateNetsHarness::retire( 11 ), 'The network remains held while a VM has an address.' );
 		$this->assertTrue( PrivateNets::release_and_retire( $one->id() ) );
 		$this->assertSame( 'held', PrivateNets::for_user( 11 )['state'], 'One address left: not quarantined yet.' );
 		$this->assertTrue( PrivateNets::release_and_retire( $two->id() ) );
 		$this->assertSame( 'quarantine', PrivateNets::for_user( 11 )['state'] );
-		$this->assertNull( PrivateNets::hold( 12 ), 'A quarantined VLAN cannot be assigned to another customer.' );
+		$this->assertNull( PrivateNetsHarness::hold( 12 ), 'A quarantined VLAN cannot be assigned to another customer.' );
 		$this->assertSame( 0, PrivateNets::reclaim(), 'The 30-day quarantine has not elapsed.' );
-		$this->assertSame( 'held_return', PrivateNets::hold( 11 )['state'], 'The original customer can return during quarantine.' );
+		$this->assertSame( 'held_return', PrivateNetsHarness::hold( 11 )['state'], 'The original customer can return during quarantine.' );
 	}
 
 	public function test_reclaim_skips_an_unready_schema_and_a_busy_pool_lock(): void {
@@ -97,8 +100,8 @@ class PrivateNetsTest extends TestCase {
 	public function test_failed_first_attach_preserves_a_returning_customers_quarantine(): void {
 		global $wpdb;
 		$this->assertTrue( PrivateNets::add( 1000, '10.64.0.0/28' ) );
-		$this->assertNotNull( PrivateNets::hold( 11 ) );
-		$this->assertTrue( PrivateNets::retire( 11 ) );
+		$this->assertNotNull( PrivateNetsHarness::hold( 11 ) );
+		$this->assertTrue( PrivateNetsHarness::retire( 11 ) );
 		$started = gmdate( 'Y-m-d H:i:s', time() - 10 * DAY_IN_SECONDS );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test clock fixture.
 		$wpdb->update( Schema::tables()['private_nets'], array( 'updated_at' => $started ), array( 'user_id' => 11 ) );
@@ -108,21 +111,21 @@ class PrivateNetsTest extends TestCase {
 		$after = PrivateNets::for_user( 11 );
 		$this->assertSame( 'quarantine', $after['state'] );
 		$this->assertSame( $started, $after['updated_at'], 'A failed return must preserve the original 30-day clock.' );
-		$this->assertNull( PrivateNets::hold( 12 ) );
+		$this->assertNull( PrivateNetsHarness::hold( 12 ) );
 		$this->assertSame( 0, PrivateNets::reclaim() );
 	}
 
 	public function test_an_empty_network_is_reused_only_after_quarantine(): void {
 		global $wpdb;
 		PrivateNets::add( 1000, '10.64.0.0/28' );
-		PrivateNets::hold( 11 );
-		$this->assertTrue( PrivateNets::retire( 11 ) );
+		PrivateNetsHarness::hold( 11 );
+		$this->assertTrue( PrivateNetsHarness::retire( 11 ) );
 		$this->assertSame( 0, PrivateNets::reclaim() );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test clock fixture.
 		$wpdb->update( Schema::tables()['private_nets'], array( 'updated_at' => gmdate( 'Y-m-d H:i:s', time() - 31 * DAY_IN_SECONDS ) ), array( 'user_id' => 11 ) );
 		$this->assertSame( 1, PrivateNets::reclaim() );
 		$this->assertNull( PrivateNets::for_user( 11 ) );
-		$this->assertSame( 1000, PrivateNets::hold( 12 )['vlan'] );
+		$this->assertSame( 1000, PrivateNetsHarness::hold( 12 )['vlan'] );
 	}
 
 	public function test_releasing_the_last_address_quarantines_and_the_sweep_reclaims(): void {
@@ -185,7 +188,7 @@ class PrivateNetsTest extends TestCase {
 
 	public function test_a_customer_holds_several_networks_up_to_the_maximum_and_the_filter_changes_it(): void {
 		$this->seed( 8 );
-		$this->assertSame( 1000, PrivateNets::hold( 11 )['vlan'] );
+		$this->assertSame( 1000, PrivateNetsHarness::hold( 11 )['vlan'] );
 		for ( $i = 2; $i <= 5; $i++ ) {
 			$net = PrivateNets::create_for_user( 11, 'Net ' . $i );
 			$this->assertNotNull( $net );
@@ -211,12 +214,12 @@ class PrivateNetsTest extends TestCase {
 		}
 		$this->assertNull( PrivateNets::create_for_user( 11, '' ), 'A name is needed.' );
 		$this->assertNull( PrivateNets::create_for_user( 11, str_repeat( 'x', 41 ) ) );
-		$this->assertSame( 1006, PrivateNets::hold( 12 )['vlan'], 'Another customer gets the next free one.' );
+		$this->assertSame( 1006, PrivateNetsHarness::hold( 12 )['vlan'], 'Another customer gets the next free one.' );
 	}
 
 	public function test_reserve_takes_only_the_customers_own_held_network_and_zero_is_the_default(): void {
 		$this->seed( 4 );
-		PrivateNets::hold( 11 );
+		PrivateNetsHarness::hold( 11 );
 		$second = PrivateNets::create_for_user( 11, 'Second' );
 		$one    = $this->resource( 11 );
 		$two    = $this->resource( 11 );
@@ -257,7 +260,7 @@ class PrivateNetsTest extends TestCase {
 
 	public function test_the_last_server_leaving_the_second_network_quarantines_only_that_one(): void {
 		$this->seed( 3 );
-		PrivateNets::hold( 11 );
+		PrivateNetsHarness::hold( 11 );
 		$second = PrivateNets::create_for_user( 11, 'Second' );
 		$one    = $this->resource( 11 );
 		$two    = $this->resource( 11 );
@@ -277,7 +280,7 @@ class PrivateNetsTest extends TestCase {
 	public function test_a_new_network_reuses_the_customers_own_quarantined_one_before_a_free_one(): void {
 		global $wpdb;
 		$this->seed( 3 );
-		PrivateNets::hold( 11 );
+		PrivateNetsHarness::hold( 11 );
 		$second = PrivateNets::create_for_user( 11, 'Second' );
 		$two    = $this->resource( 11 );
 		PrivateNets::reserve( 11, $two->id(), $second['id'] );

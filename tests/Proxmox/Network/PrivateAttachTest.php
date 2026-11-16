@@ -18,10 +18,13 @@ use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Network\NetworkTab;
 use BeltoftServices\Proxmox\Network\PrivateAttach;
 use BeltoftServices\Proxmox\Network\PrivateNets;
+use BeltoftServices\Tests\Support\PrivateNetsHarness;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
+
+require_once dirname( __DIR__, 2 ) . '/Support/PrivateNetsHarness.php';
 
 class PrivateAttachTest extends TestCase {
 
@@ -507,7 +510,7 @@ class PrivateAttachTest extends TestCase {
 		$this->more_nets( 2 );
 		$r      = $this->ready();
 		$owner  = $this->owner_of( $r );
-		PrivateNets::hold( $owner );
+		PrivateNetsHarness::hold( $owner );
 		$second = PrivateNets::create_for_user( $owner, 'Two' );
 
 		$this->assertNull( Actions::check( $r, 'private_attach', array( 'net' => (string) $second['id'] ) ) );
@@ -547,7 +550,7 @@ class PrivateAttachTest extends TestCase {
 		$this->more_nets( 1 );
 		$r     = $this->ready();
 		$owner = $this->owner_of( $r );
-		PrivateNets::hold( $owner );
+		PrivateNetsHarness::hold( $owner );
 		PrivateNets::create_for_user( $owner, 'Two' );
 		Jobs::act( $r->id(), 'private_attach', array() );
 		$this->assertSame( 1000, PrivateNets::for_resource( $r->id() )['vlan'] );
@@ -568,8 +571,8 @@ class PrivateAttachTest extends TestCase {
 		$this->more_nets( 3 );
 		$r      = $this->ready();
 		$owner  = $this->owner_of( $r );
-		$mine   = PrivateNets::hold( $owner );
-		$other  = PrivateNets::hold( $owner + 1000 );
+		$mine   = PrivateNetsHarness::hold( $owner );
+		$other  = PrivateNetsHarness::hold( $owner + 1000 );
 
 		$this->assertStringContainsString( 'not one of yours', (string) Actions::check( $r, 'private_attach', array( 'net' => (string) $other['id'] ) ) );
 		$this->assertStringContainsString( 'not one of yours', (string) Actions::check( $r, 'private_attach', array( 'net' => '99999' ) ) );
@@ -597,7 +600,7 @@ class PrivateAttachTest extends TestCase {
 
 	public function test_check_refuses_a_new_network_when_the_pool_is_empty(): void {
 		$r = $this->ready();
-		PrivateNets::hold( $this->owner_of( $r ) );
+		PrivateNetsHarness::hold( $this->owner_of( $r ) );
 		$this->assertStringContainsString( 'No private network is available', (string) Actions::check( $r, 'private_attach', array( 'net' => 'new', 'name' => 'More' ) ) );
 	}
 
@@ -605,7 +608,7 @@ class PrivateAttachTest extends TestCase {
 		$this->more_nets( 3 );
 		$r      = $this->ready();
 		$owner  = $this->owner_of( $r );
-		PrivateNets::hold( $owner );
+		PrivateNetsHarness::hold( $owner );
 		$second = PrivateNets::create_for_user( $owner, 'Two' );
 		$member = $this->service_product( 'fake' );
 		$db     = Resource::create( $this->service_license( $member, array( 'user_id' => $owner, 'fire' => false ) ), Registry::get( 'fake' ) ?? new \BeltoftServices\Tests\Support\FakeDriver(), Product::plan( $member->get_id() ) );
