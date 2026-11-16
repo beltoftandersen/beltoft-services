@@ -255,7 +255,8 @@ final class PleskMonthlyTest extends PaidAppCase {
 	}
 
 	public function test_the_delete_text_of_a_server_with_a_monthly_licence_says_it_stays_until_the_paid_date_and_can_be_used_again(): void {
-		$p    = $this->monthly_pair();
+		$p = $this->monthly_pair();
+		$this->assertTrue( $p['licence']->set( array( 'state' => 'ready' ) ), 'Delivered.' );
 		$note = \BeltoftServices\Usage\CustomerDelete::licence_note( $p['server'] );
 		$date = wp_date( get_option( 'date_format' ), (int) $p['sub']->get_time( 'next_payment' ) );
 
@@ -264,6 +265,7 @@ final class PleskMonthlyTest extends PaidAppCase {
 
 	public function test_the_delete_text_without_paid_time_left_says_the_licence_ends_with_the_server(): void {
 		$p = $this->monthly_pair();
+		$this->assertTrue( $p['licence']->set( array( 'state' => 'ready' ) ), 'Delivered.' );
 		$p['sub']->update_dates( array( 'next_payment' => gmdate( 'Y-m-d H:i:s', time() + HOUR_IN_SECONDS ) ) );
 
 		$this->assertSame( 'The app licence ends with the server.', \BeltoftServices\Usage\CustomerDelete::licence_note( $p['server'] ) );
