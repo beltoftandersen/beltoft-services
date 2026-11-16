@@ -396,6 +396,25 @@ final class Alerts {
 	}
 
 	/**
+	 * Tells the admin that a domain was paused (its order was refunded or lapsed) while it is still registered at the registrar.
+	 * A registration is never deleted by this plugin: staff decide. Once per domain.
+	 *
+	 * @param Resource $r Domain resource.
+	 * @return bool Whether a mail was sent.
+	 */
+	public static function domain_paused( Resource $r ): bool {
+		$lines = array(
+			sprintf( 'Domain: %s', (string) $r->get( 'domain' ) ),
+			sprintf( 'Registrar id: %s', (string) $r->get( 'remote_id' ) ),
+			sprintf( 'Expires: %s', (string) $r->get( 'expires_at' ) ),
+			sprintf( 'Resource: %d', $r->id() ),
+			'The order is refunded or has lapsed, but the domain is still registered and its DNS is still served. Decide what to do with it: this plugin never deletes a registration.',
+		);
+
+		return self::notify( 'Domain paused but still registered: ' . (string) $r->get( 'domain' ), $lines, $r, 'beltoft_services_domain_paused_' . $r->id(), array( 'ttl' => YEAR_IN_SECONDS ) );
+	}
+
+	/**
 	 * Alerts the admin that a deletion that was asked for is held because deletion is not turned on.
 	 * The caller sends this once.
 	 *
