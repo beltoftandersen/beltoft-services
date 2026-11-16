@@ -41,6 +41,18 @@ final class Renewal {
 	public static function register(): void {
 		add_filter( 'wcs_renewal_order_created', array( __CLASS__, 'filter' ), 20, 2 );
 		add_action( 'woocommerce_order_status_cancelled', array( __CLASS__, 'cancelled' ) );
+		add_filter( 'beltoft_services_order_cancel_refused', array( __CLASS__, 'refuse_cancel' ), 10, 2 );
+	}
+
+	/**
+	 * A usage invoice is not cancelled through the dashboard or the MCP tools.
+	 *
+	 * @param mixed $refuse Answer so far.
+	 * @param mixed $order  Order.
+	 * @return mixed
+	 */
+	public static function refuse_cancel( $refuse, $order = null ) {
+		return $refuse || ( $order instanceof \WC_Order && '' !== (string) $order->get_meta( self::META_LINES ) );
 	}
 
 	/**

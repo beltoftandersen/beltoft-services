@@ -314,6 +314,17 @@ final class Subscriptions {
 			return new \WP_Error( 'beltoft_services_tool', __( 'This order can no longer be cancelled.', 'beltoft-services' ) );
 		}
 
+		/**
+		 * Whether a feature keeps an order from being cancelled here (a usage invoice: cancelling frees its usage rows, which
+		 * nothing bills again while the account is on hold).
+		 *
+		 * @param bool      $refuse Refuse.
+		 * @param \WC_Order $order  Order.
+		 */
+		if ( apply_filters( 'beltoft_services_order_cancel_refused', false, $order ) ) {
+			return new \WP_Error( 'beltoft_services_tool', __( 'This order is a usage invoice and cannot be cancelled here. Pay it, or contact support.', 'beltoft-services' ) );
+		}
+
 		// WooCommerce Subscriptions cancels the subscriptions of a parent order with it: that is cancelling a service.
 		if ( function_exists( 'wcs_order_contains_subscription' ) && wcs_order_contains_subscription( $order, 'parent' ) ) {
 			foreach ( wcs_get_subscriptions_for_order( $order, array( 'order_type' => 'parent' ) ) as $subscription ) {

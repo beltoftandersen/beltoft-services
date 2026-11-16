@@ -78,6 +78,18 @@ final class ReviewFixesTest extends McpTestCase {
 		$this->assertSame( 'active', wcs_get_subscription( $sub->get_id() )->get_status() );
 	}
 
+	public function test_a_usage_invoice_cannot_be_cancelled_because_its_rows_would_be_freed_and_the_debt_lost(): void {
+		$user  = (int) self::factory()->user->create();
+		$token = $this->oauth( $user, Tokens::ACTIONS );
+		$order = wc_create_order( array( 'customer_id' => $user, 'status' => 'failed' ) );
+		$order->update_meta_data( \BeltoftServices\Usage\Renewal::META_LINES, 'yes' );
+		$order->save();
+
+		$refused = $this->tool( 'cancel_unpaid_order', array( 'order_id' => $order->get_id() ), $token );
+		$this->assertTrue( $refused['isError'] );
+		$this->assertSame( 'failed', wc_get_order( $order->get_id() )->get_status() );
+	}
+
 	public function test_auto_renew_on_needs_a_default_card_that_can_be_charged(): void {
 		update_option( 'woocommerce_subscriptions_enable_auto_renewal_toggle', 'yes' );
 		$user  = self::factory()->user->create();
