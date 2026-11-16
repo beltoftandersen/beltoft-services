@@ -145,9 +145,11 @@ final class KeyField {
 	 * @param array<string, mixed> $input   source (own:<license id> or other), ip, confirm.
 	 * @param int                  $user_id Customer.
 	 * @param string               $key     Catalogue key.
+	 * @param Resource|null        $moving  The licence whose address is being changed (KeyMove), else null at checkout: it needs no server
+	 *                                      type confirmed again and is not a duplicate of itself.
 	 * @return array<string, mixed>|\WP_Error What is saved on the order line; the error's message is for the customer.
 	 */
-	public static function resolve( array $input, int $user_id, string $key ) {
+	public static function resolve( array $input, int $user_id, string $key, ?Resource $moving = null ) {
 		if ( '' === $key ) {
 			return new \WP_Error( 'lickey_product', __( 'This licence is not set up for sale yet. Please try again later.', 'beltoft-services' ) );
 		}
@@ -191,11 +193,15 @@ final class KeyField {
 			}
 		}
 
-		if ( empty( $input['confirm'] ) && $edition ) {
+		if ( null === $moving && empty( $input['confirm'] ) && $edition ) {
 			return new \WP_Error( 'lickey_confirm', KeyCatalog::is_physical( $key ) ? __( 'Confirm that the server is a physical server.', 'beltoft-services' ) : __( 'Confirm that the server is a virtual server. A licence for a virtual server is not valid on a physical one.', 'beltoft-services' ) );
 		}
 
 		foreach ( KeyOrder::live( $ip ) as $other ) {
+			if ( null !== $moving && $other->id() === $moving->id() ) {
+				continue;
+			}
+
 			if ( KeyCatalog::is_edition( $key ) && KeyCatalog::is_edition( KeyOrder::key_of( $other ) ) ) {
 				return new \WP_Error( 'lickey_duplicate', __( 'This address already has a Plesk licence.', 'beltoft-services' ) );
 			}

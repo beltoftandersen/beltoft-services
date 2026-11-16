@@ -4,6 +4,7 @@
 namespace BeltoftServices\Licences;
 
 use BeltoftServices\Drivers\Driver;
+use BeltoftServices\Drivers\InternalActions;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Resource;
 
@@ -12,9 +13,10 @@ defined( 'ABSPATH' ) || exit;
 /**
  * One subscription and resource per licence. Provision orders the vendor licence for the customer's server address
  * (KeyOrder), pausing keeps it while on hold and deletes it once the licence lapsed, a plan change switches its item, and delete removes it.
- * The customer sees the key in My Account (KeyPanel); there are no customer actions.
+ * The customer sees the key in My Account (KeyPanel) and can change the server address (KeyMove, action change_address); an add-on
+ * follows the address of its parent (internal action follow_parent).
  */
-final class KeyDriver implements Driver {
+final class KeyDriver implements Driver, InternalActions {
 	public const ID   = 'licence-key';
 	public const KIND = 'lickey';
 
@@ -86,13 +88,21 @@ final class KeyDriver implements Driver {
 	}
 
 	public function customer_actions( Resource $r ): array {
-		unset( $r );
+		return KeyMove::offer( $r ) ? array( KeyMove::ACTION => __( 'Change server address', 'beltoft-services' ) ) : array();
+	}
 
-		return array();
+	public function internal_actions(): array {
+		return array( KeyMove::FOLLOW );
 	}
 
 	public function act( Resource $r, string $action, array $args ): StepResult {
-		unset( $r, $action, $args );
+		if ( KeyMove::ACTION === $action ) {
+			return KeyMove::run( $r, $args );
+		}
+
+		if ( KeyMove::FOLLOW === $action ) {
+			return KeyMove::follow( $r, $args );
+		}
 
 		return StepResult::fail( 'This licence action is not available.' );
 	}

@@ -93,6 +93,7 @@ final class Plugin {
 		Licences\KeyCatalog::register();
 		Licences\KeyOrder::register();
 		Licences\KeyField::register();
+		Licences\KeyMove::register();
 		Mail\MailSettings::register();
 		Mail\MailPacks::register();
 		Mail\MailSetup::register();

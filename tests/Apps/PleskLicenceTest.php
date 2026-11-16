@@ -615,11 +615,21 @@ final class PleskLicenceTest extends PaidAppCase {
 	}
 
 	public function test_a_kept_licence_is_rebound_to_the_new_address_and_the_hardware_id_reset_before_the_key_goes_on(): void {
-		$k = $this->kept_for_new_server();
+		$k     = $this->kept_for_new_server();
+		$moved = array();
+		add_action(
+			PleskLicence::MOVED,
+			static function ( $licence, $ip, $server ) use ( &$moved ): void {
+				$moved[] = array( $licence->id(), $ip, $server->id() );
+			},
+			10,
+			3
+		);
 
 		$result = AppInstall::queue( $k['server2'], $this->fake );
 
 		$this->assertTrue( $result->is_done(), $result->error() );
+		$this->assertSame( array( array( $k['licence']->id(), '192.0.2.11', $k['server2']->id() ) ), $moved, 'Add-ons under the licence are told it moved.' );
 		$puts = $this->op_calls( 'PUT', '/licenses/plesk/' . $k['key_id'] );
 		$this->assertCount( 1, $puts );
 		$this->assertSame( array( 'ip_address_binding' => '192.0.2.11', 'restrict_ip_binding' => true ), $puts[0]['body'], 'Only the address: no items and no period, which would order.' );
