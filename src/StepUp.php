@@ -324,6 +324,24 @@ final class StepUp {
 	private static $matched = array();
 
 	/**
+	 * The check a route makes before it shows or changes a secret: the code is in the request (parameter step_code) and is right for
+	 * the purpose. A right emailed code is NOT used up here; the route calls consume() once its work is certain.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @param string           $purpose One of purposes().
+	 * @return \WP_Error|null The 403 refusal, or null when the code is right.
+	 */
+	public static function demand( \WP_REST_Request $request, string $purpose ): ?\WP_Error {
+		$code = $request->get_param( 'step_code' );
+
+		if ( ! is_string( $code ) || ! self::verify( get_current_user_id(), $code, $purpose, false ) ) {
+			return new \WP_Error( 'step_up', self::refusal( get_current_user_id(), $purpose ), array( 'status' => 403 ) );
+		}
+
+		return null;
+	}
+
+	/**
 	 * Uses up the emailed code of a purpose after verify( ..., false ) accepted it. Atomic: the code is gone in one delete, and
 	 * only the call whose delete removed it gets true. Two requests that sent the same right code both pass verify(), one wins
 	 * here; the loser must not show or do what the code allows. A purpose a site's own check decided (no emailed code was

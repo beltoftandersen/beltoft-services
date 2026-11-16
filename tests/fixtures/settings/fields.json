@@ -767,6 +767,16 @@
         "max": 60,
         "label": "Charge renewals before expiry, in days"
     },
+    "domain_renew_loss_cap": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "number",
+        "default": 5,
+        "min": 0,
+        "max": 1000,
+        "label": "Renew below cost up to, in EUR per domain, whole euros",
+        "desc": "A paid renewal whose price is below the registrar cost is still bought when the loss is at most this amount in the cost currency, so the domain does not expire after the customer paid. Staff get one email with the price, the cost and the loss. A larger loss waits for staff. 0 turns this off. Registrations and transfers are not covered."
+    },
     "domain_free_transfers": {
         "tab": "domains",
         "section": "domains",

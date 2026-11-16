@@ -137,7 +137,7 @@ final class Renewals {
 		$expiry = (string) ( $detail['expiration_date'] ?? '' );
 		if ( self::later( $expiry, $baseline ) ) { return self::finish_renewal( $r, $order_id, $expiry, $done, $started ); }
 		if ( isset( $started[ $order_id ] ) ) { return StepResult::retry( 3600, 'A renewal request is awaiting registry confirmation.' ); }
-		$blocked = SpendGuard::guard( $r, (string) $r->get( 'domain' ), 'renew', SpendGuard::item_of_order( $order, (string) $r->get( 'domain' ) ) );
+		$blocked = SpendGuard::guard_renewal( $r, (string) $r->get( 'domain' ), SpendGuard::item_of_order( $order, (string) $r->get( 'domain' ) ), $order_id );
 		if ( $blocked ) { return $blocked; }
 		$started[ $order_id ] = $baseline;
 		if ( ! $r->set( array( 'renew_started' => $started ) ) ) { return StepResult::retry( 3600, 'The renewal could not be recorded before requesting it.' ); }

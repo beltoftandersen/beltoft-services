@@ -218,7 +218,7 @@ final class Definitions {
 			'set_php_version'  => self::act( 'Changes the PHP version of a website, and optionally its PHP memory limit and upload size (never above the plan). The website restarts its PHP. The change is queued and runs in the background (hosting_info shows the account\'s task; another change is refused until it is done). Ask the customer first.', self::obj( array( 'id' => $id, 'site' => array( 'type' => 'string', 'maxLength' => 32, 'description' => 'The website name, from hosting_info.' ), 'php' => array( 'type' => 'string', 'maxLength' => 8, 'description' => 'A version from hosting_info, for example 8.4.' ), 'memory_mb' => array( 'type' => 'integer', 'minimum' => 64, 'description' => 'PHP memory limit in MB. Optional.' ), 'upload_mb' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'Upload size in MB. Optional.' ) ), array( 'id', 'site', 'php' ) ), false, true ),
 			'clear_site_cache' => self::act( 'Clears the page cache of a website of a hosting account. Queued: it runs in the background, and another change of the account is refused until it is done (hosting_info shows the task).', self::obj( array( 'id' => $id, 'site' => array( 'type' => 'string', 'maxLength' => 32, 'description' => 'The website name, from hosting_info.' ) ), array( 'id', 'site' ) ), false, true ),
 			'create_hosting_backup' => self::act( 'Starts a backup of a hosting account now. Up to 3 a day; the 3 newest manual backups are kept. It runs in the background.', $by_id, false ),
-			'create_mailbox'   => self::act( 'Makes a mailbox in an email domain, with the size of the plan. It is queued and made in the background (email_domain_info shows the task of the domain, then the mailbox with reveal true). It gets a password that is never shown here: the customer shows it once in the dashboard, or reveal_mailbox_password shows it after the customer\'s yes. Ask the customer first.', self::obj( array( 'id' => $id, 'name' => array( 'type' => 'string', 'maxLength' => 64, 'description' => 'The part before the @: letters, numbers, dots, dashes and underscores.' ), 'display_name' => array( 'type' => 'string', 'maxLength' => 100, 'description' => 'The name shown for the mailbox. Optional.' ) ), array( 'id', 'name' ) ), false ),
+			'create_mailbox'   => self::act( 'Makes a mailbox in an email domain, with the size of the plan. It is queued and made in the background (email_domain_info shows the task of the domain, then the mailbox with reveal true). It gets a password that is never shown here: the customer shows it once in the dashboard, after a code we email to them. Ask the customer first.', self::obj( array( 'id' => $id, 'name' => array( 'type' => 'string', 'maxLength' => 64, 'description' => 'The part before the @: letters, numbers, dots, dashes and underscores.' ), 'display_name' => array( 'type' => 'string', 'maxLength' => 100, 'description' => 'The name shown for the mailbox. Optional.' ) ), array( 'id', 'name' ) ), false ),
 			'add_email_alias'  => self::act( 'Makes an alias in an email domain: an address that delivers to one or more other addresses. There is no catch-all. Delivering to other domains is allowed only when the site allows it. Ask the customer first.', self::obj( array( 'id' => $id, 'name' => array( 'type' => 'string', 'maxLength' => 64, 'description' => 'The part before the @.' ), 'deliver_to' => array( 'type' => 'array', 'maxItems' => 10, 'items' => array( 'type' => 'string', 'maxLength' => 254 ), 'description' => 'One to ten addresses.' ) ), array( 'id', 'name', 'deliver_to' ) ), false ),
 			'remove_email_alias' => self::act( 'Deletes an alias of an email domain. Mail sent to it afterwards bounces. Ask the customer first.', self::obj( array( 'id' => $id, 'address' => array( 'type' => 'string', 'maxLength' => 254, 'description' => 'The alias address, from email_domain_info.' ) ), array( 'id', 'address' ) ), true, true ),
 			'ssl_resend_email' => self::act( 'Sends the approval email of an SSL certificate again, when it is validated by email and still waits for the approval.', $by_id, false, true ),
@@ -301,10 +301,6 @@ final class Definitions {
 				self::obj( array( 'id' => $id, 'policy' => array( 'type' => 'string', 'maxLength' => 40, 'description' => 'The policy, for example noeviction or allkeys-lru, as the database offers it.' ) ), array( 'id', 'policy' ), true ),
 				false,
 				true
-			),
-			'reset_mailbox_password' => self::full(
-				'Makes a new password for a mailbox. It is queued and runs in the background (email_domain_info shows the task of the domain); the old one stops working when it is done. The new one is never shown here: reveal_mailbox_password shows it once after the customer says yes, or the customer shows it once in the dashboard.',
-				self::obj( array( 'id' => $id, 'email' => array( 'type' => 'string', 'maxLength' => 254, 'description' => 'The mailbox address, from email_domain_info.' ) ), array( 'id', 'email' ), true )
 			),
 			'delete_mailbox'   => self::full(
 				'Deletes a mailbox and every message in it for good. Get the address from email_domain_info.',
@@ -389,11 +385,6 @@ final class Definitions {
 			'reveal_app_login' => self::full(
 				'Shows the first login of the app on a server once. The value then is in this conversation and we no longer have it.',
 				self::obj( array( 'id' => $id ), array( 'id' ), true ),
-				true
-			),
-			'reveal_mailbox_password' => self::full(
-				'Shows the password of a mailbox once. The value then is in this conversation and we no longer have it. Use reset_mailbox_password first if there is none to show.',
-				self::obj( array( 'id' => $id, 'email' => array( 'type' => 'string', 'maxLength' => 254, 'description' => 'The mailbox address, from email_domain_info.' ) ), array( 'id', 'email' ), true ),
 				true
 			),
 			'get_database_ca_certificate' => self::full(

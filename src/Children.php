@@ -34,6 +34,7 @@ final class Children {
 	 */
 	public static function register(): void {
 		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'follow' ), 10, 3 );
+		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'retire' ), 10, 3 );
 	}
 
 	/**
@@ -181,6 +182,28 @@ final class Children {
 			} elseif ( 'deleted' === $new && 'deleted' !== $child->get( 'desired' ) ) {
 				self::desire( $child, 'deleted', 'The parent service was deleted' );
 			}
+		}
+	}
+
+	/**
+	 * Action beltoft_services_state_changed: a child that reached `deleted` has its own license revoked, so no active license is
+	 * left without a service (the child license has no service product, so no lifecycle listener closes it).
+	 *
+	 * @param mixed $r   Resource.
+	 * @param mixed $old Previous state.
+	 * @param mixed $new New state.
+	 */
+	public static function retire( $r, $old, $new ): void {
+		unset( $old );
+
+		if ( ! $r instanceof Resource || 'deleted' !== $new || (int) $r->get( self::PARENT ) < 1 ) {
+			return;
+		}
+
+		$license = $r->license();
+
+		if ( $license && 'child' === ( $license['source'] ?? '' ) && Licenses::STATUS_REVOKED !== ( $license['status'] ?? '' ) ) {
+			Licenses::update( (int) $license['id'], array( 'status' => Licenses::STATUS_REVOKED ) );
 		}
 	}
 

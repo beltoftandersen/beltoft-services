@@ -27,6 +27,8 @@ class SmimeTest extends SslTestCase {
 		global $wp_rest_server;
 		$wp_rest_server = new \WP_REST_Server();
 		do_action( 'rest_api_init', $wp_rest_server );
+		// A right emailed code is read as 123456 in these tests; the real check is StepUp's own (tested there).
+		add_filter( 'beltoft_services_step_up_verify', static fn( $ok, $user, $secret, $kind, $purpose ) => 'ssl_key' === $purpose ? ( '123456' === $secret ) : $ok, 10, 5 );
 	}
 
 	public function tear_down(): void {
@@ -34,6 +36,7 @@ class SmimeTest extends SslTestCase {
 		$wp_rest_server = null;
 		remove_all_filters( 'beltoft_services_smime_mailbox_allowed' );
 		remove_all_filters( 'beltoft_services_rest_rate_limit' );
+		remove_all_filters( 'beltoft_services_step_up_verify' );
 		unset( $_POST[ SslField::POST_KEY ] );
 		parent::tear_down();
 	}
@@ -61,7 +64,11 @@ class SmimeTest extends SslTestCase {
 		wp_set_current_user( $user );
 		$request = new \WP_REST_Request( 'POST', '/beltoft-services/v1/resources/' . $path );
 		$request->set_header( 'content-type', 'application/json' );
-		$request->set_body( (string) wp_json_encode( $params ) );
+		// The routes that hand out a key ask for the emailed code; a test that wants no code passes step_code => null.
+		if ( preg_match( '#/ssl-(key|pkcs12)$#', $path ) && ! array_key_exists( 'step_code', $params ) ) {
+			$params['step_code'] = '123456';
+		}
+		$request->set_body( (string) wp_json_encode( array_filter( $params, static fn( $v ) => null !== $v ) ) );
 
 		return rest_get_server()->dispatch( $request );
 	}
@@ -377,6 +384,26 @@ class SmimeTest extends SslTestCase {
 
 		$this->assertSame( '', (string) Resource::find( $r->id() )->get( Keys::META_KEY ), 'Wiped.' );
 		$this->assertSame( 409, $this->call( $r->id() . '/ssl-pkcs12', $user )->get_status() );
+	}
+
+	public function test_the_key_is_not_taken_without_the_emailed_code(): void {
+		$r = $this->smime_built();
+		$user = (int) $r->license()['user_id'];
+		foreach ( array( null, '000000' ) as $code ) {
+			$refused = $this->call( $r->id() . '/ssl-pkcs12', $user, array( 'step_code' => $code ) );
+			$this->assertSame( 403, $refused->get_status() );
+			$this->assertSame( 'step_up', $refused->get_data()['code'] );
+			$this->assertArrayNotHasKey( 'pkcs12', $refused->get_data() );
+		}
+		$this->assertTrue( Keys::revealable( Resource::find( $r->id() ) ), 'A refused request takes nothing.' );
+		$this->assertContains( 'ssl_key', \BeltoftServices\StepUp::purposes() );
+		$this->assertNotSame( 'confirming this step', apply_filters( 'beltoft_services_stepup_text', 'confirming this step', 'ssl_key' ) );
+		$web = $this->built();
+		$denied = $this->call( $web->id() . '/ssl-key', (int) $web->license()['user_id'], array( 'step_code' => null ) );
+		$this->assertSame( 403, $denied->get_status() );
+		$this->assertSame( 'step_up', $denied->get_data()['code'] );
+		$this->assertTrue( Keys::revealable( Resource::find( $web->id() ) ) );
+		$this->assertSame( 200, $this->call( $web->id() . '/ssl-key', (int) $web->license()['user_id'] )->get_status() );
 	}
 
 	public function test_a_password_is_made_when_none_is_given_and_returned_once(): void {

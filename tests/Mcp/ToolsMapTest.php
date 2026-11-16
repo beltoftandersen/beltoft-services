@@ -158,7 +158,6 @@ final class ToolsMapTest extends McpTestCase {
 			'reveal_server_password'      => array( 'POST', '/resources/1/reveal' ),
 			'reveal_database_password'    => array( 'POST', '/resources/1/db-reveal' ),
 			'reveal_app_login'            => array( 'POST', '/resources/1/app-reveal' ),
-			'reveal_mailbox_password'     => array( 'POST', '/resources/1/mail-reveal' ),
 			'get_database_ca_certificate' => array( 'GET', '/resources/1/db-ca' ),
 		);
 

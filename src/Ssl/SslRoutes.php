@@ -30,10 +30,59 @@ final class SslRoutes {
 	/** Requests a minute for the key and the panel link. */
 	public const SECRET_LIMIT = 5;
 
+	/** The step-up purpose of taking a private key. */
+	public const STEP_PURPOSE = 'ssl_key';
+
 	/** Hooks. */
 	public static function register(): void {
 		add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
+		add_filter( 'beltoft_services_stepup_purposes', array( __CLASS__, 'stepup_purposes' ) );
+		add_filter( 'beltoft_services_stepup_text', array( __CLASS__, 'stepup_text' ), 10, 2 );
 		add_filter( 'beltoft_services_action_refusal', array( __CLASS__, 'refusal' ), 10, 4 );
+	}
+
+	/**
+	 * Registers the purpose of the code step before a private key is taken.
+	 *
+	 * @param array<int, string> $purposes Purposes so far.
+	 * @return array<int, string>
+	 */
+	public static function stepup_purposes( $purposes ): array {
+		return array_merge( (array) $purposes, array( self::STEP_PURPOSE ) );
+	}
+
+	/**
+	 * What the code email says this purpose is for.
+	 *
+	 * @param string $text    Text so far.
+	 * @param string $purpose The purpose.
+	 */
+	public static function stepup_text( $text, $purpose ): string {
+		return self::STEP_PURPOSE === $purpose ? __( 'taking the private key of an SSL certificate', 'beltoft-services' ) : (string) $text;
+	}
+
+	/**
+	 * The code check before a key is taken: a refusal response, or null when the emailed code is right and now used up.
+	 * A key that is not there to take is answered before this (nothing is asked for a key that cannot be shown).
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 */
+	private static function stepped( \WP_REST_Request $request ): ?\WP_REST_Response {
+		$refused = \BeltoftServices\StepUp::demand( $request, self::STEP_PURPOSE );
+
+		// Two requests with one right code both pass the check; only the one that uses the code up may take the key.
+		if ( ! $refused && ! \BeltoftServices\StepUp::consume( get_current_user_id(), self::STEP_PURPOSE ) ) {
+			$refused = new \WP_Error( 'step_up', \BeltoftServices\StepUp::refusal( get_current_user_id(), self::STEP_PURPOSE ), array( 'status' => 403 ) );
+		}
+
+		if ( ! $refused ) {
+			return null;
+		}
+
+		$response = rest_convert_error_to_response( $refused );
+		$response->header( 'Cache-Control', 'no-store' );
+
+		return $response;
 	}
 
 	/** Registers the routes. */
@@ -151,6 +200,14 @@ final class SslRoutes {
 			return self::error( 'ssl_key_pkcs12', __( 'The key of an S/MIME certificate is downloaded as a .p12 file.', 'beltoft-services' ), 409 );
 		}
 
+		if ( Keys::revealable( $resource ) ) {
+			$refused = self::stepped( $request );
+
+			if ( $refused ) {
+				return $refused;
+			}
+		}
+
 		$key = Keys::take( $resource, get_current_user_id() );
 
 		if ( null === $key ) {
@@ -187,6 +244,14 @@ final class SslRoutes {
 
 		if ( ! $generated && ( strlen( $password ) < 12 || strlen( $password ) > 128 ) ) {
 			return self::error( 'ssl_password', __( 'Choose a password of at least 12 characters, or leave it empty and we make one.', 'beltoft-services' ), 422 );
+		}
+
+		if ( Keys::revealable( $resource ) ) {
+			$refused = self::stepped( $request );
+
+			if ( $refused ) {
+				return $refused;
+			}
 		}
 
 		$file = Keys::take( $resource, get_current_user_id(), static fn( string $key ): ?string => Keys::pkcs12( $resource, $key, $password ) );
