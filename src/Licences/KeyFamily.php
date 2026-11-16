@@ -20,7 +20,9 @@ final class KeyFamily implements LicenceFamily {
 
 	/** Logical field => stored meta name. */
 	private const META = array(
-		'title' => 'lic_title',
+		'title'  => 'lic_title',
+		'key_id' => 'lic_key_id',
+		'item'   => 'lic_item',
 	);
 
 	public function meta( string $field ): string {

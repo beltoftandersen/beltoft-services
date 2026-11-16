@@ -154,15 +154,6 @@ final class KeyOrder {
 	}
 
 	/**
-	 * The title of the vendor licence: fixed by the licence id, so a crash can find it again.
-	 *
-	 * @param Resource $r Licence resource.
-	 */
-	private static function title( Resource $r ): string {
-		return LicenceVendor::title( $r, new KeyFamily(), (string) $r->get( 'lic_ip' ) );
-	}
-
-	/**
 	 * Is the paid line at least the cost at the vendor? Null when covered, else why not.
 	 *
 	 * @param Resource $r   Licence resource.
@@ -355,71 +346,20 @@ final class KeyOrder {
 			}
 		}
 
-		$title = self::title( $r );
-
-		if ( $title !== (string) $r->get( 'lic_title' ) && ! $r->set( array( 'lic_title' => $title ) ) ) {
-			return StepResult::retry( 60, 'The licence title could not be stored.' );
-		}
-
-		$client = self::client();
-		$found  = $client->request( 'GET', '/licenses/plesk', array(), array( 'title_pattern' => $title, 'limit' => 10 ) );
-
-		if ( is_wp_error( $found ) ) {
-			return self::failure( $r, $found, 'Openprovider could not be asked for an earlier licence.' );
-		}
-
-		$existing = 0;
-
-		foreach ( (array) ( $found['results'] ?? array() ) as $row ) {
-			if ( is_array( $row ) && (int) ( $row['key_id'] ?? 0 ) > 0 && (string) ( $row['title'] ?? '' ) === $title ) {
-				$existing = (int) $row['key_id'];
-				break;
-			}
-		}
-
-		if ( 0 === $existing ) {
-			// Money is spent here: only when the paid line covers the cost. A licence found above (a crash-resume) never gets here.
-			$problem = self::spend_problem( $r, $key );
-
-			if ( null !== $problem ) {
-				Alerts::admin( $r, $problem . ' No licence was ordered.' );
-
-				return StepResult::fail( $problem );
-			}
-
-			$body = array(
-				'title'               => $title,
-				'comment'             => sprintf( 'Beltoft Services licence %d', (int) ( $r->license()['id'] ?? 0 ) ),
-				'items'               => array( $item ),
-				'period'              => 1,
-				'ip_address_binding'  => $ip,
-				'restrict_ip_binding' => true,
-			);
-
-			if ( $parent > 0 ) {
-				$body['parent_key_id'] = $parent;
-			}
-
-			$created = $client->request( 'POST', '/licenses/plesk', $body );
-
-			if ( is_wp_error( $created ) ) {
-				// A call that timed out may still have gone through: the next try finds it by its title.
-				return self::failure( $r, $created, 'Openprovider did not order the licence.' );
-			}
-
-			$existing = (int) ( $created['key_id'] ?? 0 );
-
-			if ( $existing < 1 ) {
-				return StepResult::retry( 300, 'Openprovider returned no licence id.' );
-			}
-		}
-
-		if ( ! $r->set( array( 'lic_key_id' => $existing, 'lic_item' => $item, 'lic_parent' => max( 0, $parent ) ) ) ) {
-			// The next try finds the licence by its title.
-			return StepResult::retry( 60, 'The Openprovider licence id could not be stored.' );
-		}
-
-		return $existing;
+		return LicenceVendor::find_or_create(
+			$r,
+			new KeyFamily(),
+			$key,
+			$item,
+			$ip,
+			KeyCatalog::costs(),
+			array(
+				'seed'    => (string) $r->get( 'lic_ip' ),
+				'comment' => sprintf( 'Beltoft Services licence %d', (int) ( $r->license()['id'] ?? 0 ) ),
+				'parent'  => $parent,
+				'meta'    => array( 'lic_parent' => max( 0, $parent ) ),
+			)
+		);
 	}
 
 	/**

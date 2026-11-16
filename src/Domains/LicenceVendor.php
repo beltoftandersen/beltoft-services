@@ -171,4 +171,92 @@ final class LicenceVendor {
 
 		return StepResult::retry( 3600, $text );
 	}
+
+	/**
+	 * Finds or orders the vendor licence. The order is looked up by its title first, so a crash after the call never orders a
+	 * second licence; money is spent only when the paid line covers the cost (never for a licence that was found); and the
+	 * vendor id is stored before anything else is asked.
+	 *
+	 * What the caller decides first (arguments, address, waits, the item) stays with the caller. `$spec` carries what the
+	 * order is made of: `seed` (what follows the licence id in the title), `comment` (the order's comment), `parent` (the
+	 * vendor id of the licence an add-on belongs to, 0 for none) and `meta` (more meta to store with the vendor id).
+	 *
+	 * @param Resource             $r      Licence resource.
+	 * @param LicenceFamily        $family Family.
+	 * @param string               $key    Tier or catalogue key (for the cost).
+	 * @param string               $item   Vendor item.
+	 * @param string               $ip     Address the licence is bound to.
+	 * @param array<string, float> $costs  Key => cost.
+	 * @param array<string, mixed> $spec   seed, comment, parent, meta.
+	 * @return int|StepResult The vendor id, or what the step must return.
+	 */
+	public static function find_or_create( Resource $r, LicenceFamily $family, string $key, string $item, string $ip, array $costs, array $spec ) {
+		$noun   = $family->licence_noun();
+		$title  = self::title( $r, $family, (string) ( $spec['seed'] ?? '' ) );
+		$parent = (int) ( $spec['parent'] ?? 0 );
+
+		if ( $title !== (string) $r->get( $family->meta( 'title' ) ) && ! $r->set( array( $family->meta( 'title' ) => $title ) ) ) {
+			return StepResult::retry( 60, 'The licence title could not be stored.' );
+		}
+
+		$client = self::client();
+		$found  = $client->request( 'GET', '/licenses/plesk', array(), array( 'title_pattern' => $title, 'limit' => 10 ) );
+
+		if ( is_wp_error( $found ) ) {
+			return self::failure( $r, $found, 'Openprovider could not be asked for an earlier ' . $noun . '.' );
+		}
+
+		$existing = 0;
+
+		foreach ( (array) ( $found['results'] ?? array() ) as $row ) {
+			if ( is_array( $row ) && (int) ( $row['key_id'] ?? 0 ) > 0 && (string) ( $row['title'] ?? '' ) === $title ) {
+				$existing = (int) $row['key_id'];
+				break;
+			}
+		}
+
+		if ( 0 === $existing ) {
+			// Money is spent here: only when the paid line covers the cost. A licence found above (a crash-resume) never gets here.
+			$problem = self::spend_problem( $r, $family, $key, $costs );
+
+			if ( null !== $problem ) {
+				Alerts::admin( $r, $problem . ' No ' . $noun . ' was ordered.' );
+
+				return StepResult::fail( $problem );
+			}
+
+			$body = array(
+				'title'               => $title,
+				'comment'             => (string) ( $spec['comment'] ?? '' ),
+				'items'               => array( $item ),
+				'period'              => 1,
+				'ip_address_binding'  => $ip,
+				'restrict_ip_binding' => true,
+			);
+
+			if ( $parent > 0 ) {
+				$body['parent_key_id'] = $parent;
+			}
+
+			$created = $client->request( 'POST', '/licenses/plesk', $body );
+
+			if ( is_wp_error( $created ) ) {
+				// A call that timed out may still have gone through: the next try finds it by its title.
+				return self::failure( $r, $created, 'Openprovider did not order the ' . $noun . '.' );
+			}
+
+			$existing = (int) ( $created['key_id'] ?? 0 );
+
+			if ( $existing < 1 ) {
+				return StepResult::retry( 300, 'Openprovider returned no licence id.' );
+			}
+		}
+
+		if ( ! $r->set( array( $family->meta( 'key_id' ) => $existing, $family->meta( 'item' ) => $item ) + (array) ( $spec['meta'] ?? array() ) ) ) {
+			// The next try finds the licence by its title.
+			return StepResult::retry( 60, 'The Openprovider licence id could not be stored.' );
+		}
+
+		return $existing;
+	}
 }

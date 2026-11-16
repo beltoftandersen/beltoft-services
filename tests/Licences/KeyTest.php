@@ -1092,4 +1092,19 @@ final class KeyTest extends TestCase {
 		$this->settings( array( 'domain_api_mode' => 'sandbox' ) );
 		$this->assertSame( 'The Openprovider cost of this licence is not set.', KeyOrder::spend_problem( Resource::find( $r->id() ), 'pro' ) );
 	}
+
+	public function test_s4_a_licence_found_by_its_title_makes_no_spend_check_even_when_the_cost_is_too_high(): void {
+		$this->settings( array( 'licence_costs' => 'pro=30' ) );
+		$r     = $this->licence( array( 'total' => 20.0 ) );
+		$title = 'licence ' . (int) $r->license()['id'] . ' 203.0.113.10';
+		$made  = $this->op->request( 'POST', '/licenses/plesk', array( 'title' => $title, 'items' => array( 'PLESK-12-VPS-WEB-PRO-1M' ), 'period' => 1, 'ip_address_binding' => '203.0.113.10' ) );
+		$before = count( $this->calls( 'POST', '/licenses/plesk' ) );
+
+		$result = $this->build( $r );
+
+		$this->assertTrue( $result->is_done(), $result->error() );
+		$this->assertSame( (int) $made['key_id'], (int) $result->meta()['lic_key_id'] );
+		$this->assertCount( $before, $this->calls( 'POST', '/licenses/plesk' ) );
+		$this->assertSame( array(), $this->mails );
+	}
 }

@@ -214,18 +214,6 @@ final class PleskLicence {
 	}
 
 	/**
-	 * The title of the Openprovider licence: fixed by the licence id, so a crash can find it again.
-	 *
-	 * @param Resource $licence Licence resource.
-	 * @param Resource $server  Server.
-	 */
-	private static function title( Resource $licence, Resource $server ): string {
-		$name = ServerName::of( $server );
-
-		return LicenceVendor::title( $licence, new PleskFamily(), '' !== $name ? $name : 'server' );
-	}
-
-	/**
 	 * Is the paid line of this tier at least the cost at Openprovider? Null when the spend is covered, else why not.
 	 *
 	 * @param Resource $licence Licence resource.
@@ -324,80 +312,20 @@ final class PleskLicence {
 			return time() < $until ? StepResult::wait( 60, 'Waiting for the address of the server.', $until ) : StepResult::fail( 'The server has no public address, so no Plesk licence was ordered.' );
 		}
 
-		$title = self::title( $licence, $server );
+		$name = ServerName::of( $server );
 
-		if ( $title !== (string) $licence->get( 'plesk_title' ) && ! $licence->set( array( 'plesk_title' => $title ) ) ) {
-			return StepResult::retry( 60, 'The licence title could not be stored.' );
-		}
-
-		$client = self::client();
-		$found  = $client->request( 'GET', '/licenses/plesk', array(), array( 'title_pattern' => $title, 'limit' => 10 ) );
-
-		if ( is_wp_error( $found ) ) {
-			return self::failure( $licence, $found, 'Openprovider could not be asked for an earlier Plesk licence.' );
-		}
-
-		$existing = 0;
-
-		foreach ( (array) ( $found['results'] ?? array() ) as $row ) {
-			if ( is_array( $row ) && (int) ( $row['key_id'] ?? 0 ) > 0 && (string) ( $row['title'] ?? '' ) === $title ) {
-				$existing = (int) $row['key_id'];
-				break;
-			}
-		}
-
-		if ( 0 === $existing ) {
-			// Money is spent here: only when the paid line covers the cost. A licence found above (a crash-resume) never gets here.
-			$problem = self::spend_problem( $licence, $tier );
-
-			if ( null !== $problem ) {
-				self::alert( $licence, $problem . ' No Plesk licence was ordered.' );
-
-				return StepResult::fail( $problem );
-			}
-
-			$created = $client->request(
-				'POST',
-				'/licenses/plesk',
-				array(
-					'title'               => $title,
-					'comment'             => sprintf( 'Beltoft Services licence %d, server %d', (int) ( $licence->license()['id'] ?? 0 ), (int) ( $server->license()['id'] ?? 0 ) ),
-					'items'               => array( $item ),
-					'period'              => 1,
-					'ip_address_binding'  => (string) $ip['address'],
-					'restrict_ip_binding' => true,
-				)
-			);
-
-			if ( is_wp_error( $created ) ) {
-				// A call that timed out may still have gone through: the next try finds it by its title.
-				return self::failure( $licence, $created, 'Openprovider did not order the Plesk licence.' );
-			}
-
-			$existing = (int) ( $created['key_id'] ?? 0 );
-
-			if ( $existing < 1 ) {
-				return StepResult::retry( 300, 'Openprovider returned no licence id.' );
-			}
-		}
-
-		if ( ! $licence->set( array( 'plesk_key_id' => $existing, 'plesk_item' => $item ) ) ) {
-			// The next try finds the licence by its title.
-			return StepResult::retry( 60, 'The Openprovider licence id could not be stored.' );
-		}
-
-		return $existing;
-	}
-
-	/**
-	 * What a failed Openprovider call means for a step: a temporary one is tried again soon, any other slowly and an admin is told.
-	 *
-	 * @param Resource  $licence Licence resource.
-	 * @param \WP_Error $error   Error.
-	 * @param string    $text    What was tried.
-	 */
-	private static function failure( Resource $licence, \WP_Error $error, string $text ): StepResult {
-		return LicenceVendor::failure( $licence, $error, $text );
+		return LicenceVendor::find_or_create(
+			$licence,
+			new PleskFamily(),
+			$tier,
+			$item,
+			(string) $ip['address'],
+			self::costs(),
+			array(
+				'seed'    => '' !== $name ? $name : 'server',
+				'comment' => sprintf( 'Beltoft Services licence %d, server %d', (int) ( $licence->license()['id'] ?? 0 ), (int) ( $server->license()['id'] ?? 0 ) ),
+			)
+		);
 	}
 
 	/**

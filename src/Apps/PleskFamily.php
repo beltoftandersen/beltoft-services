@@ -22,7 +22,9 @@ final class PleskFamily implements LicenceFamily {
 
 	/** Logical field => stored meta name. */
 	private const META = array(
-		'title' => 'plesk_title',
+		'title'  => 'plesk_title',
+		'key_id' => 'plesk_key_id',
+		'item'   => 'plesk_item',
 	);
 
 	public function meta( string $field ): string {

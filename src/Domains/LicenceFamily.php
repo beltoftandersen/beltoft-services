@@ -19,7 +19,7 @@ defined( 'ABSPATH' ) || exit;
 interface LicenceFamily {
 
 	/**
-	 * The stored meta name of a logical field. Fields: title.
+	 * The stored meta name of a logical field. Fields: title, key_id, item.
 	 *
 	 * @param string $field Logical field.
 	 */

@@ -1093,4 +1093,19 @@ final class PleskLicenceTest extends PaidAppCase {
 		$this->assertSame( 'The Openprovider cost of this Plesk tier is not set.', PleskLicence::spend_problem( $this->fresh( $o['licence'] ), 'pro' ) );
 		remove_filter( 'pre_wp_mail', '__return_true' );
 	}
+
+	public function test_s4_a_licence_found_by_its_title_makes_no_spend_check_even_when_the_cost_is_too_high(): void {
+		$this->settings( array( 'plesk_costs' => 'pro=15' ) );
+		$o     = $this->plesk_order( 'pro' );
+		$title = 'licence ' . (int) $o['licence']->license()['id'] . ' server';
+		$made  = $this->op->request( 'POST', '/licenses/plesk', array( 'title' => $title, 'items' => array( 'PLESK-12-VPS-WEB-PRO-1M' ), 'period' => 1, 'ip_address_binding' => '192.0.2.10' ) );
+		$before = count( $this->op_calls( 'POST', '/licenses/plesk' ) );
+
+		$result = PleskLicence::provision( null, $this->fresh( $o['licence'] ), $o['server'], 'plesk' );
+
+		$this->assertTrue( $result->is_done(), $result->error() );
+		$this->assertSame( (int) $made['key_id'], (int) $result->meta()['plesk_key_id'] );
+		$this->assertCount( $before, $this->op_calls( 'POST', '/licenses/plesk' ) );
+		$this->assertSame( array(), $this->mails, 'A found licence is not a spend, so no refusal is mailed.' );
+	}
 }
