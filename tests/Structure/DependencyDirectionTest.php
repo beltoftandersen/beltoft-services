@@ -254,11 +254,10 @@ class DependencyDirectionTest extends TestCase {
 	 */
 	public function test_dump_when_asked(): void {
 		if ( ! getenv( 'DEP_DUMP' ) ) {
-			$this->addToAssertionCount( 1 );
-			return;
+			$this->markTestSkipped( 'Only runs with DEP_DUMP=<file> to regenerate the allowlist.' );
 		}
 
-		file_put_contents( getenv( 'DEP_DUMP' ), implode( "\n", array_keys( $this->violations() ) ) . "\n" );
-		$this->addToAssertionCount( 1 );
+		$written = file_put_contents( getenv( 'DEP_DUMP' ), implode( "\n", array_keys( $this->violations() ) ) . "\n" );
+		$this->assertNotFalse( $written );
 	}
 }
