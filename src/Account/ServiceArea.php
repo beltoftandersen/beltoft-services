@@ -288,7 +288,26 @@ abstract class ServiceArea {
 			)
 		);
 
-		return $ids ? (string) get_permalink( (int) $ids[0] ) : '';
+		if ( ! $ids ) {
+			return '';
+		}
+
+		$url = (string) get_permalink( (int) $ids[0] );
+
+		/**
+		 * The address of an "order" button for a kind of service, when there is a product to sell: by default the
+		 * product's own page. A site that sends its product pages to landing pages returns the landing page here, so the
+		 * button does not cost a redirect. It runs only when a product exists (the "is there anything to sell" checks
+		 * of the areas read the same address), and an empty or non-string answer keeps the default. A page address
+		 * kept in an area's setting (hosting_order_url, mail_order_url, domain_search_url) still comes first.
+		 *
+		 * @param string             $url        The product's page.
+		 * @param array<int, string> $driver_ids Driver ids the button is for (domain, mail, ssl, hosting, http, licence-key, proxmox, db).
+		 * @param int                $product_id The product the default address is for.
+		 */
+		$filtered = apply_filters( 'beltoft_services_product_url', $url, $driver_ids, (int) $ids[0] );
+
+		return is_string( $filtered ) && '' !== $filtered ? $filtered : $url;
 	}
 
 	/**
