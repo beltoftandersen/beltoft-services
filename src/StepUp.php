@@ -29,6 +29,9 @@ final class StepUp {
 	public const SEND_LIMIT  = 3;
 	public const SEND_WINDOW = 600;
 
+	/** Verify attempts per customer and purpose in one send window, over all codes. */
+	public const VERIFY_LIMIT = 30;
+
 	/**
 	 * User meta that holds the hash of the code of a purpose.
 	 */
@@ -260,27 +263,45 @@ final class StepUp {
 			return false;
 		}
 
-		$meta = get_user_meta( $user_id, self::META . $purpose, true );
-
-		if ( ! is_array( $meta ) || empty( $meta['hash'] ) ) {
+		if ( RateLimit::exceeded( $user_id, 'beltoft-services:stepup-verify:' . $purpose, self::VERIFY_LIMIT, self::SEND_WINDOW ) ) {
+			// Over all codes of this window, so a burst of guesses cannot outrun the per code counter.
 			return false;
 		}
 
-		if ( (int) ( $meta['expires'] ?? 0 ) < time() || (int) ( $meta['tries'] ?? 0 ) >= self::MAX_TRIES ) {
-			delete_user_meta( $user_id, self::META . $purpose );
+		// One try at a time per customer and purpose: parallel guesses cannot all read the same try count.
+		[ $locked, $state ] = Locks::with(
+			'beltoft_services_stepup_' . $user_id . '_' . $purpose,
+			5,
+			function () use ( $user_id, $secret, $purpose ) {
+				$meta = get_user_meta( $user_id, self::META . $purpose, true );
 
-			return false;
-		}
+				if ( ! is_array( $meta ) || empty( $meta['hash'] ) ) {
+					return false;
+				}
 
-		if ( ! hash_equals( (string) $meta['hash'], self::hash( $user_id, $purpose, $secret ) ) ) {
-			$meta['tries'] = (int) ( $meta['tries'] ?? 0 ) + 1;
+				if ( (int) ( $meta['expires'] ?? 0 ) < time() || (int) ( $meta['tries'] ?? 0 ) >= self::MAX_TRIES ) {
+					delete_user_meta( $user_id, self::META . $purpose );
 
-			if ( $meta['tries'] >= self::MAX_TRIES ) {
-				delete_user_meta( $user_id, self::META . $purpose );
-			} else {
-				update_user_meta( $user_id, self::META . $purpose, $meta );
+					return false;
+				}
+
+				if ( ! hash_equals( (string) $meta['hash'], self::hash( $user_id, $purpose, $secret ) ) ) {
+					$meta['tries'] = (int) ( $meta['tries'] ?? 0 ) + 1;
+
+					if ( $meta['tries'] >= self::MAX_TRIES ) {
+						delete_user_meta( $user_id, self::META . $purpose );
+					} else {
+						update_user_meta( $user_id, self::META . $purpose, $meta );
+					}
+
+					return false;
+				}
+
+				return true;
 			}
+		);
 
+		if ( ! $locked || true !== $state ) {
 			return false;
 		}
 
