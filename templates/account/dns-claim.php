@@ -9,7 +9,9 @@
 defined( 'ABSPATH' ) || exit;
 ?>
 <section class="beltoft-dns-claim" aria-labelledby="beltoft-dns-claim-title">
-	<h3 class="beltoft-dns-claim__title" id="beltoft-dns-claim-title"><?php esc_html_e( 'Add a domain for DNS hosting', 'beltoft-services' ); ?></h3>
+	<div class="beltoft-services-ov__head">
+		<h2 id="beltoft-dns-claim-title"><?php esc_html_e( 'Add a domain for DNS hosting', 'beltoft-services' ); ?></h2>
+	</div>
 	<p class="beltoft-dns-claim__intro"><?php esc_html_e( 'Keep your domain where it is registered and host its DNS here. You add one TXT record to prove the domain is yours, bring your existing records, then change the name servers at your registrar.', 'beltoft-services' ); ?></p>
 	<form class="beltoft-dns-claim__form" data-dns-claim-add novalidate>
 		<label for="beltoft-dns-claim-domain"><?php esc_html_e( 'Domain name', 'beltoft-services' ); ?></label>
