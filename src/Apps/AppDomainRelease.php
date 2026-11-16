@@ -17,6 +17,7 @@ final class AppDomainRelease {
 
 	public static function register(): void {
 		add_action( 'beltoft_services_reinstall_started', array( __CLASS__, 'started' ), 10, 2 );
+		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'deleted' ), 10, 3 );
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
 		Background::declare(
 			self::HOOK,
@@ -35,6 +36,44 @@ final class AppDomainRelease {
 		}
 	}
 
+	/**
+	 * A deleted server frees its address for the next order, so the A and www records we made for its domain must go: queued
+	 * as a reinstall queues them (removed only while they are still the records we wrote), marked final because the domain is
+	 * still set on the closed resource. The job needs no live resource.
+	 *
+	 * @param mixed $r   Resource.
+	 * @param mixed $old Old state.
+	 * @param mixed $new New state.
+	 */
+	public static function deleted( $r, $old, $new ): void {
+		if ( 'deleted' !== $new || 'deleted' === $old || ! $r instanceof Resource || \BeltoftServices\Proxmox\Vm\ProxmoxDriver::ID !== (string) $r->get( 'driver' ) ) {
+			return;
+		}
+
+		$zone = (string) $r->get( 'app_zone' );
+		$ip   = (string) $r->get( 'ip' );
+		$old  = array_values( array_filter( (array) $r->get( 'app_domain_old' ), 'is_array' ) );
+		$new  = array();
+
+		if ( '' === $zone ) {
+			return;
+		}
+
+		if ( true === $r->get( 'app_domain_made' ) && '' !== (string) $r->get( 'app_domain' ) ) {
+			$new[] = array( 'zone' => $zone, 'name' => (string) $r->get( 'app_domain' ), 'ip' => $ip, 'tries' => 0, 'final' => true );
+		}
+
+		if ( true === $r->get( 'app_www_made' ) && '' !== (string) $r->get( 'app_www_ip' ) ) {
+			$new[] = array( 'zone' => $zone, 'name' => 'www.' . $zone, 'ip' => (string) $r->get( 'app_www_ip' ), 'tries' => 0, 'final' => true );
+		}
+
+		if ( ! $new || ! $r->set( array( 'app_domain_old' => array_slice( array_merge( $old, $new ), 0, 6 ) ) ) ) {
+			return;
+		}
+
+		self::schedule( $r->id() );
+	}
+
 	public static function schedule( int $id, int $delay = 0 ): void {
 		Jobs::schedule_once( time() + $delay, self::HOOK, array( $id ) );
 	}
@@ -49,17 +88,22 @@ final class AppDomainRelease {
 		foreach ( Resource::find_with_list( 'vm', 'app_domain_old' ) as $id ) {
 			$r   = Resource::find( (int) $id );
 			$old = $r ? (array) $r->get( 'app_domain_old' ) : array();
-			if ( $r && $r->is_live() && $old && time() - (int) ( $old[0]['at'] ?? 0 ) >= ( empty( $old[0]['in_progress'] ) ? MINUTE_IN_SECONDS : 10 * MINUTE_IN_SECONDS ) ) {
+			if ( $r && self::runnable( $r ) && $old && time() - (int) ( $old[0]['at'] ?? 0 ) >= ( empty( $old[0]['in_progress'] ) ? MINUTE_IN_SECONDS : 10 * MINUTE_IN_SECONDS ) ) {
 				$sets[] = array( $r->id() );
 			}
 		}
 		return $sets;
 	}
 
+	/** A live resource, or a deleted one that still owes the removal of its records. */
+	private static function runnable( Resource $r ): bool {
+		return $r->is_live() || 'deleted' === (string) $r->get( 'state' );
+	}
+
 	/** One bounded attempt. The resource and zone locks are held on separate turns. */
 	public static function run( int $id ): void {
 		$r = Resource::find( $id );
-		if ( ! $r || ! $r->is_live() ) {
+		if ( ! $r || ! self::runnable( $r ) ) {
 			return;
 		}
 		$entry = null;
@@ -153,7 +197,8 @@ final class AppDomainRelease {
 		$name = (string) ( $entry['name'] ?? '' );
 		$ip = (string) ( $entry['ip'] ?? '' );
 		$user = (int) ( $r->license()['user_id'] ?? 0 );
-		if ( '' === $zone || '' === $name || $name === (string) $r->get( 'app_domain' ) || $name === (string) $r->get( 'app_domain_want' ) || false === filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) || ! self::editable( $zone, $user ) ) {
+		$final = ! empty( $entry['final'] );
+		if ( '' === $zone || '' === $name || ( ! $final && ( $name === (string) $r->get( 'app_domain' ) || $name === (string) $r->get( 'app_domain_want' ) ) ) || false === filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) || ! self::editable( $zone, $user ) ) {
 			return true;
 		}
 		$existing = AppDomains::existing( $zone, $name );
