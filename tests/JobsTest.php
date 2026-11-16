@@ -80,6 +80,31 @@ final class JobsTest extends TestCase {
 		$this->assertNotSame( '', $result['text'] );
 	}
 
+	public function test_any_plugin_job_waits_while_the_hold_file_or_the_pause_setting_holds_and_runs_afterwards(): void {
+		$ran = 0;
+		add_action( 'beltoft_services_test_sweep', static function () use ( &$ran ) {
+			++$ran;
+		} );
+		$file = trailingslashit( WP_CONTENT_DIR ) . Jobs::HOLD_FILE;
+		touch( $file );
+
+		try {
+			$id = as_schedule_single_action( time() - 5, 'beltoft_services_test_sweep', array( 7 ), Jobs::GROUP );
+			\ActionScheduler_QueueRunner::instance()->process_action( $id );
+			$this->assertSame( 0, $ran, 'A deploy hold file stops a job that does not check it by itself.' );
+			$this->assertTrue( as_has_scheduled_action( 'beltoft_services_test_sweep', array( 7 ), Jobs::GROUP ), 'It keeps its place.' );
+		} finally {
+			unlink( $file );
+		}
+
+		$next = as_next_scheduled_action( 'beltoft_services_test_sweep', array( 7 ), Jobs::GROUP );
+		$this->assertGreaterThan( time() + 30, $next );
+		as_unschedule_all_actions( 'beltoft_services_test_sweep', array( 7 ), Jobs::GROUP );
+		$id = as_schedule_single_action( time() - 5, 'beltoft_services_test_sweep', array( 7 ), Jobs::GROUP );
+		\ActionScheduler_QueueRunner::instance()->process_action( $id );
+		$this->assertSame( 1, $ran, 'Without a hold it runs.' );
+	}
+
 	public function test_a_reconcile_job_that_keeps_crashing_backs_off_and_ends_in_a_failed_resource(): void {
 		list( $r ) = $this->resource( array( 'state' => 'provisioning', 'desired' => 'ready' ) );
 		$delays = array();
