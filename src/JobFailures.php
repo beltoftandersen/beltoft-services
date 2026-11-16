@@ -73,8 +73,11 @@ final class JobFailures {
 
 		if ( Jobs::HOOK === $hook ) {
 			// The reconciler starts again from the stored state, as after a driver exception. Staff hear of it once per error.
-			Jobs::enqueue( $id, 60 );
-			if ( $resource ) {
+			$delay = $resource ? Reconciler::crashed( $resource, $why ) : 60;
+			if ( $delay >= 0 ) {
+				Jobs::enqueue( $id, $delay );
+			}
+			if ( $resource && $delay >= 0 ) {
 				Alerts::admin( $resource, 'A service job stopped with an error and is tried again: ' . ( '' !== $why ? $why : 'no message' ) );
 			}
 			return;

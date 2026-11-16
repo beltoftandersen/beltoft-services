@@ -69,7 +69,7 @@ final class Reconciler {
 	 * Meta only the reconciler, the jobs and the resource itself write. A driver's step or
 	 * action meta cannot change these.
 	 */
-	public const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'failed_desired', 'alerted', 'protected', 'paused_at', 'warned_at', 'desired_at', 'replace_after_delete', 'reported', 'act_attempts', 'notified', 'limit_notified', 'breach_at', 'breach_reason', 'breach_alerted', 'delay_notified', 'progress_resets', 'delete_paused', 'delete_held_alerted', 'delete_origin', 'delete_started', 'warn_started_at', 'warn_alerted', 'backup_purge_at', 'delete_cleanup', 'action_pending', 'waiting', 'wait_since', 'act_wait_since', 'customer_text', 'expected_refusal' );
+	public const RESERVED = array( 'uuid', 'driver', 'state', 'desired', 'plan', 'plan_dirty', 'op', 'attempts', 'next_attempt_at', 'last_error', 'failed_op', 'failed_desired', 'alerted', 'protected', 'paused_at', 'warned_at', 'desired_at', 'replace_after_delete', 'reported', 'act_attempts', 'notified', 'limit_notified', 'breach_at', 'breach_reason', 'breach_alerted', 'delay_notified', 'progress_resets', 'delete_paused', 'delete_held_alerted', 'delete_origin', 'delete_started', 'warn_started_at', 'warn_alerted', 'backup_purge_at', 'delete_cleanup', 'action_pending', 'waiting', 'wait_since', 'act_wait_since', 'customer_text', 'expected_refusal', 'crashes' );
 
 	/**
 	 * How often one operation may restart its retry count because a run made progress. After
@@ -775,6 +775,33 @@ final class Reconciler {
 		self::move( $r, 'failed', 'Service failed: ' . $error );
 		Alerts::admin( $r, $error );
 		self::follow_up( $r );
+	}
+
+	/**
+	 * A reconcile job whose process died (memory, a hard timeout, a kill): counted per operation like a driver retry. Each
+	 * crash waits the next backoff; after the last one the resource fails, so a step that kills its job stops calling the driver.
+	 * A count older than a day starts again.
+	 *
+	 * @param Resource $r   Resource.
+	 * @param string   $why What stopped the job.
+	 * @return int Seconds until the next run, or -1 when the resource failed instead.
+	 */
+	public static function crashed( Resource $r, string $why ): int {
+		$operation = (string) ( self::operation( $r ) ?? $r->get( 'op' ) );
+		$crashes   = (array) $r->get( 'crashes' );
+		$count     = ( ( $crashes['op'] ?? '' ) === $operation && time() - (int) ( $crashes['at'] ?? 0 ) < DAY_IN_SECONDS ) ? (int) ( $crashes['n'] ?? 0 ) : 0;
+		++$count;
+
+		if ( $count > count( self::BACKOFF ) ) {
+			$r->set( array( 'crashes' => null ) );
+			self::fail( $r, $operation, 'The job stopped ' . $count . ' times without finishing: ' . ( '' !== $why ? $why : 'no message' ), array() );
+
+			return -1;
+		}
+
+		$r->set( array( 'crashes' => array( 'op' => $operation, 'n' => $count, 'at' => time() ) ) );
+
+		return self::BACKOFF[ $count - 1 ];
 	}
 
 	/**
