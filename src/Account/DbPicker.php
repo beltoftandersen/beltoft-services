@@ -13,11 +13,9 @@ use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\Proxmox\Db\DbEngines;
 use BeltoftServices\Proxmox\Db\DbNeedsServer;
-use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Proxmox\Db\PostgresEngine;
 use BeltoftServices\Proxmox\Backup\BackupField;
-use BeltoftServices\RateLimit;
 use BeltoftServices\Usage\Rates;
 
 defined( 'ABSPATH' ) || exit;
@@ -165,13 +163,10 @@ final class DbPicker {
 			);
 		};
 
-		if ( $user <= 0 || false === wp_verify_nonce( isset( $post[ self::FIELD ] ) && is_string( $post[ self::FIELD ] ) ? $post[ self::FIELD ] : '', self::NONCE ) ) {
-			return $fail( 'form', __( 'Your session has expired. Reload the page and try again.', 'beltoft-services' ) );
-		}
+		$refused = PickerCart::guard( $post, $user, self::FIELD, self::NONCE );
 
-		// The limit of the server picker, with its filter (see ServerPicker::process()).
-		if ( RateLimit::exceeded( $user, 'beltoft-services:picker', (int) apply_filters( 'beltoft_services_picker_rate_limit', 20 ), HOUR_IN_SECONDS ) ) {
-			return $fail( 'form', __( 'Too many tries. Please wait a while and try again.', 'beltoft-services' ) );
+		if ( null !== $refused ) {
+			return $fail( 'form', $refused );
 		}
 
 		$id   = isset( $post[ ServerPicker::PLAN ] ) && is_scalar( $post[ ServerPicker::PLAN ] ) ? absint( (string) $post[ ServerPicker::PLAN ] ) : 0;
@@ -231,19 +226,18 @@ final class DbPicker {
 			return __( 'The database could not be added. Please try again.', 'beltoft-services' );
 		}
 
-		$old = array();
+		// A payment for a subscription that exists is never touched or mixed with a new database.
+		$old = PickerCart::old_lines(
+			$cart,
+			static function ( array $item ): bool {
+				$driver = Product::driver_for( (int) ( $item['product_id'] ?? 0 ) );
 
-		foreach ( $cart->get_cart() as $key => $item ) {
-			// A payment for a subscription that exists is never touched or mixed with a new database.
-			if ( CartFlow::has_value( (array) $item, CartFlow::ALL ) ) {
-				return __( 'Finish or remove the subscription payment in your cart first.', 'beltoft-services' );
+				return $driver && DbDriver::ID === $driver->id();
 			}
+		);
 
-			$driver = Product::driver_for( (int) ( $item['product_id'] ?? 0 ) );
-
-			if ( $driver && DbDriver::ID === $driver->id() ) {
-				$old[] = (string) $key;
-			}
+		if ( null === $old ) {
+			return PickerCart::payment_in_cart();
 		}
 
 		wc_clear_notices();
@@ -263,19 +257,9 @@ final class DbPicker {
 			return null;
 		}
 
-		$notes = array();
+		$refusal = PickerCart::shop_refusal();
 
-		foreach ( (array) wc_get_notices( 'error' ) as $notice ) {
-			$text = is_array( $notice ) ? (string) ( $notice['notice'] ?? '' ) : (string) $notice;
-
-			if ( '' !== $text ) {
-				$notes[] = wp_strip_all_tags( $text );
-			}
-		}
-
-		wc_clear_notices();
-
-		return array() !== $notes ? implode( ' ', $notes ) : __( 'The database could not be added. Please try again.', 'beltoft-services' );
+		return '' !== $refusal ? $refusal : __( 'The database could not be added. Please try again.', 'beltoft-services' );
 	}
 
 	// -- Assets ------------------------------------------------------------------------------------
