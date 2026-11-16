@@ -11,6 +11,7 @@ use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Db\DbActions;
+use BeltoftServices\Proxmox\Db\DbIp;
 use BeltoftServices\Proxmox\Disk\DiskMeta;
 use BeltoftServices\Proxmox\Disk\DiskSteps;
 use BeltoftServices\Proxmox\Network\Firewall;
@@ -168,7 +169,7 @@ trait RestoreSteps {
 		// A database's plan disk is its data disk: the boot disk's size is not recorded as the plan's.
 		$sized = DbActions::is_db( $this->r ) ? array() : array( 'disk_gb' => (int) ceil( $size ) );
 
-		if ( ! $this->r->set( $sized + array( 'was_running' => $was_running ? true : null ) + ( 'rollback' === $what ? array( 'snapshot_rolled_at' => time() ) : array() ) ) ) {
+		if ( ! $this->r->set( $sized + array( 'was_running' => $was_running ? true : null ) + ( $was_running && DbActions::is_db( $this->r ) ? array( DbIp::RESYNC => true ) : array() ) + ( 'rollback' === $what ? array( 'snapshot_rolled_at' => time() ) : array() ) ) ) {
 			return StepResult::retry( 0, $what . ': progress could not be stored' );
 		}
 
@@ -218,6 +219,24 @@ trait RestoreSteps {
 			}
 
 			return StepResult::retry( 0, 'restore: the private network card was put back' );
+		}
+
+		// The public card is the pool's, not the backup's: the address may have been added or given back (and handed to another
+		// database) since the backup. It is written back or removed here, before the VM starts; the address itself is never released.
+		$public = DbIp::nic_repair( $this->r, $this->cluster, (array) $v['config'] );
+
+		if ( null !== $public ) {
+			if ( ! empty( $v['config']['digest'] ) ) {
+				$public['digest'] = (string) $v['config']['digest'];
+			}
+
+			$put = $this->client->request( 'PUT', '/nodes/' . rawurlencode( (string) $v['node'] ) . '/qemu/' . (int) $record['vmid'] . '/config', $public );
+
+			if ( is_wp_error( $put ) ) {
+				return $this->classify( $put, 'restore' );
+			}
+
+			return StepResult::retry( 0, 'restore: the public network card was made to match the address pool' );
 		}
 
 		$done = ( new Firewall( $this->r, $this->client, $this->cluster ) )->ensure_database( $record, $v );

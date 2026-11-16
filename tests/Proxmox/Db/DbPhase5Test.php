@@ -13,9 +13,12 @@ use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Db\DbActions;
+use BeltoftServices\Proxmox\Db\DbAccess;
 use BeltoftServices\Proxmox\Db\DbCard;
 use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\Proxmox\Db\DbGuest;
+use BeltoftServices\Proxmox\Db\DbIp;
+use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Db\DbMonitor;
 use BeltoftServices\Proxmox\Db\DbPower;
 use BeltoftServices\Proxmox\Vm\Operations;
@@ -471,8 +474,24 @@ class DbPhase5Test extends TestCase {
 		$this->assertSame( 'restoring', DbCard::view( $waiting )['kind'] );
 
 		$this->health();
-		Resource::find( $r->id() )->set( array( 'next_attempt_at' => null ) );
-		Jobs::run( $r->id() );
+
+		// The guest answers the listen and allow jobs the restore sends again (the guest layers of the backup are not trusted).
+		for ( $i = 0; $i < 12; $i++ ) {
+			$job = json_decode( (string) $this->fake->guest_file( 5000, DbGuest::JOB ), true );
+
+			if ( is_array( $job ) && ! empty( $job['request'] ) && in_array( $job['op'] ?? '', array( 'allow', 'listen' ), true ) ) {
+				$this->fake->set_guest_file( 5000, DbGuest::STATUS, wp_json_encode( array( 'request' => $job['request'], 'state' => 'ready', 'step' => (string) $job['op'], 'updated' => gmdate( 'c' ) ) ) );
+			}
+
+			Resource::find( $r->id() )->set( array( 'next_attempt_at' => null ) );
+			Jobs::run( $r->id() );
+			$this->fake->elapse( 30 );
+
+			if ( ! Resource::find( $r->id() )->get( 'plan_dirty' ) ) {
+				break;
+			}
+		}
+
 		$done = Resource::find( $r->id() );
 		$this->assertNull( $done->get( 'was_running' ) );
 		$this->assertNull( $done->get( 'db_restore_since' ) );
@@ -482,6 +501,91 @@ class DbPhase5Test extends TestCase {
 		$this->assertSame( 20, (int) ( (array) $done->get( 'plan' ) )['disk_gb'], 'The plan disk is the data disk and stays.' );
 		$this->assertSame( 20, (int) $done->get( 'disk_gb' ), 'The boot disk is not recorded as the plan disk.' );
 		$this->assertCount( 0, $this->calls( 'PUT', '/resize' ), 'Nothing is grown.' );
+	}
+
+	/**
+	 * Runs the plan change that follows a restore until it ends; the guest answers every job it is sent, and its health is fresh.
+	 *
+	 * @param Resource           $r    Resource.
+	 * @param array<int, string> $seen Ops of the jobs the guest was sent, in order.
+	 */
+	private function finish_restore( Resource $r, array &$seen = array() ): \BeltoftServices\Drivers\StepResult {
+		$driver = Registry::get( 'proxmox-db' );
+		$res    = null;
+
+		for ( $i = 0; $i < 60; $i++ ) {
+			$this->health();
+			$job = json_decode( (string) $this->fake->guest_file( 5000, DbGuest::JOB ), true );
+
+			if ( is_array( $job ) && ! empty( $job['request'] ) && in_array( $job['op'] ?? '', array( 'allow', 'listen' ), true ) ) {
+				$seen[ (string) $job['request'] ] = (string) $job['op'];
+				$this->fake->set_guest_file( 5000, DbGuest::STATUS, wp_json_encode( array( 'request' => $job['request'], 'state' => 'ready', 'step' => (string) $job['op'], 'updated' => gmdate( 'c' ) ) ) );
+			}
+
+			$res = $driver->update_plan( Resource::find( $r->id() ) );
+
+			if ( $res->is_done() || $res->is_failed() ) {
+				$seen = array_values( $seen );
+
+				return $res;
+			}
+
+			$this->fake->elapse( 30 );
+		}
+
+		$this->fail( 'The restore did not settle: ' . $res->error() );
+	}
+
+	public function test_a_restore_takes_a_public_card_the_pool_no_longer_holds_off_the_vm_and_never_releases_it(): void {
+		IpPool::add( '192.0.2.10', '192.0.2.1' );
+		$r = $this->ready_db();
+		// The backup carries a public address that was given back since and may be someone else's now.
+		$this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'net0' => 'virtio,bridge=vmbr9,firewall=1', 'ipconfig0' => 'ip=192.0.2.10/24,gw=192.0.2.1' ) );
+		$volid = $this->backup_of( $r );
+
+		Jobs::act( $r->id(), 'restore', array( 'confirm' => 'RESTORE', 'volid' => $volid ) );
+
+		$vm = $this->fake->vm( 5000 );
+		$this->assertArrayNotHasKey( 'net0', $vm['config'], 'The restored VM does not keep an address the pool does not give it.' );
+		$this->assertArrayNotHasKey( 'ipconfig0', $vm['config'] );
+		$this->assertStringContainsString( 'bridge=vmbr2', $vm['config']['net1'], 'The private card is untouched.' );
+	}
+
+	public function test_a_restore_of_a_backup_without_the_public_card_puts_the_paid_one_back(): void {
+		IpPool::add( '192.0.2.10', '192.0.2.1' );
+		$r     = $this->ready_db();
+		$volid = $this->backup_of( $r );
+		$this->assertNotNull( IpPool::hold( $r->id() ) );
+		$this->assertTrue( IpPool::assign( $r->id() ) );
+		$fresh = Resource::find( $r->id() );
+		$this->assertTrue( $fresh->set( array( 'plan' => array_merge( (array) $fresh->get( 'plan' ), array( 'public_ip' => 1 ) ), 'ip' => '192.0.2.10' ) ) );
+
+		Jobs::act( $r->id(), 'restore', array( 'confirm' => 'RESTORE', 'volid' => $volid ) );
+
+		$vm = $this->fake->vm( 5000 );
+		$this->assertSame( 'ip=192.0.2.10/24,gw=192.0.2.1', $vm['config']['ipconfig0'] );
+		$this->assertStringContainsString( 'bridge=vmbr9', $vm['config']['net0'] );
+		$this->assertSame( 'assigned', IpPool::for_resource( $r->id() )['state'], 'The address stays the database\'s.' );
+	}
+
+	public function test_after_a_restore_the_guest_gets_the_listen_addresses_and_the_stored_allow_list_again(): void {
+		$r     = $this->ready_db();
+		$fresh = Resource::find( $r->id() );
+		$this->assertTrue( $fresh->set( array( DbAccess::LIST => array( array( 'cidr' => '203.0.113.7/32', 'label' => 'office', 'added' => time() ) ), DbAccess::WORLD => false ) ) );
+		$volid = $this->backup_of( $r );
+
+		Jobs::act( $r->id(), 'restore', array( 'confirm' => 'RESTORE', 'volid' => $volid ) );
+		$this->assertTrue( Resource::find( $r->id() )->get( DbIp::RESYNC ), 'The guest layers of the backup are not trusted.' );
+
+		$seen = array();
+		$res  = $this->finish_restore( $r, $seen );
+		$this->assertTrue( $res->is_done(), $res->error() );
+
+		$this->assertSame( array( 'listen', 'allow' ), $seen, 'The listen addresses, then the stored allow-list.' );
+		$job = json_decode( (string) $this->fake->guest_file( 5000, DbGuest::JOB ), true );
+		$this->assertSame( array( '203.0.113.7/32' ), $job['allow'] );
+		$this->assertNull( Resource::find( $r->id() )->get( DbIp::RESYNC ) );
+		$this->assertSame( 'applied', Resource::find( $r->id() )->get( DbAccess::STATE ) );
 	}
 
 	public function test_a_database_that_does_not_come_back_healthy_fails_and_the_admin_is_told(): void {
