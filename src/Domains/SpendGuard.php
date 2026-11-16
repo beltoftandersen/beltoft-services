@@ -28,10 +28,33 @@ final class SpendGuard {
 		$order = $item->get_order();
 		// What was paid, in the cost currency: an order in another currency is converted at its guard rate (a little above the real one), and
 		// with no guard rate it is refused, never taken 1 to 1. This is only a comparison: nothing is converted for the customer.
-		$paid = $order ? Currency::to_cost( (float) $item->get_total(), (string) $order->get_currency() ) : null;
+		$paid = $order ? Currency::to_cost( self::paid( $item ), (string) $order->get_currency() ) : null;
 		if ( null === $paid ) { return 'The order is not in EUR; the registrar cost cannot be compared.'; }
 		if ( $paid + 0.01 < $cost ) { return self::MESSAGE; }
 		return null;
+	}
+
+	/**
+	 * What the customer paid for a line, without tax, counting account credit as paid. Account credit (gift cards the customer topped
+	 * up) is applied as an order coupon, which lowers the line total; the guards compare what was paid, so the net share of the
+	 * credit is added back, never more than the line was discounted. Other discounts stay discounts.
+	 *
+	 * @param \WC_Order_Item_Product $item The order line.
+	 */
+	public static function paid( \WC_Order_Item_Product $item ): float {
+		$total = (float) $item->get_total();
+		$order = $item->get_order();
+		$cents = $order ? (int) $order->get_meta( '_bgca_applied_cents' ) : 0;
+		if ( ! $order || $cents < 1 ) { return $total; }
+		$sub = 0.0;
+		$tax = 0.0;
+		foreach ( $order->get_items( 'line_item' ) as $line ) {
+			$sub += (float) $line->get_subtotal();
+			$tax += (float) $line->get_subtotal_tax();
+		}
+		if ( $sub <= 0 ) { return $total; }
+		$credit = ( $cents / 100 ) * ( $sub / ( $sub + $tax ) ) * ( (float) $item->get_subtotal() / $sub );
+		return $total + max( 0.0, min( $credit, (float) $item->get_subtotal() - $total ) );
 	}
 
 	/** The order line recorded on the resource when it was created. */

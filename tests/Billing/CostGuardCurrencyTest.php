@@ -245,4 +245,34 @@ class CostGuardCurrencyTest extends TestCase {
 		$this->fake_set_currency( 'EUR' );
 		$this->assertNull( $switch->invoke( null, 'pro', wc_get_product( $v->get_id() ) ), 'In the shop currency the price is compared as it is (90 is over 10).' );
 	}
+
+	/** A line that was 15.00 before a discount and 0.00 after it, on an order whose account credit took the given cents. */
+	private function credit_line( float $total, int $credit_cents ): \WC_Order_Item_Product {
+		$product = new \WC_Product_Simple();
+		$product->set_name( 'Paid' );
+		$product->set_regular_price( '15' );
+		$product->save();
+		$order = wc_create_order();
+		$order->set_currency( 'EUR' );
+		$order->add_product( $product, 1, array( 'subtotal' => 15.0, 'total' => $total ) );
+
+		if ( $credit_cents > 0 ) {
+			$order->update_meta_data( '_bgca_applied_cents', (string) $credit_cents );
+		}
+
+		$order->save();
+
+		return array_values( $order->get_items() )[0];
+	}
+
+	public function test_account_credit_that_paid_the_line_still_counts_as_paid_for_the_spend_guards(): void {
+		$this->assertNull( SpendGuard::problem( 'a.com', 'create', $this->credit_line( 0.0, 1500 ) ), 'The credit paid the whole line.' );
+		$this->assertNull( SslGuard::problem( 41, $this->credit_line( 0.0, 1500 ) ) );
+		$this->assertNull( SpendGuard::problem( 'a.com', 'create', $this->credit_line( 3.0, 1200 ) ), 'Credit 12 and card 3 paid 15.' );
+	}
+
+	public function test_a_discount_that_is_not_account_credit_still_lowers_the_paid_amount(): void {
+		$this->assertSame( SpendGuard::MESSAGE, SpendGuard::problem( 'a.com', 'create', $this->credit_line( 0.0, 0 ) ) );
+		$this->assertSame( SpendGuard::MESSAGE, SpendGuard::problem( 'a.com', 'create', $this->credit_line( 3.0, 200 ) ), 'Only 2 of the 12 discount was credit: 5 paid.' );
+	}
 }
