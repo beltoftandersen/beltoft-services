@@ -188,6 +188,25 @@ class AddonsTest extends HostingCase {
 		$this->assertMatchesRegularExpression( '/per month, (excl|incl)\. VAT\./', Addons::confirm_text( Addons::KIND_DOMAIN, $q ) );
 	}
 
+	public function test_a_renewal_exactly_a_month_away_is_one_month_and_a_second_more_is_two(): void {
+		$r   = $this->account( 'month', 40 * DAY_IN_SECONDS );
+		$sub = $this->sub( $r );
+		$now = time() + 5 * DAY_IN_SECONDS;
+
+		$sub->update_dates( array( 'next_payment' => gmdate( 'Y-m-d H:i:s', strtotime( '+1 months', $now ) ) ) );
+		$this->assertSame( 1, Addons::months_to_renewal( $this->sub( $r ), $now ), 'Exactly one month is one month.' );
+		$this->assertSame( 1, Addons::quote( $r, Addons::KIND_DOMAIN, $now )['months_now'] );
+
+		$sub->update_dates( array( 'next_payment' => gmdate( 'Y-m-d H:i:s', strtotime( '+1 months', $now ) + 1 ) ) );
+		$this->assertSame( 2, Addons::months_to_renewal( $this->sub( $r ), $now ), 'A second more starts the second month.' );
+		$this->assertSame( 2, Addons::quote( $r, Addons::KIND_DOMAIN, $now )['months_now'] );
+
+		$sub->update_dates( array( 'next_payment' => gmdate( 'Y-m-d H:i:s', $now + 1 ) ) );
+		$this->assertNotNull( Addons::quote( $r, Addons::KIND_DOMAIN, $now ), 'A renewal a second away still quotes.' );
+		$sub->update_dates( array( 'next_payment' => gmdate( 'Y-m-d H:i:s', $now ) ) );
+		$this->assertNull( Addons::quote( $r, Addons::KIND_DOMAIN, $now ), 'A renewal due now has no quote.' );
+	}
+
 	public function test_the_line_is_added_only_after_the_order_is_paid(): void {
 		$r = $this->account( 'year', 5 * 31 * DAY_IN_SECONDS + 10 * DAY_IN_SECONDS );
 
