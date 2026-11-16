@@ -164,12 +164,17 @@ final class Commands {
 	 * <license>
 	 * : The license id of the server.
 	 *
+	 * [--yes]
+	 * : Confirms the server named in the output (without it nothing is changed).
+	 *
 	 * @subcommand quarantine-lift
 	 */
 	public function quarantine_lift( array $args, array $assoc_args ): void {
-		unset( $assoc_args );
 		$resource = Resource::for_license( (int) ( $args[0] ?? 0 ) );
 		if ( ! $resource ) { \WP_CLI::error( 'The license has no live resource.' ); }
+		if ( empty( $assoc_args['yes'] ) ) {
+			\WP_CLI::error( sprintf( 'This lifts the network quarantine of server "%s" (resource %d). Add --yes to confirm.', (string) $resource->get( 'server_name' ), $resource->id() ) );
+		}
 		if ( ! Quarantine::request_lift( $resource, 'wp-cli' ) ) { \WP_CLI::error( 'This server has no network quarantine.' ); }
 		Jobs::act( $resource->id(), 'fw_quarantine_lift' );
 		$fresh = Resource::find( $resource->id() );

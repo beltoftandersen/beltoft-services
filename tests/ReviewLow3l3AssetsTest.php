@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Tests;
 
+require_once __DIR__ . '/Support/WpCliStub.php';
+
 /**
  * ASSETS-xx tests.
  */
@@ -48,5 +50,45 @@ final class ReviewLow3l3AssetsTest extends TestCase {
 		foreach ( array( 'api-reference.php', 'api-reference-full.php' ) as $name ) {
 			$this->assertStringContainsString( 'data-copied=', (string) file_get_contents( BELTOFT_SERVICES_PATH . 'templates/' . $name ) );
 		}
+	}
+
+	private function fails( callable $fn ): string {
+		try {
+			$fn();
+		} catch ( \RuntimeException $e ) {
+			return $e->getMessage();
+		}
+
+		$this->fail( 'Expected an error.' );
+	}
+
+	public function test_assets_01_ssl_order_retry_and_renew_retry_need_yes(): void {
+		$product  = $this->service_product( 'fake', array(), array( 'max' => 3 ) );
+		$license  = $this->service_license( $product, array( 'fire' => false ) );
+		$resource = \BeltoftServices\Resource::create( $license, new \BeltoftServices\Ssl\SslDriver(), array(), array( 'ssl_name' => 'example.com', 'ssl_post_attempted' => time() ) );
+		$this->assertInstanceOf( \BeltoftServices\Resource::class, $resource );
+		$cmd = new \BeltoftServices\Cli\SslCommand();
+
+		$message = $this->fails( fn() => $cmd->order_retry( array( (string) $resource->id() ), array() ) );
+		$this->assertStringContainsString( '--yes', $message );
+		$this->assertNotNull( \BeltoftServices\Resource::find( $resource->id() )->get( 'ssl_post_attempted' ), 'The marker stays.' );
+
+		$message = $this->fails( fn() => $cmd->renew_retry( array( (string) $resource->id(), '123' ), array() ) );
+		$this->assertStringContainsString( '--yes', $message );
+
+		$cmd->order_retry( array( (string) $resource->id() ), array( 'yes' => true ) );
+		$this->assertNull( \BeltoftServices\Resource::find( $resource->id() )->get( 'ssl_post_attempted' ) );
+	}
+
+	public function test_assets_10_quarantine_lift_needs_yes_and_names_the_server(): void {
+		$product  = $this->service_product( 'fake', array(), array( 'max' => 3 ) );
+		$license  = $this->service_license( $product, array( 'fire' => false ) );
+		$resource = \BeltoftServices\Resource::create( $license, $this->fake_driver(), array(), array( 'server_name' => 'web-quarantined' ) );
+		$this->assertInstanceOf( \BeltoftServices\Resource::class, $resource );
+
+		$message = $this->fails( fn() => ( new \BeltoftServices\Cli\Commands() )->quarantine_lift( array( (string) $license['id'] ), array() ) );
+
+		$this->assertStringContainsString( 'web-quarantined', $message );
+		$this->assertStringContainsString( '--yes', $message );
 	}
 }
