@@ -29,7 +29,7 @@
 				text = summary.getAttribute( 'data-text-none' );
 			} else {
 				var option = versions && versionRow && ! versionRow.hidden ? versions.options[ versions.selectedIndex ] : null;
-				text = ( summary.getAttribute( 'data-text-app' ) || '%s' ).replace( '%s', ( option ? option.textContent.replace( /^Current: /, '' ) : '' ) || ( name ? name.textContent : '' ) );
+				text = ( summary.getAttribute( 'data-text-app' ) || '%s' ).replace( '%s', ( option ? option.textContent.replace( summary.getAttribute( 'data-current' ) || 'Current: ', '' ) : '' ) || ( name ? name.textContent : '' ) );
 			}
 			summary.textContent = text;
 		}

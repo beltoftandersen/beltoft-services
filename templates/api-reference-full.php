@@ -42,7 +42,7 @@ $beltoft_services_code = static function ( string $label, string $code, string $
 	<div class="bsdocs__code"<?php echo '' !== $lang ? ' data-lang="' . esc_attr( $lang ) . '"' : ''; ?>>
 		<div class="bsdocs__codebar">
 			<span><?php echo esc_html( $label ); ?></span>
-			<button type="button" class="bsdocs__copy" data-bsdocs-copy aria-label="<?php echo esc_attr( $what ); ?>"><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button>
+			<button type="button" class="bsdocs__copy" data-bsdocs-copy data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" aria-label="<?php echo esc_attr( $what ); ?>"><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button>
 		</div>
 		<pre tabindex="0" aria-label="<?php echo esc_attr( $label ); ?>"><code><?php echo esc_html( $code ); ?></code></pre>
 	</div>
@@ -193,7 +193,7 @@ if ( $mcp['on'] ) {
 				<h2><?php esc_html_e( 'API reference', 'beltoft-services' ); ?></h2>
 				<div class="bsdocs__base">
 					<code><?php echo esc_html( $base ); ?></code>
-					<button type="button" class="bsdocs__copy bsdocs__copy--light" data-bsdocs-copy aria-label="<?php esc_attr_e( 'Copy the base address', 'beltoft-services' ); ?>"><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button>
+					<button type="button" class="bsdocs__copy bsdocs__copy--light" data-bsdocs-copy data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" aria-label="<?php esc_attr_e( 'Copy the base address', 'beltoft-services' ); ?>"><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button>
 				</div>
 				<p><?php esc_html_e( 'The API works on your own services only. All requests use HTTPS and all replies are JSON. Send your username and a personal token as HTTP Basic authentication.', 'beltoft-services' ); ?> <a href="#api-authentication"><?php esc_html_e( 'How authentication works', 'beltoft-services' ); ?></a></p>
 			</div>

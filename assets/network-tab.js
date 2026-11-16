@@ -24,7 +24,24 @@
 	var bs = window.beltoftStatus;
 	var handle = null;
 
+	var rounds = 0;
+
 	function wait( action, since ) {
+		function again() {
+			rounds += 1;
+
+			// Ten minutes without an answer: the service is given back with a message, not locked until a reload.
+			if ( rounds > 150 ) {
+				bs.fail( handle, S.error );
+				handle = null;
+				return;
+			}
+
+			timer = window.setTimeout( function () {
+				wait( action, since );
+			}, 4000 );
+		}
+
 		request( 'GET', account.root + id ).then( function ( reply ) {
 			var result = reply.data && reply.data.last_result;
 
@@ -39,10 +56,8 @@
 				return;
 			}
 
-			timer = window.setTimeout( function () {
-				wait( action, since );
-			}, 4000 );
-		} );
+			again();
+		} ).catch( again );
 	}
 
 	// The network the customer chose: an id, or "new" with a name. Without the choice box (a server that is attached) nothing is sent.
@@ -69,6 +84,7 @@
 			return;
 		}
 
+		rounds = 0;
 		handle = bs.busy( S.working, id, button );
 		request( 'POST', account.root + id + '/actions/' + action, { args: args || {} } ).then( function ( reply ) {
 			if ( reply.ok ) {
@@ -77,6 +93,10 @@
 				bs.fail( handle, ( reply.data && reply.data.message ) || S.error );
 				handle = null;
 			}
+		} ).catch( function () {
+			// A dropped request: the lock is given back with a message.
+			bs.fail( handle, S.error );
+			handle = null;
 		} );
 	}
 

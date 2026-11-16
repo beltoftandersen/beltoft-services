@@ -41,7 +41,7 @@ $beltoft_services_panel = static function ( string $label, string $code, string 
 	<div class="beltoft-services-apiref__panel">
 		<div class="beltoft-services-apiref__panelbar">
 			<span><?php echo esc_html( $label ); ?></span>
-			<button type="button" class="beltoft-services-apiref__copy" data-apiref-copy aria-label="<?php echo esc_attr( $what ); ?>"><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button>
+			<button type="button" class="beltoft-services-apiref__copy" data-apiref-copy data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" aria-label="<?php echo esc_attr( $what ); ?>"><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button>
 		</div>
 		<pre tabindex="0" aria-label="<?php echo esc_attr( $label ); ?>"><code><?php echo esc_html( $code ); ?></code></pre>
 	</div>

@@ -65,7 +65,7 @@
 		var label = button.textContent;
 
 		navigator.clipboard.writeText( code.textContent ).then( function () {
-			button.textContent = 'Copied';
+			button.textContent = button.getAttribute( 'data-copied' ) || 'Copied';
 			button.setAttribute( 'aria-live', 'polite' );
 			window.setTimeout( function () {
 				button.textContent = label;
