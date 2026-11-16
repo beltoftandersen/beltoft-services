@@ -41,6 +41,8 @@ abstract class TestCase extends \WP_UnitTestCase {
 		parent::set_up();
 		// The hosting usage memo outlives a test; the tables and options behind it are reset around each one.
 		\BeltoftServices\Hosting\HostingCapacity::forget();
+		// The per-request read memo is a static: a test that opened an account page or switched it on must not leave it on.
+		\BeltoftServices\Resource::memo_end();
 		// The licenses activation table is outside WordPress' per-test rollback. A domain resource
 		// from an earlier test would be picked up by the daily sync during unrelated alert tests.
 		global $wpdb;
@@ -93,6 +95,7 @@ abstract class TestCase extends \WP_UnitTestCase {
 	public function tear_down(): void {
 		remove_filter( 'pre_http_request', array( $this, 'record_http' ), 10 );
 		\BeltoftServices\Currency::reset();
+		\BeltoftServices\Resource::memo_end();
 
 		parent::tear_down();
 
