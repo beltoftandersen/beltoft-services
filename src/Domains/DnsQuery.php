@@ -44,6 +44,11 @@ final class DnsQuery {
 		$data = fread( $socket, 4096 ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fread -- UDP DNS socket, not file I/O.
 		fclose( $socket ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- UDP DNS socket, not file I/O.
 		if ( ! is_string( $data ) || strlen( $data ) < 12 ) { return new \WP_Error( 'dns_transport', 'Name server did not answer.' ); }
+		return self::parse_answer( $data, $id, $type );
+	}
+
+	/** The value in an authoritative answer packet: the SOA serial (6), the earliest RRSIG expiry (46) or the number of DNSKEY records (48). Pure, so a canned packet tests it. */
+	public static function parse_answer( string $data, int $id, int $type ): int|\WP_Error {
 		$head = unpack( 'nid/nflags/nquestions/nanswers/nauthority/nadditional', substr( $data, 0, 12 ) );
 		if ( (int) $head['id'] === $id && ( $head['flags'] & 0x8000 ) !== 0 && ( $head['flags'] & 0x0400 ) === 0 && in_array( $head['flags'] & 15, array( 3, 5 ), true ) ) { return new \WP_Error( 'dns_not_authoritative', 'Name server does not serve this zone.' ); }
 		if ( (int) $head['id'] !== $id || ( $head['flags'] & 0x8000 ) === 0 || ( $head['flags'] & 0x0400 ) === 0 || ( $head['flags'] & 0x0200 ) !== 0 || ( $head['flags'] & 15 ) !== 0 ) { return new \WP_Error( 'dns_response', 'Name server did not return an authoritative answer.' ); }
