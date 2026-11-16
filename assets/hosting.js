@@ -384,11 +384,9 @@
 			return;
 		}
 
-		if ( navigator.clipboard && navigator.clipboard.writeText ) {
-			navigator.clipboard.writeText( value ).then( function () {
-				say( null, text.copied || '' );
-			}, function () {} );
-		}
+		window.beltoftApi.copy( value ).then( function () {
+			say( null, text.copied || '' );
+		}, function () {} );
 	}
 
 	document.addEventListener( 'click', function ( event ) {

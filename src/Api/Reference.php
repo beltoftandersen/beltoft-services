@@ -107,7 +107,7 @@ final class Reference {
 		 */
 		if ( apply_filters( 'beltoft_services_api_reference_js', true ) ) {
 			self::core_script();
-			wp_enqueue_script( self::HANDLE, plugins_url( 'assets/api-reference.js', BELTOFT_SERVICES_FILE ), array( self::CORE_HANDLE ), \BeltoftServices\Assets::version( 'assets/api-reference.js' ), array( 'strategy' => 'defer', 'in_footer' => true ) );
+			wp_enqueue_script( self::HANDLE, plugins_url( 'assets/api-reference.js', BELTOFT_SERVICES_FILE ), array( self::CORE_HANDLE, \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/api-reference.js' ), array( 'strategy' => 'defer', 'in_footer' => true ) );
 		}
 
 		ob_start();
@@ -120,7 +120,7 @@ final class Reference {
 	 * The script both layouts share (copy buttons and the highlight of the section being read).
 	 */
 	private static function core_script(): void {
-		wp_register_script( self::CORE_HANDLE, plugins_url( 'assets/api-reference-core.js', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/api-reference-core.js' ), array( 'strategy' => 'defer', 'in_footer' => true ) );
+		wp_enqueue_script( self::CORE_HANDLE, plugins_url( 'assets/api-reference-core.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/api-reference-core.js' ), array( 'strategy' => 'defer', 'in_footer' => true ) );
 	}
 
 	/**
@@ -135,7 +135,7 @@ final class Reference {
 		/** This filter is documented in html(). */
 		if ( apply_filters( 'beltoft_services_api_reference_js', true ) ) {
 			self::core_script();
-			wp_enqueue_script( self::HANDLE . '-full', plugins_url( 'assets/api-reference-full.js', BELTOFT_SERVICES_FILE ), array( self::CORE_HANDLE ), \BeltoftServices\Assets::version( 'assets/api-reference-full.js' ), array( 'strategy' => 'defer', 'in_footer' => true ) );
+			wp_enqueue_script( self::HANDLE . '-full', plugins_url( 'assets/api-reference-full.js', BELTOFT_SERVICES_FILE ), array( self::CORE_HANDLE, \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/api-reference-full.js' ), array( 'strategy' => 'defer', 'in_footer' => true ) );
 		}
 
 		$data              = self::data();

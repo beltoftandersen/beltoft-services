@@ -2,7 +2,7 @@
  * What the two layouts of the API reference share: the copy buttons and the highlight of the section being read.
  *
  * window.beltoftApiRef.copyButtons( root, buttonSelector, holderSelector ) makes the buttons inside root copy the text of
- * the <code> of their holder. window.beltoftApiRef.scrollSpy( root, options ) marks the link of the section being read
+ * the <code> of their holder (window.beltoftApi.copy of assets/api.js). window.beltoftApiRef.scrollSpy( root, options ) marks the link of the section being read
  * (options: links, sections, opClass, groupSelector and onCurrent( section, links ) after a change).
  */
 ( function () {
@@ -12,7 +12,7 @@
 		root.addEventListener( 'click', function ( event ) {
 			var button = event.target.closest ? event.target.closest( buttonSelector ) : null;
 
-			if ( ! button || ! navigator.clipboard ) {
+			if ( ! button ) {
 				return;
 			}
 
@@ -23,15 +23,8 @@
 				return;
 			}
 
-			var label = button.textContent;
-
-			navigator.clipboard.writeText( code.textContent ).then( function () {
-				button.textContent = button.getAttribute( 'data-copied' ) || 'Copied';
-				button.setAttribute( 'aria-live', 'polite' );
-				window.setTimeout( function () {
-					button.textContent = label;
-				}, 1600 );
-			} );
+			button.setAttribute( 'aria-live', 'polite' );
+			window.beltoftApi.copy( code.textContent, button ).catch( function () {} );
 		} );
 	}
 

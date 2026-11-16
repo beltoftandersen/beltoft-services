@@ -146,10 +146,10 @@
 		if ( target.hasAttribute( 'data-mail-copy' ) ) {
 			var value = box.querySelector( '[data-mail-secret-value]' );
 
-			if ( value && window.navigator.clipboard ) {
-				window.navigator.clipboard.writeText( value.textContent ).then( function () {
+			if ( value ) {
+				window.beltoftApi.copy( value.textContent ).then( function () {
 					S.info( strings.copied );
-				} );
+				}, function () {} );
 			}
 
 			return;
@@ -406,11 +406,4 @@
 			} );
 		}
 	} );
-
-	// A copy button shows only when the browser can copy.
-	if ( ! window.navigator.clipboard ) {
-		Array.prototype.forEach.call( document.querySelectorAll( '[data-mail-copy]' ), function ( button ) {
-			button.hidden = true;
-		} );
-	}
 }() );

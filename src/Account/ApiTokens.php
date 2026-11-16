@@ -122,7 +122,7 @@ final class ApiTokens {
 		}
 
 		Panel::style();
-		wp_enqueue_script( 'beltoft-services-api-tokens', plugins_url( 'assets/api-tokens.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Status::HANDLE ), \BeltoftServices\Assets::version( 'assets/api-tokens.js' ), true );
+		wp_enqueue_script( 'beltoft-services-api-tokens', plugins_url( 'assets/api-tokens.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Status::HANDLE, \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/api-tokens.js' ), true );
 		wp_localize_script(
 			'beltoft-services-api-tokens',
 			'beltoftApiTokens',
