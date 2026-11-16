@@ -30,6 +30,21 @@ defined( 'ABSPATH' ) || exit;
 abstract class ServiceArea {
 
 	/**
+	 * Visibility: the service is listed and opens.
+	 */
+	public const SHOWN = 'shown';
+
+	/**
+	 * Visibility: the service is gone; it is not listed and its address says it was deleted.
+	 */
+	public const GONE = 'gone';
+
+	/**
+	 * Visibility: the service is history; it is not listed and its address says it was not found.
+	 */
+	public const HIDDEN = 'hidden';
+
+	/**
 	 * The areas by class name, built once.
 	 *
 	 * @var array<string, ServiceArea>
@@ -137,6 +152,68 @@ abstract class ServiceArea {
 	 * @return array<string, mixed>
 	 */
 	abstract public function row( array $view, Resource $resource ): array;
+
+	/**
+	 * The template that takes over the licenses template on the area's endpoint (templates/account, theme-overridable).
+	 */
+	protected function template_name(): string {
+		return 'area.php';
+	}
+
+	/**
+	 * The template of the list (templates/account, theme-overridable). It is given $rows, $buttons and $empty.
+	 */
+	protected function list_name(): string {
+		return 'area-list.php';
+	}
+
+	/**
+	 * How a service of the area is treated: SHOWN, GONE (not listed, the address says it was deleted) or HIDDEN (not listed,
+	 * the address says it was not found). The default is GONE for a service that is gone (see Resource::gone()).
+	 *
+	 * @param Resource|null $resource The license's resource, or null when it has none.
+	 */
+	protected function visibility( ?Resource $resource ): string {
+		return Resource::gone( $resource ) ? self::GONE : self::SHOWN;
+	}
+
+	/**
+	 * The classes of the box around a service page.
+	 *
+	 * @param bool $chrome Whether the page keeps its back link and head.
+	 */
+	protected function detail_classes( bool $chrome ): string {
+		return 'beltoft-services-server beltoft-services-area-page beltoft-services-area-page--' . $this->key() . ( $chrome ? '' : ' beltoft-services-area-page--bare' );
+	}
+
+	/**
+	 * The name of the filter that lists the tab addresses of a service page.
+	 */
+	protected function page_tabs_filter(): string {
+		return 'beltoft_services_' . $this->key() . '_page_tabs';
+	}
+
+	/**
+	 * Does the area let another plugin draw pages below a service (the filters beltoft_services_account_page_redirect,
+	 * _page_body and _page_chrome)? The tabs of a domain page are address parts too, and those filters are not for them.
+	 */
+	public function allows_plugin_pages(): bool {
+		return true;
+	}
+
+	/**
+	 * The values the head of a service page prints (templates/account/domain-head.php): title, group, badge, message,
+	 * show_message, kind, renews. An area changes what differs from the default.
+	 *
+	 * @param Resource             $resource Resource.
+	 * @param array<string, mixed> $vars     The default values.
+	 * @return array<string, mixed>
+	 */
+	protected function head_vars( Resource $resource, array $vars ): array {
+		unset( $resource );
+
+		return $vars;
+	}
 
 	/**
 	 * The buttons of the action bar over the list: label and url, the last one the main one. None by default.
@@ -307,7 +384,7 @@ abstract class ServiceArea {
 		 *
 		 * @param array<int, string> $slugs Slugs after the overview.
 		 */
-		$slugs = apply_filters( 'beltoft_services_' . $this->key() . '_page_tabs', array_keys( $this->page_tabs() ) );
+		$slugs = apply_filters( $this->page_tabs_filter(), array_keys( $this->page_tabs() ) );
 
 		return array_values( array_filter( is_array( $slugs ) ? $slugs : array(), 'is_string' ) );
 	}
@@ -481,7 +558,7 @@ abstract class ServiceArea {
 
 			$asked = $area->requested();
 
-			if ( $asked['id'] < 1 || array() === $asked['path'] ) {
+			if ( ! $area->allows_plugin_pages() || $asked['id'] < 1 || array() === $asked['path'] ) {
 				return $none;
 			}
 
@@ -556,7 +633,7 @@ abstract class ServiceArea {
 			if ( is_wc_endpoint_url( $area->slug() ) ) {
 				self::$active = $area;
 
-				return self::file( 'area.php' );
+				return self::file( $area->template_name() );
 			}
 		}
 
@@ -594,7 +671,13 @@ abstract class ServiceArea {
 			$resource = Resource::for_license( (int) $view['license']['id'] );
 			$id       = (int) $view['license']['id'];
 
-			if ( Resource::gone( $resource ) ) {
+			$visibility = $this->visibility( $resource );
+
+			if ( self::HIDDEN === $visibility ) {
+				continue;
+			}
+
+			if ( self::GONE === $visibility ) {
 				$gone[ $id ] = true;
 				continue;
 			}
@@ -626,7 +709,7 @@ abstract class ServiceArea {
 		$buttons = $this->buttons();
 		$empty   = '' !== $empty ? $empty : $this->empty_text();
 
-		include self::file( 'area-list.php' );
+		include self::file( $this->list_name() );
 	}
 
 	/**
@@ -667,10 +750,10 @@ abstract class ServiceArea {
 		 * @param bool                 $chrome Keep the link and the head, default true.
 		 * @param array<string, mixed> $page   The page: license (row), resource, area, view, path, base, tab.
 		 */
-		self::$page['chrome'] = (bool) apply_filters( 'beltoft_services_account_page_chrome', true, self::$page );
+		self::$page['chrome'] = $this->allows_plugin_pages() ? (bool) apply_filters( 'beltoft_services_account_page_chrome', true, self::$page ) : true;
 
 		try {
-			echo '<div class="beltoft-services-server beltoft-services-area-page beltoft-services-area-page--' . esc_attr( $this->key() ) . ( self::$page['chrome'] ? '' : ' beltoft-services-area-page--bare' ) . '">';
+			echo '<div class="' . esc_attr( $this->detail_classes( (bool) self::$page['chrome'] ) ) . '">';
 
 			// A head that has buttons (a database's) prints the back link on their row; any other page prints it above.
 			if ( self::$page['chrome'] ) {
@@ -742,6 +825,7 @@ abstract class ServiceArea {
 			'renews'       => ServerLinks::renewal( self::$page['license'] ),
 		);
 
+		$vars = self::$page['area']->head_vars( $resource, $vars );
 		$file = 'domain-head.php';
 
 		// A database's head has the state line, the power buttons and no renewal date on a pay as you go service.

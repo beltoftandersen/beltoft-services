@@ -297,7 +297,7 @@ final class Panel {
 		 * @param bool                 $handled Whether a listener printed the page.
 		 * @param array<string, mixed> $page    The page: license (row), resource, area, view, path (parts after the service), base (the service page's address), tab.
 		 */
-		$handled = null !== $page && ( $page['area'] ?? null ) instanceof ServiceArea && (bool) apply_filters( 'beltoft_services_account_page_body', false, $page );
+		$handled = null !== $page && ( $page['area'] ?? null ) instanceof ServiceArea && $page['area']->allows_plugin_pages() && (bool) apply_filters( 'beltoft_services_account_page_body', false, $page );
 
 		if ( ! $handled ) {
 			$driver->render_account( $resource );
