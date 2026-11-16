@@ -295,8 +295,12 @@ final class MailDnsRecheckTest extends MailTestCase {
 		$this->assertTrue( MailHold::held( $r ) );
 		$this->assertSame( 'held', $r->get( 'mail_hold' ) );
 		$this->assertFalse( $this->mailcow->mailbox( 'anna@moved.example' )['smtp'], 'Sending is held.' );
-		$this->assertCount( 1, $this->mails, 'One mail to the customer.' );
-		$this->assertSame( 'DNS records are still missing for moved.example', $this->mails[0]['subject'] );
+		$subjects = array_column( $this->mails, 'subject' );
+		$this->assertCount( 1, array_keys( $subjects, 'DNS records are still missing for moved.example', true ), 'One mail to the customer.' );
+		$this->assertCount( 1, array_filter( $subjects, static fn( $x ) => str_contains( (string) $x, 'Mail domain left our name servers: moved.example' ) ), 'One mail to staff.' );
+
+		MailDns::recheck( $r->id() );
+		$this->assertCount( 2, $this->mails, 'The next look sends no second pair.' );
 	}
 
 	public function test_a_domain_that_left_our_servers_with_its_records_intact_is_not_held(): void {
@@ -311,6 +315,6 @@ final class MailDnsRecheckTest extends MailTestCase {
 		$this->assertSame( 'ok', $r->get( 'mail_dns' ) );
 		$this->assertFalse( MailHold::held( $r ) );
 		$this->assertTrue( $this->mailcow->mailbox( 'anna@kept.example' )['smtp'] );
-		$this->assertCount( 0, $this->mails );
+		$this->assertCount( 0, array_filter( array_column( $this->mails, 'subject' ), static fn( $x ) => str_contains( (string) $x, 'DNS records are still missing' ) ), 'No mail to the customer.' );
 	}
 }

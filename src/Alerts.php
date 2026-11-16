@@ -358,6 +358,32 @@ final class Alerts {
 	}
 
 	/**
+	 * Alerts the admin that a mail domain that was on our name servers is not any more (the zone was deleted or the name
+	 * servers were moved). The daily look has read its records again; the line says whether sending is held. Once per
+	 * domain and day.
+	 *
+	 * @param Resource $r    Mail resource.
+	 * @param string   $host Mail domain.
+	 * @param bool     $held Whether the records were not found and sending is held.
+	 * @return bool Whether a mail was sent.
+	 */
+	public static function mail_domain_left( Resource $r, string $host, bool $held ): bool {
+		$license = $r->license();
+
+		return self::notify(
+			sprintf( 'Mail domain left our name servers: %s', $host ),
+			array(
+				sprintf( 'Domain: %s', $host ),
+				sprintf( 'Mail resource: %d', $r->id() ),
+				sprintf( 'Customer: %d', (int) ( $license['user_id'] ?? 0 ) ),
+				$held ? 'Its SPF or DKIM record was not found elsewhere: sending is held and the customer was emailed.' : 'Its records were found at the new DNS: sending is not held.',
+			),
+			$r,
+			'beltoft_services_mail_left_' . md5( strtolower( $host ) )
+		);
+	}
+
+	/**
 	 * Alerts the admin that the nightly scan of a hosting account found malware (the customer is told by email, the website stays
 	 * online). Once per newest find: the dedupe key holds the date of the oldest new file.
 	 *
