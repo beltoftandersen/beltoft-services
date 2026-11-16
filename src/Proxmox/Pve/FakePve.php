@@ -205,4 +205,55 @@ abstract class FakePve implements Client {
 			update_option( $this->option_name(), $this->state, false );
 		}
 	}
+
+	/** Checks a call against a schema (name => [type, required, ...]); the checked parameters or an error. */
+	abstract protected function validate( array $schema, array $params );
+
+	/** An error a test scripted with fail_next(). */
+	abstract protected function scripted_error( $spec ): \WP_Error;
+
+	/** An API error: code http_<status> with the status in the data, like the live client. */
+	abstract protected function error( int $status, string $message ): \WP_Error;
+
+	/**
+	 * The part of a call both fakes share: find the route, validate the parameters, use up a scripted failure. The caller
+	 * runs the handler (its handlers are private to it) and saves.
+	 *
+	 * @param array<int, array> $routes Method, path regex, handler, schema.
+	 * @return array{handler: string, args: array, params: mixed}|\WP_Error
+	 */
+	protected function match_call( array $routes, string $method, string $path, array $params ) {
+		$matched = null;
+
+		foreach ( $routes as $route ) {
+			if ( $route[0] === $method && 1 === preg_match( $route[1], $path, $m ) ) {
+				$matched = array( $route, $m );
+				break;
+			}
+		}
+
+		if ( null === $matched ) {
+			return $this->error( 501, 'Method not implemented' );
+		}
+
+		$checked = $this->validate( $matched[0][3], $params );
+
+		if ( is_wp_error( $checked ) ) {
+			return $checked;
+		}
+
+		foreach ( $this->failures as $i => $failure ) {
+			if ( $failure[0] === $method && 1 === preg_match( $failure[1], $path ) ) {
+				array_splice( $this->failures, $i, 1 );
+
+				return $this->scripted_error( $failure[2] );
+			}
+		}
+
+		return array( 'handler' => $matched[0][2], 'args' => array_slice( $matched[1], 1 ), 'params' => $checked );
+	}
+
+	/** No sleeping: a poll counts as 2 seconds of the timeout. */
+	protected function pause( int $seconds ): void {
+	}
 }

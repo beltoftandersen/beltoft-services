@@ -208,45 +208,16 @@ class FakeNode extends FakePve {
 		);
 		$this->load();
 
-		$matched = null;
+		$route = $this->match_call( self::routes(), $method, $path, $params );
 
-		foreach ( self::routes() as $route ) {
-			if ( $route[0] === $method && 1 === preg_match( $route[1], $path, $m ) ) {
-				$matched = array( $route, $m );
-				break;
-			}
+		if ( is_wp_error( $route ) ) {
+			return $route;
 		}
 
-		if ( null === $matched ) {
-			return $this->error( 501, 'Method not implemented' );
-		}
-
-		$checked = $this->validate( $matched[0][3], $params );
-
-		if ( is_wp_error( $checked ) ) {
-			return $checked;
-		}
-
-		foreach ( $this->failures as $i => $failure ) {
-			if ( $failure[0] === $method && 1 === preg_match( $failure[1], $path ) ) {
-				array_splice( $this->failures, $i, 1 );
-
-				return $this->scripted_error( $failure[2] );
-			}
-		}
-
-		$result = $this->{$matched[0][2]}( array_slice( $matched[1], 1 ), $checked );
+		$result = $this->{$route['handler']}( $route['args'], $route['params'] );
 		$this->save();
 
 		return $result;
-	}
-
-	/**
-	 * No sleeping: a poll counts as 2 seconds of the timeout.
-	 *
-	 * @param int $seconds Seconds.
-	 */
-	protected function pause( int $seconds ): void {
 	}
 
 	/**
@@ -1178,7 +1149,7 @@ class FakeNode extends FakePve {
 	 * @param array<string, mixed> $params Parameters.
 	 * @return array<string, mixed>|\WP_Error The parameters, typed.
 	 */
-	private function validate( array $schema, array $params ) {
+	protected function validate( array $schema, array $params ) {
 		$out = array();
 
 		foreach ( $params as $name => $value ) {
@@ -1223,7 +1194,7 @@ class FakeNode extends FakePve {
 	 *
 	 * @param \WP_Error|array $spec Spec.
 	 */
-	private function scripted_error( $spec ): \WP_Error {
+	protected function scripted_error( $spec ): \WP_Error {
 		if ( $spec instanceof \WP_Error ) {
 			return $spec;
 		}
@@ -1240,7 +1211,7 @@ class FakeNode extends FakePve {
 	 * @param string               $message Message.
 	 * @param array<string, mixed> $extra   Extra data.
 	 */
-	private function error( int $status, string $message, array $extra = array() ): \WP_Error {
+	protected function error( int $status, string $message, array $extra = array() ): \WP_Error {
 		return new \WP_Error( 'http_' . $status, $message, array_merge( array( 'status' => $status ), $extra ) );
 	}
 
