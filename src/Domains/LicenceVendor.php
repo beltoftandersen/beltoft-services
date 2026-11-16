@@ -171,10 +171,20 @@ final class LicenceVendor {
 			return StepResult::retry( 300, $text );
 		}
 
-		$data = $error->get_error_data();
-		Alerts::admin( $r, $text . ' (' . $error->get_error_code() . ( is_array( $data ) && ! empty( $data['desc'] ) ? ': ' . $data['desc'] : '' ) . ')' );
+		Alerts::admin( $r, $text . ' (' . self::error_text( $error ) . ')' );
 
 		return StepResult::retry( 3600, $text );
+	}
+
+	/**
+	 * The vendor's error as a staff line: its code and, when it has one, its description (never a key).
+	 *
+	 * @param \WP_Error $error Error.
+	 */
+	public static function error_text( \WP_Error $error ): string {
+		$data = $error->get_error_data();
+
+		return $error->get_error_code() . ( is_array( $data ) && ! empty( $data['desc'] ) ? ': ' . $data['desc'] : '' );
 	}
 
 	/**
@@ -419,6 +429,64 @@ final class LicenceVendor {
 		$reply = self::client()->request( 'PUT', '/licenses/plesk/' . $id, array( 'ip_address_binding' => $ip, 'restrict_ip_binding' => true ) );
 
 		return is_wp_error( $reply ) ? $reply : null;
+	}
+
+	/**
+	 * Resets the hardware id of a Plesk licence: its key works on another machine afterwards (a reinstalled or another server).
+	 * Safe to repeat. A refusal (nothing to reset) is returned for the caller to sort.
+	 *
+	 * @param Resource      $r      Licence resource.
+	 * @param LicenceFamily $family Family.
+	 * @return \WP_Error|null The vendor's error, or null when the id was reset.
+	 */
+	public static function reset_hardware( Resource $r, LicenceFamily $family ): ?\WP_Error {
+		$id = (int) $r->get( $family->meta( 'key_id' ) );
+
+		if ( $id < 1 ) {
+			return new \WP_Error( 'licence_reset_invalid', 'The licence is missing.' );
+		}
+
+		$reply = self::client()->request( 'POST', '/licenses/hwids/reset/plesk/' . $id, array( 'key_id' => $id, 'product' => 'plesk' ) );
+
+		return is_wp_error( $reply ) ? $reply : null;
+	}
+
+	/**
+	 * The one sequence that moves a licence to another machine: the address (rebind()), then for a Plesk licence the hardware id
+	 * (reset_hardware()). A temporary error of either returns `$say['wait']` (the caller's own StepResult: a poll inside an install job,
+	 * a retry for a customer action); a final refusal of the address tells staff once and returns a failed StepResult whose sentence is
+	 * for the customer and which is an expected refusal (staff were told here, not a second time by the action controller). A final
+	 * refusal of the reset is ignored: there was nothing to reset, and the key job or the customer sees the result. Safe to repeat.
+	 *
+	 * @param Resource             $r      Licence resource.
+	 * @param LicenceFamily        $family Family.
+	 * @param string               $ip     The new address.
+	 * @param bool                 $reset  Whether the hardware id is reset after the address (a Plesk licence).
+	 * @param array<string, mixed> $say    wait (StepResult for a temporary error), tail (what staff do, after the error), said (sentence for the customer).
+	 * @return StepResult|null Null when the licence moved.
+	 */
+	public static function move( Resource $r, LicenceFamily $family, string $ip, bool $reset, array $say ): ?StepResult {
+		$error = self::rebind( $r, $family, $ip );
+
+		if ( null !== $error ) {
+			if ( self::transient( $error ) ) {
+				return $say['wait'];
+			}
+
+			Alerts::admin( $r, 'The ' . $family->licence_noun() . ' could not be moved to the new server address (' . self::error_text( $error ) . '). ' . (string) $say['tail'] );
+
+			return StepResult::fail( (string) $say['said'], array( Jobs::TEXT => (string) $say['said'], Jobs::EXPECTED => true ) );
+		}
+
+		if ( $reset ) {
+			$error = self::reset_hardware( $r, $family );
+
+			if ( null !== $error && self::transient( $error ) ) {
+				return $say['wait'];
+			}
+		}
+
+		return null;
 	}
 
 	/**

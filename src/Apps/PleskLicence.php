@@ -64,6 +64,13 @@ final class PleskLicence {
 	public const KEY_HOOK  = 'beltoft_services_plesk_key';
 	public const SYNC_HOOK = 'beltoft_services_plesk_sync';
 
+	/**
+	 * Action: the vendor licence of a kept app licence was moved to the address of its new server. Arguments: the licence resource, the
+	 * address and the server resource. A standalone add-on that hangs under this licence follows it (Licences\KeyMove).
+	 */
+	public const MOVED = 'beltoft_services_app_licence_moved';
+
+
 	/** Guest files: the key the plugin writes and the answer the guest writes (with the hash of the key, not the key). */
 	public const KEY_FILE    = '/var/lib/beltoft-app/licence.json';
 	public const STATUS_FILE = '/var/lib/beltoft-app/licence.status.json';
@@ -430,22 +437,30 @@ final class PleskLicence {
 			return StepResult::poll( 60, 'app: waiting for the address of the server', 900 );
 		}
 
-		$error = LicenceVendor::rebind( $licence, new PleskFamily(), (string) $ip['address'] );
+		$address = (string) $ip['address'];
+		$reset   = 1 === (int) $licence->get( 'plesk_hwid_reset' );
+		$stopped = LicenceVendor::move(
+			$licence,
+			new PleskFamily(),
+			$address,
+			$reset,
+			array(
+				'wait' => StepResult::poll( 60, 'app: waiting to move the Plesk licence', 900 ),
+				'tail' => 'The licence is on the server and paid; bind it to ' . $address . ' at Openprovider, then try the install again.',
+				'said' => 'The app licence could not be moved to this server. We have been told and will fix it; then try again.',
+			)
+		);
 
-		if ( null === $error ) {
-			$licence->set( array( 'plesk_rebind' => null ) );
-
-			return null;
+		if ( null !== $stopped ) {
+			return $stopped;
 		}
 
-		if ( self::transient( $error ) ) {
-			return StepResult::poll( 60, 'app: waiting to move the Plesk licence', 900 );
-		}
+		// The new system has a new hardware id: the shared move reset it with the address.
+		$licence->set( array( 'plesk_rebind' => null ) + ( $reset ? array( 'plesk_hwid_reset' => null ) : array() ) );
 
-		$data = $error->get_error_data();
-		self::alert( $licence, 'The Plesk licence could not be moved to the new server address (' . $error->get_error_code() . ( is_array( $data ) && ! empty( $data['desc'] ) ? ': ' . $data['desc'] : '' ) . '). The licence is on the server and paid; bind it to ' . (string) $ip['address'] . ' at Openprovider, then try the install again.' );
+		do_action( self::MOVED, $licence, $address, $server );
 
-		return StepResult::fail( 'The app licence could not be moved to this server. We have been told and will fix it; then try again.' );
+		return null;
 	}
 
 	/**
@@ -633,9 +648,9 @@ final class PleskLicence {
 		}
 
 		if ( 1 === (int) $licence->get( 'plesk_hwid_reset' ) && (int) $licence->get( 'plesk_key_id' ) > 0 ) {
-			$reply = self::client()->request( 'POST', '/licenses/hwids/reset/plesk/' . (int) $licence->get( 'plesk_key_id' ), array( 'key_id' => (int) $licence->get( 'plesk_key_id' ), 'product' => 'plesk' ) );
+			$reply = LicenceVendor::reset_hardware( $licence, new PleskFamily() );
 
-			if ( is_wp_error( $reply ) && self::transient( $reply ) ) {
+			if ( null !== $reply && self::transient( $reply ) ) {
 				return StepResult::poll( 60, 'app: waiting to reset the Plesk licence', 900 );
 			}
 
