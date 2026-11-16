@@ -74,4 +74,20 @@ final class ChildrenSpawnTest extends MailTestCase {
 		$this->assertCount( 1, $rows );
 		$this->assertEmpty( $rows[0]['live_domain'], 'The activation is closed, not left live.' );
 	}
+
+	public function test_a_child_that_reached_deleted_has_its_license_revoked_and_a_service_license_is_left_alone(): void {
+		$parent = $this->ready_mail( 'parent4.example' );
+		$slug   = 'child-del-slug';
+
+		$child = Children::spawn( $parent, $slug, Registry::get( MailDriver::ID ), array( 'mailboxes' => 3 ), array( MailDomain::META_DOMAIN => 'kid4.example' ), 'no license', 'no link' );
+		$this->assertInstanceOf( Resource::class, $child );
+		$this->assertSame( Licenses::STATUS_ACTIVE, $this->child_licenses( $parent, $slug )[0]['status'] );
+
+		\BeltoftServices\Reconciler::notify( $child, 'ready', 'deleted' );
+		$this->assertSame( Licenses::STATUS_REVOKED, $this->child_licenses( $parent, $slug )[0]['status'] );
+
+		// The parent is a service license, not a child: reaching deleted does not revoke it here (the lifecycle owns that).
+		\BeltoftServices\Reconciler::notify( $parent, 'ready', 'deleted' );
+		$this->assertNotSame( Licenses::STATUS_REVOKED, Licenses::find( (int) $parent->license()['id'] )['status'] );
+	}
 }
