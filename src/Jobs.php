@@ -957,41 +957,55 @@ final class Jobs {
 	 */
 	public static function sweep(): void {
 		foreach ( self::live_ids() as $id ) {
-			$resource = Resource::find( $id );
-
-			if ( ! $resource ) {
-				continue;
+			// One odd resource (or a listener that throws for it) must not end the sweep for all later ones.
+			try {
+				self::sweep_one( (int) $id );
+			} catch ( \Throwable $e ) {
+				error_log( sprintf( 'Beltoft Services: the sweep failed for resource %d: %s', (int) $id, $e->getMessage() ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- the sweep goes on; this is the only record.
 			}
-
-			if ( ! $resource->is_valid() ) {
-				Alerts::admin( $resource, $resource->get( 'last_error' ) );
-				continue;
-			}
-
-			// An action whose job vanished is ended here (result, staff alert) even when nobody opens the page.
-			Progress::pending( $resource );
-
-			// A desired state that could not take the lock is applied by the next step.
-			if ( null !== $resource->pending_desire() ) {
-				self::enqueue( $id );
-				continue;
-			}
-
-			if ( self::license_disagrees( $resource ) ) {
-				continue;
-			}
-
-			// A failed operation waiting for an admin has no operation (see Reconciler::operation()).
-			if ( null === Reconciler::operation( $resource ) ) {
-				// A failure whose alert was never sent (no valid address then) is sent now.
-				if ( 'failed' === $resource->get( 'state' ) && '' === (string) $resource->get( 'alerted' ) ) {
-					Alerts::admin( $resource, $resource->get( 'last_error' ) );
-				}
-				continue;
-			}
-
-			self::enqueue( $id, Reconciler::wait( $resource ) );
 		}
+	}
+
+	/**
+	 * The sweep of one live resource.
+	 *
+	 * @param int $id Activation id.
+	 */
+	private static function sweep_one( int $id ): void {
+		$resource = Resource::find( $id );
+
+		if ( ! $resource ) {
+			return;
+		}
+
+		if ( ! $resource->is_valid() ) {
+			Alerts::admin( $resource, $resource->get( 'last_error' ) );
+			return;
+		}
+
+		// An action whose job vanished is ended here (result, staff alert) even when nobody opens the page.
+		Progress::pending( $resource );
+
+		// A desired state that could not take the lock is applied by the next step.
+		if ( null !== $resource->pending_desire() ) {
+			self::enqueue( $id );
+			return;
+		}
+
+		if ( self::license_disagrees( $resource ) ) {
+			return;
+		}
+
+		// A failed operation waiting for an admin has no operation (see Reconciler::operation()).
+		if ( null === Reconciler::operation( $resource ) ) {
+			// A failure whose alert was never sent (no valid address then) is sent now.
+			if ( 'failed' === $resource->get( 'state' ) && '' === (string) $resource->get( 'alerted' ) ) {
+				Alerts::admin( $resource, $resource->get( 'last_error' ) );
+			}
+			return;
+		}
+
+		self::enqueue( $id, Reconciler::wait( $resource ) );
 	}
 
 	/**
