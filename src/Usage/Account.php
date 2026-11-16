@@ -52,6 +52,8 @@ final class Account {
 		// Before Lifecycle (10), so the license is on the account when its service is made.
 		add_action( 'beltoft_licenses_license_created', array( __CLASS__, 'attach' ), 5 );
 		add_action( 'woocommerce_subscription_renewal_payment_complete', array( __CLASS__, 'paid' ), 10, 2 );
+		// An early bill is paid on an account that stays active, and WooCommerce Subscriptions then does not fire the hook above.
+		add_action( 'woocommerce_payment_complete', array( __CLASS__, 'early_paid' ) );
 		// The customer's currency, when nothing earlier answered (the core asks the filter and names no feature).
 		add_filter( 'beltoft_services_user_currency', array( __CLASS__, 'user_currency' ), 20, 2 );
 	}
@@ -340,6 +342,23 @@ final class Account {
 
 		$subscription->update_meta_data( self::META_CHARGED, 'yes' );
 		$subscription->save();
+	}
+
+	/**
+	 * An early usage bill was paid: the account has had its first successful usage charge, whatever its status.
+	 *
+	 * @param mixed $order_id Order id.
+	 */
+	public static function early_paid( $order_id ): void {
+		$order = wc_get_order( (int) $order_id );
+
+		if ( ! $order instanceof \WC_Order || '' === (string) $order->get_meta( Renewal::META_EARLY ) || ! function_exists( 'wcs_get_subscriptions_for_order' ) ) {
+			return;
+		}
+
+		foreach ( wcs_get_subscriptions_for_order( $order, array( 'order_type' => 'renewal' ) ) as $subscription ) {
+			self::paid( $subscription, $order );
+		}
 	}
 
 	/**

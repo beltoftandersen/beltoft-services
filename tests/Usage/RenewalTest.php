@@ -237,6 +237,22 @@ class RenewalTest extends UsageTestCase {
 		$this->assertTrue( Account::charged( wcs_get_subscription( $sub->get_id() ) ) );
 	}
 
+	public function test_a_paid_early_bill_on_an_active_account_marks_it_as_charged(): void {
+		$user = $this->new_user();
+		$sub  = $this->usage_account( $user );
+		$this->hours( 501, $user, 50 );
+
+		\BeltoftServices\Usage\Renewal::$early = true;
+		$order = wcs_create_renewal_order( $sub );
+		\BeltoftServices\Usage\Renewal::$early = false;
+		$order->update_meta_data( \BeltoftServices\Usage\Renewal::META_EARLY, 'yes' );
+		$order->save();
+
+		$this->assertFalse( Account::charged( $sub ) );
+		$order->payment_complete();
+		$this->assertTrue( Account::charged( wcs_get_subscription( $sub->get_id() ) ), 'WooCommerce Subscriptions does not fire its renewal hook for an active account.' );
+	}
+
 	public function test_line_wording_uses_plural_forms_and_translatable_units(): void {
 		$call = static function ( string $method, ...$args ) {
 			$m = new \ReflectionMethod( \BeltoftServices\Usage\Renewal::class, $method );
