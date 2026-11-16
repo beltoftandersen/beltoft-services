@@ -60,6 +60,19 @@ class SiteNamesTest extends HostingCase {
 		$this->assertSame( 20 + 3, strlen( $name ) );
 	}
 
+	public function test_the_daily_sweep_deletes_expired_name_holds_and_keeps_live_ones(): void {
+		$this->assertTrue( Sites::reserve( 'stale-name', 'g1' ) );
+		$this->assertTrue( Sites::reserve( 'fresh-name', 'g2' ) );
+		$stale = 'beltoft_services_slug_hold_' . substr( md5( 'stale-name' ), 0, 20 );
+		$fresh = 'beltoft_services_slug_hold_' . substr( md5( 'fresh-name' ), 0, 20 );
+		update_option( $stale, array( 'o' => 'g1', 't' => time() - 10 ), false );
+
+		do_action( \BeltoftServices\Hosting\Addons::SWEEP_HOOK );
+
+		$this->assertFalse( get_option( $stale ), 'An expired hold is gone.' );
+		$this->assertIsArray( get_option( $fresh ), 'A live hold stays.' );
+	}
+
 	public function test_an_empty_or_reserved_base_falls_back_to_site(): void {
 		$this->assertMatchesRegularExpression( '/^site-[a-hj-km-np-z2-9]{2}$/D', $this->slug( array() ) );
 		$this->assertMatchesRegularExpression( '/^site-[a-hj-km-np-z2-9]{2}$/D', $this->slug( array( 'company' => 'Admin' ) ) );

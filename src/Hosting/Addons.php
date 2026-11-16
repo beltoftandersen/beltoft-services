@@ -71,6 +71,7 @@ final class Addons {
 		add_action( 'woocommerce_order_status_cancelled', array( __CLASS__, 'reverse' ), 20 );
 		add_action( 'woocommerce_subscriptions_switch_completed', array( __CLASS__, 'after_switch' ), 20 );
 		add_action( self::SWEEP_HOOK, array( __CLASS__, 'cancel_stale' ) );
+		add_action( self::SWEEP_HOOK, array( Sites::class, 'purge_expired_holds' ) );
 		add_action( self::ACTIVATE_RETRY_HOOK, array( __CLASS__, 'activate' ) );
 		Jobs::recurring( array( __CLASS__, 'schedule' ) );
 	}
