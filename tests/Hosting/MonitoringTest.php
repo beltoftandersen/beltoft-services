@@ -368,7 +368,7 @@ class MonitoringTest extends HostingCase {
 		$html = $this->page( $r );
 
 		$this->assertStringContainsString( 'data-vm-metrics', $html );
-		foreach ( array( 'data-chart="cpu"', 'data-chart="mem"', 'data-chart="net"', 'data-chart="io"', 'data-range="hour"', 'data-range="day"', 'data-range="month"', 'Memory in use (excluding cache)', 'Network and disk activity', 'Storage used: 4.0 of 10.0 GB', 'data-usage-alerts' ) as $needle ) {
+		foreach ( array( 'data-chart="cpu"', 'data-chart="mem"', 'data-chart="net"', 'data-chart="io"', 'data-range="hour"', 'data-range="day"', 'data-range="month"', 'Memory', 'Network and disk activity', 'Storage used: 4.0 of 10.0 GB', 'data-usage-alerts' ) as $needle ) {
 			$this->assertStringContainsString( $needle, $html, $needle );
 		}
 		$this->assertStringContainsString( 'data-usage-resource="' . $r->id() . '"', $html );

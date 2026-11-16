@@ -510,7 +510,7 @@ final class Servers {
 			$bars[] = array(
 				'key'     => 'mem',
 				'label'   => __( 'Memory', 'beltoft-services' ),
-				'title'   => __( 'Memory in use (excluding cache)', 'beltoft-services' ),
+				'title'   => __( 'Memory', 'beltoft-services' ),
 				'percent' => (int) $memory['percent'],
 				'state'   => $memory['state'],
 				'text'    => 'ok' === $memory['state'] ? '' : ( 'no_agent' === $memory['state'] ? "\u{2013}" : "\u{2026}" ),

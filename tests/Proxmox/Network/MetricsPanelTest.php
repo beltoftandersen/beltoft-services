@@ -18,7 +18,7 @@ class MetricsPanelTest extends MonitoringTestCase {
 		$this->assertStringContainsString( 'data-vm-metrics', $html );
 		$this->assertSame( 4, substr_count( $html, 'data-chart=' ) );
 		$this->assertStringContainsString( 'data-chart="mem"', $html, 'The memory chart comes from our own history.' );
-		$this->assertStringContainsString( 'Memory in use (excluding cache)', $html );
+		$this->assertStringContainsString( 'Memory', $html );
 		$this->assertStringContainsString( 'gives it back when programs need it', $html );
 		$this->assertStringContainsString( 'data-range="month"', $html );
 		$this->assertStringContainsString( '>30 GB<', preg_replace( '#>\s+#', '>', preg_replace( '#\s+<#', '<', $html ) ) );

@@ -54,7 +54,7 @@ $beltoft_services_disk = (array) $monitoring['disk'];
 				<?php endforeach; ?>
 				<?php // Memory is the guest's own figure from our history (never the hypervisor's), so the cache Linux holds is not counted. ?>
 				<div class="beltoft-vm-usage__chart" data-chart="mem">
-					<div class="beltoft-vm-usage__top"><h5><?php esc_html_e( 'Memory in use (excluding cache)', 'beltoft-services' ); ?></h5><span class="beltoft-vm-usage__now" data-now></span></div>
+					<div class="beltoft-vm-usage__top"><h5><?php esc_html_e( 'Memory', 'beltoft-services' ); ?></h5><span class="beltoft-vm-usage__now" data-now></span></div>
 					<div class="beltoft-vm-usage__plot"></div>
 					<p class="beltoft-vm-usage__axis" data-axis></p>
 					<p class="beltoft-vm-usage__readout" data-readout></p>
