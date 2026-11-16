@@ -329,13 +329,27 @@ final class Slugs {
 	 * @return array<int, Resource> By license id.
 	 */
 	private static function services( string $type, int $user ): array {
-		$out = array();
-
 		if ( $user < 1 ) {
-			return $out;
+			return array();
 		}
 
-		foreach ( Licenses::where( 'user_id', $user ) as $license ) {
+		// Read once per My Account request (Resource::remembered is off for jobs and emptied by every write).
+		return Resource::remembered( 'services:' . $type . ':' . $user, static fn() => self::load_services( $type, $user ) );
+	}
+
+	/**
+	 * Reads a customer's resources of a type from the database.
+	 *
+	 * @param string $type Type of service.
+	 * @param int    $user Customer id.
+	 * @return array<int, Resource> By license id.
+	 */
+	private static function load_services( string $type, int $user ): array {
+		$out = array();
+
+		$licenses = Resource::remembered( 'user_licenses:' . $user, static fn() => Licenses::where( 'user_id', $user ) );
+
+		foreach ( $licenses as $license ) {
 			if ( self::type_of( $license ) !== $type ) {
 				continue;
 			}

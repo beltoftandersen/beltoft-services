@@ -355,4 +355,45 @@ class SlugsTest extends TestCase {
 		$this->assertSame( '', Slugs::stored( Resource::find( $later->id() ) ), 'Not again once done; a new one is slugged when its address is built.' );
 		$this->assertSame( 'later', $this->slug( $later ) );
 	}
+
+	public function test_slug_lookups_and_the_menu_filter_read_each_service_once_per_request(): void {
+		global $wpdb;
+
+		$mine = array();
+		for ( $n = 0; $n < 5; $n++ ) {
+			$mine[] = $this->server( $this->user, 'box-' . $n );
+			Slugs::for_license( $mine[ $n ]->license() );
+		}
+		$slug = Slugs::stored( Resource::find( $mine[2]->id() ) );
+
+		Resource::memo_begin();
+		$before = $wpdb->num_queries;
+
+		for ( $i = 0; $i < 6; $i++ ) {
+			apply_filters( 'beltoft_licenses_account_licenses', \BeltoftLicenses\Licenses::where( 'user_id', $this->user ) );
+		}
+		for ( $i = 0; $i < 12; $i++ ) {
+			$this->assertSame( (int) $mine[2]->license()['id'], Slugs::resolve( $slug, 'servers' ) );
+		}
+
+		$used = $wpdb->num_queries - $before;
+		Resource::memo_end();
+
+		// 6 license reads by the test itself, one live-resource read per license (5), one user read, the product reads once.
+		$this->assertLessThanOrEqual( 20, $used );
+	}
+
+	public function test_slug_lookup_sees_a_rename_made_during_the_request(): void {
+		$box = $this->server( $this->user, 'box-a' );
+		$old = Slugs::for_license( $box->license() );
+		Resource::memo_begin();
+
+		$this->assertSame( (int) $box->license()['id'], Slugs::resolve( $old, 'servers' ) );
+
+		$box->set( array( Slugs::META => 'box-b' ) );
+
+		$this->assertSame( 0, Slugs::resolve( $old, 'servers' ) );
+		$this->assertSame( (int) $box->license()['id'], Slugs::resolve( 'box-b', 'servers' ) );
+		Resource::memo_end();
+	}
 }
