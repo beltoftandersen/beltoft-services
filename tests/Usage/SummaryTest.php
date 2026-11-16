@@ -102,6 +102,21 @@ class SummaryTest extends UsageTestCase {
 		$this->assertStringContainsString( 'Your card is saved now and charged after each month.', $out );
 		$this->assertStringContainsString( '>Due today<', $out );
 		$this->assertStringNotContainsString( '>Total<', $out );
+		$this->assertStringNotContainsString( 'amount due today is charged now', $out, 'Nothing is charged today, so no extra sentence.' );
+	}
+
+	public function test_a_cart_that_owes_money_today_says_it_is_not_the_server_hours(): void {
+		$v = $this->usage_product( '0' );
+		wp_set_current_user( $this->new_user() );
+		$this->add( $v['u-None'] );
+		$simple = new \WC_Product_Simple();
+		$simple->set_name( 'Licence' );
+		$simple->set_regular_price( '10' );
+		$simple->save();
+		WC()->cart->add_to_cart( $simple->get_id() );
+		WC()->cart->calculate_totals();
+
+		$this->assertStringContainsString( 'The amount due today is charged now and does not include the hours the server is used.', Summary::checkout_summary( self::HTML ) );
 	}
 
 	public function test_a_cart_without_a_usage_server_is_untouched(): void {
