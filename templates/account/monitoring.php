@@ -47,7 +47,7 @@ $beltoft_services_disk = (array) $monitoring['disk'];
 				<?php foreach ( array( 'cpu' => __( 'CPU', 'beltoft-services' ) ) as $beltoft_metric => $beltoft_title ) : ?>
 					<div class="beltoft-vm-usage__chart" data-chart="<?php echo esc_attr( $beltoft_metric ); ?>">
 						<div class="beltoft-vm-usage__top"><h5><?php echo esc_html( $beltoft_title ); ?></h5><span class="beltoft-vm-usage__now" data-now></span></div>
-						<div class="beltoft-vm-usage__plot" aria-label="<?php echo esc_attr( $beltoft_title ); ?>"></div>
+						<div class="beltoft-vm-usage__plot"></div>
 						<p class="beltoft-vm-usage__axis" data-axis></p>
 						<p class="beltoft-vm-usage__readout" data-readout></p>
 					</div>
@@ -55,7 +55,7 @@ $beltoft_services_disk = (array) $monitoring['disk'];
 				<?php // Memory is the guest's own figure from our history (never the hypervisor's), so the cache Linux holds is not counted. ?>
 				<div class="beltoft-vm-usage__chart" data-chart="mem">
 					<div class="beltoft-vm-usage__top"><h5><?php esc_html_e( 'Memory in use (excluding cache)', 'beltoft-services' ); ?></h5><span class="beltoft-vm-usage__now" data-now></span></div>
-					<div class="beltoft-vm-usage__plot" aria-label="<?php esc_attr_e( 'Memory in use (excluding cache)', 'beltoft-services' ); ?>"></div>
+					<div class="beltoft-vm-usage__plot"></div>
 					<p class="beltoft-vm-usage__axis" data-axis></p>
 					<p class="beltoft-vm-usage__readout" data-readout></p>
 					<p class="beltoft-vm-usage__note" data-mem-hint role="status"></p>
@@ -80,7 +80,7 @@ $beltoft_services_disk = (array) $monitoring['disk'];
 					<?php foreach ( array( 'net' => __( 'Network', 'beltoft-services' ), 'io' => __( 'Disk activity', 'beltoft-services' ) ) as $beltoft_metric => $beltoft_title ) : ?>
 						<div class="beltoft-vm-usage__chart" data-chart="<?php echo esc_attr( $beltoft_metric ); ?>">
 							<div class="beltoft-vm-usage__top"><h5><?php echo esc_html( $beltoft_title ); ?></h5><span class="beltoft-vm-usage__now" data-now></span></div>
-							<div class="beltoft-vm-usage__plot" aria-label="<?php echo esc_attr( $beltoft_title ); ?>"></div>
+							<div class="beltoft-vm-usage__plot"></div>
 							<p class="beltoft-vm-usage__axis" data-axis></p>
 							<p class="beltoft-vm-usage__readout" data-readout></p>
 						</div>

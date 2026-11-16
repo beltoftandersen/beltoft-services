@@ -103,7 +103,6 @@ abstract class ServiceEmail extends \WC_Email {
 			$driver  = Registry::get( $r->get( 'driver' ) );
 			$used    = (int) ( $data['used'] ?? 0 );
 			$limit   = (int) ( $data['limit'] ?? 0 );
-			$date    = isset( $data['deletes_at'] ) ? wp_date( self::DATE, (int) $data['deletes_at'] ) : '';
 
 			$this->object    = $r;
 			// The licence's address, else the customer's own: a mail about what a connected app did must not go nowhere.
@@ -113,7 +112,9 @@ abstract class ServiceEmail extends \WC_Email {
 			// heading and text WooCommerce translates when the email is sent.
 			$order  = ! empty( $license['order_id'] ) ? wc_get_order( (int) $license['order_id'] ) : false;
 			$values = array();
-			$build  = function () use ( &$values, $r, $data, $license, $user, $driver, $used, $limit, $date ): void {
+			$build  = function () use ( &$values, $r, $data, $license, $user, $driver, $used, $limit ): void {
+				// Formatted here, inside the order's language, so a Danish mail has Danish month names.
+				$date            = isset( $data['deletes_at'] ) ? wp_date( self::DATE, (int) $data['deletes_at'] ) : '';
 				$values          = array(
 					'product_name'   => $license ? View::product_name( $license ) : '',
 					'customer_name'  => $user ? (string) ( $user->first_name ? $user->first_name : $user->display_name ) : '',

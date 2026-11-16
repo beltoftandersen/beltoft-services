@@ -69,7 +69,7 @@ final class Definitions {
 
 		$tools = array(
 			// -- Reads ------------------------------------------------------------------------------
-			'list_services'    => self::read( 'Lists the services of the customer: servers, databases, domains, DNS hosting, email domains, apps and add-ons, each with its id, name, state, renewal date, license id and subscription. Optional: only one type.' . self::DATA, self::obj( array( 'type' => array( 'type' => 'string', 'maxLength' => 20, 'description' => 'Only this type: vm, db, domain, dns or mail.' ) ) ), 30 ),
+			'list_services'    => self::read( 'Lists the services of the customer: servers, databases, domains, DNS hosting, email domains, apps and add-ons, each with its id, name, state, renewal date, license id and subscription. Optional: only one type.' . self::DATA, self::obj( array( 'type' => array( 'type' => 'string', 'maxLength' => 20, 'description' => 'Only this type: vm (server), db (database), domain, dns, mail, hosting, ssl, disk, snapshot, applic (app licence) or lickey (licence key).' ) ) ), 30 ),
 			'server_status'    => self::read( 'Shows one server: whether it is running, CPU, memory and disk use as percent, its IP address, system and size, and what it is doing now.' . self::DATA, $by_id ),
 			'server_usage'     => self::read(
 				'Shows the load of one server or hosting account over the last hour, day or month: average, highest and latest CPU, memory (in use without the file cache, in percent) and network figures.',

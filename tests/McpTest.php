@@ -153,6 +153,15 @@ final class McpTest extends McpTestCase {
 		}
 	}
 
+	public function test_list_services_type_filter_names_every_kind(): void {
+		$tools = array_column( $this->rpc( 'tools/list', array(), $this->oauth( self::factory()->user->create() ) )['result']['tools'], null, 'name' );
+		$text  = $tools['list_services']['inputSchema']['properties']['type']['description'];
+
+		foreach ( array( 'vm', 'db', 'domain', 'dns', 'mail', 'hosting', 'ssl', 'disk', 'snapshot', 'applic', 'lickey' ) as $kind ) {
+			$this->assertStringContainsString( $kind, $text, $kind );
+		}
+	}
+
 	public function test_json_rpc_errors(): void {
 		$token = $this->oauth( self::factory()->user->create() );
 
