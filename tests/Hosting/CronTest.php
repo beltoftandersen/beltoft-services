@@ -548,6 +548,29 @@ class CronTest extends HostingCase {
 		$this->assertSame( array( 'started' => 1700000000, 'ended' => 1700000005, 'exit' => 1, 'timed_out' => false, 'skipped' => false, 'tail' => "boom\n" ), $run[ $id ] );
 	}
 
+	public function test_the_last_runs_are_read_once_a_minute_and_a_save_clears_the_read(): void {
+		$r    = $this->account();
+		$slug = $this->slug( $r );
+		$this->change( $r, 'set_cron', array( array( $this->script() ), $slug ) );
+		$id = Sites::find( $r->id(), $slug )['flags']['cron'][0]['id'];
+		$this->agent->set_cron_run( $this->vmid( $r ), $slug, $id, array( 'started' => 1700000000, 'ended' => 1700000005, 'exit' => 0, 'tail' => "one\n" ) );
+		$read = fn() => ( new HostingActions( Resource::find( $r->id() ) ) )->cron_status( $slug );
+
+		$first = $read();
+		$calls = count( $this->agent->calls_of( 'site.cron_status' ) );
+		$this->assertGreaterThan( 0, $calls );
+		$this->agent->set_cron_run( $this->vmid( $r ), $slug, $id, array( 'started' => 1700000100, 'ended' => 1700000105, 'exit' => 0, 'tail' => "two\n" ) );
+		$again = $read();
+		$this->assertSame( $calls, count( $this->agent->calls_of( 'site.cron_status' ) ), 'The node was not asked again.' );
+		$this->assertEquals( $first, $again );
+
+		$this->change( $r, 'set_cron', array( array( $this->script( array( 'label' => 'Other' ) ) ), $slug ) );
+		$id = Sites::find( $r->id(), $slug )['flags']['cron'][0]['id'];
+		$this->agent->set_cron_run( $this->vmid( $r ), $slug, $id, array( 'started' => 1700000200, 'ended' => 1700000205, 'exit' => 0, 'tail' => "three\n" ) );
+		$read();
+		$this->assertGreaterThan( $calls, count( $this->agent->calls_of( 'site.cron_status' ) ), 'A save clears it.' );
+	}
+
 	public function test_the_list_never_travels_in_the_arguments_of_the_job_or_the_results(): void {
 		$r    = $this->account();
 		$slug = $this->slug( $r );

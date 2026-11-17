@@ -27,6 +27,21 @@ final class CronActions {
 
 	use Base;
 
+	/** How long a read of the last runs is reused (seconds). The node runs a job every few minutes at most; a save clears it. */
+	public const STATUS_TTL = 60;
+
+	/** How long a page load waits for the node when it reads the last runs (seconds). */
+	public const STATUS_WAIT = 3;
+
+	/**
+	 * Transient of one website's cached read.
+	 *
+	 * @param string $slug Website.
+	 */
+	private function status_key( string $slug ): string {
+		return 'bs_cron_status_' . md5( $this->r->id() . '|' . $slug );
+	}
+
 	/**
 	 * What a website's list has to be to be saved: the plan's limit, the offered PHP versions, the names the website serves, whether it has
 	 * WordPress, and the ids that may be kept.
@@ -133,6 +148,7 @@ final class CronActions {
 			)
 		);
 		( \BeltoftServices\Resource::find( $this->r->id() ) ?? $this->r )->set( array( SiteCron::UNSUPPORTED => 0 ) );
+		delete_transient( $this->status_key( $slug ) );
 
 		return array( 'slug' => $slug, 'count' => count( $jobs ) );
 	}
@@ -188,6 +204,7 @@ final class CronActions {
 			}
 
 			$done = $this->call( 'site_cron_resend_' . $site['slug'], 'site.cron_set', array( 'vmid' => (int) $record['vmid'], 'slug' => (string) $site['slug'], 'jobs' => SiteCron::for_agent( SiteCron::stored( $site ) ) ) );
+			delete_transient( $this->status_key( (string) $site['slug'] ) );
 
 			if ( is_wp_error( $done ) ) {
 				$data = $done->get_error_data();
@@ -225,11 +242,20 @@ final class CronActions {
 			return $this->error( 'not_found', __( 'That website does not exist.', 'beltoft-services' ) );
 		}
 
+		// Every Websites tab load asks once per website: a read from the last minute is reused, so a slow node holds no worker per load.
+		$cached = get_transient( $this->status_key( $slug ) );
+
+		if ( is_array( $cached ) ) {
+			$cached['jobs'] = (object) $cached['jobs'];
+
+			return $cached;
+		}
+
 		$record = (array) Records::for_resource( $this->r->id() );
 		$args   = array( 'vmid' => (int) $record['vmid'], 'slug' => $slug );
 		$name   = 'site_cron_status_' . $slug;
 		$done   = $this->agent_call( $name, 'site.cron_status', $args );
-		$until  = microtime( true ) + (int) apply_filters( 'beltoft_services_hosting_action_wait', 8, $name ); // phpcs:ignore WordPress.NamingConventions.ValidHookName -- the plugin's own filter.
+		$until  = microtime( true ) + (int) apply_filters( 'beltoft_services_hosting_action_wait', self::STATUS_WAIT, $name ); // phpcs:ignore WordPress.NamingConventions.ValidHookName -- the plugin's own filter.
 
 		while ( $done instanceof StepResult && $done->is_poll() && microtime( true ) < $until ) {
 			usleep( 400000 );
@@ -265,11 +291,15 @@ final class CronActions {
 			);
 		}
 
-		return array(
+		$out = array(
 			'available'        => true,
 			'jobs'             => (object) $jobs,
 			'wp_config'        => ! empty( $done['wp_config'] ),
 			'wp_cron_disabled' => ! empty( $done['wp_cron_disabled'] ),
 		);
+
+		set_transient( $this->status_key( $slug ), array_merge( $out, array( 'jobs' => $jobs ) ), self::STATUS_TTL );
+
+		return $out;
 	}
 }
