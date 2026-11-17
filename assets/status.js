@@ -13,7 +13,9 @@
  * The line is shown in ONE place (owner 2026-11-15). On a wide screen it sits where the page's state line ([data-bs-inline]) is, at
  * the top (in the head of a server or database page, else under the title row, else at the top of the content), and takes the place
  * of the description while it shows. A site that has its own bar can give the line a place there: an element with the attribute
- * data-bs-loader-host; the line is then shown in that element on every screen, the description stays, and nothing sticks or floats. On a phone (max-width 767px, the phone breakpoint of account.css) it is fixed to the bottom of
+ * data-bs-loader-host; the line is then shown in that element on every screen, the description stays, and nothing sticks or floats. On a
+ * phone the text takes the place of the bar's element marked data-bs-loader-yield (its title) while it shows; the moving line
+ * runs along the bottom edge of the bar, which must be a positioned box (sticky, fixed or relative). On a phone (max-width 767px, the phone breakpoint of account.css) it is fixed to the bottom of
  * the screen, above the browser's toolbar, so it never moves anything. Busy is a moving line (indeterminate); progress() fills it
  * for work whose steps are known. Done and info stay about 5 s and fade away; fail stays until closed. A failed field is only marked
  * (aria-invalid) and focused, the text is not printed next to it. Nothing is shown under the clicked button.
