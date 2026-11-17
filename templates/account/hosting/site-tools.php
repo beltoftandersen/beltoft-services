@@ -43,7 +43,7 @@ $beltoft_services_slug = $v['slug'];
 				</div>
 				<div class="beltoft-hosting-secure" data-files-form="database" hidden>
 					<?php \BeltoftServices\Hosting\HostingView::render( 'code-field', array( 'purpose' => 'hosting_database' ) ); ?>
-					<div class="beltoft-hosting-buttons"><button type="button" class="beltoft-hosting-btn beltoft-hosting-btn--primary" data-hosting-action="db_password"><?php esc_html_e( 'Show password', 'beltoft-services' ); ?></button><button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="files_close"><?php esc_html_e( 'Cancel', 'beltoft-services' ); ?></button></div>
+					<div class="beltoft-hosting-buttons"><button type="button" class="beltoft-hosting-btn" data-hosting-action="db_password"><?php esc_html_e( 'Show password', 'beltoft-services' ); ?></button><button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="files_close"><?php esc_html_e( 'Cancel', 'beltoft-services' ); ?></button></div>
 				</div>
 				<div class="beltoft-hosting-reveal" data-db-reveal hidden><p class="beltoft-hosting-line"><?php esc_html_e( 'Your database password. Copy it now: it is not shown again.', 'beltoft-services' ); ?></p><code data-db-secret></code> <button type="button" class="beltoft-hosting-btn bsh-btn--sm" data-hosting-action="copy_db_secret"><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></div>
 			<?php endif; ?>

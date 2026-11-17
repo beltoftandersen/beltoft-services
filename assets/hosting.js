@@ -219,9 +219,9 @@
 
 				var runs = result.data.jobs || {};
 
-				Array.prototype.forEach.call( box.querySelectorAll( '[data-cron-last]' ), function ( line ) {
-					var run = runs[ line.getAttribute( 'data-cron-last' ) ];
-					var row = line.closest( '[data-cron-row]' );
+				Array.prototype.forEach.call( box.querySelectorAll( '[data-cron-last]' ), function ( last ) {
+					var run = runs[ last.getAttribute( 'data-cron-last' ) ];
+					var row = last.closest( '[data-cron-row]' );
 					var more = row ? row.querySelector( '[data-hosting-action="cron_output"]' ) : null;
 					var out = row ? row.querySelector( '[data-cron-output]' ) : null;
 
@@ -243,8 +243,8 @@
 						}
 					}
 
-					line.textContent = words;
-					line.hidden = '' === words;
+					last.textContent = words;
+					last.hidden = '' === words;
 
 					if ( out && more && run.tail ) {
 						out.textContent = run.tail;

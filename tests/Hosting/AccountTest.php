@@ -557,6 +557,7 @@ class AccountTest extends HostingCase {
 			\BeltoftServices\Hosting\Actions\FilesActions::class,
 			\BeltoftServices\Hosting\Actions\CountryActions::class,
 			\BeltoftServices\Hosting\Actions\StagingActions::class,
+			\BeltoftServices\Hosting\Actions\CronActions::class,
 		);
 		$facade = new \ReflectionClass( HostingActions::class );
 
@@ -575,7 +576,7 @@ class AccountTest extends HostingCase {
 			}
 
 			// Only limits() is shared (it sits in the Base trait every group uses); the facade asks SiteActions.
-			$this->assertCount( 'limits' === $method->getName() ? 8 : 1, $found, $method->getName() );
+			$this->assertCount( 'limits' === $method->getName() ? 9 : 1, $found, $method->getName() );
 
 			$this->assertSame( $this->signature( $method ), $this->signature( $found[0] ), $method->getName() );
 		}

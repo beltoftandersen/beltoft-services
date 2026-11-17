@@ -55,7 +55,7 @@ $beltoft_services_slug = $v['slug'];
 					<?php if ( $v['limit'] > 0 ) : ?>
 						<button type="button" class="beltoft-hosting-btn" data-hosting-action="cron_add" data-limit="<?php echo (int) $v['limit']; ?>"><?php esc_html_e( 'Add a job', 'beltoft-services' ); ?></button>
 					<?php endif; ?>
-					<button type="button" class="beltoft-hosting-btn beltoft-hosting-btn--primary" data-hosting-action="cron_save" data-slug="<?php echo esc_attr( $beltoft_services_slug ); ?>"><?php esc_html_e( 'Save jobs', 'beltoft-services' ); ?></button>
+					<button type="button" class="beltoft-hosting-btn" data-hosting-action="cron_save" data-slug="<?php echo esc_attr( $beltoft_services_slug ); ?>"><?php esc_html_e( 'Save jobs', 'beltoft-services' ); ?></button>
 				</div>
 			<?php endif; ?>
 			<p class="beltoft-hosting-help">
