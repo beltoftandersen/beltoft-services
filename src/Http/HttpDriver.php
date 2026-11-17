@@ -235,6 +235,52 @@ final class HttpDriver implements Driver, Opens {
 	}
 
 	/**
+	 * A signed read of one of the connection's counted-event endpoints (`events`, `events_summary`), with a query string.
+	 * Read only and with no side effect, so it also works while the service is paused. No request is made without a
+	 * configured path and secret.
+	 *
+	 * @param Resource             $r        Resource.
+	 * @param string               $endpoint `events` or `events_summary`.
+	 * @param array<string, mixed> $query    Query arguments.
+	 * @return array{ok: bool, code: int, data: array<string, mixed>|null, error: string}
+	 */
+	public function read_events( Resource $r, string $endpoint, array $query = array() ): array {
+		$connection = $this->connection( $r );
+		$fail       = static fn( string $why, int $code = 0 ): array => array(
+			'ok'    => false,
+			'code'  => $code,
+			'data'  => null,
+			'error' => $why,
+		);
+
+		if ( ! $connection || ! in_array( $endpoint, array( 'events', 'events_summary' ), true ) || '' === (string) $connection['endpoints'][ $endpoint ]['path'] || '' === (string) $connection['secret'] ) {
+			return $fail( 'not configured' );
+		}
+
+		$url  = $this->url( $connection, (string) $connection['endpoints'][ $endpoint ]['path'], $this->values( $r, $r->license() ) );
+		$url .= $query ? '?' . http_build_query( $query, '', '&', PHP_QUERY_RFC3986 ) : '';
+		$sent = $this->send( $connection, 'GET', $url, '', (string) $r->get( 'uuid' ), '' );
+
+		if ( is_wp_error( $sent['response'] ) ) {
+			return $fail( 'no answer' );
+		}
+
+		$code = (int) wp_remote_retrieve_response_code( $sent['response'] );
+		$data = json_decode( (string) wp_remote_retrieve_body( $sent['response'] ), true );
+
+		if ( $code < 200 || $code > 299 || ! is_array( $data ) ) {
+			return $fail( 'bad answer', $code );
+		}
+
+		return array(
+			'ok'    => true,
+			'code'  => $code,
+			'data'  => $data,
+			'error' => '',
+		);
+	}
+
+	/**
 	 * {@inheritDoc}
 	 *
 	 * @param Resource $r Resource.
@@ -278,6 +324,13 @@ final class HttpDriver implements Driver, Opens {
 		}
 
 		echo '</dl>';
+
+		/**
+		 * Runs after the rows of the account card, for a feature that adds its own (the counted service's intro and orders).
+		 *
+		 * @param Resource $r Resource.
+		 */
+		do_action( 'beltoft_services_http_account_extra', $r );
 
 		$connection = $this->connection( $r );
 

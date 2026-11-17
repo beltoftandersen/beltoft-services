@@ -201,26 +201,35 @@ final class IntroCoupon {
 	 * @param string $email      Billing email, '' when not known yet.
 	 */
 	public static function held( int $product_id, int $user_id, string $email = '' ): bool {
+		return self::holdings( $product_id, $user_id, $email ) > 0;
+	}
+
+	/**
+	 * How many licenses of this product (any status) the customer holds or held, by user id and by normalised billing email.
+	 * held() is "more than none"; a caller that already holds the licence in question asks for "more than one".
+	 *
+	 * @param int    $product_id Product or variation id.
+	 * @param int    $user_id    Signed-in user, 0 for a guest.
+	 * @param string $email      Billing email, '' when not known yet.
+	 */
+	public static function holdings( int $product_id, int $user_id, string $email = '' ): int {
 		$slug = sanitize_title( (string) get_post_meta( Product::parent_id( $product_id ), \BeltoftLicenses\Software::META_SLUG, true ) );
 
 		if ( '' === $slug ) {
-			return false;
+			return 0;
 		}
 
-		$want = self::normalise_email( sanitize_email( $email ) );
+		$want  = self::normalise_email( sanitize_email( $email ) );
+		$count = 0;
 
 		// Who holds a licence of the product, of any status: two columns in one query.
 		foreach ( \BeltoftLicenses\Licenses::product_holders( $slug ) as $row ) {
-			if ( $user_id > 0 && $row['user_id'] === $user_id ) {
-				return true;
-			}
-
-			if ( '' !== $want && self::normalise_email( $row['email'] ) === $want ) {
-				return true;
+			if ( ( $user_id > 0 && $row['user_id'] === $user_id ) || ( '' !== $want && self::normalise_email( $row['email'] ) === $want ) ) {
+				++$count;
 			}
 		}
 
-		return false;
+		return $count;
 	}
 
 	/**

@@ -237,8 +237,10 @@ class CatalogTest extends UsageTestCase {
 		$vars = Catalog::query_vars( array( 'post_type' => array( 'product_variation' ), 'meta_query' => array( array( 'key' => 'attribute_backups', 'value' => 'None' ) ) ) );
 
 		$this->assertCount( 2, $vars['meta_query'] );
-		$this->assertSame( Rates::META_BILLING, $vars['meta_query'][1]['key'] );
-		$this->assertSame( 'NOT EXISTS', $vars['meta_query'][1]['compare'] );
+		// Hourly pay as you go is left out; a counted variation is the plan itself and stays in.
+		$this->assertSame( 'OR', $vars['meta_query'][1]['relation'] );
+		$this->assertSame( 'NOT EXISTS', $vars['meta_query'][1][0]['compare'] );
+		$this->assertSame( Rates::KIND_COUNTED, $vars['meta_query'][1][1]['value'] );
 
 		$found = get_posts( array_merge( $vars, array( 'post_parent' => $this->v['m-None']->get_parent_id(), 'post_status' => 'publish', 'posts_per_page' => -1, 'fields' => 'ids' ) ) );
 

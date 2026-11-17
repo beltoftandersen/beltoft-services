@@ -1279,5 +1279,56 @@
         "default": "backup{n}.{zone}",
         "label": "Alias host name pattern",
         "desc": "{n} is the number of the box and {zone} the alias zone, for example backup{n}.{zone}."
+    },
+    "counted_billing": {
+        "tab": "general",
+        "section": "usage",
+        "type": "checkbox",
+        "min": 0,
+        "default": 0,
+        "label": "Bill counted services (orders processed)",
+        "desc": "Off: the events of counted services are pulled and kept, free ones are marked free, but nothing is written to the usage ledger."
+    },
+    "counted_intro_days": {
+        "tab": "general",
+        "section": "usage",
+        "type": "number",
+        "min": 0,
+        "default": 7,
+        "label": "Free intro for a counted service, in days",
+        "desc": "Counted from the first event the plugin receives. 0 turns the intro off. A variation can set its own with the meta _beltoft_services_intro_days."
+    },
+    "counted_intro_alert": {
+        "tab": "general",
+        "section": "usage",
+        "type": "number",
+        "min": 0,
+        "default": 1000,
+        "label": "Alert when a free intro passes this many events"
+    },
+    "counted_cap_min": {
+        "tab": "general",
+        "section": "usage",
+        "type": "number",
+        "min": 1,
+        "default": 500,
+        "label": "Daily cap of new events per service: at least",
+        "desc": "Events over the cap are held, not billed, until staff release them. The cap is the larger of this and the factor below times the service's daily average of the last 14 days."
+    },
+    "counted_cap_factor": {
+        "tab": "general",
+        "section": "usage",
+        "type": "number",
+        "min": 1,
+        "default": 5,
+        "label": "Daily cap factor"
+    },
+    "counted_hold_hours": {
+        "tab": "general",
+        "section": "usage",
+        "type": "number",
+        "min": 0,
+        "default": 24,
+        "label": "Hold events this many hours before billing them"
     }
 }

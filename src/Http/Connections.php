@@ -32,7 +32,7 @@ final class Connections {
 	 *
 	 * @var string[]
 	 */
-	public const ENDPOINTS = array( 'provision', 'pause', 'resume', 'update_plan', 'delete', 'status', 'usage' );
+	public const ENDPOINTS = array( 'provision', 'pause', 'resume', 'update_plan', 'delete', 'status', 'usage', 'events', 'events_summary' );
 
 	/**
 	 * Placeholders allowed in endpoint paths.

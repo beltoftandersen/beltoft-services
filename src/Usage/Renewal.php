@@ -83,6 +83,7 @@ final class Renewal {
 			$groups[ $key ]['rate']        = (float) $row['rate'];
 			$groups[ $key ]['month']       = $start;
 			$groups[ $key ]['hours']       = ( $groups[ $key ]['hours'] ?? 0 ) + 1;
+			$groups[ $key ]['units']       = ( $groups[ $key ]['units'] ?? 0.0 ) + (float) $row['quantity'];
 			$groups[ $key ]['raw']         = ( $groups[ $key ]['raw'] ?? 0.0 ) + (float) $row['quantity'] * (float) $row['rate'];
 			$groups[ $key ]['peak']        = max( $groups[ $key ]['peak'] ?? 0.0, (float) $row['quantity'] * (float) $row['rate'] );
 		}
@@ -91,6 +92,19 @@ final class Renewal {
 		$total = 0.0;
 
 		foreach ( $groups as $group ) {
+			// A counted item (orders) is billed per unit: no peak cap, the line is the units of the month at their rate.
+			if ( null !== Items::counted( $group['item'] ) ) {
+				$raw             = round( $group['raw'], 4 );
+				$group['cap']    = 0.0;
+				$group['raw']    = $raw;
+				$group['charge'] = round( $raw, 2 );
+				$group['capped'] = false;
+				$group['counted'] = true;
+				$lines[]         = $group;
+				$total          += $group['charge'];
+				continue;
+			}
+
 			$end    = (int) strtotime( gmdate( 'Y-m-01 00:00:00', $group['month'] + 32 * DAY_IN_SECONDS ) . ' UTC' );
 			// The cap follows the month's peak, also of the rows earlier orders billed (a later price cut does not lower it).
 			$cap    = round( max( $group['peak'], Ledger::billed_peak( $group['resource_id'], $group['item'], $group['month'], $end, $except, $group['currency'] ) ) * Rates::HOURS, 2 );
@@ -165,6 +179,12 @@ final class Renewal {
 	 * @param string $item Item.
 	 */
 	public static function item_label( string $item ): string {
+		$counted = Items::counted( $item );
+
+		if ( null !== $counted ) {
+			return Items::title( $counted );
+		}
+
 		$labels = array(
 			'server'    => __( 'server', 'beltoft-services' ),
 			'database'  => __( 'database', 'beltoft-services' ),
@@ -271,6 +291,11 @@ final class Renewal {
 	 */
 	private static function write_lines( \WC_Order $order, array $statement, string $currency ): void {
 		foreach ( $statement['lines'] as $line ) {
+			if ( ! empty( $line['counted'] ) ) {
+				self::write_counted_line( $order, $line, $currency );
+				continue;
+			}
+
 			$fee = new \WC_Order_Item_Fee();
 			$qty   = self::quantity_note( (float) $line['quantity'], (string) $line['unit'] );
 			$hours = self::hours_text( (int) $line['hours'] );
@@ -325,6 +350,41 @@ final class Renewal {
 	}
 
 	/**
+	 * One fee line of a counted item: the units of a month in one price step.
+	 *
+	 * @param \WC_Order            $order    Order.
+	 * @param array<string, mixed> $line     Statement line.
+	 * @param string               $currency Order currency.
+	 */
+	private static function write_counted_line( \WC_Order $order, array $line, string $currency ): void {
+		$def     = Items::counted( (string) $line['item'] );
+		$units   = (float) $line['units'];
+		$rate    = Rates::money( (float) $line['rate'], 4, $currency );
+		$month   = wp_date( 'F Y', (int) $line['month'], new \DateTimeZone( 'UTC' ) );
+		$subject = sprintf( /* translators: 1: what is counted with its step ("Orders processed, step 2"), 2: service name. */ _x( '%1$s (%2$s)', 'usage invoice line title', 'beltoft-services' ), Items::title( $def ), self::reference( (int) $line['resource_id'] ) );
+		$detail  = sprintf(
+			/* translators: 1: month and year, 2: number of units with the word ("380 orders"), 3: price of one unit with currency. */
+			__( '%1$s: %2$s at %3$s each', 'beltoft-services' ),
+			$month,
+			Items::units_text( $def, $units ),
+			$rate
+		);
+		$fee     = new \WC_Order_Item_Fee();
+
+		$fee->set_name( $subject . "\n" . $detail );
+		$fee->add_meta_data( '_beltoft_services_usage_price', (string) round( (float) $line['rate'], 6 ), true );
+		$fee->add_meta_data( InvoiceView::META_NAME, $subject, true );
+		$fee->add_meta_data( InvoiceView::META_DETAIL, $detail, true );
+		$fee->set_total( (string) $line['charge'] );
+		$fee->set_tax_status( 'taxable' );
+		$fee->set_tax_class( '' );
+		$fee->add_meta_data( '_beltoft_services_usage_resource', $line['resource_id'], true );
+		$fee->add_meta_data( '_beltoft_services_usage_item', $line['item'], true );
+		$fee->add_meta_data( '_beltoft_services_usage_hours', (int) $units, true );
+		$order->add_item( $fee );
+	}
+
+	/**
 	 * The fixed reference of a resource on an invoice: vm-<first 8 characters of its uuid> (the server for an extra disk or an app
 	 * licence), which never changes, unlike the name a customer gives a server. Without a uuid, label().
 	 *
@@ -369,7 +429,12 @@ final class Renewal {
 	 * @param string $unit        Unit as stored.
 	 */
 	public static function invoice_title( string $item, int $resource_id, float $quantity = 1.0, string $unit = 'hour' ): string {
-		$label = self::reference( $resource_id );
+		$label   = self::reference( $resource_id );
+		$counted = Items::counted( $item );
+
+		if ( null !== $counted ) {
+			return sprintf( /* translators: 1: what is counted with its step ("Orders processed, step 2"), 2: service name. */ _x( '%1$s (%2$s)', 'usage invoice line title', 'beltoft-services' ), Items::title( $counted ), $label );
+		}
 
 		if ( in_array( $item, array( 'server', 'database' ), true ) ) {
 			$resource  = Resource::find( $resource_id );
@@ -407,6 +472,12 @@ final class Renewal {
 	 * @param string $label Server or app name (label()).
 	 */
 	public static function line_subject( string $item, string $label ): string {
+		$counted = Items::counted( $item );
+
+		if ( null !== $counted ) {
+			return sprintf( /* translators: 1: what is counted with its step ("Orders processed, step 2"), 2: service name. */ _x( '%1$s (%2$s)', 'usage invoice line title', 'beltoft-services' ), Items::title( $counted ), $label );
+		}
+
 		if ( 'server' === $item ) {
 			/* translators: %s: server name. */
 			return sprintf( __( 'Server %s', 'beltoft-services' ), $label );

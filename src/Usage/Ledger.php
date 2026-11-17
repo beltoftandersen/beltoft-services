@@ -79,6 +79,23 @@ final class Ledger {
 	}
 
 	/**
+	 * One row, by its unique key, or null.
+	 *
+	 * @param int    $resource_id Resource.
+	 * @param string $item        Item.
+	 * @param int    $hour        Start of the hour (unix time).
+	 * @return array<string, mixed>|null
+	 */
+	public static function row( int $resource_id, string $item, int $hour ): ?array {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
+		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE resource_id = %d AND item = %s AND hour_bucket = %s', self::table(), $resource_id, $item, gmdate( 'Y-m-d H:i:s', self::hour( $hour ) ) ), ARRAY_A );
+
+		return is_array( $row ) ? $row : null;
+	}
+
+	/**
 	 * Hours already written for a resource since a time, as "item|unix hour" keys.
 	 *
 	 * @param int $resource_id Resource.

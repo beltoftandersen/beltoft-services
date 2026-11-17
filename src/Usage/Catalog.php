@@ -130,7 +130,7 @@ final class Catalog {
 		return array_values(
 			array_filter(
 				$children,
-				static fn( $id ) => 'usage' !== (string) get_post_meta( (int) $id, Rates::META_BILLING, true )
+				static fn( $id ) => Rates::KIND_HOURLY !== (string) get_post_meta( (int) $id, Rates::META_BILLING, true )
 			)
 		);
 	}
@@ -147,9 +147,17 @@ final class Catalog {
 		}
 
 		$vars['meta_query']   = isset( $vars['meta_query'] ) && is_array( $vars['meta_query'] ) ? $vars['meta_query'] : array(); // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- a small catalogue.
+		// Only an hourly variation is hidden: a counted one is the plan the customer buys.
 		$vars['meta_query'][] = array(
-			'key'     => Rates::META_BILLING,
-			'compare' => 'NOT EXISTS',
+			'relation' => 'OR',
+			array(
+				'key'     => Rates::META_BILLING,
+				'compare' => 'NOT EXISTS',
+			),
+			array(
+				'key'     => Rates::META_BILLING,
+				'value'   => Rates::KIND_COUNTED,
+			),
 		);
 
 		return $vars;

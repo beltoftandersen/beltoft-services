@@ -265,6 +265,7 @@ final class Plugin {
 		Usage\UsageDisk::register();
 		Usage\CoreHooks::register();
 		Usage\Meter::register();
+		Usage\Counted\Views::register();
 		Usage\Threshold::register();
 		Usage\Account::register();
 		Usage\Cart::register();

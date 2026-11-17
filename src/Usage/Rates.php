@@ -34,6 +34,28 @@ final class Rates {
 	public const META_PREMIUM = '_beltoft_services_usage_premium';
 	public const META_MONTHLY = '_beltoft_services_usage_monthly';
 
+	/**
+	 * Billing kinds, the value of META_BILLING: hourly (`usage`, the monthly price spread over hours) and counted
+	 * (`counted`, a price for each unit a service reports, see Counted\Store). Both are pay as you go: they live on the
+	 * usage account, need its card and are invoiced by its renewal.
+	 */
+	public const KIND_HOURLY  = 'usage';
+	public const KIND_COUNTED = 'counted';
+
+	/**
+	 * Variation meta: the price of one counted unit, a number in the shop's currency, excluding VAT. Another currency has its own
+	 * meta, this name plus an underscore and the code (`_beltoft_services_unit_price_DKK`), or an answer from the filter
+	 * `beltoft_services_unit_price`. The variation's own price stays 0: nothing is charged at checkout.
+	 */
+	public const META_UNIT_PRICE = '_beltoft_services_unit_price';
+
+	/**
+	 * Variation meta: price steps per calendar month, like brackets, "500:0.10,2000:0.05,0:0.02" = the first 500 units at 0.10, the
+	 * next up to 2000 at 0.05, every unit above at 0.02 (0 = no upper end). Per currency: this name plus an underscore and the code.
+	 * Without it the single unit price is the only step.
+	 */
+	public const META_UNIT_STEPS = '_beltoft_services_unit_steps';
+
 	public const DEFAULT_PREMIUM = 10.0;
 
 	/**
@@ -49,7 +71,92 @@ final class Rates {
 	public static function is_usage( $product ): bool {
 		$product = $product instanceof \WC_Product ? $product : wc_get_product( (int) $product );
 
-		return $product instanceof \WC_Product && 'usage' === (string) $product->get_meta( self::META_BILLING );
+		return $product instanceof \WC_Product && in_array( (string) $product->get_meta( self::META_BILLING ), array( self::KIND_HOURLY, self::KIND_COUNTED ), true );
+	}
+
+	/**
+	 * Is this variation (or product) billed per counted unit (an order a service processed) and not per hour?
+	 *
+	 * @param \WC_Product|int|false $product Product or id.
+	 */
+	public static function is_counted( $product ): bool {
+		$product = $product instanceof \WC_Product ? $product : wc_get_product( (int) $product );
+
+		return $product instanceof \WC_Product && self::KIND_COUNTED === (string) $product->get_meta( self::META_BILLING );
+	}
+
+	/**
+	 * The price steps of a counted variation in a currency: a list of `upto` (the month's unit number the step ends at, null for
+	 * the last) and `rate` (per unit, excluding VAT). Empty when there is no price in that currency (it is not metered).
+	 *
+	 * @param \WC_Product $variation Counted variation.
+	 * @param string      $currency  Currency code, '' for the shop's.
+	 * @return array<int, array{upto: ?int, rate: float}>
+	 */
+	public static function unit_steps( \WC_Product $variation, string $currency = '' ): array {
+		$code = Currency::clean( $currency );
+		$code = '' !== $code ? $code : Currency::base();
+		$text = (string) $variation->get_meta( Currency::base() === $code ? self::META_UNIT_STEPS : self::META_UNIT_STEPS . '_' . $code );
+		$out  = array();
+		$last = 0;
+
+		foreach ( '' === trim( $text ) ? array() : explode( ',', $text ) as $part ) {
+			$bits = explode( ':', trim( $part ) );
+			$upto = 2 === count( $bits ) ? (int) $bits[0] : 0;
+			$rate = (float) end( $bits );
+
+			if ( $rate <= 0 || ! is_numeric( end( $bits ) ) || ( $upto > 0 && $upto <= $last ) || ( $out && null === $out[ count( $out ) - 1 ]['upto'] ) ) {
+				$out = array();
+				break;
+			}
+
+			$out[] = array( 'upto' => $upto > 0 ? $upto : null, 'rate' => $rate );
+			$last  = $upto;
+		}
+
+		if ( $out && null !== $out[ count( $out ) - 1 ]['upto'] ) {
+			$out[ count( $out ) - 1 ]['upto'] = null;
+		}
+
+		if ( ! $out ) {
+			$price = self::unit_price( $variation, $code );
+			$out   = null !== $price ? array( array( 'upto' => null, 'rate' => $price ) ) : array();
+		}
+
+		/**
+		 * Filters the price steps of a counted variation.
+		 *
+		 * @param array<int, array{upto: ?int, rate: float}> $steps     Steps.
+		 * @param \WC_Product                              $variation Variation.
+		 * @param string                                    $currency  Currency code.
+		 */
+		$steps = apply_filters( 'beltoft_services_unit_steps', $out, $variation, $code );
+
+		return is_array( $steps ) ? array_values( $steps ) : array();
+	}
+
+	/**
+	 * The price of one counted unit in a currency, excluding VAT, or null when there is none (such a currency is not metered).
+	 *
+	 * @param \WC_Product $variation Counted variation.
+	 * @param string      $currency  Currency code, '' for the shop's.
+	 */
+	public static function unit_price( \WC_Product $variation, string $currency = '' ): ?float {
+		$code = Currency::clean( $currency );
+		$code = '' !== $code ? $code : Currency::base();
+		$meta = Currency::base() === $code ? (string) $variation->get_meta( self::META_UNIT_PRICE ) : (string) $variation->get_meta( self::META_UNIT_PRICE . '_' . $code );
+		$price = is_numeric( $meta ) && (float) $meta > 0 ? (float) $meta : null;
+
+		/**
+		 * Filters the price of one counted unit: a site that keeps its prices elsewhere answers here.
+		 *
+		 * @param float|null  $price     Price excluding VAT in that currency, or null.
+		 * @param \WC_Product $variation Variation.
+		 * @param string      $currency  Currency code.
+		 */
+		$price = apply_filters( 'beltoft_services_unit_price', $price, $variation, $code );
+
+		return is_numeric( $price ) && (float) $price > 0 ? (float) $price : null;
 	}
 
 	/**
@@ -450,7 +557,8 @@ final class Rates {
 		$vid     = (int) ( $license['variation_id'] ?? 0 );
 		$v       = $vid > 0 ? wc_get_product( $vid ) : false;
 
-		if ( ! $v instanceof \WC_Product_Variation ) {
+		// A counted variation has no hourly items: its events are written by Counted\Meter.
+		if ( ! $v instanceof \WC_Product_Variation || self::is_counted( $v ) ) {
 			return array();
 		}
 
