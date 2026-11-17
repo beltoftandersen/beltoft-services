@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.40.0
+Stable tag: 0.41.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,12 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.41.0 =
+* Hosting: a website without WordPress can be ordered and added ("No WordPress"); its page shows no WordPress parts. The node decides whether a website has WordPress (agent operation `site.facts`).
+* Hosting: scheduled jobs for every website (a PHP file of the website or an address of the website, at most every 5 minutes; plan field `cron_jobs`, default 5). For a WordPress website a server cron can be switched on; it runs WordPress's due tasks and switches WordPress's own cron off while it is on. Needs the agent operations `site.cron_set` and `site.cron_status`; with an older agent the section says it is not available yet.
+* Hosting: the database name, user and host of a website are shown; the password is shown once after the emailed code.
+* Hosting: the product name in the account comes from the setting `hosting_label` (default "Hosting"); order links can preselect an empty website with `site_install=empty`.
 
 = 0.40.0 =
 * Backups: a customer can delete one of their own backups on a server, a managed database and a hosting account (Delete in the backups list, one confirm dialog). The only backup may be deleted; the dialog says so. The safety copy of a hosting restore cannot be deleted. Refused while a backup or a restore runs; at most 10 deletes an hour per service. No MCP tool.
