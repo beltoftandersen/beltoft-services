@@ -94,26 +94,46 @@ final class Provision {
 			}
 
 			if ( null === $box ) {
-				$item = SpendGuard::item_of_resource( $r );
-				$stop = StorageSpendGuard::guard( $r, $type, $item );
-
-				if ( $stop ) {
-					return StepResult::fail( $stop->error(), $meta );
-				}
-
+				// The caps are checked and the box bought under one global lock, and the box id is stored before the lock is
+				// let go, so a parallel provision of another resource sees this box in its count.
 				$password = Crypto::decrypt( (string) ( $meta['storage_password'] ?? $r->get( 'storage_password' ) ) );
+				$item     = SpendGuard::item_of_resource( $r );
+				list( $got, $made ) = \BeltoftServices\Locks::with(
+					\BeltoftServices\Locks::name( 'storage-spend', 0 ),
+					30,
+					static function () use ( $r, $client, $type, $location, $name, $password, $item, $meta ) {
+						$stop = StorageSpendGuard::guard( $r, $type, $item );
 
-				if ( null === $password || '' === $password ) {
-					return StepResult::fail( 'The stored box password cannot be read. Nothing was bought.', $meta );
+						if ( $stop ) {
+							return StepResult::fail( $stop->error(), $meta );
+						}
+
+						if ( null === $password || '' === $password ) {
+							return StepResult::fail( 'The stored box password cannot be read. Nothing was bought.', $meta );
+						}
+
+						$created = $client->create_box( $name, $type, $location, $password, array(), Boxes::default_access() );
+
+						if ( is_wp_error( $created ) ) {
+							return StepResult::retry( 300, Boxes::why( $created ), $meta, false );
+						}
+
+						StorageSpendGuard::count_created();
+						$r->set( array( 'storage_box_id' => (string) $created['id'], 'storage_type' => $type, 'storage_name' => $name ) );
+
+						return $created;
+					}
+				);
+
+				if ( ! $got ) {
+					return StepResult::retry( 30, 'Another storage purchase is running', $meta, false );
 				}
 
-				$box = $client->create_box( $name, $type, $location, $password, array(), Boxes::default_access() );
-
-				if ( is_wp_error( $box ) ) {
-					return StepResult::retry( 300, Boxes::why( $box ), $meta, false );
+				if ( $made instanceof StepResult ) {
+					return $made;
 				}
 
-				StorageSpendGuard::count_created();
+				$box = $made;
 			}
 
 			$id = (string) $box['id'];
