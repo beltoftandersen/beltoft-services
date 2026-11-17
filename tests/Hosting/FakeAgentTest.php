@@ -37,7 +37,7 @@ class FakeAgentTest extends TestCase {
 	public function test_the_operation_list_is_the_plans_list_plus_site_verify(): void {
 		$expected = array(
 			'ct.prepare', 'ct.stats', 'ct.memory', 'ct.release', 'ct.refresh',
-			'site.create', 'site.delete', 'site.php', 'site.domains', 'site.cache_purge', 'site.cache_setup', 'site.cache_status', 'site.wp_address', 'site.wp_install', 'site.verify', 'site.wp_login_link', 'site.wp_password_link', 'site.tool_link', 'site.scan_results', 'site.scan_now', 'site.country_block', 'site.staging_create', 'site.staging_push', 'site.staging_refresh', 'site.staging_undo', 'site.staging_delete', 'site.cron', 'site.workers',
+			'site.create', 'site.delete', 'site.php', 'site.domains', 'site.cache_purge', 'site.cache_setup', 'site.cache_status', 'site.wp_address', 'site.wp_install', 'site.verify', 'site.wp_login_link', 'site.wp_password_link', 'site.tool_link', 'site.scan_results', 'site.scan_now', 'site.country_block', 'site.staging_create', 'site.staging_push', 'site.staging_refresh', 'site.staging_undo', 'site.staging_delete', 'site.cron', 'site.facts', 'site.cron_set', 'site.cron_status', 'site.workers',
 			'db.create', 'db.drop', 'db.password', 'db.dump', 'db.size', 'db.sizes', 'db.limit', 'db.readonly',
 			'ssh.keys', 'ssh.password',
 			'edge.apply', 'edge.cert_push', 'edge.storage_backup',
@@ -46,6 +46,83 @@ class FakeAgentTest extends TestCase {
 		);
 
 		$this->assertSame( $expected, array_keys( FakeAgent::OPERATIONS ) );
+	}
+
+	/**
+	 * A prepared container with one site and its database.
+	 */
+	private function with_site( FakeAgent $a ): void {
+		$a->submit( 'ct.prepare', $this->prepare_args(), 'p1' );
+		$a->submit( 'site.create', array( 'vmid' => 1000, 'slug' => 'shop', 'php' => '8.3', 'workers' => 4, 'host' => 'shop.example.test' ), 'p2' );
+		$a->submit( 'db.create', array( 'account' => 'c1', 'vmid' => 1000, 'ip' => '10.200.0.10', 'databases' => array( 'c1_shop' ), 'password' => self::PASSWORD ), 'p3' );
+	}
+
+	public function test_site_facts_say_whether_a_folder_has_wordpress_and_name_the_database(): void {
+		$a = new FakeAgent();
+		$this->with_site( $a );
+
+		$plain = $a->submit( 'site.facts', array( 'vmid' => 1000, 'slug' => 'shop' ), 'f1' );
+		$this->assertSame( array( 'slug' => 'shop', 'wordpress' => false, 'db_name' => 'c1_shop' ), $plain['result'] );
+
+		$a->submit( 'site.wp_install', array( 'vmid' => 1000, 'slug' => 'shop', 'title' => 'Shop', 'admin_user' => 'owner', 'admin_email' => 'christian.beltoft@gmail.com' ), 'f2' );
+		$this->assertTrue( $a->submit( 'site.facts', array( 'vmid' => 1000, 'slug' => 'shop' ), 'f3' )['result']['wordpress'] );
+
+		$a->set_wordpress( 1000, 'shop', false );
+		$this->assertFalse( $a->submit( 'site.facts', array( 'vmid' => 1000, 'slug' => 'shop' ), 'f4' )['result']['wordpress'], 'WordPress deleted by hand.' );
+
+		$unknown = $a->submit( 'site.facts', array( 'vmid' => 1000, 'slug' => 'nothere' ), 'f5' );
+		$this->assertSame( 'failed', $unknown['status'] );
+
+		$a->set_unsupported( array( 'site.facts' ) );
+		$this->assertSame( 'unknown_op', $a->submit( 'site.facts', array( 'vmid' => 1000, 'slug' => 'shop' ), 'f6' )->get_error_code() );
+	}
+
+	public function test_cron_set_replaces_the_whole_list_and_status_reports_each_job(): void {
+		$a = new FakeAgent();
+		$this->with_site( $a );
+
+		$script = array( 'id' => 'a1b2c3d4', 'enabled' => true, 'schedule' => '*/5 * * * *', 'kind' => 'script', 'php' => '8.3', 'path' => 'public/cron.php', 'args' => array( 'schedule:run' ), 'timeout' => 300 );
+		$url    = array( 'id' => '0a0b0c0d', 'enabled' => false, 'schedule' => '0 3 * * *', 'kind' => 'url', 'url' => 'https://shop.example.test/cron?k=1', 'timeout' => 60 );
+
+		$this->assertSame( array( 'ok' => true, 'slug' => 'shop', 'count' => 2 ), $a->submit( 'site.cron_set', array( 'vmid' => 1000, 'slug' => 'shop', 'jobs' => array( $script, $url ) ), 'c1' )['result'] );
+		$this->assertSame( array( $script, $url ), $a->state()['sites'][1000]['shop']['cron'] );
+
+		$a->set_cron_run( 1000, 'shop', 'a1b2c3d4', array( 'started' => 100, 'ended' => 105, 'exit' => 0, 'tail' => 'done' ) );
+		$status = $a->submit( 'site.cron_status', array( 'vmid' => 1000, 'slug' => 'shop' ), 'c2' )['result']['jobs'];
+		$this->assertSame( array( 'started' => 100, 'ended' => 105, 'exit' => 0, 'timed_out' => false, 'skipped' => false, 'tail' => 'done' ), $status['a1b2c3d4'] );
+		$this->assertSame( 0, $status['0a0b0c0d']['started'] );
+
+		$this->assertSame( 1, $a->submit( 'site.cron_set', array( 'vmid' => 1000, 'slug' => 'shop', 'jobs' => array( $url ) ), 'c3' )['result']['count'] );
+		$this->assertCount( 1, $a->state()['sites'][1000]['shop']['cron'], 'The list is replaced, not added to.' );
+		$this->assertSame( 0, $a->submit( 'site.cron_set', array( 'vmid' => 1000, 'slug' => 'shop', 'jobs' => array() ), 'c4' )['result']['count'] );
+		$this->assertSame( array(), $a->state()['sites'][1000]['shop']['cron'] );
+	}
+
+	public function test_cron_set_refuses_a_malformed_job(): void {
+		$a = new FakeAgent();
+		$this->with_site( $a );
+
+		$good = array( 'id' => 'a1b2c3d4', 'enabled' => true, 'schedule' => '*/5 * * * *', 'kind' => 'script', 'php' => '8.3', 'path' => 'cron.php', 'timeout' => 300 );
+		$bad  = array(
+			'newline schedule' => array_merge( $good, array( 'schedule' => "*/5 * * * *\n* * * * *" ) ),
+			'six fields'       => array_merge( $good, array( 'schedule' => '*/5 * * * * echo' ) ),
+			'path with space'  => array_merge( $good, array( 'path' => 'a b.php' ) ),
+			'bad id'           => array_merge( $good, array( 'id' => 'xx' ) ),
+			'unknown key'      => array_merge( $good, array( 'command' => 'id' ) ),
+			'string bool'      => array_merge( $good, array( 'enabled' => 'yes' ) ),
+			'plain http url'   => array( 'id' => 'a1b2c3d4', 'enabled' => true, 'schedule' => '0 3 * * *', 'kind' => 'url', 'url' => 'http://x.example.test/', 'timeout' => 60 ),
+			'timeout too long' => array_merge( $good, array( 'timeout' => 9000 ) ),
+		);
+
+		$i = 0;
+		foreach ( $bad as $why => $job ) {
+			$r = $a->submit( 'site.cron_set', array( 'vmid' => 1000, 'slug' => 'shop', 'jobs' => array( $job ) ), 'bad' . ++$i );
+			$this->assertWPError( $r, $why );
+			$this->assertSame( 'invalid', $r->get_error_code(), $why );
+		}
+
+		$twice = $a->submit( 'site.cron_set', array( 'vmid' => 1000, 'slug' => 'shop', 'jobs' => array( $good, $good ) ), 'bad-twice' );
+		$this->assertWPError( $twice, 'The same id twice.' );
 	}
 
 	public function test_an_operation_outside_the_list_is_refused(): void {

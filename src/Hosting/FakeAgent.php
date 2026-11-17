@@ -23,6 +23,12 @@ defined( 'ABSPATH' ) || exit;
  * - site.delete, site.php, site.domains, site.cache_purge, site.cron, site.workers: ok (true), slug. Fail with
  *   "unknown site" for a site that was not created, except site.delete (deleting a missing site is fine).
  * - site.wp_install: installed (true), slug.
+ * - site.facts: wordpress (bool), db_name (the site's database as the container's account has it, '' when none), slug. Read only.
+ *   A site is WordPress after site.wp_install, or as set_wordpress() says. Fails with "unknown site".
+ * - site.cron_set: ok (true), slug, count. Replaces the website's whole list of scheduled jobs (an empty list removes them); the list is
+ *   kept in state(). Fails with "unknown site".
+ * - site.cron_status: jobs (map job id => started, ended (unix times, 0 when it never ran), exit (int or null), timed_out, skipped, tail
+ *   (the last of its output, at most 4096 characters)) for the jobs of the stored list. Read only. A run is scripted with set_cron_run().
  * - site.cache_setup: page_plugin (installed, updated, present, removed_by_customer or not_shipped), object_cache (enabled,
  *   installed, present, removed_by_customer, no_valkey, needs_selective_flush or failed), nginx (rendered), slug; or
  *   skipped ("no WordPress"). Idempotent. The optional object_cache argument asks for the object cache to be switched on.
@@ -226,6 +232,19 @@ class FakeAgent implements Agent {
 			'slug'    => array( 'ident', true ),
 			'enabled' => array( 'bool', true ),
 		),
+		'site.facts'        => array(
+			'vmid' => array( 'vmid', true ),
+			'slug' => array( 'ident', true ),
+		),
+		'site.cron_set'     => array(
+			'vmid' => array( 'vmid', true ),
+			'slug' => array( 'ident', true ),
+			'jobs' => array( 'cron_jobs', true ),
+		),
+		'site.cron_status'  => array(
+			'vmid' => array( 'vmid', true ),
+			'slug' => array( 'ident', true ),
+		),
 		'site.workers'      => array(
 			'vmid'    => array( 'vmid', true ),
 			'slug'    => array( 'ident', true ),
@@ -381,6 +400,7 @@ class FakeAgent implements Agent {
 			'loaders'  => array(),
 			'unsupported' => array(),
 			'wp_scripts'  => array(),
+			'cron_runs'   => array(),
 		);
 	}
 
@@ -609,6 +629,33 @@ class FakeAgent implements Agent {
 	public function set_malware_seen( int $vmid, string $slug, string $path, int $seen_at ): void {
 		$this->load();
 		$this->state['sites'][ $vmid ][ $slug ]['scan']['seen'][ $path ] = $seen_at;
+		$this->save();
+	}
+
+	/**
+	 * Says whether a website is WordPress for site.facts (the folder has WordPress or not), whatever an install did.
+	 *
+	 * @param int    $vmid      Container id.
+	 * @param string $slug      Site.
+	 * @param bool   $wordpress Whether WordPress is there.
+	 */
+	public function set_wordpress( int $vmid, string $slug, bool $wordpress ): void {
+		$this->load();
+		$this->state['sites'][ $vmid ][ $slug ]['wordpress'] = $wordpress;
+		$this->save();
+	}
+
+	/**
+	 * Scripts what site.cron_status says about the last run of a scheduled job.
+	 *
+	 * @param int                  $vmid Container id.
+	 * @param string               $slug Site.
+	 * @param string               $id   Job id.
+	 * @param array<string, mixed> $run  started, ended, exit, timed_out, skipped, tail.
+	 */
+	public function set_cron_run( int $vmid, string $slug, string $id, array $run ): void {
+		$this->load();
+		$this->state['cron_runs'][ $vmid ][ $slug ][ $id ] = $run;
 		$this->save();
 	}
 
@@ -890,6 +937,22 @@ class FakeAgent implements Agent {
 				return is_array( $value ) && count( $value ) <= 100 && array() === array_filter( $value, static fn( $v ) => ! is_string( $v ) || '' === $v || strlen( $v ) > 2000 );
 			case 'names':
 				return is_array( $value ) && array() !== $value && count( $value ) <= 50 && array() === array_filter( $value, static fn( $v ) => ! is_string( $v ) || 1 !== preg_match( '/^[a-z0-9_]{1,64}$/D', $v ) );
+			case 'cron_jobs':
+				if ( ! is_array( $value ) || ! array_is_list( $value ) || count( $value ) > 20 ) {
+					return false;
+				}
+
+				$ids = array();
+
+				foreach ( $value as $job ) {
+					if ( ! self::valid_cron_job( $job ) || isset( $ids[ $job['id'] ] ) ) {
+						return false;
+					}
+
+					$ids[ $job['id'] ] = true;
+				}
+
+				return true;
 			case 'routes':
 				if ( ! is_array( $value ) || count( $value ) > 200 ) {
 					return false;
@@ -905,6 +968,39 @@ class FakeAgent implements Agent {
 		}
 
 		return false;
+	}
+
+	/**
+	 * The shape of one scheduled job of site.cron_set (the agent validates the words again, strictly: this is the shape only).
+	 *
+	 * @param mixed $job Job.
+	 */
+	private static function valid_cron_job( $job ): bool {
+		if ( ! is_array( $job ) || array() !== array_diff( array_keys( $job ), array( 'id', 'enabled', 'schedule', 'kind', 'php', 'path', 'args', 'url', 'timeout' ) ) ) {
+			return false;
+		}
+
+		foreach ( array( 'id', 'enabled', 'schedule', 'kind', 'timeout' ) as $needed ) {
+			if ( ! array_key_exists( $needed, $job ) ) {
+				return false;
+			}
+		}
+
+		if ( ! is_string( $job['id'] ) || 1 !== preg_match( '/^[0-9a-f]{8}$/D', $job['id'] ) || ! is_bool( $job['enabled'] ) || ! is_int( $job['timeout'] ) || $job['timeout'] < 1 || $job['timeout'] > 900 ) {
+			return false;
+		}
+
+		if ( ! is_string( $job['schedule'] ) || 1 !== preg_match( '/^[0-9*,\/-]{1,40}( [0-9*,\/-]{1,40}){4}$/D', $job['schedule'] ) ) {
+			return false;
+		}
+
+		if ( 'script' === $job['kind'] ) {
+			return isset( $job['php'], $job['path'] ) && is_string( $job['php'] ) && 1 === preg_match( '/^\d\.\d{1,2}$/D', $job['php'] ) && is_string( $job['path'] ) && 1 === preg_match( '/^[A-Za-z0-9._\/-]{1,200}$/D', $job['path'] )
+				&& ( ! isset( $job['args'] ) || ( is_array( $job['args'] ) && count( $job['args'] ) <= 5 && array() === array_filter( $job['args'], static fn( $a ) => ! is_string( $a ) || 1 !== preg_match( '/^[A-Za-z0-9._:=\/@,+-]{1,100}$/D', $a ) ) ) )
+				&& ! isset( $job['url'] );
+		}
+
+		return 'url' === $job['kind'] && isset( $job['url'] ) && is_string( $job['url'] ) && strlen( $job['url'] ) <= 2000 && 0 === strpos( $job['url'], 'https://' ) && ! isset( $job['php'] ) && ! isset( $job['path'] ) && ! isset( $job['args'] );
 	}
 
 	/**
@@ -1016,6 +1112,9 @@ class FakeAgent implements Agent {
 			case 'site.cache_setup':
 			case 'site.cache_status':
 			case 'site.cron':
+			case 'site.facts':
+			case 'site.cron_set':
+			case 'site.cron_status':
 			case 'site.workers':
 			case 'site.wp_address':
 			case 'site.staging_create':
@@ -1055,6 +1154,47 @@ class FakeAgent implements Agent {
 						'object_cache' => ! empty( $cache['object'] ) ? 'on' : 'off',
 						'lifetime'     => 600,
 					);
+				}
+
+				if ( 'site.facts' === $op ) {
+					$site = $this->state['sites'][ $vmid ][ $args['slug'] ];
+					$name = '';
+
+					foreach ( (array) ( $this->state['dbs'] ?? array() ) as $account => $db ) {
+						$want = substr( $account . '_' . str_replace( '-', '_', (string) $args['slug'] ), 0, 64 );
+
+						if ( (int) ( $db['vmid'] ?? 0 ) === $vmid && in_array( $want, (array) $db['databases'], true ) ) {
+							$name = $want;
+						}
+					}
+
+					return array(
+						'slug'      => $args['slug'],
+						'wordpress' => array_key_exists( 'wordpress', $site ) ? (bool) $site['wordpress'] : ! empty( $site['admin'] ),
+						'db_name'   => $name,
+					);
+				}
+
+				if ( 'site.cron_set' === $op ) {
+					$this->state['sites'][ $vmid ][ $args['slug'] ]['cron'] = array_values( $args['jobs'] );
+
+					return array(
+						'ok'    => true,
+						'slug'  => $args['slug'],
+						'count' => count( $args['jobs'] ),
+					);
+				}
+
+				if ( 'site.cron_status' === $op ) {
+					$out = array();
+
+					foreach ( (array) ( $this->state['sites'][ $vmid ][ $args['slug'] ]['cron'] ?? array() ) as $job ) {
+						$run = (array) ( $this->state['cron_runs'][ $vmid ][ $args['slug'] ][ $job['id'] ] ?? array() );
+
+						$out[ $job['id'] ] = array_merge( array( 'started' => 0, 'ended' => 0, 'exit' => null, 'timed_out' => false, 'skipped' => false, 'tail' => '' ), $run );
+					}
+
+					return array( 'jobs' => $out );
 				}
 
 				if ( 'site.wp_install' === $op && ! $this->has_database( $vmid, (string) $args['slug'] ) ) {
