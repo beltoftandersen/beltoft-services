@@ -125,7 +125,7 @@ class TilesTest extends TestCase {
 		$root  = realpath( BELTOFT_SERVICES_PATH );
 		$found = array();
 		$skip  = array( '.git', '.internal', 'tests', 'vendor', 'node_modules', '.playwright-mcp', '.superpowers' );
-		$walk  = new \RecursiveIteratorIterator( new \RecursiveCallbackFilterIterator( new \RecursiveDirectoryIterator( $root, \FilesystemIterator::SKIP_DOTS ), static fn( $f ) => ! in_array( $f->getFilename(), $skip, true ) ) );
+		$walk  = new \RecursiveIteratorIterator( new \RecursiveCallbackFilterIterator( new \RecursiveDirectoryIterator( $root, \FilesystemIterator::SKIP_DOTS ), static fn( $f ) => ! in_array( $f->getFilename(), $skip, true ) && ! ( $f->isDir() && 0 === strpos( $f->getFilename(), '.' ) ) ) ); // No hidden folder is part of the plugin (tool worktrees, editor folders).
 
 		foreach ( $walk as $file ) {
 			if ( 'svg' === strtolower( $file->getExtension() ) ) {
