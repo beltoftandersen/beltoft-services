@@ -327,6 +327,7 @@ final class HostingRoutes {
 			'confirm'      => 402,
 			'step_up'      => 403,
 			'country_confirm' => 409,
+			'no_wordpress' => 409,
 			'addon_required' => 402,
 			'failed'       => 502,
 			'rate_limited' => 429,

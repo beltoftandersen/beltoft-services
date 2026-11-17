@@ -29,7 +29,7 @@ $beltoft_services_shown = false;
 						<div><dt><?php esc_html_e( 'Refreshed from live', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( $v['refreshed'] ); ?></dd></div>
 					<?php endif; ?>
 				</dl>
-				<?php if ( $v['ready'] ) : ?>
+				<?php if ( $v['ready'] && $v['wp'] ) : ?>
 					<div class="bs-action">
 						<p class="bs-action__text"><?php esc_html_e( 'Signs you in to the WordPress of the staging copy, in a new tab. The address above shows the copy as visitors see it.', 'beltoft-services' ); ?></p>
 						<div class="bs-action__do"><button type="button" class="beltoft-hosting-btn" data-hosting-action="staging_open" data-slug="<?php echo esc_attr( $beltoft_services_slug ); ?>"><?php esc_html_e( 'Open staging', 'beltoft-services' ); ?></button></div>

@@ -202,7 +202,7 @@ final class PhpActions {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public function purge_cache( string $slug ) {
-		return $this->site_job( $slug, 'site.cache_purge', 'purge', array( 'purged' => $slug ) );
+		return $this->site_job( $slug, 'site.cache_purge', 'purge', array( 'purged' => $slug ), true );
 	}
 
 	/**
@@ -246,7 +246,7 @@ final class PhpActions {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public function cache_status( string $slug ) {
-		$out = $this->site_job( $slug, 'site.cache_status', 'cache_status', null );
+		$out = $this->site_job( $slug, 'site.cache_status', 'cache_status', null, true );
 
 		if ( is_wp_error( $out ) ) {
 			return $out;
@@ -326,6 +326,10 @@ final class PhpActions {
 
 		if ( null === $site ) {
 			return $this->error( 'not_found', __( 'That website does not exist.', 'beltoft-services' ) );
+		}
+
+		if ( null !== $this->needs_wordpress( $site ) ) {
+			return $this->needs_wordpress( $site );
 		}
 
 		$record = (array) Records::for_resource( $this->r->id() );

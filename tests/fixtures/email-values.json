@@ -343,6 +343,7 @@
         "hosting": {
             "site_name": "",
             "site_url": "",
+            "wordpress": true,
             "admin_url": "",
             "admin_user": "",
             "admin_email": "",

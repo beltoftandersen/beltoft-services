@@ -167,7 +167,7 @@ final class SiteWordPress {
 	public static function consider( Resource $r, string $slug, bool $chosen = false ): bool {
 		$site = Sites::find( $r->id(), $slug );
 
-		if ( null === $site || ! empty( $site['flags']['pending'] ) || (int) ( Resource::find( $r->id() ) ?? $r )->get( 'wp_address_unsupported' ) + self::UNSUPPORTED_FOR > Jobs::now() ) {
+		if ( null === $site || ! empty( $site['flags']['pending'] ) || ! Sites::has_wordpress( $site ) || (int) ( Resource::find( $r->id() ) ?? $r )->get( 'wp_address_unsupported' ) + self::UNSUPPORTED_FOR > Jobs::now() ) {
 			return false;
 		}
 

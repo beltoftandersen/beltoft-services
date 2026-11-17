@@ -25,7 +25,13 @@ $beltoft_services_slug = $v['slug'];
 
 		<?php if ( $v['ready'] ) : ?>
 			<div class="bs-action">
-				<p class="bs-action__text"><?php echo esc_html( $v['enabled'] ? __( 'Change the countries, or where the block applies, or turn it off.', 'beltoft-services' ) : __( 'Visitors from every country can reach this website. Block the countries you choose, on the whole website or only on the login.', 'beltoft-services' ) ); ?></p>
+				<p class="bs-action__text"><?php
+				if ( $v['wp'] ) {
+					echo esc_html( $v['enabled'] ? __( 'Change the countries, or where the block applies, or turn it off.', 'beltoft-services' ) : __( 'Visitors from every country can reach this website. Block the countries you choose, on the whole website or only on the login.', 'beltoft-services' ) );
+				} else {
+					echo esc_html( $v['enabled'] ? __( 'Change the countries, or turn the block off.', 'beltoft-services' ) : __( 'Visitors from every country can reach this website. Block the countries you choose.', 'beltoft-services' ) );
+				}
+				?></p>
 				<div class="bs-action__do"><button type="button" class="beltoft-hosting-btn" data-hosting-action="country_edit" aria-expanded="false" aria-controls="<?php echo esc_attr( $v['id'] ); ?>"><?php echo esc_html( $v['enabled'] ? __( 'Change', 'beltoft-services' ) : __( 'Block countries', 'beltoft-services' ) ); ?></button></div>
 			</div>
 			<div class="beltoft-hosting-secure" id="<?php echo esc_attr( $v['id'] ); ?>" data-country-form<?php echo $v['enabled'] ? ' data-country-set' : ''; ?> hidden>
@@ -33,7 +39,7 @@ $beltoft_services_slug = $v['slug'];
 					<?php if ( array() !== $v['lists'] ) : ?>
 						<div class="beltoft-hosting-buttons">
 							<?php foreach ( $v['lists'] as $beltoft_services_list ) : ?>
-								<button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="country_list" data-codes="<?php echo esc_attr( $beltoft_services_list['codes'] ); ?>"<?php echo '' !== $beltoft_services_list['scope'] ? ' data-scope="' . esc_attr( $beltoft_services_list['scope'] ) . '"' : ''; ?>><?php echo esc_html( $beltoft_services_list['label'] ); ?></button>
+								<button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="country_list" data-codes="<?php echo esc_attr( $beltoft_services_list['codes'] ); ?>"<?php echo $v['wp'] && '' !== $beltoft_services_list['scope'] ? ' data-scope="' . esc_attr( $beltoft_services_list['scope'] ) . '"' : ''; ?>><?php echo esc_html( $beltoft_services_list['label'] ); ?></button>
 							<?php endforeach; ?>
 						</div>
 						<?php foreach ( $v['lists'] as $beltoft_services_list ) : ?>
@@ -47,6 +53,7 @@ $beltoft_services_slug = $v['slug'];
 						<?php endforeach; ?>
 					</div>
 				</fieldset>
+				<?php if ( $v['wp'] ) : ?>
 				<fieldset class="beltoft-hosting-fieldset"><legend><?php esc_html_e( 'Where it applies', 'beltoft-services' ); ?></legend>
 					<label class="beltoft-hosting-radio"><input type="radio" name="<?php echo esc_attr( $v['id'] ); ?>-scope" value="site"<?php echo 'login' !== $v['scope'] ? ' checked' : ''; ?>> <span><?php esc_html_e( 'Whole website', 'beltoft-services' ); ?></span></label>
 					<label class="beltoft-hosting-radio"><input type="radio" name="<?php echo esc_attr( $v['id'] ); ?>-scope" value="login"<?php echo 'login' === $v['scope'] ? ' checked' : ''; ?>> <span><?php esc_html_e( 'Login and admin only', 'beltoft-services' ); ?></span></label>
@@ -57,6 +64,13 @@ $beltoft_services_slug = $v['slug'];
 						<?php endif; ?>
 					<?php endforeach; ?>
 				</fieldset>
+				<?php else : ?>
+					<?php foreach ( $v['lists'] as $beltoft_services_list ) : ?>
+						<?php if ( '' !== $beltoft_services_list['scope_help'] ) : ?>
+							<p class="beltoft-hosting-help"><?php echo esc_html( $beltoft_services_list['scope_help'] ); ?></p>
+						<?php endif; ?>
+					<?php endforeach; ?>
+				<?php endif; ?>
 				<p class="beltoft-hosting-help"><?php esc_html_e( 'If your own country is blocked, you cannot reach the website or the buttons on this page that open it.', 'beltoft-services' ); ?></p>
 				<div class="beltoft-hosting-buttons"><button type="button" class="beltoft-hosting-btn" data-hosting-action="country_save" data-slug="<?php echo esc_attr( $beltoft_services_slug ); ?>"><?php esc_html_e( 'Save', 'beltoft-services' ); ?></button><button type="button" class="beltoft-hosting-linkbtn" data-hosting-action="country_cancel"><?php esc_html_e( 'Cancel', 'beltoft-services' ); ?></button>
 					<?php if ( $v['enabled'] ) : ?>

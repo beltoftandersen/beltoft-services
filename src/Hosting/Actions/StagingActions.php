@@ -115,7 +115,7 @@ final class StagingActions {
 			return $ready;
 		}
 
-		$site = $this->site( $slug );
+		$site = $this->site( $slug, true );
 
 		if ( is_wp_error( $site ) ) {
 			return $site;
@@ -168,12 +168,17 @@ final class StagingActions {
 	 * A website of the account, ready for a change.
 	 *
 	 * @param string $slug Website.
+	 * @param bool   $wp   True when the change needs WordPress (a copy is made and opened through it).
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	private function site( string $slug ) {
+	private function site( string $slug, bool $wp = false ) {
 		$site = Sites::find( $this->r->id(), $slug );
 
-		return null === $site || ! empty( $site['flags']['pending'] ) ? $this->error( 'not_found', __( 'That website does not exist.', 'beltoft-services' ) ) : $site;
+		if ( null === $site || ! empty( $site['flags']['pending'] ) ) {
+			return $this->error( 'not_found', __( 'That website does not exist.', 'beltoft-services' ) );
+		}
+
+		return $wp && null !== $this->needs_wordpress( $site ) ? $this->needs_wordpress( $site ) : $site;
 	}
 
 	/**
@@ -249,7 +254,7 @@ final class StagingActions {
 			return $ready;
 		}
 
-		$site = $this->site( $slug );
+		$site = $this->site( $slug, true );
 
 		if ( is_wp_error( $site ) ) {
 			return $site;
@@ -339,7 +344,8 @@ final class StagingActions {
 			return $ready;
 		}
 
-		$site = $this->site( $slug );
+		// A copy that exists can be undone and deleted whatever the website has now; refreshing and pushing need WordPress.
+		$site = $this->site( $slug, in_array( $kind, array( 'refresh', 'push' ), true ) );
 
 		if ( is_wp_error( $site ) ) {
 			return $site;

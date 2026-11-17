@@ -99,6 +99,7 @@ final class SiteActions {
 				'preview'   => $preview,
 				'main'      => SiteAddresses::main_address( $rows, $preview ),
 				'wp'        => SiteWordPress::view( $site, $rows, $preview, $task ),
+				'wordpress'   => Sites::has_wordpress( $site ),
 				'admin_user'  => (string) ( $site['flags']['admin_user'] ?? '' ),
 				'admin_email' => (string) ( $site['flags']['admin_email'] ?? '' ),
 				'country'     => \BeltoftServices\Hosting\CountryBlock::view( $site ),
@@ -781,6 +782,11 @@ final class SiteActions {
 
 		if ( null === $site || ! empty( $site['flags']['pending'] ) ) {
 			return $this->error( 'not_found', __( 'That website does not exist.', 'beltoft-services' ) );
+		}
+
+		// A website without WordPress has no address to move (the agent refuses it): an automatic move ends quietly, a customer is told.
+		if ( null !== $this->needs_wordpress( $site ) ) {
+			return $this->in_job() && ! $manual ? array( 'skipped' => true ) : $this->needs_wordpress( $site );
 		}
 
 		$preview = EdgeMap::preview_host( $slug );

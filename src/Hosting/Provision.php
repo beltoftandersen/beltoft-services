@@ -866,6 +866,18 @@ final class Provision {
 	}
 
 	/**
+	 * Does the account's first website get WordPress? What the order said (the meta `site`), or the stored first-site settings.
+	 *
+	 * @param Resource $r Hosting resource.
+	 */
+	public static function installs_wordpress( Resource $r ): bool {
+		$spec = $r->get( 'site_spec' );
+		$site = is_array( $spec ) && array_key_exists( 'install', $spec ) ? $spec : (array) $r->get( 'site' );
+
+		return ! array_key_exists( 'install', $site ) || ! empty( $site['install'] );
+	}
+
+	/**
 	 * The database name of a site: the account name and the slug with dashes as underscores.
 	 *
 	 * @param int    $resource_id Activation id.

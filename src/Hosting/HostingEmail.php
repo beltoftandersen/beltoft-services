@@ -53,6 +53,7 @@ final class HostingEmail {
 		return array(
 			'site_name'    => null === $first ? '' : ( '' !== $first['label'] ? (string) $first['label'] : (string) $first['slug'] ),
 			'site_url'     => '' === $host ? '' : 'https://' . $host . '/',
+			'wordpress'    => null === $first || Sites::has_wordpress( $first ),
 			'admin_url'    => '' === $host ? '' : 'https://' . $host . '/wp-admin/',
 			'admin_user'   => null === $first ? '' : (string) ( $first['flags']['admin_user'] ?? '' ),
 			'admin_email'  => null === $first ? '' : (string) ( $first['flags']['admin_email'] ?? '' ),

@@ -16,7 +16,8 @@
 
 defined( 'ABSPATH' ) || exit;
 
-$beltoft_services_h = is_array( $hosting ?? null ) ? $hosting : array();
+$beltoft_services_h  = is_array( $hosting ?? null ) ? $hosting : array();
+$beltoft_services_wp = ! array_key_exists( 'wordpress', $beltoft_services_h ) || ! empty( $beltoft_services_h['wordpress'] );
 
 do_action( 'woocommerce_email_header', $email_heading, $email ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own hook.
 ?>
@@ -29,10 +30,12 @@ do_action( 'woocommerce_email_header', $email_heading, $email ); // phpcs:ignore
 		<th scope="row" style="text-align:left"><?php esc_html_e( 'Your website', 'beltoft-services' ); ?></th>
 		<td><a href="<?php echo esc_url( $beltoft_services_h['site_url'] ); ?>"><?php echo esc_html( \BeltoftServices\Domains\HostName::display_url( $beltoft_services_h['site_url'] ) ); ?></a></td>
 	</tr>
+	<?php if ( $beltoft_services_wp ) : ?>
 	<tr>
 		<th scope="row" style="text-align:left"><?php esc_html_e( 'WordPress admin', 'beltoft-services' ); ?></th>
 		<td><a href="<?php echo esc_url( $beltoft_services_h['admin_url'] ); ?>"><?php echo esc_html( $beltoft_services_h['admin_url'] ); ?></a></td>
 	</tr>
+	<?php endif; ?>
 	<?php if ( ! empty( $beltoft_services_h['sftp_host'] ) ) : ?>
 	<tr>
 		<th scope="row" style="text-align:left"><?php esc_html_e( 'SFTP', 'beltoft-services' ); ?></th>
@@ -43,14 +46,18 @@ do_action( 'woocommerce_email_header', $email_heading, $email ); // phpcs:ignore
 <?php endif; ?>
 <p>
 <?php
-if ( ! empty( $beltoft_services_h['admin_user'] ) ) {
+if ( ! $beltoft_services_wp ) {
+	esc_html_e( 'Your website is empty. Upload your files with SFTP or the file manager in My Account.', 'beltoft-services' );
+} elseif ( ! empty( $beltoft_services_h['admin_user'] ) ) {
 	/* translators: %s: WordPress user name. */
 	printf( esc_html__( 'In My Account, "Log in to WordPress" signs you in as %s without a password.', 'beltoft-services' ), esc_html( $beltoft_services_h['admin_user'] ) );
+	echo ' ';
+	esc_html_e( 'You can also set a WordPress password there. A password is never sent by email.', 'beltoft-services' );
 } else {
 	esc_html_e( 'In My Account, "Log in to WordPress" signs you in without a password.', 'beltoft-services' );
+	echo ' ';
+	esc_html_e( 'You can also set a WordPress password there. A password is never sent by email.', 'beltoft-services' );
 }
-echo ' ';
-esc_html_e( 'You can also set a WordPress password there. A password is never sent by email.', 'beltoft-services' );
 ?>
 </p>
 <?php if ( ! empty( $beltoft_services_h['dns_records'] ) ) : ?>

@@ -13,6 +13,7 @@ use BeltoftServices\Hosting\HostingActions;
 use BeltoftServices\Hosting\HostingBackups;
 use BeltoftServices\Hosting\HostingDriver;
 use BeltoftServices\Hosting\HostingRestore;
+use BeltoftServices\Hosting\Provision;
 use BeltoftServices\Hosting\SiteFacts;
 use BeltoftServices\Hosting\SiteStaging;
 use BeltoftServices\Hosting\SiteWordPress;
@@ -59,6 +60,7 @@ final class Steps {
 		add_action( 'beltoft_services_action_failed', array( __CLASS__, 'failed' ), 10, 4 );
 		add_action( 'beltoft_services_action_done', array( __CLASS__, 'done' ), 10, 3 );
 		add_filter( 'beltoft_services_progress_text', array( __CLASS__, 'words' ), 10, 3 );
+		add_filter( 'beltoft_services_progress_work', array( __CLASS__, 'build_steps' ), 10, 4 );
 	}
 
 	/**
@@ -166,6 +168,26 @@ final class Steps {
 				self::start_follow( $r, 'resend_country', array( $slug ) );
 			}
 		}
+	}
+
+	/**
+	 * The steps of the build of an account whose first website has no WordPress: the step that installs says what it does.
+	 *
+	 * @param mixed    $work   Steps given by an earlier filter, or null.
+	 * @param Resource $r      Resource.
+	 * @param string   $kind   Kind of work.
+	 * @param string   $driver Driver id.
+	 * @return mixed
+	 */
+	public static function build_steps( $work, $r, $kind, $driver ) {
+		if ( null !== $work || 'build' !== $kind || HostingDriver::ID !== $driver || ! $r instanceof Resource || Provision::installs_wordpress( $r ) ) {
+			return $work;
+		}
+
+		$labels         = ( new HostingDriver() )->step_labels();
+		$labels['site'] = __( 'Creating your website', 'beltoft-services' );
+
+		return array( 'labels' => $labels, 'done' => array_values( array_intersect( (array) $r->get( 'steps' ), array_keys( $labels ) ) ) );
 	}
 
 	/**

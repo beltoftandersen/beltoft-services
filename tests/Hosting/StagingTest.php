@@ -216,7 +216,7 @@ class StagingTest extends HostingCase {
 	public function test_a_plan_with_one_copy_gives_it_to_one_website_and_per_site_gives_one_to_each(): void {
 		list( $r, $slug ) = $this->with_copy();
 		$a = new HostingActions( $r );
-		$a->add_site( 'second', '', '', false );
+		$a->add_site( 'second', '', '' );
 
 		$refused = $a->queue( 'create_staging', array( 'second' ) );
 		$this->assertWPError( $refused );
@@ -224,7 +224,7 @@ class StagingTest extends HostingCase {
 		$this->assertSame( 'This website has a staging copy already.', ( new HostingActions( $r ) )->queue( 'create_staging', array( $slug ) )->get_error_message() );
 
 		list( $q, $first ) = $this->account( array( 'staging' => 'per_site' ) );
-		( new HostingActions( $q ) )->add_site( 'other', '', '', false );
+		( new HostingActions( $q ) )->add_site( 'other', '', '' );
 		$this->assertSame( 'creating', $this->change( $q, 'create_staging', array( $first ) )['state'] );
 		$this->assertSame( 'creating', $this->change( $q, 'create_staging', array( 'other' ) )['state'] );
 		$this->assertWPError( ( new HostingActions( Resource::find( $q->id() ) ) )->queue( 'create_staging', array( $first ) ), 'One copy for each website.' );
@@ -494,7 +494,7 @@ class StagingTest extends HostingCase {
 	public function test_removing_the_website_removes_its_copy_and_its_address(): void {
 		list( $r, $slug ) = $this->with_copy();
 		$a = new HostingActions( $r );
-		$a->add_site( 'second', '', '', false );
+		$a->add_site( 'second', '', '' );
 		$host = $this->view( $r, $slug )['host'];
 
 		$out = $a->remove_site( $slug, $slug );
@@ -504,7 +504,7 @@ class StagingTest extends HostingCase {
 		$this->assertNotContains( $host, array_column( EdgeMap::routes( $r->id(), false ), 'host' ) );
 
 		list( $q, $first ) = $this->with_copy();
-		( new HostingActions( $q ) )->add_site( 'other', '', '', false );
+		( new HostingActions( $q ) )->add_site( 'other', '', '' );
 		( new HostingActions( $q ) )->queue( 'refresh_staging', array( $first ) );
 		$this->assertSame( 'busy', ( new HostingActions( Resource::find( $q->id() ) ) )->remove_site( $first, $first )->get_error_code(), 'Not while the copy is being changed.' );
 	}
@@ -572,7 +572,7 @@ class StagingTest extends HostingCase {
 
 	public function test_the_page_says_when_another_website_has_the_one_copy_of_the_plan(): void {
 		list( $r, $slug ) = $this->with_copy();
-		( new HostingActions( $r ) )->add_site( 'second', '', '', false );
+		( new HostingActions( $r ) )->add_site( 'second', '', '' );
 		$html = $this->page( $r );
 
 		$this->assertStringContainsString( 'Your plan includes one staging copy, and another website has it.', $html );

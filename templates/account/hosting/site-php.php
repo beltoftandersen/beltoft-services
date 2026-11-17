@@ -17,7 +17,7 @@ $beltoft_services_php  = $v['php'];
 	<div class="bsh-sec__body">
 		<?php if ( $v['ready'] ) : ?>
 			<div class="bs-action">
-				<p class="bs-action__text"><?php /* translators: %s: PHP version. */ echo esc_html( sprintf( __( 'This website runs on PHP %s. Choose another version if your theme or plugins need it.', 'beltoft-services' ), $beltoft_services_php['version'] ) ); ?></p>
+				<p class="bs-action__text"><?php /* translators: %s: PHP version. */ echo esc_html( sprintf( __( 'This website runs on PHP %s. Choose another version if your software needs it.', 'beltoft-services' ), $beltoft_services_php['version'] ) ); ?></p>
 				<div class="bs-action__do">
 					<span class="beltoft-hosting-inline" data-php-form>
 						<label class="screen-reader-text" for="<?php echo esc_attr( 'beltoft-php-' . $beltoft_services_slug ); ?>"><?php esc_html_e( 'PHP version', 'beltoft-services' ); ?></label>

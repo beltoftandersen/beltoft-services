@@ -266,6 +266,11 @@ final class HostingView {
 		$items  = HostingAccount::checklist( $r );
 		$rows   = array();
 
+		// The WordPress password is for a website with WordPress. Websites that were not read yet count as WordPress (Sites::has_wordpress()).
+		if ( array() !== $sites && array() === array_filter( $sites, static fn( $site ) => ! array_key_exists( 'wordpress', $site ) || ! empty( $site['wordpress'] ) ) ) {
+			unset( $items['password'] );
+		}
+
 		foreach ( $items as $key => $is_done ) {
 			$row = array(
 				'done'  => (bool) $is_done,
@@ -376,6 +381,7 @@ final class HostingView {
 		$slug    = (string) $site['slug'];
 		$main    = (string) $site['main'];
 		$wp      = (array) $site['wp'];
+		$has_wp  = ! array_key_exists( 'wordpress', $site ) || (bool) $site['wordpress'];
 		$names   = array_filter( $site['domains'], static fn( $d ) => 'preview' !== $d['kind'] );
 		$waiting = array() !== array_filter( $names, static fn( $d ) => 'active' !== $d['state'] );
 		$own     = array() !== $names;
@@ -391,7 +397,7 @@ final class HostingView {
 				$roles[] = __( 'Main address', 'beltoft-services' );
 			}
 
-			if ( $own && $d['host'] === $wp['address'] ) {
+			if ( $has_wp && $own && $d['host'] === $wp['address'] ) {
 				$roles[] = __( 'WordPress address', 'beltoft-services' );
 			}
 
@@ -431,6 +437,7 @@ final class HostingView {
 
 		return array(
 			'slug'        => $slug,
+			'has_wp'      => $has_wp,
 			'ready'       => $ready,
 			'many'        => $many,
 			'name'        => HostingAccount::site_name( $site ),
@@ -446,8 +453,8 @@ final class HostingView {
 					: sprintf( _n( '%d name connected', '%d names connected', count( $names ), 'beltoft-services' ), count( $names ) ) . ( $waiting ? ', ' . __( 'waiting for DNS', 'beltoft-services' ) : '' ),
 				'open'    => $waiting,
 				'rows'    => $domains,
-				'wp'      => self::wordpress( $slug, $site, $ready ),
-				'pairs'   => array_values( array_filter( array_map( static fn( $pair ) => self::pair( $slug, $pair, $ready, (string) $wp['address'] ), (array) $site['pairs'] ) ) ),
+				'wp'      => $has_wp ? self::wordpress( $slug, $site, $ready ) : null,
+				'pairs'   => array_values( array_filter( array_map( static fn( $pair ) => self::pair( $slug, $pair, $ready, (string) $wp['address'], $has_wp ), (array) $site['pairs'] ) ) ),
 				'allowance' => $ready ? self::domain_allowance( $r ) : '',
 			),
 			'php'         => array(
@@ -461,8 +468,8 @@ final class HostingView {
 				'url'   => 'https://' . $wp['address'] . '/wp-login.php',
 			),
 			'scan'        => self::scan( (array) $site['scan'] ),
-			'staging'     => self::staging( $slug, (array) $site['staging'], $ready, $limits ),
-			'country'     => self::country( $slug, (array) $site['country'], $ready ),
+			'staging'     => self::staging( $slug, (array) $site['staging'], $ready, $limits, $has_wp ),
+			'country'     => self::country( $slug, (array) $site['country'], $ready, $has_wp ),
 			'site'        => $site,
 			'node'        => $node,
 			'resource'    => $r,
@@ -501,7 +508,7 @@ final class HostingView {
 	 * @param array<string, mixed> $limits Ceilings.
 	 * @return array<string, mixed>
 	 */
-	public static function staging( string $slug, array $v, bool $ready, array $limits ): array {
+	public static function staging( string $slug, array $v, bool $ready, array $limits, bool $has_wp = true ): array {
 		$when = static fn( int $time ): string => wp_date( 'j F Y, H:i', $time );
 		$busy = array(
 			'creating'   => __( 'The staging copy is being made. This can take a few minutes.', 'beltoft-services' ),
@@ -513,6 +520,9 @@ final class HostingView {
 		$out  = array(
 			'slug'      => $slug,
 			'id'        => 'beltoft-staging-' . $slug,
+			'wp'        => $has_wp,
+			// A website without WordPress has no staging copy to make; one that has a copy (or a push to undo) can still see and delete it.
+			'show'      => $has_wp || ! empty( $v['exists'] ) || ! empty( $v['busy'] ) || null !== ( $v['undo'] ?? null ),
 			'ready'     => $ready,
 			'busy'      => ! empty( $v['busy'] ),
 			'busy_text' => (string) ( $busy[ $v['state'] ] ?? '' ),
@@ -534,7 +544,7 @@ final class HostingView {
 			$out['host_show'] = \BeltoftServices\Domains\HostName::display( (string) $v['host'] );
 			$out['made']      = $v['at'] > 0 ? $when( (int) $v['at'] ) : '';
 			$out['refreshed'] = $v['refreshed'] > 0 ? $when( (int) $v['refreshed'] ) : '';
-		} elseif ( $ready ) {
+		} elseif ( $ready && $has_wp ) {
 			if ( 'one' === (string) ( $limits['staging'] ?? 'one' ) && (int) ( $limits['staging_used'] ?? 0 ) > 0 ) {
 				$out['taken'] = true;
 			} else {
@@ -565,7 +575,7 @@ final class HostingView {
 	 * @param bool                 $ready Whether the account takes changes.
 	 * @return array<string, mixed>
 	 */
-	public static function country( string $slug, array $block, bool $ready ): array {
+	public static function country( string $slug, array $block, bool $ready, bool $has_wp = true ): array {
 		$names   = CountryBlock::names();
 		$lists   = CountryBlock::lists();
 		$enabled = ! empty( $block['enabled'] );
@@ -605,6 +615,7 @@ final class HostingView {
 		return array(
 			'slug'      => $slug,
 			'id'        => 'beltoft-country-' . $slug,
+			'wp'        => $has_wp,
 			'ready'     => $ready,
 			'enabled'   => $enabled,
 			'scope'     => $scope,
@@ -717,13 +728,13 @@ final class HostingView {
 	 * @param string               $wp_address The address WordPress uses.
 	 * @return array<string, mixed>|null
 	 */
-	public static function pair( string $slug, array $pair, bool $ready, string $wp_address ): ?array {
+	public static function pair( string $slug, array $pair, bool $ready, string $wp_address, bool $has_wp = true ): ?array {
 		if ( ! $pair['ready'] ) {
 			return null;
 		}
 
-		$follows = in_array( $wp_address, array( (string) $pair['base'], (string) $pair['www'] ), true );
-		$text    = $follows ? __( 'The other address redirects to the main address. WordPress moves to the main address too.', 'beltoft-services' ) : __( 'The other address redirects to the main address. This does not change the address set in WordPress.', 'beltoft-services' );
+		$follows = $has_wp && in_array( $wp_address, array( (string) $pair['base'], (string) $pair['www'] ), true );
+		$text    = ! $has_wp ? __( 'The other address redirects to the main address.', 'beltoft-services' ) : ( $follows ? __( 'The other address redirects to the main address. WordPress moves to the main address too.', 'beltoft-services' ) : __( 'The other address redirects to the main address. This does not change the address set in WordPress.', 'beltoft-services' ) );
 
 		if ( '' === (string) $pair['main'] ) {
 			$text = __( 'Both addresses show the website. Choose a main address to redirect the other one.', 'beltoft-services' ) . ' ' . $text;

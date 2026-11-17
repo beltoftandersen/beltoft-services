@@ -22,10 +22,14 @@ $beltoft_services_slug = $v['slug'];
 
 	<?php if ( $v['ready'] ) : ?>
 		<div class="bsh-quick">
-			<button type="button" class="beltoft-hosting-btn beltoft-hosting-btn--primary" data-hosting-action="login" data-slug="<?php echo esc_attr( $beltoft_services_slug ); ?>" data-busy="<?php esc_attr_e( 'Opening WordPress in a new tab...', 'beltoft-services' ); ?>" data-done="<?php esc_attr_e( 'WordPress opened in a new tab.', 'beltoft-services' ); ?>"><?php esc_html_e( 'Log in to WordPress', 'beltoft-services' ); ?></button>
-			<button type="button" class="beltoft-hosting-btn" data-hosting-action="tool_files" data-slug="<?php echo esc_attr( $beltoft_services_slug ); ?>" data-done="<?php esc_attr_e( 'The file manager opened in a new tab.', 'beltoft-services' ); ?>"><?php esc_html_e( 'Open file manager', 'beltoft-services' ); ?></button>
+			<?php if ( $v['has_wp'] ) : ?>
+				<button type="button" class="beltoft-hosting-btn beltoft-hosting-btn--primary" data-hosting-action="login" data-slug="<?php echo esc_attr( $beltoft_services_slug ); ?>" data-busy="<?php esc_attr_e( 'Opening WordPress in a new tab...', 'beltoft-services' ); ?>" data-done="<?php esc_attr_e( 'WordPress opened in a new tab.', 'beltoft-services' ); ?>"><?php esc_html_e( 'Log in to WordPress', 'beltoft-services' ); ?></button>
+			<?php endif; ?>
+			<button type="button" class="beltoft-hosting-btn<?php echo $v['has_wp'] ? '' : ' beltoft-hosting-btn--primary'; ?>" data-hosting-action="tool_files" data-slug="<?php echo esc_attr( $beltoft_services_slug ); ?>" data-done="<?php esc_attr_e( 'The file manager opened in a new tab.', 'beltoft-services' ); ?>"><?php esc_html_e( 'Open file manager', 'beltoft-services' ); ?></button>
 			<button type="button" class="beltoft-hosting-btn" data-hosting-action="tool_database" data-slug="<?php echo esc_attr( $beltoft_services_slug ); ?>" data-done="<?php esc_attr_e( 'The database tool opened in a new tab.', 'beltoft-services' ); ?>"><?php esc_html_e( 'Open database', 'beltoft-services' ); ?></button>
-			<button type="button" class="beltoft-hosting-btn" data-hosting-action="cache" data-slug="<?php echo esc_attr( $beltoft_services_slug ); ?>" data-busy="<?php esc_attr_e( 'Clearing the cache...', 'beltoft-services' ); ?>" data-done="<?php esc_attr_e( 'The cache of this website was cleared.', 'beltoft-services' ); ?>"><?php esc_html_e( 'Clear cache', 'beltoft-services' ); ?></button>
+			<?php if ( $v['has_wp'] ) : ?>
+				<button type="button" class="beltoft-hosting-btn" data-hosting-action="cache" data-slug="<?php echo esc_attr( $beltoft_services_slug ); ?>" data-busy="<?php esc_attr_e( 'Clearing the cache...', 'beltoft-services' ); ?>" data-done="<?php esc_attr_e( 'The cache of this website was cleared.', 'beltoft-services' ); ?>"><?php esc_html_e( 'Clear cache', 'beltoft-services' ); ?></button>
+			<?php endif; ?>
 		</div>
 	<?php endif; ?>
 
@@ -33,15 +37,22 @@ $beltoft_services_slug = $v['slug'];
 		<?php
 		HostingView::render( 'site-domains', $v );
 		HostingView::render( 'site-php', $v );
-		HostingView::render( 'site-login', $v );
-		HostingView::render( 'site-cache', $v );
+
+		if ( $v['has_wp'] ) {
+			HostingView::render( 'site-login', $v );
+			HostingView::render( 'site-cache', $v );
+		}
+
 		HostingView::render( 'site-tools', $v );
 
 		if ( null !== $v['scan'] ) {
 			HostingView::render( 'site-scan', array( 'slug' => $beltoft_services_slug ) + $v['scan'] );
 		}
 
-		HostingView::render( 'site-staging', $v['staging'] );
+		if ( $v['staging']['show'] ) {
+			HostingView::render( 'site-staging', $v['staging'] );
+		}
+
 		HostingView::render( 'site-country', $v['country'] );
 		?>
 	</div>

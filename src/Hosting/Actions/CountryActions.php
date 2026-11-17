@@ -84,6 +84,10 @@ final class CountryActions {
 			return $this->error( 'invalid', __( 'Choose where the block applies.', 'beltoft-services' ) );
 		}
 
+		if ( 'login' === $scope && ! Sites::has_wordpress( $site ) ) {
+			return $this->error( 'invalid', __( 'This website has no login to protect. Block the whole website instead.', 'beltoft-services' ) );
+		}
+
 		$own = CountryBlock::visitor_country();
 
 		if ( ! $confirmed && '' !== $own && in_array( $own, $codes, true ) ) {
@@ -91,6 +95,12 @@ final class CountryActions {
 			$whole = __( 'Your own country, %s, is on this list. You would be blocked from the whole website too, and the buttons on this page that open WordPress, the file manager and the database tool would stop working for you. Save anyway?', 'beltoft-services' );
 			/* translators: %s: the country of the person asking. */
 			$login = __( 'Your own country, %s, is on this list. You would be blocked from the WordPress login and admin area too, and the buttons on this page that open WordPress, the file manager and the database tool would stop working for you. Save anyway?', 'beltoft-services' );
+
+			// A website without WordPress has no such button to lose.
+			if ( ! Sites::has_wordpress( $site ) ) {
+				/* translators: %s: the country of the person asking. */
+				$whole = __( 'Your own country, %s, is on this list. You would be blocked from the whole website too, and the buttons on this page that open the file manager and the database tool would stop working for you. Save anyway?', 'beltoft-services' );
+			}
 
 			return new \WP_Error( 'country_confirm', sprintf( 'site' === $scope ? $whole : $login, CountryBlock::name( $own ) ), array( 'country' => $own ) );
 		}

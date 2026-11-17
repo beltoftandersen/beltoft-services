@@ -481,7 +481,7 @@ class AccountTest extends HostingCase {
 		$this->assertStringNotContainsString( self::NODE_SECRET, (string) wp_json_encode( $overview->get_data() ) );
 
 		// A change is checked at once and done in the background: 202 with the task, and a second change waits for it.
-		$created = $this->call( 'POST', $id . '/hosting/sites', $user, array( 'slug' => 'blog', 'label' => 'Blog', 'php' => '8.4', 'install' => false ) );
+		$created = $this->call( 'POST', $id . '/hosting/sites', $user, array( 'slug' => 'blog', 'label' => 'Blog', 'php' => '8.4' ) );
 		$this->assertSame( 202, $created->get_status(), (string) wp_json_encode( $created->get_data() ) );
 		$this->assertSame( 'pending', $created->get_data()['status'] );
 		$this->assertSame( 'add_site', $created->get_data()['task']['action'] );

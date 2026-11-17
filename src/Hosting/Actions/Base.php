@@ -426,17 +426,24 @@ trait Base {
 	 * @param string                    $op   Operation.
 	 * @param string                    $name Job name.
 	 * @param array<string, mixed>|null $out  What to return, or null for the agent's result.
+	 * @param bool                      $wp   True when only a website with WordPress can do it.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	private function site_job( string $slug, string $op, string $name, ?array $out ) {
+	private function site_job( string $slug, string $op, string $name, ?array $out, bool $wp = false ) {
 		$ready = $this->ready();
 
 		if ( is_wp_error( $ready ) ) {
 			return $ready;
 		}
 
-		if ( null === Sites::find( $this->r->id(), $slug ) ) {
+		$site = Sites::find( $this->r->id(), $slug );
+
+		if ( null === $site ) {
 			return $this->error( 'not_found', __( 'That website does not exist.', 'beltoft-services' ) );
+		}
+
+		if ( $wp && null !== $this->needs_wordpress( $site ) ) {
+			return $this->needs_wordpress( $site );
 		}
 
 		$record = (array) Records::for_resource( $this->r->id() );
@@ -498,6 +505,16 @@ trait Base {
 	 */
 	private function edge_signature(): string {
 		return md5( (string) wp_json_encode( EdgeMap::routes( $this->r->id(), false ) ) );
+	}
+
+	/**
+	 * The refusal of what only a website with WordPress can do (the sign-in link, the cache, WordPress's address, a staging copy).
+	 *
+	 * @param array<string, mixed>|null $site Site row.
+	 * @return \WP_Error|null Null when the website has WordPress (or is not found: the caller says so).
+	 */
+	private function needs_wordpress( ?array $site ): ?\WP_Error {
+		return null !== $site && ! Sites::has_wordpress( $site ) ? $this->error( 'no_wordpress', __( 'This website has no WordPress.', 'beltoft-services' ) ) : null;
 	}
 
 	/**

@@ -19,7 +19,8 @@ defined( 'ABSPATH' ) || exit;
 // A plain text email: tags are stripped, and HTML-escaping would show entities such as &amp; in the text.
 // phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped
 
-$beltoft_services_h = is_array( $hosting ?? null ) ? $hosting : array();
+$beltoft_services_h  = is_array( $hosting ?? null ) ? $hosting : array();
+$beltoft_services_wp = ! array_key_exists( 'wordpress', $beltoft_services_h ) || ! empty( $beltoft_services_h['wordpress'] );
 
 require BELTOFT_SERVICES_PATH . 'templates/parts/emails/plain-heading.php';
 
@@ -29,7 +30,10 @@ echo __( 'Your hosting is set up and your website is online.', 'beltoft-services
 
 if ( ! empty( $beltoft_services_h['site_url'] ) ) {
 	echo __( 'Your website:', 'beltoft-services' ) . ' ' . esc_url_raw( $beltoft_services_h['site_url'] ) . "\n";
-	echo __( 'WordPress admin:', 'beltoft-services' ) . ' ' . esc_url_raw( $beltoft_services_h['admin_url'] ) . "\n";
+
+	if ( $beltoft_services_wp ) {
+		echo __( 'WordPress admin:', 'beltoft-services' ) . ' ' . esc_url_raw( $beltoft_services_h['admin_url'] ) . "\n";
+	}
 
 	if ( ! empty( $beltoft_services_h['sftp_host'] ) ) {
 		/* translators: 1: host, 2: port, 3: user name. */
@@ -39,14 +43,18 @@ if ( ! empty( $beltoft_services_h['site_url'] ) ) {
 	echo "\n";
 }
 
-if ( ! empty( $beltoft_services_h['admin_user'] ) ) {
-	/* translators: %s: WordPress user name. */
-	echo wp_strip_all_tags( sprintf( __( 'In My Account, "Log in to WordPress" signs you in as %s without a password.', 'beltoft-services' ), $beltoft_services_h['admin_user'] ) ) . ' ';
+if ( ! $beltoft_services_wp ) {
+	echo __( 'Your website is empty. Upload your files with SFTP or the file manager in My Account.', 'beltoft-services' ) . "\n\n";
 } else {
-	echo __( 'In My Account, "Log in to WordPress" signs you in without a password.', 'beltoft-services' ) . ' ';
-}
+	if ( ! empty( $beltoft_services_h['admin_user'] ) ) {
+		/* translators: %s: WordPress user name. */
+		echo wp_strip_all_tags( sprintf( __( 'In My Account, "Log in to WordPress" signs you in as %s without a password.', 'beltoft-services' ), $beltoft_services_h['admin_user'] ) ) . ' ';
+	} else {
+		echo __( 'In My Account, "Log in to WordPress" signs you in without a password.', 'beltoft-services' ) . ' ';
+	}
 
-echo __( 'You can also set a WordPress password there. A password is never sent by email.', 'beltoft-services' ) . "\n\n";
+	echo __( 'You can also set a WordPress password there. A password is never sent by email.', 'beltoft-services' ) . "\n\n";
+}
 
 if ( ! empty( $beltoft_services_h['dns_records'] ) ) {
 	echo __( 'Connect your domain', 'beltoft-services' ) . "\n\n";
