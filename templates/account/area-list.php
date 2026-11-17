@@ -30,15 +30,13 @@ if ( ! $rows ) {
 		?>
 		<<?php echo $beltoft_services_tag; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- 'div' or 'a'. ?> class="beltoft-services-srv" id="beltoft-service-<?php echo (int) $beltoft_services_row['id']; ?>"<?php echo 'a' === $beltoft_services_tag ? ' href="' . esc_url( $beltoft_services_row['url'] ) . '"' : ''; ?>>
 			<span class="beltoft-services-srv__id">
+				<span class="beltoft-services-state is-<?php echo esc_attr( $beltoft_services_row['tone'] ); ?>"><?php echo esc_html( $beltoft_services_row['state'] ); ?></span>
 				<?php if ( 'a' === $beltoft_services_tag ) : ?>
 					<span class="beltoft-services-srv__name"><?php echo esc_html( $beltoft_services_row['name'] ); ?></span>
 				<?php else : ?>
 					<a class="beltoft-services-srv__name" href="<?php echo esc_url( $beltoft_services_row['url'] ); ?>"><?php echo esc_html( $beltoft_services_row['name'] ); ?></a>
 				<?php endif; ?>
 				<?php if ( '' !== $beltoft_services_row['details'] ) : ?><span class="beltoft-services-srv__sub"><?php echo esc_html( $beltoft_services_row['details'] ); ?></span><?php endif; ?>
-			</span>
-			<span class="beltoft-services-srv__state">
-				<span class="beltoft-services-state is-<?php echo esc_attr( $beltoft_services_row['tone'] ); ?>"><?php echo esc_html( $beltoft_services_row['state'] ); ?></span>
 			</span>
 			<span class="beltoft-services-srv__extra"><?php echo esc_html( $beltoft_services_row['extra'] ); ?></span>
 			<?php if ( $beltoft_services_row['action'] ) : ?>
