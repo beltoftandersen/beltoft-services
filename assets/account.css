@@ -628,13 +628,15 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-server
 .beltoft-services-ov__feed time { color: var(--ink-soft, #5e7080); font-size: var(--bs-fs-caption); font-variant-numeric: tabular-nums; }
 .beltoft-services-ov__who { font-weight: var(--bs-fw-medium); color: var(--navy, #0c1535); text-decoration: none; }
 a.beltoft-services-ov__who:hover { text-decoration: underline; }
-.beltoft-services-ov__filter { max-width: 14rem; min-height: 36px; font-size: 14px; }
+.beltoft-services-ov__filter { flex: none; width: auto; min-width: 11rem; max-width: 100%; min-height: 36px; font-size: 14px; }
+.beltoft-services-ov__head:has(.beltoft-services-ov__filter) { flex-wrap: wrap; gap: 8px 16px; }
 .beltoft-services-ov__more { margin: 12px 0 0; }
 .beltoft-services-ov__logmsg { margin: 8px 0 0; color: var(--ink-soft, #5e7080); font-size: 14px; }
-@media (max-width: 560px) {
+/* A narrow log (a phone, or half a column on the Overview): the name above, what happened under it. */
+.beltoft-services-ov__feed { container-type: inline-size; }
+@container (max-width: 520px) {
 	.beltoft-services-ov__feed li { grid-template-columns: 48px minmax(0, 1fr); gap: 0 12px; }
 	.beltoft-services-ov__feed .beltoft-services-ov__what { grid-column: 2; }
-	.beltoft-services-ov__head:has(.beltoft-services-ov__filter) { flex-wrap: wrap; }
 }
 .beltoft-services-ov__welcome > p { max-width: 70ch; margin: 4px 0 12px; color: var(--ink-soft, #5e7080); }
 .beltoft-services-ov__cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }

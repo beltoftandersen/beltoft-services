@@ -87,7 +87,7 @@ final class ActivityMap {
 	private static function fixed( string $message ): ?string {
 		switch ( $message ) {
 			case 'Service provisioned':
-				return __( 'Ready', 'beltoft-services' );
+				return __( 'Set up and ready', 'beltoft-services' );
 			case 'Service resumed':
 			case 'Hosting resumed':
 				return __( 'Resumed', 'beltoft-services' );

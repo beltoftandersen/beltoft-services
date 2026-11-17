@@ -782,6 +782,6 @@ class OverviewGatewayToken extends \WC_Payment_Token {
 			OverviewActivity::describe( 'Service provisioned', 'web-01', false ),
 			Overview::describe( 'Service provisioned', 'web-01', false )
 		);
-		$this->assertSame( 'Ready', Overview::describe( 'Service provisioned', 'web-01', false ) );
+		$this->assertSame( 'Set up and ready', Overview::describe( 'Service provisioned', 'web-01', false ) );
 	}
 }

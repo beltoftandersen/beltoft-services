@@ -85,7 +85,7 @@ class OverviewActivityTest extends MonitoringTestCase {
 
 	public function test_every_listed_text_gives_its_sentence(): void {
 		$expected = array(
-			'Service provisioned'                                    => 'Ready',
+			'Service provisioned'                                    => 'Set up and ready',
 			'Service resumed'                                        => 'Resumed',
 			'Customer shut the server down'                          => 'Server shut down',
 			'Customer started the server'                            => 'Server started',
