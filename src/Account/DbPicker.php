@@ -392,6 +392,8 @@ final class DbPicker {
 			checked( (string) $id === $chosen, true );
 			echo '>';
 			echo '<span class="beltoft-services-tile__face">';
+			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- SVG read and checked by Tiles::svg() from the plugin's own files.
+			echo '<span class="beltoft-services-tile__logo">' . \BeltoftServices\Proxmox\Vm\Tiles::engine_logo( (string) $id ) . '</span>';
 			echo '<span class="beltoft-services-tile__name">' . esc_html( $engine['name'] ) . '</span>';
 
 			if ( '' !== $engine['line'] ) {

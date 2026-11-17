@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
  * the server-side validation work as they did with a select. The script (assets/tiles.js) only adds what a select could
  * not do: an app switches the operating system to the one it runs on and greys out the others, and a version select
  * appears for an app with more than one version. Logos are local SVG files of this plugin: assets/os/<slug>.svg for a
- * system, the file named by "logo" in an app's app.json for an app, assets/os/generic.svg for anything else.
+ * system, assets/db/<engine id>.svg for a database engine, the file named by "logo" in an app's app.json for an app, assets/os/generic.svg for anything else.
  */
 final class Tiles {
 
@@ -64,8 +64,8 @@ final class Tiles {
 	// -- Logos ---------------------------------------------------------------------------------
 
 	/**
-	 * Reads one of the plugin's own SVG files for inline use: the colour follows the text. Nothing else is accepted: a
-	 * file under assets/os or an app's folder, small, with no script, event handler, link or embedded object.
+	 * Reads one of the plugin's own SVG files for inline use (brand colours are written in the files; the generic glyph
+	 * follows the text). Nothing else is accepted: a file under assets/os, assets/db or an app's folder, small, with no script, event handler, link or embedded object.
 	 *
 	 * @param string $file Absolute path.
 	 */
@@ -142,6 +142,28 @@ final class Tiles {
 		$id   = (string) ( $app['id'] ?? '' );
 		$name = (string) ( $app['logo'] ?? '' );
 		$svg  = 1 === preg_match( '/^[a-z0-9-]+$/D', $id ) && 1 === preg_match( '/^[a-zA-Z0-9._-]+\.svg$/D', $name ) ? self::svg( BELTOFT_SERVICES_PATH . 'apps/' . $id . '/' . $name ) : '';
+
+		return '' !== $svg ? $svg : self::svg( BELTOFT_SERVICES_PATH . 'assets/os/generic.svg' );
+	}
+
+	/**
+	 * The logo of a database engine (assets/db/<id>.svg), the generic glyph for an engine without one.
+	 *
+	 * @param string $id Engine id, such as postgres, valkey or mssql.
+	 * @return string SVG markup (the plugin's own file).
+	 */
+	public static function engine_logo( string $id ): string {
+		$slug = 1 === preg_match( '/^[a-z0-9-]+$/D', $id ) ? $id : '';
+
+		/**
+		 * The logo of a database engine tile.
+		 *
+		 * @param string $slug File name (without .svg) in assets/db; empty for the generic icon.
+		 * @param string $id   Engine id.
+		 */
+		$slug = apply_filters( 'beltoft_services_engine_logo', $slug, $id );
+		$slug = is_string( $slug ) && 1 === preg_match( '/^[a-z0-9-]+$/D', $slug ) ? $slug : '';
+		$svg  = '' === $slug ? '' : self::svg( BELTOFT_SERVICES_PATH . 'assets/db/' . $slug . '.svg' );
 
 		return '' !== $svg ? $svg : self::svg( BELTOFT_SERVICES_PATH . 'assets/os/generic.svg' );
 	}

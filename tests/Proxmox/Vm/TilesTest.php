@@ -14,6 +14,7 @@ class TilesTest extends TestCase {
 
 	public function tear_down(): void {
 		remove_all_filters( 'beltoft_services_os_logo' );
+		remove_all_filters( 'beltoft_services_engine_logo' );
 		remove_all_filters( 'beltoft_services_apps' );
 		@unlink( BELTOFT_SERVICES_PATH . 'apps/docker/evil.svg' ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.unlink_unlink -- test file.
 		parent::tear_down();
@@ -55,6 +56,53 @@ class TilesTest extends TestCase {
 		remove_all_filters( 'beltoft_services_os_logo' );
 		add_filter( 'beltoft_services_os_logo', static fn() => 'does-not-exist' );
 		$this->assertSame( $generic, Tiles::os_logo( 1, 'Nothing', '' ) );
+	}
+
+	public function test_every_shipped_logo_is_accepted_and_carries_its_own_colour(): void {
+		$files = array_merge( glob( BELTOFT_SERVICES_PATH . 'assets/os/*.svg' ), glob( BELTOFT_SERVICES_PATH . 'assets/db/*.svg' ), glob( BELTOFT_SERVICES_PATH . 'apps/*/logo.svg' ) );
+		$this->assertGreaterThanOrEqual( 14, count( $files ) );
+		$read = new \ReflectionMethod( Tiles::class, 'svg' );
+		$read->setAccessible( true );
+
+		foreach ( $files as $file ) {
+			$svg = $read->invoke( null, $file );
+			$this->assertNotSame( '', $svg, basename( dirname( $file ) ) . '/' . basename( $file ) . ' passes the safety check.' );
+
+			if ( 'generic.svg' !== basename( $file ) ) {
+				$this->assertDoesNotMatchRegularExpression( '/currentColor/', $svg, $file . ' has its colour written in the file.' );
+				$this->assertMatchesRegularExpression( '/fill="#[0-9a-fA-F]{6}"/', $svg, $file );
+			}
+		}
+	}
+
+	public function test_each_engine_has_its_logo_and_an_unknown_one_the_generic_glyph(): void {
+		$generic = Tiles::os_logo( 1, 'Nothing', '' );
+		$logos   = array();
+
+		foreach ( array( 'postgres', 'valkey', 'mssql' ) as $id ) {
+			$logos[ $id ] = Tiles::engine_logo( $id );
+			$this->assertStringStartsWith( '<svg aria-hidden="true" focusable="false"', $logos[ $id ], $id );
+			$this->assertNotSame( $generic, $logos[ $id ], $id );
+		}
+
+		$this->assertCount( 3, array_unique( $logos ) );
+		$this->assertSame( $generic, Tiles::engine_logo( 'oracle' ) );
+		$this->assertSame( $generic, Tiles::engine_logo( '../x' ) );
+	}
+
+	public function test_a_filter_can_name_another_engine_logo_and_a_bad_name_is_ignored(): void {
+		add_filter( 'beltoft_services_engine_logo', static fn() => 'valkey' );
+		$this->assertSame( Tiles::engine_logo( 'postgres' ), Tiles::engine_logo( 'oracle' ) );
+		$this->assertStringContainsString( '#6983FF', Tiles::engine_logo( 'oracle' ) );
+
+		remove_all_filters( 'beltoft_services_engine_logo' );
+		add_filter( 'beltoft_services_engine_logo', static fn() => '../../wp-config' );
+		$this->assertSame( Tiles::os_logo( 1, 'Nothing', '' ), Tiles::engine_logo( 'postgres' ) );
+	}
+
+	public function test_a_selected_tile_turns_its_logo_to_the_text_colour_in_the_style(): void {
+		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/tiles.css' );
+		$this->assertMatchesRegularExpression( '/__input:checked \+ \.beltoft-services-tile__face \.beltoft-services-tile__logo svg \*[^{]*\{ fill: currentColor; \}/', $css );
 	}
 
 	public function test_the_apps_name_their_logo_in_app_json_and_the_shipped_ones_exist(): void {
