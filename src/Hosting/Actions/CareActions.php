@@ -11,6 +11,7 @@ use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Hosting\HostingAccount;
 use BeltoftServices\Hosting\HostingBackups;
 use BeltoftServices\Hosting\HostingRestore;
+use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -80,6 +81,51 @@ final class CareActions {
 		$this->defer_now( 'backup' );
 
 		return $checked;
+	}
+
+	/**
+	 * Deletes one backup of the account's list. A change of the shared controller (the action `backup_delete`): the request checks the
+	 * rules, the job deletes exactly that volume (HostingBackups::delete_one()). One backup at a time, never the restore safety copy.
+	 *
+	 * @param string $volid Backup.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function delete_backup( string $volid ) {
+		return $this->queued_only() ?? $this->locked( fn() => $this->delete_backup_locked( $volid ) );
+	}
+
+	/**
+	 * delete_backup with the site lock held.
+	 *
+	 * @param string $volid Backup.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private function delete_backup_locked( string $volid ) {
+		$ready = $this->ready();
+
+		if ( is_wp_error( $ready ) ) {
+			return $ready;
+		}
+
+		$round = new HostingBackups( Resource::find( $this->r->id() ) ?? $this->r );
+
+		if ( $this->in_job() ) {
+			throw new TaskPending( $round->delete_one( $volid ) ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- a control-flow signal between request and job, never printed.
+		}
+
+		$checked = $round->delete_check( $volid );
+
+		if ( is_wp_error( $checked ) ) {
+			return $checked;
+		}
+
+		// The floor counts only a request that could be queued. A delete leaves nothing behind to put right if the queueing fails (no round is stored).
+		if ( RateLimit::exceeded( get_current_user_id(), 'beltoft-services:hosting-backup-delete:' . $this->r->id(), 10, HOUR_IN_SECONDS ) ) {
+			return $this->error( 'rate_limited', __( 'Too many requests. Please wait a while and try again.', 'beltoft-services' ) );
+		}
+
+		$this->defer_with( array( 'started' => true ) );
+		$this->defer_now( 'backup_delete' );
 	}
 
 	/**

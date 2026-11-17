@@ -50,6 +50,7 @@ defined( 'ABSPATH' ) || exit;
  * - GET    hosting/usage                   stats, memory in use (newest stored reading, without the file cache), database size, storage share
  * - GET    hosting/backups                 the backups, the safety point
  * - POST   hosting/backups                 back up now (3 a day)
+ * - DELETE hosting/backups                 volid (query): delete one backup, never the restore safety copy
  * - POST   hosting/backups/restore         scope (account, files, database), volid, slug
  * - POST   hosting/backups/undo            back to the safety point
  * - POST   hosting/checklist              item (build or backups) or dismiss
@@ -210,6 +211,12 @@ final class HostingRoutes {
 		register_rest_route( $ns, $base . '/backups', array(
 			array( 'methods' => \WP_REST_Server::READABLE, 'callback' => array( __CLASS__, 'backups' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id ),
 			array( 'methods' => $post, 'callback' => array( __CLASS__, 'backup_now' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id ),
+			array(
+				'methods'             => \WP_REST_Server::DELETABLE,
+				'callback'            => array( __CLASS__, 'delete_backup' ),
+				'permission_callback' => 'is_user_logged_in',
+				'args'                => $id + array( 'volid' => array( 'type' => 'string', 'required' => true, 'description' => 'The backup, from the list.' ) ),
+			),
 		) );
 		register_rest_route( $ns, $base . '/backups/restore', array(
 			'methods'             => $post,
@@ -571,6 +578,10 @@ final class HostingRoutes {
 
 	public static function backup_now( \WP_REST_Request $request ): \WP_REST_Response {
 		return self::change( $request, static fn( HostingActions $a ) => $a->queue( 'backup_now' ), 202 );
+	}
+
+	public static function delete_backup( \WP_REST_Request $request ): \WP_REST_Response {
+		return self::change( $request, static fn( HostingActions $a ) => $a->queue( 'delete_backup', array( (string) $request['volid'] ) ), 202 );
 	}
 
 	public static function restore( \WP_REST_Request $request ): \WP_REST_Response {

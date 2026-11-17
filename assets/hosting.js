@@ -167,6 +167,9 @@
 				var what = button.getAttribute( 'data-scope' ) || '';
 
 				return ask( text.confirmRestore || '', button, [ 'POST', base + '/backups/restore', { scope: what, volid: button.getAttribute( 'data-volid' ) || '', slug: field( scope, 'restore_slug' ) } ], false );
+			case 'backup_delete':
+				// The question names the backup's date and, for the only backup, says so (built by the page in the button's data-confirm).
+				return ask( button.getAttribute( 'data-confirm' ) || '', button, [ 'DELETE', base + '/backups?volid=' + encodeURIComponent( button.getAttribute( 'data-volid' ) || '' ), undefined ], true );
 			case 'undo':
 				return ask( text.confirmUndo || '', button, [ 'POST', base + '/backups/undo', {} ], false );
 			case 'check_item':
@@ -729,9 +732,9 @@
 
 	// The change of the account that runs in the background (a task), and the watcher that follows it.
 	var root = document.querySelector( '.beltoft-hosting' );
-	var LOCKED = [ 'php_save', 'php_rollback', 'cache', 'remove_site', 'add_site', 'add_domain', 'remove_domain', 'set_main', 'country_save', 'country_off', 'files_password', 'files_key', 'remove_key', 'wp_address', 'staging_create', 'staging_refresh', 'staging_delete', 'staging_undo', 'staging_push', 'backup_now', 'restore', 'undo' ];
+	var LOCKED = [ 'php_save', 'php_rollback', 'cache', 'remove_site', 'add_site', 'add_domain', 'remove_domain', 'set_main', 'country_save', 'country_off', 'files_password', 'files_key', 'remove_key', 'wp_address', 'staging_create', 'staging_refresh', 'staging_delete', 'staging_undo', 'staging_push', 'backup_now', 'backup_delete', 'restore', 'undo' ];
 	// A change whose new state the page shows at once (a row that is being set up, a copy that is being made): the page reloads when it is queued.
-	var DRAWN = [ 'add_site', 'remove_site', 'wp_address', 'staging_create', 'staging_refresh', 'staging_delete', 'staging_undo', 'staging_push', 'backup_now', 'restore', 'undo' ];
+	var DRAWN = [ 'add_site', 'remove_site', 'wp_address', 'staging_create', 'staging_refresh', 'staging_delete', 'staging_undo', 'staging_push', 'backup_now', 'backup_delete', 'restore', 'undo' ];
 	var NO_RELOAD = [ 'cache' ];
 	var watching = false;
 	var current = null;

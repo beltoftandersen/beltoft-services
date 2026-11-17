@@ -10,10 +10,10 @@ namespace BeltoftServices\Proxmox\Backup;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Vm\ActionsRun;
+use BeltoftServices\Proxmox\Pve\DeletesVolumes;
 use BeltoftServices\Proxmox\Pve\Prepares;
 use BeltoftServices\Proxmox\Pve\Steps;
 use BeltoftServices\Resource;
-use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -31,6 +31,7 @@ final class BackupDelete {
 	use Steps;
 	use Prepares;
 	use ActionsRun;
+	use DeletesVolumes;
 
 	/**
 	 * Deletes one backup.
@@ -62,7 +63,7 @@ final class BackupDelete {
 
 		$storage = (string) $this->cluster['backup_storage'];
 		$path    = '/nodes/' . rawurlencode( (string) $v['node'] ) . '/storage/' . rawurlencode( $storage ) . '/content/' . rawurlencode( $volid );
-		$sent    = $this->send( $path );
+		$sent    = $this->send_volume_delete( $path, 'backup delete', 'backup_delete' );
 
 		// Paused, still running or not stored: that is this run's answer (the next run polls the task and reads the listing again).
 		if ( $sent instanceof StepResult ) {
@@ -90,43 +91,6 @@ final class BackupDelete {
 	}
 
 	/**
-	 * Starts the delete and waits the bounded time. The task id is stored before the wait (like every task step), so a lost answer
-	 * is polled, not started again.
-	 *
-	 * @param string $path Content path of the volume.
-	 * @return true|\WP_Error|StepResult True: the task ended OK. WP_Error: the call or the task failed (the listing decides). StepResult: wait or retry.
-	 */
-	private function send( string $path ) {
-		if ( Settings::get( 'pause_all' ) ) {
-			return StepResult::wait( Jobs::PAUSED_DELAY, 'backup delete: all driver activity is paused', time() + 7 * DAY_IN_SECONDS );
-		}
-
-		$upid = $this->client->task( 'DELETE', $path );
-
-		if ( is_wp_error( $upid ) ) {
-			return $upid;
-		}
-
-		$node = 1 === preg_match( '/^UPID:([A-Za-z0-9][A-Za-z0-9.\-]*):/', $upid, $m ) ? $m[1] : '';
-
-		if ( ! $this->r->set( array( 'task' => array( 'step' => 'backup delete', 'phase' => 'backup_delete', 'upid' => $upid, 'node' => $node ) ) ) ) {
-			return StepResult::retry( 0, 'backup delete: the task id could not be stored' );
-		}
-
-		$result = $this->client->wait_task( $upid, $this->task_wait() );
-
-		if ( is_wp_error( $result ) && 'task_pending' === $result->get_error_code() ) {
-			return $this->waiting( 'backup delete: waiting for the Proxmox task', $this->task_budget( 'backup_delete' ) );
-		}
-
-		if ( ! $this->r->set( array( 'task' => null ) ) ) {
-			return StepResult::retry( 0, 'backup delete: the finished task could not be cleared' );
-		}
-
-		return $result;
-	}
-
-	/**
 	 * Reads the listing again and decides: the volume is gone (success, whatever the task said), or it is still there (the node
 	 * refused: expected failure for the customer, no mail to staff), or the node could not be asked (retry).
 	 *
@@ -137,7 +101,7 @@ final class BackupDelete {
 	 */
 	private function judge( Backups $backups, string $volid, array $item, $sent ): StepResult {
 		// A transport trouble or a node that is busy is tried again; a refusal (4xx, or the 500 Proxmox uses for "no") is judged by the listing.
-		if ( is_wp_error( $sent ) && $this->transient( $sent ) ) {
+		if ( is_wp_error( $sent ) && $this->volume_delete_transient( $sent ) ) {
 			return StepResult::retry( 60, 'backup delete: ' . $this->text( $sent ) );
 		}
 
@@ -161,21 +125,5 @@ final class BackupDelete {
 			array( Jobs::TEXT => __( 'The backup was deleted.', 'beltoft-services' ) ),
 			'Backup of ' . gmdate( 'Y-m-d H:i', (int) $item['ctime'] ) . ' UTC deleted at the customer\'s request'
 		);
-	}
-
-	/**
-	 * Is this error one that may pass (no answer, a busy node, a rate limit), as opposed to a refusal of the delete?
-	 *
-	 * @param \WP_Error $e Error.
-	 */
-	private function transient( \WP_Error $e ): bool {
-		$data   = $e->get_error_data();
-		$status = is_array( $data ) ? (int) ( $data['status'] ?? 0 ) : 0;
-
-		if ( 'task_failed' === $e->get_error_code() ) {
-			return false;
-		}
-
-		return 0 === $status || in_array( $status, array( 408, 429 ), true ) || ( $status >= 501 );
 	}
 }
