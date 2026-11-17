@@ -175,7 +175,7 @@ return array (
   'beltoft_services_hosting_ready' => 
   array (
     'title' => 'Hosting ready',
-    'description' => 'Sent when a WordPress hosting account is set up. It has the address of the site, the WordPress admin link, the SFTP details and the DNS records an external domain needs. It never holds a password.',
+    'description' => 'Sent when a hosting account is set up. It has the address of the site, the WordPress admin link (for a website with WordPress), the SFTP details and the DNS records an external domain needs. It never holds a password.',
     'subject' => 'Your hosting {product_name} is ready',
     'heading' => 'Your hosting is ready',
     'html' => 'emails/beltoft-services-hosting-ready.php',

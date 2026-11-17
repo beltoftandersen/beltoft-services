@@ -1,5 +1,5 @@
 <?php
-/** My Account: the WordPress hosting tab is there for every customer, with an empty state and an order button. @package BeltoftServices */
+/** My Account: the hosting tab is there for every customer, with an empty state and an order button. @package BeltoftServices */
 namespace BeltoftServices\Tests\Account;
 
 use BeltoftServices\Account\Hosting;
@@ -38,7 +38,7 @@ class HostingAreaTest extends TestCase {
 	public function test_the_tab_is_in_the_menu_of_a_customer_with_no_hosting_and_not_for_a_visitor(): void {
 		$menu = $this->menu();
 
-		$this->assertSame( 'WordPress hosting', $menu['hosting'] );
+		$this->assertSame( 'Hosting', $menu['hosting'], 'Neutral by default: the shop sets its own product name.' );
 		$keys = array_keys( $menu );
 		$this->assertSame( 'customer-logout', end( $keys ), 'Log out stays last.' );
 

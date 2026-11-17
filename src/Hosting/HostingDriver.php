@@ -85,7 +85,7 @@ class HostingDriver implements Driver, StopsOnDelete, NeedsBilling, InternalActi
 	 * {@inheritDoc}
 	 */
 	public function label(): string {
-		return __( 'WordPress hosting', 'beltoft-services' );
+		return Config::label();
 	}
 
 	/**

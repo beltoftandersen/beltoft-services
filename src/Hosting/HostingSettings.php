@@ -68,11 +68,13 @@ final class HostingSettings {
 			'admin_url' => (string) $facts['admin_url'],
 		);
 
-		// The end state says how to log in: one click, no password, and a password can be set.
-		$row['message'] = '' !== (string) $facts['admin_user']
+		// The end state says how to log in: one click, no password, and a password can be set. A website without WordPress says where to put files.
+		$row['message'] = empty( $facts['wordpress'] )
+			? __( 'Upload your files with SFTP or the file manager from your hosting in My Account.', 'beltoft-services' )
+			: ( '' !== (string) $facts['admin_user']
 			/* translators: %s: WordPress user name. */
 			? sprintf( __( 'Log in to WordPress from your hosting in My Account with one click. It signs you in as %s without a password. You can also set a WordPress password there.', 'beltoft-services' ), (string) $facts['admin_user'] )
-			: __( 'Log in to WordPress from your hosting in My Account with one click. No password is needed. You can also set a WordPress password there.', 'beltoft-services' );
+			: __( 'Log in to WordPress from your hosting in My Account with one click. No password is needed. You can also set a WordPress password there.', 'beltoft-services' ) );
 
 		return $row;
 	}
@@ -100,7 +102,7 @@ final class HostingSettings {
 	 */
 	public static function add_section( $sections ) {
 		if ( is_array( $sections ) ) {
-			$sections[ self::TAB ] = __( 'WordPress hosting', 'beltoft-services' );
+			$sections[ self::TAB ] = __( 'Hosting', 'beltoft-services' );
 		}
 
 		return $sections;
@@ -130,6 +132,7 @@ final class HostingSettings {
 			'hosting_php_eol'         => array( 'php_eol', __( 'PHP end of support dates', 'beltoft-services' ), __( 'Version and the last day of security support, for example 8.3=2027-12-31,8.4=2028-12-31. Customers are told 90 and 30 days before, and on that day their site moves to the default version.', 'beltoft-services' ) ),
 			'hosting_prefix'          => array( 'prefix', __( 'Account name prefix', 'beltoft-services' ), __( 'Letters and numbers. The account name is this prefix and the license resource id; it names the container, the database user and the edge entry.', 'beltoft-services' ) ),
 			'hosting_tag'             => array( 'tag', __( 'Container tag', 'beltoft-services' ), __( 'A Proxmox tag put on every hosting container. Lowercase letters, numbers and dashes.', 'beltoft-services' ) ),
+			'hosting_label'           => array( 'label', __( 'Product name', 'beltoft-services' ), __( 'What the hosting is called in My Account, the menu and the emails, for example Web hosting. Empty: Hosting.', 'beltoft-services' ) ),
 			'hosting_admin_user'      => array( 'admin_user', __( 'Default WordPress admin user', 'beltoft-services' ), __( 'The administrator name of a new WordPress install when the order named none.', 'beltoft-services' ) ),
 			'hosting_mem_overcommit'  => array( 'mem_overcommit', __( 'Memory overcommit', 'beltoft-services' ), __( 'Memory promised to containers may be this many times the memory of a node (1 to 4). Set it from load test results.', 'beltoft-services' ) ),
 			'hosting_disk_overcommit' => array( 'disk_overcommit', __( 'Disk overcommit', 'beltoft-services' ), __( 'Disk promised to containers may be this many times the real disk of a node (1 to 5), on thin storage.', 'beltoft-services' ) ),
@@ -229,6 +232,10 @@ final class HostingSettings {
 		if ( array_key_exists( 'hosting_tag', $value ) ) {
 			$tag                    = substr( (string) preg_replace( '/[^a-z0-9-]/', '', strtolower( (string) $value['hosting_tag'] ) ), 0, 30 );
 			$value['hosting_tag'] = '' === $tag ? Config::DEFAULTS['tag'] : $tag;
+		}
+
+		if ( array_key_exists( 'hosting_label', $value ) ) {
+			$value['hosting_label'] = mb_substr( sanitize_text_field( (string) $value['hosting_label'] ), 0, 60 );
 		}
 
 		if ( array_key_exists( 'hosting_admin_user', $value ) && 1 !== preg_match( '/^[a-z0-9_-]{1,32}$/D', (string) $value['hosting_admin_user'] ) ) {

@@ -30,6 +30,7 @@ final class Config {
 		'prefix'            => 'c',
 		'tag'               => 'hosting',
 		'admin_user'        => 'owner',
+		'label'             => 'Hosting',
 		'mem_overcommit'    => '1.5',
 		'disk_overcommit'   => '2',
 		'reserve_gb'        => '9',
@@ -135,6 +136,16 @@ final class Config {
 		$tag = preg_replace( '/[^a-z0-9-]/', '', strtolower( self::get( 'tag' ) ) );
 
 		return '' === $tag ? 'hosting' : substr( $tag, 0, 30 );
+	}
+
+	/**
+	 * What the hosting is called in the account, the menu and the emails: the shop's own name for the product (the setting `hosting_label`,
+	 * for example Web hosting), or Hosting. The plugin names no product of its own.
+	 */
+	public static function label(): string {
+		$label = trim( wp_strip_all_tags( self::get( 'label' ) ) );
+
+		return '' === $label ? self::DEFAULTS['label'] : mb_substr( $label, 0, 60 );
 	}
 
 	/**

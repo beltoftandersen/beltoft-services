@@ -1,6 +1,6 @@
 <?php
 /**
- * The WordPress hosting area of My Account.
+ * The hosting area of My Account.
  *
  * @package BeltoftServices
  */
@@ -77,7 +77,7 @@ final class Hosting extends ServiceArea {
 	 * {@inheritDoc}
 	 */
 	public function label(): string {
-		return __( 'WordPress hosting', 'beltoft-services' );
+		return \BeltoftServices\Hosting\Config::label();
 	}
 
 	/**
