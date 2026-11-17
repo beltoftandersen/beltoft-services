@@ -134,6 +134,7 @@ final class Plugin {
 		Domains\Cart::register();
 		Domains\TldRules::register();
 		Domains\DkAgreement::register();
+		Domains\OrderDomain::register();
 		Domains\Meta::register();
 		Domains\Renewals::register();
 		Domains\Actions::register();

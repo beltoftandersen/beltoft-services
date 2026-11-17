@@ -9,6 +9,7 @@ namespace BeltoftServices\Hosting;
 
 use BeltoftServices\Checkout\LineField;
 use BeltoftServices\Domains\HostName;
+use BeltoftServices\Domains\OrderDomain;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Mail\MailField;
 use BeltoftServices\Product;
@@ -304,6 +305,13 @@ final class SiteField {
 	private static function read_post( string $key ): array {
 		$out = LineField::read_post( self::POST_KEY, $key, array( 'slug', 'slug_domain', 'label', 'mode', 'host', 'host_ours', 'host_new', 'zone', 'install', 'language', 'email' ) );
 
+		// The Register and the Transfer tile both put a domain in this order: the form says which tile, the mode is one.
+		$out['tile'] = $out['mode'];
+
+		if ( in_array( $out['mode'], array( OrderDomain::REGISTER, OrderDomain::TRANSFER ), true ) ) {
+			$out['mode'] = self::MODE_NEW;
+		}
+
 		// Each mode has its own inputs; only the chosen mode's inputs count. The temporary address has no name input: its name
 		// is made from the customer's details, so a name posted with it (a changed request) is not taken.
 		$out['slug'] = '' !== $out['mode'] && self::MODE_PREVIEW !== $out['mode'] ? $out['slug_domain'] : '';
@@ -422,6 +430,7 @@ final class SiteField {
 
 		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/site-field.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/site-field.css' ) );
 		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/site-field.js', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/site-field.js' ), true );
+		OrderDomain::enqueue();
 	}
 
 	/**
@@ -496,30 +505,83 @@ final class SiteField {
 		$name = self::POST_KEY . '[' . $key . ']';
 		$id   = self::POST_KEY . '_' . sanitize_key( $key );
 		$post = self::read_post( $key );
-		$mode = '' === $post['mode'] ? self::MODE_PREVIEW : $post['mode'];
 		$have = array() !== $zones;
 		$pick = in_array( $post['install'], self::OFFERED, true ) ? $post['install'] : $install;
 		$lang = Languages::offered( $post['language'] ) ? $post['language'] : Languages::preselected();
-		$new = MailField::cart_domains();
+		$held = OrderDomain::cart_domains();
+		$have_new = array() !== $held;
+		$cart = $have_new ? $held[0] : array( 'domain' => '', 'mode' => '' );
+		$tile = '' === $post['tile'] ? '' : $post['tile'];
 
-		if ( ! in_array( $mode, array( self::MODE_PREVIEW, self::MODE_OURS, self::MODE_OWN, self::MODE_NEW ), true ) || ( self::MODE_OURS === $mode && ! $have ) || ( self::MODE_NEW === $mode && array() === $new ) ) {
-			$mode = self::MODE_PREVIEW;
+		if ( self::MODE_NEW === $tile ) {
+			$tile = $have_new ? $cart['mode'] : OrderDomain::REGISTER;
 		}
 
-		echo '<div class="beltoft-services-site-field__line" data-site-line>';
+		if ( '' === $tile ) {
+			// A domain already in the cart is the choice; otherwise the temporary address.
+			$tile = $have_new ? $cart['mode'] : self::MODE_PREVIEW;
+		}
+
+		if ( ! in_array( $tile, array( self::MODE_PREVIEW, self::MODE_OURS, self::MODE_OWN, OrderDomain::REGISTER, OrderDomain::TRANSFER ), true ) || ( self::MODE_OURS === $tile && ! $have ) ) {
+			$tile = self::MODE_PREVIEW;
+		}
+
+		$mode = $tile;
+
+		// The domain this order holds, and what the form posts for it (a posted name that is not in the cart is dropped).
+		$chosen = '';
+
+		foreach ( $held as $one ) {
+			if ( self::MODE_NEW === $post['mode'] && $post['host_new'] === $one['domain'] ) {
+				$chosen = $one['domain'];
+			}
+		}
+
+		if ( '' === $chosen && $have_new ) {
+			$chosen = $cart['domain'];
+		}
+
+		echo '<div class="beltoft-services-site-field__line" data-site-line data-od-line>';
 
 		if ( '' !== $label ) {
 			echo '<p class="beltoft-services-site-field__product">' . esc_html( $label ) . '</p>';
 		}
 
-		// Where the website is reached.
-		echo '<fieldset class="beltoft-services-site-field__group"><legend>' . esc_html__( 'Website address', 'beltoft-services' ) . '</legend>';
-		self::radio( $name, $id, self::MODE_PREVIEW, $mode, __( 'Temporary address, connect a domain later', 'beltoft-services' ) );
-		echo '<div class="beltoft-services-site-field__panel" data-site-panel="' . esc_attr( self::MODE_PREVIEW ) . '"' . ( self::MODE_PREVIEW === $mode ? '' : ' hidden' ) . '>';
-		echo '<p class="beltoft-services-site-field__note">' . esc_html__( 'Your website gets a temporary address made from your name.', 'beltoft-services' ) . '</p>';
-		echo '</div>';
+		// Where the website is reached: one tile each.
+		$items = array(
+			array( 'value' => OrderDomain::REGISTER ) + OrderDomain::tile( OrderDomain::REGISTER ),
+			array( 'value' => OrderDomain::TRANSFER ) + OrderDomain::tile( OrderDomain::TRANSFER ),
+			array( 'value' => self::MODE_OWN ) + OrderDomain::tile( self::MODE_OWN ),
+		);
+
 		if ( $have ) {
-			self::radio( $name, $id, self::MODE_OURS, $mode, __( 'A domain in my account', 'beltoft-services' ) );
+			$items[] = array(
+				'value' => self::MODE_OURS,
+				'name'  => __( 'A domain in my account', 'beltoft-services' ),
+				'line'  => __( 'Use a domain you already have with us', 'beltoft-services' ),
+			);
+		}
+
+		$items[] = array(
+			'value' => self::MODE_PREVIEW,
+			'name'  => __( 'Decide later', 'beltoft-services' ),
+			'line'  => __( 'Start on a temporary address', 'beltoft-services' ),
+		);
+
+		OrderDomain::print_tiles( array( 'name' => $name . '[mode]', 'id' => $id, 'legend' => __( 'Website address', 'beltoft-services' ), 'checked' => $mode, 'items' => $items ) );
+		OrderDomain::print_value( $name . '[host_new]', $chosen );
+
+		$find = (string) \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Domains::class )->url_register();
+
+		foreach ( array( OrderDomain::REGISTER, OrderDomain::TRANSFER ) as $kind ) {
+			OrderDomain::print_panel( $kind, $id, $kind === $mode, $have_new && $cart['mode'] === $kind ? $chosen : '', $find, __( 'The website starts on a temporary address and moves to this domain when its registration is finished.', 'beltoft-services' ) );
+		}
+
+		echo '<div class="beltoft-services-site-field__panel" data-site-panel="' . esc_attr( self::MODE_PREVIEW ) . '"' . ( self::MODE_PREVIEW === $mode ? '' : ' hidden' ) . '>';
+		echo '<p class="beltoft-services-site-field__note">' . esc_html__( 'Your website gets a temporary address made from your name. You can connect a domain later.', 'beltoft-services' ) . '</p>';
+		echo '</div>';
+
+		if ( $have ) {
 			echo '<div class="beltoft-services-site-field__panel" data-site-panel="' . esc_attr( self::MODE_OURS ) . '"' . ( self::MODE_OURS === $mode ? '' : ' hidden' ) . '>';
 			echo '<p class="form-row form-row-wide"><label for="' . esc_attr( $id ) . '_zone">' . esc_html__( 'Domain', 'beltoft-services' ) . '</label><span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[zone]" id="' . esc_attr( $id ) . '_zone">';
 
@@ -532,27 +594,10 @@ final class SiteField {
 			echo '</div>';
 		}
 
-		if ( array() !== $new ) {
-			self::radio( $name, $id, self::MODE_NEW, $mode, __( 'A new domain in this order', 'beltoft-services' ) );
-			echo '<div class="beltoft-services-site-field__panel" data-site-panel="' . esc_attr( self::MODE_NEW ) . '"' . ( self::MODE_NEW === $mode ? '' : ' hidden' ) . '>';
-			echo '<p class="form-row form-row-wide"><label for="' . esc_attr( $id ) . '_host_new">' . esc_html__( 'Domain', 'beltoft-services' ) . '</label><span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[host_new]" id="' . esc_attr( $id ) . '_host_new">';
-
-			foreach ( $new as $one ) {
-				echo '<option value="' . esc_attr( $one ) . '"' . selected( $post['host_new'], $one, false ) . '>' . esc_html( HostName::display( $one ) ) . '</option>';
-			}
-
-			echo '</select></span></p>';
-			echo '<p class="beltoft-services-site-field__note">' . esc_html__( 'The website starts on a temporary address and moves to this domain when its registration is finished.', 'beltoft-services' ) . '</p>';
-			echo '</div>';
-		}
-
-		self::radio( $name, $id, self::MODE_OWN, $mode, __( 'A domain I have elsewhere', 'beltoft-services' ) );
 		echo '<div class="beltoft-services-site-field__panel" data-site-panel="' . esc_attr( self::MODE_OWN ) . '"' . ( self::MODE_OWN === $mode ? '' : ' hidden' ) . '>';
 		self::text_row( $name . '[host]', $id . '_host', __( 'Domain name', 'beltoft-services' ), self::MODE_OWN === $mode ? $post['host'] : '', true, __( 'For example www.example.com', 'beltoft-services' ), 'url' );
 		echo '<p class="beltoft-services-site-field__note">' . esc_html__( 'After you order, your account page shows the DNS records to add where your domain is managed: an A record that points the domain to our server, and a TXT record that proves the domain is yours. Until the domain points to us, the website works on a temporary address.', 'beltoft-services' ) . '</p>';
 		echo '</div>';
-
-		echo '</fieldset>';
 
 		// What to install and in which language.
 		echo '<p class="form-row form-row-wide"><label for="' . esc_attr( $id ) . '_install">' . esc_html__( 'Install', 'beltoft-services' ) . '</label><span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[install]" id="' . esc_attr( $id ) . '_install" data-site-install>';

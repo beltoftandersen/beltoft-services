@@ -98,8 +98,12 @@ final class MailCheckoutTest extends MailTestCase {
 
 		$this->assertStringContainsString( 'Email domain', $html );
 		$this->assertStringContainsString( '[own]', $html );
-		$this->assertStringNotContainsString( 'type="radio"', $html );
+		$this->assertStringContainsString( 'type="radio"', $html, 'The choice is tiles.' );
+		$this->assertStringContainsString( 'Register a new domain', $html );
+		$this->assertStringContainsString( 'Transfer a domain', $html );
+		$this->assertStringContainsString( 'Use my own domain', $html );
 		$this->assertStringNotContainsString( '[zone]', $html );
+		$this->assertMatchesRegularExpression( '/value="own" checked/', $html, 'Without a domain in the order or an account domain, the own domain is the choice.' );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
 	}
 
@@ -115,9 +119,9 @@ final class MailCheckoutTest extends MailTestCase {
 		$this->assertStringContainsString( 'type="radio"', $html );
 		$this->assertStringContainsString( '<option value="mine.example"', $html );
 		$this->assertStringContainsString( '[own]', $html );
-		$this->assertStringContainsString( 'One of your domains with us', $html );
-		$this->assertStringContainsString( 'A domain at another provider', $html );
-		$this->assertStringNotContainsString( 'A domain hosted elsewhere', $html );
+		$this->assertStringContainsString( 'One of my domains with us', $html );
+		$this->assertStringContainsString( 'Use my own domain', $html );
+		$this->assertMatchesRegularExpression( '/value="ours" checked/', $html, 'A customer with a domain with us starts on it.' );
 	}
 
 	public function test_resolve_accepts_a_name_with_national_letters_and_stores_punycode(): void {
@@ -306,8 +310,8 @@ final class MailCheckoutTest extends MailTestCase {
 		MailField::render();
 		$html = (string) ob_get_clean();
 
-		$this->assertStringContainsString( 'A new domain in this order', $html );
-		$this->assertStringContainsString( '<option value="brand-new.example"', $html );
+		$this->assertStringContainsString( 'name="beltoft_services_mail[' . $key . '][new]" value="brand-new.example"', $html );
+		$this->assertMatchesRegularExpression( '/value="register" checked/', $html, 'A registration in the order preselects its tile.' );
 		$this->assertStringContainsString( 'type="radio"', $html );
 
 		$this->post( $key, array( 'mode' => 'new', 'new' => 'brand-new.example' ) );
@@ -317,7 +321,7 @@ final class MailCheckoutTest extends MailTestCase {
 		$this->assertNotSame( array(), $this->errors(), 'Only a domain of this cart is a new domain.' );
 	}
 
-	public function test_a_transfer_counts_a_dns_line_does_not_and_without_one_the_find_link_shows(): void {
+	public function test_a_transfer_counts_and_a_dns_line_does_not(): void {
 		$this->in_cart( $this->product() );
 		$this->add_domain_line( 'moving.example', 'transfer' );
 		$dns = $this->add_domain_line( 'dns-only.example' );
@@ -329,8 +333,36 @@ final class MailCheckoutTest extends MailTestCase {
 		ob_start();
 		MailField::render();
 		$html = (string) ob_get_clean();
-		$this->assertStringNotContainsString( 'A new domain in this order', $html );
-		$this->assertStringContainsString( 'No domain yet?', $html );
+		$this->assertStringContainsString( '[new]" value=""', $html, 'A DNS line is not a domain of the order.' );
+		$this->assertStringNotContainsString( 'is added to this order', $html );
+	}
+
+	public function test_the_email_domain_is_tiles_and_a_tile_that_adds_a_domain_posts_the_new_mode(): void {
+		$key = $this->in_cart( $this->product() );
+		$this->add_domain_line( 'Brand-New.example', 'transfer' );
+		wp_set_current_user( 0 );
+		ob_start();
+		MailField::render();
+		$html = (string) ob_get_clean();
+
+		$this->assertMatchesRegularExpression( '/value="transfer" checked/', $html, 'A transfer in the order preselects the transfer tile.' );
+		$this->assertStringContainsString( 'Transfer of brand-new.example is added to this order.', $html );
+		$this->assertStringNotContainsString( 'value="ours"', $html, 'A guest has no account domain.' );
+		$this->assertStringContainsString( 'data-od-panel="register"', $html );
+		$this->assertStringContainsString( 'data-od-panel="own"', $html );
+
+		foreach ( array( 'register', 'transfer' ) as $tile ) {
+			$this->post( $key, array( 'mode' => $tile, 'new' => 'brand-new.example' ) );
+			$this->assertSame( array(), $this->errors(), 'The ' . $tile . ' tile.' );
+			$this->post( $key, array( 'mode' => $tile, 'new' => 'forged.example' ) );
+			$this->assertNotSame( array(), $this->errors(), 'A name that is not in the cart is refused for the ' . $tile . ' tile.' );
+		}
+
+		$this->post( $key, array( 'mode' => 'transfer', 'new' => 'brand-new.example' ) );
+		$item = new \WC_Order_Item_Product();
+		MailField::save_on_item( $item, $key );
+		$this->assertSame( 'brand-new.example', $item->get_meta( MailField::ITEM_META ) );
+		$this->assertSame( '1', $item->get_meta( MailField::WAIT_META ), 'The service still waits for the domain of the order.' );
 	}
 
 	public function test_a_new_domain_line_is_marked_to_wait_and_carries_the_deadline_to_the_resource(): void {

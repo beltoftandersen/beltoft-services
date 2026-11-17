@@ -11,6 +11,7 @@ use BeltoftServices\Checkout\LineField;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
+use BeltoftServices\Domains\OrderDomain;
 use BeltoftServices\Domains\ZoneAccess;
 use BeltoftServices\Domains\Ownership;
 
@@ -54,6 +55,7 @@ final class MailField {
 		add_filter( Ownership::FILTER, array( MailDomain::class, 'answer' ), 10, 3 );
 		// Under the billing details: the theme's checkout shows the order notes step only for server and database carts.
 		add_action( 'woocommerce_after_checkout_billing_form', array( __CLASS__, 'render' ), 20 );
+		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate' ), 10, 2 );
 		add_action( 'woocommerce_store_api_checkout_update_order_from_request', array( __CLASS__, 'block_store_api' ), 10, 2 );
 		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'save_on_item' ), 30, 4 );
@@ -61,6 +63,17 @@ final class MailField {
 		add_filter( 'beltoft_services_domain_service_product', static fn( $is, $id = 0 ) => true === $is || self::is_mail_product( (int) $id ), 10, 2 );
 		add_filter( 'beltoft_services_progress_wait', array( __CLASS__, 'progress_wait' ), 10, 4 );
 		add_filter( 'woocommerce_order_item_get_formatted_meta_data', array( __CLASS__, 'show_item_domain' ), 10, 2 );
+	}
+
+	/**
+	 * The script and the style of the domain tiles, on the checkout page when the cart has a new email line.
+	 */
+	public static function assets(): void {
+		if ( ! function_exists( 'is_checkout' ) || ! is_checkout() || is_order_received_page() || array() === self::cart_lines() ) {
+			return;
+		}
+
+		OrderDomain::enqueue();
 	}
 
 	/**
@@ -202,8 +215,11 @@ final class MailField {
 
 		$one = is_array( $all ) && isset( $all[ $key ] ) && is_array( $all[ $key ] ) ? $all[ $key ] : array();
 
+		$mode = isset( $one['mode'] ) && is_string( $one['mode'] ) ? trim( $one['mode'] ) : '';
+
 		return array(
-			'mode' => isset( $one['mode'] ) && is_string( $one['mode'] ) ? trim( $one['mode'] ) : '',
+			// The Register and the Transfer tile both put a domain in this order: the form says which tile, the mode is one.
+			'mode' => in_array( $mode, array( OrderDomain::REGISTER, OrderDomain::TRANSFER ), true ) ? self::MODE_NEW : $mode,
 			'zone' => isset( $one['zone'] ) && is_string( $one['zone'] ) ? trim( $one['zone'] ) : '',
 			'new'  => isset( $one['new'] ) && is_string( $one['new'] ) ? trim( $one['new'] ) : '',
 			'own'  => isset( $one['own'] ) && is_string( $one['own'] ) ? trim( $one['own'] ) : '',
@@ -254,47 +270,58 @@ final class MailField {
 	 * @param string[] $fresh Domains this cart registers or transfers.
 	 */
 	private static function print_line( string $key, string $label, array $zones, array $fresh = array() ): void {
-		$name  = self::POST_KEY . '[' . $key . ']';
-		$id    = self::POST_KEY . '_' . sanitize_key( $key );
-		$have  = array() !== $zones;
-		$news  = array() !== $fresh;
-		$mode  = self::MODE_OWN;
-		$post  = self::posted_for_render( $key );
+		$name = self::POST_KEY . '[' . $key . ']';
+		$id   = self::POST_KEY . '_' . sanitize_key( $key );
+		$have = array() !== $zones;
+		$post = self::posted_for_render( $key );
+		$held = OrderDomain::cart_domains();
+		$cart = array() !== $held ? $held[0] : array( 'domain' => '', 'mode' => '' );
 
-		if ( $news ) {
-			$mode = self::MODE_NEW;
-		} elseif ( $have ) {
-			$mode = self::MODE_OURS;
+		// A domain already in the cart is the choice; else one of the customer's domains; else a domain elsewhere.
+		$tile = '' !== $cart['domain'] ? $cart['mode'] : ( $have ? self::MODE_OURS : self::MODE_OWN );
+
+		if ( '' !== $post['tile'] ) {
+			$asked = self::MODE_NEW === $post['tile'] ? ( '' !== $cart['domain'] ? $cart['mode'] : OrderDomain::REGISTER ) : $post['tile'];
+
+			if ( in_array( $asked, array( OrderDomain::REGISTER, OrderDomain::TRANSFER, self::MODE_OWN ), true ) || ( $have && self::MODE_OURS === $asked ) ) {
+				$tile = $asked;
+			}
 		}
 
-		if ( '' !== $post['mode'] && ( self::MODE_OWN === $post['mode'] || ( $have && self::MODE_OURS === $post['mode'] ) || ( $news && self::MODE_NEW === $post['mode'] ) ) ) {
-			$mode = $post['mode'];
-		}
+		$zone   = in_array( $post['zone'], $zones, true ) ? $post['zone'] : '';
+		$chosen = in_array( $post['new'], $fresh, true ) ? $post['new'] : ( '' !== $cart['domain'] ? $cart['domain'] : '' );
 
-		$zone = in_array( $post['zone'], $zones, true ) ? $post['zone'] : '';
-		$new  = in_array( $post['new'], $fresh, true ) ? $post['new'] : '';
-		$own  = $post['own'];
-
-		echo '<fieldset class="beltoft-services-mail-field__line" style="border:0;padding:0;margin:0 0 16px">';
+		echo '<fieldset class="beltoft-services-mail-field__line" style="border:0;padding:0;margin:0 0 16px" data-od-line>';
 
 		if ( '' !== $label ) {
 			echo '<legend>' . esc_html( $label ) . '</legend>';
 		}
 
-		if ( $news ) {
-			echo '<p class="form-row form-row-wide"><label><input type="radio" class="input-radio" name="' . esc_attr( $name ) . '[mode]" value="' . esc_attr( self::MODE_NEW ) . '"' . checked( $mode, self::MODE_NEW, false ) . '> ' . esc_html__( 'A new domain in this order', 'beltoft-services' ) . '</label>';
-			echo '<span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[new]" id="' . esc_attr( $id ) . '_new" aria-label="' . esc_attr__( 'New domain in this order', 'beltoft-services' ) . '">';
+		$items = array(
+			array( 'value' => OrderDomain::REGISTER ) + OrderDomain::tile( OrderDomain::REGISTER ),
+			array( 'value' => OrderDomain::TRANSFER ) + OrderDomain::tile( OrderDomain::TRANSFER ),
+			array( 'value' => self::MODE_OWN ) + OrderDomain::tile( self::MODE_OWN ),
+		);
 
-			foreach ( $fresh as $option ) {
-				echo '<option value="' . esc_attr( $option ) . '"' . selected( $new, $option, false ) . '>' . esc_html( \BeltoftServices\Domains\HostName::display( $option ) ) . '</option>';
-			}
+		if ( $have ) {
+			$items[] = array(
+				'value' => self::MODE_OURS,
+				'name'  => __( 'One of my domains with us', 'beltoft-services' ),
+				'line'  => __( 'Use a domain you already have with us', 'beltoft-services' ),
+			);
+		}
 
-			echo '</select></span>';
-			echo '<span class="description">' . esc_html__( 'Email is set up when the domain is ready. We add the email records for you.', 'beltoft-services' ) . '</span></p>';
+		OrderDomain::print_tiles( array( 'name' => $name . '[mode]', 'id' => $id, 'legend' => __( 'Domain for your email', 'beltoft-services' ), 'checked' => $tile, 'items' => $items ) );
+		OrderDomain::print_value( $name . '[new]', $chosen );
+
+		$find = (string) \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Domains::class )->url_register();
+
+		foreach ( array( OrderDomain::REGISTER, OrderDomain::TRANSFER ) as $kind ) {
+			OrderDomain::print_panel( $kind, $id, $kind === $tile, $cart['mode'] === $kind ? $chosen : '', $find, __( 'Email is set up when the domain is ready. We add the email records for you.', 'beltoft-services' ) );
 		}
 
 		if ( $have ) {
-			echo '<p class="form-row form-row-wide"><label><input type="radio" class="input-radio" name="' . esc_attr( $name ) . '[mode]" value="' . esc_attr( self::MODE_OURS ) . '"' . checked( $mode, self::MODE_OURS, false ) . '> ' . esc_html__( 'One of your domains with us', 'beltoft-services' ) . '</label>';
+			echo '<div class="beltoft-services-od-panel" data-od-panel="' . esc_attr( self::MODE_OURS ) . '"' . ( self::MODE_OURS === $tile ? '' : ' hidden' ) . '>';
 			echo '<span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[zone]" id="' . esc_attr( $id ) . '_zone" aria-label="' . esc_attr__( 'Domain on our name servers', 'beltoft-services' ) . '">';
 
 			foreach ( $zones as $option ) {
@@ -302,24 +329,15 @@ final class MailField {
 			}
 
 			echo '</select></span>';
-			echo '<span class="description">' . esc_html__( 'We add the email records to this domain for you. Your other records are not changed.', 'beltoft-services' ) . '</span></p>';
+			echo '<span class="description">' . esc_html__( 'We add the email records to this domain for you. Your other records are not changed.', 'beltoft-services' ) . '</span>';
+			echo '</div>';
 		}
 
-		if ( $have || $news ) {
-			echo '<p class="form-row form-row-wide"><label><input type="radio" class="input-radio" name="' . esc_attr( $name ) . '[mode]" value="' . esc_attr( self::MODE_OWN ) . '"' . checked( $mode, self::MODE_OWN, false ) . '> ' . esc_html__( 'A domain at another provider', 'beltoft-services' ) . '</label>';
-		} else {
-			echo '<input type="hidden" name="' . esc_attr( $name ) . '[mode]" value="' . esc_attr( self::MODE_OWN ) . '">';
-			echo '<p class="form-row form-row-wide validate-required"><label for="' . esc_attr( $id ) . '_own">' . esc_html__( 'Domain you want email for', 'beltoft-services' ) . '&nbsp;<abbr class="required" title="' . esc_attr__( 'required', 'beltoft-services' ) . '" style="text-decoration:none">*</abbr></label>';
-		}
-
-		echo '<span class="woocommerce-input-wrapper"><input type="text" class="input-text" name="' . esc_attr( $name ) . '[own]" id="' . esc_attr( $id ) . '_own" maxlength="253" autocomplete="off" spellcheck="false" placeholder="' . esc_attr( /* translators: example domain shown in an empty field; use the usual example for your language. */ __( 'example.com', 'beltoft-services' ) ) . '" value="' . esc_attr( $own ) . '"></span>';
+		echo '<div class="beltoft-services-od-panel" data-od-panel="' . esc_attr( self::MODE_OWN ) . '"' . ( self::MODE_OWN === $tile ? '' : ' hidden' ) . '>';
+		echo '<p class="form-row form-row-wide validate-required"><label for="' . esc_attr( $id ) . '_own">' . esc_html__( 'Domain you want email for', 'beltoft-services' ) . '&nbsp;<abbr class="required" title="' . esc_attr__( 'required', 'beltoft-services' ) . '" style="text-decoration:none">*</abbr></label>';
+		echo '<span class="woocommerce-input-wrapper"><input type="text" class="input-text" name="' . esc_attr( $name ) . '[own]" id="' . esc_attr( $id ) . '_own" maxlength="253" autocomplete="off" spellcheck="false" placeholder="' . esc_attr( /* translators: example domain shown in an empty field; use the usual example for your language. */ __( 'example.com', 'beltoft-services' ) ) . '" value="' . esc_attr( $post['own'] ) . '"></span>';
 		echo '<span class="description">' . esc_html__( 'You add the DNS records where the domain is hosted. We show you which ones after the order, and we first ask for a TXT record that proves the domain is yours.', 'beltoft-services' ) . '</span></p>';
-
-		$find = $news ? '' : (string) \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Domains::class )->url_register();
-
-		if ( '' !== $find ) {
-			echo '<p class="beltoft-services-mail-field__find">' . esc_html__( 'No domain yet?', 'beltoft-services' ) . ' <a href="' . esc_url( $find ) . '">' . esc_html__( 'Find one', 'beltoft-services' ) . '</a></p>';
-		}
+		echo '</div>';
 
 		echo '</fieldset>';
 	}
@@ -328,7 +346,7 @@ final class MailField {
 	 * The posted values to refill the form with (the checkout page is printed again after a refresh), without the checkout-run guard.
 	 *
 	 * @param string $key Cart item key.
-	 * @return array{mode: string, zone: string, new: string, own: string}
+	 * @return array{tile: string, zone: string, new: string, own: string} The tile is the posted choice as it was (register, transfer, own, ours or new).
 	 */
 	private static function posted_for_render( string $key ): array {
 		// phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- only refills a form; the value is printed escaped and checked again on submit.
@@ -337,7 +355,7 @@ final class MailField {
 		$one = is_array( $all ) && isset( $all[ $key ] ) && is_array( $all[ $key ] ) ? $all[ $key ] : array();
 		$get = static fn( string $field ): string => isset( $one[ $field ] ) && is_string( $one[ $field ] ) ? trim( $one[ $field ] ) : '';
 
-		return array( 'mode' => $get( 'mode' ), 'zone' => $get( 'zone' ), 'new' => $get( 'new' ), 'own' => $get( 'own' ) );
+		return array( 'tile' => $get( 'mode' ), 'zone' => $get( 'zone' ), 'new' => $get( 'new' ), 'own' => $get( 'own' ) );
 	}
 
 	/**

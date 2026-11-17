@@ -106,7 +106,7 @@ class CheckoutTest extends HostingCase {
 		remove_filter( 'beltoft_services_checkout_field_heading', $hide, 10 );
 
 		$this->assertStringNotContainsString( '<h3', $html, 'The heading is left out.' );
-		$this->assertStringContainsString( 'Temporary address', $html, 'The fields are still printed.' );
+		$this->assertStringContainsString( 'Decide later', $html, 'The fields are still printed.' );
 		$this->assertSame( array( 'hosting' ), $kinds, 'The filter is told which fields these are.' );
 
 		ob_start();
@@ -123,8 +123,10 @@ class CheckoutTest extends HostingCase {
 		$html = (string) ob_get_clean();
 
 		$this->assertStringContainsString( 'Your website', $html );
-		$this->assertStringContainsString( 'Temporary address', $html );
-		$this->assertStringContainsString( 'A domain I have elsewhere', $html );
+		$this->assertStringContainsString( 'Decide later', $html );
+		$this->assertStringContainsString( 'Register a new domain', $html );
+		$this->assertStringContainsString( 'Transfer a domain', $html );
+		$this->assertStringContainsString( 'Use my own domain', $html );
 		$this->assertStringNotContainsString( 'A domain in my account', $html, 'A visitor has no domains on our name servers.' );
 		$this->assertStringContainsString( '<option value="wordpress" selected', $html );
 		$this->assertMatchesRegularExpression( '#<p class="form-row form-row-wide validate-required"><label for="[^"]*_host">Domain name#', $html, 'The checkout step stops on an empty domain name, as it does on an empty website name.' );
@@ -585,15 +587,15 @@ class CheckoutTest extends HostingCase {
 
 		ob_start();
 		SiteField::render();
-		$this->assertStringNotContainsString( 'A new domain in this order', (string) ob_get_clean() );
+		$this->assertStringContainsString( 'name="beltoft_services_site[' . $key . '][host_new]" value=""', (string) ob_get_clean(), 'No domain in the order: nothing is chosen.' );
 
 		$this->add_domain_line( 'Brand-New.example' );
 		ob_start();
 		SiteField::render();
 		$html = (string) ob_get_clean();
 
-		$this->assertStringContainsString( 'A new domain in this order', $html );
-		$this->assertStringContainsString( '<option value="brand-new.example"', $html );
+		$this->assertStringContainsString( 'name="beltoft_services_site[' . $key . '][host_new]" value="brand-new.example"', $html, 'The domain of the order is the posted value.' );
+		$this->assertStringContainsString( 'Registration of brand-new.example is added to this order.', $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
 		$this->assertStringNotContainsString( "\u{00B7}", $html );
 
@@ -609,6 +611,105 @@ class CheckoutTest extends HostingCase {
 		WC()->cart->cart_contents[ $dns ]['beltoft_services_domain']['mode'] = 'dns';
 		$this->post( $key, array( 'mode' => 'new', 'host_new' => 'dns-only.example' ) );
 		$this->assertNotSame( array(), $this->errors(), 'A DNS line is not a new domain.' );
+	}
+
+	public function test_the_address_is_four_tiles_with_decide_later_chosen_and_no_account_tile_for_a_visitor(): void {
+		$key = $this->in_cart( $this->product() );
+
+		ob_start();
+		SiteField::render();
+		$html = (string) ob_get_clean();
+		$name = 'name="beltoft_services_site[' . $key . '][mode]"';
+
+		foreach ( array( 'register', 'transfer', 'own', 'preview' ) as $value ) {
+			$this->assertStringContainsString( 'type="radio" ' . $name . ' value="' . $value . '"', $html, 'A real radio for ' . $value );
+		}
+
+		$this->assertStringNotContainsString( 'value="ours"', $html, 'A visitor has no domain in an account.' );
+		$this->assertStringNotContainsString( 'A domain in my account', $html );
+		$this->assertMatchesRegularExpression( '/value="preview" checked/', $html, 'Decide later is the default.' );
+		$this->assertStringContainsString( 'Find the name for your website', $html );
+		$this->assertStringContainsString( 'Move it from another provider', $html );
+		$this->assertStringContainsString( 'Keep it with your current provider', $html );
+		$this->assertStringContainsString( 'data-od-panel="register" hidden', $html );
+		$this->assertStringContainsString( 'data-od-panel="transfer" hidden', $html );
+		$this->assertStringContainsString( 'data-od-input', $html, 'The search is inside the panel.' );
+		$this->assertStringNotContainsString( 'name="beltoft_services_site[' . $key . '][host_new]" value="x', $html );
+		$this->assertStringNotContainsString( "\u{2014}", $html );
+		$this->assertStringNotContainsString( "\u{00B7}", $html );
+	}
+
+	public function test_a_customer_with_a_domain_in_the_account_gets_that_tile(): void {
+		$user    = self::factory()->user->create();
+		$product = $this->service_product( 'domain', array(), array( 'slug' => 'domain-' . wp_generate_password( 5, false ) ) );
+		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $user ) );
+		$domain  = Resource::create( $license, new DomainDriver(), array(), array( 'domain' => 'tile.example', 'mode' => 'register', 'zone_ready' => true ) );
+		$domain->set( array( 'state' => 'ready' ) );
+		$this->dns->create_zone( 'tile.example', array( 'ns1.example.net' ) );
+		wp_set_current_user( $user );
+		$this->in_cart( $this->product() );
+
+		ob_start();
+		SiteField::render();
+		$html = (string) ob_get_clean();
+
+		$this->assertStringContainsString( 'value="ours"', $html );
+		$this->assertStringContainsString( 'A domain in my account', $html );
+	}
+
+	public function test_a_domain_in_the_cart_preselects_its_tile_and_shows_it(): void {
+		$key = $this->in_cart( $this->product() );
+		$this->add_domain_line( 'Brand-New.example' );
+
+		ob_start();
+		SiteField::render();
+		$html = (string) ob_get_clean();
+
+		$this->assertMatchesRegularExpression( '/value="register" checked/', $html );
+		$this->assertStringContainsString( 'Registration of brand-new.example is added to this order.', $html );
+		$this->assertStringContainsString( 'name="beltoft_services_site[' . $key . '][host_new]" value="brand-new.example"', $html );
+		$this->assertDoesNotMatchRegularExpression( '/data-od-panel="register" hidden/', $html, 'The chosen tile is open.' );
+		$this->assertMatchesRegularExpression( '/data-od-panel="transfer" hidden/', $html );
+
+		WC()->cart->empty_cart();
+		$this->in_cart( $this->product() );
+		$this->add_domain_line( 'Moving.example', 'transfer' );
+		ob_start();
+		SiteField::render();
+		$html = (string) ob_get_clean();
+
+		$this->assertMatchesRegularExpression( '/value="transfer" checked/', $html );
+		$this->assertStringContainsString( 'Transfer of moving.example is added to this order.', $html );
+	}
+
+	public function test_the_register_and_transfer_tiles_post_the_new_mode_and_the_name_is_still_checked_against_the_cart(): void {
+		$key = $this->in_cart( $this->product() );
+		$this->add_domain_line( 'Brand-New.example' );
+
+		foreach ( array( 'register', 'transfer' ) as $tile ) {
+			$this->post( $key, array( 'mode' => $tile, 'host_new' => 'brand-new.example' ) );
+			$this->assertSame( array(), $this->errors(), 'The ' . $tile . ' tile.' );
+
+			$this->post( $key, array( 'mode' => $tile, 'host_new' => 'forged.example' ) );
+			$this->assertSame( array( 'Choose a domain that is part of this order.' ), $this->errors(), 'A name that is not in the cart is refused for the ' . $tile . ' tile.' );
+
+			$this->post( $key, array( 'mode' => $tile, 'host_new' => '' ) );
+			$this->assertNotSame( array(), $this->errors(), 'Nothing chosen yet.' );
+		}
+
+		$this->post( $key, array( 'mode' => 'register', 'host_new' => 'brand-new.example' ) );
+		$item = new \WC_Order_Item_Product();
+		SiteField::save_on_item( $item, $key );
+		$site = $item->get_meta( SiteField::ITEM_META );
+		$this->assertSame( 'new', $site['mode'], 'The tile is stored as the one new domain mode.' );
+		$this->assertSame( 'brand-new.example', $site['domain'] );
+	}
+
+	public function test_the_search_script_and_style_load_on_the_checkout_for_a_hosting_cart(): void {
+		$this->assertNotFalse( has_action( 'wp_enqueue_scripts', array( SiteField::class, 'assets' ) ) );
+		\BeltoftServices\Domains\OrderDomain::enqueue();
+		$this->assertTrue( wp_script_is( \BeltoftServices\Domains\OrderDomain::HANDLE, 'enqueued' ) );
+		$this->assertTrue( wp_style_is( \BeltoftServices\Domains\OrderDomain::HANDLE, 'enqueued' ) );
 	}
 
 	/**
