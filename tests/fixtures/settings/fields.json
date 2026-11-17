@@ -634,6 +634,14 @@
         "label": "Container tag",
         "desc": "A Proxmox tag put on every hosting container. Lowercase letters, numbers and dashes."
     },
+    "hosting_label": {
+        "tab": "hosting",
+        "section": "hosting",
+        "type": "text",
+        "default": "Hosting",
+        "label": "Product name",
+        "desc": "What the hosting is called in My Account, the menu and the emails, for example Web hosting. Empty: Hosting."
+    },
     "hosting_admin_user": {
         "tab": "hosting",
         "section": "hosting",
