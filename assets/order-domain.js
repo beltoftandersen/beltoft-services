@@ -49,6 +49,64 @@
 		}
 	}
 
+	// Resolves true when the refreshed checkout says the order holds this domain (the server lists its domain lines in a marker that
+	// rides the refresh), false when it does not or the refresh does not answer in 20 seconds.
+	function confirmed( domain ) {
+		if ( ! window.jQuery || ! window.jQuery( 'form.checkout' ).length ) {
+			return Promise.resolve( true );
+		}
+
+		return new Promise( function ( resolve ) {
+			var body = window.jQuery( document.body );
+			var done = false;
+			var timer = null;
+
+			function finish( value ) {
+				if ( done ) {
+					return;
+				}
+
+				done = true;
+				window.clearTimeout( timer );
+				body.off( 'updated_checkout', check );
+				resolve( value );
+			}
+
+			function check() {
+				var marker = document.querySelector( '.beltoft-services-od-phone' );
+				var list = marker ? ( marker.getAttribute( 'data-od-domains' ) || '' ).split( ',' ) : [];
+
+				finish( list.indexOf( domain ) > -1 );
+			}
+
+			timer = window.setTimeout( function () {
+				finish( false );
+			}, 20000 );
+			body.on( 'updated_checkout', check );
+			refresh();
+		} );
+	}
+
+	// Adds the domain, then asks the refreshed checkout whether the order has it. Not there (a request that read the cart just
+	// before the add can write it back without the line): the add is sent once more, it is safe to repeat. Still not there: an error.
+	function addConfirmed( domain, mode, code ) {
+		return add( domain, mode, code ).then( function () {
+			return confirmed( normalise( domain ) );
+		} ).then( function ( ok ) {
+			if ( ok ) {
+				return;
+			}
+
+			return add( domain, mode, code ).then( function () {
+				return confirmed( normalise( domain ) );
+			} ).then( function ( again ) {
+				if ( ! again ) {
+					throw new Error( text.notInOrder );
+				}
+			} );
+		} );
+	}
+
 	function normalise( value ) {
 		return String( value ).trim().toLowerCase().replace( /^https?:\/\//, '' ).replace( /^www\./, '' ).replace( /[/?#].*$/, '' );
 	}
@@ -203,7 +261,6 @@
 	function added( line, domain, display, mode ) {
 		setChosen( line, domain, display, mode );
 		pickTile( line, mode );
-		refresh();
 	}
 
 	function priceHtml( item ) {
@@ -240,7 +297,7 @@
 				var results = panel.querySelector( '[data-od-results]' );
 
 				working( button, true, text.adding );
-				add( item.domain, 'register', '' ).then( function () {
+				addConfirmed( item.domain, 'register', '' ).then( function () {
 					message( results, '' );
 					added( line, item.domain, item.display || item.domain, 'register' );
 				} ).catch( function ( error ) {
@@ -386,7 +443,7 @@
 			}
 
 			working( button, true, text.adding );
-			add( item.domain, 'transfer', value ).then( function () {
+			addConfirmed( item.domain, 'transfer', value ).then( function () {
 				message( results, '' );
 				added( line, item.domain, item.display || item.domain, 'transfer' );
 			} ).catch( function ( error ) {

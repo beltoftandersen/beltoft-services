@@ -47,6 +47,16 @@ class OrderDomainTest extends TestCase {
 		$this->assertSame( array( array( 'domain' => 'fresh.example', 'mode' => 'register' ) ), OrderDomain::cart_domains() );
 	}
 
+	public function test_the_refresh_marker_lists_the_domains_the_order_holds(): void {
+		WC()->cart->empty_cart();
+		$this->assertStringContainsString( 'data-od-domains=""', OrderDomain::phone_marker() );
+
+		$this->add_domain_line( 'Fresh.example', 'register' );
+		$this->add_domain_line( 'moved.example', 'transfer' );
+
+		$this->assertStringContainsString( 'data-od-domains="fresh.example,moved.example"', OrderDomain::fragments( array() )['.beltoft-services-od-phone'] );
+	}
+
 	public function test_the_tiles_are_a_real_radio_group_and_the_checked_one_is_marked(): void {
 		ob_start();
 		OrderDomain::print_tiles( array(

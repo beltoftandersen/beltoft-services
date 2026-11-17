@@ -42,7 +42,7 @@ final class OrderDomain {
 	}
 
 	/**
-	 * The marker that says whether the cart needs the customer's phone (a domain contact goes to the registrar). The site's
+	 * The marker that says whether the cart needs the customer's phone and which domains it holds (a domain contact goes to the registrar). The site's
 	 * checkout prints its phone row when the page loads, so the script reloads the page once when a domain was added in the
 	 * page and the row is not there.
 	 *
@@ -61,7 +61,9 @@ final class OrderDomain {
 	 * The marker element.
 	 */
 	public static function phone_marker(): string {
-		return '<span class="beltoft-services-od-phone" data-od-phone="' . ( \BeltoftServices\BillingRequirements::cart_needs_phone() ? '1' : '0' ) . '" hidden></span>';
+		$names = implode( ',', array_column( self::cart_domains(), 'domain' ) );
+
+		return '<span class="beltoft-services-od-phone" data-od-phone="' . ( \BeltoftServices\BillingRequirements::cart_needs_phone() ? '1' : '0' ) . '" data-od-domains="' . esc_attr( $names ) . '" hidden></span>';
 	}
 
 	/**
@@ -186,6 +188,7 @@ final class OrderDomain {
 			'fullDomain'  => __( 'Enter the full domain, for example example.com.', 'beltoft-services' ),
 			'searchFailed' => __( 'The search could not be completed.', 'beltoft-services' ),
 			'addFailed'   => __( 'Could not add this domain.', 'beltoft-services' ),
+			'notInOrder'  => __( 'The domain did not stay in your order. Please try again.', 'beltoft-services' ),
 			'removeFailed' => __( 'The domain could not be removed. Please reload the page and try again.', 'beltoft-services' ),
 			/* translators: %s: domain name */
 			'registerAdded' => __( 'Registration of %s is added to this order.', 'beltoft-services' ),

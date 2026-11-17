@@ -207,6 +207,9 @@ final class Cart {
 		$key = $cart->add_to_cart( $product->get_id(), 1, 0, array(), $data );
 		if ( ! $key ) { return new \WP_Error( 'cart_failed', __( 'The domain could not be added to your cart.', 'beltoft-services' ), array( 'status' => 400 ) ); }
 		WC()->session->set_customer_session_cookie( true );
+		// The session is saved now and not at the end of the request: the page asks for a checkout refresh the moment this answer arrives,
+		// and a request that read the session just before the save could write it back without the line.
+		if ( method_exists( WC()->session, 'save_data' ) ) { WC()->session->save_data(); }
 		return array( 'added' => true, 'checkout_url' => wc_get_checkout_url() );
 	}
 
