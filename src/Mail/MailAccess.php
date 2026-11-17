@@ -32,11 +32,12 @@ final class MailAccess {
 	 *
 	 * @param Resource $r     Resource.
 	 * @param string   $email Mailbox address.
+	 * @param string   $typed A password the customer chose; empty for a generated one. A typed password is never revealed: finish() wipes it.
 	 * @return string The plain password, for the one request that sets it.
 	 * @throws \RuntimeException When it cannot be stored (nothing is sent then).
 	 */
-	public static function begin( Resource $r, string $email ): string {
-		$password = Passwords::generate();
+	public static function begin( Resource $r, string $email, string $typed = '' ): string {
+		$password = '' !== $typed ? $typed : Passwords::generate();
 		$all      = self::all( $r );
 
 		$all[ strtolower( $email ) ] = array(
@@ -44,6 +45,10 @@ final class MailAccess {
 			'until'   => time() + self::REVEAL_DAYS * DAY_IN_SECONDS,
 			'pending' => true,
 		);
+
+		if ( '' !== $typed ) {
+			$all[ strtolower( $email ) ]['typed'] = true;
+		}
 
 		if ( ! $r->set( array( self::META => $all ) ) ) {
 			throw new \RuntimeException( 'The password could not be stored.' );
@@ -53,7 +58,7 @@ final class MailAccess {
 	}
 
 	/**
-	 * The password is set on the mail server: from now on it can be revealed.
+	 * The password is set on the mail server: from now on it can be revealed (a typed one is wiped instead).
 	 *
 	 * @param Resource $r     Resource.
 	 * @param string   $email Mailbox address.
@@ -73,8 +78,14 @@ final class MailAccess {
 					return true;
 				}
 
-				$all[ $email ]['pending'] = false;
-				$ok                       = $r->set( array( self::META => $all ) );
+				if ( ! empty( $all[ $email ]['typed'] ) ) {
+					// The customer chose it and knows it: nothing is kept to show, the encrypted copy goes now.
+					unset( $all[ $email ] );
+				} else {
+					$all[ $email ]['pending'] = false;
+				}
+
+				$ok = $r->set( array( self::META => $all ) );
 
 				return $ok;
 			}

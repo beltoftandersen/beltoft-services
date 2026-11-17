@@ -80,7 +80,8 @@ final class DomainsGoldenTest extends TestCase {
 		$sub->set_payment_method( 'bacs' );
 		$sub->set_requires_manual_renewal( false );
 		$sub->calculate_totals();
-		$sub->update_dates( array( 'next_payment' => gmdate( 'Y-m-d H:i:s', time() + 200 * DAY_IN_SECONDS ) ) );
+		// A fixed day, like the expiry dates below: "today plus 200 days" printed another date every day and the stored pages only matched on the day they were written.
+		$sub->update_dates( array( 'next_payment' => '2027-06-04 12:00:00' ) );
 		$sub->save();
 
 		return $sub;

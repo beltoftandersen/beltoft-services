@@ -154,14 +154,15 @@ final class Mailboxes {
 	 *
 	 * @param Resource $r     Resource.
 	 * @param string   $email Mailbox address.
+	 * @param string   $typed A password the customer chose (kept the same way, never revealed); empty for a generated one.
 	 * @return true|\WP_Error
 	 */
-	public static function reserve( Resource $r, string $email ) {
+	public static function reserve( Resource $r, string $email, string $typed = '' ) {
 		$error = null;
 		$ran   = $r->locked(
-			static function () use ( $r, $email, &$error ): bool {
+			static function () use ( $r, $email, $typed, &$error ): bool {
 				try {
-					MailAccess::begin( $r, $email );
+					MailAccess::begin( $r, $email, $typed );
 				} catch ( \Throwable $e ) {
 					$error = new \WP_Error( 'unavailable', __( 'The password could not be stored. Try again later.', 'beltoft-services' ) );
 				}
@@ -224,7 +225,7 @@ final class Mailboxes {
 
 		if ( 'ready' === $state ) {
 			// An earlier run finished; its reply was lost.
-			return StepResult::done( self::said( self::created_text() ) );
+			return StepResult::done( self::said( self::created_text( ! empty( $args['own'] ) ) ) );
 		}
 
 		if ( null === $state ) {
@@ -236,7 +237,7 @@ final class Mailboxes {
 			}
 
 			if ( null !== $box ) {
-				return StepResult::done( self::said( self::created_text() ) );
+				return StepResult::done( self::said( self::created_text( ! empty( $args['own'] ) ) ) );
 			}
 
 			return StepResult::fail( 'The password was not kept.', self::said( __( 'The password could not be stored. Try again later.', 'beltoft-services' ) ) );
@@ -340,13 +341,19 @@ final class Mailboxes {
 		$seen = MailPlan::mailboxes_of( $r );
 		MailView::remember( $r, is_wp_error( $seen ) ? (int) $r->get( 'mail_boxes' ) + 1 : $seen );
 
-		return StepResult::done( self::said( self::created_text() ) );
+		return StepResult::done( self::said( self::created_text( ! empty( $args['own'] ) ) ) );
 	}
 
 	/**
 	 * The sentence of a made mailbox.
+	 *
+	 * @param bool $own Whether the customer chose the password.
 	 */
-	private static function created_text(): string {
+	private static function created_text( bool $own = false ): string {
+		if ( $own ) {
+			return __( 'The mailbox is ready. Sign in with the password you chose.', 'beltoft-services' );
+		}
+
 		return __( 'The mailbox is ready. Show the password once to set up your mail program.', 'beltoft-services' );
 	}
 
@@ -493,7 +500,7 @@ final class Mailboxes {
 		}
 
 		if ( 'ready' === MailAccess::state( $r, $email ) ) {
-			return StepResult::done( self::said( self::password_text() ) );
+			return StepResult::done( self::said( self::password_text( ! empty( $args['own'] ) ) ) );
 		}
 
 		$password = MailAccess::pending_password( $r, $email );
@@ -506,7 +513,7 @@ final class Mailboxes {
 			$result = (array) $r->get( Jobs::RESULT );
 
 			if ( ( self::PASSWORD === ( $result['action'] ?? '' ) && ! empty( $result['ok'] ) ) || ( null !== $box && ! is_wp_error( $box ) ) ) {
-				return StepResult::done( self::said( self::password_text() ) );
+				return StepResult::done( self::said( self::password_text( ! empty( $args['own'] ) ) ) );
 			}
 
 			return StepResult::fail( 'The password was not kept.', self::said( __( 'The password could not be stored. Try again later.', 'beltoft-services' ) ) );
@@ -541,13 +548,19 @@ final class Mailboxes {
 			return StepResult::retry( 30, 'The password could not be released.' );
 		}
 
-		return StepResult::done( self::said( self::password_text() ) );
+		return StepResult::done( self::said( self::password_text( ! empty( $args['own'] ) ) ) );
 	}
 
 	/**
 	 * The sentence of a new password.
+	 *
+	 * @param bool $own Whether the customer chose the password.
 	 */
-	private static function password_text(): string {
+	private static function password_text( bool $own = false ): string {
+		if ( $own ) {
+			return __( 'The new password is set. The old one no longer works.', 'beltoft-services' );
+		}
+
 		return __( 'The old password no longer works. Show the new password once.', 'beltoft-services' );
 	}
 }

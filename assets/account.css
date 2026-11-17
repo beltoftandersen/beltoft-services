@@ -811,7 +811,7 @@ div.beltoft-services-domain ul.beltoft-services-domain__import-list > li { displ
 .beltoft-services-db__form { display: grid; gap: 12px; max-width: 520px; margin: 12px 0 0; }
 .beltoft-services-db__form p { margin: 0; }
 .beltoft-services-db__form label { display: block; margin: 0 0 var(--bs-space-1); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); color: var(--navy, #0c1535); }
-.beltoft-services-db__form input[type="text"], .beltoft-services-db__form select { box-sizing: border-box; width: 100%; max-width: 100%; margin: 0; }
+.beltoft-services-db__form input[type="text"], .beltoft-services-db__form input[type="password"], .beltoft-services-db__form select { box-sizing: border-box; width: 100%; max-width: 100%; margin: 0; }
 .beltoft-services-db__form .button { justify-self: start; margin: 0; }
 
 /* Security: the API tokens box, like the two-factor box over it (880px, 24px padding, 18px heading). */
@@ -993,6 +993,10 @@ body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-vm
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__actions summary { display: inline-flex; align-items: center; box-sizing: border-box; border: 1px solid var(--bs-status-fail); box-shadow: none; color: var(--bs-status-fail); font-weight: var(--bs-fw-medium); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__actions > :is(.button, details) { display: inline-flex; vertical-align: middle; margin: 0 8px 8px 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__actions details > summary { margin: 0; }
+/* New password: a neutral button and form, not the red of Delete. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__actions details.beltoft-services-mail__newpw > summary { border-color: var(--bs-input-border); background: var(--bs-surface); color: var(--navy, #10221b); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__actions details.beltoft-services-mail__newpw > summary:hover { background: var(--bg-warm, #eeece6); border-color: var(--navy, #10221b); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__newpw .bs-confirm__body { background: var(--bg-warm, #eeece6); }
 /* In a list row the gap spaces the buttons: no margin of their own (the Delete disclosure took the 32px top margin of a page section and sat lower than the button beside it). */
 body.woocommerce-account .woocommerce-MyAccount-content .bs-item__actions.beltoft-services-mail__actions > :is(.button, details.bs-confirm) { margin: 0; }
 

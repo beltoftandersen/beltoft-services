@@ -206,9 +206,9 @@ final class OpenApi {
 				'errors'  => array( 401, 403, 409, 429 ),
 			),
 			'POST /resources/{id}/mail/mailboxes'        => array(
-				'summary' => 'Make a mailbox in an email domain. The work runs in the background (answer 202): read GET /resources/{id} until `working` is false and look at `last_result` (action mailbox_create, ok, text); GET /resources/{id}/mail lists the mailbox when it is ready. It gets a generated secret that is never in the reply: the customer shows it once in the dashboard.',
+				'summary' => 'Make a mailbox in an email domain. The work runs in the background (answer 202): read GET /resources/{id} until `working` is false and look at `last_result` (action mailbox_create, ok, text); GET /resources/{id}/mail lists the mailbox when it is ready. Without `password` it gets a generated secret that is never in the reply: the customer shows it once in the dashboard. With `password` (10 to 128 characters, at least one letter and one digit, not containing the address) the mailbox gets that password and nothing is shown afterwards; the password is never in a reply or a log.',
 				'scope'   => 'actions',
-				'body'    => array( 'local' => array( 'type' => 'string', 'description' => 'The part before the @.' ), 'name' => array( 'type' => 'string', 'description' => 'The name shown for the mailbox. Optional.' ), 'quota_mb' => array( 'type' => 'integer', 'description' => 'The size in MB, up to the size of the plan. Optional.' ) ),
+				'body'    => array( 'local' => array( 'type' => 'string', 'description' => 'The part before the @.' ), 'name' => array( 'type' => 'string', 'description' => 'The name shown for the mailbox. Optional.' ), 'quota_mb' => array( 'type' => 'integer', 'description' => 'The size in MB, up to the size of the plan. Optional.' ), 'password' => array( 'type' => 'string', 'description' => 'The password of the mailbox. Optional: without it one is generated.' ) ),
 				'required' => array( 'local' ),
 				'reply'   => array( 'queued' => $bool, 'action' => $text, 'at' => $int, 'status' => $text, 'email' => $text, 'quota_mb' => $int, 'message' => $text ),
 				'status'  => 202,

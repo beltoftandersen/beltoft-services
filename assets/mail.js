@@ -141,6 +141,40 @@
 		} ).catch( function () {} );
 	}
 
+	// A light copy of the server's password rules (MailPassword::check is the authority): the sentence that says what is wrong, or ''.
+	function passwordProblem( password, again, email ) {
+		var min = mail.passwordMin || 10;
+		var max = mail.passwordMax || 128;
+		var lower = password.toLowerCase();
+		var local = email.split( '@' )[0].toLowerCase();
+
+		if ( Array.from( password ).length < min || Array.from( password ).length > max ) {
+			return strings.pwLength.replace( '%1$d', min ).replace( '%2$d', max );
+		}
+
+		if ( /[\u0000-\u001f\u007f-\u009f]/.test( password ) ) {
+			return strings.pwControl;
+		}
+
+		if ( /^\s|\s$/.test( password ) ) {
+			return strings.pwSpace;
+		}
+
+		if ( ! /\p{L}/u.test( password ) || ! /\p{Nd}/u.test( password ) ) {
+			return strings.pwMix;
+		}
+
+		if ( email && -1 !== lower.indexOf( email.toLowerCase() ) ) {
+			return strings.pwAddress;
+		}
+
+		if ( local.length >= 4 && -1 !== lower.indexOf( local ) ) {
+			return strings.pwLocal;
+		}
+
+		return password === again ? '' : strings.pwSame;
+	}
+
 	function lines( text ) {
 		return ( text || '' ).split( /[\n,;]+/ ).map( function ( part ) {
 			return part.trim();
@@ -191,6 +225,16 @@
 
 		if ( target.hasAttribute( 'data-mail-reset' ) ) {
 			var who = target.getAttribute( 'data-mail-reset' );
+			var pwForm = target.closest( '[data-mail-newpw]' );
+			var pwField = pwForm.querySelector( '[data-mail-password]' );
+			var pwAgain = pwForm.querySelector( '[data-mail-password-again]' );
+			var pwBad = passwordProblem( pwField.value, pwAgain.value, who );
+
+			if ( pwBad ) {
+				S.fail( null, pwBad, pwField );
+
+				return;
+			}
 
 			guarded( box, target, strings.resetting, function ( h ) {
 				return window.beltoftApi.stepUp( 'mail_password', { holder: account } ).then( function ( code ) {
@@ -200,21 +244,27 @@
 						return null;
 					}
 
-					return call( box, 'POST', '/mail/mailboxes/' + encodeURIComponent( who ) + '/password', { step_code: code } ).then( function ( result ) {
+					return call( box, 'POST', '/mail/mailboxes/' + encodeURIComponent( who ) + '/password', { step_code: code, password: pwField.value, password_again: pwAgain.value } ).then( function ( result ) {
 						if ( ! result.ok ) {
-							S.fail( h, problem( result ) );
+							S.fail( h, problem( result ), pwField );
 
 							return null;
 						}
 
 						return followed( result, h ).then( function ( outcome ) {
+							pwField.value = '';
+							pwAgain.value = '';
+
 							if ( ! outcome || ! outcome.ok ) {
 								stopped( h, outcome );
 
 								return null;
 							}
 
-							return reveal( box, who, strings.reset.replace( '%s', who ), null, h, code );
+							// The customer chose the password: nothing is shown.
+							S.done( h, strings.chosenSet.replace( '%s', who ) );
+
+							return null;
 						} );
 					} );
 				} );
@@ -229,7 +279,16 @@
 			var local = localField.value.trim();
 			var name = form.querySelector( '[data-mail-name]' ).value.trim();
 			var size = form.querySelector( '[data-mail-size]' );
-			var body = { local: local, name: name };
+			var pw = form.querySelector( '[data-mail-password]' );
+			var pwAgain2 = form.querySelector( '[data-mail-password-again]' );
+			var body = { local: local, name: name, password: pw.value, password_again: pwAgain2.value };
+			var addressBad = local ? passwordProblem( pw.value, pwAgain2.value, local + '@' + ( form.getAttribute( 'data-mail-domain' ) || '' ) ) : '';
+
+			if ( addressBad ) {
+				S.fail( null, addressBad, pw );
+
+				return;
+			}
 
 			if ( size && size.value.trim() ) {
 				body.quota_mb = Math.round( parseFloat( size.value ) * 1024 );
@@ -258,7 +317,14 @@
 						}
 
 						return redraw( box ).then( function () {
-							return reveal( box, result.data.email, strings.created.replace( '%s', result.data.email ), null, h );
+							// The customer chose the password: nothing is shown. (A reply that still offers a reveal is an old flow.)
+							if ( result.data.reveal ) {
+								return reveal( box, result.data.email, strings.created.replace( '%s', result.data.email ), null, h );
+							}
+
+							S.done( h, strings.chosenNew.replace( '%s', result.data.email ) );
+
+							return null;
 						} );
 					} );
 				} );
