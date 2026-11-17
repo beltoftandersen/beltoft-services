@@ -385,7 +385,6 @@ final class HostingView {
 		$names   = array_filter( $site['domains'], static fn( $d ) => 'preview' !== $d['kind'] );
 		$waiting = array() !== array_filter( $names, static fn( $d ) => 'active' !== $d['state'] );
 		$own     = array() !== $names;
-		$busy    = ! empty( $site['task'] );
 		$domains = array();
 
 		foreach ( $site['domains'] as $d ) {
@@ -445,9 +444,10 @@ final class HostingView {
 			'name'        => HostingAccount::site_name( $site ),
 			'main'        => $main,
 			'main_show'   => \BeltoftServices\Domains\HostName::display( $main ),
-			'status_ok'   => $ready && ! $busy,
+			// What the account is doing is said in ONE place, the shared progress line; the card keeps its own state.
+			'status_ok'   => $ready,
 			'idle_text'   => $ready ? __( 'Online', 'beltoft-services' ) : __( 'Not ready', 'beltoft-services' ),
-			'status_text' => $busy ? (string) $site['task']['step_label'] : ( $ready ? __( 'Online', 'beltoft-services' ) : __( 'Not ready', 'beltoft-services' ) ),
+			'status_text' => $ready ? __( 'Online', 'beltoft-services' ) : __( 'Not ready', 'beltoft-services' ),
 			'domains'     => array(
 				'value'   => array() === $names
 					? __( 'Temporary address only', 'beltoft-services' )
