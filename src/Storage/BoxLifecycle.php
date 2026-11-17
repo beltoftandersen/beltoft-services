@@ -151,18 +151,19 @@ final class BoxLifecycle {
 		$client = StorageClients::for();
 		$lift   = $client->set_protection( $id, false );
 
-		if ( is_wp_error( $lift ) ) {
+		// A box that is already gone (deleted by hand, or the earlier answer was lost) is a finished delete.
+		if ( is_wp_error( $lift ) && ! Boxes::not_found( $lift ) ) {
 			return StepResult::retry( 900, Boxes::why( $lift ) );
 		}
 
-		$gone = $client->delete_box( $id );
+		$gone = is_wp_error( $lift ) ? true : $client->delete_box( $id );
 
-		if ( is_wp_error( $gone ) ) {
+		if ( is_wp_error( $gone ) && ! Boxes::not_found( $gone ) ) {
 			return StepResult::retry( 900, Boxes::why( $gone ) );
 		}
 
 		HostAlias::remove( $r );
 
-		return StepResult::done( array( 'storage_password' => '', 'storage_box_id' => '', 'storage_alias' => '' ), 'Storage box deleted' );
+		return StepResult::done( array( 'storage_password' => '', 'storage_box_id' => '', 'storage_alias' => '', 'storage_alias_record' => '' ), 'Storage box deleted' );
 	}
 }

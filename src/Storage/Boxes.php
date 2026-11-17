@@ -163,6 +163,17 @@ final class Boxes {
 	}
 
 	/**
+	 * Is this error "the box (or record) is not there"? For a delete that means it is done.
+	 *
+	 * @param \WP_Error $e Error.
+	 */
+	public static function not_found( \WP_Error $e ): bool {
+		$data = $e->get_error_data();
+
+		return str_ends_with( $e->get_error_code(), 'not_found' ) || str_ends_with( $e->get_error_code(), 'http_404' ) || ( is_array( $data ) && 404 === (int) ( $data['status'] ?? 0 ) );
+	}
+
+	/**
 	 * The error text for the history and the retry reason: the provider message for the admin, never a secret.
 	 *
 	 * @param \WP_Error $e Error.
