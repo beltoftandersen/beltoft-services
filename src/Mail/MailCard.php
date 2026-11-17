@@ -55,6 +55,7 @@ final class MailCard {
 					'chosenNew' => __( 'The mailbox %s is ready. Sign in with the password you chose.', 'beltoft-services' ),
 					/* translators: %s: the mailbox address. */
 					'chosenSet' => __( 'The new password of %s is set. The old one no longer works.', 'beltoft-services' ),
+					/* translators: 1: shortest length, 2: longest length. */
 					'pwLength'  => __( 'The password must be %1$d to %2$d characters long.', 'beltoft-services' ),
 					'pwControl' => __( 'The password cannot contain control characters.', 'beltoft-services' ),
 					'pwSpace'   => __( 'The password cannot start or end with a space.', 'beltoft-services' ),
