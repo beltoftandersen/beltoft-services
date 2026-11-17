@@ -489,13 +489,30 @@ final class SiteCron {
 	}
 
 	/**
-	 * What a client may read of the jobs (hosting_info): everything but the output of a run, which is never kept.
+	 * What a client may read of the jobs (the overview route, hosting_info): what each job is and when it runs, but not its arguments or the query of
+	 * its address, which may carry a key (the page of the owner shows them). The output of a run is never kept.
 	 *
 	 * @param array<string, mixed> $site Site row.
 	 * @return array<int, array<string, mixed>>
 	 */
 	public static function listing( array $site ): array {
-		return self::stored( $site );
+		$out = array();
+
+		foreach ( self::stored( $site ) as $job ) {
+			if ( isset( $job['args'] ) ) {
+				$job['args_count'] = count( (array) $job['args'] );
+				unset( $job['args'] );
+			}
+
+			if ( isset( $job['url'] ) ) {
+				$job['url_has_query'] = false !== strpos( (string) $job['url'], '?' );
+				$job['url']           = (string) preg_replace( '/\?.*$/s', '', (string) $job['url'] );
+			}
+
+			$out[] = $job;
+		}
+
+		return $out;
 	}
 
 	// The page.
@@ -503,19 +520,20 @@ final class SiteCron {
 	/**
 	 * What the page shows of a website's scheduled jobs.
 	 *
-	 * @param array<string, mixed> $site   Site row of HostingActions::sites() (slug, wordpress, domains, preview, php).
+	 * @param array<string, mixed> $site   Site of HostingActions::sites() (slug, wordpress, php, cron_state).
+	 * @param array<int, array<string, mixed>> $stored The stored jobs in full (the page is the owner's: arguments and the query of an address are shown).
 	 * @param bool                 $ready  Whether the account takes changes.
 	 * @param array<string, mixed> $limits The plan's ceilings (cron_jobs, php_versions).
 	 * @param string[]             $names  The names the website serves itself.
 	 * @param int                  $until  Meta `cron_unsupported` (when an agent without the operations was met), 0 when never.
 	 * @return array<string, mixed>
 	 */
-	public static function view( array $site, bool $ready, array $limits, array $names, int $until = 0 ): array {
+	public static function view( array $site, array $stored, bool $ready, array $limits, array $names, int $until = 0 ): array {
 		$jobs  = array();
 		$has   = ! array_key_exists( 'wordpress', $site ) || ! empty( $site['wordpress'] );
 		$state = (array) ( $site['cron_state'] ?? array() );
 
-		foreach ( (array) ( $site['cron'] ?? array() ) as $job ) {
+		foreach ( $stored as $job ) {
 			$jobs[] = self::row( $job, $names );
 		}
 

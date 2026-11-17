@@ -769,6 +769,15 @@ class CronTest extends HostingCase {
 		$this->assertCount( 1, $data['sites'][0]['cron'] );
 		$this->assertSame( 'cron/run.php', $data['sites'][0]['cron'][0]['path'] );
 		$this->assertStringNotContainsString( 'tail', (string) wp_json_encode( $data['sites'][0]['cron'] ) );
+		$this->assertSame( 1, $data['sites'][0]['cron'][0]['args_count'] );
+		$this->assertArrayNotHasKey( 'args', $data['sites'][0]['cron'][0], 'An argument can carry a key.' );
+
+		$key = 'key-in-an-address-5d41402a';
+		$this->change( $r, 'set_cron', array( array( array( 'label' => '', 'enabled' => true, 'schedule' => '0 3 * * *', 'kind' => 'url', 'url' => 'https://' . \BeltoftServices\Hosting\EdgeMap::preview_host( $slug ) . '/cron?token=' . $key ), $this->script( array( 'args' => array( '--token=' . $key ) ) ) ), $slug ) );
+		$data = $this->call( 'GET', $r->id() . '/hosting', $user )->get_data();
+		$this->assertStringNotContainsString( $key, (string) wp_json_encode( $data ), 'The overview, and so hosting_info, shows no key.' );
+		$this->assertTrue( $data['sites'][0]['cron'][0]['url_has_query'] );
+		$this->assertStringContainsString( $key, $this->panel( $r ), 'The owner sees it on the page.' );
 
 		foreach ( array( 'PUT /resources/1/hosting/sites/x/cron', 'POST /resources/1/hosting/sites/x/cron', 'DELETE /resources/1/hosting/sites/x/cron' ) as $route ) {
 			foreach ( ActionMap::ROUTES as $tool => $patterns ) {
