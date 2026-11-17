@@ -151,7 +151,7 @@
 				// The name typed in the danger block of the website (the server checks it too).
 				return [ 'DELETE', base + '/sites/' + encodeURIComponent( slug ) + '?confirm=' + encodeURIComponent( field( scope, 'remove_confirm' ) ), undefined ];
 			case 'add_site':
-				return [ 'POST', base + '/sites', { slug: '', label: field( scope, 'label' ), php: field( scope, 'php' ) } ];
+				return [ 'POST', base + '/sites', { slug: '', label: field( scope, 'label' ), php: field( scope, 'php' ), install: 'empty' !== field( scope, 'install' ) } ];
 			case 'add_domain':
 				return '' === field( scope, 'host' ) ? null : [ 'POST', base + '/sites/' + encodeURIComponent( slug ) + '/domains', { host: field( scope, 'host' ) } ];
 			case 'add_pack':

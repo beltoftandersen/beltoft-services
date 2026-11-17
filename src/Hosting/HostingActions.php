@@ -432,6 +432,16 @@ final class HostingActions {
 	}
 
 	/**
+	 * Whether the node finds WordPress in the website's folder (read only).
+	 *
+	 * @param string $slug Site.
+	 * @return array{wordpress: bool}|\WP_Error
+	 */
+	public function site_facts( string $slug ) {
+		return $this->php->site_facts( $slug );
+	}
+
+	/**
 	 * A one-time sign-in address for the site's WordPress.
 	 *
 	 * @param string $slug Site.

@@ -90,11 +90,19 @@ final class DomainSweep {
 			$changed[ $row['host'] ] = 'active';
 		}
 
+		$reads = SiteFacts::PER_SWEEP;
+
 		foreach ( Resource::live_ids( HostingDriver::KIND ) as $resource_id ) {
 			$r = Resource::find( (int) $resource_id );
 
 			if ( ! $r || HostingDriver::ID !== $r->get( 'driver' ) || 'ready' !== $r->get( 'state' ) || 'ready' !== $r->get( 'desired' ) ) {
 				continue;
+			}
+
+			// Whether each website has WordPress, read again from the node about once an hour (a few accounts a round).
+			if ( $reads > 0 && SiteFacts::due( $r ) ) {
+				SiteFacts::refresh( $r );
+				--$reads;
 			}
 
 			// Paid domains a change under way held up (to add, or to take off) are made now.

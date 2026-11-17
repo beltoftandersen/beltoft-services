@@ -180,7 +180,6 @@ class CheckoutTest extends HostingCase {
 			'preview zone' => array( array( 'slug' => 'a', 'mode' => 'own', 'host' => 'x.preview.example.test' ), 'site_host' ),
 			'ours no zone' => array( array( 'slug' => 'a', 'mode' => 'ours', 'host' => 'www.nowhere.example' ), 'site_zone' ),
 			'install'     => array( array( 'slug' => 'a', 'install' => 'drupal' ), 'site_install' ),
-			'empty site'  => array( array( 'slug' => 'a', 'install' => 'empty' ), 'site_install' ),
 			'reserved'    => array( array( 'slug' => 'www' ), 'site_slug' ),
 			'language'    => array( array( 'slug' => 'a', 'language' => 'english' ), 'site_language' ),
 			'language unlisted' => array( array( 'slug' => 'a', 'language' => 'xx_XX' ), 'site_language' ),
@@ -543,17 +542,18 @@ class CheckoutTest extends HostingCase {
 		$this->assertFalse( $meta['site']['install'] );
 		$this->assertSame( 'empty', $meta['site']['install_kind'] );
 		$this->assertContains( 'empty', SiteField::INSTALLS );
-		$this->assertNotContains( 'empty', SiteField::OFFERED );
+		$this->assertContains( 'empty', SiteField::OFFERED, 'An empty website is offered now.' );
 	}
 
-	public function test_the_form_has_a_language_list_without_the_empty_site_and_explains_the_domain_step(): void {
+	public function test_the_form_has_a_language_list_offers_the_empty_website_and_explains_the_domain_step(): void {
 		$this->in_cart( $this->product() );
 		ob_start();
 		SiteField::render();
 		$html = (string) ob_get_clean();
 
-		$this->assertStringNotContainsString( 'Empty site', $html );
-		$this->assertStringNotContainsString( 'value="empty"', $html );
+		$this->assertStringContainsString( '<option value="empty"', $html );
+		$this->assertStringContainsString( 'No WordPress, an empty website', $html );
+		$this->assertStringContainsString( 'data-site-admin-email', $html, 'The admin email row can be hidden for an empty website.' );
 		$this->assertStringContainsString( '<select name="beltoft_services_site[' . array_key_first( WC()->cart->get_cart() ) . '][language]"', $html );
 		$this->assertStringContainsString( '<option value="en_US" selected', $html );
 		$this->assertStringContainsString( '>Dansk</option>', $html );

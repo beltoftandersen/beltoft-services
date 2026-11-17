@@ -13,6 +13,7 @@ use BeltoftServices\Hosting\HostingActions;
 use BeltoftServices\Hosting\HostingBackups;
 use BeltoftServices\Hosting\HostingDriver;
 use BeltoftServices\Hosting\HostingRestore;
+use BeltoftServices\Hosting\SiteFacts;
 use BeltoftServices\Hosting\SiteStaging;
 use BeltoftServices\Hosting\SiteWordPress;
 use BeltoftServices\Hosting\Sites;
@@ -150,6 +151,11 @@ final class Steps {
 			SiteWordPress::consider_all( $r );
 
 			return;
+		}
+
+		// A restore or a push put other files on the websites: whether they have WordPress is read again.
+		if ( in_array( $action, array( 'restore_backup', 'restore_undo', 'staging_push', 'staging_undo' ), true ) ) {
+			SiteFacts::ask( $r );
 		}
 
 		if ( in_array( $action, array( 'restore_backup', 'restore_undo' ), true ) ) {

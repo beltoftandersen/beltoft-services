@@ -563,7 +563,7 @@ final class Provision {
 	}
 
 	/**
-	 * Step site: the first website and, unless the order said otherwise, a WordPress install.
+	 * Step site: the first website and, unless the order chose an empty website, a WordPress install.
 	 *
 	 * @return array<string, mixed>|StepResult
 	 */
@@ -574,7 +574,7 @@ final class Provision {
 			return $spec;
 		}
 
-		if ( ! Sites::add( $this->r->id(), $spec['slug'], $spec['label'], $spec['php'], Plan::workers_per_site( $this->plan, 1 ) ) ) {
+		if ( ! Sites::add( $this->r->id(), $spec['slug'], $spec['label'], $spec['php'], Plan::workers_per_site( $this->plan, 1 ), array( 'wp' => (bool) $spec['install'] ) ) ) {
 			return StepResult::fail( 'site: the site "' . $spec['slug'] . '" could not be recorded (is the name taken?)' );
 		}
 
@@ -775,7 +775,11 @@ final class Provision {
 			return $result;
 		}
 
-		return 200 === (int) ( $result['status'] ?? 0 ) ? array() : StepResult::retry( 0, 'verify: the site answered ' . (int) ( $result['status'] ?? 0 ) );
+		$status = (int) ( $result['status'] ?? 0 );
+
+		// A website with no WordPress answers 403 until its owner uploads a first page (an agent without the placeholder page has an empty
+		// folder): the website is made and works, so that is accepted.
+		return 200 === $status || ( 403 === $status && ! $spec['install'] ) ? array() : StepResult::retry( 0, 'verify: the site answered ' . $status );
 	}
 
 	/**

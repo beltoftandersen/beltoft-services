@@ -42,8 +42,8 @@ final class SiteField {
 	/** Every value an account can carry (an earlier order may hold `empty`). */
 	public const INSTALLS = array( 'wordpress', 'woocommerce', 'empty' );
 
-	/** What the checkout offers and accepts for a new order. */
-	public const OFFERED = array( 'wordpress', 'woocommerce' );
+	/** What the checkout offers and accepts for a new order: WordPress, WordPress with WooCommerce, or an empty website. */
+	public const OFFERED = array( 'wordpress', 'woocommerce', 'empty' );
 
 	public const HANDLE = 'beltoft-services-site-field';
 
@@ -193,7 +193,7 @@ final class SiteField {
 		$install = '' === (string) ( $input['install'] ?? '' ) ? 'wordpress' : (string) $input['install'];
 
 		if ( ! in_array( $install, self::OFFERED, true ) ) {
-			return new \WP_Error( 'site_install', __( 'Choose WordPress or WordPress with WooCommerce.', 'beltoft-services' ) );
+			return new \WP_Error( 'site_install', __( 'Choose what to install.', 'beltoft-services' ) );
 		}
 
 		$language = (string) ( $input['language'] ?? '' );
@@ -502,9 +502,9 @@ final class SiteField {
 		echo '</fieldset>';
 
 		// What to install and in which language.
-		echo '<p class="form-row form-row-wide"><label for="' . esc_attr( $id ) . '_install">' . esc_html__( 'Install', 'beltoft-services' ) . '</label><span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[install]" id="' . esc_attr( $id ) . '_install">';
+		echo '<p class="form-row form-row-wide"><label for="' . esc_attr( $id ) . '_install">' . esc_html__( 'Install', 'beltoft-services' ) . '</label><span class="woocommerce-input-wrapper"><select name="' . esc_attr( $name ) . '[install]" id="' . esc_attr( $id ) . '_install" data-site-install>';
 
-		foreach ( array( 'wordpress' => __( 'WordPress', 'beltoft-services' ), 'woocommerce' => __( 'WordPress with WooCommerce', 'beltoft-services' ) ) as $value => $text ) {
+		foreach ( array( 'wordpress' => __( 'WordPress', 'beltoft-services' ), 'woocommerce' => __( 'WordPress with WooCommerce', 'beltoft-services' ), 'empty' => __( 'No WordPress, an empty website', 'beltoft-services' ) ) as $value => $text ) {
 			echo '<option value="' . esc_attr( $value ) . '"' . selected( $pick, $value, false ) . '>' . esc_html( $text ) . '</option>';
 		}
 
@@ -530,8 +530,10 @@ final class SiteField {
 		$open = '' !== $post['email'] || '' !== $post['label'] || '' !== $post['slug_domain'];
 
 		echo '<details class="beltoft-services-site-field__more"' . ( $open ? ' open' : '' ) . '><summary>' . esc_html__( 'More options', 'beltoft-services' ) . '</summary>';
-		self::text_row( $name . '[label]', $id . '_label', __( 'Website title', 'beltoft-services' ), $post['label'], false, __( 'Shown in the browser tab. Empty uses the domain or the website name. You can change it in WordPress.', 'beltoft-services' ), 'text', 100 );
+		self::text_row( $name . '[label]', $id . '_label', __( 'Website title', 'beltoft-services' ), $post['label'], false, __( 'Shown in the browser tab. Empty uses the domain or the website name.', 'beltoft-services' ), 'text', 100 );
+		echo '<div data-site-admin-email' . ( 'empty' === $pick ? ' hidden' : '' ) . '>';
 		self::text_row( $name . '[email]', $id . '_email', __( 'WordPress admin email', 'beltoft-services' ), $post['email'], false, __( 'Empty uses your billing email.', 'beltoft-services' ), 'email' );
+		echo '</div>';
 		echo '<div data-site-more-slug' . ( self::MODE_PREVIEW === $mode ? ' hidden' : '' ) . '>';
 		self::text_row( $name . '[slug_domain]', $id . '_slug_domain', __( 'Temporary address name', 'beltoft-services' ), $post['slug_domain'], false, __( 'Made from your domain, for example example-com. Your website is reachable at this address until your domain points to us.', 'beltoft-services' ), 'text', 32 );
 		echo '</div>';

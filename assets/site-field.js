@@ -15,6 +15,14 @@
 			panel.hidden = panel.getAttribute( 'data-site-panel' ) !== mode;
 		} );
 
+		// An empty website has no WordPress administrator: the email row goes.
+		var install = root.querySelector( '[data-site-install]' );
+		var admin = root.querySelector( '[data-site-admin-email]' );
+
+		if ( install && admin ) {
+			admin.hidden = 'empty' === install.value;
+		}
+
 		var more = root.querySelector( '[data-site-more-slug]' );
 
 		if ( more ) {
@@ -23,7 +31,7 @@
 	}
 
 	document.addEventListener( 'change', function ( event ) {
-		if ( event.target.matches && event.target.matches( '.beltoft-services-site-field input[type="radio"]' ) ) {
+		if ( event.target.matches && event.target.matches( '.beltoft-services-site-field input[type="radio"], .beltoft-services-site-field [data-site-install]' ) ) {
 			show( line( event.target ) );
 		}
 	} );

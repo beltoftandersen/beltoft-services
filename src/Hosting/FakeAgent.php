@@ -646,6 +646,17 @@ class FakeAgent implements Agent {
 	}
 
 	/**
+	 * Sets what site.verify answers for every site (an empty folder answers 403 on a node whose agent has no placeholder page).
+	 *
+	 * @param int $status HTTP status.
+	 */
+	public function set_verify_status( int $status ): void {
+		$this->load();
+		$this->state['verify_status'] = $status;
+		$this->save();
+	}
+
+	/**
 	 * Scripts what site.cron_status says about the last run of a scheduled job.
 	 *
 	 * @param int                  $vmid Container id.
@@ -1219,7 +1230,7 @@ class FakeAgent implements Agent {
 
 				if ( 'site.verify' === $op ) {
 					return array(
-						'status' => 200,
+						'status' => (int) ( $this->state['verify_status'] ?? 200 ),
 						'host'   => $args['host'],
 					);
 				}

@@ -334,6 +334,11 @@ final class HostingAccount {
 			$monitoring = HostingView::monitoring( $r, $ready );
 			$out       .= null === $monitoring ? '' : HostingView::capture( 'monitoring', $monitoring );
 		} elseif ( 'websites' === $tab ) {
+			// Whether each website has WordPress: read again in the background when the last reading is a day old.
+			if ( $ready && SiteFacts::due( $r, SiteFacts::TAB_AFTER ) ) {
+				SiteFacts::ask( $r );
+			}
+
 			$pending = array_values( array_filter( $all, static fn( $s ) => ! empty( $s['pending'] ) ) );
 			$ending  = Addons::ending_domains( $r );
 			$node    = (array) ( Nodes::get( (string) ( Records::for_resource( $r->id() )['node'] ?? '' ) ) ?? array() );

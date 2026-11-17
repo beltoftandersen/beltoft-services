@@ -46,6 +46,19 @@ final class Sites {
 	}
 
 	/**
+	 * Does the website have WordPress? The site flag `wp` is the last answer: set when the website was made (what the order or
+	 * the customer chose) and read again from the node (SiteFacts). A website with no flag (made before the flag existed) is
+	 * taken to have WordPress, so its page stays as it was until the first reading.
+	 *
+	 * @param array<string, mixed> $site Site row.
+	 */
+	public static function has_wordpress( array $site ): bool {
+		$flags = (array) ( $site['flags'] ?? array() );
+
+		return ! array_key_exists( 'wp', $flags ) || ! empty( $flags['wp'] );
+	}
+
+	/**
 	 * Adds a site; an existing site of the same resource and slug is kept as it is.
 	 *
 	 * @param int                  $resource_id Activation id.

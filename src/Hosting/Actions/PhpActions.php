@@ -267,6 +267,23 @@ final class PhpActions {
 	}
 
 	/**
+	 * What the node knows about the website's folder: whether WordPress is in it. Read only. A node whose agent does not know the
+	 * operation answers with a refusal, and what was stored stays.
+	 *
+	 * @param string $slug Site.
+	 * @return array{wordpress: bool}|\WP_Error
+	 */
+	public function site_facts( string $slug ) {
+		$out = $this->site_job( $slug, 'site.facts', 'facts', null );
+
+		if ( is_wp_error( $out ) ) {
+			return $out;
+		}
+
+		return isset( $out['wordpress'] ) && is_bool( $out['wordpress'] ) ? array( 'wordpress' => $out['wordpress'] ) : $this->error( 'failed', __( 'That did not work. Try again in a moment, or contact support if it keeps happening.', 'beltoft-services' ) );
+	}
+
+	/**
 	 * A one-time sign-in address for the site's WordPress.
 	 *
 	 * @param string $slug Site.

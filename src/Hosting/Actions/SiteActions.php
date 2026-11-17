@@ -201,7 +201,7 @@ final class SiteActions {
 		$workers = $resuming ? (int) $found['workers'] : max( 2, Plan::workers_per_site( $this->plan, count( $existing ) + 1 ) );
 		$deficit = $this->workers_used() + ( $resuming ? 0 : $workers ) - (int) $this->plan['php_workers'];
 
-		if ( ! $resuming && ! Sites::add( $this->r->id(), $slug, sanitize_text_field( $label ), $php, $workers, array( 'pending' => true ) ) ) {
+		if ( ! $resuming && ! Sites::add( $this->r->id(), $slug, sanitize_text_field( $label ), $php, $workers, array( 'pending' => true, 'wp' => $install ) ) ) {
 			return $this->error( 'exists', __( 'That site name is taken. Choose another.', 'beltoft-services' ) );
 		}
 

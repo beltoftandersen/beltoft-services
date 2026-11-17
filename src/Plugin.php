@@ -113,6 +113,7 @@ final class Plugin {
 		Hosting\NodeHealth::register();
 		Hosting\HostingRefresh::register();
 		Hosting\DomainSweep::register();
+		Hosting\SiteFacts::register();
 		Hosting\Actions\Steps::register();
 		Hosting\MalwareScan::register();
 		Hosting\RestoreTest::register();
