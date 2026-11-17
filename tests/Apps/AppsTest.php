@@ -201,8 +201,8 @@ final class AppsTest extends TestCase {
 	}
 
 	public function test_the_n8n_logo_is_inline_safe(): void {
-		$svg = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'apps/n8n/logo.svg' );
-		$this->assertLessThan( 8192, strlen( $svg ) );
+		$svg = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/logos/n8n.svg' );
+		$this->assertLessThan( 12288, strlen( $svg ) );
 		$this->assertDoesNotMatchRegularExpression( '/<(script|foreignObject|iframe|image|use|a)\b|\son[a-z]+\s*=|href\s*=/i', preg_replace( '/<!--.*?-->/s', '', $svg ) );
 	}
 }

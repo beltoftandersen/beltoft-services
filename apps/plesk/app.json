@@ -1,7 +1,7 @@
 {
   "id": "plesk",
   "name": "Plesk",
-  "logo": "logo.svg",
+  "logo": "plesk",
   "summary": "Plesk Obsidian web hosting control panel, installed and licensed. Choose a Plesk edition when you order.",
   "getting_started": "Open https://your-server-address:8443 and sign in as admin with the password shown once. The login is also stored on the server in /root/.beltoft-app/credentials.json. Your browser warns about the certificate at first, because Plesk starts with a certificate of its own; secure the panel with a Let's Encrypt certificate for a host name in Tools and Settings. The Plesk licence matches the edition you chose and is tied to the address of this server. It ends when you cancel the Plesk subscription or delete the server, and you can switch edition on this page. Plesk keeps itself up to date. The firewall opens ports 22, 80, 443 and 8443; open more in the firewall tab if you need them. Outgoing mail on port 25 is blocked on all servers; use an SMTP service on port 587 or 465.",
   "needs_email": true,

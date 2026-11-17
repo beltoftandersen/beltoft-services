@@ -16,8 +16,8 @@ defined( 'ABSPATH' ) || exit;
  * Every tile is a real radio input (visually hidden, still focusable), so the keyboard, screen readers, the form post and
  * the server-side validation work as they did with a select. The script (assets/tiles.js) only adds what a select could
  * not do: an app switches the operating system to the one it runs on and greys out the others, and a version select
- * appears for an app with more than one version. Logos are local SVG files of this plugin: assets/os/<slug>.svg for a
- * system, assets/db/<engine id>.svg for a database engine, the file named by "logo" in an app's app.json for an app, assets/os/generic.svg for anything else.
+ * appears for an app with more than one version. Logos are local SVG files of this plugin: assets/logos/<slug>.svg for all of
+ * them (the one place of logo files): the slug of a system, of a database engine (its id) and of an app ("logo" in its app.json), generic for anything else.
  */
 final class Tiles {
 
@@ -65,7 +65,7 @@ final class Tiles {
 
 	/**
 	 * Reads one of the plugin's own SVG files for inline use (brand colours are written in the files; the generic glyph
-	 * follows the text). Nothing else is accepted: a file under assets/os, assets/db or an app's folder, small, with no script, event handler, link or embedded object.
+	 * follows the text). Nothing else is accepted: a file under assets/logos, small, with no script, event handler, link or embedded object.
 	 *
 	 * @param string $file Absolute path.
 	 */
@@ -80,7 +80,7 @@ final class Tiles {
 		$root           = wp_normalize_path( BELTOFT_SERVICES_PATH );
 		$real           = is_readable( $file ) ? realpath( $file ) : false;
 
-		if ( false === $real || ! str_starts_with( wp_normalize_path( $real ), $root ) || filesize( $real ) > 12288 ) {
+		if ( false === $real || ! str_starts_with( wp_normalize_path( $real ), $root . 'assets/logos/' ) || filesize( $real ) > 12288 ) {
 			return '';
 		}
 
@@ -99,7 +99,35 @@ final class Tiles {
 	}
 
 	/**
-	 * The logo of an operating system: by family and label, a filter may name another logo (a file name without .svg in assets/os).
+	 * The inline markup of the logo with this slug (assets/logos/<slug>.svg), the generic glyph when the slug is empty,
+	 * not a plain slug or has no file.
+	 *
+	 * @param string $slug Slug, such as ubuntu, odoo or postgres.
+	 * @return string SVG markup (the plugin's own file).
+	 */
+	private static function logo( string $slug ): string {
+		$svg = 1 === preg_match( '/^[a-z0-9-]+$/D', $slug ) ? self::svg( BELTOFT_SERVICES_PATH . 'assets/logos/' . $slug . '.svg' ) : '';
+
+		return '' !== $svg ? $svg : self::svg( BELTOFT_SERVICES_PATH . 'assets/logos/generic.svg' );
+	}
+
+	/**
+	 * The URL of a logo file by slug, so a page can show the same file as an image: empty for an unknown slug. Every file
+	 * has explicit fills, a viewBox and xmlns, so it also works as an img (the generic glyph is the one exception: it takes the text colour).
+	 *
+	 * @param string $slug Slug, such as ubuntu, odoo or postgres.
+	 * @return string URL, or empty.
+	 */
+	public static function logo_url( string $slug ): string {
+		if ( 1 !== preg_match( '/^[a-z0-9-]+$/D', $slug ) || ! is_readable( BELTOFT_SERVICES_PATH . 'assets/logos/' . $slug . '.svg' ) ) {
+			return '';
+		}
+
+		return plugins_url( 'assets/logos/' . $slug . '.svg', BELTOFT_SERVICES_FILE );
+	}
+
+	/**
+	 * The logo of an operating system: by family and label, a filter may name another logo (a slug in assets/logos).
 	 *
 	 * @param int    $vmid   Template VMID.
 	 * @param string $label  Label of the template.
@@ -120,34 +148,29 @@ final class Tiles {
 		/**
 		 * The logo of an operating system tile.
 		 *
-		 * @param string $slug   File name (without .svg) in assets/os; empty for the generic icon.
+		 * @param string $slug   Slug in assets/logos; empty for the generic icon.
 		 * @param int    $vmid   Template VMID.
 		 * @param string $label  Label of the template.
 		 * @param string $family Family, or empty.
 		 */
 		$slug = apply_filters( 'beltoft_services_os_logo', $slug, $vmid, $label, $family );
 		$slug = is_string( $slug ) && 1 === preg_match( '/^[a-z0-9-]+$/D', $slug ) ? $slug : '';
-		$svg  = '' === $slug ? '' : self::svg( BELTOFT_SERVICES_PATH . 'assets/os/' . $slug . '.svg' );
 
-		return '' !== $svg ? $svg : self::svg( BELTOFT_SERVICES_PATH . 'assets/os/generic.svg' );
+		return self::logo( $slug );
 	}
 
 	/**
-	 * The logo of an app, from the "logo" file name in its app.json (in the app's own folder).
+	 * The logo of an app: the slug in the "logo" field of its app.json (a file of assets/logos).
 	 *
 	 * @param array<string, mixed> $app Definition.
 	 * @return string SVG markup.
 	 */
 	public static function app_logo( array $app ): string {
-		$id   = (string) ( $app['id'] ?? '' );
-		$name = (string) ( $app['logo'] ?? '' );
-		$svg  = 1 === preg_match( '/^[a-z0-9-]+$/D', $id ) && 1 === preg_match( '/^[a-zA-Z0-9._-]+\.svg$/D', $name ) ? self::svg( BELTOFT_SERVICES_PATH . 'apps/' . $id . '/' . $name ) : '';
-
-		return '' !== $svg ? $svg : self::svg( BELTOFT_SERVICES_PATH . 'assets/os/generic.svg' );
+		return self::logo( (string) ( $app['logo'] ?? '' ) );
 	}
 
 	/**
-	 * The logo of a database engine (assets/db/<id>.svg), the generic glyph for an engine without one.
+	 * The logo of a database engine (assets/logos/<id>.svg), the generic glyph for an engine without one.
 	 *
 	 * @param string $id Engine id, such as postgres, valkey or mssql.
 	 * @return string SVG markup (the plugin's own file).
@@ -158,14 +181,13 @@ final class Tiles {
 		/**
 		 * The logo of a database engine tile.
 		 *
-		 * @param string $slug File name (without .svg) in assets/db; empty for the generic icon.
+		 * @param string $slug Slug in assets/logos; empty for the generic icon.
 		 * @param string $id   Engine id.
 		 */
 		$slug = apply_filters( 'beltoft_services_engine_logo', $slug, $id );
 		$slug = is_string( $slug ) && 1 === preg_match( '/^[a-z0-9-]+$/D', $slug ) ? $slug : '';
-		$svg  = '' === $slug ? '' : self::svg( BELTOFT_SERVICES_PATH . 'assets/db/' . $slug . '.svg' );
 
-		return '' !== $svg ? $svg : self::svg( BELTOFT_SERVICES_PATH . 'assets/os/generic.svg' );
+		return self::logo( $slug );
 	}
 
 	// -- The operating system tiles ------------------------------------------------------------------
