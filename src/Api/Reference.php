@@ -214,6 +214,7 @@ final class Reference {
 			'dns'       => array( __( 'DNS', 'beltoft-services' ), __( 'Read and change the records of the domains and DNS services we host.', 'beltoft-services' ) ),
 			'email'     => array( __( 'Email', 'beltoft-services' ), __( 'Read an email domain, make mailboxes and aliases, and check its DNS records. Deleting a mailbox and everything to do with its secret are only possible in the dashboard, or through Claude with Full access.', 'beltoft-services' ) ),
 			'ssl'       => array( __( 'SSL certificates', 'beltoft-services' ), __( 'Fetch the current certificate and its chain, for a script that installs each new certificate. The private key is only available in the dashboard, once.', 'beltoft-services' ) ),
+			'storage'   => array( __( 'Backup storage', 'beltoft-services' ), __( 'The connection details, usage and snapshots of a backup storage. Showing or changing the password and restoring a snapshot need the code we email to the account address, so they are only possible in the dashboard.', 'beltoft-services' ) ),
 			'domains'   => array( __( 'Domains', 'beltoft-services' ), __( 'Check whether a domain name is available.', 'beltoft-services' ) ),
 			'usage'     => array( __( 'Usage', 'beltoft-services' ), __( 'Current use of CPU, memory and disk, and usage alerts.', 'beltoft-services' ) ),
 			'reference' => array( __( 'API document', 'beltoft-services' ), __( 'The machine readable description of this API.', 'beltoft-services' ) ),
@@ -238,6 +239,10 @@ final class Reference {
 				'usage-alerts' => 'usage',
 				'mail'         => 'email',
 				'ssl-certificate' => 'ssl',
+				'storage'         => 'storage',
+				'storage-password' => 'storage',
+				'storage-password-reset' => 'storage',
+				'storage-rollback' => 'storage',
 			);
 
 			return $sub[ (string) ( $segs[2] ?? '' ) ] ?? 'services';

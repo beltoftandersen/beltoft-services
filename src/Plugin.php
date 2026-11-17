@@ -90,6 +90,10 @@ final class Plugin {
 		Ssl\SslRenewals::register();
 		Ssl\SslRoutes::register();
 		Ssl\SslJobs::register();
+		Storage\StorageSettings::register();
+		Storage\StorageSwitch::register();
+		Storage\StorageRoutes::register();
+		Storage\StoragePanel::register();
 		Licences\KeyCatalog::register();
 		Licences\KeyOrder::register();
 		Licences\KeyField::register();
@@ -129,6 +133,7 @@ final class Plugin {
 		add_filter( 'woocommerce_account_menu_items', array( Account\Email::class, 'menu' ), 100 );
 		add_filter( 'woocommerce_account_menu_items', array( Account\Ssl::class, 'menu' ), 101 );
 		add_filter( 'woocommerce_account_menu_items', array( Account\Licences::class, 'menu' ), 102 );
+		add_filter( 'woocommerce_account_menu_items', array( Account\Storage::class, 'menu' ), 103 );
 		Domains\Search::register();
 		Bricks\Integration::register();
 		Domains\Cart::register();

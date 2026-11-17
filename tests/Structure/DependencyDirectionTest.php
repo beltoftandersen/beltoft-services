@@ -20,7 +20,7 @@ use PHPUnit\Framework\TestCase;
  */
 class DependencyDirectionTest extends TestCase {
 
-	private const FEATURES = array( 'Proxmox', 'Domains', 'Mail', 'Mcp', 'Account', 'Usage', 'Http', 'Oauth', 'Api', 'Bricks', 'Hosting', 'Ssl', 'Licences', 'GiftCredit', 'Card', 'Admin', 'Cli', 'Apps' );
+	private const FEATURES = array( 'Proxmox', 'Domains', 'Mail', 'Mcp', 'Account', 'Usage', 'Http', 'Oauth', 'Api', 'Bricks', 'Hosting', 'Ssl', 'Licences', 'GiftCredit', 'Card', 'Admin', 'Cli', 'Apps', 'Storage' );
 
 	/**
 	 * Folders that belong to the core layer as sources (they may not import a feature). As targets they stay what they are.

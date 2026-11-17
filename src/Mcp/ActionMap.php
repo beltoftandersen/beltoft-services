@@ -65,6 +65,10 @@ final class ActionMap {
 		'ssl_reissue'       => 'never: a reissue replaces the key and the certificate that works; it is done in the dashboard, where the key is taken once',
 		'ssl_change_validation' => 'never: the validation method, approver and request are chosen on the certificate page, in the dashboard',
 		'backup_delete'     => 'never: a backup is the last copy after a mistake or an attack; deleting one is only done in the dashboard',
+		'storage_snapshot'  => 'never: backup storage is changed in the dashboard only in this version (no tool, no API token)',
+		'storage_snapshot_delete' => 'never: a snapshot can be the last copy after a mistake or an attack; deleting one is only done in the dashboard',
+		'storage_snapshot_plan' => 'never: backup storage is changed in the dashboard only in this version (no tool, no API token)',
+		'storage_access'    => 'never: switching access of backup storage is only done in the dashboard',
 		'ssl_cancel'        => 'never: cancelling is irreversible and ends in a refund a person decides; it is only done in the dashboard',
 	);
 

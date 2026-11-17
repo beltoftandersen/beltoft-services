@@ -229,6 +229,7 @@ final class Slugs {
 			'email'     => 'email',
 			'ssl'       => 'certificate',
 			'licences'  => 'licence',
+			'storage'   => 'storage',
 		);
 
 		return $words[ $type ] ?? 'service';
