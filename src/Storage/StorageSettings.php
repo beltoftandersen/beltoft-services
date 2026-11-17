@@ -226,7 +226,7 @@ final class StorageSettings {
 	 * @return mixed
 	 */
 	public static function bad_lines( $bad, $key = '', $text = '' ) {
-		if ( ! is_array( $bad ) || ! 'storage_cost_table' === $key ) {
+		if ( ! is_array( $bad ) || 'storage_cost_table' !== $key ) {
 			return $bad;
 		}
 

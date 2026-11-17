@@ -1086,5 +1086,158 @@
         "default": "",
         "label": "Plesk licence costs",
         "desc": "One tier key and what Openprovider charges per month in EUR excluding VAT, for example pro=12.50. A licence is only ordered when the paid line of the tier covers this. Empty means unknown, and the live client refuses to order."
+    },
+    "storage_enabled": {
+        "tab": "storage",
+        "section": "storage",
+        "type": "checkbox",
+        "default": 0,
+        "label": "Sell backup storage",
+        "desc": "Off: nothing is created at the storage provider."
+    },
+    "storage_client": {
+        "tab": "storage",
+        "section": "storage",
+        "type": "select",
+        "default": "fake",
+        "options": {
+            "fake": "Fake: nothing real is created",
+            "live": "Live: boxes are bought at the provider"
+        },
+        "label": "Storage provider connection",
+        "desc": "Live needs this setting, the token below AND the constant BELTOFT_SERVICES_STORAGE_LIVE set to true in wp-config.php. Every box created live costs real money."
+    },
+    "storage_api_url": {
+        "tab": "storage",
+        "section": "storage",
+        "type": "url",
+        "default": "https://api.hetzner.com/v1",
+        "label": "Storage provider API address",
+        "desc": "https only."
+    },
+    "storage_api_token": {
+        "tab": "storage",
+        "section": "storage",
+        "type": "secret",
+        "default": "",
+        "label": "Storage provider API token",
+        "desc": "Use a token of a project that holds only storage boxes. It is stored encrypted and never shown again."
+    },
+    "storage_default_location": {
+        "tab": "storage",
+        "section": "storage",
+        "type": "text",
+        "default": "fsn1",
+        "label": "Location code",
+        "desc": "The one location boxes are made in (the provider code of the German location). There is no choice at checkout."
+    },
+    "storage_country": {
+        "tab": "storage",
+        "section": "storage",
+        "type": "text",
+        "default": "Germany",
+        "label": "Country name shown to customers",
+        "desc": "Must match the location code above."
+    },
+    "storage_cost_table": {
+        "tab": "storage",
+        "section": "storage",
+        "type": "textarea",
+        "default": "",
+        "label": "Monthly cost per box type, in EUR without VAT",
+        "desc": "One line per type: the provider type name, an equals sign and the monthly cost, for example bx11=3.20. EMPTY BY DEFAULT: a type that is not listed has an unknown cost and no box of it is ever bought. Fill it from the provider price list and re-check it before price changes."
+    },
+    "storage_max_boxes": {
+        "tab": "storage",
+        "section": "storage",
+        "type": "number",
+        "default": 0,
+        "min": 0,
+        "max": 100000,
+        "label": "Most live boxes at once",
+        "desc": "Applies to live purchases only. 0: none may be bought live."
+    },
+    "storage_max_monthly_cost": {
+        "tab": "storage",
+        "section": "storage",
+        "type": "number",
+        "default": 0,
+        "min": 0,
+        "max": 1000000,
+        "label": "Highest monthly cost of all live boxes, in whole EUR",
+        "desc": "The sum of the cost table over the live boxes. A new box or a larger type that would pass it is refused and staff are told. 0: none may be bought live."
+    },
+    "storage_max_new_per_day": {
+        "tab": "storage",
+        "section": "storage",
+        "type": "number",
+        "default": 0,
+        "min": 0,
+        "max": 10000,
+        "label": "Most new boxes per day",
+        "desc": "Applies to live purchases only. 0: none may be bought live."
+    },
+    "storage_deletes_enabled": {
+        "tab": "storage",
+        "section": "storage",
+        "type": "checkbox",
+        "default": 0,
+        "label": "Allow deleting boxes at the provider",
+        "desc": "Off: a deletion waits and staff are told, and the data stays. A box is also only deleted when the deletion mode under General allows it. A deleted box is gone for good."
+    },
+    "storage_retention_days": {
+        "tab": "storage",
+        "section": "storage",
+        "type": "number",
+        "default": 14,
+        "min": 0,
+        "max": 365,
+        "label": "Keep a lapsed box for, in days",
+        "desc": "Used for storage products with no retention of their own. The provider has no real suspend, so a paused box still costs money for these days. 0: never delete."
+    },
+    "storage_snapshot_default": {
+        "tab": "storage",
+        "section": "storage",
+        "type": "select",
+        "default": "day",
+        "options": {
+            "off": "No automatic snapshots",
+            "day": "Every day",
+            "week": "Every week",
+            "month": "Every month"
+        },
+        "label": "Automatic snapshots of a new box"
+    },
+    "storage_extra_protocols": {
+        "tab": "storage",
+        "section": "storage",
+        "type": "checkbox",
+        "default": 0,
+        "label": "Let customers switch on SMB and WebDAV",
+        "desc": "Off: only the SSH based protocols (SFTP, rsync, borg, restic) are offered. SMB and WebDAV use a certificate of the provider host name, which does not match a host name alias."
+    },
+    "storage_alias_enabled": {
+        "tab": "storage",
+        "section": "storage",
+        "type": "checkbox",
+        "default": 0,
+        "label": "Give each box a host name of our own",
+        "desc": "OFF by default: customers see the provider host name. On: each new box gets a CNAME to the provider host in the zone below, written through the plugin DNS writer (the live name servers in production), and customers see the alias. Turn it on only when you approve the DNS change. SMB and WebDAV over TLS check the provider certificate name, so for those protocols the connection details always show the provider host, alias or not."
+    },
+    "storage_alias_zone": {
+        "tab": "storage",
+        "section": "storage",
+        "type": "text",
+        "default": "",
+        "label": "Alias zone",
+        "desc": "A zone hosted on our own name servers, for example example.com."
+    },
+    "storage_alias_pattern": {
+        "tab": "storage",
+        "section": "storage",
+        "type": "text",
+        "default": "backup{n}.{zone}",
+        "label": "Alias host name pattern",
+        "desc": "{n} is the number of the box and {zone} the alias zone, for example backup{n}.{zone}."
     }
 }

@@ -90,7 +90,6 @@ final class Plugin {
 		Ssl\SslRenewals::register();
 		Ssl\SslRoutes::register();
 		Ssl\SslJobs::register();
-		Storage\StorageSettings::register();
 		Storage\StorageSwitch::register();
 		Storage\StorageRoutes::register();
 		Storage\StoragePanel::register();
@@ -281,6 +280,7 @@ final class Plugin {
 		Card\Card::register();
 		Card\DeleteGuard::register();
 		GiftCredit\GiftCredit::register();
+		Storage\StorageSettings::register();
 
 		// Later tasks register their parts here.
 		self::$booted = true;
