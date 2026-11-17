@@ -1224,13 +1224,53 @@
         "label": "Give each box a host name of our own",
         "desc": "OFF by default: customers see the provider host name. On: each new box gets a CNAME to the provider host in the zone below, written through the plugin DNS writer (the live name servers in production), and customers see the alias. Turn it on only when you approve the DNS change. SMB and WebDAV over TLS check the provider certificate name, so for those protocols the connection details always show the provider host, alias or not."
     },
+    "storage_alias_writer": {
+        "tab": "storage",
+        "section": "storage",
+        "type": "select",
+        "default": "cloudflare",
+        "options": {
+            "cloudflare": "A record in a Cloudflare zone",
+            "own": "A record on our own name servers"
+        },
+        "label": "Alias record writer",
+        "desc": "Cloudflare: one CNAME per box in the zone below, never proxied (SSH, rsync and borg cannot pass the proxy). Own: written through the plugin DNS writer, for a zone on our own name servers."
+    },
+    "storage_alias_dns_client": {
+        "tab": "storage",
+        "section": "storage",
+        "type": "select",
+        "default": "fake",
+        "options": {
+            "fake": "Fake: nothing is written to DNS",
+            "live": "Live: write to the Cloudflare zone"
+        },
+        "label": "Cloudflare connection",
+        "desc": "Live needs this setting, the token and zone id below AND the constant BELTOFT_SERVICES_STORAGE_DNS_LIVE set to true in wp-config.php."
+    },
+    "storage_cf_token": {
+        "tab": "storage",
+        "section": "storage",
+        "type": "secret",
+        "default": "",
+        "label": "Cloudflare API token",
+        "desc": "A scoped token with Zone, DNS, Edit on the alias zone only. Stored encrypted and never shown again."
+    },
+    "storage_cf_zone_id": {
+        "tab": "storage",
+        "section": "storage",
+        "type": "text",
+        "default": "",
+        "label": "Cloudflare zone id",
+        "desc": "32 characters, from the zone overview. The zone name is the alias zone below."
+    },
     "storage_alias_zone": {
         "tab": "storage",
         "section": "storage",
         "type": "text",
         "default": "",
         "label": "Alias zone",
-        "desc": "A zone hosted on our own name servers, for example example.com."
+        "desc": "The zone the alias names live in (the zone name at Cloudflare, or a zone on our own name servers), for example example.com."
     },
     "storage_alias_pattern": {
         "tab": "storage",

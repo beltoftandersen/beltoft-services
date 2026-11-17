@@ -26,6 +26,7 @@ abstract class StorageTestCase extends TestCase {
 		add_filter( 'beltoft_services_key', static fn() => $key );
 		FakeStorageClient::reset();
 		delete_option( FakeDns::OPTION );
+		delete_option( \BeltoftServices\Storage\FakeAliasDns::OPTION );
 		update_option( 'woocommerce_currency', 'EUR' );
 		$this->client = new FakeStorageClient();
 		add_filter( 'beltoft_services_storage_client', fn() => $this->client );

@@ -141,7 +141,7 @@ final class StorageDriverTest extends StorageTestCase {
 		$dns = new FakeDns( true );
 		$dns->create_zone( 'example.test', array( 'ns1.example.test' ) );
 		add_filter( 'beltoft_services_domains_dns', static fn() => $dns );
-		$this->settings( array( 'storage_alias_enabled' => 1, 'storage_alias_zone' => 'example.test', 'storage_alias_pattern' => 'backup{n}.{zone}' ) );
+		$this->settings( array( 'storage_alias_enabled' => 1, 'storage_alias_writer' => 'own', 'storage_alias_zone' => 'example.test', 'storage_alias_pattern' => 'backup{n}.{zone}' ) );
 		$r = $this->ready_storage();
 		$alias = (string) $r->get( 'storage_alias' );
 		$this->assertSame( 'backup' . $r->id() . '.example.test', $alias );
@@ -158,7 +158,7 @@ final class StorageDriverTest extends StorageTestCase {
 	}
 
 	public function test_a_zone_that_is_not_ours_keeps_the_box_on_the_upstream_host(): void {
-		$this->settings( array( 'storage_alias_enabled' => 1, 'storage_alias_zone' => 'missing.test' ) );
+		$this->settings( array( 'storage_alias_enabled' => 1, 'storage_alias_writer' => 'own', 'storage_alias_zone' => 'missing.test' ) );
 		$r = $this->ready_storage();
 		$this->assertSame( '', (string) $r->get( 'storage_alias' ) );
 		$this->assertSame( (string) $r->get( 'storage_host' ), Boxes::connection( $r )['host'] );

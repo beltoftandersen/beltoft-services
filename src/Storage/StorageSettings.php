@@ -147,6 +147,29 @@ final class StorageSettings {
 	}
 
 	/**
+	 * Which writer makes the alias record: `cloudflare` (a record in a Cloudflare zone, the default) or `own` (our own name servers).
+	 */
+	public static function alias_writer(): string {
+		return 'own' === (string) Settings::get( 'storage_alias_writer' ) ? 'own' : 'cloudflare';
+	}
+
+	/**
+	 * The DNS API token for the alias zone, decrypted, '' when unset. Keep it out of logs, events and mail.
+	 */
+	public static function cf_token(): string {
+		$stored = (string) Settings::get( 'storage_cf_token' );
+
+		return '' === $stored ? '' : (string) Crypto::decrypt( $stored );
+	}
+
+	/**
+	 * The zone id of the alias zone at the DNS provider, '' when unset.
+	 */
+	public static function cf_zone_id(): string {
+		return strtolower( trim( (string) Settings::get( 'storage_cf_zone_id' ) ) );
+	}
+
+	/**
 	 * Is the host name alias switched on?
 	 */
 	public static function alias_enabled(): bool {
@@ -316,7 +339,29 @@ final class StorageSettings {
 		);
 		$fields['storage_extra_protocols']  = $base + array( 'type' => 'checkbox', 'default' => 0, 'label' => __( 'Let customers switch on SMB and WebDAV', 'beltoft-services' ), 'desc' => __( 'Off: only the SSH based protocols (SFTP, rsync, borg, restic) are offered. SMB and WebDAV use a certificate of the provider host name, which does not match a host name alias.', 'beltoft-services' ) );
 		$fields['storage_alias_enabled']   = $base + array( 'type' => 'checkbox', 'default' => 0, 'label' => __( 'Give each box a host name of our own', 'beltoft-services' ), 'desc' => __( 'OFF by default: customers see the provider host name. On: each new box gets a CNAME to the provider host in the zone below, written through the plugin DNS writer (the live name servers in production), and customers see the alias. Turn it on only when you approve the DNS change. SMB and WebDAV over TLS check the provider certificate name, so for those protocols the connection details always show the provider host, alias or not.', 'beltoft-services' ) );
-		$fields['storage_alias_zone']      = $base + array( 'type' => 'text', 'default' => '', 'label' => __( 'Alias zone', 'beltoft-services' ), 'desc' => __( 'A zone hosted on our own name servers, for example example.com.', 'beltoft-services' ) );
+		$fields['storage_alias_writer']    = $base + array(
+			'type'    => 'select',
+			'default' => 'cloudflare',
+			'options' => array(
+				'cloudflare' => __( 'A record in a Cloudflare zone', 'beltoft-services' ),
+				'own'        => __( 'A record on our own name servers', 'beltoft-services' ),
+			),
+			'label'   => __( 'Alias record writer', 'beltoft-services' ),
+			'desc'    => __( 'Cloudflare: one CNAME per box in the zone below, never proxied (SSH, rsync and borg cannot pass the proxy). Own: written through the plugin DNS writer, for a zone on our own name servers.', 'beltoft-services' ),
+		);
+		$fields['storage_alias_dns_client'] = $base + array(
+			'type'    => 'select',
+			'default' => 'fake',
+			'options' => array(
+				'fake' => __( 'Fake: nothing is written to DNS', 'beltoft-services' ),
+				'live' => __( 'Live: write to the Cloudflare zone', 'beltoft-services' ),
+			),
+			'label'   => __( 'Cloudflare connection', 'beltoft-services' ),
+			'desc'    => __( 'Live needs this setting, the token and zone id below AND the constant BELTOFT_SERVICES_STORAGE_DNS_LIVE set to true in wp-config.php.', 'beltoft-services' ),
+		);
+		$fields['storage_cf_token']        = $base + array( 'type' => 'secret', 'default' => '', 'label' => __( 'Cloudflare API token', 'beltoft-services' ), 'desc' => __( 'A scoped token with Zone, DNS, Edit on the alias zone only. Stored encrypted and never shown again.', 'beltoft-services' ) );
+		$fields['storage_cf_zone_id']      = $base + array( 'type' => 'text', 'default' => '', 'label' => __( 'Cloudflare zone id', 'beltoft-services' ), 'desc' => __( '32 characters, from the zone overview. The zone name is the alias zone below.', 'beltoft-services' ) );
+		$fields['storage_alias_zone']      = $base + array( 'type' => 'text', 'default' => '', 'label' => __( 'Alias zone', 'beltoft-services' ), 'desc' => __( 'The zone the alias names live in (the zone name at Cloudflare, or a zone on our own name servers), for example example.com.', 'beltoft-services' ) );
 		$fields['storage_alias_pattern']   = $base + array( 'type' => 'text', 'default' => 'backup{n}.{zone}', 'label' => __( 'Alias host name pattern', 'beltoft-services' ), 'desc' => __( '{n} is the number of the box and {zone} the alias zone, for example backup{n}.{zone}.', 'beltoft-services' ) );
 
 		return $fields;
