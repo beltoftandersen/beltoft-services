@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.41.1
+Stable tag: 0.42.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,11 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.42.0 =
+* Checkout: the address of a website and the domain of Business email are chosen with tiles: register a new domain, transfer a domain, use my own domain, a domain in my account, and for a website decide later. The domain search and the transfer are in the checkout and add the domain to the same order (`Domains\OrderDomain`); a domain that stays in the order while another choice is made is announced with a remove link.
+* Domain search: `domains/check` takes `tax` so prices can follow the display of the checkout.
+* Account overview: Recent activity is a log of everything the customer did or is told about, by the service's own name, grouped by day, with repeats counted and a Show more button (`Account\ActivityMap`, route `GET activity`). History texts still reach the customer only through fixed sentences.
 
 = 0.41.1 =
 * Hosting: a website's card keeps its own state (Online) while the account is working; what it is doing is said in the progress line only.
