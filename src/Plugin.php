@@ -132,6 +132,7 @@ final class Plugin {
 		Domains\Search::register();
 		Bricks\Integration::register();
 		Domains\Cart::register();
+		Domains\PendingLines::register();
 		Domains\TldRules::register();
 		Domains\DkAgreement::register();
 		Domains\OrderDomain::register();

@@ -207,6 +207,9 @@ final class Cart {
 		$key = $cart->add_to_cart( $product->get_id(), 1, 0, array(), $data );
 		if ( ! $key ) { return new \WP_Error( 'cart_failed', __( 'The domain could not be added to your cart.', 'beltoft-services' ), array( 'status' => 400 ) ); }
 		WC()->session->set_customer_session_cookie( true );
+		// Kept outside the session row too: a request that read the session before this save writes its older copy back, and the line comes back from here.
+		$line = $cart->get_cart_item( $key );
+		if ( is_array( $line ) ) { PendingLines::keep( $line ); }
 		// The session is saved now and not at the end of the request: the page asks for a checkout refresh the moment this answer arrives,
 		// and a request that read the session just before the save could write it back without the line.
 		if ( method_exists( WC()->session, 'save_data' ) ) { WC()->session->save_data(); }
@@ -257,6 +260,23 @@ final class Cart {
 	/** Registrar transfer codes are short printable ASCII text; anything else is a typing or paste mistake, and the length is bounded. */
 	public static function auth_code_valid( string $code ): bool {
 		return 1 === preg_match( '/^[\x20-\x7E]{6,64}$/D', $code );
+	}
+
+	/** Is this line a renewal, resubscribe or switch? */
+	public static function is_continuation_line( array $item ): bool {
+		return self::is_continuation( $item );
+	}
+
+	/**
+	 * May a pending registration or transfer line be put back in a cart? The cheap local checks of the add, never the registrar: the
+	 * name is not held here, the extension still has a price and the line was priced in the customer's currency.
+	 */
+	public static function can_restore( array $item ): bool {
+		$line = $item['beltoft_services_domain'] ?? null;
+		if ( ! is_array( $line ) || ! in_array( $line['mode'] ?? '', array( 'register', 'transfer' ), true ) || self::is_continuation( $item ) ) { return false; }
+		if ( null !== self::domain_held( (string) ( $line['domain'] ?? '' ) ) || self::is_unpriced_domain_line( $item ) ) { return false; }
+		$tag = '' !== (string) ( $item[ Currency::CART_KEY ] ?? '' ) ? (string) $item[ Currency::CART_KEY ] : Currency::base();
+		return Currency::current() === $tag;
 	}
 
 	/** Is this a renewal, resubscribe or switch line, which carries no new ownership proof? */
