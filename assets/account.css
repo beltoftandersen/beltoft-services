@@ -1341,12 +1341,15 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit
 @keyframes bs-loader-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes bs-loader-run { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
 @media (max-width: 767px) {
-	.bs-loader { position: fixed; z-index: 100000; right: var(--bs-space-4); bottom: calc(env(safe-area-inset-bottom, 0px) + var(--bs-space-4)); left: var(--bs-space-4); min-width: 0; padding: var(--bs-space-3) var(--bs-space-4) calc(var(--bs-space-3) + 2px); overflow: hidden; border: 1px solid var(--bs-line); border-radius: var(--bs-radius); background: var(--bg-warm, #eeece6); box-shadow: 0 6px 24px rgba(12, 21, 53, 0.16); line-height: var(--bs-lh-text); animation: bs-loader-up .25s ease-out; }
-	.bs-loader.is-fading { transform: translateY(8px); }
-	.bs-loader__text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; }
-	.bs-loader.is-fail .bs-loader__text { display: block; -webkit-line-clamp: unset; }
-	.bs-loader__bar { bottom: 0; border-radius: 0; }
-	.bs-loader__close { margin: -12px -14px -12px 0; }
+	body > .bs-loader { position: fixed; z-index: 100000; right: var(--bs-space-4); bottom: calc(env(safe-area-inset-bottom, 0px) + var(--bs-space-4)); left: var(--bs-space-4); min-width: 0; padding: var(--bs-space-3) var(--bs-space-4) calc(var(--bs-space-3) + 2px); overflow: hidden; border: 1px solid var(--bs-line); border-radius: var(--bs-radius); background: var(--bg-warm, #eeece6); box-shadow: 0 6px 24px rgba(12, 21, 53, 0.16); line-height: var(--bs-lh-text); animation: bs-loader-up .25s ease-out; }
+	body > .bs-loader.is-fading { transform: translateY(8px); }
+	body > .bs-loader .bs-loader__text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; }
+	body > .bs-loader.is-fail .bs-loader__text { display: block; -webkit-line-clamp: unset; }
+	body > .bs-loader .bs-loader__bar { bottom: 0; border-radius: 0; }
+	body > .bs-loader .bs-loader__close { margin: -12px -14px -12px 0; }
+	/* In the site's bar on a phone: a line of its own under the title, only while it shows. */
+	[data-bs-loader-host] { order: 99; flex: 1 0 100%; justify-content: flex-start; max-width: 100%; padding-bottom: 6px; }
+	[data-bs-loader-host]:not(:has(.bs-loader:not([hidden]))) { display: none; }
 }
 @keyframes bs-loader-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
