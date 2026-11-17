@@ -110,6 +110,10 @@ class DbDriver extends ProxmoxDriver {
 			return ( new Actions( $r ) )->run( 'restore', $args );
 		}
 
+		if ( DbActions::BACKUP_DELETE === $action ) {
+			return ( new Actions( $r ) )->run( 'backup_delete', $args );
+		}
+
 		if ( DbAccess::APPLY === $action ) {
 			return ( new DbAccess( $r ) )->run();
 		}

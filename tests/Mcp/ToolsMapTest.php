@@ -282,7 +282,7 @@ final class ToolsMapTest extends McpTestCase {
 			'set_default_card', 'set_subscription_payment_method', 'delete_saved_card', 'add_card',
 			'reveal_server_password', 'reveal_database_password', 'reveal_app_login', 'database_ca_certificate', 'delete_mailbox', 'reset_mailbox_password', 'reveal_mailbox_password',
 			'domain_transfer_code', 'domain_unlock', 'console_ticket', 'account_password_and_email', 'connected_apps_and_limits',
-			'order_server', 'order_database', 'delete_server', 'delete_database', 'restore_hosting_backup', 'delete_site',
+			'order_server', 'order_database', 'delete_server', 'delete_database', 'restore_hosting_backup', 'delete_site', 'delete_hosting_backup',
 		);
 
 		foreach ( $known as $capability ) {
@@ -316,5 +316,24 @@ final class ToolsMapTest extends McpTestCase {
 		}
 
 		$this->assertStringStartsWith( 'never', ActionMap::EXCLUDED['unlock'] );
+	}
+
+	public function test_deleting_a_backup_has_no_tool_anywhere_and_says_why(): void {
+		$this->assertArrayNotHasKey( 'backup_delete', ActionMap::ACTIONS );
+		$this->assertStringStartsWith( 'never', ActionMap::EXCLUDED['backup_delete'] );
+		$this->assertArrayNotHasKey( 'delete_hosting_backup', ActionMap::CAPABILITIES );
+		$this->assertStringStartsWith( 'never', ActionMap::CAPABILITIES_EXCLUDED['delete_hosting_backup'] );
+		$this->assertStringContainsString( 'last copy', ActionMap::EXCLUDED['backup_delete'] );
+
+		foreach ( array_keys( Tools::definitions() ) as $name ) {
+			$this->assertDoesNotMatchRegularExpression( '/delete.*backup|backup.*delete/', $name );
+		}
+
+		// No tool may call the hosting delete route either.
+		foreach ( ActionMap::ROUTES as $tool => $routes ) {
+			foreach ( $routes as $route ) {
+				$this->assertFalse( 0 === strpos( $route, 'DELETE' ) && false !== strpos( $route, 'hosting/backups' ), $tool . ' reaches the hosting backup delete.' );
+			}
+		}
 	}
 }

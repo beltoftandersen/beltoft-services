@@ -35,6 +35,9 @@ final class DbActions {
 	/** The restore is the server's own action (Actions::run), with a database's wording. */
 	public const RESTORE = 'restore';
 
+	/** A backup delete is the server's own action (Actions::run), with the same checks and floor. */
+	public const BACKUP_DELETE = 'backup_delete';
+
 	/** Restores per user, database and hour. */
 	private const RESTORE_LIMIT = 3;
 
@@ -76,6 +79,10 @@ final class DbActions {
 			$out[ self::RESTORE ] = __( 'Restore from a backup', 'beltoft-services' );
 		}
 
+		if ( Backups::enabled( $r ) && ! is_array( $r->get( 'restore' ) ) ) {
+			$out[ self::BACKUP_DELETE ] = __( 'Delete a backup', 'beltoft-services' );
+		}
+
 		if ( DbPolicy::offered( $r ) ) {
 			$out[ DbPolicy::ACTION ] = __( 'When memory is full', 'beltoft-services' );
 		}
@@ -94,7 +101,7 @@ final class DbActions {
 	public static function buttons( $actions, $r ) {
 		if ( is_array( $actions ) && self::is_db( $r ) ) {
 			// The power buttons are drawn by the database page itself (a question first, its own note).
-			unset( $actions[ self::RESET ], $actions[ self::RESTORE ], $actions[ DbPolicy::ACTION ], $actions['start'], $actions['shutdown'] );
+			unset( $actions[ self::RESET ], $actions[ self::RESTORE ], $actions[ self::BACKUP_DELETE ], $actions[ DbPolicy::ACTION ], $actions['start'], $actions['shutdown'] );
 		}
 
 		return $actions;
@@ -116,6 +123,10 @@ final class DbActions {
 
 		if ( self::is_db( $r ) && self::RESTORE === $action ) {
 			return self::restore_refusal( $refusal, $r, is_array( $args ) ? $args : array() );
+		}
+
+		if ( self::is_db( $r ) && self::BACKUP_DELETE === $action ) {
+			return self::delete_refusal( $refusal, $r, is_array( $args ) ? $args : array() );
 		}
 
 		if ( self::is_db( $r ) && DbPolicy::ACTION === $action ) {
@@ -181,6 +192,33 @@ final class DbActions {
 
 		if ( RateLimit::exceeded( get_current_user_id(), 'beltoft-services:db-restore:' . $r->id(), self::RESTORE_LIMIT, HOUR_IN_SECONDS ) ) {
 			return new \WP_Error( 'beltoft_services_rate_limited', __( 'A database can be restored three times an hour. Please try again later.', 'beltoft-services' ), array( 'status' => 429 ) );
+		}
+
+		return $refusal;
+	}
+
+	/**
+	 * The early refusal of a backup delete: the server's own checks (a restore or a backup under way, the volume's shape),
+	 * a database that is busy with a new password, and the server's fixed floor.
+	 *
+	 * @param mixed                $refusal Refusal so far.
+	 * @param Resource             $r       Database.
+	 * @param array<string, mixed> $args    Arguments.
+	 * @return mixed
+	 */
+	private static function delete_refusal( $refusal, Resource $r, array $args ) {
+		if ( null !== $refusal ) {
+			return $refusal;
+		}
+
+		$why = Actions::check( $r, self::BACKUP_DELETE, $args );
+
+		if ( null !== $why ) {
+			return new \WP_Error( 'beltoft_services_refused', $why, array( 'status' => 422 ) );
+		}
+
+		if ( Actions::floor_exceeded( $r, self::BACKUP_DELETE ) ) {
+			return new \WP_Error( 'beltoft_services_rate_limited', __( 'Too many requests. Please wait a while and try again.', 'beltoft-services' ), array( 'status' => 429 ) );
 		}
 
 		return $refusal;

@@ -11,7 +11,7 @@
  * Variables (set by BeltoftServices\Proxmox\Vm\Panels::account()): $ip, $plan (cores, memory_mb,
  * disk_gb, net_mbit), $busy (a reinstall, restore or other work shows: Power then says Busy), $power (running, stopped or empty when not known), $os_label, $os_cluster, $os_options
  * (VMID => label), $os_current, $has_key, $can_reveal, $forms (whether actions are allowed now), $ssh_user,
- * $backups (null, or enabled, days, list of volid/when/size, last_ok, add_url, add_price, remove_url, can_restore),
+ * $backups (null, or enabled, days, list of volid/when/size, last_ok, add_url, add_price, remove_url, can_restore, can_delete),
  * $snapshots (null when the block is absent, or slots, used, included, added, packs (the packs the server has: slots, days, paused), buy (packs to add), full, days, free_days, paid_days, max_label, entries of id/label/taken/keeps/consistent/state),
  * $cost ("Cost so far this month: EUR X" for a pay-as-you-go server, else empty),
  * $resource_id (the resource id, for ids that must be unique on a page),
@@ -480,11 +480,17 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 				<?php else : ?>
 					<table class="beltoft-services-vm__backup-list">
 						<thead>
-							<tr><th scope="col"><?php esc_html_e( 'Backup', 'beltoft-services' ); ?></th><th scope="col"><?php esc_html_e( 'Size', 'beltoft-services' ); ?></th></tr>
+							<tr><th scope="col"><?php esc_html_e( 'Backup', 'beltoft-services' ); ?></th><th scope="col"><?php esc_html_e( 'Size', 'beltoft-services' ); ?></th><?php if ( ! empty( $backups['can_delete'] ) ) : ?><th scope="col"><span class="screen-reader-text"><?php esc_html_e( 'Delete', 'beltoft-services' ); ?></span></th><?php endif; ?></tr>
 						</thead>
 						<tbody>
 							<?php foreach ( $backups['list'] as $beltoft_services_backup ) : ?>
-								<tr><td><?php echo esc_html( $beltoft_services_backup['when'] ); ?></td><td><?php echo esc_html( $beltoft_services_backup['size'] ); ?></td></tr>
+								<tr>
+									<td><?php echo esc_html( $beltoft_services_backup['when'] ); ?></td>
+									<td><?php echo esc_html( $beltoft_services_backup['size'] ); ?></td>
+									<?php if ( ! empty( $backups['can_delete'] ) ) : ?>
+										<td><button type="button" class="button woocommerce-button bs-btn bs-btn--sm bs-btn--danger" data-backup-delete="<?php echo esc_attr( $beltoft_services_backup['volid'] ); ?>" data-backup-when="<?php echo esc_attr( $beltoft_services_backup['when'] ); ?>"<?php echo 1 === count( $backups['list'] ) ? ' data-backup-only="1"' : ''; ?>><?php esc_html_e( 'Delete', 'beltoft-services' ); ?></button></td>
+									<?php endif; ?>
+								</tr>
 							<?php endforeach; ?>
 						</tbody>
 					</table>

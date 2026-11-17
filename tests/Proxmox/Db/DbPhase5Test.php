@@ -1238,4 +1238,97 @@ class DbPhase5Test extends TestCase {
 		$this->assertArrayNotHasKey( 'dump_admin', $state, 'Judged from the start, not from before the stop.' );
 		$this->assertArrayNotHasKey( 'down_admin', $state );
 	}
+	// -- Deleting a backup ---------------------------------------------------------------------
+
+	private function db_backups( Resource $r, int $count ): array {
+		$vmid = (int) $r->get( 'vmid' );
+
+		for ( $i = 0; $i < $count; $i++ ) {
+			$this->fake->add_backup( 'backup-store', array( 'vmid' => $vmid, 'ctime' => time() + 1000 - $i * 100 ) );
+		}
+
+		$list = ( new Backups( Resource::find( $r->id() ) ) )->list();
+		( new Backups( Resource::find( $r->id() ) ) )->remember( $list );
+
+		return array_column( $list, 'volid' );
+	}
+
+	public function test_a_database_backup_delete_is_offered_checked_limited_and_run_through_the_servers_action(): void {
+		$r   = $this->ready_db();
+		$ids = $this->db_backups( $r, 2 );
+		$r   = Resource::find( $r->id() );
+
+		$this->assertArrayHasKey( DbActions::BACKUP_DELETE, DbActions::offered( $r ) );
+		$this->assertArrayNotHasKey( DbActions::BACKUP_DELETE, DbActions::buttons( DbActions::offered( $r ), $r ), 'The table draws it, not a generic button.' );
+
+		$wrong = DbActions::refusal( null, $r, 'backup_delete', array( 'volid' => 'backup-store:backup/vm/9999/x' ) );
+		$this->assertInstanceOf( \WP_Error::class, $wrong );
+		$this->assertSame( 'Choose one of your backups.', $wrong->get_error_message() );
+		$this->assertNull( DbActions::refusal( null, $r, 'backup_delete', array( 'volid' => $ids[0] ) ) );
+
+		Jobs::act( $r->id(), 'backup_delete', array( 'volid' => $ids[0] ) );
+
+		$this->assertNotContains( $ids[0], array_column( $this->fake->state()['backups']['backup-store'], 'volid' ) );
+		$this->assertContains( $ids[1], array_column( $this->fake->state()['backups']['backup-store'], 'volid' ) );
+		$this->assertSame( array( $ids[1] ), array_column( (array) Resource::find( $r->id() )->get( 'backup_list' ), 'volid' ) );
+		$this->assertTrue( Resource::find( $r->id() )->get( Jobs::RESULT )['ok'] );
+		$this->assertCount( 1, array_filter( $this->fake->calls(), static fn( $c ) => 'DELETE' === $c['method'] && false !== strpos( $c['path'], '/content/' ) ) );
+	}
+
+	public function test_a_database_backup_delete_is_refused_while_a_restore_or_a_backup_runs_and_after_ten_an_hour(): void {
+		$r    = $this->ready_db();
+		$ids  = $this->db_backups( $r, 1 );
+		$args = array( 'volid' => $ids[0] );
+
+		$r->set( array( 'restore' => array( 'volid' => 'x', 'phase' => 'restored', 'ctime' => 1 ) ) );
+		$this->assertInstanceOf( \WP_Error::class, DbActions::refusal( null, Resource::find( $r->id() ), 'backup_delete', $args ) );
+		$this->assertArrayNotHasKey( DbActions::BACKUP_DELETE, DbActions::offered( Resource::find( $r->id() ) ) );
+
+		$r->set( array( 'restore' => null, 'was_running' => true ) );
+		$waiting = DbActions::refusal( null, Resource::find( $r->id() ), 'backup_delete', $args );
+		$this->assertSame( 'A restore is running. Try again when it has finished.', $waiting->get_error_message() );
+
+		$r->set( array( 'was_running' => null, 'backup_task' => array( 'upid' => 'UPID:node-a:1:2:3:vzdump:5000:x@pve!t:', 'started' => time() ) ) );
+		$this->assertSame( 'A backup is running. Try again when it has finished.', DbActions::refusal( null, Resource::find( $r->id() ), 'backup_delete', $args )->get_error_message() );
+		$r->set( array( 'backup_task' => null ) );
+
+		wp_set_current_user( (int) $r->license()['user_id'] );
+		$limited = null;
+
+		for ( $i = 0; $i < 11; $i++ ) {
+			$limited = DbActions::refusal( null, Resource::find( $r->id() ), 'backup_delete', $args );
+		}
+
+		$this->assertInstanceOf( \WP_Error::class, $limited );
+		$this->assertSame( 429, $limited->get_error_data()['status'] );
+		$this->assertCount( 0, array_filter( $this->fake->calls(), static fn( $c ) => 'DELETE' === $c['method'] && false !== strpos( $c['path'], '/content/' ) ) );
+	}
+
+	public function test_the_backups_tab_draws_a_delete_button_per_backup_and_says_so_for_the_only_one(): void {
+		$r = $this->ready_db();
+		$this->db_backups( $r, 1 );
+		$tab = $this->page( Resource::find( $r->id() ), 'backups' );
+
+		$this->assertStringContainsString( 'data-db-backup-delete=', $tab );
+		$this->assertStringContainsString( 'data-backup-only="1"', $tab );
+		$this->assertStringContainsString( 'bs-btn--danger', $tab );
+
+		$this->fake->add_backup( 'backup-store', array( 'vmid' => (int) $r->get( 'vmid' ), 'ctime' => time() + 2000 ) );
+		( new Backups( Resource::find( $r->id() ) ) )->remember( ( new Backups( Resource::find( $r->id() ) ) )->list() );
+		$two = $this->page( Resource::find( $r->id() ), 'backups' );
+		$this->assertSame( 2, substr_count( $two, 'data-db-backup-delete=' ) );
+		$this->assertStringNotContainsString( 'data-backup-only', $two );
+
+		// A restore under way: no delete button.
+		Resource::find( $r->id() )->set( array( 'restore' => array( 'volid' => 'x', 'phase' => 'restored', 'ctime' => 1 ) ) );
+		$this->assertStringNotContainsString( 'data-db-backup-delete=', $this->page( Resource::find( $r->id() ), 'backups' ) );
+	}
+
+	public function test_the_database_script_confirms_with_the_only_backup_sentence_and_posts_the_server_action(): void {
+		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/db.js' );
+
+		$this->assertStringContainsString( "'/actions/backup_delete'", $js );
+		$this->assertStringContainsString( 'backupdeleteonly', $js );
+		$this->assertStringContainsString( 'danger: true', $js );
+	}
 }

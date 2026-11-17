@@ -10,7 +10,9 @@ namespace BeltoftServices\Proxmox\Vm;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\Apps\AppInstall;
+use BeltoftServices\Proxmox\Backup\BackupDelete;
 use BeltoftServices\Proxmox\Backup\Backups;
+use BeltoftServices\Proxmox\Db\DbRestore;
 use BeltoftServices\Proxmox\Disk\DiskMeta;
 use BeltoftServices\Proxmox\Network\Firewall;
 use BeltoftServices\Proxmox\Network\FirewallRules;
@@ -81,6 +83,7 @@ final class Actions {
 		'replace_ssh_key' => array( 10, HOUR_IN_SECONDS ),
 		'reinstall'      => array( 5, HOUR_IN_SECONDS ),
 		'restore'        => array( 3, HOUR_IN_SECONDS ),
+		'backup_delete'  => array( 10, HOUR_IN_SECONDS ),
 		'rename'         => array( 10, HOUR_IN_SECONDS ),
 		'app_retry'      => array( 3, HOUR_IN_SECONDS ),
 		'snapshot_take'     => array( 5, HOUR_IN_SECONDS ),
@@ -177,6 +180,11 @@ final class Actions {
 			$out['restore'] = __( 'Restore from a backup', 'beltoft-services' );
 		}
 
+		// One backup at a time. A restore that has begun offers its own action only.
+		if ( Backups::enabled( $r ) && ! is_array( $r->get( 'restore' ) ) ) {
+			$out['backup_delete'] = __( 'Delete a backup', 'beltoft-services' );
+		}
+
 		$out['replace_ssh_key'] = self::has_key( $r ) ? __( 'Replace SSH key', 'beltoft-services' ) : __( 'Add SSH key', 'beltoft-services' );
 		$out['reinstall']       = __( 'Reinstall', 'beltoft-services' );
 
@@ -213,7 +221,7 @@ final class Actions {
 	 */
 	public static function buttons( $actions, $resource, $context = 'card' ) {
 		if ( is_array( $actions ) && $resource instanceof Resource && ProxmoxDriver::ID === $resource->get( 'driver' ) ) {
-			unset( $actions[ AppInstall::RETRY ], $actions[ ServerName::ACTION ], $actions['replace_ssh_key'], $actions['reinstall'], $actions['restore'], $actions['snapshot_take'], $actions['snapshot_delete'], $actions['snapshot_rollback'], $actions['fw_apply'], $actions['fw_reset'], $actions[ PrivateAttach::ATTACH ], $actions[ PrivateAttach::DETACH ] );
+			unset( $actions[ AppInstall::RETRY ], $actions[ ServerName::ACTION ], $actions['replace_ssh_key'], $actions['reinstall'], $actions['restore'], $actions['backup_delete'], $actions['snapshot_take'], $actions['snapshot_delete'], $actions['snapshot_rollback'], $actions['fw_apply'], $actions['fw_reset'], $actions[ PrivateAttach::ATTACH ], $actions[ PrivateAttach::DETACH ] );
 
 			if ( 'page' === $context ) {
 				unset( $actions['start'], $actions['shutdown'], $actions['reboot'], $actions['reset_password'] );
@@ -333,7 +341,7 @@ final class Actions {
 				return $block;
 			}
 		}
-		if ( true === $r->get( 'linked' ) && in_array( $action, array( 'replace_ssh_key', 'reinstall', 'restore', ServerName::ACTION ), true ) ) {
+		if ( true === $r->get( 'linked' ) && in_array( $action, array( 'replace_ssh_key', 'reinstall', 'restore', 'backup_delete', ServerName::ACTION ), true ) ) {
 			return __( 'This is not available for this server. Please contact support.', 'beltoft-services' );
 		}
 
@@ -359,6 +367,10 @@ final class Actions {
 
 		if ( 'restore' === $action ) {
 			return self::check_restore( $r, $args );
+		}
+
+		if ( 'backup_delete' === $action ) {
+			return self::check_backup_delete( $r, $args );
 		}
 
 		if ( 'reinstall' !== $action ) {
@@ -430,6 +442,33 @@ final class Actions {
 	}
 
 	/**
+	 * The backup delete's checks that need no Proxmox call (words for the customer). That the volume is really listed for this
+	 * server, and not older than its record, is proved by the job against the live listing.
+	 *
+	 * @param Resource             $r    Resource.
+	 * @param array<string, mixed> $args Arguments.
+	 */
+	private static function check_backup_delete( Resource $r, array $args ): ?string {
+		if ( ! Backups::enabled( $r ) ) {
+			return __( 'Backups are not available for this service.', 'beltoft-services' );
+		}
+
+		if ( is_array( $r->get( 'restore' ) ) || DbRestore::waiting( $r ) ) {
+			return __( 'A restore is running. Try again when it has finished.', 'beltoft-services' );
+		}
+
+		if ( Backups::running( $r ) ) {
+			return __( 'A backup is running. Try again when it has finished.', 'beltoft-services' );
+		}
+
+		if ( ! Backups::volid_fits( $r, $args['volid'] ?? null ) ) {
+			return __( 'Choose one of your backups.', 'beltoft-services' );
+		}
+
+		return null;
+	}
+
+	/**
 	 * Listener of beltoft_services_action_refusal: bad arguments and the fixed floors, answered by the route.
 	 *
 	 * @param mixed $refusal  Refusal so far.
@@ -492,7 +531,8 @@ final class Actions {
 
 		// A refusal is an answer, not an error: no alert for a stray click.
 		if ( null !== $why ) {
-			return StepResult::refused( array(), ucfirst( str_replace( '_', ' ', $action ) ) . ' refused: ' . $this->scrub( $why, 160 ) );
+			// A backup delete says why to the customer (the sentence is fixed text); the others show the generic line.
+			return StepResult::refused( 'backup_delete' === $action ? array( Jobs::TEXT => $why ) : array(), ucfirst( str_replace( '_', ' ', $action ) ) . ' refused: ' . $this->scrub( $why, 160 ) );
 		}
 
 		// Snapshots have their own steps (verification, task polling and all).
@@ -546,6 +586,8 @@ final class Actions {
 				return ( new AccessActions( $this->r, $this ) )->replace_ssh_key( $record, $v, (string) $args['key'] );
 			case 'restore':
 				return ( new Restore( $this->r, $this ) )->restore( $record, (string) $args['volid'] );
+			case 'backup_delete':
+				return ( new BackupDelete( $this->r, $this ) )->delete( $record, $v, (string) $args['volid'] );
 			case ServerName::ACTION:
 				return ( new AccessActions( $this->r, $this ) )->rename( $record, $v, (string) $args['name'] );
 			default:

@@ -348,10 +348,31 @@ final class Backups {
 		$list = $this->list();
 
 		if ( is_array( $list ) ) {
-			$this->store( array( 'backup_list' => $list ) );
+			$this->remember( $list );
 		}
 
 		return StepResult::done();
+	}
+
+	/**
+	 * Keeps the listing the panels show (no Proxmox call to print a page), under the resource lock.
+	 *
+	 * @param array<int, array{volid: string, ctime: int, size: int}> $list As list() returns it.
+	 */
+	public function remember( array $list ): bool {
+		return $this->store( array( 'backup_list' => $list ) );
+	}
+
+	/**
+	 * Is a backup of this server running (the nightly run, started and not yet collected)? It holds no lock, so this is the
+	 * only way to know; a delete or a restore waits for it.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function running( Resource $r ): bool {
+		$task = $r->get( 'backup_task' );
+
+		return is_array( $task ) && ! empty( $task['upid'] );
 	}
 
 	/**
@@ -754,6 +775,8 @@ final class Backups {
 			'add_price'   => '' === $add ? '' : self::price_label( $r, true ),
 			'remove_url'  => $remove,
 			'can_restore' => $enabled && array() !== $list,
+			// A customer may delete one backup at a time, while no restore or backup runs and the server accepts actions.
+			'can_delete'  => $enabled && array() !== $list && $r->accepts_actions() && ! is_array( $r->get( 'restore' ) ) && ! self::running( $r ),
 		);
 	}
 

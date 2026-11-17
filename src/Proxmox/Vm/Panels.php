@@ -134,6 +134,13 @@ final class Panels {
 					'snapshotDelete' => __( 'Deleting a snapshot cannot be undone.', 'beltoft-services' ),
 					'deleteTitle'    => __( 'Delete this snapshot?', 'beltoft-services' ),
 					'deleteYes'      => __( 'Delete the snapshot', 'beltoft-services' ),
+					'backupDeleteTitle' => __( 'Delete this backup?', 'beltoft-services' ),
+					/* translators: %s: date and time of the backup */
+					'backupDeleteText'  => __( 'The backup from %s will be deleted. It cannot be undone and you cannot restore from it afterwards.', 'beltoft-services' ),
+					'backupDeleteOnly'  => __( 'This is your only backup. You will have no backup until the next one is made tonight.', 'beltoft-services' ),
+					'backupDeleteYes'   => __( 'Delete backup', 'beltoft-services' ),
+					'backupDeleteStart' => __( 'Deleting the backup.', 'beltoft-services' ),
+					'backupDeleteDone'  => __( 'The backup is deleted.', 'beltoft-services' ),
 					/* translators: %s: name of the snapshot */
 					'deleteStart'    => __( 'Deleting snapshot %s.', 'beltoft-services' ),
 					/* translators: %s: name of the snapshot */
