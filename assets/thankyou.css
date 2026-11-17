@@ -32,6 +32,6 @@
 @media (prefers-reduced-motion: reduce) { .beltoft-services-progress__steps li.is-current::before { animation: none; } .beltoft-services-progress.is-queued .beltoft-services-progress__text::before, .beltoft-services-progress.is-running .beltoft-services-progress__text::before { animation: none; background-size: 0.3em 0.3em, 0.3em 0.3em, 0.3em 0.3em; } }
 .beltoft-next .beltoft-next__dashboard { margin: 1.5em 0 0; }
 .beltoft-next .beltoft-next__dashboard a, .beltoft-next .beltoft-next__dashboard a:visited { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: var(--bs-btn-h, 40px); padding: 0 var(--bs-space-4, 16px); border-radius: var(--bs-radius, 8px); background: var(--navy, #0c1535); color: var(--bg-card, #fff) !important; border: 1px solid var(--navy, #0c1535); font-weight: 500; line-height: 1.2; text-decoration: none !important; transition: background-color .12s ease, border-color .12s ease; }
-.beltoft-next .beltoft-next__dashboard a:hover, .beltoft-next .beltoft-next__dashboard a:focus-visible { background: var(--ink-mid, #2d4060); border-color: var(--ink-mid, #2d4060); color: var(--bg-card, #fff) !important; }
+.beltoft-next .beltoft-next__dashboard a:hover, .beltoft-next .beltoft-next__dashboard a:focus-visible { background: var(--green, #28513e); border-color: var(--green, #28513e); color: var(--bg-card, #fff) !important; }
 .beltoft-services-progress__note { margin: 1em 0 0; }
 .beltoft-services-progress__note[hidden], .beltoft-services-progress__note [hidden] { display: none; }
