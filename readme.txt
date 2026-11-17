@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.42.0
+Stable tag: 0.42.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.42.1 =
+* .dk: under the registration agreement a short note says what happens after the order (an email from Punktum dk, log in with MitID, a time limit), in our own words and outside the prescribed text.
 
 = 0.42.0 =
 * Checkout: the address of a website and the domain of Business email are chosen with tiles: register a new domain, transfer a domain, use my own domain, a domain in my account, and for a website decide later. The domain search and the transfer are in the checkout and add the domain to the same order (`Domains\OrderDomain`); a domain that stays in the order while another choice is made is announced with a remove link.

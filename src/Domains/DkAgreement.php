@@ -86,6 +86,8 @@ final class DkAgreement {
 		foreach ( $names as $index => $name ) {
 			echo '<label class="beltoft-dk-accept"><input type="checkbox" name="beltoft_dk_agreement[' . esc_attr( (string) $index ) . ']" value="' . esc_attr( $name ) . '"> ' . esc_html( self::CHECKBOX_LABEL ) . ' (' . esc_html( HostName::display( $name ) ) . ')</label>';
 		}
+		// What happens after the order, in our own words and outside Punktum dk's prescribed text above.
+		echo '<p class="beltoft-dk-after">' . esc_html__( 'After the order, Punktum dk sends you an email. Log in with MitID and confirm your details. A private person needs a personal MitID; a business uses MitID Erhverv. If you do not do this within the time limit, the domain is suspended.', 'beltoft-services' ) . '</p>';
 		echo '</section>';
 	}
 

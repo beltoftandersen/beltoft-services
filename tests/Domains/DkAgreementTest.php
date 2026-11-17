@@ -78,6 +78,8 @@ class DkAgreementTest extends TestCase {
 		$this->assertStringContainsString( DkAgreement::TERMS_LABEL, $html );
 		$this->assertStringContainsString( 'Section 18 (2) (13) of the Danish Consumer Contract Act', $html );
 		$this->assertStringContainsString( 'I hereby agree to enter into an agreement on the right to use the specified .dk domain name', $html );
+		$this->assertStringContainsString( 'Log in with MitID and confirm your details.', $html, 'The note after the agreement says what happens next.' );
+		$this->assertLessThan( strpos( $html, 'Log in with MitID' ), strpos( $html, 'type="checkbox"' ), 'The note stands after the prescribed text and the box.' );
 		DkAgreement::validate();
 		$this->assertGreaterThan( 0, wc_notice_count( 'error' ) );
 		wc_clear_notices();
