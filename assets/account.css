@@ -1317,9 +1317,9 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit
    it moves while the end is not known and fills when the steps are known (progress()). */
 .bs-loader { position: relative; box-sizing: border-box; display: flex; align-items: center; gap: var(--bs-space-2); max-width: 100%; min-width: min(100%, 240px); min-height: 20px; color: var(--ink-mid, #2d4060); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-regular); line-height: 20px; transition: opacity .3s ease, transform .3s ease; animation: bs-loader-in .2s ease-out; }
 .bs-loader[hidden] { display: none; }
-/* In a place the site gives the line in its own bar (data-bs-loader-host): it takes the room there is. */
-[data-bs-loader-host] { display: flex; flex: 1 1 0; align-items: center; justify-content: flex-end; min-width: 0; }
-[data-bs-loader-host] .bs-loader { min-width: 0; }
+/* In a place the site gives the line in its own bar (data-bs-loader-host): as wide as its text, at most 60% of the bar. */
+[data-bs-loader-host] { display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-end; max-width: 60%; }
+[data-bs-loader-host] .bs-loader { min-width: 0; max-width: 100%; }
 .bs-loader__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bs-loader.is-fading { opacity: 0; }
 .bs-loader.is-fail { align-items: flex-start; color: var(--bs-status-fail); font-weight: var(--bs-fw-medium); }
