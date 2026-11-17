@@ -647,11 +647,11 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-server
 .beltoft-services-billing-tabs a:focus-visible { outline: 2px solid var(--bs-focus); outline-offset: -2px; }
 
 /* Domains: the list (templates/account/domains-list.php), its header buttons, and a domain's page (domain-page.php). Same row, state and tab styles as Servers. */
-.beltoft-services-servers--domains a.beltoft-services-srv { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.6fr) auto; }
+.beltoft-services-servers--domains a.beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; }
 @container (max-width: 620px) { .beltoft-services-servers--domains a.beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; } }
 @media (max-width: 700px) { .beltoft-services-servers--domains a.beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; } }
 /* Databases and Apps lists: name and detail, state, one more value (the private host), then an arrow or the Open button. A row with a button is a div, the name is its link. */
-.beltoft-services-servers--area .beltoft-services-srv { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.2fr) minmax(0, 1.4fr) auto; }
+.beltoft-services-servers--area .beltoft-services-srv { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.4fr) auto; }
 .beltoft-services-servers--area div.beltoft-services-srv { display: grid; gap: 12px; align-items: center; padding: 8px 16px; border-top: 1px solid var(--bg-warm, #eeece6); color: var(--navy, #0c1535); }
 .beltoft-services-servers--area div.beltoft-services-srv:first-child { border-top: 0; }
 .beltoft-services-servers--area a.beltoft-services-srv__name { color: var(--navy, #0c1535) !important; text-decoration: none !important; }
