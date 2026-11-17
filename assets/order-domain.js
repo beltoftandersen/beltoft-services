@@ -50,8 +50,8 @@
 	}
 
 	// Resolves true when the refreshed checkout says the order holds this domain (the server lists its domain lines in a marker that
-	// rides the refresh), false when it does not or the refresh does not answer in 20 seconds.
-	function confirmed( domain ) {
+	// rides the refresh), false when it does not or the refresh does not answer in `wait` milliseconds (20 seconds by default).
+	function confirmed( domain, wait ) {
 		if ( ! window.jQuery || ! window.jQuery( 'form.checkout' ).length ) {
 			return Promise.resolve( true );
 		}
@@ -81,30 +81,64 @@
 
 			timer = window.setTimeout( function () {
 				finish( false );
-			}, 20000 );
+			}, wait || 20000 );
 			body.on( 'updated_checkout', check );
 			refresh();
 		} );
 	}
 
 	// Adds the domain, then asks the refreshed checkout whether the order has it. Not there (a request that read the cart just
-	// before the add can write it back without the line): the add is sent once more, it is safe to repeat. Still not there: an error.
-	function addConfirmed( domain, mode, code ) {
+	// before the add can write it back without the line): the add is sent once more, it is safe to repeat. Still not there: the cart is
+	// read one more time with a longer wait before an error is shown, and if the answer comes later still, `late` is called, so a domain
+	// that is in the order is never left with an empty value and no Remove button.
+	function addConfirmed( domain, mode, code, late ) {
+		var name = normalise( domain );
+
 		return add( domain, mode, code ).then( function () {
-			return confirmed( normalise( domain ) );
+			return confirmed( name );
 		} ).then( function ( ok ) {
 			if ( ok ) {
 				return;
 			}
 
 			return add( domain, mode, code ).then( function () {
-				return confirmed( normalise( domain ) );
+				return confirmed( name );
 			} ).then( function ( again ) {
-				if ( ! again ) {
-					throw new Error( text.notInOrder );
+				if ( again ) {
+					return;
 				}
+
+				return confirmed( name, 30000 ).then( function ( last ) {
+					if ( last ) {
+						return;
+					}
+
+					watchLate( name, late );
+					throw new Error( text.notInOrder );
+				} );
 			} );
 		} );
+	}
+
+	// After an error: should a later refresh show the domain in the order, it is shown as added (once).
+	function watchLate( name, late ) {
+		if ( ! late || ! window.jQuery ) {
+			return;
+		}
+
+		var body = window.jQuery( document.body );
+
+		function look() {
+			var marker = document.querySelector( '.beltoft-services-od-phone' );
+			var list = marker ? ( marker.getAttribute( 'data-od-domains' ) || '' ).split( ',' ) : [];
+
+			if ( list.indexOf( name ) > -1 ) {
+				body.off( 'updated_checkout', look );
+				late();
+			}
+		}
+
+		body.on( 'updated_checkout', look );
 	}
 
 	function normalise( value ) {
@@ -297,10 +331,12 @@
 				var results = panel.querySelector( '[data-od-results]' );
 
 				working( button, true, text.adding );
-				addConfirmed( item.domain, 'register', '' ).then( function () {
+				function done() {
 					message( results, '' );
 					added( line, item.domain, item.display || item.domain, 'register' );
-				} ).catch( function ( error ) {
+				}
+
+				addConfirmed( item.domain, 'register', '', done ).then( done ).catch( function ( error ) {
 					working( button, false );
 					message( results, error.message, true );
 				} );
@@ -443,10 +479,12 @@
 			}
 
 			working( button, true, text.adding );
-			addConfirmed( item.domain, 'transfer', value ).then( function () {
+			function done() {
 				message( results, '' );
 				added( line, item.domain, item.display || item.domain, 'transfer' );
-			} ).catch( function ( error ) {
+			}
+
+			addConfirmed( item.domain, 'transfer', value, done ).then( done ).catch( function ( error ) {
 				working( button, false );
 				results.appendChild( el( 'p', 'beltoft-services-od-note', error.message ) ).setAttribute( 'role', 'alert' );
 			} );
@@ -516,25 +554,84 @@
 
 	// The phone row of the checkout is printed when the page loads. A domain added in the page needs a phone number for the
 	// registrar: when the refresh says so and the row is not there, the page loads once more (the site keeps what was typed).
+	// Once per cart: the reload is remembered with the domains of the order (sessionStorage; a URL marker when that is not
+	// available). If the row is still missing afterwards the page does not load again, it says what to do.
+	function phoneReload( domains ) {
+		var id = 'od:' + domains;
+		var url = null;
+
+		try {
+			if ( window.sessionStorage.getItem( 'beltoftOdReload' ) === id ) {
+				return false;
+			}
+
+			window.sessionStorage.setItem( 'beltoftOdReload', id );
+		} catch ( e ) {
+			url = new URL( window.location.href );
+
+			if ( url.searchParams.get( 'od_reload' ) === '1' ) {
+				return false;
+			}
+
+			url.searchParams.set( 'od_reload', '1' );
+		}
+
+		if ( url ) {
+			window.location.assign( url.toString() );
+		} else {
+			window.location.reload();
+		}
+
+		return true;
+	}
+
+	function phoneNote( on ) {
+		var note = document.querySelector( '[data-od-phone-note]' );
+		var anchor = document.querySelector( '[data-od-line]' );
+
+		if ( ! on ) {
+			if ( note ) {
+				note.remove();
+			}
+
+			return;
+		}
+
+		if ( note || ! anchor ) {
+			return;
+		}
+
+		note = el( 'p', 'beltoft-services-od-note', text.phoneMissing );
+		note.setAttribute( 'data-od-phone-note', '' );
+		note.setAttribute( 'role', 'status' );
+		anchor.appendChild( note );
+	}
+
 	if ( window.jQuery ) {
 		window.jQuery( document.body ).on( 'updated_checkout', function () {
 			var marker = document.querySelector( '.beltoft-services-od-phone' );
 
-			if ( ! marker || '1' !== marker.getAttribute( 'data-od-phone' ) || document.getElementById( 'billing_phone' ) ) {
+			if ( ! marker || '1' !== marker.getAttribute( 'data-od-phone' ) ) {
+				phoneNote( false );
+
 				return;
 			}
 
-			try {
-				if ( Date.now() - Number( window.sessionStorage.getItem( 'beltoftOdReload' ) || 0 ) < 60000 ) {
-					return;
+			if ( document.getElementById( 'billing_phone' ) ) {
+				phoneNote( false );
+
+				try {
+					window.sessionStorage.removeItem( 'beltoftOdReload' );
+				} catch ( e ) {
+					// Nothing to forget.
 				}
 
-				window.sessionStorage.setItem( 'beltoftOdReload', String( Date.now() ) );
-			} catch ( e ) {
 				return;
 			}
 
-			window.location.reload();
+			if ( ! phoneReload( marker.getAttribute( 'data-od-domains' ) || '' ) ) {
+				phoneNote( true );
+			}
 		} );
 	}
 
