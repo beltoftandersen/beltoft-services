@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.42.3
+Stable tag: 0.42.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,10 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.42.4 =
+* Checkout: the phone row reload happens at most once per cart, then a short note; a slow checkout is read once more before an error, and a domain that is in the order is always shown as added; the remove action is bound to the visitor's session; a kept domain line ends with its session and is dropped at login.
+* Hosting: the last runs of scheduled jobs are read at most once a minute per website, and a page load waits at most 3 s for the node.
 
 = 0.42.3 =
 * Checkout: a domain line kept for the customer is only put back into the customer's own cart, never into a recurring cart that WooCommerce Subscriptions builds for another billing group (it could join the hosting subscription).
