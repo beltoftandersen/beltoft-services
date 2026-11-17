@@ -169,6 +169,10 @@ final class OrderDomain {
 			'transferAdded' => __( 'Transfer of %s is added to this order.', 'beltoft-services' ),
 			'remove'      => __( 'Remove from order', 'beltoft-services' ),
 			/* translators: %s: domain name */
+			'heldRegister' => __( 'Registration of %s stays in this order. This choice does not use it.', 'beltoft-services' ),
+			/* translators: %s: domain name */
+			'heldTransfer' => __( 'Transfer of %s stays in this order. This choice does not use it.', 'beltoft-services' ),
+			/* translators: %s: domain name */
 			'codeLabel'   => __( 'Transfer code for %s', 'beltoft-services' ),
 			'codePlaceholder' => __( 'Transfer code', 'beltoft-services' ),
 		);

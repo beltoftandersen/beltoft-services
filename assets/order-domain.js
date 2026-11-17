@@ -144,6 +144,51 @@
 				chosen.querySelector( '[data-od-chosen-text]' ).textContent = fill( 'transfer' === kind ? text.transferAdded : text.registerAdded, display );
 			}
 		} );
+
+		heldNote( line );
+	}
+
+	// A domain the order holds while another tile is chosen: it stays in the order and is paid for, so the customer is told and can take it out.
+	function heldNote( line ) {
+		var value = line.querySelector( '[data-od-value]' );
+		var domain = value ? value.value : '';
+		var picked = line.querySelector( '[data-od-tiles] input[type="radio"]:checked' );
+		var tiles = line.querySelector( '[data-od-tiles]' );
+		var note = line.querySelector( '[data-od-held]' );
+		var mode = '';
+
+		[ 'register', 'transfer' ].forEach( function ( kind ) {
+			var panel = panelOf( line, kind );
+			var chosen = panel ? panel.querySelector( '[data-od-chosen]' ) : null;
+
+			if ( chosen && ! chosen.hidden ) {
+				mode = kind;
+			}
+		} );
+
+		if ( ! domain || ! mode || ! picked || picked.value === mode || ! tiles ) {
+			if ( note ) {
+				note.hidden = true;
+			}
+
+			return;
+		}
+
+		if ( ! note ) {
+			note = el( 'div', 'beltoft-services-od-chosen beltoft-services-od-held' );
+			note.setAttribute( 'data-od-held', '' );
+			note.appendChild( el( 'p', 'beltoft-services-od-chosen__text' ) );
+
+			var remove = el( 'button', 'beltoft-services-od-link', text.remove );
+
+			remove.type = 'button';
+			remove.setAttribute( 'data-od-remove', '' );
+			note.appendChild( remove );
+			tiles.insertAdjacentElement( 'afterend', note );
+		}
+
+		note.querySelector( 'p' ).textContent = fill( 'transfer' === mode ? text.heldTransfer : text.heldRegister, domain );
+		note.hidden = false;
 	}
 
 	function pickTile( line, kind ) {
@@ -406,7 +451,11 @@
 		line.querySelectorAll( '[data-od-panel]' ).forEach( function ( panel ) {
 			panel.hidden = panel.getAttribute( 'data-od-panel' ) !== mode;
 		} );
+
+		heldNote( line );
 	}
+
+	document.querySelectorAll( '[data-od-line]' ).forEach( heldNote );
 
 	document.addEventListener( 'change', function ( event ) {
 		if ( event.target.matches && event.target.matches( '[data-od-tiles] input[type="radio"]' ) && lineOf( event.target ) ) {
@@ -417,13 +466,14 @@
 	document.addEventListener( 'click', function ( event ) {
 		var target = event.target.closest ? event.target.closest( '[data-od-go], [data-od-remove]' ) : null;
 		var panel = target ? target.closest( '[data-od-panel]' ) : null;
+		var held = target ? target.closest( '[data-od-held]' ) : null;
 
-		if ( ! target || ! panel || ! lineOf( panel ) ) {
+		if ( ! target || ( ! panel && ! held ) || ! lineOf( panel || held ) ) {
 			return;
 		}
 
-		var line = lineOf( panel );
-		var kind = panel.getAttribute( 'data-od-panel' );
+		var line = lineOf( panel || held );
+		var kind = panel ? panel.getAttribute( 'data-od-panel' ) : '';
 
 		if ( target.hasAttribute( 'data-od-go' ) ) {
 			if ( 'transfer' === kind ) {
@@ -448,7 +498,11 @@
 			setChosen( line, '', '', '' );
 			refresh();
 		} ).fail( function () {
-			message( panel.querySelector( '[data-od-results]' ), text.removeFailed, true );
+			var box = ( panel || line.querySelector( '[data-od-panel]:not([hidden])' ) || line ).querySelector( '[data-od-results]' );
+
+			if ( box ) {
+				message( box, text.removeFailed, true );
+			}
 		} ).always( function () {
 			working( target, false );
 		} );

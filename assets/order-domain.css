@@ -49,3 +49,5 @@
 	.beltoft-services-od-form__row, .beltoft-services-od-code { flex-direction: column; }
 	.beltoft-services-od-panel input[type="text"] { font-size: 16px; }
 }
+.beltoft-services-od-held { margin: 0 0 16px; }
+.beltoft-services-od-held[hidden] { display: none; }
