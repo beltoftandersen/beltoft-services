@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.38.0
+Stable tag: 0.38.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.38.1 =
+* Email page: the Delete button of a mailbox sits level with the button beside it.
 
 = 0.38.0 =
 * Server licences (Plesk editions, CloudLinux, add-on keys): the server address of a licence can be changed on its page in My Account, to one of the customer's own servers or a typed address. Nothing is charged and no new licence is ordered. One change per licence in 24 hours (filter `beltoft_services_licence_moves_per_day`).

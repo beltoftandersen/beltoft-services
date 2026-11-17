@@ -993,6 +993,8 @@ body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-vm
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__actions summary { display: inline-flex; align-items: center; box-sizing: border-box; border: 1px solid var(--bs-status-fail); box-shadow: none; color: var(--bs-status-fail); font-weight: var(--bs-fw-medium); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__actions > :is(.button, details) { display: inline-flex; vertical-align: middle; margin: 0 8px 8px 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__actions details > summary { margin: 0; }
+/* In a list row the gap spaces the buttons: no margin of their own (the Delete disclosure took the 32px top margin of a page section and sat lower than the button beside it). */
+body.woocommerce-account .woocommerce-MyAccount-content .bs-item__actions.beltoft-services-mail__actions > :is(.button, details.bs-confirm) { margin: 0; }
 
 /* Link style: 15/500, underlined */
 body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-fw__link, .beltoft-services-vm .beltoft-services-vm__link, div.beltoft-services-domain button.beltoft-services-domain__link, .beltoft-services-vm__disk a, .beltoft-services-vm__disks p a) { display: inline-flex; align-items: center; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; color: var(--navy, #0c1535); font-family: inherit; font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); line-height: 1.4; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
