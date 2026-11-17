@@ -19,7 +19,7 @@ final class AppNextcloudTest extends TestCase {
 		$this->assertSame( '35.0.2', $app['upstream'] );
 		$this->assertSame( hash_file( 'sha256', BELTOFT_SERVICES_PATH . 'apps/nextcloud/35/install.script' ), $app['sha256'] );
 		$this->assertStringContainsString( hash( 'sha256', $this->script() ) . '  nextcloud/35/install.script', (string) file_get_contents( BELTOFT_SERVICES_PATH . 'apps/CHECKSUMS' ) );
-		$this->assertFileExists( BELTOFT_SERVICES_PATH . 'apps/nextcloud/logo.svg' );
+		$this->assertFileExists( BELTOFT_SERVICES_PATH . 'assets/logos/nextcloud.svg' );
 	}
 
 	public function test_the_minimum_plan_is_performance_and_a_starter_plan_is_refused(): void {

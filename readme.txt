@@ -264,6 +264,9 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 * Hosting: the database name, user and host of a website are shown; the password is shown once after the emailed code.
 * Hosting: the product name in the account comes from the setting `hosting_label` (default "Hosting"); order links can preselect an empty website with `site_install=empty`.
 
+= 0.40.1 =
+* Logos: the operating system, app and database tiles show the logos in their brand colours (white on the selected tile), the database engines have a logo too. Every logo file is in `assets/logos/`; `Tiles::logo_url()` gives the URL of one, filter `beltoft_services_engine_logo`.
+
 = 0.40.0 =
 * Backups: a customer can delete one of their own backups on a server, a managed database and a hosting account (Delete in the backups list, one confirm dialog). The only backup may be deleted; the dialog says so. The safety copy of a hosting restore cannot be deleted. Refused while a backup or a restore runs; at most 10 deletes an hour per service. No MCP tool.
 

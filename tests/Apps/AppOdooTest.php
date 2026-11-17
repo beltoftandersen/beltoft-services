@@ -19,7 +19,7 @@ final class AppOdooTest extends TestCase {
 		$this->assertSame( '20.0', $app['upstream'] );
 		$this->assertSame( hash_file( 'sha256', BELTOFT_SERVICES_PATH . 'apps/odoo/20/install.script' ), $app['sha256'] );
 		$this->assertStringContainsString( hash( 'sha256', $this->script() ) . '  odoo/20/install.script', (string) file_get_contents( BELTOFT_SERVICES_PATH . 'apps/CHECKSUMS' ) );
-		$this->assertFileExists( BELTOFT_SERVICES_PATH . 'apps/odoo/logo.svg' );
+		$this->assertFileExists( BELTOFT_SERVICES_PATH . 'assets/logos/odoo.svg' );
 	}
 
 	public function test_the_minimum_is_the_smallest_plan_and_more_is_recommended_in_the_text(): void {

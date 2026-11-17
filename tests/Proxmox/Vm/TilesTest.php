@@ -14,8 +14,9 @@ class TilesTest extends TestCase {
 
 	public function tear_down(): void {
 		remove_all_filters( 'beltoft_services_os_logo' );
+		remove_all_filters( 'beltoft_services_engine_logo' );
 		remove_all_filters( 'beltoft_services_apps' );
-		@unlink( BELTOFT_SERVICES_PATH . 'apps/docker/evil.svg' ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.unlink_unlink -- test file.
+		array_map( 'unlink', glob( BELTOFT_SERVICES_PATH . 'assets/logos/evil*.svg' ) ?: array() ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink -- test files.
 		parent::tear_down();
 	}
 
@@ -57,16 +58,97 @@ class TilesTest extends TestCase {
 		$this->assertSame( $generic, Tiles::os_logo( 1, 'Nothing', '' ) );
 	}
 
+	public function test_every_shipped_logo_is_accepted_and_carries_its_own_colour(): void {
+		$files = glob( BELTOFT_SERVICES_PATH . 'assets/logos/*.svg' );
+		$this->assertCount( 16, $files );
+		$read = new \ReflectionMethod( Tiles::class, 'svg' );
+		$read->setAccessible( true );
+
+		foreach ( $files as $file ) {
+			$svg = $read->invoke( null, $file );
+			$this->assertNotSame( '', $svg, basename( $file ) . ' passes the safety check.' );
+			$this->assertMatchesRegularExpression( '/^<svg aria-hidden="true" focusable="false" [^>]*viewBox="[^"]+"/', $svg, basename( $file ) . ' has a viewBox.' );
+			$this->assertStringContainsString( 'xmlns="http://www.w3.org/2000/svg"', $svg, basename( $file ) . ' works as an img.' );
+
+			if ( 'generic.svg' !== basename( $file ) ) {
+				$this->assertDoesNotMatchRegularExpression( '/currentColor/', $svg, $file . ' has its colour written in the file.' );
+				$this->assertMatchesRegularExpression( '/fill="#[0-9a-fA-F]{6}"/', $svg, $file );
+			}
+		}
+	}
+
+	public function test_each_engine_has_its_logo_and_an_unknown_one_the_generic_glyph(): void {
+		$generic = Tiles::os_logo( 1, 'Nothing', '' );
+		$logos   = array();
+
+		foreach ( array( 'postgres', 'valkey', 'mssql' ) as $id ) {
+			$logos[ $id ] = Tiles::engine_logo( $id );
+			$this->assertStringStartsWith( '<svg aria-hidden="true" focusable="false"', $logos[ $id ], $id );
+			$this->assertNotSame( $generic, $logos[ $id ], $id );
+		}
+
+		$this->assertCount( 3, array_unique( $logos ) );
+		$this->assertSame( $generic, Tiles::engine_logo( 'oracle' ) );
+		$this->assertSame( $generic, Tiles::engine_logo( '../x' ) );
+	}
+
+	public function test_a_filter_can_name_another_engine_logo_and_a_bad_name_is_ignored(): void {
+		add_filter( 'beltoft_services_engine_logo', static fn() => 'valkey' );
+		$this->assertSame( Tiles::engine_logo( 'postgres' ), Tiles::engine_logo( 'oracle' ) );
+		$this->assertStringContainsString( '#6983FF', Tiles::engine_logo( 'oracle' ) );
+
+		remove_all_filters( 'beltoft_services_engine_logo' );
+		add_filter( 'beltoft_services_engine_logo', static fn() => '../../wp-config' );
+		$this->assertSame( Tiles::os_logo( 1, 'Nothing', '' ), Tiles::engine_logo( 'postgres' ) );
+	}
+
+	public function test_a_selected_tile_turns_its_logo_to_the_text_colour_in_the_style(): void {
+		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/tiles.css' );
+		$this->assertMatchesRegularExpression( '/__input:checked \+ \.beltoft-services-tile__face \.beltoft-services-tile__logo svg \*[^{]*\{ fill: currentColor; \}/', $css );
+	}
+
 	public function test_the_apps_name_their_logo_in_app_json_and_the_shipped_ones_exist(): void {
-		foreach ( array( 'docker', 'wordpress', 'coolify' ) as $id ) {
+		foreach ( array( 'docker', 'wordpress', 'coolify', 'n8n', 'nextcloud', 'odoo', 'plesk' ) as $id ) {
 			$data = json_decode( (string) file_get_contents( BELTOFT_SERVICES_PATH . 'apps/' . $id . '/app.json' ), true );
-			$this->assertSame( 'logo.svg', $data['logo'], $id );
-			$this->assertFileExists( BELTOFT_SERVICES_PATH . 'apps/' . $id . '/logo.svg' );
+			$this->assertSame( $id, $data['logo'], 'The slug of the file in assets/logos.' );
+			$this->assertFileExists( BELTOFT_SERVICES_PATH . 'assets/logos/' . $data['logo'] . '.svg' );
 			$this->assertNotSame( Tiles::os_logo( 1, 'Nothing', '' ), Tiles::app_logo( $data ), $id . ' has its own logo.' );
 		}
 
-		foreach ( array( 'ubuntu', 'debian', 'almalinux', 'generic' ) as $slug ) {
-			$this->assertFileExists( BELTOFT_SERVICES_PATH . 'assets/os/' . $slug . '.svg' );
+		foreach ( array( 'ubuntu', 'debian', 'almalinux', 'generic', 'cloudlinux', 'woocommerce', 'postgres', 'valkey', 'mssql' ) as $slug ) {
+			$this->assertFileExists( BELTOFT_SERVICES_PATH . 'assets/logos/' . $slug . '.svg' );
+		}
+	}
+
+	public function test_logo_files_live_in_one_folder_only(): void {
+		$root  = realpath( BELTOFT_SERVICES_PATH );
+		$found = array();
+		$skip  = array( '.git', '.internal', 'tests', 'vendor', 'node_modules', '.playwright-mcp', '.superpowers' );
+		$walk  = new \RecursiveIteratorIterator( new \RecursiveCallbackFilterIterator( new \RecursiveDirectoryIterator( $root, \FilesystemIterator::SKIP_DOTS ), static fn( $f ) => ! in_array( $f->getFilename(), $skip, true ) ) );
+
+		foreach ( $walk as $file ) {
+			if ( 'svg' === strtolower( $file->getExtension() ) ) {
+				$found[] = substr( $file->getPathname(), strlen( $root ) + 1 );
+			}
+		}
+
+		foreach ( $found as $path ) {
+			$this->assertStringStartsWith( 'assets/logos/', $path, 'Every logo file is in assets/logos.' );
+		}
+
+		$this->assertDirectoryDoesNotExist( BELTOFT_SERVICES_PATH . 'assets/os' );
+		$this->assertDirectoryDoesNotExist( BELTOFT_SERVICES_PATH . 'assets/db' );
+	}
+
+	public function test_logo_url_gives_the_file_of_a_slug_and_nothing_for_an_unknown_one(): void {
+		$url = Tiles::logo_url( 'ubuntu' );
+		$this->assertStringEndsWith( '/assets/logos/ubuntu.svg', $url );
+		$this->assertSame( '', Tiles::logo_url( 'no-such-logo' ) );
+		$this->assertSame( '', Tiles::logo_url( '../tiles' ) );
+		$this->assertSame( '', Tiles::logo_url( '' ) );
+
+		foreach ( glob( BELTOFT_SERVICES_PATH . 'assets/logos/*.svg' ) as $file ) {
+			$this->assertNotSame( '', Tiles::logo_url( basename( $file, '.svg' ) ) );
 		}
 	}
 
@@ -74,22 +156,20 @@ class TilesTest extends TestCase {
 		$generic = Tiles::os_logo( 1, 'Nothing', '' );
 
 		$this->assertSame( $generic, Tiles::app_logo( array( 'id' => 'docker' ) ), 'No logo field.' );
-		$this->assertSame( $generic, Tiles::app_logo( array( 'id' => 'docker', 'logo' => '../../apps/CHECKSUMS.svg' ) ), 'A path is not a file name.' );
-		$this->assertSame( $generic, Tiles::app_logo( array( 'id' => 'docker', 'logo' => 'missing.svg' ) ) );
-		$this->assertSame( $generic, Tiles::app_logo( array( 'id' => '../x', 'logo' => 'logo.svg' ) ) );
+		$this->assertSame( $generic, Tiles::app_logo( array( 'id' => 'docker', 'logo' => '../../apps/CHECKSUMS' ) ), 'A path is not a file name.' );
+		$this->assertSame( $generic, Tiles::app_logo( array( 'id' => 'docker', 'logo' => 'missing' ) ) );
+		$this->assertSame( $generic, Tiles::app_logo( array( 'id' => 'docker', 'logo' => 'Docker.svg' ) ) );
 	}
 
 	public function test_a_logo_with_a_script_or_a_handler_is_never_printed(): void {
 		$generic = Tiles::os_logo( 1, 'Nothing', '' );
 
 		foreach ( array( '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>', '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><path d="M0 0"/></svg>', '<svg xmlns="http://www.w3.org/2000/svg"><a href="javascript:alert(1)"><path d="M0 0"/></a></svg>', '<html><svg></svg></html>' ) as $i => $body ) {
-			file_put_contents( BELTOFT_SERVICES_PATH . 'apps/docker/evil.svg', $body ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- test file.
-			clearstatcache();
-			// The same file name gives a new content each round, but the markup is cached per path: use a new name.
-			$name = 'evil' . $i . '.svg';
-			rename( BELTOFT_SERVICES_PATH . 'apps/docker/evil.svg', BELTOFT_SERVICES_PATH . 'apps/docker/' . $name ); // phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename -- test file.
+			// The markup is cached per path: a new name each round.
+			$name = 'evil' . $i;
+			file_put_contents( BELTOFT_SERVICES_PATH . 'assets/logos/' . $name . '.svg', $body ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- test file.
 			$this->assertSame( $generic, Tiles::app_logo( array( 'id' => 'docker', 'logo' => $name ) ), $body );
-			unlink( BELTOFT_SERVICES_PATH . 'apps/docker/' . $name ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink -- test file.
+			unlink( BELTOFT_SERVICES_PATH . 'assets/logos/' . $name . '.svg' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink -- test file.
 		}
 	}
 

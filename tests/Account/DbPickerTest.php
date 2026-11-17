@@ -430,6 +430,7 @@ class DbPickerTest extends BackupTestCase {
 
 		$this->assertStringContainsString( 'data-picker-engines', $html );
 		$this->assertSame( 2, substr_count( $html, 'name="beltoft_services_db_engine"' ) );
+		$this->assertSame( 2, preg_match_all( '#<span class="beltoft-services-tile__logo"><svg aria-hidden="true"#', substr( $html, (int) strpos( $html, 'data-picker-engines' ), (int) strpos( $html, '</fieldset>', (int) strpos( $html, 'data-picker-engines' ) ) - (int) strpos( $html, 'data-picker-engines' ) ) ), 'A logo on each engine tile.' );
 		$this->assertStringContainsString( 'Relational database', $html );
 		$this->assertStringContainsString( 'In-memory key-value store, Redis compatible', $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
