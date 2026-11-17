@@ -264,6 +264,9 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 * Hosting: the database name, user and host of a website are shown; the password is shown once after the emailed code.
 * Hosting: the product name in the account comes from the setting `hosting_label` (default "Hosting"); order links can preselect an empty website with `site_install=empty`.
 
+= 0.40.2 =
+* Account lists: the state stands above the name in every list (servers, hosting, databases, domains, email, SSL, licences, apps); the renewal date is no longer in the server and domain rows.
+
 = 0.40.1 =
 * Logos: the operating system, app and database tiles show the logos in their brand colours (white on the selected tile), the database engines have a logo too. Every logo file is in `assets/logos/`; `Tiles::logo_url()` gives the URL of one, filter `beltoft_services_engine_logo`.
 
