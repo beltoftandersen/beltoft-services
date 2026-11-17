@@ -92,7 +92,7 @@ final class Meter {
 
 		$written = 0;
 
-		foreach ( \BeltoftServices\Http\OrderPull::counted( $now ) as $r ) {
+		foreach ( \BeltoftServices\Http\OrderPull::counted( $now, true ) as $r ) {
 			$written += self::bill( $r, $now );
 		}
 
@@ -165,9 +165,12 @@ final class Meter {
 				}
 			}
 
-			if ( $clean ) {
-				Store::mark_billed( $r->id(), $hour );
+			// An hour that could not be settled stops the run: a later hour would start its steps from a count that lacks this one.
+			if ( ! $clean ) {
+				break;
 			}
+
+			Store::mark_billed( $r->id(), $hour );
 		}
 
 		return $written;

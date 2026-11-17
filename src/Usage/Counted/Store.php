@@ -106,6 +106,20 @@ final class Store {
 	}
 
 	/**
+	 * Events received in a period that were taken for billing (billable or billed): not held, not free, not credited.
+	 *
+	 * @param int $resource_id Resource.
+	 * @param int $from        Unix time.
+	 * @param int $to          Unix time (exclusive).
+	 */
+	public static function accepted_between( int $resource_id, int $from, int $to ): int {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
+		return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE resource_id = %d AND state IN (%s, %s) AND received_at >= %s AND received_at < %s', self::table(), $resource_id, self::BILLABLE, self::BILLED, gmdate( 'Y-m-d H:i:s', $from ), gmdate( 'Y-m-d H:i:s', $to ) ) );
+	}
+
+	/**
 	 * The highest remote sequence a resource has, or 0.
 	 *
 	 * @param int $resource_id Resource.

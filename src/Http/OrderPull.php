@@ -33,6 +33,7 @@ final class OrderPull {
 	public const STOPPED = 'events_stopped';
 	public const ERRORS  = 'events_errors';
 	public const LAST    = 'events_last_pull';
+	public const FINAL   = 'events_final';
 	public const PAGE    = 500;
 	public const PAGES   = 10;
 
@@ -45,27 +46,38 @@ final class OrderPull {
 	public static function run( int $now ): int {
 		$stored = 0;
 
-		foreach ( self::counted( $now ) as $r ) {
-			$stored += self::pull( $r, $now );
+		foreach ( self::counted( $now, true ) as $r ) {
+			if ( 'deleted' !== $r->get( 'state' ) ) {
+				$stored += self::pull( $r, $now );
+				continue;
+			}
+
+			// A service that has ended gets one last pull (its service may be gone already: the read then fails and that is the end of it).
+			if ( ! (int) $r->get( self::FINAL ) ) {
+				$stored += self::pull( $r, $now );
+				$r->set( array( self::FINAL => 1 ) );
+			}
 		}
 
 		return $stored;
 	}
 
 	/**
-	 * The live counted services (billing kind counted, on the usage account).
+	 * The counted services (billing kind counted, on the usage account). With $with_gone the ones that have ended are in too:
+	 * their last orders are still pulled once and billed when they are old enough.
 	 *
-	 * @param int $now Unix time.
+	 * @param int  $now       Unix time.
+	 * @param bool $with_gone Include services in state deleted.
 	 * @return Resource[]
 	 */
-	public static function counted( int $now ): array {
+	public static function counted( int $now, bool $with_gone = false ): array {
 		$out  = array();
 		$rows = Licenses::resources_of_source( 'usage', gmdate( 'Y-m-d H:i:s', $now - 60 * DAY_IN_SECONDS ) );
 
 		foreach ( (array) $rows as $row ) {
 			$r = Resource::find( (int) $row['id'] );
 
-			if ( $r && $r->is_valid() && Rates::is_counted( (int) ( $r->license()['variation_id'] ?? 0 ) ) && 'deleted' !== $r->get( 'state' ) ) {
+			if ( $r && $r->is_valid() && Rates::is_counted( (int) ( $r->license()['variation_id'] ?? 0 ) ) && ( $with_gone || 'deleted' !== $r->get( 'state' ) ) ) {
 				$out[] = $r;
 			}
 		}
@@ -90,6 +102,7 @@ final class OrderPull {
 		$cursor = (int) $r->get( self::CURSOR );
 		$stored = 0;
 		$remote = null;
+		$done   = false;
 
 		for ( $page = 0; $page < self::PAGES; $page++ ) {
 			$answer = $driver->read_events( $r, 'events', array( 'after' => $cursor, 'limit' => self::PAGE ) );
@@ -118,13 +131,15 @@ final class OrderPull {
 			}
 
 			if ( null === ( $data['next'] ?? null ) || ! $orders ) {
+				$done = true;
 				break;
 			}
 		}
 
 		$r->set( array( self::CURSOR => $cursor, self::LAST => $now, self::ERRORS => 0 ) );
 
-		if ( null !== $remote ) {
+		// Totals are compared only when the pull has caught up: during a backlog the held count is lower by design.
+		if ( null !== $remote && $done ) {
 			self::reconcile( $r, $remote );
 		}
 
@@ -230,7 +245,8 @@ final class OrderPull {
 	 * @param int      $now Unix time.
 	 */
 	public static function cap( Resource $r, int $now ): int {
-		$average = Store::received_between( $r->id(), $now - 15 * DAY_IN_SECONDS, $now - DAY_IN_SECONDS ) / 14;
+		// Billing history only: held events (a flood) never raise the cap.
+		$average = Store::accepted_between( $r->id(), $now - 15 * DAY_IN_SECONDS, $now - DAY_IN_SECONDS ) / 14;
 
 		return max( (int) Settings::get( 'counted_cap_min' ), (int) ceil( (float) Settings::get( 'counted_cap_factor' ) * $average ) );
 	}

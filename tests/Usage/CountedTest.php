@@ -566,4 +566,92 @@ class CountedTest extends TestCase {
 		Views::render( Resource::find( $r->id() ) );
 		$this->assertSame( '', (string) ob_get_clean() );
 	}
+
+	// ------------------------------------------------------------ review fixes
+
+	public function test_an_ended_service_still_bills_its_last_orders_and_gets_one_final_pull(): void {
+		$r   = $this->service();
+		$now = (int) strtotime( '2026-11-20 12:30:00 UTC' );
+		$this->seed_billable( $r, array( '2026-11-18 10:00:00' => 4 ) );
+		$r->set( array( 'state' => 'deleted' ) );
+
+		Meter::run( $now );
+		$this->assertCount( 1, $this->ledger( $r ) );
+		$this->assertSame( array( Store::BILLED => 4 ), $this->states( $r ) );
+
+		$this->remote( 2 );
+		$calls = count( $this->http_calls() );
+		OrderPull::run( $now );
+		$this->assertSame( 2, Store::count( $r->id(), Store::BILLABLE ) + Store::count( $r->id(), Store::FREE ) );
+		$this->assertSame( 1, (int) Resource::find( $r->id() )->get( OrderPull::FINAL ) );
+		$after = count( $this->http_calls() );
+		OrderPull::run( $now + 3600 );
+		$this->assertSame( $after, count( $this->http_calls() ), 'Only one final pull.' );
+		$this->assertGreaterThan( $calls, $after );
+	}
+
+	public function test_a_backlog_larger_than_one_run_keeps_its_cursor_and_gives_no_false_alert(): void {
+		update_option( 'beltoft_services_settings', array_merge( (array) get_option( 'beltoft_services_settings' ), array( 'counted_intro_days' => 0, 'counted_cap_min' => 100000 ) ) );
+		$mails = 0;
+		add_filter( 'pre_wp_mail', static function () use ( &$mails ) {
+			++$mails;
+			return true;
+		} );
+		$r = $this->service();
+		$this->remote( OrderPull::PAGE * OrderPull::PAGES + 200 );
+
+		$this->assertSame( OrderPull::PAGE * OrderPull::PAGES, OrderPull::pull( $r, time() ) );
+		$r = Resource::find( $r->id() );
+		$this->assertSame( OrderPull::PAGE * OrderPull::PAGES, (int) $r->get( OrderPull::CURSOR ), 'The cursor is not reset during a backlog.' );
+		$this->assertSame( 0, $mails );
+
+		$this->assertSame( 200, OrderPull::pull( $r, time() + 3600 ), 'The next run takes the rest.' );
+		$this->assertSame( 0, (int) Resource::find( $r->id() )->get( 'events_regap' ) );
+		$this->assertSame( '', (string) Resource::find( $r->id() )->get( OrderPull::STOPPED ) );
+	}
+
+	public function test_an_hour_that_cannot_be_settled_holds_back_the_later_hours(): void {
+		$r   = $this->service();
+		$now = (int) strtotime( '2026-11-20 12:30:00 UTC' );
+		$this->seed_billable( $r, array( '2026-11-18 10:00:00' => 10, '2026-11-18 11:00:00' => 5 ), 1 );
+		// The ledger already holds a different quantity for the first hour.
+		Ledger::record( $r->id(), (int) $r->license()['user_id'], 'order', 9.0, 'order', 0.10, (int) strtotime( '2026-11-18 10:00:00 UTC' ), '' );
+
+		Meter::bill( $r, $now );
+		$hours = array_column( $this->ledger( $r ), 'hour_bucket' );
+		$this->assertSame( array( '2026-11-18 10:00:00' ), $hours, 'The second hour waits.' );
+		$this->assertSame( array( Store::BILLABLE => 15 ), $this->states( $r ) );
+	}
+
+	public function test_a_flood_of_held_events_does_not_raise_the_cap(): void {
+		update_option( 'beltoft_services_settings', array_merge( (array) get_option( 'beltoft_services_settings' ), array( 'counted_cap_min' => 3, 'counted_cap_factor' => 1 ) ) );
+		$r   = $this->service();
+		$now = time();
+		for ( $i = 1; $i <= 140; $i++ ) {
+			Store::add( array( 'resource_id' => $r->id(), 'remote_seq' => $i, 'store_key' => 's', 'woo_order_id' => (string) $i, 'received_at' => $now - 3 * DAY_IN_SECONDS, 'state' => Store::HELD ) );
+		}
+		$this->assertSame( 3, OrderPull::cap( $r, $now ) );
+
+		for ( $i = 1; $i <= 140; $i++ ) {
+			Store::add( array( 'resource_id' => $r->id(), 'remote_seq' => 1000 + $i, 'store_key' => 's', 'woo_order_id' => (string) ( 1000 + $i ), 'received_at' => $now - 4 * DAY_IN_SECONDS, 'state' => Store::BILLED ) );
+		}
+		$this->assertSame( 10, OrderPull::cap( $r, $now ), 'Billed history does count.' );
+	}
+
+	public function test_an_intro_refused_by_one_key_leaves_no_claims_behind(): void {
+		global $wpdb;
+		// Another service holds the store.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test.
+		$wpdb->insert( Intro::table(), array( 'kind' => 'store', 'key_hash' => Intro::hash( 'store', 'shop.example' ), 'resource_id' => 99999, 'claimed_at' => gmdate( 'Y-m-d H:i:s' ) ) );
+
+		$r = $this->service();
+		$this->remote( 1 );
+		OrderPull::pull( $r, time() );
+		$r = Resource::find( $r->id() );
+
+		$this->assertSame( 'store', $r->get( Intro::DENIED ) );
+		$this->assertSame( 0, Intro::claimed_by( 'user', (string) (int) $r->license()['user_id'] ) );
+		$this->assertSame( 0, Intro::claimed_by( 'odoo', 'odoo.example/db' ) );
+		$this->assertSame( 99999, Intro::claimed_by( 'store', 'shop.example' ) );
+	}
 }

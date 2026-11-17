@@ -104,18 +104,32 @@ final class Intro {
 	}
 
 	/**
-	 * Writes a claim; one that exists is left as it is.
+	 * Writes a claim; one that exists is left as it is. True when this call made it.
 	 *
 	 * @param string $kind        Kind.
 	 * @param string $value       Value.
 	 * @param int    $resource_id Resource.
 	 * @param int    $now         Unix time.
 	 */
-	private static function claim( string $kind, string $value, int $resource_id, int $now ): void {
+	private static function claim( string $kind, string $value, int $resource_id, int $now ): bool {
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
-		$wpdb->query( $wpdb->prepare( 'INSERT IGNORE INTO %i (kind, key_hash, resource_id, claimed_at) VALUES (%s, %s, %d, %s)', self::table(), $kind, self::hash( $kind, $value ), $resource_id, gmdate( 'Y-m-d H:i:s', $now ) ) );
+		return 1 === (int) $wpdb->query( $wpdb->prepare( 'INSERT IGNORE INTO %i (kind, key_hash, resource_id, claimed_at) VALUES (%s, %s, %d, %s)', self::table(), $kind, self::hash( $kind, $value ), $resource_id, gmdate( 'Y-m-d H:i:s', $now ) ) );
+	}
+
+	/**
+	 * Gives back a claim this resource just made.
+	 *
+	 * @param string $kind        Kind.
+	 * @param string $value       Value.
+	 * @param int    $resource_id Resource.
+	 */
+	private static function unclaim( string $kind, string $value, int $resource_id ): void {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
+		$wpdb->delete( self::table(), array( 'kind' => $kind, 'key_hash' => self::hash( $kind, $value ), 'resource_id' => $resource_id ), array( '%s', '%s', '%d' ) );
 	}
 
 	/**
@@ -146,22 +160,31 @@ final class Intro {
 			$reason = 'customer';
 		}
 
+		// Each key is claimed with one insert on the unique key (kind, hash), so two services decided at the same moment cannot both win.
+		$mine = array();
+
 		foreach ( '' === $reason ? $keys : array() as $kind => $value ) {
+			if ( self::claim( $kind, $value, $r->id(), $now ) ) {
+				$mine[ $kind ] = $value;
+				continue;
+			}
+
 			$holder = self::claimed_by( $kind, $value );
 
-			if ( $holder > 0 && $holder !== $r->id() ) {
+			if ( $holder !== $r->id() ) {
 				$reason = $kind;
 				break;
 			}
 		}
 
 		if ( '' !== $reason ) {
+			// Keys this call claimed before the refusal are given back.
+			foreach ( $mine as $kind => $value ) {
+				self::unclaim( $kind, $value, $r->id() );
+			}
+
 			$r->set( array( self::DENIED => $reason ) );
 			return;
-		}
-
-		foreach ( $keys as $kind => $value ) {
-			self::claim( $kind, $value, $r->id(), $now );
 		}
 
 		$r->set(
