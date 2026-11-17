@@ -177,4 +177,37 @@ class OrderDomainTest extends TestCase {
 	public function test_the_removal_endpoint_is_hooked(): void {
 		$this->assertNotFalse( has_action( 'wc_ajax_' . OrderDomain::AJAX, array( OrderDomain::class, 'ajax' ) ) );
 	}
+
+	public function test_a_guests_nonce_does_not_work_in_another_session_and_removes_only_the_own_cart(): void {
+		$this->add_domain_line( 'Fresh.example' );
+		$session = WC()->session;
+		$this->assertInstanceOf( \WC_Session_Handler::class, $session );
+		$props = new \ReflectionProperty( \WC_Session_Handler::class, '_customer_id' );
+		$props->setAccessible( true );
+		$was = $props->getValue( $session );
+		wp_set_current_user( 0 );
+		$filter = array( $session, 'maybe_update_nonce_user_logged_out' );
+		add_filter( 'nonce_user_logged_out', $filter, 10, 2 );
+		$has = new \ReflectionProperty( \WC_Session_Handler::class, '_has_cookie' );
+		$has->setAccessible( true );
+		$had = $has->getValue( $session );
+		$has->setValue( $session, true );
+
+		try {
+			$props->setValue( $session, 't_guest_one_0000000000000000000' );
+			$nonce = wp_create_nonce( OrderDomain::NONCE );
+			$this->assertNotFalse( wp_verify_nonce( $nonce, OrderDomain::NONCE ) );
+
+			$props->setValue( $session, 't_guest_two_0000000000000000000' );
+			$this->assertFalse( wp_verify_nonce( $nonce, OrderDomain::NONCE ), 'Another guest session.' );
+			$_POST['domain'] = 'fresh.example';
+			$_POST['nonce']  = $_REQUEST['nonce'] = $nonce;
+			$this->assertSame( 403, OrderDomain::respond()[1] );
+			$this->assertCount( 1, OrderDomain::cart_domains(), 'The line stays.' );
+		} finally {
+			remove_filter( 'nonce_user_logged_out', $filter, 10 );
+			$props->setValue( $session, $was );
+			$has->setValue( $session, $had );
+		}
+	}
 }

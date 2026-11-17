@@ -30,6 +30,29 @@ final class PendingLines {
 		add_action( 'woocommerce_cart_item_restored', array( __CLASS__, 'line_restored' ), 10, 2 );
 		add_action( 'woocommerce_cart_emptied', array( __CLASS__, 'forget_all' ) );
 		add_action( 'woocommerce_checkout_order_processed', array( __CLASS__, 'forget_all' ) );
+		add_action( 'wp_login', array( __CLASS__, 'login_merge' ), 5, 2 );
+	}
+
+	/**
+	 * A guest logs in: the cart is merged into the account's own cart by WooCommerce, and the guest's pending store would only be
+	 * orphaned (the customer id changes), so it goes now.
+	 *
+	 * @param string   $login Login name.
+	 * @param \WP_User $user  The user.
+	 */
+	public static function login_merge( $login = '', $user = null ): void {
+		$customer = self::customer();
+		if ( '' !== $customer && $user instanceof \WP_User && (string) $user->ID !== $customer ) {
+			self::forget_all();
+		}
+	}
+
+	/** The end of the WooCommerce session of this request (the cart expires with it), as a time stamp; 0 when it is not known. */
+	private static function session_end(): int {
+		$session = function_exists( 'WC' ) && WC() ? WC()->session : null;
+		if ( ! $session instanceof \WC_Session_Handler ) { return 0; }
+		$read = \Closure::bind( fn() => (int) $this->_session_expiration, $session, \WC_Session_Handler::class );
+		return $read();
 	}
 
 	/** The WooCommerce session customer id, or '' when there is no session. */
@@ -46,7 +69,11 @@ final class PendingLines {
 	private static function all( string $customer ): array {
 		if ( '' === $customer ) { return array(); }
 		$rows = get_transient( self::option_key( $customer ) );
-		return is_array( $rows ) ? $rows : array();
+		if ( ! is_array( $rows ) ) { return array(); }
+		// A logged-in customer keeps the same id for ever, so the store itself would outlive an expired cart: each row carries the end
+		// of the session it was kept in, and is gone with it.
+		$now = time();
+		return array_filter( $rows, fn( $row ) => ! is_array( $row ) || ! isset( $row['exp'] ) || (int) $row['exp'] >= $now );
 	}
 
 	private static function save( string $customer, array $rows ): void {
@@ -77,7 +104,9 @@ final class PendingLines {
 		if ( '' === $name || Cart::is_continuation_line( $item ) ) { return; }
 		$customer = self::customer();
 		$rows = self::all( $customer );
-		$rows[ $name ] = array( 'product_id' => (int) ( $item['product_id'] ?? 0 ), 'item' => self::session_form( $item ) );
+		$end = self::session_end();
+		$exp = time() + self::EXPIRY;
+		$rows[ $name ] = array( 'product_id' => (int) ( $item['product_id'] ?? 0 ), 'item' => self::session_form( $item ), 'exp' => $end > 0 ? min( $exp, $end ) : $exp );
 		self::save( $customer, $rows );
 	}
 

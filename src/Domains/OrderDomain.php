@@ -27,8 +27,11 @@ final class OrderDomain {
 	/** The wc-ajax action that takes a domain line out of the cart. */
 	public const AJAX = 'beltoft_services_order_domain';
 
-	/** Nonce action of that call. */
-	public const NONCE = 'beltoft-services-order-domain';
+	/**
+	 * Nonce action of that call. It starts with `woocommerce-`: only then does WooCommerce put the guest's session customer id into the
+	 * nonce, so a guest's nonce does not verify in another session (a plain action is built on user 0 for every guest).
+	 */
+	public const NONCE = 'woocommerce-beltoft-services-order-domain';
 
 	/** Script and style handle. */
 	public const HANDLE = 'beltoft-services-order-domain';

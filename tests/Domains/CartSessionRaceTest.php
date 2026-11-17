@@ -299,4 +299,33 @@ class CartSessionRaceTest extends TestCase {
 		\BeltoftServices\Domains\PendingLines::restore( $copy );
 		$this->assertSame( array(), array_filter( $copy->cart_contents, static fn( $i ) => isset( $i['beltoft_services_domain'] ) ) );
 	}
+
+	private function pending_key(): string {
+		return \BeltoftServices\Domains\PendingLines::TRANSIENT . md5( $this->customer );
+	}
+
+	public function test_a_pending_line_ends_with_the_session_it_was_kept_in(): void {
+		$name = $this->race( true );
+		$rows = get_transient( $this->pending_key() );
+		$this->assertLessThanOrEqual( time() + DAY_IN_SECONDS, $rows[ $name ]['exp'], 'Not longer than the session.' );
+		$this->assertSame( array( $name ), $this->stored_domains(), 'Within the session it comes back.' );
+	}
+
+	public function test_a_pending_line_does_not_come_back_after_the_session_ended(): void {
+		// The stale request B runs after the customer's cart session expired: the same id (a logged-in customer), an old row.
+		$this->race( true, function ( string $name ): void {
+			$rows = get_transient( $this->pending_key() );
+			$rows[ $name ]['exp'] = time() - 5;
+			set_transient( $this->pending_key(), $rows, DAY_IN_SECONDS );
+		} );
+		$this->assertSame( array(), $this->stored_domains() );
+	}
+
+	public function test_a_guest_who_logs_in_leaves_no_pending_store_behind(): void {
+		$this->race( true );
+		$this->assertNotFalse( get_transient( $this->pending_key() ) );
+		$this->request();
+		do_action( 'wp_login', 'someone', new \WP_User( self::factory()->user->create() ) );
+		$this->assertFalse( get_transient( $this->pending_key() ) );
+	}
 }
