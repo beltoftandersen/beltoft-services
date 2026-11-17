@@ -38,6 +38,30 @@ final class OrderDomain {
 	 */
 	public static function register(): void {
 		add_action( 'wc_ajax_' . self::AJAX, array( __CLASS__, 'ajax' ) );
+		add_filter( 'woocommerce_update_order_review_fragments', array( __CLASS__, 'fragments' ) );
+	}
+
+	/**
+	 * The marker that says whether the cart needs the customer's phone (a domain contact goes to the registrar). The site's
+	 * checkout prints its phone row when the page loads, so the script reloads the page once when a domain was added in the
+	 * page and the row is not there.
+	 *
+	 * @param mixed $fragments Fragments of the order review refresh.
+	 * @return mixed
+	 */
+	public static function fragments( $fragments ) {
+		if ( is_array( $fragments ) ) {
+			$fragments['.beltoft-services-od-phone'] = self::phone_marker();
+		}
+
+		return $fragments;
+	}
+
+	/**
+	 * The marker element.
+	 */
+	public static function phone_marker(): string {
+		return '<span class="beltoft-services-od-phone" data-od-phone="' . ( \BeltoftServices\BillingRequirements::cart_needs_phone() ? '1' : '0' ) . '" hidden></span>';
 	}
 
 	/**
@@ -213,6 +237,7 @@ final class OrderDomain {
 	 */
 	public static function print_value( string $name, string $value ): void {
 		echo '<input type="hidden" name="' . esc_attr( $name ) . '" value="' . esc_attr( $value ) . '" data-od-value>';
+		echo self::phone_marker(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built here from constants.
 	}
 
 	/**

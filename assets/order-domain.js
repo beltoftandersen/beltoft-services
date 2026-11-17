@@ -457,6 +457,30 @@
 
 	document.querySelectorAll( '[data-od-line]' ).forEach( heldNote );
 
+	// The phone row of the checkout is printed when the page loads. A domain added in the page needs a phone number for the
+	// registrar: when the refresh says so and the row is not there, the page loads once more (the site keeps what was typed).
+	if ( window.jQuery ) {
+		window.jQuery( document.body ).on( 'updated_checkout', function () {
+			var marker = document.querySelector( '.beltoft-services-od-phone' );
+
+			if ( ! marker || '1' !== marker.getAttribute( 'data-od-phone' ) || document.getElementById( 'billing_phone' ) ) {
+				return;
+			}
+
+			try {
+				if ( Date.now() - Number( window.sessionStorage.getItem( 'beltoftOdReload' ) || 0 ) < 60000 ) {
+					return;
+				}
+
+				window.sessionStorage.setItem( 'beltoftOdReload', String( Date.now() ) );
+			} catch ( e ) {
+				return;
+			}
+
+			window.location.reload();
+		} );
+	}
+
 	document.addEventListener( 'change', function ( event ) {
 		if ( event.target.matches && event.target.matches( '[data-od-tiles] input[type="radio"]' ) && lineOf( event.target ) ) {
 			show( lineOf( event.target ) );

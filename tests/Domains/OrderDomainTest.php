@@ -124,6 +124,17 @@ class OrderDomainTest extends TestCase {
 		$this->assertSame( array( 'incl', 'excl' ), $route['tax']['enum'] ?? null );
 	}
 
+	public function test_the_refresh_carries_the_phone_marker_and_the_form_prints_it(): void {
+		$fragments = OrderDomain::fragments( array( 'a' => 'b' ) );
+
+		$this->assertArrayHasKey( '.beltoft-services-od-phone', $fragments );
+		$this->assertStringContainsString( 'data-od-phone="', $fragments['.beltoft-services-od-phone'] );
+
+		ob_start();
+		OrderDomain::print_value( 'n', '' );
+		$this->assertStringContainsString( 'beltoft-services-od-phone', (string) ob_get_clean() );
+	}
+
 	public function test_removing_takes_out_the_domain_line_and_nothing_else(): void {
 		WC()->cart->empty_cart();
 		$this->add_domain_line( 'Fresh.example' );
