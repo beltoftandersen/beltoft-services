@@ -240,6 +240,9 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-co
 
 /* Scheduled jobs: a row for each job, its fields in rows, and the fields a choice hides. */
 .beltoft-hosting .bsh-cron { margin: var(--bs-space-3, 12px) 0; }
+/* The two buttons of the jobs stay side by side on a phone, and the plan note under them has room above it. */
+.beltoft-hosting .bsh-cron .beltoft-hosting-buttons { display: flex; flex-wrap: wrap; gap: var(--bs-space-2, 8px); }
+.beltoft-hosting .bsh-cron .beltoft-hosting-buttons + .beltoft-hosting-help { margin-top: var(--bs-space-3, 12px); }
 .beltoft-hosting .bsh-cron__row { display: grid; gap: var(--bs-space-3, 12px); grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
 .beltoft-hosting .bsh-cron__row .bs-item__main { display: grid; gap: var(--bs-space-3, 12px); min-width: 0; }
 .beltoft-hosting [data-cron-box] [hidden] { display: none; }
