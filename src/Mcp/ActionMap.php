@@ -20,6 +20,9 @@ defined( 'ABSPATH' ) || exit;
  * DbActions and Domains\Actions offer and fails when an action is in neither list, so a new dashboard action cannot
  * be forgotten.
  *
+ * The activity log (GET /activity) has no tool on purpose: a tool reads the services themselves, and the log is a dashboard
+ * view that a customer's own script may read with a read token.
+ *
  * Domain transfers are never possible through a connected app: the unlock, and the transfer code, have no tool at any
  * level. Do not add them here.
  */

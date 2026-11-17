@@ -245,6 +245,52 @@ final class Resource {
 	}
 
 	/**
+	 * The newest closed (ended) resource of each license, for naming a service that no longer exists: its meta still holds the
+	 * name it had (server name, domain). One query for all licenses, then one read of the rows. A license without a closed
+	 * resource is left out.
+	 *
+	 * @param int[] $license_ids License ids.
+	 * @return array<int, Resource> License id => resource.
+	 */
+	public static function latest_closed( array $license_ids ): array {
+		global $wpdb;
+
+		$ids = array_values( array_unique( array_filter( array_map( 'intval', $license_ids ), static fn( $id ) => $id > 0 ) ) );
+
+		if ( ! $ids ) {
+			return array();
+		}
+
+		$marks = implode( ', ', array_fill( 0, count( $ids ), '%d' ) );
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- custom table, one query; the placeholders are built to match the ids.
+		$found = (array) $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT license_id, MAX(id) AS activation_id FROM %i WHERE license_id IN ( $marks ) AND deactivated_at IS NOT NULL AND kind <> 'site' GROUP BY license_id",
+				array_merge( array( Install::tables()['activations'] ), $ids )
+			),
+			ARRAY_A
+		);
+		// phpcs:enable
+
+		$by_license = array();
+
+		foreach ( $found as $row ) {
+			$by_license[ (int) $row['license_id'] ] = (int) $row['activation_id'];
+		}
+
+		$rows = Licenses::activations( array_values( $by_license ) );
+		$out  = array();
+
+		foreach ( $by_license as $license_id => $activation_id ) {
+			if ( isset( $rows[ $activation_id ] ) ) {
+				$out[ $license_id ] = new self( $rows[ $activation_id ] );
+			}
+		}
+
+		return $out;
+	}
+
+	/**
 	 * A state in words, translated.
 	 *
 	 * @param string $state State (see STATES).

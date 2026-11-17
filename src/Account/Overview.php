@@ -57,11 +57,6 @@ final class Overview {
 	public const LIMIT = 10;
 
 	/**
-	 * Most items in the activity feed.
-	 */
-	public const FEED = 5;
-
-	/**
 	 * Whether the Dashboard already printed the overview in this request.
 	 *
 	 * @var bool
@@ -292,7 +287,13 @@ final class Overview {
 					)
 				);
 			case 'activity':
-				return $data['activity'] ? self::template( 'overview/activity.php', array( 'items' => $data['activity'] ) ) : '';
+				if ( ! $data['activity']['days'] ) {
+					return '';
+				}
+
+				OverviewActivity::script();
+
+				return self::template( 'overview/activity.php', $data['activity'] );
 			default:
 				return $data['welcome'] ? self::template( 'overview/welcome.php', $data['welcome'] ) : '';
 		}
