@@ -54,7 +54,7 @@ abstract class StorageTestCase extends TestCase {
 	 * @param array<string, mixed> $opts type, total, user, meta, size_gb.
 	 */
 	protected function storage_resource( array $opts = array() ): Resource {
-		$opts   += array( 'type' => 'bx11', 'total' => 8.0, 'user' => 0, 'meta' => array(), 'size_gb' => 1000 );
+		$opts   += array( 'type' => 'bx11', 'total' => 8.0, 'user' => 0, 'meta' => array(), 'size_gb' => 1000, 'subscription' => 0 );
 		$product = $this->service_product( StorageDriver::ID, array( 'storage_type' => $opts['type'], 'storage_size_gb' => $opts['size_gb'] ), array( 'slug' => 'storage-' . wp_generate_password( 6, false ) ) );
 		$user    = $opts['user'] > 0 ? (int) $opts['user'] : (int) self::factory()->user->create();
 		$order   = wc_create_order( array( 'customer_id' => $user ) );
@@ -63,7 +63,7 @@ abstract class StorageTestCase extends TestCase {
 		$line->set_props( array( 'name' => 'Storage', 'quantity' => 1, 'subtotal' => $opts['total'], 'total' => $opts['total'] ) );
 		$order->add_item( $line );
 		$order->save();
-		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $user, 'order_id' => $order->get_id() ) );
+		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $user, 'order_id' => $order->get_id() ) + ( $opts['subscription'] ? array( 'subscription_id' => $opts['subscription'] ) : array() ) );
 		$r       = Resource::create( $license, new StorageDriver(), Product::plan( $product->get_id() ), $opts['meta'] + array( 'order_item_id' => (int) $line->get_id() ) );
 		$this->assertInstanceOf( Resource::class, $r );
 

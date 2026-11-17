@@ -2,7 +2,7 @@
     "buttons|off": "[{\"label\":\"Register a domain\",\"url\":\"http:\\/\\/example.org\\/?product={slug}\"}]",
     "groups|domains": "[\"domains\",\"Domains\",\"You have no domains yet.\"]",
     "groups|match": "[true,true]",
-    "groups|order": "domains,vps,databases,hosting,apps,email,ssl-certificates,licences",
+    "groups|order": "domains,vps,databases,hosting,apps,email,ssl-certificates,licences,backup-storage",
     "menu|always": "dashboard,vps,databases,hosting,domains,email,apps,ssl-certificates,licences,customer-logout",
     "redirect|": "",
     "redirect|add": "",
