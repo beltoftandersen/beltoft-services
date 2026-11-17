@@ -80,7 +80,7 @@ final class Tiles {
 		$root           = wp_normalize_path( BELTOFT_SERVICES_PATH );
 		$real           = is_readable( $file ) ? realpath( $file ) : false;
 
-		if ( false === $real || ! str_starts_with( wp_normalize_path( $real ), $root ) || filesize( $real ) > 8192 ) {
+		if ( false === $real || ! str_starts_with( wp_normalize_path( $real ), $root ) || filesize( $real ) > 12288 ) {
 			return '';
 		}
 
