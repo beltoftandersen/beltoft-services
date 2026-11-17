@@ -85,7 +85,7 @@ final class OverviewData {
 			'licenses'     => array(),
 			'licenses_url' => '',
 			'next_payment' => null,
-			'activity'     => array(),
+			'activity'     => array( 'days' => array(), 'next' => 0, 'services' => array() ),
 			'welcome'      => null,
 		);
 	}
@@ -250,7 +250,7 @@ final class OverviewData {
 
 		$data['attention']    = self::attention( $all_resources, $by_id, $names, $subscriptions, $by_subscription );
 		$data['next_payment'] = self::next_payment( $user_id, $subscriptions, $by_subscription );
-		$data['activity']     = OverviewActivity::activity( $licenses, $names, $subscriptions, $resources );
+		$data['activity']     = OverviewActivity::feed( $user_id );
 
 		return $data;
 	}

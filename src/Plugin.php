@@ -185,6 +185,7 @@ final class Plugin {
 		Account\Panel::register();
 		Api\Routes::register();
 		Api\Services::register();
+		Api\Activity::register();
 		Api\OpenApi::register();
 		Api\Reference::register();
 		Api\Tokens::register();

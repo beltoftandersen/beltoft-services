@@ -158,6 +158,51 @@ final class OpenApi {
 				'reply'   => array( 'resources' => array( 'type' => 'object', 'description' => 'Readings by service id.' ) ),
 				'errors'  => array( 401, 429 ),
 			),
+			'GET /activity'                              => array(
+				'summary' => 'What happened to your services, newest first, in sentences: what you did and what you are told about. Ended services are included. Lines are grouped by day; a sentence that repeats on one day for one service is one line with a count. Pass the `next` of an answer as `before` for the following page.',
+				'scope'   => 'read',
+				'reply'   => array(
+					'days'     => array(
+						'type'  => 'array',
+						'items' => array(
+							'type'       => 'object',
+							'properties' => array(
+								'day'   => array( 'type' => 'string', 'description' => 'The day, Y-m-d, in the site time zone.' ),
+								'label' => $text,
+								'lines' => array(
+									'type'  => 'array',
+									'items' => array(
+										'type'       => 'object',
+										'properties' => array(
+											'id'         => array( 'type' => 'integer', 'description' => 'Id of the newest event of the line.' ),
+											'time'       => $text,
+											'datetime'   => array( 'type' => 'string', 'description' => 'ISO 8601, UTC.' ),
+											'service_id' => $int,
+											'service'    => array( 'type' => 'string', 'description' => 'The name of the service as the lists show it. An ended service keeps its last name.' ),
+											'url'        => array( 'type' => 'string', 'description' => 'The service page, empty when the service has ended.' ),
+											'text'       => $text,
+											'count'      => $int,
+										),
+									),
+								),
+							),
+						),
+					),
+					'next'     => array( 'type' => 'integer', 'description' => 'Cursor for the following page, 0 when there are no older lines.' ),
+					'services' => array(
+						'type'        => 'array',
+						'description' => 'First page without a service filter only: the services that have history.',
+						'items'       => array(
+							'type'       => 'object',
+							'properties' => array(
+								'id'   => $int,
+								'name' => $text,
+							),
+						),
+					),
+				),
+				'errors'  => array( 401, 403, 429 ),
+			),
 			'GET /resources/{id}/dns-records'            => array(
 				'summary' => 'The DNS records of a domain or DNS service that we host.',
 				'scope'   => 'read',
