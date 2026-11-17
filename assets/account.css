@@ -895,9 +895,9 @@ div.beltoft-services-domain ul.beltoft-services-domain__import-list > li { displ
 .beltoft-services-credit__tile .beltoft-services-credit__input { position: absolute; top: 0; left: 0; width: 1px; height: 1px; margin: 0; opacity: 0; }
 .beltoft-services-credit__face { display: flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: 44px; padding: 8px; background: var(--bg-card, #fff); color: var(--navy, #0c1535); font-size: 15px; font-weight: 500; line-height: 1.2; white-space: nowrap; font-variant-numeric: tabular-nums; transition: background-color 0.12s ease, color 0.12s ease; }
 .beltoft-services-credit__tile:hover .beltoft-services-credit__face { background: var(--bg-warm, #eeece6); }
-.beltoft-services-credit__tile .beltoft-services-credit__input:checked + .beltoft-services-credit__face, .beltoft-services-credit__tile:hover .beltoft-services-credit__input:checked + .beltoft-services-credit__face { background: var(--navy, #0c1535); color: #ffffff; font-weight: 600; }
+.beltoft-services-credit__tile .beltoft-services-credit__input:checked + .beltoft-services-credit__face, .beltoft-services-credit__tile:hover .beltoft-services-credit__input:checked + .beltoft-services-credit__face { background: var(--bg-card, #fff); color: var(--navy, #0c1535); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--navy, #0c1535) 22%, transparent), 0 1px 4px color-mix(in srgb, var(--navy, #0c1535) 10%, transparent); font-weight: 600; }
 .beltoft-services-credit__tile .beltoft-services-credit__input:focus-visible + .beltoft-services-credit__face { outline: 2px solid var(--navy, #0c1535); outline-offset: -2px; box-shadow: inset 0 0 0 4px var(--bg-card, #fff); }
-.beltoft-services-credit__tile .beltoft-services-credit__input:checked:focus-visible + .beltoft-services-credit__face { outline-color: #ffffff; box-shadow: none; }
+.beltoft-services-credit__tile .beltoft-services-credit__input:checked:focus-visible + .beltoft-services-credit__face { outline-color: var(--bs-focus); }
 .beltoft-services-credit__custom { margin: 0; max-width: 220px; }
 .beltoft-services-credit__custom input { box-sizing: border-box; width: 100%; }
 /* Other reveals its field only when chosen; a browser without :has() or a form without a choice keeps it shown. */
@@ -1317,6 +1317,12 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit
    it moves while the end is not known and fills when the steps are known (progress()). */
 .bs-loader { position: relative; box-sizing: border-box; display: flex; align-items: center; gap: var(--bs-space-2); max-width: 100%; min-width: min(100%, 240px); min-height: 20px; color: var(--ink-mid, #2d4060); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-regular); line-height: 20px; transition: opacity .3s ease, transform .3s ease; animation: bs-loader-in .2s ease-out; }
 .bs-loader[hidden] { display: none; }
+/* In a place the site gives the line in its own bar (data-bs-loader-host): as wide as its text, at most 60% of the bar. */
+[data-bs-loader-host] { display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-end; max-width: 60%; }
+[data-bs-loader-host] .bs-loader { min-width: 0; max-width: 100%; }
+/* There the moving line runs along the bottom edge of the bar itself (the bar is the positioned box), over its whole width. */
+[data-bs-loader-host] .bs-loader { position: static; }
+[data-bs-loader-host] .bs-loader__bar { right: 0; bottom: 0; left: 0; border-radius: 0; }
 .bs-loader__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bs-loader.is-fading { opacity: 0; }
 .bs-loader.is-fail { align-items: flex-start; color: var(--bs-status-fail); font-weight: var(--bs-fw-medium); }
@@ -1338,12 +1344,17 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit
 @keyframes bs-loader-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes bs-loader-run { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
 @media (max-width: 767px) {
-	.bs-loader { position: fixed; z-index: 100000; right: var(--bs-space-4); bottom: calc(env(safe-area-inset-bottom, 0px) + var(--bs-space-4)); left: var(--bs-space-4); min-width: 0; padding: var(--bs-space-3) var(--bs-space-4) calc(var(--bs-space-3) + 2px); overflow: hidden; border: 1px solid var(--bs-line); border-radius: var(--bs-radius); background: var(--bg-warm, #eeece6); box-shadow: 0 6px 24px rgba(12, 21, 53, 0.16); line-height: var(--bs-lh-text); animation: bs-loader-up .25s ease-out; }
-	.bs-loader.is-fading { transform: translateY(8px); }
-	.bs-loader__text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; }
-	.bs-loader.is-fail .bs-loader__text { display: block; -webkit-line-clamp: unset; }
-	.bs-loader__bar { bottom: 0; border-radius: 0; }
-	.bs-loader__close { margin: -12px -14px -12px 0; }
+	body > .bs-loader { position: fixed; z-index: 100000; right: var(--bs-space-4); bottom: calc(env(safe-area-inset-bottom, 0px) + var(--bs-space-4)); left: var(--bs-space-4); min-width: 0; padding: var(--bs-space-3) var(--bs-space-4) calc(var(--bs-space-3) + 2px); overflow: hidden; border: 1px solid var(--bs-line); border-radius: var(--bs-radius); background: var(--bg-warm, #eeece6); box-shadow: 0 6px 24px rgba(12, 21, 53, 0.16); line-height: var(--bs-lh-text); animation: bs-loader-up .25s ease-out; }
+	body > .bs-loader.is-fading { transform: translateY(8px); }
+	body > .bs-loader .bs-loader__text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; }
+	body > .bs-loader.is-fail .bs-loader__text { display: block; -webkit-line-clamp: unset; }
+	body > .bs-loader .bs-loader__bar { bottom: 0; border-radius: 0; }
+	body > .bs-loader .bs-loader__close { margin: -12px -14px -12px 0; }
+	/* In the site's bar on a phone: the text takes the place of the element the site marks with data-bs-loader-yield (the
+	   title), only while it shows, so the bar keeps its height and nothing in the page moves. */
+	[data-bs-loader-host] { flex: 1 1 0; justify-content: flex-start; min-width: 0; max-width: none; }
+	[data-bs-loader-host]:not(:has(.bs-loader:not([hidden]))) { display: none; }
+	:has(> [data-bs-loader-host] .bs-loader:not([hidden])) > [data-bs-loader-yield] { display: none; }
 }
 @keyframes bs-loader-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {

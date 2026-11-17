@@ -102,9 +102,10 @@ class TilesTest extends TestCase {
 		$this->assertSame( Tiles::os_logo( 1, 'Nothing', '' ), Tiles::engine_logo( 'postgres' ) );
 	}
 
-	public function test_a_selected_tile_turns_its_logo_to_the_text_colour_in_the_style(): void {
+	public function test_a_selected_tile_is_light_and_keeps_the_colours_of_its_logo(): void {
 		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/tiles.css' );
-		$this->assertMatchesRegularExpression( '/__input:checked \+ \.beltoft-services-tile__face \.beltoft-services-tile__logo svg \*[^{]*\{ fill: currentColor; \}/', $css );
+		$this->assertStringNotContainsString( 'fill: currentColor', $css, 'The logo keeps its brand colours on the selected tile.' );
+		$this->assertMatchesRegularExpression( '/__input:checked \+ \.beltoft-services-tile__face[^{]*\{ background: var\(--bg-card, #fff\);/', $css );
 	}
 
 	public function test_the_apps_name_their_logo_in_app_json_and_the_shipped_ones_exist(): void {

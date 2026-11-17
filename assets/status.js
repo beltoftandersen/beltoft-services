@@ -12,7 +12,10 @@
  *
  * The line is shown in ONE place (owner 2026-11-15). On a wide screen it sits where the page's state line ([data-bs-inline]) is, at
  * the top (in the head of a server or database page, else under the title row, else at the top of the content), and takes the place
- * of the description while it shows. On a phone (max-width 767px, the phone breakpoint of account.css) it is fixed to the bottom of
+ * of the description while it shows. A site that has its own bar can give the line a place there: an element with the attribute
+ * data-bs-loader-host; the line is then shown in that element on every screen, the description stays, and nothing sticks or floats. On a
+ * phone the text takes the place of the bar's element marked data-bs-loader-yield (its title) while it shows; the moving line
+ * runs along the bottom edge of the bar, which must be a positioned box (sticky, fixed or relative). On a phone (max-width 767px, the phone breakpoint of account.css) it is fixed to the bottom of
  * the screen, above the browser's toolbar, so it never moves anything. Busy is a moving line (indeterminate); progress() fills it
  * for work whose steps are known. Done and info stay about 5 s and fade away; fail stays until closed. A failed field is only marked
  * (aria-invalid) and focused, the text is not printed next to it. Nothing is shown under the clicked button.
@@ -131,6 +134,15 @@
 		return line.firstChild;
 	}
 
+	// A place the site gives the line in its own bar (an element with data-bs-loader-host, for example in a sticky account
+	// header): the line is shown there on every screen, the page's state line keeps its text, and nothing sticks or floats.
+	function barHost() {
+		var found = document.querySelector( '[data-bs-loader-host]' );
+
+		// The place itself may take no room while it is empty (a phone), so its bar is asked.
+		return found && found.parentNode && document.body.contains( found ) && found.parentNode.getClientRects().length ? found : null;
+	}
+
 	// The state indicator in front of the line (Running, Stopped, or the state text of a service that is not ready).
 	function indicatorOf( target ) {
 		var row = target.parentNode;
@@ -214,7 +226,7 @@
 
 	function place( host ) {
 		var parts = loaderParts();
-		var where = phone() ? document.body : host;
+		var where = phone() && ! host.hasAttribute( 'data-bs-loader-host' ) ? document.body : host;
 
 		if ( parts.el.parentNode !== where ) {
 			where.appendChild( parts.el );
@@ -250,7 +262,7 @@
 		var host = parts.host;
 		var box;
 
-		if ( ! host || parts.el.hidden || phone() ) {
+		if ( ! host || parts.el.hidden || phone() || host.hasAttribute( 'data-bs-loader-host' ) ) {
 			unstick();
 
 			return;
@@ -314,7 +326,7 @@
 
 	// kind: busy, done, fail, info. Only the newest message is shown.
 	function show( kind, message, handle ) {
-		var host = inlineTarget();
+		var host = barHost() || inlineTarget();
 		var parts = loaderParts();
 		var full = ( 'fail' === kind ? text( 'failedPrefix', 'Failed: ' ) : '' ) + message;
 

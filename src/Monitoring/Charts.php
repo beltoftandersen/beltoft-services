@@ -43,8 +43,8 @@ final class Charts {
 			'peak' => __( 'peak %s', 'beltoft-services' ),
 			'noReading' => __( 'No reading', 'beltoft-services' ),
 			'memory' => __( 'Memory', 'beltoft-services' ),
-			/* translators: 1: memory in use in GB, 2: total memory in GB, 3: percent in use. */
-			'memNow' => __( '%1$s of %2$s GB (%3$s%)', 'beltoft-services' ),
+			/* translators: 1: memory in use in GB, 2: total memory in GB. */
+			'memOf' => __( '%1$s of %2$s GB', 'beltoft-services' ),
 			'total' => __( 'Total', 'beltoft-services' ),
 			'agentHint' => GuestMemory::agent_hint(),
 			'alertsOn' => __( 'Usage emails are on for this server.', 'beltoft-services' ),

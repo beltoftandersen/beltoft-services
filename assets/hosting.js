@@ -1027,14 +1027,6 @@
 			}
 		} );
 
-		Array.prototype.forEach.call( root.querySelectorAll( '[data-site-status]' ), function ( el ) {
-			var panel = el.closest( '[data-slug]' );
-
-			if ( panel && panel.getAttribute( 'data-slug' ) === task.slug ) {
-				el.textContent = task.step_label || task.label || '';
-				el.classList.remove( 'is-ok' );
-			}
-		} );
 	}
 
 	function unlock() {

@@ -119,7 +119,7 @@ class HostingTabsTest extends HostingCase {
 		foreach ( array( '', 'websites', 'files', 'email' ) as $tab ) {
 			$html = $this->page( $r, $tab );
 			$this->assertStringContainsString( 'data-hosting-resource="' . $r->id() . '"', $html, $tab );
-			$this->assertStringContainsString( 'data-task-line', $html, $tab );
+			$this->assertStringNotContainsString( 'data-task-line', $html, $tab . ': the shared progress line says it' );
 		}
 	}
 
