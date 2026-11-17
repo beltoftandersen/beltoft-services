@@ -263,6 +263,9 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 * Hosting: scheduled jobs for every website (a PHP file of the website or an address of the website, at most every 5 minutes; plan field `cron_jobs`, default 5). For a WordPress website a server cron can be switched on; it runs WordPress's due tasks and switches WordPress's own cron off while it is on. Needs the agent operations `site.cron_set` and `site.cron_status`; with an older agent the section says it is not available yet.
 * Hosting: the database name, user and host of a website are shown; the password is shown once after the emailed code.
 * Hosting: the product name in the account comes from the setting `hosting_label` (default "Hosting"); order links can preselect an empty website with `site_install=empty`.
+* Choice tiles: the selected tile is white with a soft line and shadow and its logo keeps its colours.
+* Monitoring: the CPU, memory and storage cards keep one height; memory shows the share large and the amount beside it.
+* Progress line: a site can give it a place in its own bar (an element with `data-bs-loader-host`); it is then shown there on a wide screen and nothing sticks while scrolling. The hosting page no longer prints its own wait line beside it.
 
 = 0.40.2 =
 * Account lists: the state stands above the name in every list (servers, hosting, databases, domains, email, SSL, licences, apps); the renewal date is no longer in the server and domain rows.
