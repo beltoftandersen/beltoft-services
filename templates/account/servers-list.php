@@ -15,11 +15,11 @@ defined( 'ABSPATH' ) || exit;
 	<?php foreach ( $rows as $beltoft_services_row ) : ?>
 		<a class="beltoft-services-srv" id="beltoft-service-<?php echo (int) $beltoft_services_row['id']; ?>" href="<?php echo esc_url( $beltoft_services_row['url'] ); ?>">
 			<span class="beltoft-services-srv__id">
+				<span class="beltoft-services-state is-<?php echo esc_attr( $beltoft_services_row['tone'] ); ?>"><?php echo esc_html( $beltoft_services_row['state'] ); ?></span>
 				<span class="beltoft-services-srv__name"><?php echo esc_html( $beltoft_services_row['name'] ); ?></span>
 				<?php if ( '' !== $beltoft_services_row['details'] ) : ?><span class="beltoft-services-srv__sub"><?php echo esc_html( $beltoft_services_row['details'] ); ?></span><?php endif; ?>
 			</span>
 			<span class="beltoft-services-srv__state">
-				<span class="beltoft-services-state is-<?php echo esc_attr( $beltoft_services_row['tone'] ); ?>"><?php echo esc_html( $beltoft_services_row['state'] ); ?></span>
 				<?php if ( ! empty( $beltoft_services_row['note'] ) ) : ?><span class="beltoft-services-srv__sub"><?php echo esc_html( $beltoft_services_row['note'] ); ?></span><?php endif; ?>
 				<?php if ( '' !== $beltoft_services_row['renews'] ) : ?><span class="beltoft-services-srv__sub"><?php echo esc_html( $beltoft_services_row['renews'] ); ?></span><?php endif; ?>
 			</span>
