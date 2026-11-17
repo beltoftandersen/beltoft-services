@@ -132,6 +132,10 @@ final class PendingLines {
 	public static function restore( $cart = null ): void {
 		$cart = $cart instanceof \WC_Cart ? $cart : ( function_exists( 'WC' ) && WC() ? WC()->cart : null );
 		if ( ! $cart instanceof \WC_Cart ) { return; }
+		// Only the customer's own cart. WooCommerce Subscriptions builds a recurring cart per billing group as a clone of it, with the
+		// other groups' lines removed, and calculates its totals through the same hook: a line put back there would join another
+		// subscription (a domain inside the hosting subscription).
+		if ( ! empty( $cart->recurring_cart_key ) || ( function_exists( 'WC' ) && WC() && WC()->cart instanceof \WC_Cart && $cart !== WC()->cart ) ) { return; }
 		$customer = self::customer();
 		if ( '' === $customer ) { return; }
 		$rows = self::all( $customer );

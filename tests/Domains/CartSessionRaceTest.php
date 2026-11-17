@@ -277,4 +277,26 @@ class CartSessionRaceTest extends TestCase {
 		$this->request();
 		$this->assertCount( 1, array_filter( WC()->cart->get_cart(), static fn( $i ) => isset( $i['beltoft_services_domain'] ) ) );
 	}
+
+	public function test_a_subscription_recurring_cart_never_gets_a_pending_line(): void {
+		$this->race( true );
+		$this->request();
+		// What WooCommerce Subscriptions does for each billing group: a clone of the cart without the other groups' lines.
+		$recurring = clone WC()->cart;
+		$recurring->recurring_cart_key = 'hosting_monthly';
+		foreach ( $recurring->cart_contents as $key => $item ) {
+			if ( isset( $item['beltoft_services_domain'] ) ) { unset( $recurring->cart_contents[ $key ] ); }
+		}
+		\BeltoftServices\Domains\PendingLines::restore( $recurring );
+		$this->assertSame( array(), array_filter( $recurring->cart_contents, static fn( $i ) => isset( $i['beltoft_services_domain'] ) ), 'The domain stays out of the other subscription.' );
+		$this->assertCount( 1, array_filter( WC()->cart->get_cart(), static fn( $i ) => isset( $i['beltoft_services_domain'] ) ), 'The customer cart keeps it.' );
+
+		// A copy without the key that is not the customer's cart is left alone too.
+		$copy = clone WC()->cart;
+		foreach ( $copy->cart_contents as $key => $item ) {
+			if ( isset( $item['beltoft_services_domain'] ) ) { unset( $copy->cart_contents[ $key ] ); }
+		}
+		\BeltoftServices\Domains\PendingLines::restore( $copy );
+		$this->assertSame( array(), array_filter( $copy->cart_contents, static fn( $i ) => isset( $i['beltoft_services_domain'] ) ) );
+	}
 }
