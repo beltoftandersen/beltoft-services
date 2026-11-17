@@ -951,12 +951,23 @@ final class HostingView {
 		$busy   = ( new HostingBackups( $r ) )->active() || HostingRestore::active( $r );
 		$rows   = array();
 
-		foreach ( HostingBackups::stored( $r ) as $b ) {
+		$stored = HostingBackups::stored( $r );
+
+		foreach ( $stored as $b ) {
+			$date = wp_date( 'j F Y, H:i', (int) $b['ctime'] );
+			/* translators: %s: date and time of the backup. */
+			$ask  = sprintf( __( 'Delete the backup from %s? It cannot be undone and you cannot restore from it afterwards.', 'beltoft-services' ), $date );
+
+			if ( 1 === count( $stored ) ) {
+				$ask .= ' ' . __( 'This is your only backup. You will have no backup until the next one is made tonight.', 'beltoft-services' );
+			}
+
 			$rows[] = array(
-				'date'  => wp_date( 'j F Y, H:i', (int) $b['ctime'] ),
-				'kind'  => 'manual' === $b['kind'] ? __( 'Manual', 'beltoft-services' ) : __( 'Nightly', 'beltoft-services' ),
-				'size'  => HostingAccount::backup_size( (int) $b['size'] ),
-				'volid' => (string) $b['volid'],
+				'date'    => $date,
+				'kind'    => 'manual' === $b['kind'] ? __( 'Manual', 'beltoft-services' ) : __( 'Nightly', 'beltoft-services' ),
+				'size'    => HostingAccount::backup_size( (int) $b['size'] ),
+				'volid'   => (string) $b['volid'],
+				'confirm' => $ask,
 			);
 		}
 

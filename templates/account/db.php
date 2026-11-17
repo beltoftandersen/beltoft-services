@@ -290,11 +290,17 @@ $beltoft_services_db_wait = array(
 				<?php else : ?>
 					<table class="beltoft-services-vm__backup-list">
 						<thead>
-							<tr><th scope="col"><?php esc_html_e( 'Backup', 'beltoft-services' ); ?></th><th scope="col"><?php esc_html_e( 'Size', 'beltoft-services' ); ?></th></tr>
+							<tr><th scope="col"><?php esc_html_e( 'Backup', 'beltoft-services' ); ?></th><th scope="col"><?php esc_html_e( 'Size', 'beltoft-services' ); ?></th><?php if ( ! empty( $beltoft_services_backups['can_delete'] ) ) : ?><th scope="col"><span class="screen-reader-text"><?php esc_html_e( 'Delete', 'beltoft-services' ); ?></span></th><?php endif; ?></tr>
 						</thead>
 						<tbody>
 							<?php foreach ( $beltoft_services_backups['list'] as $beltoft_services_backup ) : ?>
-								<tr><td><?php echo esc_html( $beltoft_services_backup['when'] ); ?></td><td><?php echo esc_html( $beltoft_services_backup['size'] ); ?></td></tr>
+								<tr>
+									<td><?php echo esc_html( $beltoft_services_backup['when'] ); ?></td>
+									<td><?php echo esc_html( $beltoft_services_backup['size'] ); ?></td>
+									<?php if ( ! empty( $beltoft_services_backups['can_delete'] ) ) : ?>
+										<td><button type="button" class="button woocommerce-button bs-btn bs-btn--sm bs-btn--danger" data-db-backup-delete="<?php echo esc_attr( $beltoft_services_backup['volid'] ); ?>" data-backup-when="<?php echo esc_attr( $beltoft_services_backup['when'] ); ?>"<?php echo 1 === count( $beltoft_services_backups['list'] ) ? ' data-backup-only="1"' : ''; ?>><?php esc_html_e( 'Delete', 'beltoft-services' ); ?></button></td>
+									<?php endif; ?>
+								</tr>
 							<?php endforeach; ?>
 						</tbody>
 					</table>

@@ -203,6 +203,7 @@ final class HostingActions {
 			'backup_now'        => $this->care,
 			'restore'           => $this->care,
 			'undo'              => $this->care,
+			'delete_backup'     => $this->care,
 			'set_sftp_password' => $this->files,
 			'add_ssh_key'       => $this->files,
 			'remove_ssh_key'    => $this->files,
@@ -593,6 +594,16 @@ final class HostingActions {
 	 */
 	public function backup_now() {
 		return $this->care->backup_now();
+	}
+
+	/**
+	 * Deletes one backup of the account's list.
+	 *
+	 * @param string $volid Backup.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function delete_backup( string $volid ) {
+		return $this->care->delete_backup( $volid );
 	}
 
 	/**

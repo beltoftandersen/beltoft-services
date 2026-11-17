@@ -208,6 +208,7 @@ final class Steps {
 			'backup_now'        => array( 'backup_now', __( 'Backing up', 'beltoft-services' ) ),
 			'restore'           => array( 'restore_backup', __( 'Restoring from a backup', 'beltoft-services' ) ),
 			'undo'              => array( 'restore_undo', __( 'Undoing the restore', 'beltoft-services' ) ),
+			'delete_backup'     => array( 'backup_delete', __( 'Deleting a backup', 'beltoft-services' ) ),
 			'resend_country'    => array( 'resend_country', __( 'Sending the country block to the server again', 'beltoft-services' ) ),
 		);
 	}

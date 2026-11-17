@@ -46,6 +46,12 @@ final class DbCard {
 				'confirmremove' => __( 'Remove this address from the list?', 'beltoft-services' ),
 				'policyworking' => __( 'Applying the setting. This can take a minute.', 'beltoft-services' ),
 				'nobackup'  => __( 'Choose a backup.', 'beltoft-services' ),
+				'backupdeletetitle' => __( 'Delete this backup?', 'beltoft-services' ),
+				/* translators: %s: date and time of the backup */
+				'backupdeletetext'  => __( 'The backup from %s will be deleted. It cannot be undone and you cannot restore from it afterwards.', 'beltoft-services' ),
+				'backupdeleteonly'  => __( 'This is your only backup. You will have no backup until the next one is made tonight.', 'beltoft-services' ),
+				'backupdeleteyes'   => __( 'Delete backup', 'beltoft-services' ),
+				'backupdeleting'    => __( 'Deleting the backup.', 'beltoft-services' ),
 				'confirmshutdown' => __( 'Shut down the database? It stays off until you start it, and applications cannot reach it while it is off.', 'beltoft-services' ),
 				'shuttingdown'    => __( 'Shutting down the database. This can take a minute.', 'beltoft-services' ),
 				'starting'        => __( 'Starting the database. This can take a minute.', 'beltoft-services' ),
@@ -70,7 +76,8 @@ final class DbCard {
 		$restore = 'ready' === $state && ( is_array( $r->get( 'restore' ) ) || DbRestore::waiting( $r ) );
 		$kind    = $restore ? 'restoring' : ( $ready ? 'ready' : ( 'paused' === $state ? 'paused' : ( 'failed' === $state ? 'failed' : 'building' ) ) );
 		$offered = DbActions::offered( $r );
-		$backups = self::backups( $r, $ready && ! $restore && $r->accepts_actions() && array_key_exists( DbActions::RESTORE, $offered ) );
+		$active  = $ready && ! $restore && $r->accepts_actions();
+		$backups = self::backups( $r, $active && array_key_exists( DbActions::RESTORE, $offered ), $active && array_key_exists( DbActions::BACKUP_DELETE, $offered ) );
 		$access  = DbAccess::view( $r );
 		$stopped = $ready && DbPower::stopped( $r );
 		$power   = $ready && ! $restore && $r->accepts_actions() ? DbPower::offered( $r ) : array();
@@ -129,9 +136,10 @@ final class DbCard {
 	 *
 	 * @param Resource $r       Database.
 	 * @param bool     $offered Whether a restore may be started now.
+	 * @param bool     $delete  Whether a backup may be deleted now.
 	 * @return array<string, mixed>
 	 */
-	public static function backups( Resource $r, bool $offered ): array {
+	public static function backups( Resource $r, bool $offered, bool $delete = false ): array {
 		$enabled = Backups::enabled( $r );
 		$view    = Backups::listing( $r );
 		$dump    = (int) $r->get( 'db_last_dump' );
@@ -144,6 +152,7 @@ final class DbCard {
 			'last_ok'     => $view['last_ok'],
 			'last_dump'   => $dump > 0 ? wp_date( $format, $dump ) : '',
 			'can_restore' => $enabled && $offered && array() !== $view['list'],
+			'can_delete'  => $enabled && $delete && array() !== $view['list'] && ! Backups::running( $r ),
 			'confirm'     => Actions::CONFIRM_RESTORE,
 		);
 	}

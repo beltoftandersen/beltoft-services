@@ -11,6 +11,7 @@ use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\Progress;
+use BeltoftServices\Proxmox\Pve\DeletesVolumes;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
@@ -38,6 +39,7 @@ defined( 'ABSPATH' ) || exit;
 final class HostingBackups {
 
 	use Runs;
+	use DeletesVolumes;
 
 	public const HOOK       = 'beltoft_services_hosting_backups';
 	public const CRON       = '*/10 * * * *';
@@ -420,8 +422,7 @@ final class HostingBackups {
 		$meta = array( 'backup' => array( 'phase' => '', 'kind' => $round['kind'] ), 'backup_error' => '', 'backup_fails' => 0, 'backup_try_at' => 0 );
 
 		if ( is_array( $list ) ) {
-			// A safety point is no backup of the customer's: it is not listed and is not restored from the list.
-			$meta['backup_list'] = array_values( array_filter( $list, static fn( $b ) => 'safety' !== $b['kind'] ) );
+			$meta['backup_list'] = self::customer_list( $list );
 		}
 
 		if ( 'nightly' === $round['kind'] ) {
@@ -431,6 +432,17 @@ final class HostingBackups {
 		$this->r = Resource::find( $this->r->id() ) ?? $this->r;
 
 		return $this->r->set( $meta ) ? true : StepResult::retry( 0, 'backup: the result could not be stored' );
+	}
+
+	/**
+	 * The listing the customer sees and restores from. A safety point is no backup of the customer's: it is not listed, is not restored
+	 * from the list and is never deleted by the customer.
+	 *
+	 * @param array<int, array{volid: string, ctime: int, size: int, kind: string, protected?: bool}> $list As read_list() returns it.
+	 * @return array<int, array{volid: string, ctime: int, size: int, kind: string, protected?: bool}>
+	 */
+	public static function customer_list( array $list ): array {
+		return array_values( array_filter( $list, static fn( $b ) => 'safety' !== $b['kind'] ) );
 	}
 
 	/**
@@ -461,10 +473,10 @@ final class HostingBackups {
 	}
 
 	/**
-	 * The container's backups on the node's storage, newest first: volid, ctime, size, kind (nightly or manual).
+	 * The container's backups on the node's storage, newest first: volid, ctime, size, kind (nightly or manual), protected.
 	 * Only volumes of this container id and this plugin's volume format are listed.
 	 *
-	 * @return array<int, array{volid: string, ctime: int, size: int, kind: string}>|\WP_Error Safety points included (kind safety).
+	 * @return array<int, array{volid: string, ctime: int, size: int, kind: string, protected: bool}>|\WP_Error Safety points included (kind safety).
 	 */
 	public function list() {
 		$early = null === $this->client ? $this->connect() : null;
@@ -514,6 +526,8 @@ final class HostingBackups {
 				'ctime' => (int) $item['ctime'],
 				'size'  => (int) ( $item['size'] ?? 0 ),
 				'kind'  => false !== strpos( (string) ( $item['notes'] ?? '' ), 'safety' ) ? 'safety' : ( false !== strpos( (string) ( $item['notes'] ?? '' ), 'manual' ) ? 'manual' : 'nightly' ),
+				// A protected volume is refused by the node on a delete: the customer is told before a job (set by staff on the node, or by the safety point).
+				'protected' => ! empty( $item['protected'] ),
 			);
 		}
 
@@ -545,6 +559,168 @@ final class HostingBackups {
 	 */
 	public static function stored( Resource $r ): array {
 		return array_values( array_filter( (array) $r->get( 'backup_list' ), 'is_array' ) );
+	}
+
+	/**
+	 * Checks a customer's delete of one backup, with the account's site lock held (the request that queues the change calls this).
+	 * Only a backup of the stored list (nightly or manual) can be deleted: the restore safety copy never, whatever the id says.
+	 * Nothing is counted or changed here.
+	 *
+	 * @param string $volid Volume id as sent.
+	 * @return array{volid: string, ctime: int, size: int, kind: string}|\WP_Error The stored item, or the refusal in words for the customer.
+	 */
+	public function delete_check( string $volid ) {
+		$this->r = Resource::find( $this->r->id() ) ?? $this->r;
+
+		if ( ! self::enabled( $this->r ) || 'ready' !== $this->r->get( 'state' ) || 'ready' !== $this->r->get( 'desired' ) ) {
+			return new \WP_Error( 'not_ready', __( 'Backups are not available for your hosting right now.', 'beltoft-services' ) );
+		}
+
+		if ( $this->active() || HostingRestore::active( $this->r ) ) {
+			return new \WP_Error( 'busy', __( 'A backup or a restore is running. Try again when it has finished.', 'beltoft-services' ) );
+		}
+
+		// The safety copy of a restore is protected and expires by itself: it cannot be named here, even by its own id.
+		$safety = HostingRestore::safety( $this->r );
+
+		if ( null !== $safety && '' !== (string) $safety['volid'] && (string) $safety['volid'] === $volid ) {
+			return new \WP_Error( 'invalid', __( 'That backup cannot be deleted.', 'beltoft-services' ) );
+		}
+
+		foreach ( self::stored( $this->r ) as $item ) {
+			if ( ( $item['volid'] ?? '' ) !== $volid ) {
+				continue;
+			}
+
+			if ( ! in_array( $item['kind'] ?? '', array( 'nightly', 'manual' ), true ) ) {
+				return new \WP_Error( 'invalid', __( 'That backup cannot be deleted.', 'beltoft-services' ) );
+			}
+
+			if ( ! empty( $item['protected'] ) ) {
+				return new \WP_Error( 'invalid', __( 'That backup could not be deleted. It may be protected. Contact support.', 'beltoft-services' ) );
+			}
+
+			return $item;
+		}
+
+		return new \WP_Error( 'invalid', __( 'That backup is not in your list.', 'beltoft-services' ) );
+	}
+
+	/**
+	 * Deletes one backup, in the job of the change `backup_delete` (the account's site lock held). Proves the volume against the live
+	 * listing, refuses the safety copy and a protected volume again (the request is never trusted alone), deletes exactly that volume,
+	 * and judges the result by reading the listing again. The stored list is rewritten only when the volume is gone. A replay finds
+	 * the volume gone and is done; a task that is stored is polled, never started a second time.
+	 *
+	 * @param string $volid Volume id.
+	 */
+	public function delete_one( string $volid ): StepResult {
+		$early = $this->connect();
+
+		if ( null !== $early ) {
+			return $early;
+		}
+
+		$early = $this->poll_task();
+
+		if ( null !== $early ) {
+			return $early;
+		}
+
+		$this->r = Resource::find( $this->r->id() ) ?? $this->r;
+		$refusal = static fn( string $event, string $text ): StepResult => StepResult::fail( $event, array( Jobs::TEXT => $text, Jobs::EXPECTED => true ) );
+
+		if ( $this->active() || HostingRestore::active( $this->r ) ) {
+			return $refusal( 'Backup delete refused: a backup or a restore is running', __( 'A backup or a restore is running. Try again when it has finished.', 'beltoft-services' ) );
+		}
+
+		$list = $this->read_list();
+
+		if ( is_wp_error( $list ) ) {
+			return StepResult::retry( 60, 'backup delete: ' . $this->scrub( $list->get_error_message(), 160 ) );
+		}
+
+		$item = self::find( $list, $volid );
+
+		if ( null === $item ) {
+			return $this->store_list( $list ) ? StepResult::done( array( Jobs::TEXT => __( 'The backup was deleted.', 'beltoft-services' ) ), 'Backup delete: it was already gone' ) : StepResult::retry( 60, 'backup delete: the new list could not be stored' );
+		}
+
+		$safety = HostingRestore::safety( $this->r );
+
+		if ( 'safety' === $item['kind'] || ( null !== $safety && (string) $safety['volid'] === $volid ) ) {
+			return $refusal( 'Backup delete refused: that is the restore safety copy', __( 'That backup cannot be deleted.', 'beltoft-services' ) );
+		}
+
+		if ( ! empty( $item['protected'] ) ) {
+			return $refusal( 'Backup delete refused: the volume is protected', __( 'That backup could not be deleted. It may be protected. Contact support.', 'beltoft-services' ) );
+		}
+
+		$record = (array) Records::for_resource( $this->r->id() );
+		$v      = $this->verified( $record, 'backup delete' );
+
+		if ( $v instanceof StepResult ) {
+			return $v;
+		}
+
+		$path = '/nodes/' . rawurlencode( (string) $v['node'] ) . '/storage/' . rawurlencode( (string) $this->node['backup_storage'] ) . '/content/' . rawurlencode( $volid );
+		$sent = $this->send_volume_delete( $path, 'backup delete', 'delete' );
+
+		if ( $sent instanceof StepResult ) {
+			return $sent;
+		}
+
+		// A transport trouble is tried again; a refusal is judged by the listing, never by the error text.
+		if ( is_wp_error( $sent ) && $this->volume_delete_transient( $sent ) ) {
+			return StepResult::retry( 60, 'backup delete: ' . $this->text( $sent ) );
+		}
+
+		$after = $this->read_list();
+
+		if ( is_wp_error( $after ) ) {
+			return StepResult::retry( 60, 'backup delete: ' . $this->scrub( $after->get_error_message(), 160 ) );
+		}
+
+		if ( null !== self::find( $after, $volid ) ) {
+			return $refusal( 'Backup delete: ' . ( is_wp_error( $sent ) ? $this->text( $sent ) : 'the volume is still listed after the delete' ), __( 'That backup could not be deleted. It may be protected. Contact support.', 'beltoft-services' ) );
+		}
+
+		if ( ! $this->store_list( $after ) ) {
+			return StepResult::retry( 60, 'backup delete: the new list could not be stored' );
+		}
+
+		return StepResult::done(
+			array( Jobs::TEXT => __( 'The backup was deleted.', 'beltoft-services' ) ),
+			'Backup of ' . gmdate( 'Y-m-d H:i', (int) $item['ctime'] ) . ' UTC deleted at the customer\'s request'
+		);
+	}
+
+	/**
+	 * The item of a listing with this volume id.
+	 *
+	 * @param array<int, array<string, mixed>> $list  Listing.
+	 * @param string                           $volid Volume id.
+	 * @return array<string, mixed>|null
+	 */
+	private static function find( array $list, string $volid ): ?array {
+		foreach ( $list as $item ) {
+			if ( $item['volid'] === $volid ) {
+				return $item;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Keeps the listing the pages show (the safety copy left out), without touching the round.
+	 *
+	 * @param array<int, array<string, mixed>> $list As read_list() returns it.
+	 */
+	private function store_list( array $list ): bool {
+		$this->r = Resource::find( $this->r->id() ) ?? $this->r;
+
+		return $this->r->set( array( 'backup_list' => self::customer_list( $list ) ) );
 	}
 
 	/**

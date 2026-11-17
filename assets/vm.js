@@ -185,6 +185,8 @@
 				return { action: action, start: s.reinstallStart, done: s.reinstallDone, running: true, password: true };
 			case 'snapshot_delete':
 				return { action: action, start: fill( s.deleteStart, name ), done: name ? fill( s.deleteDone, name ) : s.deleteDoneAnon };
+			case 'backup_delete':
+				return { action: action, start: s.backupDeleteStart, done: s.backupDeleteDone };
 			case 'rename':
 				return { action: action, start: s.renameStart, done: s.renameDone };
 			case 'replace_ssh_key':
@@ -733,6 +735,7 @@
 			var resetPw = event.target.closest( '[data-reset-password]' );
 			var cancel = event.target.closest( '[data-snapshot-cancel], [data-confirm-cancel]' );
 			var drop = event.target.closest( '[data-snapshot-delete]' );
+			var dropBackup = event.target.closest( '[data-backup-delete]' );
 			var remove = event.target.closest( '[data-cancel-url]' );
 			var undo = event.target.closest( '[data-undo-url]' );
 			var diskOp = event.target.closest( '[data-delete-disk], [data-grow-disk]' );
@@ -793,6 +796,22 @@
 				bs.confirm( { title: vm.strings.deleteTitle, confirm: vm.strings.deleteYes, text: [ name, vm.strings.snapshotDelete ].filter( Boolean ), danger: true } ).then( function ( yes ) {
 					if ( yes ) {
 						send( panel, 'snapshot_delete', { id: drop.getAttribute( 'data-snapshot-delete' ) }, null, null, describe( 'snapshot_delete', name ) );
+					}
+				} );
+
+				return;
+			}
+
+			if ( dropBackup && ! dropBackup.disabled ) {
+				if ( panel.beltoftPending || bs.locked( scopeOf( panel ) ) ) {
+					return;
+				}
+
+				// The only backup says so, and that the next one is made tonight. A backup that is deleted cannot be brought back.
+				name = fill( vm.strings.backupDeleteText, dropBackup.getAttribute( 'data-backup-when' ) || '' );
+				bs.confirm( { title: vm.strings.backupDeleteTitle, confirm: vm.strings.backupDeleteYes, text: [ name ].concat( dropBackup.hasAttribute( 'data-backup-only' ) ? [ vm.strings.backupDeleteOnly ] : [] ), danger: true } ).then( function ( yes ) {
+					if ( yes ) {
+						send( panel, 'backup_delete', { volid: dropBackup.getAttribute( 'data-backup-delete' ) }, null, null, describe( 'backup_delete', '' ) );
 					}
 				} );
 

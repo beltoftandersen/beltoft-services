@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.39.0
+Stable tag: 0.40.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.40.0 =
+* Backups: a customer can delete one of their own backups on a server, a managed database and a hosting account (Delete in the backups list, one confirm dialog). The only backup may be deleted; the dialog says so. The safety copy of a hosting restore cannot be deleted. Refused while a backup or a restore runs; at most 10 deletes an hour per service. No MCP tool.
 
 = 0.39.0 =
 * Email: the customer chooses the password of a mailbox, when making it and when changing it (10 to 128 characters, a letter and a digit, not the address; shortest length by filter `beltoft_services_mail_password_min`). A chosen password is never shown again. A change still needs the emailed code. The REST routes take an optional `password`; without it a password is generated and shown once, as before.

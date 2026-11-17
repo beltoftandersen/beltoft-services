@@ -61,6 +61,7 @@ final class ActionMap {
 		'fw_apply'          => 'route: the firewall has its own tool (set_firewall)',
 		'ssl_reissue'       => 'never: a reissue replaces the key and the certificate that works; it is done in the dashboard, where the key is taken once',
 		'ssl_change_validation' => 'never: the validation method, approver and request are chosen on the certificate page, in the dashboard',
+		'backup_delete'     => 'never: a backup is the last copy after a mistake or an attack; deleting one is only done in the dashboard',
 		'ssl_cancel'        => 'never: cancelling is irreversible and ends in a refund a person decides; it is only done in the dashboard',
 	);
 
@@ -98,6 +99,7 @@ final class ActionMap {
 	 * that is not built; "dashboard" is a flow that cannot be done without the customer's own browser.
 	 */
 	public const CAPABILITIES_EXCLUDED = array(
+		'delete_hosting_backup'       => 'never: a backup is the last copy after a mistake or an attack; deleting one is only done in the dashboard',
 		'domain_transfer_code'        => 'never: the transfer code of a domain is only available in the dashboard, behind its password step',
 		'reset_mailbox_password'     => 'never: a new mailbox password needs the code emailed to the account address, so it is only available in the dashboard',
 		'reveal_mailbox_password'    => 'never: showing a mailbox password needs the code emailed to the account address, so it is only available in the dashboard',

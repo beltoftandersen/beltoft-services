@@ -189,6 +189,23 @@
 		run( panel, button, db.strings.restoring, '/actions/restore', JSON.stringify( { args: { confirm: input ? input.value : '', volid: choice.value } } ), 'restore', undefined, input );
 	}
 
+	// One backup at a time: a question first (the only backup says so), then the server's own action; the page is read again when the job has run.
+	function removeBackup( box, panel, button ) {
+		var lines = [ db.strings.backupdeletetext.replace( '%s', function () {
+			return button.getAttribute( 'data-backup-when' ) || '';
+		} ) ];
+
+		if ( button.hasAttribute( 'data-backup-only' ) ) {
+			lines.push( db.strings.backupdeleteonly );
+		}
+
+		S.confirm( { title: db.strings.backupdeletetitle, text: lines, confirm: db.strings.backupdeleteyes, danger: true } ).then( function ( yes ) {
+			if ( yes ) {
+				run( panel, button, db.strings.backupdeleting, '/actions/backup_delete', JSON.stringify( { args: { volid: button.getAttribute( 'data-db-backup-delete' ) } } ), 'backup_delete', undefined );
+			}
+		} );
+	}
+
 	// Copy: the text of the code block next to the button, read when it is clicked (it holds the password once that is shown).
 	function copy( box, button ) {
 		var code = button.parentNode ? button.parentNode.querySelector( 'code' ) : null;
@@ -291,7 +308,7 @@
 	} );
 
 	document.addEventListener( 'click', function ( event ) {
-		var button = event.target.closest( '[data-db-reveal], [data-db-reset], [data-db-power], [data-db-restore], [data-db-policy-save], [data-db-copy], [data-db-access-mine], [data-db-access-add], [data-db-access-remove], [data-db-access-world]' );
+		var button = event.target.closest( '[data-db-reveal], [data-db-reset], [data-db-power], [data-db-restore], [data-db-backup-delete], [data-db-policy-save], [data-db-copy], [data-db-access-mine], [data-db-access-add], [data-db-access-remove], [data-db-access-world]' );
 		var panel = button ? button.closest( '[data-resource]' ) : null;
 		// The power buttons are in the page's head, outside the card.
 		var box = button ? ( button.closest( '[data-db-card]' ) || ( panel ? panel.querySelector( '[data-db-card]' ) : null ) ) : null;
@@ -310,6 +327,8 @@
 			policy( box, panel, button );
 		} else if ( button.hasAttribute( 'data-db-restore' ) ) {
 			restore( box, panel, button );
+		} else if ( button.hasAttribute( 'data-db-backup-delete' ) ) {
+			removeBackup( box, panel, button );
 		} else if ( button.hasAttribute( 'data-db-access-mine' ) || button.hasAttribute( 'data-db-access-add' ) || button.hasAttribute( 'data-db-access-remove' ) || button.hasAttribute( 'data-db-access-world' ) ) {
 			accessClick( box, panel, button );
 		} else {

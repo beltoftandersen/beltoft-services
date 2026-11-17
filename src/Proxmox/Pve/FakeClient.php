@@ -274,6 +274,7 @@ class FakeClient extends FakePve {
 			'ctime'   => $ctime,
 			'size'    => (int) ( $backup['size'] ?? 1073741824 ),
 			'notes'   => (string) ( $backup['notes'] ?? '' ),
+			'protected' => (int) ( $backup['protected'] ?? 0 ),
 			'content' => 'backup',
 			'format'  => 'pbs-vm',
 			'config'  => (array) ( $backup['config'] ?? array() ),
@@ -2133,6 +2134,11 @@ class FakeClient extends FakePve {
 
 		foreach ( $this->state['backups'][ $a[1] ] ?? array() as $backup ) {
 			if ( $backup['volid'] === $volid ) {
+				// A protected backup is kept (set by hand on the backup server, or by a test).
+				if ( ! empty( $backup['protected'] ) ) {
+					return $this->error( 500, 'cannot remove protected volume' );
+				}
+
 				return $this->new_task(
 					$a[0],
 					'imgdel',
