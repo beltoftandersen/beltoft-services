@@ -36,6 +36,7 @@ $beltoft_services_size   = static function ( int $mb ): string {
 	return $mb >= 1024 ? sprintf( /* translators: %s: size in GB, such as 5 or 2.5 */ __( '%s GB', 'beltoft-services' ), (string) round( $mb / 1024, 1 ) ) : sprintf( /* translators: %d: size in MB */ __( '%d MB', 'beltoft-services' ), $mb );
 };
 $beltoft_services_all    = ! $nav;
+$beltoft_services_password_hint = \BeltoftServices\Mail\MailPassword::hint();
 $beltoft_services_row    = static function ( string $label, string $value ): void {
 	echo '<div><dt>' . esc_html( $label ) . '</dt><dd>' . $value . '</dd></div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- the caller escapes the value.
 };
@@ -200,7 +201,24 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 									<?php if ( $beltoft_services_box['reveal'] ) : ?>
 										<button type="button" class="button woocommerce-button bs-btn bs-btn--secondary bs-btn--sm beltoft-services-mail__outline" data-mail-reveal="<?php echo esc_attr( $beltoft_services_box['email'] ); ?>"><?php esc_html_e( 'Show password once', 'beltoft-services' ); ?></button>
 									<?php endif; ?>
-									<button type="button" class="button woocommerce-button bs-btn bs-btn--secondary bs-btn--sm beltoft-services-mail__outline" data-mail-reset="<?php echo esc_attr( $beltoft_services_box['email'] ); ?>"><?php esc_html_e( 'New password', 'beltoft-services' ); ?></button>
+									<details class="bs-confirm beltoft-services-mail__newpw">
+										<summary class="bs-btn bs-btn--secondary bs-btn--sm"><?php esc_html_e( 'New password', 'beltoft-services' ); ?></summary>
+										<div class="bs-confirm__body">
+											<p class="bs-item__meta"><?php esc_html_e( 'The old password stops working at once. We email you a code to confirm.', 'beltoft-services' ); ?></p>
+											<div class="beltoft-services-db__form" data-mail-newpw>
+												<p>
+													<label for="beltoft-mail-pw-<?php echo esc_attr( md5( $beltoft_services_box['email'] ) ); ?>"><?php esc_html_e( 'New password', 'beltoft-services' ); ?></label>
+													<input type="password" id="beltoft-mail-pw-<?php echo esc_attr( md5( $beltoft_services_box['email'] ) ); ?>" autocomplete="new-password" maxlength="128" data-mail-password>
+													<span class="description"><?php echo esc_html( $beltoft_services_password_hint ); ?></span>
+												</p>
+												<p>
+													<label for="beltoft-mail-pw2-<?php echo esc_attr( md5( $beltoft_services_box['email'] ) ); ?>"><?php esc_html_e( 'Repeat the password', 'beltoft-services' ); ?></label>
+													<input type="password" id="beltoft-mail-pw2-<?php echo esc_attr( md5( $beltoft_services_box['email'] ) ); ?>" autocomplete="new-password" maxlength="128" data-mail-password-again>
+												</p>
+												<p><button type="button" class="button woocommerce-button bs-btn bs-btn--sm" data-mail-reset="<?php echo esc_attr( $beltoft_services_box['email'] ); ?>"><?php esc_html_e( 'Set new password', 'beltoft-services' ); ?></button></p>
+											</div>
+										</div>
+									</details>
 									<details class="bs-confirm beltoft-services-vm__more">
 										<summary class="bs-btn bs-btn--danger bs-btn--sm"><?php esc_html_e( 'Delete', 'beltoft-services' ); ?></summary>
 										<div class="bs-confirm__body">
@@ -241,8 +259,8 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 						?>
 					</p>
 				<?php else : ?>
-					<p class="description"><?php echo esc_html( sprintf( /* translators: %s: size of a mailbox, such as 5 GB */ __( 'Each mailbox has %s of storage. You get a password to show once.', 'beltoft-services' ), $beltoft_services_size( (int) $beltoft_services_limits['quota_mb'] ) ) ); ?></p>
-					<div class="beltoft-services-db__form" data-mail-create>
+					<p class="description"><?php echo esc_html( sprintf( /* translators: %s: size of a mailbox, such as 5 GB */ __( 'Each mailbox has %s of storage. You choose its password below.', 'beltoft-services' ), $beltoft_services_size( (int) $beltoft_services_limits['quota_mb'] ) ) ); ?></p>
+					<div class="beltoft-services-db__form" data-mail-create data-mail-domain="<?php echo esc_attr( $beltoft_services_domain ); ?>">
 						<p>
 							<label for="beltoft-mail-local"><?php esc_html_e( 'Name before the @', 'beltoft-services' ); ?></label>
 							<input type="text" id="beltoft-mail-local" autocomplete="off" maxlength="64" placeholder="info" data-mail-local>
@@ -251,6 +269,15 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 						<p>
 							<label for="beltoft-mail-name"><?php esc_html_e( 'Name shown (optional)', 'beltoft-services' ); ?></label>
 							<input type="text" id="beltoft-mail-name" autocomplete="off" maxlength="100" data-mail-name>
+						</p>
+						<p>
+							<label for="beltoft-mail-password"><?php esc_html_e( 'Password', 'beltoft-services' ); ?></label>
+							<input type="password" id="beltoft-mail-password" autocomplete="new-password" maxlength="128" data-mail-password>
+							<span class="description"><?php echo esc_html( $beltoft_services_password_hint ); ?></span>
+						</p>
+						<p>
+							<label for="beltoft-mail-password-again"><?php esc_html_e( 'Repeat the password', 'beltoft-services' ); ?></label>
+							<input type="password" id="beltoft-mail-password-again" autocomplete="new-password" maxlength="128" data-mail-password-again>
 						</p>
 						<?php if ( (int) $beltoft_services_limits['quota_mb'] >= 2048 ) : ?>
 							<p>

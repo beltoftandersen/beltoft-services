@@ -38,6 +38,8 @@ final class MailCard {
 			self::HANDLE,
 			'beltoftServicesMail',
 			array(
+				'passwordMin' => MailPassword::min(),
+				'passwordMax' => MailPassword::MAX,
 				'strings' => array(
 					'failed'    => __( 'Something went wrong. Please try again.', 'beltoft-services' ),
 					'limit'     => __( 'Too many requests. Please wait and try again later.', 'beltoft-services' ),
@@ -49,9 +51,20 @@ final class MailCard {
 					'reset'     => __( 'New password for %s.', 'beltoft-services' ),
 					'copied'    => __( 'Copied', 'beltoft-services' ),
 					'noCode'    => __( 'No password was shown. Use Show password once when you have the code we email you.', 'beltoft-services' ),
+					/* translators: %s: the mailbox address. */
+					'chosenNew' => __( 'The mailbox %s is ready. Sign in with the password you chose.', 'beltoft-services' ),
+					/* translators: %s: the mailbox address. */
+					'chosenSet' => __( 'The new password of %s is set. The old one no longer works.', 'beltoft-services' ),
+					'pwLength'  => __( 'The password must be %1$d to %2$d characters long.', 'beltoft-services' ),
+					'pwControl' => __( 'The password cannot contain control characters.', 'beltoft-services' ),
+					'pwSpace'   => __( 'The password cannot start or end with a space.', 'beltoft-services' ),
+					'pwMix'     => __( 'The password needs at least one letter and one digit.', 'beltoft-services' ),
+					'pwAddress' => __( 'The password cannot contain the mailbox address.', 'beltoft-services' ),
+					'pwLocal'   => __( 'The password cannot contain the name before the @ of the mailbox.', 'beltoft-services' ),
+					'pwSame'    => __( 'The two passwords are not the same.', 'beltoft-services' ),
 					'confirm'   => __( 'Delete this alias?', 'beltoft-services' ),
 					'revealing' => __( 'Showing the password…', 'beltoft-services' ),
-					'resetting' => __( 'Making a new password…', 'beltoft-services' ),
+					'resetting' => __( 'Setting the new password…', 'beltoft-services' ),
 					'creating'  => __( 'Making the mailbox…', 'beltoft-services' ),
 					'deleting'  => __( 'Deleting…', 'beltoft-services' ),
 					'aliasing'  => __( 'Making the alias…', 'beltoft-services' ),
