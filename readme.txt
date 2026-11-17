@@ -265,7 +265,7 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 * Hosting: the product name in the account comes from the setting `hosting_label` (default "Hosting"); order links can preselect an empty website with `site_install=empty`.
 * Choice tiles: the selected tile is white with a soft line and shadow and its logo keeps its colours.
 * Monitoring: the CPU, memory and storage cards keep one height; memory shows the share large and the amount beside it.
-* Progress line: a site can give it a place in its own bar (an element with `data-bs-loader-host`); it is then shown there on every screen, nothing sticks or floats, and the box at the bottom of a phone is only for a site without such a place. The hosting page no longer prints its own wait line beside it.
+* Progress line: a site can give it a place in its own bar (an element with `data-bs-loader-host`); it is then shown there on every screen with its moving line along the bottom edge of the bar, nothing sticks or floats (on a phone the text takes the place of the element marked `data-bs-loader-yield`), and the box at the bottom of a phone is only for a site without such a place. The hosting page no longer prints its own wait line beside it.
 
 = 0.40.2 =
 * Account lists: the state stands above the name in every list (servers, hosting, databases, domains, email, SSL, licences, apps); the renewal date is no longer in the server and domain rows.
