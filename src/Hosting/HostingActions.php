@@ -10,6 +10,7 @@ namespace BeltoftServices\Hosting;
 use BeltoftServices\Hosting\Actions\AddonActions;
 use BeltoftServices\Hosting\Actions\CareActions;
 use BeltoftServices\Hosting\Actions\CountryActions;
+use BeltoftServices\Hosting\Actions\CronActions;
 use BeltoftServices\Hosting\Actions\FilesActions;
 use BeltoftServices\Hosting\Actions\PhpActions;
 use BeltoftServices\Hosting\Actions\ToolActions;
@@ -63,6 +64,13 @@ final class HostingActions {
 	 * @var CountryActions
 	 */
 	private $country;
+
+	/**
+	 * The scheduled jobs of a website.
+	 *
+	 * @var CronActions
+	 */
+	private $cron;
 
 	/**
 	 * The staging copy of a website.
@@ -168,6 +176,7 @@ final class HostingActions {
 		$this->tools   = new ToolActions( $r, $mode );
 		$this->addons  = new AddonActions( $r, $mode );
 		$this->country = new CountryActions( $r, $mode );
+		$this->cron    = new CronActions( $r, $mode );
 		$this->staging = new StagingActions( $r, $mode );
 		$this->care    = new CareActions( $r, $mode );
 	}
@@ -194,6 +203,8 @@ final class HostingActions {
 			'purge_cache'       => $this->php,
 			'set_country_block' => $this->country,
 			'resend_country'    => $this->country,
+			'set_cron'          => $this->cron,
+			'resend_cron'       => $this->cron,
 			'wordpress_address' => $this->sites,
 			'create_staging'    => $this->staging,
 			'refresh_staging'   => $this->staging,
@@ -234,6 +245,20 @@ final class HostingActions {
 			$chosen = '' !== $chosen ? $chosen : wp_generate_password( 24, false );
 
 			return $group->queue( $method, array( $chosen ), $chosen );
+		}
+
+		// The whole list of scheduled jobs is checked here, and goes to the task encrypted (an address may carry a key): its checked form is the secret.
+		if ( 'set_cron' === $method ) {
+			$slug = (string) ( $args[1] ?? '' );
+			$jobs = $group->prepare_cron( (array) ( $args[0] ?? array() ), $slug );
+
+			if ( is_wp_error( $jobs ) ) {
+				return $jobs;
+			}
+
+			$json = (string) wp_json_encode( $jobs );
+
+			return $group->queue( $method, array( $json, $slug ), $json );
 		}
 
 		return $group->queue( $method, $args );
@@ -429,6 +454,16 @@ final class HostingActions {
 	 */
 	public function cache_status( string $slug ) {
 		return $this->php->cache_status( $slug );
+	}
+
+	/**
+	 * The last runs of the website's scheduled jobs, from the node (read only; the output is for the owner and is never kept).
+	 *
+	 * @param string $slug Site.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function cron_status( string $slug ) {
+		return $this->cron->cron_status( $slug );
 	}
 
 	/**

@@ -557,6 +557,7 @@ trait Base {
 			'php_memory_mb' => (int) $this->plan['php_memory_mb'],
 			'upload_mb'     => (int) $this->plan['upload_mb'],
 			'php_versions'  => Config::php_versions(),
+			'cron_jobs'     => (int) $this->plan['cron_jobs'],
 			'staging'       => (string) $this->plan['staging'],
 			'staging_used'  => count( \BeltoftServices\Hosting\SiteStaging::copies( $this->r->id() ) ),
 		);

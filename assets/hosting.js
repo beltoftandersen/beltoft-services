@@ -83,6 +83,182 @@
 		return Promise.resolve( window.confirm( question ) );
 	}
 
+	// Scheduled jobs. A row shows only the fields of what it runs and of its schedule (cronShow), and the list is saved as a whole (cronJobs).
+	function cronValue( row, name ) {
+		var el = row.querySelector( '[data-cron-field="' + name + '"]' );
+
+		return el ? String( el.value || '' ).trim() : '';
+	}
+
+	function cronShow( row ) {
+		if ( ! row ) {
+			return;
+		}
+
+		var kind = cronValue( row, 'kind' ) || row.getAttribute( 'data-kind' ) || 'script';
+		var preset = cronValue( row, 'preset' );
+
+		Array.prototype.forEach.call( row.querySelectorAll( '[data-cron-show]' ), function ( part ) {
+			part.hidden = part.getAttribute( 'data-cron-show' ) !== kind;
+		} );
+		Array.prototype.forEach.call( row.querySelectorAll( '[data-cron-show-for]' ), function ( part ) {
+			part.hidden = ( ' ' + part.getAttribute( 'data-cron-show-for' ) + ' ' ).indexOf( ' ' + preset + ' ' ) < 0;
+		} );
+	}
+
+	// The five fields of a schedule from the preset and its time.
+	function cronSchedule( row ) {
+		var preset = cronValue( row, 'preset' );
+		var time = cronValue( row, 'time' ).split( ':' );
+		var minute = parseInt( time[ 0 ] && time[ 1 ] ? time[ 1 ] : '0', 10 ) || 0;
+		var hour = parseInt( time[ 0 ] || '0', 10 ) || 0;
+
+		switch ( preset ) {
+			case 'every5':
+				return '*/5 * * * *';
+			case 'every15':
+				return '*/15 * * * *';
+			case 'every30':
+				return '*/30 * * * *';
+			case 'hourly':
+				return '0 * * * *';
+			case 'daily':
+				return minute + ' ' + hour + ' * * *';
+			case 'weekly':
+				return minute + ' ' + hour + ' * * ' + ( cronValue( row, 'weekday' ) || '1' );
+			case 'monthly':
+				return minute + ' ' + hour + ' ' + ( cronValue( row, 'monthday' ) || '1' ) + ' * *';
+		}
+
+		return cronValue( row, 'custom' );
+	}
+
+	// The whole list of the box as the route takes it; the server checks every value again. The two server cron buttons add or take away the WordPress job.
+	function cronJobs( box, action ) {
+		var jobs = [];
+
+		Array.prototype.forEach.call( box.querySelectorAll( '[data-cron-list] > [data-cron-row]' ), function ( row ) {
+			var kind = 'wordpress' === row.getAttribute( 'data-kind' ) ? 'wordpress' : ( cronValue( row, 'kind' ) || 'script' );
+
+			if ( 'cron_wp_off' === action && 'wordpress' === kind ) {
+				return;
+			}
+
+			var enabled = row.querySelector( '[data-cron-field="enabled"]' );
+			var job = {
+				label: cronValue( row, 'label' ),
+				enabled: ! enabled || enabled.checked,
+				schedule: cronSchedule( row ),
+				kind: kind,
+				timeout: parseInt( cronValue( row, 'timeout' ) || '300', 10 ) || 300
+			};
+
+			if ( row.getAttribute( 'data-id' ) ) {
+				job.id = row.getAttribute( 'data-id' );
+			}
+
+			if ( 'script' === kind ) {
+				job.php = cronValue( row, 'php' );
+				job.path = cronValue( row, 'path' );
+				job.args = cronValue( row, 'args' ).split( /\s+/ ).filter( function ( word ) {
+					return '' !== word;
+				} );
+			} else if ( 'url' === kind ) {
+				job.url = 'https://' + cronValue( row, 'host' ) + ( cronValue( row, 'urlpath' ) || '/' );
+			}
+
+			jobs.push( job );
+		} );
+
+		if ( 'cron_wp_on' === action ) {
+			jobs.push( { label: '', enabled: true, schedule: '*/5 * * * *', kind: 'wordpress', timeout: 300 } );
+		}
+
+		return jobs;
+	}
+
+	document.addEventListener( 'change', function ( event ) {
+		var changed = event.target && event.target.closest ? event.target.closest( '[data-cron-row]' ) : null;
+
+		if ( changed && event.target.matches( '[data-cron-kind], [data-cron-preset]' ) ) {
+			cronShow( changed );
+		}
+	} );
+
+	function cronDate( time ) {
+		return new Date( time * 1000 ).toLocaleString();
+	}
+
+	// The last runs of the jobs, asked from the node when the page is open (the page itself is drawn without calling the node).
+	function cronFacts() {
+		Array.prototype.forEach.call( document.querySelectorAll( '[data-cron-box]' ), function ( box ) {
+			var panel = box.closest( '[data-hosting-resource]' );
+			var slug = box.getAttribute( 'data-slug' ) || '';
+
+			// Only a website that has saved jobs asks the node (a page with none draws without calling it).
+			if ( ! panel || ! slug || ! box.querySelector( '[data-cron-row][data-id]:not([data-id=""])' ) ) {
+				return;
+			}
+
+			call( 'GET', panel.getAttribute( 'data-hosting-resource' ) + '/hosting/sites/' + encodeURIComponent( slug ) + '/cron' ).then( function ( result ) {
+				if ( ! result.ok || ! result.data ) {
+					return;
+				}
+
+				var unavailable = box.querySelector( '[data-cron-unavailable]' );
+				var main = box.querySelector( '[data-cron-main]' );
+
+				if ( false === result.data.available ) {
+					setHidden( unavailable, false );
+					setHidden( main, true );
+					return;
+				}
+
+				setHidden( unavailable, true );
+				setHidden( main, false );
+
+				var runs = result.data.jobs || {};
+
+				Array.prototype.forEach.call( box.querySelectorAll( '[data-cron-last]' ), function ( line ) {
+					var run = runs[ line.getAttribute( 'data-cron-last' ) ];
+					var row = line.closest( '[data-cron-row]' );
+					var more = row ? row.querySelector( '[data-hosting-action="cron_output"]' ) : null;
+					var out = row ? row.querySelector( '[data-cron-output]' ) : null;
+
+					if ( ! run ) {
+						return;
+					}
+
+					var words = text.cronNever || '';
+
+					if ( run.started ) {
+						if ( run.skipped ) {
+							words = format( text.cronSkipped || '', [ cronDate( run.started ) ] );
+						} else if ( run.timed_out ) {
+							words = format( text.cronTimedOut || '', [ cronDate( run.started ) ] );
+						} else if ( 0 === run.exit ) {
+							words = format( text.cronOk || '', [ cronDate( run.started ) ] );
+						} else {
+							words = format( text.cronFailed || '', [ cronDate( run.started ), null === run.exit ? '' : String( run.exit ) ] );
+						}
+					}
+
+					line.textContent = words;
+					line.hidden = '' === words;
+
+					if ( out && more && run.tail ) {
+						out.textContent = run.tail;
+						more.hidden = false;
+					}
+				} );
+			}, function () {
+				// The last runs are an extra: without them the lines stay hidden.
+			} );
+		} );
+	}
+
+	Array.prototype.forEach.call( document.querySelectorAll( '[data-cron-row]' ), cronShow );
+
 	// The request for each action: [ method, path, body ] or null when the input is not complete.
 	function plan( panel, button, id ) {
 		var base = id + '/hosting';
@@ -137,6 +313,13 @@
 				return ask( text.confirmRemoveDomain || '', button, [ 'DELETE', base + '/domains/' + encodeURIComponent( button.getAttribute( 'data-host' ) || '' ), undefined ], true );
 			case 'files_password':
 				return '' === field( scope, 'code' ) ? null : [ 'POST', base + '/files/password', { code: field( scope, 'code' ), password: field( scope, 'sftp_password' ) } ];
+			case 'cron_save':
+			case 'cron_wp_on':
+			case 'cron_wp_off':
+				var cronBox = button.closest( '[data-cron-box]' );
+				var jobs = cronBox ? cronJobs( cronBox, button.getAttribute( 'data-hosting-action' ) ) : null;
+
+				return jobs ? [ 'PUT', base + '/sites/' + encodeURIComponent( slug ) + '/cron', { jobs: jobs } ] : null;
 			case 'db_password':
 				return '' === field( scope, 'code' ) ? null : [ 'POST', base + '/database/password', { code: field( scope, 'code' ) } ];
 			case 'files_key':
@@ -363,6 +546,47 @@
 				return true;
 			case 'copy_secret':
 				copy( ( scope.querySelector( '[data-files-secret]' ) || {} ).textContent || '' );
+				return true;
+			case 'cron_add':
+				var addBox = button.closest( '[data-cron-box]' );
+				var template = addBox ? addBox.querySelector( 'template[data-cron-template]' ) : null;
+				var list = addBox ? addBox.querySelector( '[data-cron-list]' ) : null;
+
+				if ( ! template || ! list || list.querySelectorAll( '[data-cron-row]' ).length >= parseInt( button.getAttribute( 'data-limit' ) || '0', 10 ) ) {
+					return true;
+				}
+
+				list.appendChild( template.content.cloneNode( true ) );
+				cronShow( list.lastElementChild );
+				setHidden( addBox.querySelector( '[data-cron-empty]' ), true );
+				var firstField = list.lastElementChild.querySelector( 'input, select' );
+
+				if ( firstField ) {
+					firstField.focus();
+				}
+
+				return true;
+			case 'cron_remove':
+				var gone = button.closest( '[data-cron-row]' );
+				var goneBox = button.closest( '[data-cron-box]' );
+
+				if ( gone && gone.parentNode ) {
+					gone.parentNode.removeChild( gone );
+				}
+
+				if ( goneBox ) {
+					setHidden( goneBox.querySelector( '[data-cron-empty]' ), 0 !== goneBox.querySelectorAll( '[data-cron-row]' ).length );
+				}
+
+				return true;
+			case 'cron_output':
+				var outRow = button.closest( '[data-cron-row]' );
+				var outBox = outRow ? outRow.querySelector( '[data-cron-output]' ) : null;
+
+				if ( outBox ) {
+					setHidden( outBox, ! outBox.hidden );
+				}
+
 				return true;
 			case 'copy_db_secret':
 				copy( ( scope.querySelector( '[data-db-secret]' ) || {} ).textContent || '' );
@@ -752,11 +976,12 @@
 	// While a task runs the node is busy: the facts are asked once it is over (finish).
 	if ( ! ( document.querySelector( '.beltoft-hosting' ) || document.createElement( 'i' ) ).getAttribute( 'data-hosting-task' ) ) {
 		cacheFacts();
+		cronFacts();
 	}
 
 	// The change of the account that runs in the background (a task), and the watcher that follows it.
 	var root = document.querySelector( '.beltoft-hosting' );
-	var LOCKED = [ 'php_save', 'php_rollback', 'cache', 'remove_site', 'add_site', 'add_domain', 'remove_domain', 'set_main', 'country_save', 'country_off', 'files_password', 'files_key', 'remove_key', 'wp_address', 'staging_create', 'staging_refresh', 'staging_delete', 'staging_undo', 'staging_push', 'backup_now', 'backup_delete', 'restore', 'undo' ];
+	var LOCKED = [ 'cron_save', 'cron_wp_on', 'cron_wp_off', 'php_save', 'php_rollback', 'cache', 'remove_site', 'add_site', 'add_domain', 'remove_domain', 'set_main', 'country_save', 'country_off', 'files_password', 'files_key', 'remove_key', 'wp_address', 'staging_create', 'staging_refresh', 'staging_delete', 'staging_undo', 'staging_push', 'backup_now', 'backup_delete', 'restore', 'undo' ];
 	// A change whose new state the page shows at once (a row that is being set up, a copy that is being made): the page reloads when it is queued.
 	var DRAWN = [ 'add_site', 'remove_site', 'wp_address', 'staging_create', 'staging_refresh', 'staging_delete', 'staging_undo', 'staging_push', 'backup_now', 'backup_delete', 'restore', 'undo' ];
 	var NO_RELOAD = [ 'cache' ];

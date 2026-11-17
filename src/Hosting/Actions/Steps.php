@@ -14,6 +14,7 @@ use BeltoftServices\Hosting\HostingBackups;
 use BeltoftServices\Hosting\HostingDriver;
 use BeltoftServices\Hosting\HostingRestore;
 use BeltoftServices\Hosting\Provision;
+use BeltoftServices\Hosting\SiteCron;
 use BeltoftServices\Hosting\SiteFacts;
 use BeltoftServices\Hosting\SiteStaging;
 use BeltoftServices\Hosting\SiteWordPress;
@@ -167,6 +168,11 @@ final class Steps {
 			if ( 'restore_undo' === $action || in_array( $kind, array( 'account', 'files' ), true ) ) {
 				self::start_follow( $r, 'resend_country', array( $slug ) );
 			}
+
+			// The container went back as it was: the scheduled jobs it had then are replaced by the stored ones.
+			if ( 'restore_undo' === $action || 'account' === $kind ) {
+				SiteCron::resend_later( $r );
+			}
 		}
 	}
 
@@ -238,6 +244,8 @@ final class Steps {
 			'undo'              => array( 'restore_undo', __( 'Undoing the restore', 'beltoft-services' ) ),
 			'delete_backup'     => array( 'backup_delete', __( 'Deleting a backup', 'beltoft-services' ) ),
 			'resend_country'    => array( 'resend_country', __( 'Sending the country block to the server again', 'beltoft-services' ) ),
+			'set_cron'          => array( 'set_cron', __( 'Saving the scheduled jobs', 'beltoft-services' ) ),
+			'resend_cron'       => array( 'resend_cron', __( 'Sending the scheduled jobs to the server again', 'beltoft-services' ) ),
 		);
 	}
 
@@ -295,7 +303,7 @@ final class Steps {
 	 * @param string $method Facade method.
 	 */
 	private static function about_site( string $method ): bool {
-		return in_array( $method, array( 'add_site', 'remove_site', 'set_php', 'php_rollback', 'set_workers', 'purge_cache', 'set_country_block', 'abandon_site', 'wordpress_address', 'create_staging', 'refresh_staging', 'push_staging', 'undo_staging', 'delete_staging', 'resend_country' ), true );
+		return in_array( $method, array( 'add_site', 'remove_site', 'set_php', 'php_rollback', 'set_workers', 'purge_cache', 'set_country_block', 'abandon_site', 'wordpress_address', 'create_staging', 'refresh_staging', 'push_staging', 'undo_staging', 'delete_staging', 'resend_country', 'set_cron' ), true );
 	}
 
 	/**
@@ -321,7 +329,8 @@ final class Steps {
 
 		$state = array(
 			'action'     => $row[0],
-			'slug'       => self::about_site( $method ) ? (string) ( $args[0] ?? '' ) : '',
+			// The jobs of set_cron are the secret first argument: its website is the second.
+			'slug'       => self::about_site( $method ) ? (string) ( $args['set_cron' === $method ? 1 : 0 ] ?? '' ) : '',
 			'args'       => array_values( $args ),
 			'secret'     => null === $secret ? '' : Crypto::encrypt( $secret ),
 			'step'       => '',
@@ -414,7 +423,7 @@ final class Steps {
 		$last = ( Resource::find( $r->id() ) ?? $r )->get( Jobs::RESULT );
 
 		// A follow-up the customer did not ask for (the country block sent again after a restore) is staff's concern: they were told.
-		if ( ! is_array( $last ) || ! in_array( (string) ( $last['action'] ?? '' ), self::actions(), true ) || 'resend_country' === (string) $last['action'] || (int) ( $last['at'] ?? 0 ) < time() - self::LAST_SHOWN ) {
+		if ( ! is_array( $last ) || ! in_array( (string) ( $last['action'] ?? '' ), self::actions(), true ) || in_array( (string) $last['action'], array( 'resend_country', 'resend_cron' ), true ) || (int) ( $last['at'] ?? 0 ) < time() - self::LAST_SHOWN ) {
 			return null;
 		}
 

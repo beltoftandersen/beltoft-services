@@ -237,3 +237,13 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-co
 
 /* The tab strip of the page (the shared .beltoft-services-tabs): the 32px gap of the page sits below it. */
 .beltoft-hosting > .beltoft-services-tabs { margin: 0; }
+
+/* Scheduled jobs: a row for each job, its fields in rows, and the fields a choice hides. */
+.beltoft-hosting .bsh-cron { margin: var(--bs-space-3, 12px) 0; }
+.beltoft-hosting .bsh-cron__row { display: grid; gap: var(--bs-space-3, 12px); grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+.beltoft-hosting .bsh-cron__row .bs-item__main { display: grid; gap: var(--bs-space-3, 12px); min-width: 0; }
+.beltoft-hosting [data-cron-box] [hidden] { display: none; }
+.beltoft-hosting .beltoft-hosting-output { margin: 0; padding: var(--bs-space-3, 12px); overflow: auto; max-height: 240px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--bs-fs-small, 14px); border-radius: var(--bs-radius, 8px); }
+@media (max-width: 640px) {
+	.beltoft-hosting .bsh-cron__row { grid-template-columns: minmax(0, 1fr); }
+}

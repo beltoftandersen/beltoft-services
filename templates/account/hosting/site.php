@@ -44,6 +44,7 @@ $beltoft_services_slug = $v['slug'];
 		}
 
 		HostingView::render( 'site-tools', $v );
+		HostingView::render( 'site-cron', $v['cron'] );
 
 		if ( null !== $v['scan'] ) {
 			HostingView::render( 'site-scan', array( 'slug' => $beltoft_services_slug ) + $v['scan'] );

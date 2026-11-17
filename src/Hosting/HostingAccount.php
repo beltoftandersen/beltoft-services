@@ -103,6 +103,15 @@ final class HostingAccount {
 					'confirmRemoveDomain' => __( 'Remove this address from the website?', 'beltoft-services' ),
 					'confirmRemoveKey' => __( 'Remove this SSH key?', 'beltoft-services' ),
 					'codeSent'  => __( 'A code was sent to your email.', 'beltoft-services' ),
+					'cronNever' => __( 'It has not run yet.', 'beltoft-services' ),
+					/* translators: %s: date and time. */
+					'cronOk' => __( 'Last run: %s, it ended well.', 'beltoft-services' ),
+					/* translators: 1: date and time, 2: the exit code of the job. */
+					'cronFailed' => __( 'Last run: %1$s, it failed with exit code %2$s.', 'beltoft-services' ),
+					/* translators: %s: date and time. */
+					'cronTimedOut' => __( 'Last run: %s, it was stopped because it took too long.', 'beltoft-services' ),
+					/* translators: %s: date and time. */
+					'cronSkipped' => __( 'Last start: %s, it was skipped because the run before was still going.', 'beltoft-services' ),
 					'dbPasswordShown' => __( 'The database password is shown below. Copy it now.', 'beltoft-services' ),
 					'copied'    => __( 'Copied.', 'beltoft-services' ),
 					'confirmRestore' => __( 'Restore from this backup? A safety copy of your hosting is made first, so you can undo it for 24 hours.', 'beltoft-services' ),

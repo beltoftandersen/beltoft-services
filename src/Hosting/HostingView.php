@@ -439,6 +439,7 @@ final class HostingView {
 			'slug'        => $slug,
 			'has_wp'      => $has_wp,
 			'database'    => array_merge( array( 'name' => '', 'user' => '', 'host' => '' ), (array) ( $site['database'] ?? array() ) ),
+			'cron'        => SiteCron::view( $site, $ready, $limits, SiteCron::own_names( $r->id(), (array) Sites::find( $r->id(), $slug ) ), (int) ( \BeltoftServices\Resource::find( $r->id() ) ?? $r )->get( SiteCron::UNSUPPORTED ) ),
 			'ready'       => $ready,
 			'many'        => $many,
 			'name'        => HostingAccount::site_name( $site ),

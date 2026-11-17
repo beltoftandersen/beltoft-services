@@ -100,6 +100,8 @@ final class SiteActions {
 				'main'      => SiteAddresses::main_address( $rows, $preview ),
 				'wp'        => SiteWordPress::view( $site, $rows, $preview, $task ),
 				'wordpress'   => Sites::has_wordpress( $site ),
+				'cron'        => \BeltoftServices\Hosting\SiteCron::listing( $site ),
+				'cron_state'  => (array) ( $site['flags']['cron_wp'] ?? array() ),
 				'database'    => array(
 					'name' => Provision::db_name( $this->r->id(), (string) $site['slug'] ),
 					'user' => Config::account( $this->r->id() ),

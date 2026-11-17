@@ -26,6 +26,8 @@ defined( 'ABSPATH' ) || exit;
  * - POST   hosting/sites/<slug>/workers    workers
  * - POST   hosting/sites/<slug>/cache      clears the page cache
  * - GET    hosting/sites/<slug>/cache      what the node reports about the page cache and the object cache
+ * - GET    hosting/sites/<slug>/cron            the last runs of the scheduled jobs, from the node (the output of a run is for the owner and is never kept)
+ * - PUT    hosting/sites/<slug>/cron            jobs: the whole list of scheduled jobs of the website (replaces the list; background)
  * - GET    hosting/sites/<slug>/country-block  the country block of the website, the ready lists, the visitor's own country when known
  * - POST   hosting/sites/<slug>/country-block  countries (codes; empty turns it off), scope (site or login), confirm (true when the person's own country is on the list)
  * - GET    hosting/sites/<slug>/staging         where the staging copy is now (state, busy)
@@ -126,6 +128,22 @@ final class HostingRoutes {
 		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/cache', array(
 			array( 'methods' => $post, 'callback' => array( __CLASS__, 'purge_cache' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ),
 			array( 'methods' => \WP_REST_Server::READABLE, 'callback' => array( __CLASS__, 'cache_status' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ),
+		) );
+		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/cron', array(
+			array( 'methods' => \WP_REST_Server::READABLE, 'callback' => array( __CLASS__, 'cron_status' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ),
+			array(
+				'methods'             => 'PUT',
+				'callback'            => array( __CLASS__, 'set_cron' ),
+				'permission_callback' => 'is_user_logged_in',
+				'args'                => $id + $site + array(
+					'jobs' => array(
+						'type'        => 'array',
+						'required'    => true,
+						'description' => 'The whole list of scheduled jobs of the website; an empty list removes them. A job: label, enabled, schedule (five fields, at least 5 minutes between runs), kind (script: php, path inside the website, args; url: an https address of the website; wordpress: the server cron of WordPress, only for a website with WordPress), timeout (seconds, up to 900), and id for a job that exists.',
+						'items'       => array( 'type' => 'object' ),
+					),
+				),
+			),
 		) );
 		register_rest_route( $ns, $base . '/sites/(?P<slug>[a-z0-9-]+)/country-block', array(
 			array( 'methods' => \WP_REST_Server::READABLE, 'callback' => array( __CLASS__, 'country_block' ), 'permission_callback' => 'is_user_logged_in', 'args' => $id + $site ),
@@ -444,6 +462,27 @@ final class HostingRoutes {
 		$r = self::guard( $request, true, Routes::STATUS_RATE_LIMIT );
 
 		return $r instanceof Resource ? self::reply( ( new HostingActions( $r ) )->cache_status( (string) $request['slug'] ) ) : $r;
+	}
+
+	/**
+	 * The last runs of the scheduled jobs of a website as the node reports them (read only). The output can hold secrets: it is for the owner, is
+	 * answered with no-store and is neither stored nor logged here.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 */
+	public static function cron_status( \WP_REST_Request $request ): \WP_REST_Response {
+		$r = self::guard( $request, true, Routes::STATUS_RATE_LIMIT );
+
+		return $r instanceof Resource ? self::reply( ( new HostingActions( $r ) )->cron_status( (string) $request['slug'] ) ) : $r;
+	}
+
+	/**
+	 * Saves the whole list of the scheduled jobs of a website, in the background (a change of the shared controller: 202 with the task).
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 */
+	public static function set_cron( \WP_REST_Request $request ): \WP_REST_Response {
+		return self::change( $request, static fn( HostingActions $a ) => $a->queue( 'set_cron', array( (array) $request['jobs'], (string) $request['slug'] ) ) );
 	}
 
 	public static function country_block( \WP_REST_Request $request ): \WP_REST_Response {

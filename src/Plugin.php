@@ -114,6 +114,7 @@ final class Plugin {
 		Hosting\HostingRefresh::register();
 		Hosting\DomainSweep::register();
 		Hosting\SiteFacts::register();
+		Hosting\SiteCron::register();
 		Hosting\Actions\Steps::register();
 		Hosting\MalwareScan::register();
 		Hosting\RestoreTest::register();
