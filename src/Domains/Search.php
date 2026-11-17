@@ -35,13 +35,20 @@ final class Search {
 			'methods' => \WP_REST_Server::READABLE,
 			'callback' => array( __CLASS__, 'rest_check' ),
 			'permission_callback' => '__return_true',
-			'args' => array( 'name' => array( 'type' => 'string', 'required' => true ) ),
+			'args' => array(
+				'name' => array( 'type' => 'string', 'required' => true ),
+				// The tax display the page prints its prices in (the checkout shows the cart's display, which a REST call cannot know).
+				'tax'  => array( 'type' => 'string', 'required' => false, 'enum' => array( 'incl', 'excl' ) ),
+			),
 		) );
 	}
 
 	public static function rest_check( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
 		// A token holder (REST token, OAuth, MCP) gets the plain answer; the browser of a visitor also gets the prices as the page prints them.
-		$result = self::visitor_search( (string) $request['name'], null === Tokens::current() );
+		$name   = (string) $request['name'];
+		$decor  = null === Tokens::current();
+		$tax    = (string) $request->get_param( 'tax' );
+		$result = $decor && in_array( $tax, array( 'incl', 'excl' ), true ) ? TaxNote::in( $tax, static fn() => self::visitor_search( $name, true ) ) : self::visitor_search( $name, $decor );
 		if ( is_wp_error( $result ) ) { return $result; }
 		// A token holder's prices are excluding tax and carry their currency.
 		if ( null !== Tokens::current() ) { $result['currency'] = (string) get_woocommerce_currency(); }

@@ -121,6 +121,7 @@ final class OrderDomain {
 			'restNonce' => (string) ( $root['data-rest-nonce'] ?? '' ),
 			'remove'    => class_exists( '\WC_AJAX' ) ? \WC_AJAX::get_endpoint( self::AJAX ) : '',
 			'removeNonce' => wp_create_nonce( self::NONCE ),
+			'tax'       => \BeltoftServices\Billing\TaxNote::display( 'cart' ),
 			'text'      => self::texts(),
 		);
 	}

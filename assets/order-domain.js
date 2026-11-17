@@ -92,7 +92,7 @@
 	}
 
 	function check( name ) {
-		return json( config.check + '?name=' + encodeURIComponent( name ), { credentials: 'same-origin' } ).then( function ( answer ) {
+		return json( config.check + '?name=' + encodeURIComponent( name ) + ( config.tax ? '&tax=' + config.tax : '' ), { credentials: 'same-origin' } ).then( function ( answer ) {
 			if ( ! answer.ok ) {
 				throw new Error( answer.data.message || text.searchFailed );
 			}
@@ -162,15 +162,9 @@
 	}
 
 	function priceHtml( item ) {
-		var shown = item.price_html || '';
+		var safe = el( 'span', '', item.price_text || '' );
 
-		if ( ! shown ) {
-			var safe = el( 'span', '', item.price_text || '' );
-
-			shown = safe.innerHTML;
-		}
-
-		return shown;
+		return safe.innerHTML;
 	}
 
 	// One result row of the register search.

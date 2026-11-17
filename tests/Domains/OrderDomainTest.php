@@ -109,6 +109,21 @@ class OrderDomainTest extends TestCase {
 		}
 	}
 
+	public function test_the_search_prints_prices_in_the_tax_display_the_checkout_asks_for(): void {
+		$this->settings( array( 'domains_enabled' => 'yes' ) );
+		update_option( 'woocommerce_calc_taxes', 'yes' );
+		update_option( 'woocommerce_tax_display_shop', 'excl' );
+		update_option( 'woocommerce_tax_display_cart', 'incl' );
+
+		$this->assertSame( 'incl', OrderDomain::config()['tax'] );
+		$this->assertSame( 'incl', \BeltoftServices\Billing\TaxNote::in( 'incl', static fn() => \BeltoftServices\Billing\TaxNote::display() ) );
+		$this->assertSame( 'excl', \BeltoftServices\Billing\TaxNote::display() );
+
+		$args = \BeltoftServices\Api\Routes::NAMESPACE;
+		$route = rest_get_server()->get_routes()[ '/' . $args . '/domains/check' ][0]['args'] ?? array();
+		$this->assertSame( array( 'incl', 'excl' ), $route['tax']['enum'] ?? null );
+	}
+
 	public function test_removing_takes_out_the_domain_line_and_nothing_else(): void {
 		WC()->cart->empty_cart();
 		$this->add_domain_line( 'Fresh.example' );
