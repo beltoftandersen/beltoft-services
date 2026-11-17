@@ -25,7 +25,7 @@ defined( 'ABSPATH' ) || exit;
  * - GET    mail                              the whole picture (MailView)
  * - POST   mail/mailboxes                    local, name (202: queued as the action mailbox_create; read GET resources/<id> last_result)
  * - DELETE mail/mailboxes/<email>            confirm (the word DELETE)
- * - POST   mail/mailboxes/<email>/password   a new password, kept for one reveal (202: queued as mailbox_password)
+ * - POST   mail/mailboxes/<email>/password   a new password (202: queued as mailbox_password); `password` optional: typed one is never shown again, else kept for one reveal
  * - POST   mail/aliases                      address (the part before the @), goto
  * - DELETE mail/aliases/<address>
  * - POST   mail-domains                     mode (ours or own), domain: adds a domain to the plan
@@ -124,6 +124,7 @@ final class MailRoutes {
 				'local' => array( 'type' => 'string', 'required' => true, 'description' => 'The part before the @.' ),
 				'name'  => array( 'type' => 'string', 'description' => 'The name shown for the mailbox.' ),
 				'quota_mb' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'The size in MB, up to the size of the plan. Default: the size of the plan.' ),
+				'password' => array( 'type' => 'string', 'description' => 'Optional. The password for the mailbox, 10 to 128 characters with a letter and a digit. Without it a password is generated and the customer shows it once in the dashboard.' ),
 			),
 		) );
 		register_rest_route( $ns, $base . '/mailboxes/(?P<email>[^/]+)', array(
@@ -136,7 +137,7 @@ final class MailRoutes {
 			'methods'             => \WP_REST_Server::CREATABLE,
 			'callback'            => array( __CLASS__, 'reset_password' ),
 			'permission_callback' => 'is_user_logged_in',
-			'args'                => $id + $email,
+			'args'                => $id + $email + array( 'password' => array( 'type' => 'string', 'description' => 'Optional. The new password, 10 to 128 characters with a letter and a digit. Without it a password is generated and shown once.' ) ),
 		) );
 		register_rest_route( $ns, $base . '/aliases', array(
 			'methods'             => \WP_REST_Server::CREATABLE,
@@ -317,11 +318,29 @@ final class MailRoutes {
 			return self::failure( $plan );
 		}
 
+		// A password the customer typed: checked here, kept encrypted like a generated one, never queued, never shown again.
+		$typed = MailPassword::from_request( $request );
+
+		if ( null !== $typed ) {
+			$bad = is_wp_error( $typed ) ? $typed : MailPassword::check( $typed, $plan['email'] );
+
+			if ( $bad ) {
+				return self::failure( $bad );
+			}
+
+			$plan['own'] = true; // A flag for the job's sentence, not the password.
+		}
+
 		// The mailbox is made by the shared action mailbox_create; its password is kept encrypted (reserve) and never queued.
-		$queued = Jobs::start_action( $r, Mailboxes::CREATE, __( 'Creating the mailbox', 'beltoft-services' ), $plan, static fn() => Mailboxes::reserve( $r, $plan['email'] ) );
+		$queued = Jobs::start_action( $r, Mailboxes::CREATE, __( 'Creating the mailbox', 'beltoft-services' ), $plan, static fn() => Mailboxes::reserve( $r, $plan['email'], (string) $typed ) );
+		$typed  = null;
 
 		if ( is_wp_error( $queued ) ) {
 			return self::failure( $queued );
+		}
+
+		if ( ! empty( $plan['own'] ) ) {
+			return self::queued( $r, Mailboxes::CREATE, array( 'email' => $plan['email'], 'quota_mb' => $plan['quota'], 'reveal' => false ), __( 'We are making the mailbox. This can take a minute. Then you can sign in with the password you chose.', 'beltoft-services' ) );
 		}
 
 		return self::queued( $r, Mailboxes::CREATE, array( 'email' => $plan['email'], 'quota_mb' => $plan['quota'], 'reveal' => true ), __( 'We are making the mailbox. This can take a minute. Then you can show the password once.', 'beltoft-services' ) );
@@ -376,10 +395,31 @@ final class MailRoutes {
 			return $refused;
 		}
 
-		$queued = Jobs::start_action( $r, Mailboxes::PASSWORD, __( 'Setting a new password', 'beltoft-services' ), array( 'email' => $email ), static fn() => Mailboxes::reserve( $r, $email ) );
+		$typed = MailPassword::from_request( $request );
+		$args  = array( 'email' => $email );
+
+		if ( null !== $typed ) {
+			$bad = is_wp_error( $typed ) ? $typed : MailPassword::check( $typed, $email );
+
+			if ( $bad ) {
+				return self::failure( $bad );
+			}
+
+			$args['own'] = true; // A flag for the job's sentence, not the password.
+		}
+
+		$queued = Jobs::start_action( $r, Mailboxes::PASSWORD, __( 'Setting a new password', 'beltoft-services' ), $args, static fn() => Mailboxes::reserve( $r, $email, (string) $typed ) );
+		$typed  = null;
 
 		if ( is_wp_error( $queued ) ) {
 			return self::failure( $queued );
+		}
+
+		if ( ! empty( $args['own'] ) ) {
+			// Nothing is shown afterwards, so no later request uses the code up: it is used up here.
+			StepUp::consume( get_current_user_id(), self::STEP_PURPOSE );
+
+			return self::queued( $r, Mailboxes::PASSWORD, array( 'email' => $email, 'reveal' => false ), __( 'We are setting the new password. This can take a minute.', 'beltoft-services' ) );
 		}
 
 		// The code is not used up here: the page shows the new password with the same code, and that request uses it up.
