@@ -21,7 +21,6 @@ defined( 'ABSPATH' ) || exit;
 			</span>
 			<span class="beltoft-services-srv__state">
 				<?php if ( ! empty( $beltoft_services_row['note'] ) ) : ?><span class="beltoft-services-srv__sub"><?php echo esc_html( $beltoft_services_row['note'] ); ?></span><?php endif; ?>
-				<?php if ( '' !== $beltoft_services_row['renews'] ) : ?><span class="beltoft-services-srv__sub"><?php echo esc_html( $beltoft_services_row['renews'] ); ?></span><?php endif; ?>
 			</span>
 			<span class="beltoft-services-srv__bars" data-usage-resource="<?php echo (int) $beltoft_services_row['id']; ?>">
 				<?php foreach ( $beltoft_services_row['bars'] as $beltoft_services_bar ) : ?>
