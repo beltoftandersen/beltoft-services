@@ -1320,6 +1320,9 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit
 /* In a place the site gives the line in its own bar (data-bs-loader-host): as wide as its text, at most 60% of the bar. */
 [data-bs-loader-host] { display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-end; max-width: 60%; }
 [data-bs-loader-host] .bs-loader { min-width: 0; max-width: 100%; }
+/* There the moving line runs along the bottom edge of the bar itself (the bar is the positioned box), over its whole width. */
+[data-bs-loader-host] .bs-loader { position: static; }
+[data-bs-loader-host] .bs-loader__bar { right: 0; bottom: 0; left: 0; border-radius: 0; }
 .bs-loader__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bs-loader.is-fading { opacity: 0; }
 .bs-loader.is-fail { align-items: flex-start; color: var(--bs-status-fail); font-weight: var(--bs-fw-medium); }
@@ -1347,9 +1350,11 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit
 	body > .bs-loader.is-fail .bs-loader__text { display: block; -webkit-line-clamp: unset; }
 	body > .bs-loader .bs-loader__bar { bottom: 0; border-radius: 0; }
 	body > .bs-loader .bs-loader__close { margin: -12px -14px -12px 0; }
-	/* In the site's bar on a phone: a line of its own under the title, only while it shows. */
-	[data-bs-loader-host] { order: 99; flex: 1 0 100%; justify-content: flex-start; max-width: 100%; padding-bottom: 6px; }
+	/* In the site's bar on a phone: the text takes the place of the element the site marks with data-bs-loader-yield (the
+	   title), only while it shows, so the bar keeps its height and nothing in the page moves. */
+	[data-bs-loader-host] { flex: 1 1 0; justify-content: flex-start; min-width: 0; max-width: none; }
 	[data-bs-loader-host]:not(:has(.bs-loader:not([hidden]))) { display: none; }
+	:has(> [data-bs-loader-host] .bs-loader:not([hidden])) > [data-bs-loader-yield] { display: none; }
 }
 @keyframes bs-loader-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
