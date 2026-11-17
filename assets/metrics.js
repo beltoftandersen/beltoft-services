@@ -148,13 +148,16 @@
 			var marker = document.createElement( 'i' );
 			var kind = chart.getAttribute( 'data-chart' );
 			if ( spec.memory ) {
-				big.textContent = fillAll( labels.memNow, [ formatGb( current ), formatGb( last.total_gb ), format( last.percent ) ] );
+				// The share, large, like the other cards; the amount beside it, small, so the three headings keep one height.
+				big.textContent = format( last.percent ) + '%';
+				small.textContent = fillAll( labels.memOf, [ formatGb( current ), formatGb( last.total_gb ) ] );
 			} else {
 				big.textContent = 'cpu' === kind ? withUnit( current, spec.unit ) : format( current );
 			}
-			small.textContent = 'cpu' === kind || spec.memory ? '' : spec.unit + ' ' + spec.names[ 0 ];
+			if ( ! spec.memory ) { small.textContent = 'cpu' === kind ? '' : spec.unit + ' ' + spec.names[ 0 ]; }
+			if ( spec.memory && small.textContent ) { small.className = 'is-before'; now.appendChild( small ); }
 			now.appendChild( big );
-			if ( small.textContent ) { now.appendChild( small ); }
+			if ( ! spec.memory && small.textContent ) { now.appendChild( small ); }
 			marker.className = 'beltoft-vm-usage__point';
 			marker.style.left = ( xOf( lastIndex ) / 6 ) + '%';
 			marker.style.top = ( yOf( current ) / 160 * 100 ) + '%';

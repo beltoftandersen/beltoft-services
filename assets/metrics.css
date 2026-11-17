@@ -21,6 +21,8 @@ body.woocommerce-account .beltoft-vm-usage .beltoft-vm-usage__chart h5 { margin:
 .beltoft-vm-usage__now { font-variant-numeric: tabular-nums; }
 .beltoft-vm-usage__now b { font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); letter-spacing: -0.01em; }
 .beltoft-vm-usage__now small { margin-left: 4px; color: var(--bvu-soft); font-size: 13px; font-weight: 400; }
+.beltoft-vm-usage__now small.is-before { margin: 0 8px 0 0; }
+.beltoft-vm-usage__now { white-space: nowrap; }
 .beltoft-vm-usage__plot { position: relative; width: 100%; height: 56px; margin-top: 4px; }
 .beltoft-vm-usage__plot svg { display: block; width: 100%; height: 100%; }
 .beltoft-vm-usage__grid-line { stroke: var(--bvu-warm); stroke-width: 1; vector-effect: non-scaling-stroke; }
@@ -33,7 +35,8 @@ body.woocommerce-account .beltoft-vm-usage .beltoft-vm-usage__chart h5 { margin:
 body.woocommerce-account .beltoft-vm-usage p.beltoft-vm-usage__axis { display: flex; justify-content: space-between; gap: 8px; margin: 4px 0 0; color: var(--bvu-soft); font-size: var(--bs-fs-caption); letter-spacing: normal; white-space: nowrap; font-variant-numeric: tabular-nums; }
 body.woocommerce-account .beltoft-vm-usage p.beltoft-vm-usage__note { margin: 4px 0 0; max-width: none; color: var(--bvu-soft); font-size: var(--bs-fs-caption); line-height: var(--bs-lh-text, 1.5); letter-spacing: normal; overflow-wrap: anywhere; }
 body.woocommerce-account .beltoft-vm-usage p.beltoft-vm-usage__readout { min-height: 1.4em; margin: 4px 0 0; overflow: hidden; color: var(--bvu-soft); font-size: var(--bs-fs-caption); letter-spacing: normal; text-overflow: ellipsis; white-space: nowrap; }
-.beltoft-vm-usage__bar { height: 8px; margin: 16px 0 8px; background: var(--bvu-warm); }
+/* The bar stands in the space a graph takes (56px and its 4px gap), so the lines under it are level with the other cards. */
+.beltoft-vm-usage__bar { height: 8px; margin: 28px 0 24px; background: var(--bvu-warm); }
 .beltoft-vm-usage__bar i { display: block; height: 100%; background: var(--bvu-mid); }
 body.woocommerce-account .beltoft-vm-usage p.beltoft-vm-usage__disk { margin: 0; color: var(--bvu-soft); font-size: 14px; }
 .beltoft-vm-usage__chart--disk body.woocommerce-account .beltoft-vm-usage p.beltoft-vm-usage__axis { margin-top: 8px; }

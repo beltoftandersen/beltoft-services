@@ -19,7 +19,7 @@
 .beltoft-services-plan__hourly { font-size: 13px; line-height: 1.3; opacity: 0.75; font-variant-numeric: tabular-nums; }
 .beltoft-services-plan__specs { display: grid; gap: 4px; margin-top: auto; font-size: 14px; }
 .beltoft-services-plan__stock { font-size: 14px; font-weight: 500; }
-.beltoft-services-plan .beltoft-services-plan__input:checked + .beltoft-services-plan__face, .beltoft-services-plan:hover .beltoft-services-plan__input:checked + .beltoft-services-plan__face { background: var(--navy, #0c1535); color: var(--bg-card, #fff); }
+.beltoft-services-plan .beltoft-services-plan__input:checked + .beltoft-services-plan__face, .beltoft-services-plan:hover .beltoft-services-plan__input:checked + .beltoft-services-plan__face { background: var(--bg-card, #fff); color: var(--navy, #0c1535); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--navy, #0c1535) 22%, transparent), 0 1px 4px color-mix(in srgb, var(--navy, #0c1535) 10%, transparent); }
 .beltoft-services-plan .beltoft-services-plan__input:focus-visible + .beltoft-services-plan__face { outline: 2px solid var(--bs-focus); outline-offset: 2px; }
 .beltoft-services-plan.is-disabled { cursor: not-allowed; }
 .beltoft-services-plan.is-disabled .beltoft-services-plan__face, .beltoft-services-plan.is-disabled:hover .beltoft-services-plan__face { background: var(--bg-warm, #eeece6); color: var(--ink-mid, #2d4060); }
@@ -39,7 +39,7 @@
 .beltoft-services-bill:hover .beltoft-services-bill__face { background: var(--rule, #d6d2c8); }
 .beltoft-services-bill__name { font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); }
 .beltoft-services-bill .beltoft-services-picker__rate { color: inherit; font-size: 13px; line-height: 1.4; opacity: 0.8; }
-.beltoft-services-bill .beltoft-services-bill__input:checked + .beltoft-services-bill__face, .beltoft-services-bill:hover .beltoft-services-bill__input:checked + .beltoft-services-bill__face { background: var(--navy, #0c1535); color: #ffffff; }
+.beltoft-services-bill .beltoft-services-bill__input:checked + .beltoft-services-bill__face, .beltoft-services-bill:hover .beltoft-services-bill__input:checked + .beltoft-services-bill__face { background: var(--bg-card, #fff); color: var(--navy, #0c1535); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--navy, #0c1535) 22%, transparent), 0 1px 4px color-mix(in srgb, var(--navy, #0c1535) 10%, transparent); }
 .beltoft-services-bill .beltoft-services-bill__input:focus-visible + .beltoft-services-bill__face { outline: 2px solid var(--bs-focus); outline-offset: 2px; }
 .beltoft-services-bill.is-disabled { cursor: not-allowed; }
 .beltoft-services-bill.is-disabled .beltoft-services-bill__face, .beltoft-services-bill.is-disabled:hover .beltoft-services-bill__face { background: var(--bg-warm, #eeece6); color: var(--ink-mid, #2d4060); }
