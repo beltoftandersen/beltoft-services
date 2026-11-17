@@ -26,7 +26,7 @@ use BeltoftServices\Resource;
 class CheckoutTest extends HostingCase {
 
 	public function tear_down(): void {
-		unset( $_POST[ SiteField::POST_KEY ] );
+		unset( $_POST[ SiteField::POST_KEY ], $_REQUEST[ SiteField::LINK_PARAM ], $_GET[ SiteField::LINK_PARAM ] );
 
 		if ( function_exists( 'WC' ) && WC()->cart ) {
 			WC()->cart->empty_cart();
@@ -787,5 +787,116 @@ class CheckoutTest extends HostingCase {
 		$this->assertSame( 'typed-name', $read->invoke( null, 'k1' )['slug'], 'A domain mode keeps its More options name.' );
 
 		unset( $_POST[ SiteField::POST_KEY ] );
+	}
+
+	// -- The order link: site_install -----------------------------------------------------------------------------
+
+	/**
+	 * Adds the product to the cart the way the order link does (WooCommerce's add-to-cart request carries the parameter).
+	 *
+	 * @param \WC_Product $product Product.
+	 * @param mixed       $value   Value of site_install, or null for a link without it.
+	 */
+	private function through_link( \WC_Product $product, $value ): string {
+		WC()->cart->empty_cart();
+		unset( $_REQUEST[ SiteField::LINK_PARAM ] );
+
+		if ( null !== $value ) {
+			$_REQUEST[ SiteField::LINK_PARAM ] = $value;
+		}
+
+		$key = WC()->cart->add_to_cart( $product->get_id() );
+		unset( $_REQUEST[ SiteField::LINK_PARAM ] );
+
+		if ( ! $key ) {
+			$this->markTestSkipped( 'The fixture product cannot be put in the cart here.' );
+		}
+
+		return (string) $key;
+	}
+
+	private function form(): string {
+		ob_start();
+		SiteField::render();
+
+		return (string) ob_get_clean();
+	}
+
+	public function test_the_link_parameter_preselects_an_empty_website_and_the_line_remembers_it(): void {
+		$key  = $this->through_link( $this->product(), 'empty' );
+		$line = WC()->cart->get_cart()[ $key ];
+
+		$this->assertSame( 'empty', $line[ SiteField::LINE_DATA ] );
+		$this->assertSame( 'empty', SiteField::default_install( (int) $line['product_id'], 0, $line ) );
+		$this->assertMatchesRegularExpression( '/<option value="empty" selected/', $this->form() );
+		$this->assertDoesNotMatchRegularExpression( '/<option value="wordpress" selected/', $this->form() );
+		$this->assertStringContainsString( 'data-site-admin-email hidden', $this->form(), 'No admin email row for an empty website.' );
+	}
+
+	public function test_every_offered_value_of_the_parameter_works_and_the_plan_default_stays_without_it(): void {
+		foreach ( array( 'wordpress' => 'wordpress', 'woocommerce' => 'woocommerce', 'EMPTY' => 'empty', ' empty ' => 'empty' ) as $given => $want ) {
+			$this->through_link( $this->product(), $given );
+			$this->assertMatchesRegularExpression( '/<option value="' . $want . '" selected/', $this->form(), $given );
+		}
+
+		$this->through_link( $this->product( array( 'woocommerce_default' => true ) ), null );
+		$this->assertMatchesRegularExpression( '/<option value="woocommerce" selected/', $this->form(), 'No parameter: the plan decides.' );
+
+		$this->through_link( $this->product( array( 'woocommerce_default' => true ) ), 'empty' );
+		$this->assertMatchesRegularExpression( '/<option value="empty" selected/', $this->form(), 'The link beats the plan default.' );
+	}
+
+	public function test_a_value_that_is_not_offered_is_ignored(): void {
+		foreach ( array( 'drupal', '', 'empty; drop', array( 'empty' ), '../empty', 'empty empty', '1', 'null' ) as $bad ) {
+			$key  = $this->through_link( $this->product(), $bad );
+			$line = WC()->cart->get_cart()[ $key ];
+
+			$this->assertArrayNotHasKey( SiteField::LINE_DATA, $line, wp_json_encode( $bad ) );
+			$this->assertMatchesRegularExpression( '/<option value="wordpress" selected/', $this->form(), wp_json_encode( $bad ) );
+		}
+	}
+
+	public function test_a_posted_choice_beats_the_link(): void {
+		$key = $this->through_link( $this->product(), 'empty' );
+		$this->post( $key, array( 'install' => 'woocommerce', 'mode' => 'preview' ) );
+
+		$this->assertMatchesRegularExpression( '/<option value="woocommerce" selected/', $this->form() );
+		$this->assertDoesNotMatchRegularExpression( '/<option value="empty" selected/', $this->form() );
+
+		$found = SiteField::resolve( array( 'slug' => 'chosen', 'install' => 'woocommerce' ), 0 );
+		$this->assertSame( 'woocommerce', $found['install'] );
+	}
+
+	public function test_the_checkout_address_is_read_when_the_cart_has_no_value_and_the_cart_value_wins(): void {
+		$product = $this->product();
+		$this->through_link( $product, null );
+		$_GET[ SiteField::LINK_PARAM ] = 'empty';
+		$this->assertMatchesRegularExpression( '/<option value="empty" selected/', $this->form(), 'A link that skips the cart.' );
+
+		$_GET[ SiteField::LINK_PARAM ] = 'drupal';
+		$this->assertMatchesRegularExpression( '/<option value="wordpress" selected/', $this->form() );
+
+		$this->through_link( $product, 'woocommerce' );
+		$_GET[ SiteField::LINK_PARAM ] = 'empty';
+		$this->assertMatchesRegularExpression( '/<option value="woocommerce" selected/', $this->form(), 'The cart line is what the customer clicked.' );
+	}
+
+	public function test_the_parameter_is_kept_only_for_a_hosting_product(): void {
+		$other = $this->service_product( 'mail', array(), array( 'slug' => 'mail-' . wp_generate_password( 4, false ) ) );
+		$this->assertSame( array(), SiteField::cart_item_data( array(), $other->get_id(), 0 ) );
+
+		$_REQUEST[ SiteField::LINK_PARAM ] = 'empty';
+		$this->assertSame( array(), SiteField::cart_item_data( array(), $other->get_id(), 0 ), 'Another product keeps nothing.' );
+		$this->assertSame( array( SiteField::LINE_DATA => 'empty' ), SiteField::cart_item_data( array(), $this->product()->get_id(), 0 ) );
+		$this->assertSame( 'text', SiteField::cart_item_data( 'text', $this->product()->get_id(), 0 ), 'Not our data: left alone.' );
+	}
+
+	public function test_an_order_made_from_the_link_provisions_an_empty_website(): void {
+		$key = $this->through_link( $this->product(), 'empty' );
+		$this->post( $key, array( 'slug_domain' => 'linked', 'mode' => 'preview', 'install' => 'empty', 'language' => 'en_US' ) );
+		$item = new \WC_Order_Item_Product();
+		SiteField::save_on_item( $item, $key );
+
+		$this->assertSame( 'empty', $item->get_meta( SiteField::ITEM_META )['install'] );
 	}
 }

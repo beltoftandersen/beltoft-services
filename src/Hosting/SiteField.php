@@ -31,6 +31,10 @@ final class SiteField {
 	public const POST_KEY  = 'beltoft_services_site';
 	public const ITEM_META = '_beltoft_services_site';
 
+	/** Name of the order link parameter that preselects what to install (wordpress, woocommerce or empty), and of its cart item data. */
+	public const LINK_PARAM = 'site_install';
+	public const LINE_DATA  = 'beltoft_services_install';
+
 	public const MODE_PREVIEW = 'preview';
 	public const MODE_OURS    = 'ours';
 	public const MODE_OWN     = 'own';
@@ -56,6 +60,7 @@ final class SiteField {
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate' ), 10, 2 );
 		add_action( 'woocommerce_store_api_checkout_update_order_from_request', array( __CLASS__, 'block_store_api' ), 10, 2 );
 		add_action( 'woocommerce_created_customer', array( __CLASS__, 'customer_made' ), 5 );
+		add_filter( 'woocommerce_add_cart_item_data', array( __CLASS__, 'cart_item_data' ), 10, 3 );
 		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'save_on_item' ), 30, 4 );
 		add_filter( 'beltoft_services_initial_meta', array( __CLASS__, 'initial_meta' ), 30, 3 );
 		add_filter( 'beltoft_services_domain_service_product', static fn( $is, $id = 0 ) => true === $is || self::is_hosting_product( (int) $id ), 10, 2 );
@@ -342,22 +347,70 @@ final class SiteField {
 			$product = $item['data'] ?? null;
 			$name    = is_object( $product ) && method_exists( $product, 'get_name' ) ? (string) $product->get_name() : '';
 
-			self::print_line( (string) $key, count( $lines ) > 1 ? $name : '', $zones, self::default_install( (int) ( $item['product_id'] ?? 0 ), (int) ( $item['variation_id'] ?? 0 ) ) );
+			self::print_line( (string) $key, count( $lines ) > 1 ? $name : '', $zones, self::default_install( (int) ( $item['product_id'] ?? 0 ), (int) ( $item['variation_id'] ?? 0 ), (array) $item ) );
 		}
 
 		echo '</div>';
 	}
 
 	/**
-	 * What is preselected to install: WooCommerce when the plan says so (field woocommerce_default), WordPress otherwise.
+	 * What is preselected to install: what the order link asked for (the parameter site_install, kept on the cart line, or on the checkout
+	 * address when the cart has none), else WooCommerce when the plan says so (field woocommerce_default), else WordPress. A choice the customer
+	 * posts always wins over this (print_line()).
 	 *
-	 * @param int $product_id   Product.
-	 * @param int $variation_id Variation.
+	 * @param int                  $product_id   Product.
+	 * @param int                  $variation_id Variation.
+	 * @param array<string, mixed> $item         The cart line, when known.
 	 */
-	public static function default_install( int $product_id, int $variation_id ): string {
+	public static function default_install( int $product_id, int $variation_id, array $item = array() ): string {
+		$asked = self::asked( (string) ( $item[ self::LINE_DATA ] ?? '' ) );
+
+		if ( '' === $asked ) {
+			// A link that goes to the checkout without the cart (or a cart made before the link): the address says it.
+			$asked = self::asked( isset( $_GET[ self::LINK_PARAM ] ) ? wp_unslash( $_GET[ self::LINK_PARAM ] ) : '' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- a preselection only, checked against the list below.
+		}
+
+		if ( '' !== $asked ) {
+			return $asked;
+		}
+
 		$plan = Plan::typed( Product::plan( $product_id, $variation_id > 0 ? $variation_id : null ) );
 
 		return ! empty( $plan['woocommerce_default'] ) ? 'woocommerce' : 'wordpress';
+	}
+
+	/**
+	 * A value of the order link parameter, when it is one the checkout offers (wordpress, woocommerce, empty); '' for anything else.
+	 *
+	 * @param mixed $value Value.
+	 */
+	private static function asked( $value ): string {
+		$value = is_string( $value ) ? strtolower( trim( $value ) ) : '';
+
+		return in_array( $value, self::OFFERED, true ) ? $value : '';
+	}
+
+	/**
+	 * The order link `...add-to-cart=<id>&site_install=empty`: WooCommerce's own add-to-cart request carries the parameter, and a hosting line
+	 * keeps it (a value that is not offered is ignored). The line then differs from a plain one, so the same plan with another choice is a line of its own.
+	 *
+	 * @param mixed $data       Cart item data so far.
+	 * @param mixed $product_id Product.
+	 * @param mixed $variation_id Variation.
+	 * @return mixed
+	 */
+	public static function cart_item_data( $data, $product_id = 0, $variation_id = 0 ) {
+		if ( ! is_array( $data ) || ! self::is_hosting_product( (int) ( $variation_id ?: $product_id ) ) && ! self::is_hosting_product( (int) $product_id ) ) {
+			return $data;
+		}
+
+		$asked = self::asked( isset( $_REQUEST[ self::LINK_PARAM ] ) ? wp_unslash( $_REQUEST[ self::LINK_PARAM ] ) : '' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- the add-to-cart request of WooCommerce itself; checked against the list.
+
+		if ( '' !== $asked ) {
+			$data[ self::LINE_DATA ] = $asked;
+		}
+
+		return $data;
 	}
 	/**
 	 * The scripts and styles, on the checkout page only, and only when the cart has a new hosting line.
