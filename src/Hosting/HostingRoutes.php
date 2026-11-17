@@ -43,6 +43,7 @@ defined( 'ABSPATH' ) || exit;
  * - POST   hosting/sites/<slug>/domains    host
  * - DELETE hosting/domains/<host>
  * - POST   hosting/domains/<host>/main     the main address of a with-and-without-www pair (the other one redirects)
+ * - POST   hosting/database/password      code (emailed): the account's database password, shown once (no tool of the MCP server reaches it)
  * - POST   hosting/files/password         code (emailed), password (optional): the SFTP password, shown once
  * - POST   hosting/files/keys              code (emailed), key: adds a public SSH key
  * - DELETE hosting/files/keys              fingerprint: removes one
@@ -69,6 +70,12 @@ final class HostingRoutes {
 
 	/** The purpose of the emailed code before a password or a key is set for file access. */
 	public const STEP_PURPOSE = 'hosting_files';
+
+	/** The purpose of the emailed code before the database password is shown. */
+	public const DB_PURPOSE = 'hosting_database';
+
+	/** Database password reveals (and wrong codes) per resource and hour. */
+	public const DB_LIMIT = 10;
 
 	public static function register(): void {
 		add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
@@ -180,6 +187,12 @@ final class HostingRoutes {
 			'callback'            => array( __CLASS__, 'set_main_address' ),
 			'permission_callback' => 'is_user_logged_in',
 			'args'                => $id + array( 'host' => array( 'type' => 'string', 'required' => true, 'description' => 'The name that becomes the main address: example.com or www.example.com.' ) ),
+		) );
+		register_rest_route( $ns, $base . '/database/password', array(
+			'methods'             => $post,
+			'callback'            => array( __CLASS__, 'database_password' ),
+			'permission_callback' => 'is_user_logged_in',
+			'args'                => $id + array( 'code' => array( 'type' => 'string', 'required' => true, 'description' => 'The code emailed to the account owner (POST step-up/send with purpose hosting_database).' ) ),
 		) );
 		register_rest_route( $ns, $base . '/files/password', array(
 			'methods'             => $post,
@@ -649,6 +662,33 @@ final class HostingRoutes {
 			// Where to connect, with the password that was queued: the customer reads it once.
 			return is_array( $out ) && isset( $out['password'] ) ? array_merge( $out, array_intersect_key( $a->files(), array_flip( array( 'host', 'port', 'user' ) ) ) ) : $out;
 		} );
+	}
+
+	/**
+	 * Shows the database password of the account, once, after the emailed code. The password is read from the encrypted resource meta and goes
+	 * only into this answer (never cached, never in a job, a task, the step memory or a log); the code is checked after the guard, so a wrong code
+	 * is counted by the hourly limit too.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 */
+	public static function database_password( \WP_REST_Request $request ): \WP_REST_Response {
+		$r = self::guard( $request, true, Routes::RATE_LIMIT, 'database', self::DB_LIMIT );
+
+		if ( ! $r instanceof Resource ) {
+			return $r;
+		}
+
+		if ( ! \BeltoftServices\StepUp::verify( get_current_user_id(), (string) $request['code'], self::DB_PURPOSE ) ) {
+			return self::error( 'step_up', \BeltoftServices\StepUp::refusal( get_current_user_id(), self::DB_PURPOSE ) );
+		}
+
+		$password = \BeltoftServices\Crypto::decrypt( (string) $r->get( 'db_secret' ) );
+
+		if ( null === $password || '' === $password ) {
+			return self::error( 'failed', __( 'The database password cannot be shown right now.', 'beltoft-services' ) );
+		}
+
+		return self::ok( array( 'password' => $password ) );
 	}
 
 	public static function add_ssh_key( \WP_REST_Request $request ): \WP_REST_Response {

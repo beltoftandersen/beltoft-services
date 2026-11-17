@@ -100,6 +100,11 @@ final class SiteActions {
 				'main'      => SiteAddresses::main_address( $rows, $preview ),
 				'wp'        => SiteWordPress::view( $site, $rows, $preview, $task ),
 				'wordpress'   => Sites::has_wordpress( $site ),
+				'database'    => array(
+					'name' => Provision::db_name( $this->r->id(), (string) $site['slug'] ),
+					'user' => Config::account( $this->r->id() ),
+					'host' => (string) ( Records::for_resource( $this->r->id() )['db_host'] ?? '' ),
+				),
 				'admin_user'  => (string) ( $site['flags']['admin_user'] ?? '' ),
 				'admin_email' => (string) ( $site['flags']['admin_email'] ?? '' ),
 				'country'     => \BeltoftServices\Hosting\CountryBlock::view( $site ),

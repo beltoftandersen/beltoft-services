@@ -137,6 +137,8 @@
 				return ask( text.confirmRemoveDomain || '', button, [ 'DELETE', base + '/domains/' + encodeURIComponent( button.getAttribute( 'data-host' ) || '' ), undefined ], true );
 			case 'files_password':
 				return '' === field( scope, 'code' ) ? null : [ 'POST', base + '/files/password', { code: field( scope, 'code' ), password: field( scope, 'sftp_password' ) } ];
+			case 'db_password':
+				return '' === field( scope, 'code' ) ? null : [ 'POST', base + '/database/password', { code: field( scope, 'code' ) } ];
 			case 'files_key':
 				return '' === field( scope, 'code' ) || '' === field( scope, 'ssh_key' ) ? null : [ 'POST', base + '/files/keys', { code: field( scope, 'code' ), key: field( scope, 'ssh_key' ) } ];
 			case 'remove_key':
@@ -362,9 +364,12 @@
 			case 'copy_secret':
 				copy( ( scope.querySelector( '[data-files-secret]' ) || {} ).textContent || '' );
 				return true;
+			case 'copy_db_secret':
+				copy( ( scope.querySelector( '[data-db-secret]' ) || {} ).textContent || '' );
+				return true;
 			case 'send_code':
 				button.disabled = true;
-				window.beltoftApi.call( account.stepUpUrl, { method: 'POST', body: { purpose: 'hosting_files' }, holder: account } ).then( function ( result ) {
+				window.beltoftApi.call( account.stepUpUrl, { method: 'POST', body: { purpose: button.getAttribute( 'data-purpose' ) || 'hosting_files' }, holder: account } ).then( function ( result ) {
 					button.disabled = false;
 
 					if ( result.ok ) {
@@ -585,6 +590,25 @@
 				if ( result.data.task ) {
 					begin( result.data.task, false, button );
 				}
+
+				return;
+			}
+
+			// The database password is shown once, in place, and the page is not reloaded. It is never stored by the page.
+			if ( 'db_password' === action && result.data && result.data.password ) {
+				var dbScope = button.closest( '[data-hosting-scope]' ) || panel;
+				var dbSecret = dbScope.querySelector( '[data-db-secret]' );
+
+				if ( dbSecret ) {
+					dbSecret.textContent = result.data.password;
+				}
+
+				setHidden( dbScope.querySelector( '[data-db-reveal]' ), false );
+				setHidden( button.closest( '[data-files-form]' ), true );
+				Array.prototype.forEach.call( dbScope.querySelectorAll( '[data-files-form="database"] [data-hosting-field]' ), function ( input ) {
+					input.value = '';
+				} );
+				ok( text.dbPasswordShown || text.done || '' );
 
 				return;
 			}

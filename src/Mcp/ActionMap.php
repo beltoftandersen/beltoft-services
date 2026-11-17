@@ -100,6 +100,8 @@ final class ActionMap {
 	 */
 	public const CAPABILITIES_EXCLUDED = array(
 		'delete_hosting_backup'       => 'never: a backup is the last copy after a mistake or an attack; deleting one is only done in the dashboard',
+		'reveal_hosting_database_password' => 'never: showing the database password of a hosting account needs the code emailed to the account address, so it is only available in the dashboard',
+		'hosting_scheduled_jobs'      => 'never: a scheduled job runs code on the hosting, so it is only set in the dashboard; hosting_info lists the jobs read only',
 		'domain_transfer_code'        => 'never: the transfer code of a domain is only available in the dashboard, behind its password step',
 		'reset_mailbox_password'     => 'never: a new mailbox password needs the code emailed to the account address, so it is only available in the dashboard',
 		'reveal_mailbox_password'    => 'never: showing a mailbox password needs the code emailed to the account address, so it is only available in the dashboard',

@@ -438,6 +438,7 @@ final class HostingView {
 		return array(
 			'slug'        => $slug,
 			'has_wp'      => $has_wp,
+			'database'    => array_merge( array( 'name' => '', 'user' => '', 'host' => '' ), (array) ( $site['database'] ?? array() ) ),
 			'ready'       => $ready,
 			'many'        => $many,
 			'name'        => HostingAccount::site_name( $site ),

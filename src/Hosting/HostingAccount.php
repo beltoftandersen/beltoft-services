@@ -39,7 +39,7 @@ final class HostingAccount {
 	 * @return array<int, string>
 	 */
 	public static function stepup_purposes( $purposes ): array {
-		return array_merge( (array) $purposes, array( HostingRoutes::STEP_PURPOSE ) );
+		return array_merge( (array) $purposes, array( HostingRoutes::STEP_PURPOSE, HostingRoutes::DB_PURPOSE ) );
 	}
 
 	/**
@@ -49,6 +49,10 @@ final class HostingAccount {
 	 * @param string $purpose The purpose.
 	 */
 	public static function stepup_text( $text, $purpose ): string {
+		if ( HostingRoutes::DB_PURPOSE === $purpose ) {
+			return __( 'showing the database password of your hosting', 'beltoft-services' );
+		}
+
 		return HostingRoutes::STEP_PURPOSE === $purpose ? __( 'setting a password or an SSH key for your hosting files', 'beltoft-services' ) : (string) $text;
 	}
 
@@ -99,6 +103,7 @@ final class HostingAccount {
 					'confirmRemoveDomain' => __( 'Remove this address from the website?', 'beltoft-services' ),
 					'confirmRemoveKey' => __( 'Remove this SSH key?', 'beltoft-services' ),
 					'codeSent'  => __( 'A code was sent to your email.', 'beltoft-services' ),
+					'dbPasswordShown' => __( 'The database password is shown below. Copy it now.', 'beltoft-services' ),
 					'copied'    => __( 'Copied.', 'beltoft-services' ),
 					'confirmRestore' => __( 'Restore from this backup? A safety copy of your hosting is made first, so you can undo it for 24 hours.', 'beltoft-services' ),
 					'confirmPack' => __( 'Remove one extra storage pack from this mailbox? It ends at your next renewal, the storage stays until then, and nothing is refunded.', 'beltoft-services' ),

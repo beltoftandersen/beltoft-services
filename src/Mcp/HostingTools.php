@@ -25,7 +25,8 @@ defined( 'ABSPATH' ) || exit;
  *
  * Not here, on purpose or for later: reading logs (the agent has no log operation yet), the SFTP password tools and the
  * WordPress sign-in link (a secret that needs the Secrets machinery and an agent job that is not built), and ordering
- * hosting (the purchase flow of the cart). Nothing here shows a password or a sign-in link.
+ * hosting (the purchase flow of the cart). Nothing here shows a password or a sign-in link, and no tool shows the database password or
+ * sets a scheduled job (hosting_info lists the jobs, read only; ActionMap::CAPABILITIES_EXCLUDED gives the reasons).
  */
 final class HostingTools {
 
