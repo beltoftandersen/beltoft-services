@@ -95,7 +95,14 @@ final class HostAlias {
 		if ( array() === $rows ) {
 			$made = $dns->create( $name, $host );
 
-			return is_wp_error( $made ) ? $made : $name;
+			if ( is_wp_error( $made ) ) {
+				return $made;
+			}
+
+			// Our own record of what we made: only this record may be changed or removed later.
+			$r->set( array( 'storage_alias_record' => (string) $made['id'] ) );
+
+			return $name;
 		}
 
 		$row = $rows[0];
@@ -106,7 +113,16 @@ final class HostAlias {
 			return '';
 		}
 
-		if ( $row['content'] !== $host || ! empty( $row['proxied'] ) ) {
+		// Update only a record we made for THIS box (its id is stored on the resource). Any other record, even a CNAME, is somebody's.
+		$mine = '' !== (string) $r->get( 'storage_alias_record' ) && (string) $r->get( 'storage_alias_record' ) === (string) $row['id'];
+
+		if ( ! $mine && ( $row['content'] !== $host || ! empty( $row['proxied'] ) ) ) {
+			Alerts::admin( $r, sprintf( 'The host name alias %s was not made: a CNAME that is not ours is at that name. The customer sees the provider host name.', $name ) );
+
+			return '';
+		}
+
+		if ( $mine && ( $row['content'] !== $host || ! empty( $row['proxied'] ) ) ) {
 			$done = $dns->update( (string) $row['id'], $name, $host );
 
 			return is_wp_error( $done ) ? $done : $name;
