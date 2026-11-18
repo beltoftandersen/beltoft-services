@@ -299,8 +299,13 @@ class DiskRestoreTest extends BackupTestCase {
 		$this->ipv6_on();
 		$this->restore( $server, $volid );
 		$this->assertNull( Resource::find( $server->id() )->get( 'restore' ), 'The restore finished.' );
+		$this->assertSame( $old, $this->config()['ipconfig0'], 'An IPv4-only server is never given an address by a restore.' );
+		$this->assertNull( Resource::find( $server->id() )->get( 'ip6' ) );
+
+		// A server built with IPv6 gets the address back when the backup lacks it.
+		$this->assertTrue( $server->set( array( 'ip6' => '2001:db8:430c:1:1388::1' ) ) );
+		$this->restore( $server, $volid );
 		$this->assertSame( $old . ',ip6=2001:db8:430c:1:1388::1/64,gw6=2001:db8:430c:1::1', $this->config()['ipconfig0'], 'The IPv4 part is the backup\'s, the IPv6 part is put back.' );
-		$this->assertSame( '2001:db8:430c:1:1388::1', Resource::find( $server->id() )->get( 'ip6' ) );
 
 		// An adopted server is never changed.
 		$linked = $this->ready_vm();

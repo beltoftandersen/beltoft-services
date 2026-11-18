@@ -266,7 +266,6 @@ final class Panels {
 			'can_reset'  => null !== $page && $r->accepts_actions() && array_key_exists( 'reset_password', Actions::offered( $r ) ),
 			'ip'         => false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ? $ip : '',
 			'ip6'        => self::ip6( $r ),
-			'ip6_pending' => '' !== self::ip6( $r ) && (int) $r->get( 'ipv6_pending_at' ) > 0,
 			'plan'       => array(
 				'cores'     => (int) ( $plan['cores'] ?? 0 ),
 				'memory_mb' => (int) ( $plan['memory_mb'] ?? 0 ),

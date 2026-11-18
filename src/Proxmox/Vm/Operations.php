@@ -498,7 +498,7 @@ final class Operations {
 
 		$v = $rate;
 
-		// IPv6 follows the plan change too (a no-op unless the cluster has IPv6 on and the address is missing).
+		// A server built with IPv6 (meta ip6) keeps it; an IPv4-only server is never given one (a no-op for it).
 		$ip6 = $this->sync_ipv6( $record, $v );
 
 		if ( $ip6 instanceof StepResult ) {
@@ -633,10 +633,12 @@ final class Operations {
 	}
 
 	/**
-	 * Gives the VM's ipconfig0 the IPv6 part the cluster wants for its VMID (`ip6=`, `gw6=`). Only those two keys change:
-	 * the VM's own IPv4 part is copied as it is, never rewritten. Nothing is sent when the cluster has IPv6 off, when the
-	 * VM has no public IPv4 ipconfig0 (a database without the add-on, a VM that was never ours) or when it already says
-	 * the right thing. A running VM keeps the change pending until it is stopped and started again and is never
+	 * Puts back the IPv6 part of ipconfig0 (`ip6=`, `gw6=`) of a server that was built with IPv6 (meta `ip6`) and lost it,
+	 * for instance after a restore of a backup that has another ipconfig0. Only those two keys change: the VM's own IPv4
+	 * part is copied as it is. A server without meta `ip6` is NEVER touched: writing ip6 into the ipconfig0 of an IPv4-only
+	 * server would make cloud-init run again at its next start (new SSH host keys). Nothing is sent either when the cluster
+	 * has IPv6 off, when the VM has no public IPv4 ipconfig0, or when it already says the right thing. Proxmox changes the
+	 * configuration at once (nothing is pending); the guest takes it at its next start or reboot, and the server is never
 	 * restarted for it.
 	 *
 	 * @param array<string, mixed> $record VM record.
@@ -647,7 +649,7 @@ final class Operations {
 		$have = (string) ( $v['config']['ipconfig0'] ?? '' );
 		$vmid = (int) $record['vmid'];
 
-		if ( true === $this->r->get( 'linked' ) || null === Ipv6::address( $this->cluster, $vmid ) || ! self::has_public_ipv4( $have ) || Ipv6::has_ipconfig( $have, $this->cluster, $vmid ) ) {
+		if ( ! $this->has_ipv6() || true === $this->r->get( 'linked' ) || null === Ipv6::address( $this->cluster, $vmid ) || ! self::has_public_ipv4( $have ) || Ipv6::has_ipconfig( $have, $this->cluster, $vmid ) ) {
 			return $v;
 		}
 
@@ -667,6 +669,13 @@ final class Operations {
 	}
 
 	/**
+	 * Was the server built with IPv6? Only then is its ipconfig0 repaired (see sync_ipv6()).
+	 */
+	private function has_ipv6(): bool {
+		return '' !== (string) $this->r->get( 'ip6' );
+	}
+
+	/**
 	 * Does the ipconfig0 carry a public IPv4 address (`ip=a.b.c.d/n`)? `ip=dhcp` and `ip=manual` do not count.
 	 *
 	 * @param string $ipconfig0 The VM's ipconfig0.
@@ -676,12 +685,16 @@ final class Operations {
 	}
 
 	/**
-	 * The job's version of sync_ipv6(): the VM is read and verified here. The caller holds the resource lock. On a
-	 * server that has the address (written now or before) its meta `ip6`, the log row and the ipfilter set follow.
+	 * The job's version of sync_ipv6(): the VM is read and verified here. The caller holds the resource lock. Only for a
+	 * server that has meta `ip6` (built with IPv6); the log row and the ipfilter set follow.
 	 *
-	 * @return string `written` (ipconfig0 changed), `same` (already right), `skipped` (nothing to give this VM) or `failed` (could not be done now; the next sweep tries again).
+	 * @return string `written` (ipconfig0 changed), `same` (already right), `skipped` (nothing to do for this VM) or `failed` (could not be done now).
 	 */
 	public function reconcile_ipv6(): string {
+		if ( ! $this->has_ipv6() ) {
+			return 'skipped';
+		}
+
 		$record = VmRecords::for_resource( $this->r->id() );
 
 		if ( null === $record || null !== $this->prepare( $record ) ) {

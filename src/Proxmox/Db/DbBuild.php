@@ -226,7 +226,7 @@ final class DbBuild {
 			: array( 'v' => 1, 'request' => $request, 'op' => 'reset_password' );
 
 		// The IPv6 address of a database with the public IP add-on, as a list of its own that an older guest ignores.
-		$ip6 = null === $public ? null : Ipv6::address( (array) Clusters::get( (string) $record['cluster'] ), (int) $record['vmid'] );
+		$ip6 = null === $public || ! Ipv6::databases() ? null : Ipv6::address( (array) Clusters::get( (string) $record['cluster'] ), (int) $record['vmid'] );
 
 		if ( 'init' === $op && null !== $ip6 ) {
 			$job['listen6'] = array( $ip6 );

@@ -159,7 +159,7 @@ trait RestoreSteps {
 			}
 		}
 
-		// A backup made before IPv6 has an ipconfig0 without the address: it is written back (the IPv4 part stays the backup's). A failure here does not stop the restore: the IPv6 sweep puts it right later.
+		// A server built with IPv6 (meta ip6) gets the address written back when the backup's ipconfig0 lacks it (the IPv4 part stays the backup's); an IPv4-only server is never given one. A failure here does not stop the restore.
 		if ( ! DbActions::is_db( $this->r ) && true !== $this->r->get( 'linked' ) ) {
 			( new Operations( $this->r ) )->reconcile_ipv6();
 		}

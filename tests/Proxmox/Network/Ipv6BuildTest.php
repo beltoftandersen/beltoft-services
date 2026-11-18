@@ -137,11 +137,5 @@ class Ipv6BuildTest extends FirewallTestCase {
 		} catch ( \RuntimeException $e ) {
 			$this->assertStringContainsString( 'IPv4 or IPv6', $e->getMessage() );
 		}
-
-		\WP_CLI::reset();
-		$cli->ipv6_list( array(), array( 'format' => 'json' ) );
-		$out = (string) ( \WP_CLI::$lines[0][1] ?? '' );
-		$this->assertStringContainsString( '2001:db8:430c:1:1388::1', $out );
-		$this->assertStringContainsString( '"status":"done"', $out );
 	}
 }

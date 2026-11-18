@@ -249,10 +249,6 @@ class ServerPageTest extends MonitoringTestCase {
 		$this->assertStringContainsString( '<dt>IPv6 address</dt><dd><code>2001:db8:430c:1:1388::1</code></dd>', $html );
 		$this->assertStringNotContainsString( 'Works after the next time', $html );
 		$this->assertStringContainsString( 'data-copy="ssh root@192.0.2.10"', $html, 'The log in line stays IPv4.' );
-
-		$r->set( array( 'ipv6_pending_at' => time() ) );
-		$html = $this->page( $r, (string) $r->license()['id'] );
-		$this->assertStringContainsString( 'Works after the next time you stop and start the server.', $html );
 	}
 
 	public function test_a_junk_ip6_meta_is_not_shown(): void {

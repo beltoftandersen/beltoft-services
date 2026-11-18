@@ -158,7 +158,7 @@ final class DbIp {
 	 * @param array<string, mixed> $cluster Cluster.
 	 * @param array<string, mixed> $ip      Pool row.
 	 * @param string               $net0    The VM's net0 now ('' for none).
-	 * @param int                  $vmid    The VMID: with it and a cluster that has IPv6 on, ipconfig0 carries the IPv6 address too (0: IPv4 only).
+	 * @param int                  $vmid    The VMID: with it, a cluster that has IPv6 on and Ipv6::databases() (off), ipconfig0 carries the IPv6 address too (0: IPv4 only).
 	 * @return array<string, string>
 	 */
 	public static function public_params( array $cluster, array $ip, string $net0, int $vmid = 0 ): array {
@@ -177,7 +177,7 @@ final class DbIp {
 
 		$gateway = null !== $ip['gateway'] && '' !== $ip['gateway'] ? $ip['gateway'] : (string) $cluster['gateway'];
 
-		$ip6 = $vmid > 0 ? Ipv6::ipconfig( $cluster, $vmid ) : '';
+		$ip6 = $vmid > 0 && Ipv6::databases() ? Ipv6::ipconfig( $cluster, $vmid ) : '';
 
 		return array(
 			'ipconfig0' => 'ip=' . $ip['address'] . '/' . (int) $cluster['prefix'] . ',gw=' . $gateway . ( '' === $ip6 ? '' : ',' . $ip6 ),
@@ -442,7 +442,7 @@ final class DbIp {
 		$job = array( 'v' => 1, 'request' => $request, 'op' => 'listen', 'listen' => $listen );
 
 		// The IPv6 address is a list of its own (`listen6`): a guest that does not know the key keeps listening on the IPv4 addresses only.
-		if ( '' !== $public && Ipv6::is_address( (string) $r->get( 'ip6' ) ) ) {
+		if ( Ipv6::databases() && '' !== $public && Ipv6::is_address( (string) $r->get( 'ip6' ) ) ) {
 			$job['listen6'] = array( (string) Ipv6::normalise( (string) $r->get( 'ip6' ) ) );
 		}
 
@@ -784,7 +784,7 @@ final class DbIp {
 			}
 		}
 
-		$ip6 = Ipv6::address( $this->cluster, (int) $record['vmid'] );
+		$ip6 = Ipv6::databases() ? Ipv6::address( $this->cluster, (int) $record['vmid'] ) : null;
 
 		if ( ! VmRecords::set_ip( $this->r->id(), $ip['id'] ) || ! IpPool::assign( $this->r->id() ) || ! $this->r->set( array( 'ip' => $ip['address'], 'ip6' => $ip6 ) ) ) {
 			return StepResult::retry( 0, 'db_ip: the address could not be recorded as in use' );

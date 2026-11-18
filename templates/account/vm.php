@@ -8,7 +8,7 @@
  * tab, and without script the links still open the right tab. Elsewhere (a card on the Licenses tab)
  * the sections follow each other with no tabs.
  *
- * Variables (set by BeltoftServices\Proxmox\Vm\Panels::account()): $ip, $ip6 (the IPv6 address, or empty), $ip6_pending (the address was written while the server ran: it works after the next stop and start), $plan (cores, memory_mb,
+ * Variables (set by BeltoftServices\Proxmox\Vm\Panels::account()): $ip, $ip6 (the IPv6 address, or empty), $plan (cores, memory_mb,
  * disk_gb, net_mbit), $busy (a reinstall, restore or other work shows: Power then says Busy), $power (running, stopped or empty when not known), $os_label, $os_cluster, $os_options
  * (VMID => label), $os_current, $has_key, $can_reveal, $forms (whether actions are allowed now), $ssh_user,
  * $backups (null, or enabled, days, list of volid/when/size, last_ok, add_url, add_price, remove_url, can_restore, can_delete),
@@ -127,7 +127,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 			<?php if ( '' !== $ip ) : ?>
 				<div><dt><?php esc_html_e( 'IP address', 'beltoft-services' ); ?></dt><dd><code><?php echo esc_html( $ip ); ?></code></dd></div>
 				<?php if ( '' !== ( $ip6 ?? '' ) ) : ?>
-					<div><dt><?php esc_html_e( 'IPv6 address', 'beltoft-services' ); ?></dt><dd><code><?php echo esc_html( (string) $ip6 ); ?></code><?php if ( ! empty( $ip6_pending ) ) : ?> <span class="description"><?php esc_html_e( 'Works after the next time you stop and start the server.', 'beltoft-services' ); ?></span><?php endif; ?></dd></div>
+					<div><dt><?php esc_html_e( 'IPv6 address', 'beltoft-services' ); ?></dt><dd><code><?php echo esc_html( (string) $ip6 ); ?></code></dd></div>
 				<?php endif; ?>
 				<div><dt><?php esc_html_e( 'Log in', 'beltoft-services' ); ?></dt><dd><code>ssh <?php echo esc_html( $ssh_user ); ?>@<wbr><?php echo esc_html( $ip ); ?></code> <button type="button" class="beltoft-services-copy" data-copy="<?php echo esc_attr( 'ssh ' . $ssh_user . '@' . $ip ); ?>" data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></dd></div>
 			<?php endif; ?>

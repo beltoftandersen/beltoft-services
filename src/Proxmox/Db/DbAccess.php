@@ -161,7 +161,8 @@ final class DbAccess {
 		$input = trim( $input );
 
 		if ( false !== strpos( $input, ':' ) ) {
-			return self::canonical6( $input );
+			// IPv6 entries are not enforced by the guest yet (see Ipv6::databases()): refused, not silently ignored.
+			return Ipv6::databases() ? self::canonical6( $input ) : new \WP_Error( 'beltoft_services_cidr', __( 'Enter an IPv4 address such as 203.0.113.7 or a range such as 203.0.113.0/24.', 'beltoft-services' ) );
 		}
 
 		$parsed = self::parse( $input );
@@ -267,6 +268,11 @@ final class DbAccess {
 		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( (string) $_SERVER['REMOTE_ADDR'] ) ) : '';
 		/** This filter is documented in RateLimit::visitor(). */
 		$ip = (string) apply_filters( 'beltoft_services_client_ip', $ip );
+
+		// An IPv6 visitor gets no suggestion while IPv6 entries are refused (Ipv6::databases()).
+		if ( false !== strpos( $ip, ':' ) && ! Ipv6::databases() ) {
+			return '';
+		}
 
 		return false !== filter_var( $ip, FILTER_VALIDATE_IP ) && false === strpos( $ip, '%' ) ? (string) ( Ipv6::normalise( $ip ) ?? $ip ) : '';
 	}
@@ -397,7 +403,7 @@ final class DbAccess {
 
 		return array(
 			'address'   => $address,
-			'address6'  => '' === $address ? '' : (string) $r->get( 'ip6' ),
+			'address6'  => '' === $address || ! Ipv6::databases() ? '' : (string) $r->get( 'ip6' ),
 			'adding'    => 'add' === DbIp::action( $r ) || ( $wanted && '' === $address ),
 			'removing'  => 'remove' === DbIp::action( $r ),
 			'entries'   => $entries,
@@ -591,7 +597,7 @@ final class DbAccess {
 		);
 
 		// The IPv6 entries go in a list of their own, only when there are some: a guest that does not know the key ignores it (and so keeps the stricter state), and the job of a database without IPv6 is what it always was.
-		if ( array() !== $six ) {
+		if ( Ipv6::databases() && array() !== $six ) {
 			$job['allow6'] = $six;
 		}
 

@@ -24,6 +24,15 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Ipv6 {
 
+	/**
+	 * The one switch for IPv6 on databases: OFF. The database guest (a script outside this plugin) does not listen on IPv6
+	 * or honour `allow6` yet, so a database gets no IPv6 address and takes no IPv6 allow-list entry. The code that gives a
+	 * database an address stays behind this switch for later (filter `beltoft_services_db_ipv6`).
+	 */
+	public static function databases(): bool {
+		return (bool) apply_filters( 'beltoft_services_db_ipv6', false );
+	}
+
 	/** The log kind (IpHistory) of an IPv6 holding. */
 	public const KIND = 'public6';
 

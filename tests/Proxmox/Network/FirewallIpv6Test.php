@@ -249,6 +249,8 @@ class FirewallIpv6Test extends FirewallTestCase {
 		$vmid = (int) $r->get( 'vmid' );
 
 		$this->v6_cluster();
+		$this->assertSame( 'skipped', ( new \BeltoftServices\Proxmox\Vm\Operations( Resource::find( $r->id() ) ) )->reconcile_ipv6(), 'An IPv4-only server is left alone.' );
+		$this->assertTrue( $r->set( array( 'ip6' => self::ADDRESS ) ) );
 		$this->assertSame( 'written', ( new \BeltoftServices\Proxmox\Vm\Operations( Resource::find( $r->id() ) ) )->reconcile_ipv6() );
 
 		$this->assertSame( 'ip=' . $r->get( 'ip' ) . '/24,gw=192.0.2.1,ip6=' . self::ADDRESS . '/64,gw6=2001:db8:430c:1::1', $this->fake->vm( $vmid )['config']['ipconfig0'] );

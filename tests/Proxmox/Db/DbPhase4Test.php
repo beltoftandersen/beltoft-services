@@ -124,6 +124,7 @@ class DbPhase4Test extends TestCase {
 		remove_all_filters( 'beltoft_services_key' );
 		remove_all_filters( 'beltoft_services_proxmox_client' );
 		remove_all_filters( 'beltoft_services_proxmox_pause' );
+		remove_all_filters( 'beltoft_services_db_ipv6' );
 		remove_all_filters( 'pre_wp_mail' );
 		delete_option( Clusters::OPTION );
 		$this->wipe();
@@ -952,6 +953,7 @@ class DbPhase4Test extends TestCase {
 	 * @dataProvider cidr_table
 	 */
 	public function test_allow_list_validation_table( string $input, ?string $expected ): void {
+		add_filter( 'beltoft_services_db_ipv6', '__return_true' );
 		$this->assertSame( $expected, DbAccess::normalise( $input ) );
 	}
 
@@ -1271,8 +1273,22 @@ class DbPhase4Test extends TestCase {
 
 	private const DB_V6 = '2001:db8:430c:1:1388::1';
 
+	/** A cluster with a prefix, and the switch for database IPv6 turned on (it is off by default, see Ipv6::databases()). */
 	private function ipv6_cluster(): void {
+		add_filter( 'beltoft_services_db_ipv6', '__return_true' );
 		$this->save_cluster( array( 'ipv6_prefix' => '2001:db8:430c:1::/64', 'fw_enabled' => '1', 'fw_ipfilter' => '1' ) );
+	}
+
+	public function test_databases_get_no_ipv6_while_the_switch_is_off(): void {
+		$this->save_cluster( array( 'ipv6_prefix' => '2001:db8:430c:1::/64', 'fw_enabled' => '1', 'fw_ipfilter' => '1' ) );
+		$r = $this->db_with_ip();
+
+		$this->assertStringNotContainsString( 'ip6', (string) $this->fake->vm( 5000 )['config']['ipconfig0'] );
+		$this->assertNull( Resource::find( $r->id() )->get( 'ip6' ) );
+		$this->assertSame( '', DbAccess::view( $r )['address6'] );
+		$this->assertNull( DbAccess::normalise( '2001:db8::1' ) );
+		$listen = array_values( array_filter( $this->guest_jobs(), static fn( $j ) => 'listen' === $j['job']['op'] ) );
+		$this->assertArrayNotHasKey( 'listen6', $listen[0]['job'] );
 	}
 
 	public function test_a_database_without_the_add_on_has_no_ipv6_and_a_cluster_without_a_prefix_changes_nothing(): void {
