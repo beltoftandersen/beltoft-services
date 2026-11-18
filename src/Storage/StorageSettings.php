@@ -33,6 +33,7 @@ final class StorageSettings {
 		add_filter( 'beltoft_services_cost_guard_drivers', array( __CLASS__, 'guarded_driver' ) );
 		add_filter( 'beltoft_services_default_retention', array( __CLASS__, 'retention' ), 10, 2 );
 		add_action( 'beltoft_services_settings_tab_' . self::TAB, array( __CLASS__, 'render' ) );
+		OrderLine::register();
 	}
 
 	/**
