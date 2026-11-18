@@ -47,10 +47,10 @@ final class ManualServerDelivery {
 	}
 
 	/**
-	 * The hours the order promises delivery in (setting manual_server_promise_hours).
+	 * The minutes the order promises delivery in (setting manual_server_promise_minutes, default 10).
 	 */
-	public static function promise_hours(): int {
-		return max( 1, (int) Settings::get( 'manual_server_promise_hours' ) );
+	public static function promise_minutes(): int {
+		return max( 1, (int) Settings::get( 'manual_server_promise_minutes' ) );
 	}
 
 	/**
@@ -278,8 +278,8 @@ final class ManualServerDelivery {
 
 		$lines = array_merge(
 			array(
-				'A dedicated server was paid for. Buy it at the supplier by hand, then press Mark ready on the service with the address.',
-				sprintf( 'It is promised within %d hours of the payment.', self::promise_hours() ),
+				'A dedicated server was paid for and automatic ordering is OFF (Settings, Dedicated servers). Buy it at the supplier by hand, then press Mark ready on the service with the address.',
+				sprintf( 'It is promised within %d minutes of the payment.', self::promise_minutes() ),
 				'Nothing is ordered by the plugin.',
 				'',
 			),
@@ -299,11 +299,11 @@ final class ManualServerDelivery {
 	public static function overdue_mail( Resource $r ): void {
 		$since = (int) $r->get( self::REQUESTED_AT );
 
-		if ( $since < 1 || (int) $r->get( 'manual_overdue_mailed' ) > 0 || time() - $since < self::promise_hours() * HOUR_IN_SECONDS ) {
+		if ( $since < 1 || (int) $r->get( 'manual_overdue_mailed' ) > 0 || time() - $since < self::promise_minutes() * MINUTE_IN_SECONDS ) {
 			return;
 		}
 
-		$lines = array_merge( array( sprintf( 'This server is not delivered %d hours after the order. The customer was promised that.', self::promise_hours() ), '' ), self::order_lines( $r ) );
+		$lines = array_merge( array( sprintf( 'This server is not delivered %d minutes after the order. The customer was promised that.', self::promise_minutes() ), '' ), self::order_lines( $r ) );
 
 		if ( Alerts::notify( sprintf( 'Dedicated server is late (service %d)', $r->id() ), $lines, $r ) ) {
 			$r->set( array( 'manual_overdue_mailed' => time() ) );

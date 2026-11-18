@@ -92,6 +92,7 @@ final class ManualServerPanel {
 			__( 'Storage', 'beltoft-services' )        => (string) ( $plan['server_storage'] ?? '' ),
 			__( 'Location', 'beltoft-services' )       => (string) ( $plan['server_location'] ?? '' ),
 			__( 'IP address', 'beltoft-services' )     => implode( ', ', $ips ),
+			__( 'IPv6 network', 'beltoft-services' )   => (string) $r->get( RobotOrder::IPV6 ),
 			__( 'Login', 'beltoft-services' )          => (string) $r->get( ManualServerDelivery::NOTE ),
 		);
 
@@ -132,8 +133,8 @@ final class ManualServerPanel {
 		$delivered = (int) $r->get( ManualServerDelivery::READY_AT ) > 0;
 
 		if ( ! $delivered ) {
-			/* translators: %d: hours. */
-			echo '<p>' . esc_html( sprintf( __( 'Your server is being set up by hand. It is delivered within %d hours of your payment. We email you when it is ready, and the address appears here.', 'beltoft-services' ), ManualServerDelivery::promise_hours() ) ) . '</p>';
+			/* translators: %d: minutes. */
+			echo '<p>' . esc_html( sprintf( __( 'Your server is being set up. It is ready in up to %d minutes after your payment. We email you when it is ready, and the address appears here.', 'beltoft-services' ), ManualServerDelivery::promise_minutes() ) ) . '</p>';
 		}
 
 		echo '<dl class="beltoft-services-facts">';

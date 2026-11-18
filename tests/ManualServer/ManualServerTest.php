@@ -161,7 +161,7 @@ class ManualServerTest extends ManualServerTestCase {
 		Jobs::run( $r->id() );
 		$this->assertCount( 0, $this->mails_with( 'is late' ) );
 
-		Resource::find( $r->id() )->set( array( ManualServerDelivery::REQUESTED_AT => time() - 3 * HOUR_IN_SECONDS, 'next_attempt_at' => null ) );
+		Resource::find( $r->id() )->set( array( ManualServerDelivery::REQUESTED_AT => time() - 11 * MINUTE_IN_SECONDS, 'next_attempt_at' => null ) );
 		Jobs::run( $r->id() );
 		Resource::find( $r->id() )->set( array( 'next_attempt_at' => null ) );
 		Jobs::run( $r->id() );
@@ -294,7 +294,7 @@ class ManualServerTest extends ManualServerTestCase {
 		ManualServerPanel::account( Resource::find( $r->id() ) );
 		$html = (string) ob_get_clean();
 
-		$this->assertStringContainsString( 'delivered within 2 hours', $html );
+		$this->assertStringContainsString( 'ready in up to 10 minutes', $html );
 		$this->assertStringContainsString( 'contact support', $html );
 	}
 

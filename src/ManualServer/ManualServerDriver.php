@@ -17,7 +17,7 @@ use BeltoftServices\Resource;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Nothing here calls a supplier or any API. A new service waits in `provisioning` (a poll, one look a minute that costs no
+ * Without the setting dedicated_enabled nothing here calls a supplier or any API: a new service waits in `provisioning` (a poll, one look a minute that costs no
  * attempt) while staff are mailed the order; "Mark ready" (ManualServerDelivery) stores the address and the reconciler moves
  * the service to `ready`, which starts the hourly meter and sends the service ready email. Pause, resume and delete only
  * tell staff what to do by hand. A delete ends the activation, and with it the billing, at once.
@@ -82,14 +82,23 @@ final class ManualServerDriver implements Driver, StopsOnDelete, NeedsBilling {
 			$meta[ ManualServerDelivery::REQUESTED_AT ] = time();
 		}
 
+		if ( $meta && $r->set( $meta ) ) {
+			$r = Resource::find( $r->id() ) ?? $r;
+		}
+
+		// Delivered by hand (Mark ready), the fallback of an order that failed or timed out.
 		if ( (int) $r->get( ManualServerDelivery::READY_AT ) > 0 ) {
-			return StepResult::done( $meta, 'Server delivered' );
+			return StepResult::done( array(), 'Server delivered' );
+		}
+
+		if ( RobotOrder::enabled() ) {
+			return RobotOrder::provision( $r );
 		}
 
 		ManualServerDelivery::order_mail( $r );
 		ManualServerDelivery::overdue_mail( $r );
 
-		return StepResult::poll( 60, 'Waiting for staff to set up the server', Reconciler::POLL_BUDGET_MAX, $meta );
+		return StepResult::poll( 60, 'Waiting for staff to set up the server', Reconciler::POLL_BUDGET_MAX );
 	}
 
 	/**
@@ -126,15 +135,13 @@ final class ManualServerDriver implements Driver, StopsOnDelete, NeedsBilling {
 	}
 
 	/**
-	 * Tells staff to cancel the server at the supplier. The data is gone at once there, so this is only ever reached by an
-	 * explicit cancel (the customer's typed confirmation, or an admin).
+	 * Cancels the server at the supplier at once (RobotOrder::cancel), or tells staff when it was not ordered through the API.
+	 * The data is gone at once there, so this is only ever reached by an explicit cancel (the customer's typed confirmation, or an admin).
 	 *
 	 * @param Resource $r Resource.
 	 */
 	public function delete( Resource $r ): StepResult {
-		ManualServerDelivery::staff_mail( $r, 'cancel' );
-
-		return StepResult::done( array(), 'Staff told to cancel the server at the supplier' );
+		return RobotOrder::cancel( $r );
 	}
 
 	/**

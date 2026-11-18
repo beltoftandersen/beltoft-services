@@ -32,6 +32,10 @@ abstract class ManualServerTestCase extends UsageTestCase {
 		add_filter(
 			'pre_http_request',
 			function ( $pre, $args, $url ) {
+				if ( false !== $pre ) {
+					return $pre; // A test stub answered first.
+				}
+
 				$this->fail( 'A dedicated server test reached the network: ' . $url );
 
 				return $pre;
@@ -166,6 +170,16 @@ abstract class ManualServerTestCase extends UsageTestCase {
 		$this->assertInstanceOf( Resource::class, $resource, is_wp_error( $resource ) ? $resource->get_error_code() . ': ' . $resource->get_error_message() : '' );
 
 		return $resource;
+	}
+
+	/**
+	 * Switches automatic ordering on with the in-process fake client and a key for the encrypted password.
+	 */
+	protected function automatic(): void {
+		$key = base64_encode( str_repeat( 'k', 32 ) );
+		add_filter( 'beltoft_services_key', static fn() => $key );
+		\BeltoftServices\ManualServer\FakeRobotClient::reset();
+		$this->settings( array( 'dedicated_enabled' => 1, 'dedicated_client' => 'fake' ) );
 	}
 
 	/**
