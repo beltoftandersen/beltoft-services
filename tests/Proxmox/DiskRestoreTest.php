@@ -283,4 +283,31 @@ class DiskRestoreTest extends BackupTestCase {
 		$this->assertStringNotContainsString( 'Reinstall is unavailable', $html );
 		$this->assertStringContainsString( 'Extra disks are kept with their data and stay attached.', $html );
 	}
+
+	private function ipv6_on(): void {
+		$stored        = get_option( \BeltoftServices\Proxmox\Pve\Clusters::OPTION );
+		$stored['lab'] = array_merge( $stored['lab'], array( 'ipv6_prefix' => '2001:db8:430c:1::/64', 'fw_enabled' => 1, 'fw_ipfilter' => 1 ) );
+		update_option( \BeltoftServices\Proxmox\Pve\Clusters::OPTION, $stored, false );
+	}
+
+	public function test_a_backup_from_before_ipv6_gets_its_address_back_in_a_restore_and_a_linked_server_is_left_alone(): void {
+		$server = $this->ready_vm();
+		$old    = $this->config()['ipconfig0'];
+		$this->assertStringNotContainsString( 'ip6', $old );
+		$volid = $this->backup_of( $server );
+
+		$this->ipv6_on();
+		$this->restore( $server, $volid );
+		$this->assertNull( Resource::find( $server->id() )->get( 'restore' ), 'The restore finished.' );
+		$this->assertSame( $old . ',ip6=2001:db8:430c:1:1388::1/64,gw6=2001:db8:430c:1::1', $this->config()['ipconfig0'], 'The IPv4 part is the backup\'s, the IPv6 part is put back.' );
+		$this->assertSame( '2001:db8:430c:1:1388::1', Resource::find( $server->id() )->get( 'ip6' ) );
+
+		// An adopted server is never changed.
+		$linked = $this->ready_vm();
+		$this->assertTrue( $linked->set( array( 'linked' => true ) ) );
+		$id   = (int) $linked->get( 'vmid' );
+		$cfg  = $this->fake->request( 'GET', '/nodes/node-a/qemu/' . $id . '/config' );
+		$this->assertSame( 'skipped', ( new \BeltoftServices\Proxmox\Vm\Operations( Resource::find( $linked->id() ) ) )->reconcile_ipv6() );
+		$this->assertSame( $cfg['ipconfig0'], $this->fake->request( 'GET', '/nodes/node-a/qemu/' . $id . '/config' )['ipconfig0'] );
+	}
 }

@@ -312,6 +312,25 @@ class FlowsTest extends FirewallTestCase {
 		return Resource::find( $r->id() );
 	}
 
+	public function test_a_quarantine_on_an_ipv6_cluster_adds_no_ipv6_allow_rule_so_all_ipv6_traffic_out_is_dropped(): void {
+		$this->save_cluster( array( 'ipv6_prefix' => '2001:db8:430c:1::/64', 'fw_enabled' => '1', 'fw_ipfilter' => '1' ) );
+		$r     = $this->server();
+		$vmid  = (int) $r->get( 'vmid' );
+		$fresh = $this->quarantine( $r );
+
+		$this->assertTrue( Quarantine::active( $fresh ) );
+		$this->assertSame( 'DROP', $this->options( $r )['policy_out'] );
+
+		foreach ( $this->fake->vm( $vmid )['firewall_rules'] as $rule ) {
+			if ( 'out' === ( $rule['type'] ?? '' ) && 'ACCEPT' === ( $rule['action'] ?? '' ) ) {
+				$this->assertStringNotContainsString( ':', (string) ( $rule['dest'] ?? '' ), 'No outgoing accept rule names an IPv6 address.' );
+				$this->assertNotSame( 'icmpv6', (string) ( $rule['proto'] ?? '' ) );
+			}
+		}
+
+		$this->assertFalse( $this->fake->fake_outbound_allowed( $vmid, 'tcp', 443 ) );
+	}
+
 	public function test_mode_on_blocks_outgoing_traffic_and_tells_everyone(): void {
 		$r     = $this->server();
 		$vmid  = (int) $r->get( 'vmid' );

@@ -709,4 +709,17 @@ class ProxmoxCliTest extends TestCase {
 
 		wp_set_current_user( 0 );
 	}
+
+	public function test_link_vm_adopts_a_machine_that_already_has_an_ipv6_address_and_sets_no_ip6_meta(): void {
+		$license = $this->license();
+		$this->vm( 250, array( 'ipconfig0' => 'ip=192.0.2.11/24,gw=192.0.2.1,ip6=2001:db8:1::5/64,gw6=2001:db8:1::1' ) );
+
+		$result = $this->link( $license, array( 'vmid' => 250, 'ip' => '192.0.2.11' ) );
+		$this->assertIsArray( $result, $this->error_text( $result ) );
+
+		$resource = Resource::for_license( (int) $license['id'] );
+		$this->assertSame( '192.0.2.11', $resource->get( 'ip' ) );
+		$this->assertNull( $resource->get( 'ip6' ), 'An adopted server keeps what it has: no derived address.' );
+		$this->assertSame( 'ip=192.0.2.11/24,gw=192.0.2.1,ip6=2001:db8:1::5/64,gw6=2001:db8:1::1', $this->fake->vm( 250 )['config']['ipconfig0'] );
+	}
 }
