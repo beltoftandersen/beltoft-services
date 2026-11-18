@@ -38,7 +38,7 @@ final class DedicatedReinstall {
 	public const META   = 'ded_reinstall';
 	public const ACTION = 'dedicated_reinstall';
 
-	/** Seconds to wait before looking for the rescue system after the reset, and how long to wait for it. */
+	/** Seconds to wait before looking for the rescue system after the reset, and how long to wait for it (a fake shell: no wait, see delay()). */
 	private const BOOT_AFTER = 45;
 	private const BOOT_WAIT  = 1200;
 	/** The longest an installation may take. */
@@ -218,7 +218,7 @@ final class DedicatedReinstall {
 				}
 
 				$memo['step']  = 'wait';
-				$memo['after'] = $now + self::BOOT_AFTER;
+				$memo['after'] = $now + self::delay( self::BOOT_AFTER );
 				$memo['until'] = $now + self::BOOT_WAIT;
 				self::save( $r, $memo );
 
@@ -295,7 +295,7 @@ final class DedicatedReinstall {
 			case 'reboot':
 				$shell->reboot( $ip, self::password( $memo ) );
 				$memo['step']  = 'back';
-				$memo['after'] = $now + self::REBOOT_AFTER;
+				$memo['after'] = $now + self::delay( self::REBOOT_AFTER );
 				$memo['until'] = $now + self::REBOOT_WAIT;
 				self::save( $r, $memo );
 
@@ -408,13 +408,22 @@ final class DedicatedReinstall {
 	}
 
 	/**
-	 * A wait: queued again in half a minute. $progress marks a step that got further.
+	 * A wait for a real server is the real time; with a fake shell (tests and staging: there is no machine to wait for) there is none.
+	 *
+	 * @param int $seconds Seconds for a real server.
+	 */
+	private static function delay( int $seconds ): int {
+		return RescueShells::for() instanceof SshRescueShell ? $seconds : 0;
+	}
+
+	/**
+	 * A wait: queued again in half a minute (a few seconds with a fake shell). $progress marks a step that got further.
 	 *
 	 * @param string $why      What the customer reads.
 	 * @param bool   $progress True when a step finished.
 	 */
 	private static function wait( string $why, bool $progress = false ): StepResult {
-		$result = StepResult::poll( 30, $why, Reconciler::POLL_BUDGET_MAX );
+		$result = StepResult::poll( RescueShells::for() instanceof SshRescueShell ? 30 : 3, $why, Reconciler::POLL_BUDGET_MAX );
 
 		return $progress ? $result->with_progress() : $result;
 	}

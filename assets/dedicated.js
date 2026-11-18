@@ -283,7 +283,7 @@
 			}
 
 			rules = data.firewall.input.slice();
-			status = select( [ [ 'active', T.fwActive ], [ 'disabled', T.fwOff ] ], data.firewall.status === 'active' ? 'active' : 'disabled', T.fwStatus );
+			status = select( [ [ 'active', T.fwActive ], [ 'disabled', T.fwOff ] ], 'disabled' === data.firewall.status ? 'disabled' : 'active', T.fwStatus );
 			table = el( 'div', { 'class': 'beltoft-services-dedicated__rules' } );
 
 			function draw() {

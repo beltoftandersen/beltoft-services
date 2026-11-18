@@ -134,7 +134,7 @@ final class DedicatedReinstallTest extends ControlsTestCase {
 		$memo     = Resource::find( $r->id() )->get( DedicatedReinstall::META );
 		$password = FakeRobotClient::rescue_password( self::NUMBER );
 		$this->assertNotSame( '', $password );
-		$this->assertSame( 'wait', $memo['step'] );
+		$this->assertSame( 'installing', $memo['step'], 'With a fake shell nothing is waited for: the first run goes up to the installation.' );
 		$this->assertStringNotContainsString( $password, (string) wp_json_encode( $memo ) );
 
 		$r = $this->drive( $r );
