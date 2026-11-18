@@ -291,6 +291,64 @@ final class Tiles {
 	}
 
 	/**
+	 * Tiles for a list of choices that a supplier names (the distributions of a dedicated server, the images of its installer): one
+	 * tile per family with the versions of that family in a select inside, as os_items() does for the templates. The value of a tile is
+	 * the exact name the supplier lists; nothing is mapped or rewritten. Newest version first in a family; the family of the value
+	 * checked shows that value, any other family its newest. Tile order is the order of the first entry of each family.
+	 *
+	 * @param array<int, array{value: string, family: string, short: string}> $entries  value (the exact name), family (the tile name), short (the text in the select).
+	 * @param string                                                           $selected Value checked first, or empty.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function family_items( array $entries, string $selected ): array {
+		$groups = array();
+		foreach ( $entries as $entry ) {
+			$groups[ strtolower( $entry['family'] ) ][] = $entry;
+		}
+		$items = array();
+		foreach ( $groups as $versions ) {
+			$order = array_keys( $versions );
+			usort(
+				$order,
+				static function ( $a, $b ) use ( $versions ): int {
+					$va = preg_match( '/\d[\d.]*/', $versions[ $a ]['short'], $ma ) ? $ma[0] : '0';
+					$vb = preg_match( '/\d[\d.]*/', $versions[ $b ]['short'], $mb ) ? $mb[0] : '0';
+					return version_compare( $vb, $va ) ?: $a <=> $b;
+				}
+			);
+			$shown = $versions[ $order[0] ];
+			foreach ( $versions as $entry ) {
+				if ( $entry['value'] === $selected ) {
+					$shown = $entry;
+				}
+			}
+			$attrs = array();
+			if ( count( $versions ) > 1 ) {
+				$list = array();
+				foreach ( $order as $i ) {
+					$list[] = array(
+						'value'  => $versions[ $i ]['value'],
+						'label'  => $versions[ $i ]['family'] . ' ' . $versions[ $i ]['short'],
+						'short'  => $versions[ $i ]['short'],
+						'line'   => '',
+						'family' => '',
+					);
+				}
+				$attrs['data-versions'] = (string) wp_json_encode( $list );
+			}
+			$items[] = array(
+				'value'   => $shown['value'],
+				'name'    => $shown['family'],
+				'line'    => '' !== $shown['short'] ? $shown['short'] : '',
+				'logo'    => self::os_logo( 0, $shown['family'], '' ),
+				'checked' => $shown['value'] === $selected,
+				'attrs'   => $attrs,
+			);
+		}
+		return $items;
+	}
+
+	/**
 	 * Prints the operating system tiles. Each carries its family, so the app tiles' script can tell which apps run on it.
 	 *
 	 * @param string             $cluster  Cluster id.

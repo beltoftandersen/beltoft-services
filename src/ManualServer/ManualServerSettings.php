@@ -28,6 +28,8 @@ final class ManualServerSettings {
 		add_action( 'beltoft_services_settings_tab_' . self::TAB, array( __CLASS__, 'render' ) );
 		ManualServerPanel::register();
 		ManualServerRoutes::register();
+		ControlRoutes::register();
+		DistField::register();
 		OrderLine::register();
 	}
 
@@ -127,6 +129,7 @@ final class ManualServerSettings {
 		$fields['dedicated_api_user']         = $base + array( 'type' => 'secret', 'default' => '', 'label' => __( 'Web service user', 'beltoft-services' ), 'desc' => __( 'Stored encrypted and never shown again.', 'beltoft-services' ) );
 		$fields['dedicated_api_password']     = $base + array( 'type' => 'secret', 'default' => '', 'label' => __( 'Web service password', 'beltoft-services' ), 'desc' => __( 'Stored encrypted and never shown again.', 'beltoft-services' ) );
 		$fields['dedicated_dist']             = $base + array( 'type' => 'text', 'default' => '', 'label' => __( 'Distribution to preinstall', 'beltoft-services' ), 'desc' => __( 'The name exactly as the supplier product lists it (optional). A plan can set its own. Empty: none is preinstalled.', 'beltoft-services' ) );
+		$fields['dedicated_images']           = $base + array( 'type' => 'textarea', 'default' => '', 'label' => __( 'Systems for a reinstall', 'beltoft-services' ), 'desc' => __( 'One image file name per line, exactly as the installer lists them (the result of ls /root/images in a rescue system). Used until a reinstall has read the real list from a rescue system. Empty and no list yet: the reinstall is not offered.', 'beltoft-services' ) );
 		$fields['dedicated_max_servers']      = $base + array( 'type' => 'number', 'default' => 0, 'min' => 0, 'max' => 100000, 'label' => __( 'Most servers ordered live', 'beltoft-services' ), 'desc' => __( 'Live orders only. 0: none may be ordered live.', 'beltoft-services' ) );
 		$fields['dedicated_max_monthly_cost'] = $base + array( 'type' => 'number', 'default' => 0, 'min' => 0, 'max' => 10000000, 'label' => __( 'Highest monthly cost of all live servers, in whole EUR', 'beltoft-services' ), 'desc' => __( 'The sum of the cost field of the plans. An order that would pass it is refused and staff are told. 0: none may be ordered live.', 'beltoft-services' ) );
 		$fields['dedicated_max_new_per_day']  = $base + array( 'type' => 'number', 'default' => 0, 'min' => 0, 'max' => 20, 'label' => __( 'Most new servers per day', 'beltoft-services' ), 'desc' => __( 'Live orders only. The supplier itself allows 20 order requests a day. 0: none may be ordered live.', 'beltoft-services' ) );
