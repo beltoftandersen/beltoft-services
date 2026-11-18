@@ -22,6 +22,7 @@ use BeltoftServices\Proxmox\Network\Firewall;
 use BeltoftServices\Proxmox\Network\FirewallRules;
 use BeltoftServices\Proxmox\Snapshot\PanelData;
 use BeltoftServices\Proxmox\Vm\GuestDisk;
+use BeltoftServices\Proxmox\Vm\Panels;
 use BeltoftServices\Monitoring\LiveUsage;
 use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Proxmox\Network\PrivateAttach;
@@ -111,6 +112,7 @@ final class Details {
 			'memory_percent' => null !== $cached && 'running' === $cached['power'] ? $guest : null,
 			'disk_percent'   => null !== $disk ? max( 0, min( 100, (int) round( $disk['used'] / $disk['total'] * 100 ) ) ) : null,
 			'ip'             => false !== filter_var( (string) $r->get( 'ip' ), FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ? (string) $r->get( 'ip' ) : '',
+			'ip6'            => Panels::ip6( $r ),
 			'system'         => Servers::os_label( $r ),
 			'size'           => sprintf( '%d vCPU, %s GB memory, %d GB disk', (int) ( $plan['cores'] ?? 0 ), (string) round( (int) ( $plan['memory_mb'] ?? 0 ) / 1024, 1 ), (int) ( $plan['disk_gb'] ?? 0 ) ),
 			'app'            => '' !== (string) $r->get( 'app_id' ) ? (string) $r->get( 'app_id' ) : '',

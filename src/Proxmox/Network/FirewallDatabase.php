@@ -175,7 +175,12 @@ trait FirewallDatabase {
 	 * @param array<string, mixed> $rule   Wanted rule.
 	 */
 	private static function same_database_rule( array $remote, array $rule ): bool {
-		$source = static fn( $value ): string => preg_replace( '#/32$#D', '', (string) $value );
+		$source = static function ( $value ): string {
+			$text = (string) preg_replace( '#/(32|128)$#D', '', (string) $value );
+
+			// Proxmox may list an IPv6 source in another spelling.
+			return false !== strpos( $text, ':' ) && null !== Ipv6::normalise( explode( '/', $text )[0] ) ? Ipv6::normalise( explode( '/', $text )[0] ) . ( false !== strpos( $text, '/' ) ? '/' . explode( '/', $text )[1] : '' ) : $text;
+		};
 
 		return 'in' === ( $remote['type'] ?? '' ) && 'ACCEPT' === ( $remote['action'] ?? '' ) && 'tcp' === ( $remote['proto'] ?? '' ) && 'net0' === ( $remote['iface'] ?? '' )
 			&& (string) ( $rule['dport'] ?? '' ) === (string) ( $remote['dport'] ?? '' ) && 1 === (int) ( $remote['enable'] ?? 0 )

@@ -439,7 +439,14 @@ final class DbIp {
 			$listen[] = $public;
 		}
 
-		return array( 'v' => 1, 'request' => $request, 'op' => 'listen', 'listen' => $listen );
+		$job = array( 'v' => 1, 'request' => $request, 'op' => 'listen', 'listen' => $listen );
+
+		// The IPv6 address is a list of its own (`listen6`): a guest that does not know the key keeps listening on the IPv4 addresses only.
+		if ( '' !== $public && Ipv6::is_address( (string) $r->get( 'ip6' ) ) ) {
+			$job['listen6'] = array( (string) Ipv6::normalise( (string) $r->get( 'ip6' ) ) );
+		}
+
+		return $job;
 	}
 
 	/**

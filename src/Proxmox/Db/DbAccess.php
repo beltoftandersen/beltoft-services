@@ -10,6 +10,7 @@ namespace BeltoftServices\Proxmox\Db;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Proxmox\Network\Firewall;
 use BeltoftServices\Proxmox\Network\IpPool;
+use BeltoftServices\Proxmox\Network\Ipv6;
 use BeltoftServices\Proxmox\Pve\Prepares;
 use BeltoftServices\Proxmox\Pve\Steps;
 use BeltoftServices\Proxmox\Vm\VmRecords;
@@ -50,6 +51,9 @@ final class DbAccess {
 
 	/** The shortest prefix of a range (a /16 is 65536 addresses). */
 	public const MIN_PREFIX = 16;
+
+	/** The shortest IPv6 prefix of a range. */
+	public const MIN_PREFIX6 = 48;
 
 	/** Seconds the guest has for an allow job. */
 	private const BUDGET = 600;
@@ -137,7 +141,7 @@ final class DbAccess {
 	}
 
 	/**
-	 * An address or range as `a.b.c.d/n`, or null. IPv4 only; no host bits.
+	 * An address or range as `a.b.c.d/n` (IPv4) or `address/n` (IPv6), or null. No host bits.
 	 *
 	 * @param string $input Address, or range with prefix.
 	 */
@@ -148,15 +152,66 @@ final class DbAccess {
 	}
 
 	/**
-	 * Address or range as `a.b.c.d/n`, or the reason it is refused.
+	 * Address or range as `a.b.c.d/n` or `address/n`, or the reason it is refused.
 	 *
 	 * @param string $input Address, or range with prefix.
 	 * @return string|\WP_Error
 	 */
 	private static function canonical( string $input ) {
-		$parsed = self::parse( trim( $input ) );
+		$input = trim( $input );
+
+		if ( false !== strpos( $input, ':' ) ) {
+			return self::canonical6( $input );
+		}
+
+		$parsed = self::parse( $input );
 
 		return is_array( $parsed ) ? long2ip( $parsed[0] ) . '/' . $parsed[1] : $parsed;
+	}
+
+	/**
+	 * An IPv6 address or range as `address/n` (always with the length), or the reason it is refused. Global unicast only
+	 * (2000::/3): loopback, link-local, unique-local, multicast and the unallocated rest are never a customer's address on
+	 * the internet. A range is at most a /48 wide, and starts at its first address.
+	 *
+	 * @param string $input Text with a colon in it.
+	 * @return string|\WP_Error
+	 */
+	private static function canonical6( string $input ) {
+		$message = __( 'Enter an IPv4 address such as 203.0.113.7, an IPv6 address such as 2001:db8::7, or a range such as 203.0.113.0/24 or 2001:db8:1::/48.', 'beltoft-services' );
+
+		if ( 1 !== preg_match( '#^([0-9A-Fa-f:]+)(?:/(\d{1,3}))?$#D', $input, $m ) ) {
+			return new \WP_Error( 'beltoft_services_cidr', $message );
+		}
+
+		$packed = Ipv6::pack( $m[1] );
+		$prefix = isset( $m[2] ) ? (int) $m[2] : 128;
+
+		if ( null === $packed || $prefix > 128 ) {
+			return new \WP_Error( 'beltoft_services_cidr', $message );
+		}
+
+		if ( ( ord( $packed[0] ) & 0xE0 ) !== 0x20 ) {
+			return new \WP_Error( 'beltoft_services_cidr_private', __( 'This address is on a private or reserved network. Applications on your private network already reach the database; enter the public address of the place the connection comes from.', 'beltoft-services' ), array( 'status' => 422 ) );
+		}
+
+		if ( $prefix < self::MIN_PREFIX6 ) {
+			/* translators: %d: the shortest IPv6 prefix, 48 */
+			return new \WP_Error( 'beltoft_services_cidr_wide', sprintf( __( 'An IPv6 range can be at most a /%d. To let everyone in, use the option to open the database to everyone.', 'beltoft-services' ), self::MIN_PREFIX6 ), array( 'status' => 422 ) );
+		}
+
+		$first = '';
+
+		for ( $i = 0; $i < 16; $i++ ) {
+			$keep   = max( 0, min( 8, $prefix - 8 * $i ) );
+			$first .= chr( ord( $packed[ $i ] ) & ( ( 0xFF << ( 8 - $keep ) ) & 0xFF ) );
+		}
+
+		if ( $first !== $packed ) {
+			return new \WP_Error( 'beltoft_services_cidr_host', sprintf( /* translators: %s: the first address of the range */ __( 'The range must start at its first address, %s.', 'beltoft-services' ), Ipv6::text( $first ) . '/' . $prefix ), array( 'status' => 422 ) );
+		}
+
+		return Ipv6::text( $packed ) . '/' . $prefix;
 	}
 
 	/**
@@ -206,14 +261,14 @@ final class DbAccess {
 	}
 
 	/**
-	 * The address the customer is using (IPv4 only), or ''. A convenience for the button "Use my current IP".
+	 * The address the customer is using (IPv4 or IPv6), or ''. A convenience for the button "Use my current IP".
 	 */
 	public static function my_ip(): string {
 		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( (string) $_SERVER['REMOTE_ADDR'] ) ) : '';
 		/** This filter is documented in RateLimit::visitor(). */
 		$ip = (string) apply_filters( 'beltoft_services_client_ip', $ip );
 
-		return false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ? $ip : '';
+		return false !== filter_var( $ip, FILTER_VALIDATE_IP ) && false === strpos( $ip, '%' ) ? (string) ( Ipv6::normalise( $ip ) ?? $ip ) : '';
 	}
 
 	// -- A change ----------------------------------------------------------------------------------
@@ -303,11 +358,20 @@ final class DbAccess {
 		$out = array();
 
 		foreach ( self::entries( $r ) as $entry ) {
-			$source                                   = preg_replace( '#/32$#D', '', $entry['cidr'] );
+			$source                                   = self::bare( $entry['cidr'] );
 			$out[ Firewall::TAG_DB . $source ] = (string) $source;
 		}
 
 		return $out;
+	}
+
+	/**
+	 * An entry as the customer reads it: a single host without its /32 or /128.
+	 *
+	 * @param string $cidr Stored entry.
+	 */
+	public static function bare( string $cidr ): string {
+		return (string) preg_replace( '#/(32|128)$#D', '', $cidr );
 	}
 
 	/**
@@ -323,7 +387,7 @@ final class DbAccess {
 
 		foreach ( self::entries( $r ) as $entry ) {
 			$entries[] = array(
-				'cidr'  => preg_replace( '#/32$#D', '', $entry['cidr'] ),
+				'cidr'  => self::bare( $entry['cidr'] ),
 				'label' => $entry['label'],
 				'added' => $entry['added'] > 0 ? wp_date( $format, $entry['added'] ) : '',
 			);
@@ -333,6 +397,7 @@ final class DbAccess {
 
 		return array(
 			'address'   => $address,
+			'address6'  => '' === $address ? '' : (string) $r->get( 'ip6' ),
 			'adding'    => 'add' === DbIp::action( $r ) || ( $wanted && '' === $address ),
 			'removing'  => 'remove' === DbIp::action( $r ),
 			'entries'   => $entries,
@@ -513,13 +578,24 @@ final class DbAccess {
 	 * @return array<string, mixed>
 	 */
 	public static function job( Resource $r, string $request ): array {
-		return array(
+		$all  = array_column( self::entries( $r ), 'cidr' );
+		$four = array_values( array_filter( $all, static fn( $c ) => false === strpos( $c, ':' ) ) );
+		$six  = array_values( array_filter( $all, static fn( $c ) => false !== strpos( $c, ':' ) ) );
+
+		$job = array(
 			'v'       => 1,
 			'request' => $request,
 			'op'      => 'allow',
-			'allow'   => array_column( self::entries( $r ), 'cidr' ),
+			'allow'   => $four,
 			'world'   => self::world( $r ),
 		);
+
+		// The IPv6 entries go in a list of their own, only when there are some: a guest that does not know the key ignores it (and so keeps the stricter state), and the job of a database without IPv6 is what it always was.
+		if ( array() !== $six ) {
+			$job['allow6'] = $six;
+		}
+
+		return $job;
 	}
 
 	/**
