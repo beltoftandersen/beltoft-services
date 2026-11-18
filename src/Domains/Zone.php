@@ -123,7 +123,17 @@ final class Zone {
 		return array_values( array_filter( array_map( static fn( $host ) => strtolower( trim( $host, " .\t\r\n" ) ), explode( ',', $raw ) ) ) );
 	}
 
+	/**
+	 * Makes the zone and signs it. Once the zone is ready, a domain with no address of its own is parked (Parking, off unless the
+	 * parking addresses are set); a failed parking never fails the step.
+	 */
 	public static function ensure( Resource $r, bool $switching_to_ours = false, bool $publish_ds = true ): StepResult {
+		$result = self::ensure_zone( $r, $switching_to_ours, $publish_ds );
+		if ( $result->is_done() && self::nameservers() && ( $switching_to_ours || ! ( 'custom' === $r->get( 'ns_mode' ) || $r->get( 'dns_external' ) ) ) ) { Parking::offer( $r ); }
+		return $result;
+	}
+
+	private static function ensure_zone( Resource $r, bool $switching_to_ours, bool $publish_ds ): StepResult {
 		$name = (string) $r->get( 'domain' );
 		$nameservers = self::nameservers();
 		if ( ! $nameservers || ( ! $switching_to_ours && ( 'custom' === $r->get( 'ns_mode' ) || $r->get( 'dns_external' ) ) ) ) { return StepResult::done(); }

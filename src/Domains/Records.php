@@ -16,7 +16,7 @@ final class Records {
 		$rows = array();
 		foreach ( $rrsets as $set ) {
 			$type = strtoupper( (string) ( $set['type'] ?? '' ) );
-			if ( ! in_array( $type, self::TYPES, true ) ) { continue; }
+			if ( ! in_array( $type, self::TYPES, true ) || Parking::is_ours( $zone, (array) $set ) ) { continue; }
 			$fqdn = strtolower( (string) ( $set['name'] ?? '' ) );
 			$relative = rtrim( substr( $fqdn, 0, max( 0, strlen( $fqdn ) - strlen( $zone ) - 1 ) ), '.' );
 			$name = rtrim( $fqdn, '.' ) === $zone ? '@' : ( substr_count( $relative, '.' ) > 1 ? $fqdn : $relative );
@@ -246,6 +246,7 @@ final class Records {
 	/** The customer RRsets of a zone (types the editor knows), keyed by lowercase name and type. */
 	private static function customer_sets( array $zone_data ): array {
 		$have = array();
+		list( $zone_data ) = Parking::split( $zone_data ); // Our parking records are not the customer's.
 		foreach ( (array) ( $zone_data['rrsets'] ?? array() ) as $set ) {
 			$type = strtoupper( (string) ( $set['type'] ?? '' ) );
 			if ( in_array( $type, self::TYPES, true ) ) { $have[ strtolower( (string) ( $set['name'] ?? '' ) ) . '|' . $type ] = $set; }
@@ -375,6 +376,7 @@ final class Records {
 			$data = self::read( $zone );
 			if ( is_wp_error( $data ) ) { return $data; }
 			if ( self::paused( $zone, $data ) ) { return new \WP_Error( 'records_off', __( 'DNS hosting is paused for this domain.', 'beltoft-services' ) ); }
+			list( $view, $parked ) = Parking::split( $data );
 			$have    = self::customer_sets( $data );
 			$old_key = strtolower( $fqdn ) . '|' . $type;
 			$key     = strtolower( $new_fqdn ) . '|' . $new_type;
@@ -388,7 +390,7 @@ final class Records {
 				return $old ? Clients::dns()->replace_rrsets( $zone, array( array( 'name' => $old['name'], 'type' => $type, 'changetype' => 'DELETE' ) ) ) : true;
 			}
 			// What else lives at the name in the live zone, of any type, decides the CNAME rule. The RRset that moves away does not count.
-			foreach ( (array) ( $data['rrsets'] ?? array() ) as $other ) {
+			foreach ( (array) ( $view['rrsets'] ?? array() ) as $other ) {
 				$other_type = strtoupper( (string) ( $other['type'] ?? '' ) );
 				$other_key  = strtolower( (string) ( $other['name'] ?? '' ) ) . '|' . $other_type;
 				if ( strtolower( (string) ( $other['name'] ?? '' ) ) !== strtolower( $new_fqdn ) || $other_type === $new_type || empty( $other['records'] ) || ( $moving && $other_key === $old_key ) ) { continue; }
@@ -403,7 +405,7 @@ final class Records {
 			if ( ! $moving && $old && self::signature( (string) $set['type'], $set['records'], $set['ttl'] ) === self::signature( (string) $set['type'], (array) ( $old['records'] ?? array() ), (int) ( $old['ttl'] ?? 3600 ) ) ) { return true; }
 			$sets = array( $set );
 			if ( $moving ) { array_unshift( $sets, array( 'name' => $old['name'], 'type' => $type, 'changetype' => 'DELETE' ) ); }
-			return Clients::dns()->replace_rrsets( $zone, $sets );
+			return self::send( $zone, $parked, $sets );
 		} );
 	}
 
@@ -443,6 +445,7 @@ final class Records {
 			// A paused service takes no customer writes; a zone with no holder is judged by its own records.
 			$off = self::holder_off( $zone );
 			if ( true === $off ) { return new \WP_Error( 'records_off', __( 'DNS hosting is paused for this domain.', 'beltoft-services' ) ); }
+			list( , $parked ) = Parking::split( $data );
 			$have = self::customer_sets( $data );
 			$paused = null === $off && self::zone_paused( $data );
 			$sets = array();
@@ -458,8 +461,16 @@ final class Records {
 			foreach ( $have as $key => $old ) {
 				if ( ! isset( $wanted[ $key ] ) ) { $sets[] = array( 'name' => $old['name'], 'type' => $old['type'], 'changetype' => 'DELETE' ); }
 			}
-			return $sets ? Clients::dns()->replace_rrsets( $zone, $sets ) : true;
+			return $sets ? self::send( $zone, $parked, $sets ) : true;
 		} );
+	}
+
+	/** Sends RRsets; an address at the apex or at www ends our parking records in the same write (Parking::merge). */
+	private static function send( string $zone, array $parked, array $sets ): bool|\WP_Error {
+		list( $sets, $unparked ) = Parking::merge( $zone, $parked, $sets );
+		$done = Clients::dns()->replace_rrsets( $zone, $sets );
+		if ( $unparked && ! is_wp_error( $done ) ) { Parking::forget( $zone ); }
+		return $done;
 	}
 
 	/**

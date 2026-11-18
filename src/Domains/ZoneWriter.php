@@ -57,7 +57,9 @@ final class ZoneWriter {
 					return self::refused( 'paused' );
 				}
 
-				$decision = $policy( $zone_data, $sets, $zone );
+				// Our parking records are not the customer's and not the policy's business: it sees the zone without them.
+				list( $view, $parked ) = Parking::split( $zone_data );
+				$decision              = $policy( $view, $sets, $zone );
 
 				if ( is_string( $decision ) ) {
 					return self::refused( $decision );
@@ -71,10 +73,17 @@ final class ZoneWriter {
 					);
 				}
 
+				// An address at the apex or at www ends the parking in the same write.
+				list( $decision, $unparked ) = Parking::merge( $zone, $parked, $decision );
+
 				$done = Clients::dns()->replace_rrsets( $zone, $decision );
 
 				if ( is_wp_error( $done ) ) {
 					return new \WP_Error( 'transient', __( 'The DNS record could not be saved.', 'beltoft-services' ) );
+				}
+
+				if ( $unparked ) {
+					Parking::forget( $zone );
 				}
 
 				return array(

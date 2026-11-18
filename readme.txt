@@ -258,6 +258,9 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 == Changelog ==
 
+= 0.46.0 =
+* Domain parking (off until a parking address is set in the domain settings: `parking_ipv4`, `parking_ipv6`): a domain on our name servers that has no A, AAAA, CNAME or ALIAS record at the root and at www gets A and AAAA records (TTL 300) at both names, written through the zone writer when the zone is made (registration, DNS hosting, a transfer that keeps our DNS) and by `wp beltoft-services parking add` (dry run unless `--apply`; `parking list` shows the parked domains). The records are marked by a stored copy and are never listed in the record editor. They are removed in the same DNS write by whatever puts an address, alias or CNAME at the root or at www (a hosting website, an app, the record editor, the zone file import); a record of the customer is never touched or mixed with them. Actions `beltoft_services_parked` and `beltoft_services_unparked`.
+
 = 0.43.6 =
 * Account and order forms: one type scale (14, 16, 20) and one set of colour tokens; card padding, phone meta line and overview width fixed; no "Expires 00 /" for wallet methods; API reference on the scale; hosting label translatable.
 
