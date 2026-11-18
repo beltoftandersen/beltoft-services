@@ -58,6 +58,10 @@ final class LiveRobotClient implements RobotClient {
 			}
 		}
 
+		foreach ( (array) ( $fields['authorized_key'] ?? array() ) as $fingerprint ) {
+			$body[] = rawurlencode( 'authorized_key[]' ) . '=' . rawurlencode( (string) $fingerprint );
+		}
+
 		foreach ( (array) ( $fields['addon'] ?? array() ) as $addon ) {
 			$body[] = rawurlencode( 'addon[]' ) . '=' . rawurlencode( (string) $addon );
 		}
@@ -69,6 +73,22 @@ final class LiveRobotClient implements RobotClient {
 		$answer = $this->request( 'POST', '/order/server/transaction', implode( '&', $body ) );
 
 		return is_wp_error( $answer ) ? $answer : (array) ( $answer['transaction'] ?? array() );
+	}
+
+	public function add_key( string $name, string $data ) {
+		$answer = $this->request( 'POST', '/key', 'name=' . rawurlencode( $name ) . '&data=' . rawurlencode( $data ) );
+
+		return is_wp_error( $answer ) ? $answer : (array) ( $answer['key'] ?? array() );
+	}
+
+	public function keys() {
+		$answer = $this->request( 'GET', '/key' );
+
+		if ( is_wp_error( $answer ) ) {
+			return $answer;
+		}
+
+		return array_values( array_filter( array_map( static fn( $row ) => is_array( $row ) && is_array( $row['key'] ?? null ) ? $row['key'] : null, $answer ) ) );
 	}
 
 	public function transaction( string $id ) {

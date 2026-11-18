@@ -20,6 +20,16 @@ final class UnavailableRobotClient implements RobotClient {
 		return $this->no();
 	}
 
+	public function add_key( string $name, string $data ) {
+		unset( $name, $data );
+
+		return $this->no();
+	}
+
+	public function keys() {
+		return $this->no();
+	}
+
 	public function transaction( string $id ) {
 		unset( $id );
 

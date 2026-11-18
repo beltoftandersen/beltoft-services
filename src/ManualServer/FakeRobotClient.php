@@ -24,6 +24,15 @@ final class FakeRobotClient implements RobotClient {
 		return (array) ( self::state()['orders'] ?? array() );
 	}
 
+	/**
+	 * The keys registered at the fake, fingerprint => key.
+	 *
+	 * @return array<string, array<string, mixed>>
+	 */
+	public static function registered_keys(): array {
+		return (array) ( self::state()['keys'] ?? array() );
+	}
+
 	/** Forgets everything. */
 	public static function reset(): void {
 		delete_option( self::OPTION );
@@ -108,12 +117,17 @@ final class FakeRobotClient implements RobotClient {
 			'status'         => 'in process',
 			'server_number'  => null,
 			'server_ip'      => null,
-			'authorized_key' => array(),
 			'host_key'       => array(),
 			'comment'        => null,
 			'product'        => array( 'id' => (string) $fields['product_id'], 'name' => 'Dedicated Server ' . $fields['product_id'], 'dist' => (string) ( $fields['dist'] ?? '' ), 'location' => (string) ( $fields['location'] ?? '' ) ),
 			'addons'         => array_values( (array) ( $fields['addon'] ?? array() ) ),
+			'authorized_key' => array_map( static fn( $f ) => array( 'key' => array( 'fingerprint' => (string) $f ) ), array_values( (array) ( $fields['authorized_key'] ?? array() ) ) ),
 		);
+
+		// Either a key or a password (the documentation), never both.
+		if ( ! empty( $fields['authorized_key'] ) && '' !== (string) ( $fields['password'] ?? '' ) ) {
+			return self::error( 400, 'INVALID_INPUT', 'invalid input' );
+		}
 
 		$state['orders'][] = array_diff_key( $fields, array( 'password' => 1 ) );
 
@@ -126,6 +140,36 @@ final class FakeRobotClient implements RobotClient {
 		self::save( $state );
 
 		return $tx;
+	}
+
+	public function add_key( string $name, string $data ) {
+		$parts = preg_split( '/\s+/', trim( $data ) );
+
+		if ( '' === trim( $name ) || ! is_array( $parts ) || count( $parts ) < 2 ) {
+			return self::error( 400, 'INVALID_INPUT', 'invalid input' );
+		}
+
+		$state = self::state();
+
+		foreach ( (array) ( $state['keys'] ?? array() ) as $key ) {
+			if ( $key['data'] === $parts[0] . ' ' . $parts[1] ) {
+				return self::error( 409, 'KEY_ALREADY_EXISTS', 'The supplied key already exists' );
+			}
+		}
+
+		$print = implode( ':', str_split( md5( $parts[1] ), 2 ) );
+		$key   = array( 'name' => $name, 'fingerprint' => $print, 'type' => 'ED25519', 'size' => 256, 'data' => $parts[0] . ' ' . $parts[1], 'created_at' => gmdate( 'Y-m-d H:i:s' ) );
+
+		$state['keys'][ $print ] = $key;
+		self::save( $state );
+
+		return $key;
+	}
+
+	public function keys() {
+		$keys = array_values( (array) ( self::state()['keys'] ?? array() ) );
+
+		return $keys ? $keys : self::error( 404, 'NOT_FOUND', 'No keys found' );
 	}
 
 	public function transaction( string $id ) {

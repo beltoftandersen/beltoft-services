@@ -93,7 +93,7 @@ final class ManualServerPanel {
 			__( 'Location', 'beltoft-services' )       => (string) ( $plan['server_location'] ?? '' ),
 			__( 'IP address', 'beltoft-services' )     => implode( ', ', $ips ),
 			__( 'IPv6 network', 'beltoft-services' )   => (string) $r->get( RobotOrder::IPV6 ),
-			__( 'Login', 'beltoft-services' )          => (string) $r->get( ManualServerDelivery::NOTE ),
+			__( 'Login', 'beltoft-services' )          => '' !== (string) $r->get( ManualServerDelivery::NOTE ) ? (string) $r->get( ManualServerDelivery::NOTE ) : ( '' !== (string) $r->get( 'ssh_key' ) && (int) $r->get( ManualServerDelivery::READY_AT ) > 0 ? __( 'Log in as root with your SSH key.', 'beltoft-services' ) : '' ),
 		);
 
 		return array_filter( $rows, static fn( $value ): bool => '' !== trim( $value ) );

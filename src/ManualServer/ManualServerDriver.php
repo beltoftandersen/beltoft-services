@@ -22,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
  * the service to `ready`, which starts the hourly meter and sends the service ready email. Pause, resume and delete only
  * tell staff what to do by hand. A delete ends the activation, and with it the billing, at once.
  */
-final class ManualServerDriver implements Driver, StopsOnDelete, NeedsBilling {
+final class ManualServerDriver implements Driver, StopsOnDelete, NeedsBilling, \BeltoftServices\Drivers\TakesSshKey {
 	public const ID   = 'manual-server';
 	public const KIND = 'dedicated';
 

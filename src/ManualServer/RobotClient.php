@@ -18,12 +18,29 @@ defined( 'ABSPATH' ) || exit;
 interface RobotClient {
 
 	/**
-	 * POST /order/server/transaction (Server ordering). Fields: product_id, location, dist, password, addon[], test.
+	 * POST /order/server/transaction (Server ordering). Fields: product_id, location, dist, password or authorized_key[] (the documentation: either one), addon[], test.
 	 *
-	 * @param array<string, mixed> $fields product_id (string), location, dist, password (strings), addon (string[]), test (bool).
+	 * @param array<string, mixed> $fields product_id (string), location, dist, password (strings), authorized_key and addon (string[]), test (bool).
 	 * @return array<string, mixed>|\WP_Error The `transaction` object.
 	 */
 	public function order( array $fields );
+
+	/**
+	 * POST /key (SSH keys): "Add a new SSH key"; fields name and data ("SSH key data in OpenSSH or SSH2 format"). 201 with the key
+	 * (name, fingerprint, type, size, data); 409 KEY_ALREADY_EXISTS "The supplied key already exists"; 400 INVALID_INPUT.
+	 *
+	 * @param string $name Key name.
+	 * @param string $data Key data.
+	 * @return array<string, mixed>|\WP_Error The `key` object.
+	 */
+	public function add_key( string $name, string $data );
+
+	/**
+	 * GET /key (SSH keys): "Query all SSH keys", each with fingerprint and data. A 404 NOT_FOUND is documented for it.
+	 *
+	 * @return array<int, array<string, mixed>>|\WP_Error The `key` objects.
+	 */
+	public function keys();
 
 	/**
 	 * GET /order/server/transaction/{id}.

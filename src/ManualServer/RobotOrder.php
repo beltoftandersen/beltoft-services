@@ -32,6 +32,7 @@ final class RobotOrder {
 	public const NUMBER      = 'robot_server_number';
 	public const ORDERING    = 'robot_ordering';
 	public const IPV6        = 'manual_ipv6';
+	public const KEY_FINGERPRINT = 'robot_key_fingerprint';
 
 	/** Is ordering at the supplier switched on (otherwise staff buy by hand)? */
 	public static function enabled(): bool {
@@ -86,12 +87,31 @@ final class RobotOrder {
 			}
 		}
 
-		$plan     = (array) $r->get( 'plan' );
-		$password = wp_generate_password( 24, false, false );
+		$plan = (array) $r->get( 'plan' );
+
+		// A key the customer gave at checkout is registered first (it spends nothing). The documentation lets an order carry a key OR a
+		// password, so with a key there is no password at all.
+		$fingerprint = '';
+
+		if ( '' !== (string) $r->get( 'ssh_key' ) ) {
+			$fingerprint = self::register_key( $r, $client );
+
+			if ( $fingerprint instanceof StepResult ) {
+				return $fingerprint;
+			}
+		}
+
+		$password = '' === $fingerprint ? wp_generate_password( 24, false, false ) : '';
 		$dist     = '' !== (string) ( $plan['server_dist'] ?? '' ) ? (string) $plan['server_dist'] : trim( (string) Settings::get( 'dedicated_dist' ) );
 
 		// The marker and the password are stored before the call, so a lost answer can never lead to a second order.
-		if ( ! $r->set( array( self::ORDERING => time(), ManualServerDelivery::PASSWORD => Crypto::encrypt( $password ) ) ) ) {
+		$marker = array( self::ORDERING => time() );
+
+		if ( '' !== $password ) {
+			$marker[ ManualServerDelivery::PASSWORD ] = Crypto::encrypt( $password );
+		}
+
+		if ( ! $r->set( $marker ) ) {
 			return StepResult::retry( 60, 'The order marker could not be stored.' );
 		}
 
@@ -101,6 +121,7 @@ final class RobotOrder {
 				'location'   => (string) ( $plan['server_location_code'] ?? '' ),
 				'dist'       => $dist,
 				'password'   => $password,
+				'authorized_key' => '' !== $fingerprint ? array( $fingerprint ) : array(),
 				'addon'      => array( 'primary_ipv4' ),
 			)
 		);
@@ -124,6 +145,81 @@ final class RobotOrder {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Registers the customer's key at the supplier and returns its fingerprint (POST /key; an identical key that already exists answers
+	 * 409 KEY_ALREADY_EXISTS, then GET /key is read for the fingerprint of the one with the same data).
+	 *
+	 * @param Resource    $r      Resource.
+	 * @param RobotClient $client Client.
+	 * @return string|StepResult Fingerprint, or a result to return.
+	 */
+	private static function register_key( Resource $r, RobotClient $client ) {
+		$stored = (string) $r->get( self::KEY_FINGERPRINT );
+
+		if ( '' !== $stored ) {
+			return $stored;
+		}
+
+		$data   = trim( (string) $r->get( 'ssh_key' ) );
+		$answer = $client->add_key( 'beltoft-' . substr( preg_replace( '/[^a-z0-9]/', '', strtolower( (string) $r->get( 'uuid' ) ) ), 0, 12 ), $data );
+
+		if ( is_wp_error( $answer ) ) {
+			$data_e = $answer->get_error_data();
+			$status = is_array( $data_e ) ? (int) ( $data_e['status'] ?? 0 ) : 0;
+
+			if ( 409 === $status && 'KEY_ALREADY_EXISTS' === $answer->get_error_code() ) {
+				$answer = self::find_key( $client, $data );
+			}
+		}
+
+		if ( is_wp_error( $answer ) ) {
+			$status = is_array( $answer->get_error_data() ) ? (int) ( $answer->get_error_data()['status'] ?? 0 ) : 0;
+
+			if ( 400 === $status ) {
+				Alerts::admin( $r, 'The supplier refused the customer SSH key. Nothing was ordered.' );
+
+				return StepResult::fail( 'The supplier refused the SSH key.' );
+			}
+
+			return StepResult::retry( 60, 'The SSH key could not be registered: ' . $answer->get_error_code() );
+		}
+
+		$print = (string) ( $answer['fingerprint'] ?? '' );
+
+		if ( '' === $print ) {
+			return StepResult::retry( 60, 'The supplier answered the SSH key without a fingerprint.' );
+		}
+
+		$r->set( array( self::KEY_FINGERPRINT => $print ) );
+
+		return $print;
+	}
+
+	/**
+	 * The registered key with the same data (type and key part), from GET /key.
+	 *
+	 * @param RobotClient $client Client.
+	 * @param string      $data   Key as `type base64 [comment]`.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function find_key( RobotClient $client, string $data ) {
+		$keys = $client->keys();
+
+		if ( is_wp_error( $keys ) ) {
+			return $keys;
+		}
+
+		$mine = array_slice( preg_split( '/\s+/', $data ) ?: array(), 0, 2 );
+
+		foreach ( $keys as $key ) {
+			if ( array_slice( preg_split( '/\s+/', trim( (string) ( $key['data'] ?? '' ) ) ) ?: array(), 0, 2 ) === $mine ) {
+				return $key;
+			}
+		}
+
+		return new \WP_Error( 'KEY_NOT_FOUND', 'The existing key was not found in the key list.', array( 'status' => 0 ) );
 	}
 
 	/**

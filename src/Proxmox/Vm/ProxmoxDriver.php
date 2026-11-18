@@ -26,7 +26,7 @@ defined( 'ABSPATH' ) || exit;
  * power, the plan change and deletion run through Provision and Operations, and every write to
  * Proxmox is behind Ownership::verify. No sign-in link: a VM has none (no Drivers\Opens).
  */
-class ProxmoxDriver implements Driver, StopsOnDelete, NeedsBilling, InternalActions, ProvisionSteps {
+class ProxmoxDriver implements Driver, StopsOnDelete, NeedsBilling, InternalActions, ProvisionSteps, \BeltoftServices\Drivers\TakesSshKey {
 
 	/**
 	 * Driver id of the Proxmox driver.
