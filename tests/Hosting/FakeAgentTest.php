@@ -40,7 +40,7 @@ class FakeAgentTest extends TestCase {
 			'site.create', 'site.delete', 'site.php', 'site.domains', 'site.cache_purge', 'site.cache_setup', 'site.cache_status', 'site.wp_address', 'site.wp_install', 'site.verify', 'site.wp_login_link', 'site.wp_password_link', 'site.tool_link', 'site.scan_results', 'site.scan_now', 'site.country_block', 'site.staging_create', 'site.staging_push', 'site.staging_refresh', 'site.staging_undo', 'site.staging_delete', 'site.cron', 'site.facts', 'site.cron_set', 'site.cron_status', 'site.workers',
 			'db.create', 'db.drop', 'db.password', 'db.dump', 'db.size', 'db.sizes', 'db.limit', 'db.readonly',
 			'ssh.keys', 'ssh.password',
-			'edge.apply', 'edge.cert_push', 'edge.storage_backup',
+			'edge.apply', 'edge.cert_push', 'edge.parked', 'edge.storage_backup',
 			'backup.prepare', 'backup.file_restore', 'backup.db_restore', 'backup.restore_test', 'backup.export',
 			'mail.smtp', 'agent.health', 'agent.update',
 		);

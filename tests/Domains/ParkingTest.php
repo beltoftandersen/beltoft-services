@@ -36,13 +36,13 @@ class ParkingTest extends TestCase {
 	}
 
 	/** A DNS-only service whose claim and assignment are in place. */
-	private function dns_service( string $name ): Resource {
+	private function dns_service( string $name, array $draft = array() ): Resource {
 		$product = $this->service_product( 'dns' );
 		$order   = wc_create_order( array( 'customer_id' => $this->user ) );
 		$order->save();
 		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $this->user, 'order_id' => $order->get_id() ) );
 		$claim   = DnsClaims::create( $this->user, $name );
-		DnsClaims::set_status( $claim['id'], 'consumed', array() );
+		DnsClaims::set_status( $claim['id'], 'consumed', $draft ? array( 'draft_records' => $draft ) : array() );
 		$this->assertTrue( DnsAssignments::reserve( $this->user, $claim['id'], $name ) );
 		DnsAssignments::bind_order( $name, $this->user, $order->get_id(), 1 );
 		$r = Resource::create( $license, new DnsDriver(), array(), array( 'domain' => $name, 'mode' => 'dns', 'claim_id' => $claim['id'] ) );
@@ -103,6 +103,37 @@ class ParkingTest extends TestCase {
 		$custom = Resource::create( $license, new DomainDriver(), array(), array( 'domain' => 'regd-b.example', 'mode' => 'register', 'ns_mode' => 'custom' ) );
 		$this->assertTrue( Zone::ensure( $custom, false, false )->is_done() );
 		$this->assertNull( $this->dns->zone( 'regd-b.example' ) );
+	}
+
+	public function test_a_switch_to_our_dns_a_transfer_and_a_zone_with_records_are_never_parked(): void {
+		$product = $this->service_product( 'domain', array(), array( 'slug' => 'domain-' . wp_generate_password( 5, false ) ) );
+		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $this->user ) );
+
+		// Adopt: the name servers are switched to ours (Zone::ensure with $switching_to_ours).
+		$adopt = Resource::create( $license, new DomainDriver(), array(), array( 'domain' => 'adopt-p.example', 'mode' => 'register', 'ns_mode' => 'custom' ) );
+		$this->assertTrue( Zone::ensure( $adopt, true, false )->is_done() );
+		$this->assertSame( array(), $this->dns->zone( 'adopt-p.example' )['rrsets'] );
+		$this->assertNull( Parking::state( 'adopt-p.example' ) );
+
+		// A transfer keeps the old records, which are copied later.
+		$transfer = Resource::create( $license, new DomainDriver(), array(), array( 'domain' => 'transfer-p.example', 'mode' => 'transfer' ) );
+		$this->assertTrue( Zone::ensure( $transfer, false, false )->is_done() );
+		$this->assertNull( Parking::state( 'transfer-p.example' ) );
+
+		// A new domain whose zone already holds a record (no address) is not new and empty.
+		$this->dns->create_zone( 'recs-p.example', array( 'ns1.example.net', 'ns2.example.net' ) );
+		$this->assertTrue( Records::replace( 'recs-p.example', array( array( 'name' => '@', 'type' => 'TXT', 'ttl' => 3600, 'value' => 'old' ) ) ) );
+		$reg = Resource::create( $license, new DomainDriver(), array(), array( 'domain' => 'recs-p.example', 'mode' => 'register' ) );
+		$this->assertTrue( Zone::ensure( $reg, false, false )->is_done() );
+		$this->assertNull( Parking::state( 'recs-p.example' ) );
+		$this->assertSame( 'has_records', Parking::park( 'recs-p.example', true ) );
+	}
+
+	public function test_dns_hosting_with_records_to_import_is_not_parked(): void {
+		$r = $this->dns_service( 'import-p.example', array( array( 'name' => '@', 'type' => 'A', 'ttl' => 3600, 'value' => '198.51.100.3' ) ) );
+		$this->assertTrue( ( new DnsDriver() )->provision( $r )->is_done() );
+		$this->assertSame( array( 'import-p.example|A' => array( '198.51.100.3' ) ), $this->addresses( 'import-p.example' ) );
+		$this->assertNull( Parking::state( 'import-p.example' ) );
 	}
 
 	public function test_nothing_is_written_when_the_settings_are_empty(): void {

@@ -41,6 +41,7 @@ class AgentContractTest extends TestCase {
 		'db.limit'          => array(),
 		'ct.release'        => array(),
 		'ct.refresh'        => array(),
+		'edge.parked'       => array(),
 		'backup.restore_test' => array(),
 		'site.staging_create' => array( 'copy', 'host' ),
 		'site.staging_push'   => array( 'files_only' ),

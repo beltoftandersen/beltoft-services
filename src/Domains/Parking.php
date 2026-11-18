@@ -208,10 +208,11 @@ final class Parking {
 	 * Parks a zone when it qualifies. Writes through ZoneWriter, only A and AAAA at the apex and at www, only when
 	 * neither name holds an address, alias or CNAME.
 	 *
-	 * @param string $zone Zone (the domain).
+	 * @param string $zone       Zone (the domain).
+	 * @param bool   $only_empty Park only a zone with no record of any kind besides SOA and NS (a new zone).
 	 * @return string parked, already, off, no_zone, not_served, paused, has_address or error:<code>.
 	 */
-	public static function park( string $zone ): string {
+	public static function park( string $zone, bool $only_empty = false ): string {
 		$zone  = strtolower( rtrim( $zone, '.' ) );
 		$wants = self::addresses();
 
@@ -233,7 +234,13 @@ final class Parking {
 		}
 
 		$verdict = 'parked';
-		$policy  = static function ( array $zone_data, array $sets, string $zone ) use ( &$verdict ) {
+		$policy  = static function ( array $zone_data, array $sets, string $zone ) use ( &$verdict, $only_empty ) {
+			if ( $only_empty && self::has_records( $zone_data ) ) {
+				$verdict = 'has_records';
+
+				return true;
+			}
+
 			if ( self::holds_address( $zone, $zone_data ) ) {
 				$verdict = 'has_address';
 
@@ -267,8 +274,8 @@ final class Parking {
 					return 'invalid' === $result['reason'] ? 'error:invalid' : $result['reason'];
 				}
 
-				if ( 'has_address' === $verdict ) {
-					return 'has_address';
+				if ( 'has_address' === $verdict || 'has_records' === $verdict ) {
+					return $verdict;
 				}
 
 				self::remember( $zone, $rows );
@@ -281,8 +288,9 @@ final class Parking {
 	}
 
 	/**
-	 * Called when a zone of ours has been made or switched to our servers: parks it when parking is on and it qualifies.
-	 * Never fails the caller.
+	 * Called when a zone of ours is ready: parks it only when the domain is new to DNS and the zone is empty (a registration,
+	 * or DNS hosting with nothing to import). A zone adopted from another DNS, a transfer and a zone with any record are never
+	 * parked here, so a live site cannot flash the parking page. Never fails the caller.
 	 *
 	 * @param Resource $r Domain or DNS service.
 	 */
@@ -291,7 +299,34 @@ final class Parking {
 			return;
 		}
 
-		self::park( (string) $r->get( 'domain' ) );
+		$mode = (string) $r->get( 'mode' );
+
+		if ( 'dns' === $mode ) {
+			$claim = DnsClaims::get( (int) $r->get( 'claim_id' ) );
+
+			if ( is_array( $claim ) && array() !== (array) ( $claim['draft_records'] ?? array() ) ) {
+				return;
+			}
+		} elseif ( 'register' !== $mode ) {
+			return;
+		}
+
+		self::park( (string) $r->get( 'domain' ), true );
+	}
+
+	/**
+	 * Does the zone hold anything besides SOA and NS?
+	 *
+	 * @param array<string, mixed> $zone_data Zone.
+	 */
+	private static function has_records( array $zone_data ): bool {
+		foreach ( (array) ( $zone_data['rrsets'] ?? array() ) as $set ) {
+			if ( is_array( $set ) && ! in_array( strtoupper( (string) ( $set['type'] ?? '' ) ), array( 'SOA', 'NS' ), true ) && array() !== (array) ( $set['records'] ?? array() ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

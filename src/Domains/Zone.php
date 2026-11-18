@@ -124,12 +124,12 @@ final class Zone {
 	}
 
 	/**
-	 * Makes the zone and signs it. Once the zone is ready, a domain with no address of its own is parked (Parking, off unless the
-	 * parking addresses are set); a failed parking never fails the step.
+	 * Makes the zone and signs it. Once the zone is ready, a new, empty zone is parked (Parking, off unless the
+	 * parking addresses are set; never on a switch to our DNS); a failed parking never fails the step.
 	 */
 	public static function ensure( Resource $r, bool $switching_to_ours = false, bool $publish_ds = true ): StepResult {
 		$result = self::ensure_zone( $r, $switching_to_ours, $publish_ds );
-		if ( $result->is_done() && self::nameservers() && ( $switching_to_ours || ! ( 'custom' === $r->get( 'ns_mode' ) || $r->get( 'dns_external' ) ) ) ) { Parking::offer( $r ); }
+		if ( $result->is_done() && ! $switching_to_ours && self::nameservers() && ! ( 'custom' === $r->get( 'ns_mode' ) || $r->get( 'dns_external' ) ) ) { Parking::offer( $r ); }
 		return $result;
 	}
 
