@@ -16,7 +16,7 @@
 	--apiref-codesoft: var(--apiref-code-soft, #b4bdd0);
 	--apiref-copybg: var(--apiref-copy-bg, #1d2a55);
 	--apiref-copyhover: var(--apiref-copy-hover, #2a3a70);
-	--apiref-codesize: var(--apiref-code-size, 13px);
+	--apiref-codesize: var(--apiref-code-size, 14px);
 	--apiref-offset: 88px;
 	--apiref-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 	box-sizing: border-box;
@@ -30,15 +30,15 @@
 .beltoft-services-apiref a:focus-visible, .beltoft-services-apiref button:focus-visible, .beltoft-services-apiref pre:focus-visible { outline: 2px solid var(--apiref-green); outline-offset: 2px; }
 .beltoft-services-apiref__main { min-width: 0; }
 .beltoft-services-apiref__main > section { margin: 0 0 56px; min-width: 0; }
-.beltoft-services-apiref h2 { margin: 0 0 12px; font-size: clamp(20px, calc(16px + 1.4vw), 28px); line-height: 1.25; color: var(--apiref-navy); }
-.beltoft-services-apiref h3 { margin: 24px 0 8px; font-size: 18px; line-height: 1.35; color: var(--apiref-navy); overflow-wrap: anywhere; }
+.beltoft-services-apiref h2 { margin: 0 0 12px; font-size: clamp(32px, calc(24px + 1.2vw), 40px); line-height: 1.25; color: var(--apiref-navy); }
+.beltoft-services-apiref h3 { margin: 24px 0 8px; font-size: 20px; line-height: 1.35; color: var(--apiref-navy); overflow-wrap: anywhere; }
 .beltoft-services-apiref p, .beltoft-services-apiref ol, .beltoft-services-apiref ul { max-width: 70ch; }
-.beltoft-services-apiref code { padding: 0; border: 0; background: none; color: inherit; font-family: var(--apiref-mono); font-size: 0.9em; overflow-wrap: anywhere; }
+.beltoft-services-apiref code { padding: 0; border: 0; background: none; color: inherit; font-family: var(--apiref-mono); font-size: 14px; overflow-wrap: anywhere; }
 .beltoft-services-apiref [data-apiref-section] { scroll-margin-top: calc(var(--apiref-offset) + 8px); }
 .beltoft-services-apiref__lead, .beltoft-services-apiref__meta { color: var(--apiref-soft); }
-.beltoft-services-apiref__meta { margin: 0 0 8px; font-size: 0.9em; }
+.beltoft-services-apiref__meta { margin: 0 0 8px; font-size: 14px; }
 .beltoft-services-apiref__note { margin: -24px 0 56px; color: var(--apiref-soft); }
-.beltoft-services-apiref__tool { font-family: var(--apiref-mono); font-size: 0.95em; }
+.beltoft-services-apiref__tool { font-family: var(--apiref-mono); font-size: 16px; }
 
 /* Navigation */
 .beltoft-services-apiref__nav { margin: 0 0 32px; }
@@ -47,8 +47,8 @@
 .beltoft-services-apiref__nav a:hover { color: var(--apiref-navy); text-decoration: underline; }
 .beltoft-services-apiref__nav a.is-current { color: var(--apiref-nav-active, var(--apiref-navy)); font-weight: 700; }
 .beltoft-services-apiref__navgroup > a { margin-top: 14px; color: var(--apiref-navy); font-weight: 600; }
-.beltoft-services-apiref__navgroup ul a { padding: 2px 0; overflow: hidden; font-size: 13px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
-.beltoft-services-apiref__navmethod { display: inline-block; min-width: 3.6em; font-size: 11px; font-weight: 700; }
+.beltoft-services-apiref__navgroup ul a { padding: 2px 0; overflow: hidden; font-size: 14px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+.beltoft-services-apiref__navmethod { display: inline-block; min-width: 3.6em; font-size: 14px; font-weight: 700; }
 .beltoft-services-apiref__navmethod--get { color: var(--apiref-getc); }
 .beltoft-services-apiref__navmethod--post { color: var(--apiref-postc); }
 .beltoft-services-apiref__navmethod--put { color: var(--apiref-putc); }
@@ -58,8 +58,8 @@
 .beltoft-services-apiref__op { min-width: 0; margin: 0; padding: 32px 0; border-top: 1px solid var(--apiref-rule); }
 .beltoft-services-apiref__group > .beltoft-services-apiref__lead { margin: 0 0 24px; }
 .beltoft-services-apiref__head, .beltoft-services-apiref__text, .beltoft-services-apiref__split > div { min-width: 0; }
-.beltoft-services-apiref__head h3 { margin: 0 0 8px; font-size: clamp(17px, calc(12px + 1.6vw), 24px); line-height: 1.3; }
-.beltoft-services-apiref__method { display: inline-block; margin-right: 8px; padding: 2px 8px; border: 2px solid transparent; color: #fff; font-family: var(--apiref-mono); font-size: 13px; font-weight: 700; line-height: 1.4; vertical-align: 0.2em; }
+.beltoft-services-apiref__head h3 { margin: 0 0 8px; font-size: 20px; line-height: 1.3; }
+.beltoft-services-apiref__method { display: inline-block; margin-right: 8px; padding: 2px 8px; border: 2px solid transparent; color: #fff; font-family: var(--apiref-mono); font-size: 14px; font-weight: 700; line-height: 1.4; vertical-align: 0.2em; }
 .beltoft-services-apiref__method--get { background: var(--apiref-getc); }
 .beltoft-services-apiref__method--post { background: var(--apiref-postc); }
 .beltoft-services-apiref__method--put { border-color: var(--apiref-putc); background: transparent; color: var(--apiref-putc); }
@@ -72,8 +72,8 @@
 
 /* Code panels */
 .beltoft-services-apiref__panel { min-width: 0; max-width: 100%; background: var(--apiref-panel); color: var(--apiref-codefg); }
-.beltoft-services-apiref__panelbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 8px 0 16px; color: var(--apiref-codesoft); font-size: 13px; }
-.beltoft-services-apiref__copy { display: none; margin: 0; padding: 4px 12px; border: 0; background: var(--apiref-copybg); color: var(--apiref-codefg); font: inherit; font-size: 13px; line-height: 1.5; cursor: pointer; }
+.beltoft-services-apiref__panelbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 8px 0 16px; color: var(--apiref-codesoft); font-size: 14px; }
+.beltoft-services-apiref__copy { display: none; margin: 0; padding: 4px 12px; border: 0; background: var(--apiref-copybg); color: var(--apiref-codefg); font: inherit; font-size: 14px; line-height: 1.5; cursor: pointer; }
 .beltoft-services-apiref.is-js .beltoft-services-apiref__copy { display: inline-block; }
 .beltoft-services-apiref__copy:hover { background: var(--apiref-copyhover); }
 .beltoft-services-apiref__panel :focus-visible { outline-color: #fff; }
@@ -81,7 +81,7 @@
 .beltoft-services-apiref__panel code { display: block; font-size: inherit; overflow-wrap: normal; white-space: pre; }
 
 /* Tables */
-.beltoft-services-apiref__table { width: 100%; margin: 16px 0; border-collapse: collapse; font-size: 15px; }
+.beltoft-services-apiref__table { width: 100%; margin: 16px 0; border-collapse: collapse; font-size: 16px; }
 .beltoft-services-apiref__table caption { padding: 0 0 6px; font-weight: 600; text-align: left; }
 .beltoft-services-apiref__table th, .beltoft-services-apiref__table td { padding: 8px 16px 8px 0; text-align: left; vertical-align: top; border-bottom: 1px solid var(--apiref-rule); }
 .beltoft-services-apiref__table th { color: var(--apiref-soft); font-weight: 600; }

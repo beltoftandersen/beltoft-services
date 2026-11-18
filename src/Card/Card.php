@@ -40,6 +40,7 @@ final class Card {
 	public static function register(): void {
 		Jobs::recurring( array( __CLASS__, 'unschedule' ) );
 		add_filter( 'woocommerce_account_menu_items', array( __CLASS__, 'menu' ), 40 );
+		add_filter( 'woocommerce_payment_methods_list_item', array( __CLASS__, 'list_item' ), 99, 2 );
 		add_action( 'woocommerce_before_account_payment_methods', array( __CLASS__, 'note' ) );
 		add_filter( 'wc_subscriptions_allow_subscription_token_deletion', array( __CLASS__, 'allow_deletion' ), 10, 2 );
 		// Any change of a customer's saved cards: the default card is the usage account's card. A new default is
@@ -49,6 +50,24 @@ final class Card {
 		add_action( 'woocommerce_new_payment_token', array( __CLASS__, 'token_event' ), 20, 2 );
 		add_action( 'woocommerce_payment_token_set_default', array( __CLASS__, 'token_event' ), 5, 2 );
 		add_action( 'woocommerce_payment_token_deleted', array( __CLASS__, 'token_deleted' ), 20, 2 );
+	}
+
+	/**
+	 * A saved method without an expiry date (a wallet, a token with month and year 0) shows no expiry text: an empty cell,
+	 * which the account stylesheet hides, instead of "00 /".
+	 *
+	 * @param array<string,mixed> $item  The list item.
+	 * @param mixed               $token The token.
+	 * @return array<string,mixed>
+	 */
+	public static function list_item( $item, $token = null ): array {
+		unset( $token );
+		$item = (array) $item;
+		if ( isset( $item['expires'] ) && is_string( $item['expires'] ) && 1 !== preg_match( '/[1-9]/', $item['expires'] ) ) {
+			$item['expires'] = '';
+		}
+
+		return $item;
 	}
 
 	/**

@@ -145,7 +145,12 @@ final class Config {
 	public static function label(): string {
 		$label = trim( wp_strip_all_tags( self::get( 'label' ) ) );
 
-		return '' === $label ? self::DEFAULTS['label'] : mb_substr( $label, 0, 60 );
+		$label = '' === $label ? self::DEFAULTS['label'] : mb_substr( $label, 0, 60 );
+
+		// A site shows the name in the visitor's language (the setting is stored once).
+		$label = trim( wp_strip_all_tags( (string) apply_filters( 'beltoft_services_hosting_label', $label ) ) );
+
+		return '' === $label ? self::DEFAULTS['label'] : $label;
 	}
 
 	/**

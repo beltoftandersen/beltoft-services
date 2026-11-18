@@ -582,6 +582,10 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-server
 .beltoft-services-ov__cols { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .beltoft-services-ov__col { display: contents; }
 .beltoft-services-ov__slot { min-width: 0; }
+/* Review 2026-11-18: the two columns of the overview share the whole content area on a wide screen (they were 428px each inside 880px). */
+@media (min-width: 1200px) {
+	.beltoft-services-overview { max-width: none; }
+}
 @media (min-width: 1000px) {
 	.beltoft-services-overview { gap: 24px; }
 	.beltoft-services-ov__cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 24px; align-items: start; }
@@ -1247,6 +1251,16 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-ssl h3
 
 /* The subscription list: the names of what a subscription is for, under its number. */
 body.woocommerce-account .woocommerce-MyAccount-content .bs-sub-name { display: block; margin-top: 2px; font-size: var(--bs-fs-small); color: var(--bs-muted); text-decoration: none; }
+
+/* Review 2026-11-18: the payment methods table prints an empty cell for a method without an expiry date (a wallet); it shows no label either. */
+.woocommerce-MyAccount-content td.woocommerce-PaymentMethod--expires:empty { display: none; }
+
+/* Review 2026-11-18, phone: the line under the page title (state, type, renewal) wraps instead of cutting the type short. */
+@media (max-width: 600px) {
+	.beltoft-services-page__meta { flex-wrap: wrap; height: auto; min-height: 20px; gap: 0 var(--bs-space-4); }
+	.beltoft-services-page__meta > * { flex: none; max-width: 100%; }
+	.beltoft-services-page__meta .bs-inline__text { overflow: visible; text-overflow: clip; white-space: normal; }
+}
 
 /* ==== Redesign 4 (2026-11-14): server tabs ======================================================================
    One card per tab: 24px inside (16px on a phone), blocks 24px apart, the first block on the top edge, every heading the same
