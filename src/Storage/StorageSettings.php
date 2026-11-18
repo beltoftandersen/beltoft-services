@@ -135,7 +135,8 @@ final class StorageSettings {
 	public static function country(): string {
 		$name = trim( (string) Settings::get( 'storage_country' ) );
 
-		return '' !== $name ? $name : 'Germany';
+		// The default country goes through translation (Danish: Tyskland); a name typed in the setting is shown as typed.
+		return '' === $name || 'Germany' === $name ? __( 'Germany', 'beltoft-services' ) : $name;
 	}
 
 	/**

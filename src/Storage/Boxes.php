@@ -172,12 +172,16 @@ final class Boxes {
 		$value = (float) max( 0, $bytes );
 		$i     = 0;
 
-		while ( $value >= 1000 && $i < count( $units ) - 1 ) {
-			$value /= 1000;
+		// Steps of 1024: the provider sizes its boxes in binary units and sells 1 099 511 627 776 bytes as "1 TB" (owner
+		// 2026-11-18: the list said "1.1 TB" for the 1 TB box). Used space is counted the same way, as backup tools do.
+		while ( $value >= 1024 && $i < count( $units ) - 1 ) {
+			$value /= 1024;
 			++$i;
 		}
 
-		return ( $value >= 100 || 0 === $i ? number_format_i18n( $value, 0 ) : number_format_i18n( $value, 1 ) ) . ' ' . $units[ $i ];
+		$whole = $value >= 100 || 0 === $i || abs( $value - round( $value ) ) < 0.05; // "1 TB", not "1.0 TB".
+
+		return ( $whole ? number_format_i18n( $value, 0 ) : number_format_i18n( $value, 1 ) ) . ' ' . $units[ $i ];
 	}
 
 	/**
