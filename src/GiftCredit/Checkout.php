@@ -48,6 +48,21 @@ final class Checkout {
 	private static array $saved_card_orders = array();
 
 	/**
+	 * Orders whose subscriptions now carry the saved card: nothing is left to collect from a gateway (order id => true).
+	 *
+	 * @var array<int, bool>
+	 */
+	private static array $settled_orders = array();
+
+	/**
+	 * Set when the order of this request exists and the order hooks run: from then on "needs payment" is read from the real order, not
+	 * from the forecast.
+	 *
+	 * @var bool
+	 */
+	private static bool $processing = false;
+
+	/**
 	 * Per request: forecasts by customer, currency, total and cart cap.
 	 *
 	 * @var array<string, array<string, mixed>|null>
@@ -60,7 +75,10 @@ final class Checkout {
 	public static function register(): void {
 		add_action( 'bgca_cards_applied', array( __CLASS__, 'applied' ), 10, 3 );
 		// After WooCommerce Subscriptions (10), the trial rule (20) and the usage rule (30).
-		add_filter( 'woocommerce_cart_needs_payment', array( __CLASS__, 'gateway_saves_card' ), 40 );
+		add_filter( 'woocommerce_cart_needs_payment', array( __CLASS__, 'gateway_saves_card' ), 40, 2 );
+		// First of all: the order exists, the forecast is no longer the answer.
+		add_action( 'woocommerce_checkout_order_processed', array( __CLASS__, 'order_exists' ), 0 );
+		add_action( 'woocommerce_review_order_before_submit', array( __CLASS__, 'saved_method_line' ) );
 		// After WooCommerce Subscriptions made the subscriptions (100) and the add-on put the cards on the order (200).
 		add_action( 'woocommerce_checkout_order_processed', array( __CLASS__, 'saved_card_on_subscriptions' ), 250, 3 );
 		add_action( 'woocommerce_review_order_before_order_total', array( __CLASS__, 'review_row' ) );
@@ -75,6 +93,15 @@ final class Checkout {
 		self::$memo              = array();
 		self::$ask_gateway       = false;
 		self::$saved_card_orders = array();
+		self::$settled_orders    = array();
+		self::$processing        = false;
+	}
+
+	/**
+	 * The checkout made the order: "needs payment" is now decided by the order ({@see Checkout::gateway_saves_card()}).
+	 */
+	public static function order_exists(): void {
+		self::$processing = true;
 	}
 
 	/**
@@ -142,7 +169,7 @@ final class Checkout {
 		$saved = $order instanceof \WC_Order ? self::saved_card( (int) $order->get_customer_id() ) : null;
 
 		if ( null === $saved || (int) $saved['token']->get_id() !== self::$saved_card_orders[ $order_id ] || Wallet::cents( $order->get_total() ) > 0 ) {
-			unset( self::$saved_card_orders[ $order_id ] );
+			unset( self::$saved_card_orders[ $order_id ], self::$settled_orders[ $order_id ] );
 			self::$ask_gateway = true;
 
 			return;
@@ -151,22 +178,68 @@ final class Checkout {
 		foreach ( wcs_get_subscriptions_for_order( $order, array( 'order_type' => 'parent' ) ) as $subscription ) {
 			Card::apply_token( $subscription, $saved['token'], $saved['gateway'] );
 		}
+
+		self::$settled_orders[ $order_id ] = true;
 	}
 
 	/**
-	 * See the class comment: a cart that saves a card asks the gateway, unless the order is on the customer's saved card.
+	 * See the class comment. Two phases:
+	 *
+	 * - Before the order exists (the page, the refresh, the validation of the submit): the forecast. When the cards will pay the whole cart
+	 *   and the customer has a usable saved method, no payment is needed, so no payment methods (and no card form) are shown and none is
+	 *   required.
+	 * - After the order exists (the order hooks of the submit, where WooCommerce decides between payment and no payment): the order
+	 *   decides. A cart that saves a card asks the gateway, unless the cards paid the whole order and its subscriptions carry the saved
+	 *   card ({@see Checkout::saved_card_on_subscriptions()}). An order with a total above 0 is never answered "no payment".
 	 *
 	 * @param mixed $needs Whether a payment is needed.
+	 * @param mixed $cart  The cart.
 	 * @return mixed
 	 */
-	public static function gateway_saves_card( $needs ) {
+	public static function gateway_saves_card( $needs, $cart = null ) {
+		if ( ! self::$processing ) {
+			return $needs && null !== self::forecast_saved_card( $cart ) ? false : $needs;
+		}
+
 		if ( self::$ask_gateway ) {
 			return true;
 		}
 
-		// An order the cards paid in full and whose subscriptions carry the saved card: WooCommerce Subscriptions would still ask for a
-		// payment (a recurring total above 0 on a zero order), but there is nothing to collect.
-		return array() !== self::$saved_card_orders ? false : $needs;
+		return array() !== self::$settled_orders ? false : $needs;
+	}
+
+	/**
+	 * The saved method that replaces the card form: the checkout is the current cart's, the cards pay all of it and the customer has a
+	 * usable saved method.
+	 *
+	 * @param mixed $cart Cart.
+	 * @return array{token: \WC_Payment_Token, gateway: \WC_Payment_Gateway}|null
+	 */
+	private static function forecast_saved_card( $cart ): ?array {
+		if ( ! $cart instanceof \WC_Cart || ! function_exists( 'WC' ) || WC()->cart !== $cart || ! self::on_checkout() || ! Rules::cart_saves_card( $cart ) ) {
+			return null;
+		}
+
+		$p = self::preview( $cart );
+
+		return null !== $p && $p['due'] < 1 ? self::saved_card( get_current_user_id() ) : null;
+	}
+
+	/**
+	 * Where the payment methods would be: the line that tells the customer no card is needed.
+	 */
+	public static function saved_method_line(): void {
+		$cart  = function_exists( 'WC' ) ? WC()->cart : null;
+		$saved = self::$processing ? null : self::forecast_saved_card( $cart );
+
+		if ( null === $saved ) {
+			return;
+		}
+
+		$name = trim( wp_strip_all_tags( (string) $saved['token']->get_display_name() ) );
+
+		/* translators: %s: the saved payment method, for example "Visa ending in 4242". */
+		echo '<p class="beltoft-services-credit-saved">' . esc_html( sprintf( __( 'Paid from your account credit. Renewals use your saved payment method (%s).', 'beltoft-services' ), $name ) ) . '</p>';
 	}
 
 	/**

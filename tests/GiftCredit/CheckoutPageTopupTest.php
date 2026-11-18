@@ -361,6 +361,91 @@ class CheckoutPageTopupTest extends GiftCreditTestCase {
 		$this->assertTrue( $asked );
 	}
 
+	/**
+	 * The checkout page defines WOOCOMMERCE_CHECKOUT for good: a process of its own.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_the_checkout_page_shows_no_payment_methods_when_credit_and_a_saved_method_cover_it(): void {
+		$user = $this->subscription_cart( 5000 );
+		define_if_missing( 'WOOCOMMERCE_CHECKOUT' );
+		Checkout::reset();
+
+		$this->assertFalse( WC()->cart->needs_payment(), 'No payment methods, no card form.' );
+		ob_start();
+		Checkout::saved_method_line();
+		$line = (string) ob_get_clean();
+		$this->assertStringContainsString( 'Paid from your account credit. Renewals use your saved payment method (', $line );
+		$this->assertStringContainsString( 'ending in 4242', $line );
+		$this->assertStringNotContainsString( "\u{2014}", $line );
+		$this->assertNotNull( Checkout::saved_card( $user ) );
+	}
+
+	/**
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_the_checkout_page_is_unchanged_without_a_saved_method_or_with_partial_credit(): void {
+		$this->subscription_cart( 5000, null );
+		define_if_missing( 'WOOCOMMERCE_CHECKOUT' );
+		Checkout::reset();
+		$this->assertTrue( WC()->cart->needs_payment(), 'No saved method: the payment box stays.' );
+		ob_start();
+		Checkout::saved_method_line();
+		$this->assertSame( '', ob_get_clean() );
+
+		$this->subscription_cart( 400 );
+		Checkout::reset();
+		$this->assertTrue( WC()->cart->needs_payment(), 'Partial credit: the payment box stays.' );
+		ob_start();
+		Checkout::saved_method_line();
+		$this->assertSame( '', ob_get_clean() );
+	}
+
+	/**
+	 * The forecast says "covered", but the add-on applies nothing when the order is made: the order decides, the gateway is asked and the
+	 * order is never completed unpaid.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_the_submit_follows_the_order_not_the_forecast(): void {
+		$user = $this->subscription_cart( 5000 );
+		define_if_missing( 'WOOCOMMERCE_CHECKOUT' );
+		Checkout::reset();
+		$this->assertFalse( WC()->cart->needs_payment(), 'The forecast says covered.' );
+
+		list( $order, $subs, $asked ) = $this->check_out(
+			$user,
+			static function (): void {
+				add_filter( 'bgca_auto_apply', '__return_false', 100 );
+			}
+		);
+
+		$this->assertGreaterThan( 0, (float) $order->get_total(), 'The cards were not applied.' );
+		$this->assertTrue( $asked, 'An order with a total above 0 never goes without payment.' );
+		$this->assertSame( '', (string) $subs[0]->get_meta( '_payment_method_token', true ) );
+	}
+
+	/**
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_the_submit_after_a_forecast_of_covered_puts_the_saved_method_on_the_subscription(): void {
+		$user = $this->subscription_cart( 5000 );
+		define_if_missing( 'WOOCOMMERCE_CHECKOUT' );
+		Checkout::reset();
+		$this->assertFalse( WC()->cart->needs_payment() );
+
+		list( $order, $subs, $asked ) = $this->check_out( $user );
+
+		$this->assertSame( '0.00', wc_format_decimal( $order->get_total(), 2 ) );
+		$this->assertFalse( $asked );
+		$this->assertNotSame( '', (string) $subs[0]->get_meta( '_payment_method_token', true ) );
+		$this->assertFalse( $subs[0]->is_manual() );
+	}
+
 	public function test_without_a_saved_card_the_gateway_is_asked_as_before(): void {
 		$user = $this->subscription_cart( 5000, null );
 		list( , $subs, $asked ) = $this->check_out( $user );

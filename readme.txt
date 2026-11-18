@@ -259,7 +259,7 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 == Changelog ==
 
 = 0.43.1 =
-* Checkout: a customer whose account credit pays the whole order and who has a usable default saved method (card, Google Pay or Apple Pay) is no longer asked for a card; the subscriptions of that order carry the saved method, so renewals are charged automatically. A part payment, a customer without a usable saved method, or a method that stops working in between asks for a card as before.
+* Checkout: a customer whose account credit pays the whole order and who has a usable default saved method (card, Google Pay or Apple Pay) is no longer asked for a card; the subscriptions of that order carry the saved method, so renewals are charged automatically. The checkout then shows one line instead of the card form, and what is decided at submit is read from the real order (an order with a total above 0 still goes to the gateway). A part payment, a customer without a usable saved method, or a method that stops working in between asks for a card as before.
 
 = 0.43.0 =
 * Backup storage (off by default): a backup box per subscription at a storage provider, with a spend guard (cost table, caps), host name alias as one DNS record per box, connection details, password behind an emailed code, snapshots and their plan, upgrade only. Nothing is bought until the cost table, the caps, the token and the live switches are set.
