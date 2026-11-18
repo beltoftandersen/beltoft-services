@@ -201,14 +201,19 @@ final class FirewallRules {
 
 
 	/**
-	 * Normalises one source: an IPv4 address or a network. Anything else, "anywhere" (0.0.0.0/0), private, loopback,
-	 * link-local, multicast and reserved ranges are refused. A network is written as its first address.
+	 * Normalises one source: an IPv4 or IPv6 address or a network. Anything else, "anywhere" (0.0.0.0/0, ::/0), private,
+	 * loopback, link-local, multicast and reserved ranges are refused. A network is written as its first address. An
+	 * IPv6 source must be a global address (2000::/3) and a network at least a /48.
 	 *
 	 * @param mixed $source Raw source.
 	 * @return string|null Normalised, or null when it is not acceptable.
 	 */
 	private static function clean_source( $source ): ?string {
 		$source = is_string( $source ) ? trim( $source ) : '';
+
+		if ( false !== strpos( $source, ':' ) ) {
+			return self::clean_source6( $source );
+		}
 
 		if ( 1 !== preg_match( '#^(\d{1,3}(?:\.\d{1,3}){3})(?:/(\d{1,2}))?$#D', $source, $m ) ) {
 			return null;
@@ -233,9 +238,49 @@ final class FirewallRules {
 	}
 
 	/**
-	 * Is an address inside one of the sources?
+	 * The IPv6 half of clean_source(): `address` or `address/48..128`, global unicast only, written as the compressed
+	 * network address (with /len unless it is a single address).
 	 *
-	 * @param string            $ip      IPv4 address.
+	 * @param string $source Trimmed text with a colon in it.
+	 */
+	private static function clean_source6( string $source ): ?string {
+		if ( 1 !== preg_match( '#^([0-9A-Fa-f:]+)(?:/(\d{1,3}))?$#D', $source, $m ) ) {
+			return null;
+		}
+
+		$prefix = isset( $m[2] ) ? (int) $m[2] : 128;
+		$packed = Ipv6::pack( $m[1] );
+
+		if ( null === $packed || $prefix < 48 || $prefix > 128 || ( ord( $packed[0] ) & 0xE0 ) !== 0x20 ) {
+			return null;
+		}
+
+		$net = self::mask6( $packed, $prefix );
+
+		return 128 === $prefix ? Ipv6::text( $net ) : Ipv6::text( $net ) . '/' . $prefix;
+	}
+
+	/**
+	 * An IPv6 address (16 bytes) with everything after the first $bits bits cleared.
+	 *
+	 * @param string $packed 16 bytes.
+	 * @param int    $bits   Prefix length, 0 to 128.
+	 */
+	private static function mask6( string $packed, int $bits ): string {
+		$out = '';
+
+		for ( $i = 0; $i < 16; $i++ ) {
+			$keep = max( 0, min( 8, $bits - 8 * $i ) );
+			$out .= chr( ord( $packed[ $i ] ) & ( ( 0xFF << ( 8 - $keep ) ) & 0xFF ) );
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Is an address inside one of the sources? An IPv4 address is covered by IPv4 sources only, an IPv6 address by IPv6 sources only.
+	 *
+	 * @param string            $ip      IPv4 or IPv6 address.
 	 * @param array<int,string> $sources Normalised sources (empty: anywhere).
 	 */
 	public static function source_covers( string $ip, array $sources ): bool {
@@ -243,12 +288,29 @@ final class FirewallRules {
 			return true;
 		}
 
-		if ( false === filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
+		$ip6 = Ipv6::pack( $ip );
+
+		if ( null === $ip6 && false === filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
 			return false;
 		}
 
 		foreach ( $sources as $source ) {
 			$bits = explode( '/', (string) $source );
+
+			if ( false !== strpos( $bits[0], ':' ) ) {
+				$net = Ipv6::pack( $bits[0] );
+
+				if ( null !== $ip6 && null !== $net && self::mask6( $ip6, isset( $bits[1] ) ? (int) $bits[1] : 128 ) === self::mask6( $net, isset( $bits[1] ) ? (int) $bits[1] : 128 ) ) {
+					return true;
+				}
+
+				continue;
+			}
+
+			if ( null !== $ip6 ) {
+				continue;
+			}
+
 			$len  = isset( $bits[1] ) ? (int) $bits[1] : 32;
 			$mask = ( -1 << ( 32 - $len ) ) & 0xFFFFFFFF;
 
@@ -293,8 +355,9 @@ final class FirewallRules {
 			$before[ (string) ( $rule['id'] ?? '' ) ] = $rule;
 		}
 
-		$own = (string) $r->get( 'ip' );
-		$out = array();
+		$own  = (string) $r->get( 'ip' );
+		$own6 = (string) Ipv6::normalise( (string) $r->get( 'ip6' ) );
+		$out  = array();
 
 		foreach ( array_values( $input ) as $i => $raw ) {
 			if ( ! is_array( $raw ) ) {
@@ -336,10 +399,10 @@ final class FirewallRules {
 				$one = self::clean_source( $source );
 
 				if ( null === $one ) {
-					return self::rule_error( __( 'Use public IPv4 addresses, like 203.0.113.7 or 203.0.113.0/24. Leave the field empty to allow anyone.', 'beltoft-services' ), $i );
+					return self::rule_error( __( 'Use public IPv4 or IPv6 addresses, like 203.0.113.7, 203.0.113.0/24 or 2001:db8:1::/48. Leave the field empty to allow anyone.', 'beltoft-services' ), $i );
 				}
 
-				if ( '' !== $own && $one === $own ) {
+				if ( ( '' !== $own && $one === $own ) || ( '' !== $own6 && $one === $own6 ) ) {
 					return self::rule_error( __( 'The address of the server itself cannot be used here.', 'beltoft-services' ), $i );
 				}
 

@@ -138,7 +138,6 @@ class FirewallTest extends FirewallTestCase {
 			'private'         => $this->rule( 'tcp', 80, 0, array( '10.0.0.5' ) ),
 			'multicast'       => $this->rule( 'tcp', 80, 0, array( '224.0.0.1' ) ),
 			'link local'      => $this->rule( 'tcp', 80, 0, array( '169.254.1.1' ) ),
-			'ipv6'            => $this->rule( 'tcp', 80, 0, array( '2001:db8::1' ) ),
 			'own address'     => $this->rule( 'tcp', 80, 0, array( '192.0.2.10' ) ),
 			'six sources'     => $this->rule( 'tcp', 80, 0, array( '203.0.113.1', '203.0.113.2', '203.0.113.3', '203.0.113.4', '203.0.113.5', '203.0.113.6' ) ),
 			'junk source'     => $this->rule( 'tcp', 80, 0, array( 'example.com' ) ),

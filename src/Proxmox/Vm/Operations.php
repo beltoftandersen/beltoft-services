@@ -13,6 +13,7 @@ use BeltoftServices\Lifecycle;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Disk\DiskMeta;
 use BeltoftServices\Proxmox\Network\Firewall;
+use BeltoftServices\Proxmox\Network\FirewallRules;
 use BeltoftServices\Proxmox\Network\IpHistory;
 use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Network\Ipv6;
@@ -714,8 +715,9 @@ final class Operations {
 
 		IpHistory::start_once( Ipv6::KIND, $address, $this->r->id() );
 
-		// The ipfilter set takes the new address before the guest can use it.
-		$fw = ( new Firewall( $this->r, $this->client, $this->cluster ) )->ensure_ipfilter( $record, $after );
+		// The ipfilter set takes the new address before the guest can use it; a server the dashboard manages also gets the IPv6 side of its rules (the ping twin, `ndp`, `radv`).
+		$firewall = new Firewall( $this->r, $this->client, $this->cluster );
+		$fw       = FirewallRules::managed( $this->r ) && true !== $this->r->get( Firewall::LOCKED ) ? $firewall->ensure( $record, $after ) : $firewall->ensure_ipfilter( $record, $after );
 
 		if ( $fw instanceof StepResult ) {
 			return 'failed';
