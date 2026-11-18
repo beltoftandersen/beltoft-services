@@ -61,6 +61,7 @@ final class ManualServerDriver implements Driver, StopsOnDelete, NeedsBilling {
 			'server_location'     => array( 'text', __( 'Country shown', 'beltoft-services' ), __( 'Shown to the customer. Never the name of the supplier.', 'beltoft-services' ), '', true ),
 			'server_ref'          => array( 'text', __( 'Supplier product code (staff only)', 'beltoft-services' ), __( 'The product to buy by hand. Staff only, never shown.', 'beltoft-services' ), '', true ),
 			'server_location_code' => array( 'text', __( 'Supplier location code (staff only)', 'beltoft-services' ), __( 'Where to buy it. Staff only, never shown.', 'beltoft-services' ), '', true ),
+			'server_dist'         => array( 'text', __( 'Distribution to preinstall (staff only)', 'beltoft-services' ), __( 'The name exactly as the supplier product lists it. Empty: the setting under Dedicated servers.', 'beltoft-services' ), '', true ),
 			'cost_monthly'        => array( 'text', __( 'Monthly cost, EUR without VAT (staff only)', 'beltoft-services' ), __( 'A figure such as 99.00, told to staff in the order mail. Not used for billing. Kept as text: a decimal figure in a plan does not survive storage.', 'beltoft-services' ), '', true ),
 			'cost_setup'          => array( 'text', __( 'Setup cost, EUR without VAT (staff only)', 'beltoft-services' ), __( 'A figure such as 49.00, told to staff in the order mail. Not used for billing.', 'beltoft-services' ), '', true ),
 		);

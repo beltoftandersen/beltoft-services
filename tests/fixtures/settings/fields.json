@@ -173,6 +173,99 @@
         "label": "Account credit as gift cards",
         "desc": "Account credit is gift cards of the plugin Beltoft Gift Cards for WooCommerce, handled by the add-on Beltoft Gift Cards Account Credit: a top-up buys a card for the customer, free credit is a free card made in the gift card plugin, and the cards pay checkout orders, renewals and usage invoices (set in the add-on). Needs both plugins to be active; without them this setting does nothing."
     },
+    "dedicated_enabled": {
+        "tab": "dedicated",
+        "section": "dedicated",
+        "type": "checkbox",
+        "default": 0,
+        "label": "Order dedicated servers automatically",
+        "desc": "Off: a paid order waits and staff are mailed to buy the server by hand and press Mark ready. On: the server is ordered through the supplier web service after payment."
+    },
+    "dedicated_client": {
+        "tab": "dedicated",
+        "section": "dedicated",
+        "type": "select",
+        "default": "fake",
+        "options": {
+            "fake": "Fake: nothing real is ordered",
+            "test_server": "Test server: the real client against a test address (staging). The real host is refused",
+            "live": "Live: servers are ordered at the supplier and cost real money"
+        },
+        "label": "Supplier connection",
+        "desc": "Live needs this setting, the login below AND the constant BELTOFT_SERVICES_DEDICATED_LIVE set to true in wp-config.php. Every server ordered live costs real money."
+    },
+    "dedicated_api_url": {
+        "tab": "dedicated",
+        "section": "dedicated",
+        "type": "url",
+        "default": "https://robot-ws.your-server.de",
+        "label": "Web service address",
+        "desc": "https only. Live accepts only the supplier host."
+    },
+    "dedicated_api_user": {
+        "tab": "dedicated",
+        "section": "dedicated",
+        "type": "secret",
+        "default": "",
+        "label": "Web service user",
+        "desc": "Stored encrypted and never shown again."
+    },
+    "dedicated_api_password": {
+        "tab": "dedicated",
+        "section": "dedicated",
+        "type": "secret",
+        "default": "",
+        "label": "Web service password",
+        "desc": "Stored encrypted and never shown again."
+    },
+    "dedicated_dist": {
+        "tab": "dedicated",
+        "section": "dedicated",
+        "type": "text",
+        "default": "",
+        "label": "Distribution to preinstall",
+        "desc": "The name exactly as the supplier product lists it (optional). A plan can set its own. Empty: none is preinstalled."
+    },
+    "dedicated_max_servers": {
+        "tab": "dedicated",
+        "section": "dedicated",
+        "type": "number",
+        "default": 0,
+        "min": 0,
+        "max": 100000,
+        "label": "Most servers ordered live",
+        "desc": "Live orders only. 0: none may be ordered live."
+    },
+    "dedicated_max_monthly_cost": {
+        "tab": "dedicated",
+        "section": "dedicated",
+        "type": "number",
+        "default": 0,
+        "min": 0,
+        "max": 10000000,
+        "label": "Highest monthly cost of all live servers, in whole EUR",
+        "desc": "The sum of the cost field of the plans. An order that would pass it is refused and staff are told. 0: none may be ordered live."
+    },
+    "dedicated_max_new_per_day": {
+        "tab": "dedicated",
+        "section": "dedicated",
+        "type": "number",
+        "default": 0,
+        "min": 0,
+        "max": 20,
+        "label": "Most new servers per day",
+        "desc": "Live orders only. The supplier itself allows 20 order requests a day. 0: none may be ordered live."
+    },
+    "manual_server_promise_minutes": {
+        "tab": "dedicated",
+        "section": "dedicated",
+        "type": "number",
+        "default": 10,
+        "min": 1,
+        "max": 10080,
+        "label": "Minutes to deliver",
+        "desc": "The promise told to the customer. Staff are mailed once when a server is later than this."
+    },
     "site_tag": {
         "tab": "proxmox",
         "section": "proxmox",
