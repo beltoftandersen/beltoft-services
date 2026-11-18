@@ -61,7 +61,7 @@ final class Store {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
 		$done = $wpdb->query(
 			$wpdb->prepare(
-				'INSERT IGNORE INTO %i (resource_id, user_id, remote_seq, store_key, odoo_key, woo_order_id, order_number, order_date, status, total, currency, odoo_order_name, source, received_at, hour_bucket, state, free_reason) VALUES (%d, %d, %d, %s, %s, %s, %s, ' . ( '' === $date ? 'NULL' : '%s' ) . ', %s, %s, %s, %s, %s, %s, %s, %s, %s)',
+				'INSERT IGNORE INTO %i (resource_id, user_id, remote_seq, store_key, odoo_key, woo_order_id, order_number, order_date, status, total, currency, odoo_order_name, source, received_at, hour_bucket, state, free_reason) VALUES (%d, %d, %d, %s, %s, %s, %s, NULLIF(%s, \'\'), %s, %s, %s, %s, %s, %s, %s, %s, %s)',
 				...array_merge(
 					array(
 						self::table(),
@@ -73,7 +73,7 @@ final class Store {
 						(string) $event['woo_order_id'],
 						(string) ( $event['order_number'] ?? '' ),
 					),
-					'' === $date ? array() : array( $date ),
+					array( $date ),
 					array(
 						(string) ( $event['status'] ?? '' ),
 						(string) ( $event['total'] ?? '' ),
@@ -101,8 +101,13 @@ final class Store {
 	public static function count( int $resource_id, string $state = '' ): int {
 		global $wpdb;
 
+		if ( '' === $state ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
+			return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE resource_id = %d', self::table(), $resource_id ) );
+		}
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
-		return (int) $wpdb->get_var( '' === $state ? $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE resource_id = %d', self::table(), $resource_id ) : $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE resource_id = %d AND state = %s', self::table(), $resource_id, $state ) );
+		return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE resource_id = %d AND state = %s', self::table(), $resource_id, $state ) );
 	}
 
 	/**
