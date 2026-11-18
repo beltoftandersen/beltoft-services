@@ -39,7 +39,7 @@ final class Threshold {
 	 * @param \WC_Subscription $account Account.
 	 */
 	public static function for_account( \WC_Subscription $account ): ?float {
-		$value = Currency::amount( Account::charged( $account ) ? 'usage_threshold' : 'usage_threshold_new', (string) $account->get_currency() );
+		$value = Currency::amount( Trusted::established( (int) $account->get_customer_id(), $account ) ? 'usage_threshold' : 'usage_threshold_new', (string) $account->get_currency() );
 
 		return null === $value ? null : (float) $value;
 	}
