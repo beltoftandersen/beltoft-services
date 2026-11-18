@@ -258,6 +258,13 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 == Changelog ==
 
+= 0.44.0 =
+* IPv6 on servers and databases, off until a cluster has an IPv6 prefix. A cluster gets two fields, the /64 and the gateway; each server gets one address in it, made from its VMID (nothing is allocated, a reinstall or a restore keeps it). New servers get the address when they are built. Existing servers and databases with a public address get it written into their configuration by the sweep without a restart: it works after the customer's next stop and start, and the server page says so. The IPv4 address is never rewritten.
+* Firewall: customers can name IPv6 addresses and networks as sources; one rule is one Proxmox rule per address family, and a ping rule gets an IPv6 ping twin; neighbour discovery is written on and router advertisements from the guest off; the anti-spoofing set holds both addresses.
+* Databases: the access list takes IPv6 addresses and ranges (sent to the guest in a list of their own), and the public network card check compares the IPv6 part.
+* Abuse monitoring: the host counts are accepted for IPv6 sources too (mapped to the server by prefix and VMID), the lookup `wp beltoft-services who` takes IPv6, a log row `public6` records who held an address, and `wp beltoft-services ipv6-list` shows which servers the sweep will change (read-only).
+* The server page, the ready email, the MCP details and the admin panel show the IPv6 address. The REST list of services is unchanged.
+
 = 0.43.6 =
 * Account and order forms: one type scale (14, 16, 20) and one set of colour tokens; card padding, phone meta line and overview width fixed; no "Expires 00 /" for wallet methods; API reference on the scale; hosting label translatable.
 
