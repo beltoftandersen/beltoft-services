@@ -141,6 +141,7 @@ final class MailProductsCommand {
 		$product->set_tax_status( 'taxable' );
 		$product->set_tax_class( '' );
 		$product->set_virtual( true );
+		$product->set_sold_individually( true ); // one line per domain; a second identical line is refused (owner 2026-11-18)
 
 		$attribute = new \WC_Product_Attribute();
 		$attribute->set_name( 'Plan' );
