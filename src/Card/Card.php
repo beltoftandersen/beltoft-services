@@ -41,6 +41,7 @@ final class Card {
 		Jobs::recurring( array( __CLASS__, 'unschedule' ) );
 		add_filter( 'woocommerce_account_menu_items', array( __CLASS__, 'menu' ), 40 );
 		add_filter( 'woocommerce_payment_methods_list_item', array( __CLASS__, 'list_item' ), 99, 2 );
+		add_action( 'woocommerce_account_payment_methods_column_expires', array( __CLASS__, 'expires_cell' ) );
 		add_action( 'woocommerce_before_account_payment_methods', array( __CLASS__, 'note' ) );
 		add_filter( 'wc_subscriptions_allow_subscription_token_deletion', array( __CLASS__, 'allow_deletion' ), 10, 2 );
 		// Any change of a customer's saved cards: the default card is the usage account's card. A new default is
@@ -68,6 +69,16 @@ final class Card {
 		}
 
 		return $item;
+	}
+
+	/**
+	 * The expiry cell: the text, or a marker the account stylesheet hides together with the cell's label.
+	 *
+	 * @param array<string,mixed> $method The list item.
+	 */
+	public static function expires_cell( $method ): void {
+		$text = is_array( $method ) ? trim( (string) ( $method['expires'] ?? '' ) ) : '';
+		echo '' === $text ? '<span class="beltoft-services-noexpiry"></span>' : esc_html( $text );
 	}
 
 	/**

@@ -26,6 +26,15 @@ class CardListItemTest extends TestCase {
 		$this->assertSame( array( 'method' => 'x' ), Card::list_item( array( 'method' => 'x' ) ) );
 	}
 
+	public function test_expires_cell_marks_an_empty_one(): void {
+		ob_start();
+		Card::expires_cell( array( 'expires' => '' ) );
+		$this->assertStringContainsString( 'beltoft-services-noexpiry', (string) ob_get_clean() );
+		ob_start();
+		Card::expires_cell( array( 'expires' => '08 / 2028' ) );
+		$this->assertSame( '08 / 2028', ob_get_clean() );
+	}
+
 	public function test_hosting_label_has_a_filter(): void {
 		$this->settings( array( 'hosting_label' => 'Webhotel' ) );
 		add_filter( 'beltoft_services_hosting_label', static fn() => 'Web hosting' );

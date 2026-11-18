@@ -1253,7 +1253,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-ssl h3
 body.woocommerce-account .woocommerce-MyAccount-content .bs-sub-name { display: block; margin-top: 2px; font-size: var(--bs-fs-small); color: var(--bs-muted); text-decoration: none; }
 
 /* Review 2026-11-18: the payment methods table prints an empty cell for a method without an expiry date (a wallet); it shows no label either. */
-.woocommerce-MyAccount-content td.woocommerce-PaymentMethod--expires:empty { display: none; }
+.woocommerce-MyAccount-content td.woocommerce-PaymentMethod--expires:has(.beltoft-services-noexpiry) { display: none; }
 
 /* Review 2026-11-18, phone: the line under the page title (state, type, renewal) wraps instead of cutting the type short. */
 @media (max-width: 600px) {
