@@ -12,6 +12,7 @@ use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Lifecycle;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Disk\DiskMeta;
+use BeltoftServices\Proxmox\Network\Firewall;
 use BeltoftServices\Proxmox\Network\IpHistory;
 use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Network\Ipv6;
@@ -496,6 +497,15 @@ final class Operations {
 
 		$v = $rate;
 
+		// IPv6 follows the plan change too (a no-op unless the cluster has IPv6 on and the address is missing).
+		$ip6 = $this->sync_ipv6( $record, $v );
+
+		if ( $ip6 instanceof StepResult ) {
+			return $ip6;
+		}
+
+		$v = $ip6;
+
 		$was_running = (bool) $this->r->get( 'was_running' );
 		$result      = $this->change( $record, $v, $want, $was_running );
 
@@ -619,6 +629,99 @@ final class Operations {
 		}
 
 		return $this->verified( $record, 'update' );
+	}
+
+	/**
+	 * Gives the VM's ipconfig0 the IPv6 part the cluster wants for its VMID (`ip6=`, `gw6=`). Only those two keys change:
+	 * the VM's own IPv4 part is copied as it is, never rewritten. Nothing is sent when the cluster has IPv6 off, when the
+	 * VM has no public IPv4 ipconfig0 (a database without the add-on, a VM that was never ours) or when it already says
+	 * the right thing. A running VM keeps the change pending until it is stopped and started again and is never
+	 * restarted for it.
+	 *
+	 * @param array<string, mixed> $record VM record.
+	 * @param array<string, mixed> $v      Verified VM.
+	 * @return array<string, mixed>|StepResult The VM as it is now.
+	 */
+	public function sync_ipv6( array $record, array $v ) {
+		$have = (string) ( $v['config']['ipconfig0'] ?? '' );
+		$vmid = (int) $record['vmid'];
+
+		if ( true === $this->r->get( 'linked' ) || null === Ipv6::address( $this->cluster, $vmid ) || ! self::has_public_ipv4( $have ) || Ipv6::has_ipconfig( $have, $this->cluster, $vmid ) ) {
+			return $v;
+		}
+
+		$params = array( 'ipconfig0' => Ipv6::with_ipconfig( $have, $this->cluster, $vmid ) );
+
+		if ( ! empty( $v['config']['digest'] ) ) {
+			$params['digest'] = (string) $v['config']['digest'];
+		}
+
+		$answer = $this->client->request( 'PUT', '/nodes/' . rawurlencode( $v['node'] ) . '/qemu/' . $vmid . '/config', $params );
+
+		if ( is_wp_error( $answer ) ) {
+			return $this->classify( $answer, 'update' );
+		}
+
+		return $this->verified( $record, 'update' );
+	}
+
+	/**
+	 * Does the ipconfig0 carry a public IPv4 address (`ip=a.b.c.d/n`)? `ip=dhcp` and `ip=manual` do not count.
+	 *
+	 * @param string $ipconfig0 The VM's ipconfig0.
+	 */
+	public static function has_public_ipv4( string $ipconfig0 ): bool {
+		return 1 === preg_match( '#(?:^|,)ip=\d{1,3}(?:\.\d{1,3}){3}(?:/\d{1,2})?(?:,|$)#D', $ipconfig0 );
+	}
+
+	/**
+	 * The job's version of sync_ipv6(): the VM is read and verified here. The caller holds the resource lock. On a
+	 * server that has the address (written now or before) its meta `ip6`, the log row and the ipfilter set follow.
+	 *
+	 * @return string `written` (ipconfig0 changed), `same` (already right), `skipped` (nothing to give this VM) or `failed` (could not be done now; the next sweep tries again).
+	 */
+	public function reconcile_ipv6(): string {
+		$record = VmRecords::for_resource( $this->r->id() );
+
+		if ( null === $record || null !== $this->prepare( $record ) ) {
+			return 'failed';
+		}
+
+		$v = Ownership::verify( $this->client, $record, $this->r );
+
+		if ( is_wp_error( $v ) ) {
+			return 'failed';
+		}
+
+		$vmid = (int) $record['vmid'];
+
+		if ( true === $this->r->get( 'linked' ) || null === Ipv6::address( $this->cluster, $vmid ) || ! self::has_public_ipv4( (string) ( $v['config']['ipconfig0'] ?? '' ) ) ) {
+			return 'skipped';
+		}
+
+		$changed = ! Ipv6::has_ipconfig( (string) ( $v['config']['ipconfig0'] ?? '' ), $this->cluster, $vmid );
+		$after   = $this->sync_ipv6( $record, $v );
+
+		if ( $after instanceof StepResult ) {
+			return 'failed';
+		}
+
+		$address = (string) Ipv6::address( $this->cluster, $vmid );
+
+		if ( ! Ipv6::has_ipconfig( (string) ( $after['config']['ipconfig0'] ?? '' ), $this->cluster, $vmid ) || ! $this->r->set( array( 'ip6' => $address ) ) ) {
+			return 'failed';
+		}
+
+		IpHistory::start_once( Ipv6::KIND, $address, $this->r->id() );
+
+		// The ipfilter set takes the new address before the guest can use it.
+		$fw = ( new Firewall( $this->r, $this->client, $this->cluster ) )->ensure_ipfilter( $record, $after );
+
+		if ( $fw instanceof StepResult ) {
+			return 'failed';
+		}
+
+		return $changed ? 'written' : 'same';
 	}
 
 	/**

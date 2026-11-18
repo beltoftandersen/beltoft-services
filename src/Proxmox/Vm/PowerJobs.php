@@ -96,6 +96,7 @@ final class PowerJobs {
 				if ( $resource ) { Monitor::power( $resource, $power ); }
 				if ( $resource ) { self::hostname_applied( $resource, $vm, $power, $before ); }
 				if ( $resource ) { self::display_applied( $resource, $vm, $power, $before ); }
+				if ( $resource ) { self::display_applied( $resource, $vm, $power, $before, 'ipv6_pending_at' ); }
 				if ( $resource && DbActions::is_db( $resource ) ) { DbMonitor::check( $resource, $one['client'], (string) ( $vm['node'] ?? '' ), $vmid, $power ); }
 
 				if ( 'running' === $power ) {
@@ -174,9 +175,10 @@ final class PowerJobs {
 	 * @param array<string, mixed>      $vm     Cluster row.
 	 * @param string                    $power  Power now.
 	 * @param array<string, mixed>|null $before The cached row of the run before.
+	 * @param string                    $key    The meta key that holds the time of the pending change: display_pending_at, or ipv6_pending_at for an IPv6 address written while the server ran (same rule).
 	 */
-	private static function display_applied( Resource $r, array $vm, string $power, ?array $before ): void {
-		$at = (int) $r->get( 'display_pending_at' );
+	private static function display_applied( Resource $r, array $vm, string $power, ?array $before, string $key = 'display_pending_at' ): void {
+		$at = (int) $r->get( $key );
 
 		if ( 'running' !== $power || $at <= 0 ) {
 			return;
@@ -187,7 +189,7 @@ final class PowerJobs {
 			: ( null !== $before && 'stopped' === $before['power'] );
 
 		if ( $booted ) {
-			$r->set( array( 'display_pending_at' => null ) );
+			$r->set( array( $key => null ) );
 		}
 	}
 

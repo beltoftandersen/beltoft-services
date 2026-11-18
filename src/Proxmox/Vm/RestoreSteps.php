@@ -159,6 +159,11 @@ trait RestoreSteps {
 			}
 		}
 
+		// A backup made before IPv6 has an ipconfig0 without the address: it is written back (the IPv4 part stays the backup's). A failure here does not stop the restore: the IPv6 sweep puts it right later.
+		if ( ! DbActions::is_db( $this->r ) && true !== $this->r->get( 'linked' ) ) {
+			( new Operations( $this->r ) )->reconcile_ipv6();
+		}
+
 		// The backup or snapshot carries the VM name it had then: the server's own name is written back, in one call.
 		$named = $this->reapply_name( $record );
 

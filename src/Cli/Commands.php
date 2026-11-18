@@ -575,7 +575,7 @@ final class Commands {
 	}
 
 	/**
-	 * Shows who holds an IPv4 address, or held it at a time (for abuse reports). Read-only.
+	 * Shows who holds an IPv4 or IPv6 address, or held it at a time (for abuse reports). Read-only.
 	 *
 	 * Looks in the IP pool, the private networks and the holding log: resource, license, customer
 	 * (id, name, email), product and resource state. Without --at every holding is listed, the
@@ -586,7 +586,7 @@ final class Commands {
 	 * ## OPTIONS
 	 *
 	 * <ip>
-	 * : The IPv4 address, public or private.
+	 * : The address: IPv4 (public or private) or IPv6. An IPv6 address inside a server's own /80 is looked up as that server's.
 	 *
 	 * [--at=<datetime>]
 	 * : Who held it then. UTC unless the text names a zone, e.g. "2026-10-29 14:30" or "2026-10-29T14:30:00+02:00".
@@ -611,8 +611,8 @@ final class Commands {
 	public function who( array $args, array $assoc_args ): void {
 		$ip = trim( (string) ( $args[0] ?? '' ) );
 
-		if ( false === filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
-			\WP_CLI::error( 'Give an IPv4 address.' );
+		if ( false === filter_var( $ip, FILTER_VALIDATE_IP ) || false !== strpos( $ip, '%' ) ) {
+			\WP_CLI::error( 'Give an IPv4 or IPv6 address.' );
 		}
 
 		$at = null;
@@ -638,6 +638,71 @@ final class Commands {
 		}
 
 		\WP_CLI\Utils\format_items( $format, $items, array( 'ip', 'kind', 'resource_id', 'license_id', 'customer_id', 'name', 'email', 'product', 'state', 'from', 'until', 'note' ) );
+	}
+
+	/**
+	 * Lists the servers the IPv6 sweep would give an address, and what each has. Read-only: no Proxmox call, nothing written.
+	 *
+	 * Only clusters with an IPv6 prefix. A server is "pending" when it is ready and has not been given the address yet
+	 * (the sweep writes it into the VM configuration without a restart; a running server uses it after its next stop and start),
+	 * "done" when it has, and "skipped" when the sweep leaves it alone (adopted, on hold, not ready).
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--format=<format>]
+	 * : table or json.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp beltoft-services ipv6-list
+	 *
+	 * @subcommand ipv6-list
+	 *
+	 * @param string[]              $args       Positional arguments.
+	 * @param array<string, string> $assoc_args Flags.
+	 */
+	public function ipv6_list( array $args, array $assoc_args ): void {
+		unset( $args );
+		$items = array();
+
+		foreach ( \BeltoftServices\Proxmox\Pve\Clusters::all() as $id => $cluster ) {
+			if ( null === \BeltoftServices\Proxmox\Network\Ipv6::prefix_bytes( $cluster ) ) {
+				continue;
+			}
+
+			foreach ( \BeltoftServices\Proxmox\Vm\VmRecords::rows_for_cluster( (string) $id ) as $record ) {
+				$r       = Resource::find( (int) $record['resource_id'] );
+				$address = \BeltoftServices\Proxmox\Network\Ipv6::address( $cluster, (int) $record['vmid'] );
+
+				if ( null === $r || null === $address ) {
+					continue;
+				}
+
+				$skipped = 'ready' !== $r->get( 'state' ) || true === $r->get( 'linked' ) || $r->on_hold();
+				$done    = $address === $r->get( 'ip6' ) && (int) $r->get( 'ipv6_at' ) > 0;
+
+				$items[] = array(
+					'cluster' => (string) $id,
+					'vmid'    => (string) $record['vmid'],
+					'license' => (string) ( $r->license()['id'] ?? '' ),
+					'address' => $address,
+					'status'  => $skipped ? 'skipped' : ( $done ? ( $r->get( 'ipv6_pending_at' ) ? 'done (applies at next restart)' : 'done' ) : 'pending' ),
+				);
+			}
+		}
+
+		if ( array() === $items ) {
+			\WP_CLI::warning( 'No cluster has an IPv6 prefix, or no server is recorded in one.' );
+			return;
+		}
+
+		\WP_CLI\Utils\format_items( 'json' === ( $assoc_args['format'] ?? 'table' ) ? 'json' : 'table', $items, array( 'cluster', 'vmid', 'license', 'address', 'status' ) );
 	}
 
 	/**

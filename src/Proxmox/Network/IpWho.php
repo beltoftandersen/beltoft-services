@@ -8,6 +8,8 @@
 namespace BeltoftServices\Proxmox\Network;
 
 use BeltoftLicenses\Licenses;
+use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -24,15 +26,22 @@ final class IpWho {
 	/**
 	 * Holdings of an address.
 	 *
-	 * @param string $ip Address (IPv4).
+	 * @param string $ip Address (IPv4 or IPv6). An IPv6 address in a server's reserved /80 is looked up as that server's address.
 	 * @param ?int   $at Unix time: only the holding that covered it. Null lists every holding.
 	 * @return array<int, array<string, string>> Oldest first; empty when nobody held it.
 	 */
 	public static function lookup( string $ip, ?int $at = null ): array {
 		$holdings = array();
 		$open     = array();
+		$derived  = Ipv6::is_address( $ip ) ? Ipv6::vmid_for( $ip ) : null;
+		$key      = Ipv6::is_address( $ip ) ? (string) Ipv6::normalise( $ip ) : $ip;
 
-		foreach ( IpHistory::for_address( $ip ) as $row ) {
+		if ( null !== $derived ) {
+			// The log keys a server's IPv6 holding by the address the cluster derives from its VMID.
+			$key = (string) Ipv6::address( (array) Clusters::get( $derived['cluster'] ), $derived['vmid'] );
+		}
+
+		foreach ( IpHistory::for_address( $key ) as $row ) {
 			$holdings[] = array(
 				'kind'        => $row['kind'],
 				'resource_id' => $row['resource_id'],
@@ -47,14 +56,22 @@ final class IpWho {
 		}
 
 		// The current holder from the allocation tables; the log may not know it (held before the log began).
-		$pool    = IpPool::find( $ip );
+		$pool    = Ipv6::is_address( $ip ) ? null : IpPool::find( $ip );
 		$current = array();
 
 		if ( $pool && ! empty( $pool['resource_id'] ) ) {
 			$current[] = array( 'public', (int) $pool['resource_id'] );
 		}
 
-		$private = PrivateNets::resource_for_address( $ip );
+		if ( null !== $derived ) {
+			$holder = VmRecords::for_cluster( $derived['cluster'] )[ $derived['vmid'] ] ?? null;
+
+			if ( null !== $holder ) {
+				$current[] = array( Ipv6::KIND, (int) $holder );
+			}
+		}
+
+		$private = Ipv6::is_address( $ip ) ? null : PrivateNets::resource_for_address( $ip );
 
 		if ( null !== $private ) {
 			$current[] = array( 'private', $private );

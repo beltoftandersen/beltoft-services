@@ -7,6 +7,9 @@
 
 namespace BeltoftServices\Proxmox\Vm;
 
+use BeltoftServices\Proxmox\Db\DbActions;
+use BeltoftServices\Proxmox\Db\DbIp;
+use BeltoftServices\Proxmox\Network\Ipv6;
 use BeltoftServices\Proxmox\Pve\JobScope;
 use BeltoftServices\Resource;
 
@@ -150,5 +153,105 @@ final class ServerSyncJobs {
 				return $r->set( array( 'net_rate_mbit' => $mbit, 'net_rate_at' => time() ) );
 			}
 		);
+	}
+
+	/** Servers looked at per sweep run for IPv6: a hundred servers do not make a hundred writes in one request. */
+	public const IPV6_PER_RUN = 20;
+
+	/**
+	 * From the sweep: gives every server and every database with a public address the IPv6 address of its cluster (see
+	 * ipv6()). Only clusters that have IPv6 on. One cluster listing per cluster; at most IPV6_PER_RUN servers are read
+	 * per run (the rest wait for the next sweep).
+	 */
+	public static function ipv6s(): void {
+		$budget = self::IPV6_PER_RUN;
+
+		foreach ( JobScope::clusters() as $id => $one ) {
+			if ( null === Ipv6::prefix_bytes( $one['cluster'] ) ) {
+				continue;
+			}
+
+			$rows = JobScope::vm_rows( $one['client'] );
+
+			if ( null === $rows ) {
+				continue;
+			}
+
+			$ours = VmRecords::for_cluster( $id );
+
+			foreach ( $rows as $vm ) {
+				$vmid = (int) ( $vm['vmid'] ?? 0 );
+
+				if ( $budget < 1 ) {
+					return;
+				}
+
+				if ( ! empty( $vm['template'] ) || ! isset( $ours[ $vmid ] ) || '' !== (string) ( $vm['lock'] ?? '' ) ) {
+					continue;
+				}
+
+				$resource = Resource::find( (int) $ours[ $vmid ] );
+
+				if ( $resource && self::ipv6( $resource, $vm, $one['cluster'] ) ) {
+					--$budget;
+				}
+			}
+		}
+	}
+
+	/**
+	 * Writes the IPv6 address into one server's ipconfig0 as a pending change and NEVER restarts it: the address is live
+	 * after the customer's next stop and start. `ipv6_at` marks a server that was looked at (again after a day, or at
+	 * once when its address is not the one the cluster derives now); on a running server written to, `ipv6_pending_at`
+	 * lets the server page say so until its next boot (PowerJobs). Left alone: a server that is not ready, adopted
+	 * (linked), on hold, locked by a running operation, or a database in the middle of an address change.
+	 *
+	 * @param Resource             $r       Server resource.
+	 * @param array<string, mixed> $vm      Cluster row.
+	 * @param array<string, mixed> $cluster Cluster settings.
+	 * @return bool Whether the server was read (counts against the budget).
+	 */
+	private static function ipv6( Resource $r, array $vm, array $cluster ): bool {
+		if ( 'ready' !== $r->get( 'state' ) || true === $r->get( 'linked' ) || $r->on_hold() || '' === (string) ( $vm['node'] ?? '' ) ) {
+			return false;
+		}
+
+		$record  = VmRecords::for_resource( $r->id() );
+		$address = null === $record ? null : Ipv6::address( $cluster, (int) $record['vmid'] );
+
+		if ( null === $address ) {
+			return false;
+		}
+
+		if ( $r->get( 'ip6' ) === $address && (int) $r->get( 'ipv6_at' ) > time() - DAY_IN_SECONDS ) {
+			return false;
+		}
+
+		if ( DbActions::is_db( $r ) && ( ! DbIp::idle( $r ) || '' === (string) $r->get( 'ip' ) ) ) {
+			return false;
+		}
+
+		$running = 'running' === (string) ( $vm['status'] ?? '' );
+		$read    = false;
+
+		$r->locked(
+			static function () use ( $r, $running, &$read ): bool {
+				// Fresh under the lock: an operation may have started since the cluster row was read.
+				if ( 'ready' !== $r->get( 'state' ) || 'ready' !== $r->get( 'desired' ) || true === $r->get( 'linked' ) ) {
+					return false;
+				}
+
+				$read   = true;
+				$result = ( new Operations( $r ) )->reconcile_ipv6();
+
+				if ( 'failed' === $result ) {
+					return false;
+				}
+
+				return $r->set( array( 'ipv6_at' => time(), 'ipv6_pending_at' => 'written' === $result && $running ? time() : $r->get( 'ipv6_pending_at' ) ) );
+			}
+		);
+
+		return $read;
 	}
 }

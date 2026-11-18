@@ -129,6 +129,7 @@ final class ProxmoxJobs {
 		add_action( Jobs::SWEEP, array( ServerSyncJobs::class, 'net_rates' ), 22 );
 		add_action( Jobs::SWEEP, array( PrivateNets::class, 'check_pool' ), 24 );
 		add_action( Jobs::SWEEP, array( ServerSyncJobs::class, 'displays' ), 23 );
+		add_action( Jobs::SWEEP, array( ServerSyncJobs::class, 'ipv6s' ), 25 );
 	}
 
 	/**
