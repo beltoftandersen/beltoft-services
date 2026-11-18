@@ -258,6 +258,9 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 == Changelog ==
 
+= 0.45.0 =
+* Counted services (OdooWoo per order): the plugin pulls the orders a service processed, keeps them as events, gives a 7 day free intro, prices them in steps per calendar month, bills them in the usage ledger and shows the customer a Billed orders list. Off until the setting "Bill counted services" is ticked; with it off events are pulled and judged but nothing is billed.
+
 = 0.43.6 =
 * Account and order forms: one type scale (14, 16, 20) and one set of colour tokens; card padding, phone meta line and overview width fixed; no "Expires 00 /" for wallet methods; API reference on the scale; hosting label translatable.
 
