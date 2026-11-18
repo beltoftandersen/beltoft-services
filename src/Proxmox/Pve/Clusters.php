@@ -10,6 +10,7 @@ namespace BeltoftServices\Proxmox\Pve;
 use BeltoftServices\Crypto;
 use BeltoftServices\Http\Connections;
 use BeltoftServices\Proxmox\Network\Firewall;
+use BeltoftServices\Proxmox\Network\Ipv6;
 use BeltoftServices\Proxmox\Network\PrivateNets;
 use BeltoftServices\Proxmox\Vm\Stock;
 
@@ -72,6 +73,9 @@ final class Clusters {
 			'fw_max_rules'      => 30,
 			'fw_ipfilter'       => 0,
 			'fw_pilot'          => array(),
+			// IPv6 (empty prefix = off): the /64 of the cluster and the address the guests use as gateway (empty: the first address of the /64).
+			'ipv6_prefix'       => '',
+			'ipv6_gateway'      => '',
 		);
 	}
 
@@ -638,6 +642,15 @@ final class Clusters {
 			$clean['fw_max_rules'] = max( 1, min( Firewall::MAX_CEILING, (int) $input['fw_max_rules'] ) );
 		}
 
+		$ipv6 = self::clean_ipv6( $input, $clean, $all, $id );
+
+		if ( is_wp_error( $ipv6 ) ) {
+			return $ipv6;
+		}
+
+		$clean['ipv6_prefix']  = $ipv6['ipv6_prefix'];
+		$clean['ipv6_gateway'] = $ipv6['ipv6_gateway'];
+
 		$secret = self::clean_secret( $input, (string) ( $existing['token_secret'] ?? '' ) );
 
 		if ( is_wp_error( $secret ) ) {
@@ -666,6 +679,61 @@ final class Clusters {
 		Stock::sync(); // A plan that named this cluster before it was saved opens now.
 
 		return true;
+	}
+
+	/**
+	 * The IPv6 fields. Empty prefix: IPv6 is off. A prefix is a /64 no other cluster uses, the gateway an address of the
+	 * host's own block (the first /80 of the /64, which no VMID owns), and IPv6 needs the dashboard firewall with the
+	 * anti-spoofing filter: the whole /64 is on one bridge, so without the per-server filter a guest could answer for
+	 * another server's address.
+	 *
+	 * @param array<string, mixed>                $input Raw values.
+	 * @param array<string, mixed>                $clean The cluster as it will be saved so far.
+	 * @param array<string, array<string, mixed>> $all   The stored clusters.
+	 * @param string                              $id    This cluster.
+	 * @return array{ipv6_prefix: string, ipv6_gateway: string}|\WP_Error
+	 */
+	private static function clean_ipv6( array $input, array $clean, array $all, string $id ) {
+		$prefix  = array_key_exists( 'ipv6_prefix', $input ) ? trim( (string) $input['ipv6_prefix'] ) : (string) $clean['ipv6_prefix'];
+		$gateway = array_key_exists( 'ipv6_gateway', $input ) ? trim( (string) $input['ipv6_gateway'] ) : (string) $clean['ipv6_gateway'];
+
+		if ( '' === $prefix ) {
+			return array( 'ipv6_prefix' => '', 'ipv6_gateway' => '' );
+		}
+
+		$bytes = Ipv6::parse_prefix( $prefix );
+
+		if ( null === $bytes ) {
+			return self::error( 'ipv6_prefix', __( 'The IPv6 prefix is a /64 written like 2001:db8:1:2::/64, or empty to leave IPv6 off.', 'beltoft-services' ) );
+		}
+
+		$prefix = Ipv6::text( $bytes . "\0\0\0\0\0\0\0\0" ) . '/64';
+
+		foreach ( $all as $other_id => $other ) {
+			if ( (string) $other_id !== $id && Ipv6::prefix_bytes( $other ) === $bytes ) {
+				return self::error( 'ipv6_prefix', __( 'Another cluster already uses this IPv6 prefix.', 'beltoft-services' ) );
+			}
+		}
+
+		if ( '' !== $gateway ) {
+			$packed = Ipv6::pack( $gateway );
+
+			if ( null === $packed || substr( $packed, 0, 8 ) !== $bytes || "\0\0" !== substr( $packed, 8, 2 ) || "\0\0\0\0\0\0\0\0" === substr( $packed, 8 ) ) {
+				return self::error( 'ipv6_gateway', __( 'The IPv6 gateway is an address inside the prefix, in its first block (such as 2001:db8:1:2::1), or empty to use the first address.', 'beltoft-services' ) );
+			}
+
+			$gateway = Ipv6::text( $packed );
+		}
+
+		if ( (int) $clean['vmid_max'] > 65535 ) {
+			return self::error( 'vmid', __( 'With IPv6 on, the last customer VMID is at most 65535: the VMID is part of the address.', 'beltoft-services' ) );
+		}
+
+		if ( empty( $clean['fw_ipfilter'] ) || ( empty( $clean['fw_enabled'] ) && empty( $clean['fw_pilot'] ) ) ) {
+			return self::error( 'ipv6_prefix', __( 'Switch on the dashboard firewall and the anti-spoofing IP filter first: with IPv6 every server shares one network and the filter keeps each to its own address.', 'beltoft-services' ) );
+		}
+
+		return array( 'ipv6_prefix' => $prefix, 'ipv6_gateway' => $gateway );
 	}
 
 	/**
