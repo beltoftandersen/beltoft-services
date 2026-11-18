@@ -291,10 +291,10 @@
 				rules.forEach( function ( rule, index ) {
 					var row = el( 'p' );
 					var fields = {
-						name: el( 'input', { type: 'text', size: '14', 'aria-label': T.fwName, value: rule.name || '' } ),
+						name: el( 'input', { type: 'text', size: '14', 'aria-label': T.fwName, placeholder: T.fwName, value: rule.name || '' } ),
 						ip_version: select( [ [ '', T.any ], [ 'ipv4', 'IPv4' ], [ 'ipv6', 'IPv6' ] ], rule.ip_version || '', T.fwVersion ),
-						src_ip: el( 'input', { type: 'text', size: '16', 'aria-label': T.fwSource, value: rule.src_ip || '' } ),
-						dst_port: el( 'input', { type: 'text', size: '8', 'aria-label': T.fwPort, value: rule.dst_port || '' } ),
+						src_ip: el( 'input', { type: 'text', size: '16', 'aria-label': T.fwSource, placeholder: T.fwSource, value: rule.src_ip || '' } ),
+						dst_port: el( 'input', { type: 'text', size: '8', 'aria-label': T.fwPort, placeholder: T.fwPort, value: rule.dst_port || '' } ),
 						protocol: select( [ [ '', T.any ], [ 'tcp', 'tcp' ], [ 'udp', 'udp' ], [ 'icmp', 'icmp' ], [ 'gre', 'gre' ], [ 'ipip', 'ipip' ], [ 'ah', 'ah' ], [ 'esp', 'esp' ] ], rule.protocol || '', T.fwProto ),
 						action: select( [ [ 'accept', T.accept ], [ 'discard', T.discard ] ], rule.action || 'accept', T.fwAction )
 					};

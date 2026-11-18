@@ -29,7 +29,7 @@ final class SshRescueShell implements RescueShell {
 
 		$errno  = 0;
 		$errstr = '';
-		$socket = @fsockopen( $ip, 22, $errno, $errstr, 5 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- a closed port is a plain no.
+		$socket = @fsockopen( $ip, 22, $errno, $errstr, 5 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged,WordPress.WP.AlternativeFunctions.file_system_operations_fsockopen -- a TCP connect to the ssh port, not file I/O; a closed port is a plain no.
 
 		if ( ! is_resource( $socket ) ) {
 			return false;
@@ -181,7 +181,7 @@ final class SshRescueShell implements RescueShell {
 			'BS_SSH_PW'            => $password,
 		);
 		$pipes = array();
-		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_proc_open -- the one place that runs ssh, with an argument list (no shell) and a fixed environment.
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_proc_open,Generic.PHP.ForbiddenFunctions.Found -- the one place that runs ssh, with an argument list (no shell) and a fixed environment.
 		$proc = proc_open( $args, array( 0 => array( 'pipe', 'r' ), 1 => array( 'pipe', 'w' ), 2 => array( 'pipe', 'w' ) ), $pipes, null, $env );
 
 		if ( ! is_resource( $proc ) ) {

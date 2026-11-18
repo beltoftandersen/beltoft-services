@@ -99,6 +99,7 @@ final class ControlsPanel {
 	/** The script of the controls and the tiles. */
 	private static function assets(): void {
 		Tiles::enqueue();
+		wp_enqueue_style( 'beltoft-services-dedicated', plugins_url( 'assets/dedicated.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/dedicated.css' ) );
 		wp_enqueue_script( 'beltoft-services-dedicated', plugins_url( 'assets/dedicated.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Account\Panel::HANDLE, \BeltoftServices\Status::HANDLE, \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/dedicated.js' ), true );
 		wp_localize_script(
 			'beltoft-services-dedicated',
