@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.44.0
+Stable tag: 0.44.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,10 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.44.1 =
+* Server order and reinstall forms: one tile per system family (Ubuntu, Debian, AlmaLinux) with a Version select; the posted value is unchanged.
+* Trusted pay as you go customers: a shop manager lifts the new-account service limit and early billing on the user profile; the limit message says to contact us.
 
 = 0.44.0 =
 * Counted services (OdooWoo per order): the plugin pulls the orders a service processed, keeps them as events, gives a 7 day free intro, prices them in steps per calendar month, bills them in the usage ledger and shows the customer a Billed orders list. Off until the setting "Bill counted services" is ticked; with it off events are pulled and judged but nothing is billed.
