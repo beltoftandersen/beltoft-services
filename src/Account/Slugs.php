@@ -230,6 +230,7 @@ final class Slugs {
 			'ssl'       => 'certificate',
 			'licences'  => 'licence',
 			'storage'   => 'storage',
+			'dedicated' => 'dedicated',
 		);
 
 		return $words[ $type ] ?? 'service';

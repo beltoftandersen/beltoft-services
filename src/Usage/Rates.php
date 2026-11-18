@@ -17,6 +17,7 @@ use BeltoftServices\Proxmox\Disk\DiskDriver;
 use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
+use BeltoftServices\ManualServer\ManualServerDriver;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -487,6 +488,9 @@ final class Rates {
 			if ( $extra > 0 && Backups::enabled( $r ) ) {
 				$out[] = array( 'item' => 'backups', 'quantity' => 1.0, 'unit' => 'hour', 'rate' => self::hourly( $extra, $premium ) );
 			}
+		} elseif ( ManualServerDriver::ID === $driver ) {
+			// A dedicated server: one item, the variation's price / 730 an hour. With the product premium 0 the monthly cap is the monthly price.
+			$out[] = array( 'item' => 'server', 'quantity' => 1.0, 'unit' => 'hour', 'rate' => self::hourly( $monthly, $premium ) );
 		} elseif ( DiskDriver::ID === $driver ) {
 			list( $gb, $basis ) = self::disk_basis( $r, $v, $monthly );
 

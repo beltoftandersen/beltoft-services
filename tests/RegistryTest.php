@@ -17,16 +17,16 @@ use BeltoftServices\Http\HttpDriver;
 class RegistryTest extends TestCase {
 
 	public function test_registry_uses_the_filter(): void {
-		$this->assertSame( array( 'http', 'proxmox', 'proxmox-db', 'proxmox-disk', 'proxmox-snapshots', 'proxmox-app', 'domain', 'dns', 'mail', 'ssl', 'licence-key', 'hosting', 'storage' ), array_keys( Registry::all() ) );
+		$this->assertSame( array( 'http', 'proxmox', 'proxmox-db', 'proxmox-disk', 'proxmox-snapshots', 'proxmox-app', 'domain', 'dns', 'mail', 'ssl', 'licence-key', 'hosting', 'storage', 'manual-server' ), array_keys( Registry::all() ) );
 		$this->assertInstanceOf( HttpDriver::class, Registry::get( 'http' ) );
 		$this->assertSame( 'vm', Registry::get( 'proxmox' )->kind() );
 		$this->assertSame( 'disk', Registry::get( 'proxmox-disk' )->kind() );
 
 		$fake = $this->fake_driver();
 
-		$this->assertSame( array( 'http', 'proxmox', 'proxmox-db', 'proxmox-disk', 'proxmox-snapshots', 'proxmox-app', 'domain', 'dns', 'mail', 'ssl', 'licence-key', 'hosting', 'storage', 'fake' ), array_keys( Registry::all() ) );
+		$this->assertSame( array( 'http', 'proxmox', 'proxmox-db', 'proxmox-disk', 'proxmox-snapshots', 'proxmox-app', 'domain', 'dns', 'mail', 'ssl', 'licence-key', 'hosting', 'storage', 'manual-server', 'fake' ), array_keys( Registry::all() ) );
 		$this->assertSame( $fake, Registry::get( 'fake' ) );
-		$this->assertSame( array( 'http', 'vm', 'db', 'disk', 'snapshot', 'applic', 'domain', 'dns', 'mail', 'ssl', 'lickey', 'hosting', 'storage', 'fake' ), Registry::kinds() );
+		$this->assertSame( array( 'http', 'vm', 'db', 'disk', 'snapshot', 'applic', 'domain', 'dns', 'mail', 'ssl', 'lickey', 'hosting', 'storage', 'dedicated', 'fake' ), Registry::kinds() );
 	}
 
 	/**
@@ -48,6 +48,7 @@ class RegistryTest extends TestCase {
 			'licence-key'       => \BeltoftServices\Licences\KeyDriver::class,
 			'hosting'           => \BeltoftServices\Hosting\HostingDriver::class,
 			'storage'           => \BeltoftServices\Storage\StorageDriver::class,
+			'manual-server'     => \BeltoftServices\ManualServer\ManualServerDriver::class,
 		);
 
 		$actual = array();

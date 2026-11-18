@@ -133,6 +133,7 @@ final class Plugin {
 		add_filter( 'woocommerce_account_menu_items', array( Account\Ssl::class, 'menu' ), 101 );
 		add_filter( 'woocommerce_account_menu_items', array( Account\Licences::class, 'menu' ), 102 );
 		add_filter( 'woocommerce_account_menu_items', array( Account\Storage::class, 'menu' ), 103 );
+		add_filter( 'woocommerce_account_menu_items', array( Account\Dedicated::class, 'menu' ), 104 );
 		Domains\Search::register();
 		Bricks\Integration::register();
 		Domains\Cart::register();
@@ -281,6 +282,7 @@ final class Plugin {
 		Card\DeleteGuard::register();
 		GiftCredit\GiftCredit::register();
 		Storage\StorageSettings::register();
+		ManualServer\ManualServerSettings::register();
 
 		// Later tasks register their parts here.
 		self::$booted = true;

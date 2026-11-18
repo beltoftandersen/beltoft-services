@@ -52,6 +52,7 @@ final class CustomerDelete {
 		'vm' => 'server',
 		'db' => 'database',
 		'disk' => 'disk',
+		'dedicated' => 'dedicated',
 	);
 
 	/**
@@ -137,7 +138,12 @@ final class CustomerDelete {
 			return __( 'This service is already being deleted.', 'beltoft-services' );
 		}
 
-		if ( 'ready' !== $r->get( 'state' ) || null !== $r->pending_desire() || ! empty( Progress::build( $r )['active'] ) ) {
+		// A dedicated server is cancelled once it is delivered; a lapsed (paused) one may be cancelled too, to stop the billing.
+		if ( 'dedicated' === $kind && ! in_array( (string) $r->get( 'state' ), array( 'ready', 'paused' ), true ) ) {
+			return __( 'Your server is still being set up. Please contact support if you want to cancel it before it is delivered.', 'beltoft-services' );
+		}
+
+		if ( 'dedicated' === $kind ? null !== $r->pending_desire() : ( 'ready' !== $r->get( 'state' ) || null !== $r->pending_desire() || ! empty( Progress::build( $r )['active'] ) ) ) {
 			if ( 'disk' === $kind ) {
 				return __( 'Something is still running on this disk, such as a setup or a resize. Please try again when it has finished.', 'beltoft-services' );
 			}
@@ -166,6 +172,10 @@ final class CustomerDelete {
 	public static function text( string $kind ): string {
 		if ( 'disk' === $kind ) {
 			return __( 'Removing deletes the extra disk and all its data, including the snapshots that include it. It cannot be undone. Billing stops in the hour it is removed. The server and the usage account are not touched.', 'beltoft-services' );
+		}
+
+		if ( 'dedicated' === $kind ) {
+			return __( 'Cancelling ends the server at once. All its data is deleted at once and cannot be brought back. It cannot be undone. Billing stops in the hour you cancel.', 'beltoft-services' );
 		}
 
 		return 'database' === $kind
@@ -210,6 +220,10 @@ final class CustomerDelete {
 	public static function billing_note( string $kind ): string {
 		if ( 'disk' === $kind ) {
 			return __( 'The disk is billed by the hour while it exists. Remove it to stop the charge.', 'beltoft-services' );
+		}
+
+		if ( 'dedicated' === $kind ) {
+			return __( 'The server is billed by the hour from the hour it is ready, and never more than the monthly price in a calendar month. Cancel it to stop the charge.', 'beltoft-services' );
 		}
 
 		return 'database' === $kind
