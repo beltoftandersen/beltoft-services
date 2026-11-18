@@ -23,7 +23,7 @@ final class Schema {
 
 	use VersionedSchema;
 
-	public const DB_VERSION        = '8';
+	public const DB_VERSION        = '9';
 	public const OPTION_DB_VERSION = 'beltoft_services_db_version';
 	public const RETRY_TRANSIENT   = 'beltoft_services_proxmox_schema_retry';
 
@@ -56,6 +56,13 @@ final class Schema {
 		'guest_memory' => array(
 			'PRIMARY' => array( 'resource_id', 'span', 'bucket' ),
 		),
+		'usage_events' => array(
+			'resource_seq'   => array( 'resource_id', 'remote_seq' ),
+			'resource_order' => array( 'resource_id', 'store_key', 'woo_order_id' ),
+		),
+		'intro_claims' => array(
+			'kind_key' => array( 'kind', 'key_hash' ),
+		),
 	);
 
 	/**
@@ -63,6 +70,7 @@ final class Schema {
 	 * Version 6: the currency of a ledger row. An empty value reads as the shop's currency (Currency::of_row()).
 	 * Version 7: the name of a customer private network (empty reads as "Network N").
 	 * Version 8: the guest memory table (bs_guest_memory, Monitoring\GuestMemory).
+	 * Version 9: the counted usage events and the intro claims (Usage\Events\Store, Usage\Events\Intro).
 	 */
 	private const REQUIRED_COLUMNS = array(
 		'usage'        => array( 'currency' ),
@@ -89,6 +97,8 @@ final class Schema {
 			'usage' => $wpdb->prefix . 'bs_usage',
 			'ip_log' => $wpdb->prefix . 'beltoft_services_ip_log',
 			'guest_memory' => $wpdb->prefix . 'bs_guest_memory',
+			'usage_events' => $wpdb->prefix . 'bs_usage_events',
+			'intro_claims' => $wpdb->prefix . 'bs_intro_claims',
 		);
 	}
 
@@ -379,6 +389,50 @@ final class Schema {
 				total_mb int(10) unsigned NOT NULL,
 				used_max_mb int(10) unsigned NOT NULL,
 				PRIMARY KEY  (resource_id,span,bucket)
+			) $collate;"
+		);
+
+		// Version 9: one row per counted event pulled from a service (an order the service processed). The two unique keys make
+		// the pull idempotent: one row per remote sequence and one per store and order. `received_at` is the billing time.
+		dbDelta(
+			"CREATE TABLE {$t['usage_events']} (
+				id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+				resource_id bigint(20) unsigned NOT NULL,
+				user_id bigint(20) unsigned NOT NULL DEFAULT 0,
+				remote_seq bigint(20) unsigned NOT NULL,
+				store_key varchar(255) NOT NULL DEFAULT '',
+				odoo_key varchar(255) NOT NULL DEFAULT '',
+				woo_order_id varchar(64) NOT NULL DEFAULT '',
+				order_number varchar(64) NOT NULL DEFAULT '',
+				order_date datetime NULL DEFAULT NULL,
+				status varchar(32) NOT NULL DEFAULT '',
+				total varchar(32) NOT NULL DEFAULT '',
+				currency varchar(8) NOT NULL DEFAULT '',
+				odoo_order_name varchar(255) NOT NULL DEFAULT '',
+				source varchar(16) NOT NULL DEFAULT '',
+				received_at datetime NOT NULL,
+				hour_bucket datetime NOT NULL,
+				state varchar(12) NOT NULL DEFAULT 'new',
+				free_reason varchar(16) NOT NULL DEFAULT '',
+				billed_hour datetime NULL DEFAULT NULL,
+				PRIMARY KEY  (id),
+				UNIQUE KEY resource_seq (resource_id,remote_seq),
+				UNIQUE KEY resource_order (resource_id,store_key,woo_order_id),
+				KEY resource_state (resource_id,state,hour_bucket),
+				KEY user_received (user_id,received_at)
+			) $collate;"
+		);
+
+		// Version 9: who has had a free intro, by hash of the customer, email, store and database. Kept after a service is deleted.
+		dbDelta(
+			"CREATE TABLE {$t['intro_claims']} (
+				id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+				kind varchar(10) NOT NULL,
+				key_hash char(64) NOT NULL,
+				resource_id bigint(20) unsigned NOT NULL DEFAULT 0,
+				claimed_at datetime NOT NULL,
+				PRIMARY KEY  (id),
+				UNIQUE KEY kind_key (kind,key_hash)
 			) $collate;"
 		);
 

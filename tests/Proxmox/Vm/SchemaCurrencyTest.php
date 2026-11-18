@@ -97,7 +97,7 @@ final class SchemaCurrencyTest extends TestCase {
 	public function test_a_fresh_install_has_the_columns(): void {
 		$t = Schema::tables();
 
-		$this->assertSame( '8', Schema::DB_VERSION );
+		$this->assertSame( '9', Schema::DB_VERSION );
 		$this->assertContains( 'currency', $this->columns( $t['usage'] ) );
 		$this->assertSame( array(), Schema::missing_columns() );
 	}

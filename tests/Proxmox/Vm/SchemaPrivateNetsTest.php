@@ -74,7 +74,7 @@ final class SchemaPrivateNetsTest extends TestCase {
 	}
 
 	public function test_a_fresh_install_has_the_name_column_and_a_plain_user_key(): void {
-		$this->assertSame( '8', Schema::DB_VERSION );
+		$this->assertSame( '9', Schema::DB_VERSION );
 		$this->assertSame( array(), Schema::missing_columns() );
 		$this->assertFalse( Schema::private_user_key_unique() );
 		$this->assertFalse( $this->indexes()['user_id'] );

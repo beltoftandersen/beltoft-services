@@ -126,6 +126,10 @@ final class Meter {
 			}
 		}
 
+		// Counted services: pull their events, then bill the ones that are old enough (no extra schedule).
+		\BeltoftServices\Http\OrderPull::run( $now );
+		$written += Counted\Meter::run( $now );
+
 		return $written;
 	}
 
@@ -149,6 +153,11 @@ final class Meter {
 		$license = $resource->license();
 		$user_id = (int) ( $license['user_id'] ?? 0 );
 		$ready   = $resource->get( self::READY_AT );
+
+		// A service billed per counted unit has no hours: Counted\Meter writes its events.
+		if ( Rates::is_counted( (int) ( $license['variation_id'] ?? 0 ) ) ) {
+			return 0;
+		}
 
 		// Billing starts in the hour the resource first was ready, which is recorded when it gets there. One that never got
 		// ready bills nothing: a failed build, or a placeholder that was paused or closed (marked deleted) before it was built.
@@ -259,7 +268,7 @@ final class Meter {
 	 * @param array<string, mixed> $license License row.
 	 * @param int                  $user_id Customer.
 	 */
-	private static function currency_of( array $license, int $user_id ): string {
+	public static function currency_of( array $license, int $user_id ): string {
 		$sub_id = (int) ( $license['subscription_id'] ?? 0 );
 		$key    = $sub_id > 0 ? $sub_id : -$user_id;
 

@@ -170,6 +170,8 @@ final class ConnectionsScreen {
 			'delete'      => __( 'Delete', 'beltoft-services' ),
 			'status'      => __( 'Status', 'beltoft-services' ),
 			'usage'       => __( 'Usage', 'beltoft-services' ),
+			'events'         => __( 'Counted events', 'beltoft-services' ),
+			'events_summary' => __( 'Counted events summary', 'beltoft-services' ),
 		);
 
 		return $labels[ $name ] ?? $name;
