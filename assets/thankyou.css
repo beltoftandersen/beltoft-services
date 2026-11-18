@@ -15,7 +15,7 @@
 .beltoft-services-progress__steps li { position: relative; margin: 0; padding-left: 1.75em; line-height: 1.4; opacity: 0.65; }
 .beltoft-services-progress__steps li::before { content: ""; position: absolute; left: 0; top: 0.3em; width: 0.8em; height: 0.8em; background: currentcolor; opacity: 0.35; }
 .beltoft-services-progress__steps li.is-done { opacity: 1; }
-.beltoft-services-progress__steps li.is-done::before { background: var(--green, currentcolor); opacity: 1; }
+.beltoft-services-progress__steps li.is-done::before { background: var(--bs-status-ok, currentcolor); opacity: 1; }
 .beltoft-services-progress__steps li.is-current { opacity: 1; font-weight: 600; }
 .beltoft-services-progress__steps li.is-current::before { opacity: 1; animation: beltoft-services-pulse 1.2s ease-in-out infinite; }
 .beltoft-services-progress__steps li.is-failed { opacity: 1; font-weight: 600; text-decoration: underline; }
@@ -31,7 +31,7 @@
 .beltoft-services-progress.is-queued .beltoft-services-progress__text::before, .beltoft-services-progress.is-running .beltoft-services-progress__text::before { content: ""; display: inline-block; width: 1.5em; height: 0.44em; margin-right: 0.6em; vertical-align: 0.02em; background: linear-gradient(currentColor, currentColor) 0 50% / 0.44em 0.44em no-repeat, linear-gradient(currentColor, currentColor) 50% 50% / 0.18em 0.18em no-repeat, linear-gradient(currentColor, currentColor) 100% 50% / 0.18em 0.18em no-repeat; animation: beltoft-services-dots 1.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .beltoft-services-progress__steps li.is-current::before { animation: none; } .beltoft-services-progress.is-queued .beltoft-services-progress__text::before, .beltoft-services-progress.is-running .beltoft-services-progress__text::before { animation: none; background-size: 0.3em 0.3em, 0.3em 0.3em, 0.3em 0.3em; } }
 .beltoft-next .beltoft-next__dashboard { margin: 1.5em 0 0; }
-.beltoft-next .beltoft-next__dashboard a, .beltoft-next .beltoft-next__dashboard a:visited { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: var(--bs-btn-h, 40px); padding: 0 var(--bs-space-4, 16px); border-radius: var(--bs-radius, 8px); background: var(--navy, #0c1535); color: var(--bg-card, #fff) !important; border: 1px solid var(--navy, #0c1535); font-weight: 500; line-height: 1.2; text-decoration: none !important; transition: background-color .12s ease, border-color .12s ease; }
-.beltoft-next .beltoft-next__dashboard a:hover, .beltoft-next .beltoft-next__dashboard a:focus-visible { background: var(--green, #28513e); border-color: var(--green, #28513e); color: var(--bg-card, #fff) !important; }
+.beltoft-next .beltoft-next__dashboard a, .beltoft-next .beltoft-next__dashboard a:visited { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: var(--bs-btn-h, 40px); padding: 0 var(--bs-space-4, 16px); border-radius: var(--bs-radius, 8px); background: var(--bs-dark, #10241b); color: var(--bs-on-dark, #fff) !important; border: 1px solid var(--bs-dark, #10241b); font-weight: 500; line-height: 1.2; text-decoration: none !important; transition: background-color .12s ease, border-color .12s ease; }
+.beltoft-next .beltoft-next__dashboard a:hover, .beltoft-next .beltoft-next__dashboard a:focus-visible { background: var(--bs-status-ok, #28513e); border-color: var(--bs-status-ok, #28513e); color: var(--bs-on-dark, #fff) !important; }
 .beltoft-services-progress__note { margin: 1em 0 0; }
 .beltoft-services-progress__note[hidden], .beltoft-services-progress__note [hidden] { display: none; }

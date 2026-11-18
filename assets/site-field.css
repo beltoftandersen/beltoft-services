@@ -9,7 +9,7 @@
 .beltoft-services-site-field__choice { margin: 0 0 8px; }
 .beltoft-services-site-field__choice label { display: flex; align-items: center; gap: 8px; margin: 0; cursor: pointer; }
 .beltoft-services-site-field__choice input[type="radio"] { flex: 0 0 auto; margin: 0; }
-.beltoft-services-site-field__panel { margin: 0 0 16px 24px; padding: 0 0 0 16px; border-left: 2px solid var(--rule, #d6d2c8); }
+.beltoft-services-site-field__panel { margin: 0 0 16px 24px; padding: 0 0 0 16px; border-left: 2px solid var(--bs-line, #e2ded5); }
 .beltoft-services-site-field__panel[hidden], .beltoft-services-site-field [data-site-more-slug][hidden] { display: none; }
 .beltoft-services-site-field .description { display: block; margin: 4px 0 0; font-size: 14px; line-height: 1.45; }
 .beltoft-services-site-field__note { margin: 4px 0 0; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
@@ -17,7 +17,7 @@
 .beltoft-services-site-field__more { margin: 0 0 16px; }
 .beltoft-services-site-field__more > summary { cursor: pointer; font-weight: 700; padding: 4px 0; }
 .beltoft-services-site-field__more[open] > summary { margin: 0 0 12px; }
-.beltoft-services-site-field input:focus-visible, .beltoft-services-site-field select:focus-visible, .beltoft-services-site-field summary:focus-visible { outline: 2px solid var(--navy, #0c1535); outline-offset: 2px; }
+.beltoft-services-site-field input:focus-visible, .beltoft-services-site-field select:focus-visible, .beltoft-services-site-field summary:focus-visible { outline: 2px solid var(--bs-dark, #10241b); outline-offset: 2px; }
 @media (max-width: 600px) {
 	.beltoft-services-site-field { margin-top: 32px; }
 	.beltoft-services-site-field__panel { margin-left: 8px; padding-left: 12px; }
