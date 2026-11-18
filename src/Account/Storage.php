@@ -45,7 +45,7 @@ final class Storage extends ServiceArea {
 	public function buttons(): array {
 		$url = $this->url_add();
 
-		return '' === $url ? array() : array( array( 'label' => __( 'Order backup storage', 'beltoft-services' ), 'url' => $url ) );
+		return '' === $url ? array() : array( array( 'label' => __( 'Order online backup', 'beltoft-services' ), 'url' => $url ) );
 	}
 
 	protected function key(): string {
@@ -61,19 +61,19 @@ final class Storage extends ServiceArea {
 	}
 
 	public function label(): string {
-		return __( 'Backup storage', 'beltoft-services' );
+		return __( 'Online backup', 'beltoft-services' );
 	}
 
 	protected function empty_text(): string {
-		return __( 'You have no backup storage yet.', 'beltoft-services' );
+		return __( 'You have no online backup yet.', 'beltoft-services' );
 	}
 
 	public function all_label(): string {
-		return __( 'All backup storage', 'beltoft-services' );
+		return __( 'All online backups', 'beltoft-services' );
 	}
 
 	protected function not_found_text(): string {
-		return __( 'That backup storage was not found. Here is your backup storage.', 'beltoft-services' );
+		return __( 'That online backup was not found. Here is your online backup.', 'beltoft-services' );
 	}
 
 	/**
@@ -84,7 +84,7 @@ final class Storage extends ServiceArea {
 	public function label_of( Resource $resource ): string {
 		unset( $resource );
 
-		return __( 'Backup storage', 'beltoft-services' );
+		return __( 'Online backup', 'beltoft-services' );
 	}
 
 	/**

@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Tests\Storage;
 
+use BeltoftServices\Storage\HostAlias;
 use BeltoftServices\Crypto;
 use BeltoftServices\Domains\Clients;
 use BeltoftServices\Domains\FakeDns;
@@ -144,7 +145,7 @@ final class StorageDriverTest extends StorageTestCase {
 		$this->settings( array( 'storage_alias_enabled' => 1, 'storage_alias_writer' => 'own', 'storage_alias_zone' => 'example.test', 'storage_alias_pattern' => 'backup{n}.{zone}' ) );
 		$r = $this->ready_storage();
 		$alias = (string) $r->get( 'storage_alias' );
-		$this->assertSame( 'backup' . $r->id() . '.example.test', $alias );
+		$this->assertSame( 'backup' . HostAlias::number( $r ) . '.example.test', $alias );
 		$set = null;
 		foreach ( (array) $dns->zone( 'example.test' )['rrsets'] as $rr ) {
 			if ( 'CNAME' === $rr['type'] ) { $set = $rr; }

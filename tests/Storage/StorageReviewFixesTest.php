@@ -39,7 +39,7 @@ final class StorageReviewFixesTest extends StorageTestCase {
 
 	public function test_a_foreign_cname_at_the_alias_name_is_not_repointed(): void {
 		$r = $this->storage_resource();
-		FakeAliasDns::seed( 'backup' . $r->id() . '.example.test', 'CNAME', 'manual.example.net' );
+		FakeAliasDns::seed( 'backup' . HostAlias::number( $r ) . '.example.test', 'CNAME', 'manual.example.net' );
 		$this->assertSame( '', HostAlias::publish( $r, 'u1.host.test' ) );
 		$rows = array_values( FakeAliasDns::records() );
 		$this->assertCount( 1, $rows );
@@ -54,7 +54,7 @@ final class StorageReviewFixesTest extends StorageTestCase {
 		$this->assertSame( 'moved.host.test', array_values( FakeAliasDns::records() )[0]['content'] );
 		// The same record id with another resource's id on it is not ours.
 		$other = $this->storage_resource();
-		FakeAliasDns::seed( 'backup' . $other->id() . '.example.test', 'CNAME', 'old.host.test' );
+		FakeAliasDns::seed( 'backup' . HostAlias::number( $other ) . '.example.test', 'CNAME', 'old.host.test' );
 		$other->set( array( 'storage_alias_record' => 'r999' ) );
 		$this->assertSame( '', HostAlias::publish( Resource::find( $other->id() ), 'new.host.test' ) );
 	}

@@ -748,6 +748,13 @@ final class Jobs {
 			$claim = $store->stake_claim( 1, null, self::runner_hooks() );
 		}
 
+		// Nothing of ours is due: a hook added through beltoft_services_job_hooks may belong to another plugin's group (the site
+		// adds the SES mailer's send job, so emailed codes do not wait for cron). Claim those by hook name alone.
+		if ( array() === $claim->get_actions() && count( self::runner_hooks() ) > 2 ) {
+			$store->release_claim( $claim );
+			$claim = $store->stake_claim( 1, null, array_slice( self::runner_hooks(), 2 ) );
+		}
+
 		$ran = false;
 
 		// The same watch Action Scheduler's own runner keeps: a fatal error in the job fires action_scheduler_unexpected_shutdown

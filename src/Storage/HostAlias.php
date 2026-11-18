@@ -9,6 +9,7 @@ namespace BeltoftServices\Storage;
 
 use BeltoftServices\Alerts;
 use BeltoftServices\Domains\ZoneWriter;
+use BeltoftServices\Locks;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -29,7 +30,8 @@ final class HostAlias {
 	 * @return string|\WP_Error The alias, '' when there is none (off, or refused: staff are told), an error to retry.
 	 */
 	public static function publish( Resource $r, string $host ) {
-		$name = StorageSettings::alias_name( $r->id() );
+		$number = self::number( $r );
+		$name   = $number > 0 ? StorageSettings::alias_name( $number ) : '';
 		$zone = StorageSettings::alias_zone();
 		$host = strtolower( rtrim( $host, '.' ) );
 
@@ -55,6 +57,44 @@ final class HostAlias {
 		}
 
 		return $name;
+	}
+
+	/** Option: the next free alias number (backup1, backup2, ...). */
+	public const NEXT_OPTION = 'beltoft_services_storage_alias_next';
+
+	/**
+	 * The box's alias number: a running count (backup1, backup2, ...), given once per box and kept (owner 2026-11-18: not the
+	 * service id, which jumps). Given under a lock so two boxes built at the same time never share a number. 0 when the lock was
+	 * not had (the alias step tries again later).
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function number( Resource $r ): int {
+		$n = (int) $r->get( 'storage_alias_number' );
+
+		if ( $n > 0 ) {
+			return $n;
+		}
+
+		list( $got, $given ) = Locks::with(
+			Locks::name( 'storage-alias-number', 0 ),
+			10,
+			static function () use ( $r ): int {
+				$fresh = Resource::find( $r->id() );
+				$have  = $fresh ? (int) $fresh->get( 'storage_alias_number' ) : 0;
+
+				if ( $have > 0 ) {
+					return $have;
+				}
+
+				$next = max( 1, (int) get_option( self::NEXT_OPTION, 1 ) );
+				update_option( self::NEXT_OPTION, $next + 1, false );
+
+				return $r->set( array( 'storage_alias_number' => $next ) ) ? $next : 0;
+			}
+		);
+
+		return $got ? (int) $given : 0;
 	}
 
 	/**

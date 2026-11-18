@@ -40,7 +40,7 @@ final class StorageAliasTest extends StorageTestCase {
 
 	public function test_a_record_is_created_unproxied_and_a_rerun_makes_no_second(): void {
 		$r = $this->ready_storage();
-		$name = 'backup' . $r->id() . '.example.test';
+		$name = 'backup' . HostAlias::number( $r ) . '.example.test';
 		$this->assertSame( $name, (string) $r->get( 'storage_alias' ) );
 		$rows = FakeAliasDns::records();
 		$this->assertCount( 1, $rows );
@@ -63,7 +63,7 @@ final class StorageAliasTest extends StorageTestCase {
 
 	public function test_a_foreign_record_at_the_name_is_left_alone(): void {
 		$r = $this->storage_resource();
-		FakeAliasDns::seed( 'backup' . $r->id() . '.example.test', 'A', '192.0.2.1' );
+		FakeAliasDns::seed( 'backup' . HostAlias::number( $r ) . '.example.test', 'A', '192.0.2.1' );
 		$this->assertSame( '', HostAlias::publish( $r, 'u1.host.test' ) );
 		$rows = array_values( FakeAliasDns::records() );
 		$this->assertCount( 1, $rows, 'Nothing was added or changed.' );
@@ -78,8 +78,8 @@ final class StorageAliasTest extends StorageTestCase {
 		$this->settings( array( 'storage_deletes_enabled' => 1 ) );
 		$this->assertTrue( ( new StorageDriver() )->delete( $r )->is_done() );
 		$names = array_column( FakeAliasDns::records(), 'name' );
-		$this->assertNotContains( 'backup' . $r->id() . '.example.test', $names );
-		$this->assertContains( 'backup' . $other->id() . '.example.test', $names, 'The other box keeps its record.' );
+		$this->assertNotContains( 'backup' . HostAlias::number( $r ) . '.example.test', $names );
+		$this->assertContains( 'backup' . HostAlias::number( $other ) . '.example.test', $names, 'The other box keeps its record.' );
 		$this->assertContains( 'www.example.test', $names );
 	}
 
@@ -87,7 +87,7 @@ final class StorageAliasTest extends StorageTestCase {
 		$r = $this->ready_storage();
 		$rows = FakeAliasDns::records();
 		$id = array_key_first( $rows );
-		( new FakeAliasDns() )->update( (string) $id, 'backup' . $r->id() . '.example.test', 'someone-else.example.net' );
+		( new FakeAliasDns() )->update( (string) $id, 'backup' . HostAlias::number( $r ) . '.example.test', 'someone-else.example.net' );
 		HostAlias::remove( $r );
 		$this->assertCount( 1, FakeAliasDns::records() );
 	}
@@ -183,5 +183,16 @@ final class StorageAliasTest extends StorageTestCase {
 		ob_start();
 		Settings::render_field( array( 'key' => 'storage_cf_token' ) );
 		$this->assertStringNotContainsString( 'CF-TOKEN-VALUE', (string) ob_get_clean() );
+	}
+
+	public function test_boxes_get_running_numbers_that_stay(): void {
+		delete_option( HostAlias::NEXT_OPTION );
+		$a = $this->storage_resource();
+		$b = $this->storage_resource();
+
+		$this->assertSame( 1, HostAlias::number( $a ) );
+		$this->assertSame( 2, HostAlias::number( $b ) );
+		$this->assertSame( 1, HostAlias::number( $a ), 'A box keeps its number.' );
+		$this->assertSame( 1, (int) \BeltoftServices\Resource::find( $a->id() )->get( 'storage_alias_number' ) );
 	}
 }

@@ -512,6 +512,19 @@ final class PollTest extends TestCase {
 		$this->assertCount( 1, $this->queued( Jobs::HOOK ), 'The future job is still waiting.' );
 	}
 
+	public function test_run_due_runs_an_added_hook_of_another_plugins_group(): void {
+		$probe = array();
+		add_action( 'beltoft_services_runner_probe', static function () use ( &$probe ) { $probe[] = 'mail sent'; } );
+		add_filter( 'beltoft_services_job_hooks', $f = static fn( $h ) => array_merge( (array) $h, array( 'beltoft_services_runner_probe' ) ) );
+		as_enqueue_async_action( 'beltoft_services_runner_probe', array(), 'api-mailer-for-aws-ses' );
+
+		$ran = Jobs::run_due( 0 );
+		remove_filter( 'beltoft_services_job_hooks', $f );
+
+		$this->assertSame( 1, $ran );
+		$this->assertSame( array( 'mail sent' ), $probe, 'A hook the site adds is run at once, whatever its group (emailed codes do not wait for cron).' );
+	}
+
 	public function test_run_due_does_nothing_while_the_kill_switch_is_on(): void {
 		list( $resource, $driver ) = $this->resource();
 		Jobs::enqueue( $resource->id(), 0 );

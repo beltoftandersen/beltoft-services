@@ -45,7 +45,7 @@ final class StorageDriver implements Driver, InternalActions, NeedsBilling, Prov
 	}
 
 	public function label(): string {
-		return __( 'Backup storage', 'beltoft-services' );
+		return __( 'Online backup', 'beltoft-services' );
 	}
 
 	public function kind(): string {
