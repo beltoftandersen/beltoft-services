@@ -22,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
  * the service to `ready`, which starts the hourly meter and sends the service ready email. Pause, resume and delete only
  * tell staff what to do by hand. A delete ends the activation, and with it the billing, at once.
  */
-final class ManualServerDriver implements Driver, StopsOnDelete, NeedsBilling, \BeltoftServices\Drivers\TakesSshKey {
+final class ManualServerDriver implements Driver, StopsOnDelete, NeedsBilling, \BeltoftServices\Drivers\TakesSshKey, \BeltoftServices\Drivers\InternalActions {
 	public const ID   = 'manual-server';
 	public const KIND = 'dedicated';
 
@@ -174,9 +174,20 @@ final class ManualServerDriver implements Driver, StopsOnDelete, NeedsBilling, \
 	 * @param array<string, mixed> $args   Arguments.
 	 */
 	public function act( Resource $r, string $action, array $args ): StepResult {
-		unset( $r, $args );
+		if ( DedicatedReinstall::ACTION === $action ) {
+			return DedicatedReinstall::run( $r, $args );
+		}
 
 		return StepResult::fail( sprintf( 'Unknown action "%s".', $action ) );
+	}
+
+	/**
+	 * The reinstall is queued by its route (ControlRoutes) after the typed name and the emailed code.
+	 *
+	 * @return string[]
+	 */
+	public function internal_actions(): array {
+		return array( DedicatedReinstall::ACTION );
 	}
 
 	/**

@@ -31,7 +31,7 @@ final class Irreversible {
 	/**
 	 * The tools this class runs.
 	 */
-	public const NAMES = array( 'delete_snapshot', 'rollback_snapshot', 'restore_backup', 'reinstall_server', 'replace_ssh_key', 'reset_firewall', 'reset_server_password', 'reset_database_password', 'set_database_eviction_policy', 'cancel_subscription', 'remove_addon', 'set_default_payment_method', 'delete_mailbox', 'order_server', 'order_database', 'delete_server', 'delete_database', 'restore_hosting_backup', 'delete_site' );
+	public const NAMES = array( 'dedicated_hard_reset', 'dedicated_set_firewall', 'dedicated_reinstall', 'delete_snapshot', 'rollback_snapshot', 'restore_backup', 'reinstall_server', 'replace_ssh_key', 'reset_firewall', 'reset_server_password', 'reset_database_password', 'set_database_eviction_policy', 'cancel_subscription', 'remove_addon', 'set_default_payment_method', 'delete_mailbox', 'order_server', 'order_database', 'delete_server', 'delete_database', 'restore_hosting_backup', 'delete_site' );
 
 	/**
 	 * The summary of a call that needs a confirmation, and what the summary depends on.
@@ -73,6 +73,11 @@ final class Irreversible {
 			case 'restore_hosting_backup':
 			case 'delete_site':
 				return HostingTools::summary( $name, $args );
+
+			case 'dedicated_hard_reset':
+			case 'dedicated_set_firewall':
+			case 'dedicated_reinstall':
+				return DedicatedTools::summary( $name, $args );
 		}
 
 		$r = Tools::owned( (int) $args['id'], true );
@@ -120,6 +125,10 @@ final class Irreversible {
 
 		if ( in_array( $name, HostingTools::FULL, true ) ) {
 			return HostingTools::run( $name, $args );
+		}
+
+		if ( in_array( $name, DedicatedTools::FULL, true ) ) {
+			return DedicatedTools::run( $name, $args );
 		}
 
 		return ServerActions::run( $name, $args );

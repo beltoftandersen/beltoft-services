@@ -99,6 +99,9 @@ final class ActionMap {
 		'delete_database'          => 'delete_database',
 		'restore_hosting_backup'   => 'restore_hosting_backup',
 		'delete_site'              => 'delete_site',
+		'dedicated_hard_reset'     => 'dedicated_hard_reset',
+		'dedicated_firewall'       => 'dedicated_set_firewall',
+		'dedicated_reinstall'      => 'dedicated_reinstall',
 	);
 
 	/**
@@ -108,6 +111,7 @@ final class ActionMap {
 	public const CAPABILITIES_EXCLUDED = array(
 		'delete_hosting_backup'       => 'never: a backup is the last copy after a mistake or an attack; deleting one is only done in the dashboard',
 		'reveal_hosting_database_password' => 'never: showing the database password of a hosting account needs the code emailed to the account address, so it is only available in the dashboard',
+		'dedicated_rescue_password'  => 'never: the rescue password of a dedicated server needs the code emailed to the account address, so it is only available in the dashboard',
 		'hosting_scheduled_jobs'      => 'never: a scheduled job runs code on the hosting, so it is only set in the dashboard; hosting_info lists the jobs read only',
 		'domain_transfer_code'        => 'never: the transfer code of a domain is only available in the dashboard, behind its password step',
 		'reset_mailbox_password'     => 'never: a new mailbox password needs the code emailed to the account address, so it is only available in the dashboard',
@@ -146,6 +150,14 @@ final class ActionMap {
 		'reveal_database_password' => array( 'POST #^/resources/\d+/db-reveal$#D' ),
 		'reveal_app_login'         => array( 'POST #^/resources/\d+/app-reveal$#D' ),
 		'get_database_ca_certificate' => array( 'GET #^/resources/\d+/db-ca$#D' ),
+		'dedicated_info'           => array( 'GET #^/resources/\d+/dedicated$#D', 'GET #^/resources/\d+/dedicated/images$#D' ),
+		'dedicated_restart'        => array( 'POST #^/resources/\d+/dedicated/reset$#D' ),
+		'dedicated_power_on'       => array( 'POST #^/resources/\d+/dedicated/wol$#D' ),
+		'dedicated_set_rdns'       => array( 'PUT #^/resources/\d+/dedicated/rdns$#D', 'DELETE #^/resources/\d+/dedicated/rdns$#D' ),
+		'dedicated_rescue'         => array( 'POST #^/resources/\d+/dedicated/rescue$#D', 'DELETE #^/resources/\d+/dedicated/rescue$#D' ),
+		'dedicated_hard_reset'     => array( 'POST #^/resources/\d+/dedicated/reset$#D' ),
+		'dedicated_set_firewall'   => array( 'PUT #^/resources/\d+/dedicated/firewall$#D' ),
+		'dedicated_reinstall'      => array( 'POST #^/resources/\d+/dedicated/reinstall$#D' ),
 		'hosting_info'             => array( 'GET #^/resources/\d+/hosting$#D' ),
 		'hosting_usage'            => array( 'GET #^/resources/\d+/hosting/usage$#D' ),
 		'list_hosting_backups'     => array( 'GET #^/resources/\d+/hosting/backups$#D' ),

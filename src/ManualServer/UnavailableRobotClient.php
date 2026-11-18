@@ -48,6 +48,70 @@ final class UnavailableRobotClient implements RobotClient {
 		return $this->no();
 	}
 
+	public function reset_options( int $number ) {
+		unset( $number );
+		return $this->no();
+	}
+
+	public function reset_server( int $number, string $type ) {
+		unset( $number, $type );
+		return $this->no();
+	}
+
+	public function wol_available( int $number ) {
+		unset( $number );
+		return $this->no();
+	}
+
+	public function wol( int $number ) {
+		unset( $number );
+		return $this->no();
+	}
+
+	public function rescue_status( int $number ) {
+		unset( $number );
+		return $this->no();
+	}
+
+	public function rescue_activate( int $number, string $os, array $keys ) {
+		unset( $number, $os, $keys );
+		return $this->no();
+	}
+
+	public function rescue_deactivate( int $number ) {
+		unset( $number );
+		return $this->no();
+	}
+
+	public function rdns_list( string $server_ip ) {
+		unset( $server_ip );
+		return $this->no();
+	}
+
+	public function rdns_set( string $ip, string $ptr ) {
+		unset( $ip, $ptr );
+		return $this->no();
+	}
+
+	public function rdns_delete( string $ip ) {
+		unset( $ip );
+		return $this->no();
+	}
+
+	public function firewall( int $number ) {
+		unset( $number );
+		return $this->no();
+	}
+
+	public function firewall_set( int $number, array $config ) {
+		unset( $number, $config );
+		return $this->no();
+	}
+
+	public function products() {
+		return $this->no();
+	}
+
 	private function no(): \WP_Error {
 		return new \WP_Error( 'robot_unavailable', 'Automatic ordering is not usable: the address or login is missing, or the live switch is off.', array( 'status' => 0 ) );
 	}

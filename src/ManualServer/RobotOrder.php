@@ -102,7 +102,8 @@ final class RobotOrder {
 		}
 
 		$password = '' === $fingerprint ? wp_generate_password( 24, false, false ) : '';
-		$dist     = '' !== (string) ( $plan['server_dist'] ?? '' ) ? (string) $plan['server_dist'] : trim( (string) Settings::get( 'dedicated_dist' ) );
+		// The customer's choice at checkout (an exact string of the product's list), else the plan's, else the setting.
+		$dist = '' !== (string) $r->get( DistField::META ) ? (string) $r->get( DistField::META ) : ( '' !== (string) ( $plan['server_dist'] ?? '' ) ? (string) $plan['server_dist'] : trim( (string) Settings::get( 'dedicated_dist' ) ) );
 
 		// The marker and the password are stored before the call, so a lost answer can never lead to a second order.
 		$marker = array( self::ORDERING => time() );
@@ -145,6 +146,23 @@ final class RobotOrder {
 		}
 
 		return null;
+	}
+
+	/**
+	 * The fingerprint of the customer's key at the supplier (registered if it is not yet), or empty when there is no key or it could not be
+	 * registered. For the rescue system, which can start with the customer's key (Robot webservice, Boot configuration, `authorized_key`).
+	 *
+	 * @param Resource    $r      Resource.
+	 * @param RobotClient $client Client.
+	 */
+	public static function key_fingerprint( Resource $r, RobotClient $client ): string {
+		if ( '' === trim( (string) $r->get( 'ssh_key' ) ) ) {
+			return '';
+		}
+
+		$print = self::register_key( $r, $client );
+
+		return is_string( $print ) ? $print : '';
 	}
 
 	/**

@@ -158,6 +158,7 @@ final class ManualServerPanel {
 			echo '<p data-manual-password hidden><input type="text" readonly size="40" data-manual-password-field aria-label="' . esc_attr__( 'Root password', 'beltoft-services' ) . '"> <button type="button" class="button bs-btn bs-btn--sm" data-manual-copy>' . esc_html__( 'Copy', 'beltoft-services' ) . '</button></p>';
 		}
 
+		ControlsPanel::render( $r );
 		$beltoft_services_delete_id = $r->id();
 		include BELTOFT_SERVICES_PATH . 'templates/account/delete.php';
 

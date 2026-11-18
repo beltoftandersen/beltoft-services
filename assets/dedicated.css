@@ -1,0 +1,31 @@
+/* My Account, dedicated server controls: forms in a row, sections apart. */
+.beltoft-services-dedicated__section {
+	margin-top: 24px;
+}
+
+.beltoft-services-dedicated__section h3 {
+	margin-bottom: 4px;
+}
+
+.beltoft-services-dedicated__section p:not(.bs-note) {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+}
+
+.beltoft-services-dedicated__section input[type="text"],
+.beltoft-services-dedicated__section select {
+	width: auto;
+	max-width: 100%;
+	min-width: 0;
+}
+
+.beltoft-services-dedicated__rules p input[type="text"] {
+	flex: 1 1 120px;
+}
+
+.beltoft-services-dedicated__section form input[name="confirm"] {
+	width: 100%;
+	max-width: 360px;
+}
