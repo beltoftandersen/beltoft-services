@@ -238,10 +238,10 @@ final class Cart {
 	public static function limit_problem( int $user_id, ?\WC_Subscription $account, int $units ): ?string {
 		$limit = (int) Settings::get( 'usage_new_limit' );
 
-		if ( $limit > 0 && ! Account::charged( $account ) && count( Account::services( $user_id ) ) + $units > $limit ) {
+		if ( $limit > 0 && ! Trusted::established( $user_id, $account ) && count( Account::services( $user_id ) ) + $units > $limit ) {
 			return sprintf(
 				/* translators: %d: number of services. */
-				_n( 'A new account can run %d pay as you go service until its first usage invoice is paid.', 'A new account can run %d pay as you go services until its first usage invoice is paid.', $limit, 'beltoft-services' ),
+				_n( 'A new account can run %d pay as you go service until its first usage invoice is paid. Contact us if you need more before then.', 'A new account can run %d pay as you go services until its first usage invoice is paid. Contact us if you need more before then.', $limit, 'beltoft-services' ),
 				$limit
 			);
 		}

@@ -268,6 +268,7 @@ final class Plugin {
 		Usage\Threshold::register();
 		Usage\Account::register();
 		Usage\Cart::register();
+		Usage\Trusted::register();
 		Usage\Summary::register();
 		Usage\Breakdown::register();
 		Usage\BillingField::register();
