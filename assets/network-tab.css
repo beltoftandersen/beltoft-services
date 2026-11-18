@@ -1,22 +1,22 @@
 /* The Network tab of a server page. Square, few borders. Colours come from the dashboard's own variables. */
-.beltoft-services-net { font-size: 15px; line-height: 1.5; }
+.beltoft-services-net { font-size: 16px; line-height: 1.5; }
 .beltoft-services-net h4 { margin: 0 0 4px; }
 .beltoft-services-net h5 { margin: var(--bs-space-5) 0 var(--bs-space-2); font-size: var(--bs-fs-body); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-text); }
 .beltoft-services-net p { margin: 0 0 12px; }
-.beltoft-services-net .description { color: var(--ink-soft, #5e7080); max-width: 640px; }
+.beltoft-services-net .description { color: var(--bs-muted); max-width: 640px; }
 .beltoft-services-net .button { margin: 0 8px 0 0; border-radius: var(--bs-radius, 8px); }
 .beltoft-services-net code { overflow-wrap: anywhere; }
 .beltoft-services-net p.description code { white-space: nowrap; overflow-wrap: normal; }
-.beltoft-services-net__notice { padding: 8px 12px; background: var(--bg-warm, #eeece6); max-width: 640px; }
+.beltoft-services-net__notice { padding: 8px 12px; background: var(--bs-warm); max-width: 640px; }
 .beltoft-services-net__others { margin: 0 0 12px; padding-left: 1.25em; }
 /* The facts are the shared facts card; Detach outlined. */
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net .beltoft-services-net__buttons { margin: 16px 0 0; }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net button[data-net-detach] { border: 1px solid var(--navy, #10221b); background: transparent; color: var(--navy, #10221b); }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net button[data-net-detach]:hover { background: var(--bg-warm, #eeece6); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net button[data-net-detach] { border: 1px solid var(--bs-dark); background: transparent; color: var(--bs-ink); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net button[data-net-detach]:hover { background: var(--bs-warm); }
 
 /* 2026-11-14: the network choice before Attach. */
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net__choose { margin: 16px 0 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net__choose p { margin: 0 0 12px; }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net__choose label { display: inline-block; margin-bottom: 4px; color: var(--ink-soft, #5e7080); font-size: var(--bs-fs-small, 14px); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net__choose label { display: inline-block; margin-bottom: 4px; color: var(--bs-muted); font-size: var(--bs-fs-small); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net__choose select,
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net__choose input[type="text"] { width: 100%; max-width: 420px; border-radius: var(--bs-radius, 8px); }

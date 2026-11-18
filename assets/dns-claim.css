@@ -25,7 +25,7 @@
 	display: block;
 	margin: 0;
 	padding: 0;
-	font-size: 0.875em;
+	font-size: 14px;
 	font-weight: 600;
 	line-height: 1.4;
 }
@@ -75,7 +75,7 @@
 .beltoft-dns-claim__claim {
 	min-width: 0;
 	padding-top: 1em;
-	border-top: 1px solid rgba(0, 0, 0, 0.12);
+	border-top: 1px solid color-mix(in srgb, var(--bs-ink) 12%, transparent);
 }
 
 .beltoft-dns-claim__domain {
@@ -94,7 +94,7 @@
 }
 
 .beltoft-dns-claim__note {
-	font-size: 0.875em;
+	font-size: 14px;
 	opacity: 0.75;
 }
 
@@ -115,7 +115,7 @@
 
 .beltoft-dns-claim__hint {
 	margin: 0.25em 0 0.5em;
-	font-size: 0.875em;
+	font-size: 14px;
 	opacity: 0.75;
 	overflow-wrap: anywhere;
 }
@@ -126,7 +126,7 @@
 }
 
 .beltoft-dns-claim__label {
-	font-size: 0.875em;
+	font-size: 14px;
 	opacity: 0.75;
 }
 
@@ -204,7 +204,7 @@
 	max-width: 22em;
 	height: 4px;
 	overflow: hidden;
-	background: rgba(0, 0, 0, 0.12);
+	background: color-mix(in srgb, var(--bs-ink) 12%, transparent);
 }
 
 .beltoft-dns-claim__bar::before {
@@ -265,7 +265,7 @@
 
 	.beltoft-dns-claim__table tr {
 		padding: 0.5em 0;
-		border-top: 1px solid rgba(0, 0, 0, 0.12);
+		border-top: 1px solid color-mix(in srgb, var(--bs-ink) 12%, transparent);
 	}
 
 	.beltoft-dns-claim__table td,

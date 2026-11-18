@@ -6,17 +6,17 @@
 .beltoft-services-app-pane > .beltoft-services-vm__more:first-of-type { margin-top: 24px; }
 .beltoft-services-app-pane > .description { margin: 16px 0 0; }
 .beltoft-services-app-steps { display: grid; gap: 8px; margin: 0 0 12px; padding: 0; list-style: none; counter-reset: appstep; }
-.beltoft-services-app-steps__item { position: relative; padding-left: 32px; color: var(--ink-soft, #5e7080); counter-increment: appstep; }
-.beltoft-services-app-steps__item::before { content: ""; position: absolute; left: 0; top: 0.4em; width: 10px; height: 10px; background: var(--rule, #d6d2c8); }
-.beltoft-services-app-steps__item.is-done { color: var(--ink-soft, #5e7080); }
-.beltoft-services-app-steps__item.is-done::before { background: var(--green, #28513e); }
-.beltoft-services-app-steps__item.is-current { color: var(--navy, #0c1535); font-weight: 500; }
-.beltoft-services-app-steps__item.is-current::before { background: var(--navy, #0c1535); }
+.beltoft-services-app-steps__item { position: relative; padding-left: 32px; color: var(--bs-muted); counter-increment: appstep; }
+.beltoft-services-app-steps__item::before { content: ""; position: absolute; left: 0; top: 0.4em; width: 10px; height: 10px; background: var(--bs-line); }
+.beltoft-services-app-steps__item.is-done { color: var(--bs-muted); }
+.beltoft-services-app-steps__item.is-done::before { background: var(--bs-status-ok); }
+.beltoft-services-app-steps__item.is-current { color: var(--bs-ink); font-weight: 500; }
+.beltoft-services-app-steps__item.is-current::before { background: var(--bs-dark); }
 .beltoft-services-app-login { display: grid; gap: 8px; margin: 12px 0; }
 .beltoft-services-app-login > div { display: grid; gap: 4px; margin: 0; }
-.beltoft-services-app-login dt { margin: 0; color: var(--ink-soft, #5e7080); font-size: var(--bs-fs-caption); font-weight: var(--bs-fw-medium); }
+.beltoft-services-app-login dt { margin: 0; color: var(--bs-muted); font-size: var(--bs-fs-caption); font-weight: var(--bs-fw-medium); }
 .beltoft-services-app-login dd { margin: 0; }
-.beltoft-services-app-login code { display: inline-block; padding: 4px 8px; background: var(--bg-warm, #eeece6); font: inherit; font-size: 14px; overflow-wrap: anywhere; user-select: all; }
+.beltoft-services-app-login code { display: inline-block; padding: 4px 8px; background: var(--bs-warm); font: inherit; font-size: 14px; overflow-wrap: anywhere; user-select: all; }
 .beltoft-services-app-reinstall { margin: 0 0 8px; }
 .beltoft-services-app-reinstall label { display: block; }
 .beltoft-services-app-reinstall select { width: 100%; }

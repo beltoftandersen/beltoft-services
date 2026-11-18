@@ -2,33 +2,33 @@
    pages (--bg-card, 16px padding, no border), the section heading at the heading size, 32px between panels and a 16px
    rhythm inside. Buttons: one navy filled primary per panel, the navy 1px outline for secondary actions, and link
    style for small actions in a row. Corners: the account tokens (--bs-radius for controls, --bs-radius-lg for cards). */
-.beltoft-hosting { --bsh-ink: var(--navy, #0c1535); --bsh-soft: var(--ink-soft, #5e7080); --bsh-rule: var(--rule, #d6d2c8); --bsh-warm: var(--bg-warm, #eeece6); --bsh-card: var(--bg-card, #fff); display: flex; flex-direction: column; gap: var(--bs-space-6, 32px); max-width: 1040px; font-size: var(--bs-fs-body, 15px); line-height: var(--bs-lh-text, 1.5); min-width: 0; }
+.beltoft-hosting { display: flex; flex-direction: column; gap: var(--bs-space-6, 32px); max-width: 1040px; font-size: var(--bs-fs-body); line-height: var(--bs-lh-text, 1.5); min-width: 0; }
 .beltoft-hosting > * { min-width: 0; margin: 0; }
 .beltoft-hosting p { margin: 0 0 var(--bs-space-3, 12px); }
 .beltoft-hosting p:last-child { margin-bottom: 0; }
-.beltoft-hosting h3 { margin: 0; color: var(--bsh-ink); font-size: var(--bs-fs-heading, 18px); font-weight: var(--bs-fw-strong, 600); line-height: var(--bs-lh-heading, 1.3); }
-.beltoft-hosting h4 { margin: 0 0 var(--bs-space-3, 12px); color: var(--bsh-ink); font-size: var(--bs-fs-body, 15px); font-weight: var(--bs-fw-strong, 600); line-height: var(--bs-lh-heading, 1.3); }
+.beltoft-hosting h3 { margin: 0; color: var(--bs-ink); font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong, 600); line-height: var(--bs-lh-heading, 1.3); }
+.beltoft-hosting h4 { margin: 0 0 var(--bs-space-3, 12px); color: var(--bs-ink); font-size: var(--bs-fs-body); font-weight: var(--bs-fw-strong, 600); line-height: var(--bs-lh-heading, 1.3); }
 
 /* Notices */
 .beltoft-hosting .beltoft-hosting-notices { display: grid; gap: var(--bs-space-3, 12px); }
-.beltoft-hosting .beltoft-hosting-notice, .beltoft-hosting .beltoft-hosting-warning { margin: 0; padding: var(--bs-space-3, 12px) var(--bs-space-4, 16px); border-left: 3px solid var(--bs-status-warn, #8a5a00); background: var(--bsh-warm); overflow-wrap: anywhere; }
-.beltoft-hosting .beltoft-hosting-warning { border-left-color: var(--bs-status-fail, #a4372a); color: var(--bs-status-fail, #a4372a); }
+.beltoft-hosting .beltoft-hosting-notice, .beltoft-hosting .beltoft-hosting-warning { margin: 0; padding: var(--bs-space-3, 12px) var(--bs-space-4, 16px); border-left: 3px solid var(--bs-status-warn); background: var(--bs-warm); overflow-wrap: anywhere; }
+.beltoft-hosting .beltoft-hosting-warning { border-left-color: var(--bs-status-fail); color: var(--bs-status-fail); }
 .beltoft-hosting-site .beltoft-hosting-notice { margin: var(--bs-space-3, 12px) 0 0; }
 
 /* Panels */
-.beltoft-hosting .beltoft-hosting-panel { box-sizing: border-box; display: flex; flex-direction: column; gap: var(--bs-space-4, 16px); padding: var(--bs-space-4, 16px); background: var(--bsh-card); }
+.beltoft-hosting .beltoft-hosting-panel { box-sizing: border-box; display: flex; flex-direction: column; gap: var(--bs-space-4, 16px); padding: var(--bs-space-4, 16px); background: var(--bs-surface); }
 .beltoft-hosting .beltoft-hosting-panel__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--bs-space-1, 4px) var(--bs-space-4, 16px); }
 .beltoft-hosting .beltoft-hosting-panel__title { min-width: 0; overflow-wrap: anywhere; }
-.beltoft-hosting .beltoft-hosting-panel__main { min-width: 0; overflow-wrap: anywhere; font-size: var(--bs-fs-small, 14px); }
-.beltoft-hosting .beltoft-hosting-panel__count, .beltoft-hosting .beltoft-hosting-status { color: var(--bsh-soft); font-size: var(--bs-fs-small, 14px); }
+.beltoft-hosting .beltoft-hosting-panel__main { min-width: 0; overflow-wrap: anywhere; font-size: var(--bs-fs-small); }
+.beltoft-hosting .beltoft-hosting-panel__count, .beltoft-hosting .beltoft-hosting-status { color: var(--bs-muted); font-size: var(--bs-fs-small); }
 .beltoft-hosting .beltoft-hosting-panel__aside, .beltoft-hosting .beltoft-hosting-status { margin-left: auto; }
-.beltoft-hosting .beltoft-hosting-status.is-ok { color: var(--bs-status-ok, #28513e); font-weight: var(--bs-fw-medium, 500); }
+.beltoft-hosting .beltoft-hosting-status.is-ok { color: var(--bs-status-ok); font-weight: var(--bs-fw-medium, 500); }
 .beltoft-hosting .beltoft-hosting-status::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: var(--bs-space-2, 8px); background: currentColor; }
 .beltoft-hosting .beltoft-hosting-section { display: flex; flex-direction: column; gap: var(--bs-space-1, 4px); margin-bottom: calc(var(--bs-space-4, 16px) * -1); }
 .beltoft-hosting .beltoft-hosting-section + .beltoft-hosting-site { margin-top: 0; }
 .beltoft-hosting .beltoft-hosting-site + .beltoft-hosting-site { margin-top: calc(var(--bs-space-4, 16px) - var(--bs-space-6, 32px)); }
 
-.beltoft-hosting .beltoft-hosting-help { margin: var(--bs-space-2, 8px) 0 0; color: var(--bsh-soft); font-size: var(--bs-fs-small, 14px); }
+.beltoft-hosting .beltoft-hosting-help { margin: var(--bs-space-2, 8px) 0 0; color: var(--bs-muted); font-size: var(--bs-fs-small); }
 .beltoft-hosting .beltoft-hosting-line { margin: 0 0 var(--bs-space-3, 12px); }
 
 .beltoft-hosting .beltoft-hosting-radio { display: inline-flex; align-items: center; gap: var(--bs-space-2, 8px); margin: 0; cursor: pointer; }
@@ -36,36 +36,36 @@
 
 /* Get started: a mark, the text, the action at the right edge */
 .beltoft-hosting .beltoft-hosting-checklist ul { margin: 0; padding: 0; list-style: none; }
-.beltoft-hosting .beltoft-hosting-checklist li { display: flex; align-items: center; gap: var(--bs-space-3, 12px); margin: 0; padding: var(--bs-space-2, 8px) 0; border-top: 1px solid var(--bsh-rule); }
+.beltoft-hosting .beltoft-hosting-checklist li { display: flex; align-items: center; gap: var(--bs-space-3, 12px); margin: 0; padding: var(--bs-space-2, 8px) 0; border-top: 1px solid var(--bs-line); }
 .beltoft-hosting .beltoft-hosting-checklist li:first-child { border-top: 0; }
 .beltoft-hosting .beltoft-hosting-check-label { flex: 1 1 auto; min-width: 0; }
 .beltoft-hosting .beltoft-hosting-check-action { flex: none; margin-left: auto; }
-.beltoft-hosting .beltoft-hosting-mark { flex: none; box-sizing: border-box; width: 18px; height: 18px; border: 2px solid var(--bs-input-border, #7d8b99); background: transparent; }
-.beltoft-hosting li[data-done="1"] .beltoft-hosting-mark { border-color: var(--bs-status-ok, #28513e); background: var(--bs-status-ok, #28513e) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M4 9.5l3.2 3.2L14 5.8' fill='none' stroke='%23fff' stroke-width='2'/%3E%3C/svg%3E") center / 100% 100% no-repeat; }
-.beltoft-hosting li[data-done="1"] .beltoft-hosting-check-label { color: var(--bsh-soft); }
+.beltoft-hosting .beltoft-hosting-mark { flex: none; box-sizing: border-box; width: 18px; height: 18px; border: 2px solid var(--bs-input-border); background: transparent; }
+.beltoft-hosting li[data-done="1"] .beltoft-hosting-mark { border-color: var(--bs-status-ok); background: var(--bs-status-ok) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M4 9.5l3.2 3.2L14 5.8' fill='none' stroke='%23fff' stroke-width='2'/%3E%3C/svg%3E") center / 100% 100% no-repeat; }
+.beltoft-hosting li[data-done="1"] .beltoft-hosting-check-label { color: var(--bs-muted); }
 
 /* Backups table */
 .beltoft-hosting table { width: 100%; max-width: none; margin: 0; border-collapse: collapse; table-layout: auto; }
-.beltoft-hosting th { padding: 0 var(--bs-space-2, 8px) var(--bs-space-2, 8px) 0; border: 0; border-bottom: 1px solid var(--bsh-rule); background: none; color: var(--bsh-soft); font-size: var(--bs-fs-caption, 13px); font-weight: var(--bs-fw-medium, 500); text-align: left; }
-.beltoft-hosting td { padding: var(--bs-space-3, 12px) var(--bs-space-2, 8px) var(--bs-space-3, 12px) 0; border: 0; border-bottom: 1px solid var(--bsh-rule); background: none; vertical-align: top; overflow-wrap: anywhere; }
+.beltoft-hosting th { padding: 0 var(--bs-space-2, 8px) var(--bs-space-2, 8px) 0; border: 0; border-bottom: 1px solid var(--bs-line); background: none; color: var(--bs-muted); font-size: var(--bs-fs-caption); font-weight: var(--bs-fw-medium, 500); text-align: left; }
+.beltoft-hosting td { padding: var(--bs-space-3, 12px) var(--bs-space-2, 8px) var(--bs-space-3, 12px) 0; border: 0; border-bottom: 1px solid var(--bs-line); background: none; vertical-align: top; overflow-wrap: anywhere; }
 .beltoft-hosting tr:last-child td { border-bottom: 0; }
 .beltoft-hosting .beltoft-hosting-actions { display: flex; flex-wrap: wrap; gap: var(--bs-space-2, 8px) var(--bs-space-4, 16px); }
 
 /* Fields: as wide as the content needs; a field and its button on one line, the same height */
 .beltoft-hosting .beltoft-hosting-formrow { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--bs-space-3, 12px); margin: 0; }
 .beltoft-hosting .beltoft-hosting-field { display: flex; flex-direction: column; gap: var(--bs-space-1, 4px); flex: 0 1 auto; min-width: 0; margin: 0; }
-.beltoft-hosting .beltoft-hosting-field > span { color: var(--bsh-soft); font-size: var(--bs-fs-small, 14px); font-weight: var(--bs-fw-medium, 500); }
-.beltoft-hosting input[type="text"], .beltoft-hosting select, .beltoft-hosting textarea { box-sizing: border-box; width: auto; min-width: 160px; max-width: 360px; height: var(--bs-input-h, 44px); margin: 0; padding: 0 var(--bs-space-3, 12px); border: 1px solid var(--bs-input-border, #7d8b99); background: #fff; box-shadow: none; color: var(--bsh-ink); font: inherit; font-size: var(--bs-fs-body, 15px); }
+.beltoft-hosting .beltoft-hosting-field > span { color: var(--bs-muted); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium, 500); }
+.beltoft-hosting input[type="text"], .beltoft-hosting select, .beltoft-hosting textarea { box-sizing: border-box; width: auto; min-width: 160px; max-width: 360px; height: var(--bs-input-h, 44px); margin: 0; padding: 0 var(--bs-space-3, 12px); border: 1px solid var(--bs-input-border); background: var(--bs-surface); box-shadow: none; color: var(--bs-ink); font: inherit; font-size: var(--bs-fs-body); }
 .beltoft-hosting select { padding-right: var(--bs-space-5, 24px); }
 .beltoft-hosting textarea { height: auto; padding: var(--bs-space-2, 8px) var(--bs-space-3, 12px); }
 .beltoft-hosting .beltoft-hosting-field--wide textarea { width: 100%; max-width: 520px; }
 .beltoft-hosting .beltoft-hosting-secure { display: grid; gap: var(--bs-space-3, 12px); margin-top: var(--bs-space-3, 12px); }
 .beltoft-hosting .beltoft-hosting-secure[hidden], .beltoft-hosting [data-files-reveal][hidden], .beltoft-hosting [data-php-form][hidden] { display: none; }
 /* Country block: a filter field and a scrolling list of countries in columns */
-.beltoft-hosting input[type="search"] { box-sizing: border-box; width: auto; min-width: 160px; max-width: 360px; height: var(--bs-input-h, 44px); margin: 0; padding: 0 var(--bs-space-3, 12px); border: 1px solid var(--bs-input-border, #7d8b99); border-radius: 0; background: #fff; box-shadow: none; color: var(--bsh-ink); font: inherit; font-size: var(--bs-fs-body, 15px); }
+.beltoft-hosting input[type="search"] { box-sizing: border-box; width: auto; min-width: 160px; max-width: 360px; height: var(--bs-input-h, 44px); margin: 0; padding: 0 var(--bs-space-3, 12px); border: 1px solid var(--bs-input-border); border-radius: 0; background: var(--bs-surface); box-shadow: none; color: var(--bs-ink); font: inherit; font-size: var(--bs-fs-body); }
 .beltoft-hosting .beltoft-hosting-fieldset { display: grid; gap: var(--bs-space-2, 8px); min-width: 0; margin: 0; padding: 0; border: 0; }
-.beltoft-hosting .beltoft-hosting-fieldset legend { padding: 0; margin-bottom: var(--bs-space-2, 8px); color: var(--bsh-soft); font-size: var(--bs-fs-small, 14px); font-weight: var(--bs-fw-medium, 500); }
-.beltoft-hosting .beltoft-hosting-countries { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--bs-space-1, 4px) var(--bs-space-3, 12px); max-height: 260px; overflow-y: auto; padding: var(--bs-space-2, 8px) var(--bs-space-3, 12px); border: 1px solid var(--bs-input-border, #7d8b99); }
+.beltoft-hosting .beltoft-hosting-fieldset legend { padding: 0; margin-bottom: var(--bs-space-2, 8px); color: var(--bs-muted); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium, 500); }
+.beltoft-hosting .beltoft-hosting-countries { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--bs-space-1, 4px) var(--bs-space-3, 12px); max-height: 260px; overflow-y: auto; padding: var(--bs-space-2, 8px) var(--bs-space-3, 12px); border: 1px solid var(--bs-input-border); }
 .beltoft-hosting .beltoft-hosting-check { display: flex; align-items: center; gap: var(--bs-space-2, 8px); margin: 0; cursor: pointer; }
 .beltoft-hosting .beltoft-hosting-check input { margin: 0; }
 .beltoft-hosting .beltoft-hosting-check[hidden] { display: none; }
@@ -74,20 +74,20 @@
 .beltoft-hosting .beltoft-hosting-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bs-space-2, 8px) var(--bs-space-4, 16px); }
 
 /* Buttons: primary (navy), secondary (navy outline), small in-row actions (link style) */
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.beltoft-hosting-btn, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting a.beltoft-hosting-btn { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; width: auto; min-height: var(--bs-btn-h, 40px); margin: 0; padding: 0 var(--bs-space-4, 16px); border: 1px solid var(--bsh-ink); background: transparent; box-shadow: none; color: var(--bsh-ink); font-family: inherit; font-size: var(--bs-fs-small, 14px); font-weight: var(--bs-fw-medium, 500); line-height: 1.3; text-decoration: none; white-space: nowrap; text-align: center; cursor: pointer; }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.beltoft-hosting-btn:hover, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting a.beltoft-hosting-btn:hover { background: var(--bsh-warm); color: var(--bsh-ink); }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.beltoft-hosting-btn--primary, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting a.beltoft-hosting-btn--primary { background: var(--bsh-ink); color: #fff; }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.beltoft-hosting-btn--primary:hover, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting a.beltoft-hosting-btn--primary:hover { background: var(--green, #28513e); border-color: var(--green, #28513e); color: #fff; }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .beltoft-hosting-linkbtn, .beltoft-hosting .beltoft-hosting-linkbtn { display: inline; box-sizing: border-box; width: auto; min-height: 0; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; color: var(--bsh-ink); font: inherit; font-size: var(--bs-fs-small, 14px); font-weight: var(--bs-fw-medium, 500); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .beltoft-hosting-linkbtn:hover { background: none; color: var(--ink-mid, #2d4060); }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .beltoft-hosting-linkbtn--danger { color: var(--bs-status-fail, #a4372a); }
-.beltoft-hosting button:focus-visible, .beltoft-hosting a:focus-visible, .beltoft-hosting input:focus-visible, .beltoft-hosting select:focus-visible, .beltoft-hosting textarea:focus-visible { outline: 2px solid var(--bs-focus, #0c1535); outline-offset: 2px; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.beltoft-hosting-btn, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting a.beltoft-hosting-btn { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; width: auto; min-height: var(--bs-btn-h, 40px); margin: 0; padding: 0 var(--bs-space-4, 16px); border: 1px solid var(--bs-dark); background: transparent; box-shadow: none; color: var(--bs-ink); font-family: inherit; font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium, 500); line-height: 1.3; text-decoration: none; white-space: nowrap; text-align: center; cursor: pointer; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.beltoft-hosting-btn:hover, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting a.beltoft-hosting-btn:hover { background: var(--bs-warm); color: var(--bs-ink); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.beltoft-hosting-btn--primary, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting a.beltoft-hosting-btn--primary { background: var(--bs-dark); color: var(--bs-on-dark); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.beltoft-hosting-btn--primary:hover, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting a.beltoft-hosting-btn--primary:hover { background: var(--bs-status-ok); border-color: var(--bs-status-ok); color: var(--bs-on-dark); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .beltoft-hosting-linkbtn, .beltoft-hosting .beltoft-hosting-linkbtn { display: inline; box-sizing: border-box; width: auto; min-height: 0; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; color: var(--bs-ink); font: inherit; font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium, 500); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .beltoft-hosting-linkbtn:hover { background: none; color: var(--bs-ink); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .beltoft-hosting-linkbtn--danger { color: var(--bs-status-fail); }
+.beltoft-hosting button:focus-visible, .beltoft-hosting a:focus-visible, .beltoft-hosting input:focus-visible, .beltoft-hosting select:focus-visible, .beltoft-hosting textarea:focus-visible { outline: 2px solid var(--bs-focus); outline-offset: 2px; }
 .beltoft-hosting button:disabled { opacity: .5; cursor: default; }
-.beltoft-hosting a.beltoft-hosting-link { color: var(--bsh-ink); font-weight: var(--bs-fw-medium, 500); text-decoration: underline; text-underline-offset: 3px; }
+.beltoft-hosting a.beltoft-hosting-link { color: var(--bs-ink); font-weight: var(--bs-fw-medium, 500); text-decoration: underline; text-underline-offset: 3px; }
 
 /* Email and extra storage */
 .beltoft-hosting .beltoft-hosting-mail p { margin: 0 0 var(--bs-space-3, 12px); }
-.beltoft-hosting .beltoft-hosting-packs { margin-top: var(--bs-space-2, 8px); padding-top: var(--bs-space-4, 16px); border-top: 1px solid var(--bsh-rule); }
+.beltoft-hosting .beltoft-hosting-packs { margin-top: var(--bs-space-2, 8px); padding-top: var(--bs-space-4, 16px); border-top: 1px solid var(--bs-line); }
 .beltoft-hosting .beltoft-hosting-pack-list { margin: 0; padding: 0; list-style: none; }
 .beltoft-hosting .beltoft-hosting-pack-list li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bs-space-2, 8px) var(--bs-space-4, 16px); padding: var(--bs-space-2, 8px) 0; }
 .beltoft-hosting .beltoft-hosting-pack-name { flex: 1 1 100%; overflow-wrap: anywhere; }
@@ -102,10 +102,10 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .beltof
 	.beltoft-hosting table, .beltoft-hosting tbody, .beltoft-hosting tr, .beltoft-hosting td { display: block; width: auto; }
 	.beltoft-hosting thead { display: none; }
 	.beltoft-hosting td { padding: var(--bs-space-1, 4px) 0; border: 0; }
-	.beltoft-hosting tr { padding: var(--bs-space-3, 12px) 0; border-bottom: 1px solid var(--bsh-rule); }
+	.beltoft-hosting tr { padding: var(--bs-space-3, 12px) 0; border-bottom: 1px solid var(--bs-line); }
 }
 /* A field the action cannot do without, left empty. */
-.beltoft-hosting [data-hosting-field][aria-invalid="true"] { border-color: var(--bs-status-fail, #a4372a); box-shadow: inset 0 0 0 1px var(--bs-status-fail, #a4372a); }
+.beltoft-hosting [data-hosting-field][aria-invalid="true"] { border-color: var(--bs-status-fail); box-shadow: inset 0 0 0 1px var(--bs-status-fail); }
 .beltoft-hosting .beltoft-hosting-steps { margin: var(--bs-space-2, 8px) 0 0; padding-left: 20px; }
 .beltoft-hosting .beltoft-hosting-steps li { margin: 0 0 4px; }
 .beltoft-hosting .beltoft-hosting-dns + .beltoft-hosting-formrow { margin-top: var(--bs-space-4, 16px); }
@@ -118,35 +118,35 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting a.belto
 .beltoft-hosting button.beltoft-hosting-btn, .beltoft-hosting a.beltoft-hosting-btn, .beltoft-hosting input[type="text"], .beltoft-hosting input[type="search"], .beltoft-hosting select, .beltoft-hosting textarea { border-radius: var(--bs-radius, 8px); }
 
 /* Overview: three facts and the links to the account-wide sections. */
-.beltoft-hosting .bsh-overview { margin-top: var(--bs-space-4, 16px) !important; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--bs-space-4, 16px) var(--bs-space-6, 32px); padding: var(--bs-space-5, 24px); border-radius: var(--bs-radius-lg, 12px); background: var(--bsh-card); }
+.beltoft-hosting .bsh-overview { margin-top: var(--bs-space-4, 16px); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--bs-space-4, 16px) var(--bs-space-6, 32px); padding: var(--bs-space-5, 24px); border-radius: var(--bs-radius-lg, 12px); background: var(--bs-surface); }
 .beltoft-hosting .bsh-overview__facts { display: flex; flex-wrap: wrap; gap: var(--bs-space-4, 16px) var(--bs-space-6, 32px); margin: 0; }
 .beltoft-hosting .bsh-overview__facts > div { display: flex; flex-direction: column; gap: 4px; min-width: 120px; }
-.beltoft-hosting .bsh-overview__facts dt { margin: 0; color: var(--bsh-soft); font-size: var(--bs-fs-caption, 13px); font-weight: var(--bs-fw-medium, 500); }
-.beltoft-hosting .bsh-overview__facts dd { display: flex; flex-direction: column; gap: 6px; margin: 0; color: var(--bsh-ink); font-size: var(--bs-fs-heading, 18px); font-weight: var(--bs-fw-strong, 600); line-height: 1.2; }
+.beltoft-hosting .bsh-overview__facts dt { margin: 0; color: var(--bs-muted); font-size: var(--bs-fs-caption); font-weight: var(--bs-fw-medium, 500); }
+.beltoft-hosting .bsh-overview__facts dd { display: flex; flex-direction: column; gap: 6px; margin: 0; color: var(--bs-ink); font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong, 600); line-height: 1.2; }
 .beltoft-hosting .bsh-overview__facts .bs-meter { width: 140px; }
 .beltoft-hosting .bsh-overview__facts > div[hidden] { display: none; }
 .beltoft-hosting .bsh-overview__facts [data-usage-sub]:empty { display: none; }
 .beltoft-hosting #beltoft-hosting-monitoring { padding: var(--bs-space-5, 24px); }
-.beltoft-hosting .bsh-overview__small { color: var(--bsh-soft); font-size: var(--bs-fs-small, 14px); font-weight: var(--bs-fw-regular, 400); }
-.beltoft-hosting .bsh-jump { display: flex; flex-wrap: wrap; gap: var(--bs-space-2, 8px) var(--bs-space-4, 16px); font-size: var(--bs-fs-small, 14px); }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-jump a { color: var(--bsh-ink); font-weight: var(--bs-fw-medium, 500); text-decoration: none; border-bottom: 1px solid var(--bsh-rule); padding-bottom: 2px; }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-jump a:hover { border-bottom-color: var(--bsh-ink); }
+.beltoft-hosting .bsh-overview__small { color: var(--bs-muted); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-regular, 400); }
+.beltoft-hosting .bsh-jump { display: flex; flex-wrap: wrap; gap: var(--bs-space-2, 8px) var(--bs-space-4, 16px); font-size: var(--bs-fs-small); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-jump a { color: var(--bs-ink); font-weight: var(--bs-fw-medium, 500); text-decoration: none; border-bottom: 1px solid var(--bs-line); padding-bottom: 2px; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-jump a:hover { border-bottom-color: var(--bs-dark); }
 
 /* A website: the main actions as one row under its name. */
 .beltoft-hosting .bsh-quick { display: flex; flex-wrap: wrap; gap: var(--bs-space-2, 8px); }
 .beltoft-hosting .bsh-quick + .bs-note { margin-top: 0; }
 
 /* Sections: a row with the name at the left and the current value at the right; it opens to the rest. */
-.beltoft-hosting .bsh-secs { display: flex; flex-direction: column; margin: 0 calc(var(--bs-space-5, 24px) * -1) calc(var(--bs-space-5, 24px) * -1); border-top: 1px solid var(--bsh-rule); }
-.beltoft-hosting .bsh-sec { margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--bsh-rule); background: none; }
+.beltoft-hosting .bsh-secs { display: flex; flex-direction: column; margin: 0 calc(var(--bs-space-5, 24px) * -1) calc(var(--bs-space-5, 24px) * -1); border-top: 1px solid var(--bs-line); }
+.beltoft-hosting .bsh-sec { margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--bs-line); background: none; }
 .beltoft-hosting .bsh-sec:last-child { border-bottom: 0; }
-.beltoft-hosting .bsh-sec__row { display: flex; align-items: center; gap: var(--bs-space-4, 16px); padding: var(--bs-space-4, 16px) var(--bs-space-5, 24px); cursor: pointer; list-style: none; color: var(--bsh-ink); }
+.beltoft-hosting .bsh-sec__row { display: flex; align-items: center; gap: var(--bs-space-4, 16px); padding: var(--bs-space-4, 16px) var(--bs-space-5, 24px); cursor: pointer; list-style: none; color: var(--bs-ink); }
 .beltoft-hosting .bsh-sec__row::-webkit-details-marker { display: none; }
-.beltoft-hosting .bsh-sec__row::after { content: ""; flex: none; width: 10px; height: 10px; margin-left: var(--bs-space-2, 8px); border-right: 2px solid var(--bsh-soft); border-bottom: 2px solid var(--bsh-soft); transform: rotate(45deg) translate(-3px, -3px); transition: transform .15s ease; }
+.beltoft-hosting .bsh-sec__row::after { content: ""; flex: none; width: 10px; height: 10px; margin-left: var(--bs-space-2, 8px); border-right: 2px solid var(--bs-muted); border-bottom: 2px solid var(--bs-muted); transform: rotate(45deg) translate(-3px, -3px); transition: transform .15s ease; }
 .beltoft-hosting .bsh-sec[open] > .bsh-sec__row::after { transform: rotate(225deg) translate(-3px, -3px); }
-.beltoft-hosting .bsh-sec__row:hover { background: var(--bsh-warm); }
+.beltoft-hosting .bsh-sec__row:hover { background: var(--bs-warm); }
 .beltoft-hosting .bsh-sec__label { flex: 0 0 auto; min-width: 9em; font-weight: var(--bs-fw-medium, 500); }
-.beltoft-hosting .bsh-sec__value { flex: 1 1 auto; min-width: 0; color: var(--bsh-soft); font-size: var(--bs-fs-small, 14px); text-align: right; overflow-wrap: anywhere; }
+.beltoft-hosting .bsh-sec__value { flex: 1 1 auto; min-width: 0; color: var(--bs-muted); font-size: var(--bs-fs-small); text-align: right; overflow-wrap: anywhere; }
 .beltoft-hosting .bsh-sec__body { display: flex; flex-direction: column; gap: var(--bs-space-3, 12px); padding: var(--bs-space-2, 8px) var(--bs-space-5, 24px) var(--bs-space-5, 24px); }
 .beltoft-hosting .bsh-sec__body > :is(p, div, ul, fieldset):last-child { margin-bottom: 0; }
 .beltoft-hosting .bsh-sec__body .beltoft-hosting-help { margin: 0; }
@@ -166,12 +166,12 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-ju
 /* Facts as label and value pairs inside a section (WordPress user, email). */
 .beltoft-hosting .bsh-kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--bs-space-1, 4px) var(--bs-space-4, 16px); margin: 0; }
 .beltoft-hosting .bsh-kv > div { display: contents; }
-.beltoft-hosting .bsh-kv dt { margin: 0; color: var(--bsh-soft); font-size: var(--bs-fs-small, 14px); }
-.beltoft-hosting .bsh-kv dd { margin: 0; color: var(--bsh-ink); font-weight: var(--bs-fw-medium, 500); overflow-wrap: anywhere; }
+.beltoft-hosting .bsh-kv dt { margin: 0; color: var(--bs-muted); font-size: var(--bs-fs-small); }
+.beltoft-hosting .bsh-kv dd { margin: 0; color: var(--bs-ink); font-weight: var(--bs-fw-medium, 500); overflow-wrap: anywhere; }
 
 /* A destructive action row's button: red outline, red fill on hover. */
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.beltoft-hosting-btn.bs-btn--danger { border-color: var(--bs-status-fail, #b3261e); color: var(--bs-status-fail, #b3261e); }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.beltoft-hosting-btn.bs-btn--danger:hover { background: #fbeeec; color: var(--bs-status-fail, #b3261e); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.beltoft-hosting-btn.bs-btn--danger { border-color: var(--bs-status-fail); color: var(--bs-status-fail); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.beltoft-hosting-btn.bs-btn--danger:hover { background: var(--bs-fail-tint); color: var(--bs-status-fail); }
 /* Facts and actions inside a website section sit at one width; a select in an action row keeps its size. */
 .beltoft-hosting .bsh-sec__body .bs-action__do .beltoft-hosting-inline { display: flex; flex-wrap: nowrap; gap: var(--bs-space-2, 8px); align-items: center; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bs-action__do select { width: 10em; min-width: 0; }
@@ -184,19 +184,19 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bs-act
 /* Sections, 0.25: names as rows, a title over each action's text, the main address as two options, small buttons. */
 .beltoft-hosting .bsh-sec__body { gap: var(--bs-space-4, 16px); }
 .beltoft-hosting .bsh-sec__body > .bs-action { padding: 0; border-top: 0; }
-.beltoft-hosting .bsh-sec__body > .bs-action + .bs-action, .beltoft-hosting .bsh-sec__body > .bsh-names + .bs-action { padding-top: var(--bs-space-4, 16px); border-top: 1px solid var(--bsh-rule); }
-.beltoft-hosting .bsh-action__title { display: block; margin: 0 0 2px; font-weight: var(--bs-fw-medium, 500); color: var(--bsh-ink); }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-names { margin: 0; border: 1px solid var(--bsh-rule); border-radius: var(--bs-radius, 8px); }
+.beltoft-hosting .bsh-sec__body > .bs-action + .bs-action, .beltoft-hosting .bsh-sec__body > .bsh-names + .bs-action { padding-top: var(--bs-space-4, 16px); border-top: 1px solid var(--bs-line); }
+.beltoft-hosting .bsh-action__title { display: block; margin: 0 0 2px; font-weight: var(--bs-fw-medium, 500); color: var(--bs-ink); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-names { margin: 0; border: 1px solid var(--bs-line); border-radius: var(--bs-radius, 8px); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-names .bs-item { grid-template-columns: minmax(0, 1fr) auto; padding: var(--bs-space-3, 12px) var(--bs-space-4, 16px); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-names .bs-item:first-child { border-top: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-names .bs-item__actions { grid-column: 2; grid-row: 1; }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.beltoft-hosting-btn.bsh-btn--sm { min-height: 36px; padding: 0 var(--bs-space-3, 12px); font-size: var(--bs-fs-small, 14px); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.beltoft-hosting-btn.bsh-btn--sm { min-height: 36px; padding: 0 var(--bs-space-3, 12px); font-size: var(--bs-fs-small); }
 .beltoft-hosting .bsh-choice { display: inline-flex; flex-wrap: wrap; gap: var(--bs-space-2, 8px); }
 .beltoft-hosting .bsh-choice__opt { position: relative; display: inline-flex; margin: 0; cursor: pointer; }
 .beltoft-hosting .bsh-choice__opt input { position: absolute; opacity: 0; width: 1px; height: 1px; }
-.beltoft-hosting .bsh-choice__opt span { display: inline-flex; align-items: center; min-height: var(--bs-input-h, 44px); padding: 0 var(--bs-space-3, 12px); border: 1px solid var(--bsh-rule); border-radius: var(--bs-radius, 8px); background: #fff; color: var(--bsh-ink); font-size: var(--bs-fs-small, 14px); overflow-wrap: anywhere; }
-.beltoft-hosting .bsh-choice__opt input:checked + span { border-color: var(--bsh-ink); box-shadow: inset 0 0 0 1px var(--bsh-ink); font-weight: var(--bs-fw-medium, 500); }
-.beltoft-hosting .bsh-choice__opt input:focus-visible + span { outline: 2px solid var(--bs-focus, #0c1535); outline-offset: 2px; }
+.beltoft-hosting .bsh-choice__opt span { display: inline-flex; align-items: center; min-height: var(--bs-input-h, 44px); padding: 0 var(--bs-space-3, 12px); border: 1px solid var(--bs-line); border-radius: var(--bs-radius, 8px); background: var(--bs-surface); color: var(--bs-ink); font-size: var(--bs-fs-small); overflow-wrap: anywhere; }
+.beltoft-hosting .bsh-choice__opt input:checked + span { border-color: var(--bs-dark); box-shadow: inset 0 0 0 1px var(--bs-dark); font-weight: var(--bs-fw-medium, 500); }
+.beltoft-hosting .bsh-choice__opt input:focus-visible + span { outline: 2px solid var(--bs-focus); outline-offset: 2px; }
 @media (max-width: 640px) {
 	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-names .bs-item { grid-template-columns: minmax(0, 1fr) auto; }
 	.beltoft-hosting .bsh-sec__body .bs-action__do .beltoft-hosting-inline { flex-wrap: wrap; }
@@ -207,15 +207,15 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting button.
 }
 
 /* Panels, 0.25: connection details as rows with their copy button, actions with the button at the right edge, small buttons for row actions. */
-.beltoft-hosting .beltoft-hosting-panel > .bs-action { padding: var(--bs-space-4, 16px) 0 0; border-top: 1px solid var(--bsh-rule); }
+.beltoft-hosting .beltoft-hosting-panel > .bs-action { padding: var(--bs-space-4, 16px) 0 0; border-top: 1px solid var(--bs-line); }
 .beltoft-hosting .beltoft-hosting-panel > .beltoft-hosting-panel__head + .bs-action { padding-top: 0; border-top: 0; }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting a.beltoft-hosting-btn.bsh-btn--sm { display: inline-flex; align-items: center; min-height: 36px; padding: 0 var(--bs-space-3, 12px); font-size: var(--bs-fs-small, 14px); text-decoration: none; }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-conn { margin: 0; border: 1px solid var(--bsh-rule); border-radius: var(--bs-radius, 8px); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting a.beltoft-hosting-btn.bsh-btn--sm { display: inline-flex; align-items: center; min-height: 36px; padding: 0 var(--bs-space-3, 12px); font-size: var(--bs-fs-small); text-decoration: none; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-conn { margin: 0; border: 1px solid var(--bs-line); border-radius: var(--bs-radius, 8px); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-conn .bs-item { grid-template-columns: 9em minmax(0, 1fr) auto; padding: var(--bs-space-2, 8px) var(--bs-space-2, 8px) var(--bs-space-2, 8px) var(--bs-space-4, 16px); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-conn .bs-item:first-child { border-top: 0; }
-.beltoft-hosting .bsh-conn__label { color: var(--bsh-soft); font-size: var(--bs-fs-small, 14px); }
-.beltoft-hosting .bsh-conn__value { justify-self: start; padding: 2px 8px; border-radius: var(--bs-radius-sm, 4px); background: var(--bsh-warm); font-size: var(--bs-fs-small, 14px); overflow-wrap: anywhere; }
-.beltoft-hosting .bsh-note { margin: 0; color: var(--bsh-soft); font-size: var(--bs-fs-small, 14px); }
+.beltoft-hosting .bsh-conn__label { color: var(--bs-muted); font-size: var(--bs-fs-small); }
+.beltoft-hosting .bsh-conn__value { justify-self: start; padding: 2px 8px; border-radius: var(--bs-radius-sm, 4px); background: var(--bs-warm); font-size: var(--bs-fs-small); overflow-wrap: anywhere; }
+.beltoft-hosting .bsh-note { margin: 0; color: var(--bs-muted); font-size: var(--bs-fs-small); }
 .beltoft-hosting .beltoft-hosting-backup-list .beltoft-hosting-actions { gap: var(--bs-space-2, 8px); justify-content: flex-end; }
 .beltoft-hosting .beltoft-hosting-checklist li { padding: var(--bs-space-3, 12px) 0; }
 @media (max-width: 640px) {
@@ -246,7 +246,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting .bsh-co
 .beltoft-hosting .bsh-cron__row { display: grid; gap: var(--bs-space-3, 12px); grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
 .beltoft-hosting .bsh-cron__row .bs-item__main { display: grid; gap: var(--bs-space-3, 12px); min-width: 0; }
 .beltoft-hosting [data-cron-box] [hidden] { display: none; }
-.beltoft-hosting .beltoft-hosting-output { margin: 0; padding: var(--bs-space-3, 12px); overflow: auto; max-height: 240px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--bs-fs-small, 14px); border-radius: var(--bs-radius, 8px); }
+.beltoft-hosting .beltoft-hosting-output { margin: 0; padding: var(--bs-space-3, 12px); overflow: auto; max-height: 240px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--bs-fs-small); border-radius: var(--bs-radius, 8px); }
 @media (max-width: 640px) {
 	.beltoft-hosting .bsh-cron__row { grid-template-columns: minmax(0, 1fr); }
 }
