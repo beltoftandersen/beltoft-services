@@ -319,6 +319,7 @@ class TilesTest extends TestCase {
 		Tiles::print_os( 'osv', array( 9004 => 'AlmaLinux 9', 9006 => 'Custom image' ), 9004, 'os', 'os-one' );
 		$html = (string) ob_get_clean();
 		$this->assertStringNotContainsString( 'data-tiles-os-version', $html, 'No select when no family has a second version.' );
+		$this->assertStringContainsString( '>Version 9</span>', $html, 'The plain line stays.' );
 	}
 
 	public function test_the_posted_value_is_the_same_field_and_a_system_id_as_before(): void {
@@ -335,10 +336,12 @@ class TilesTest extends TestCase {
 			$this->assertArrayHasKey( (int) $value, $labels, 'Every posted value is a template id the cluster lists.' );
 		}
 
-		// The select has no name (it is never posted itself), is labelled and starts hidden for the script.
-		$this->assertMatchesRegularExpression( '#<p class="[^"]*" data-tiles-os-version-row hidden><label for="beltoft-vm-os-version">Version</label><select id="beltoft-vm-os-version" data-tiles-os-version>#', $html );
+		// The select sits in the tile, has no name (it is never posted itself) and is labelled.
+		$this->assertMatchesRegularExpression( '#<span class="beltoft-services-tile__name">Ubuntu</span><select class="beltoft-services-tile__version" data-tiles-os-version aria-label="Ubuntu Version">#', $html );
 		$this->assertDoesNotMatchRegularExpression( '#<select[^>]*name=#', $html );
-		$this->assertMatchesRegularExpression( '#<option value="9002">Ubuntu 26.04 LTS</option><option value="9000" selected=\'selected\'>Ubuntu 24.04</option><option value="9003">Ubuntu 22.04</option>#', $html );
+		$this->assertStringNotContainsString( 'data-tiles-os-version-row', $html, 'No separate select under the group.' );
+		$this->assertMatchesRegularExpression( '#<option value="9002">26.04 LTS</option><option value="9000" selected=\'selected\'>24.04</option><option value="9003">22.04</option>#', $html );
+		$this->assertSame( 2, substr_count( $html, 'data-tiles-os-version ' ), 'Ubuntu and Debian have a select, AlmaLinux and Custom image the plain line.' );
 		$this->assertStringNotContainsString( '—', $html );
 		$this->assertStringNotContainsString( '·', $html );
 	}
