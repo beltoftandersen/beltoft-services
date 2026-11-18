@@ -3,6 +3,9 @@
 
 namespace BeltoftServices\Proxmox\Vm;
 
+use BeltoftServices\Proxmox\Network\Ipv6;
+use BeltoftServices\Proxmox\Pve\Clusters;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -11,9 +14,13 @@ defined( 'ABSPATH' ) || exit;
 trait PostBuildMeta {
 
 	public function post_build_meta( array $record, ?array $ip ): array {
+		// The IPv6 address goes with a public IPv4 one (a server always has one, a database only with the add-on).
+		$cluster = null === $ip ? null : Clusters::get( (string) $record['cluster'] );
+
 		return array(
 			'disks_check' => null,
 			'ip'          => $ip['address'] ?? null,
+			'ip6'         => null === $cluster ? null : Ipv6::address( $cluster, (int) $record['vmid'] ),
 			'node'        => $record['node'],
 			'vmid'        => $record['vmid'],
 			'vm'          => array(

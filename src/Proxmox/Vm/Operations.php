@@ -12,7 +12,9 @@ use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Lifecycle;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Disk\DiskMeta;
+use BeltoftServices\Proxmox\Network\IpHistory;
 use BeltoftServices\Proxmox\Network\IpPool;
+use BeltoftServices\Proxmox\Network\Ipv6;
 use BeltoftServices\Proxmox\Network\NetConfig;
 use BeltoftServices\Proxmox\Network\PrivateNets;
 use BeltoftServices\Proxmox\Pve\Ownership;
@@ -426,6 +428,7 @@ final class Operations {
 		if ( true !== apply_filters( 'beltoft_services_hold_ip_on_delete', false, $this->r ) ) {
 			IpPool::release( $this->r->id() );
 		}
+		IpHistory::end( Ipv6::KIND, $this->r->id() );
 		VmRecords::remove( $this->r->id() );
 		Access::purge( $this->r );
 

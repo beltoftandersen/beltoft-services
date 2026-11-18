@@ -205,4 +205,79 @@ final class Ipv6 {
 	public static function text( string $packed ): string {
 		return (string) inet_ntop( $packed );
 	}
+
+	// -- ipconfig0 ---------------------------------------------------------------------------------
+
+	/**
+	 * The ipconfig0 string with the IPv6 keys (`ip6`, `gw6`) taken out: what the IPv4 side says, untouched and in order.
+	 *
+	 * @param string $ipconfig0 The VM's ipconfig0.
+	 */
+	public static function strip( string $ipconfig0 ): string {
+		$keep = array();
+
+		foreach ( '' === $ipconfig0 ? array() : explode( ',', $ipconfig0 ) as $token ) {
+			if ( ! in_array( explode( '=', $token, 2 )[0], array( 'ip6', 'gw6' ), true ) ) {
+				$keep[] = $token;
+			}
+		}
+
+		return implode( ',', $keep );
+	}
+
+	/**
+	 * The IPv6 keys of an ipconfig0, normalised: `ip6` as `address/length`, `gw6` as an address. Empty for a key that is
+	 * missing or does not parse (`auto`, `dhcp`).
+	 *
+	 * @param string $ipconfig0 The VM's ipconfig0.
+	 * @return array{ip6: string, gw6: string}
+	 */
+	public static function keys( string $ipconfig0 ): array {
+		$out = array( 'ip6' => '', 'gw6' => '' );
+
+		foreach ( '' === $ipconfig0 ? array() : explode( ',', $ipconfig0 ) as $token ) {
+			$pair = explode( '=', $token, 2 );
+
+			if ( 'ip6' === $pair[0] && isset( $pair[1] ) && 1 === preg_match( '#^([0-9A-Fa-f:]+)/(\d{1,3})$#D', $pair[1], $m ) && null !== self::normalise( $m[1] ) ) {
+				$out['ip6'] = self::normalise( $m[1] ) . '/' . (int) $m[2];
+			} elseif ( 'gw6' === $pair[0] && isset( $pair[1] ) && null !== self::normalise( $pair[1] ) ) {
+				$out['gw6'] = (string) self::normalise( $pair[1] );
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * The VM's ipconfig0 with the IPv6 part this cluster wants for the VMID. The IPv4 part is the VM's own and is never
+	 * rewritten. A cluster with IPv6 off leaves the string as it is (a written address stays, see the rollout notes).
+	 *
+	 * @param string               $ipconfig0 The VM's ipconfig0.
+	 * @param array<string, mixed> $cluster   Cluster settings.
+	 * @param int                  $vmid      VMID.
+	 */
+	public static function with_ipconfig( string $ipconfig0, array $cluster, int $vmid ): string {
+		$wanted = self::ipconfig( $cluster, $vmid );
+
+		if ( '' === $wanted ) {
+			return $ipconfig0;
+		}
+
+		$v4 = self::strip( $ipconfig0 );
+
+		return '' === $v4 ? $wanted : $v4 . ',' . $wanted;
+	}
+
+	/**
+	 * Does the ipconfig0 carry the IPv6 part this cluster wants for the VMID? True when the cluster has IPv6 off (nothing wanted).
+	 *
+	 * @param string               $ipconfig0 The VM's ipconfig0.
+	 * @param array<string, mixed> $cluster   Cluster settings.
+	 * @param int                  $vmid      VMID.
+	 */
+	public static function has_ipconfig( string $ipconfig0, array $cluster, int $vmid ): bool {
+		$wanted = self::ipconfig( $cluster, $vmid );
+
+		return '' === $wanted || self::keys( $ipconfig0 ) === self::keys( $wanted );
+	}
 }

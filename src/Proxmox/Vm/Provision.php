@@ -16,7 +16,9 @@ use BeltoftServices\Proxmox\Db\DbEngines;
 use BeltoftServices\Proxmox\Db\DbProfile;
 use BeltoftServices\Proxmox\Disk\DiskSteps;
 use BeltoftServices\Proxmox\Network\Firewall;
+use BeltoftServices\Proxmox\Network\IpHistory;
 use BeltoftServices\Proxmox\Network\IpPool;
+use BeltoftServices\Proxmox\Network\Ipv6;
 use BeltoftServices\Proxmox\Network\NetConfig;
 use BeltoftServices\Proxmox\Network\PrivateAttach;
 use BeltoftServices\Proxmox\Pve\Capacity;
@@ -1572,6 +1574,12 @@ final class Provision {
 		}
 
 		$meta = $this->profile->post_build_meta( $record, $ip );
+
+		if ( is_string( $meta['ip6'] ?? null ) && '' !== $meta['ip6'] ) {
+			// Bookkeeping for abuse reports: the address is derived from the VMID, which is reused after a delete.
+			IpHistory::start_once( Ipv6::KIND, $meta['ip6'], $this->r->id() );
+		}
+
 		if ( '' !== (string) $this->r->get( 'app_id' ) && ! $this->r->get( 'app_state' ) ) {
 			$meta['app_state'] = 'pending';
 		}
