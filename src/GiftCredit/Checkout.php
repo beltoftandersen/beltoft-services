@@ -239,7 +239,7 @@ final class Checkout {
 		$name = trim( wp_strip_all_tags( (string) $saved['token']->get_display_name() ) );
 
 		/* translators: %s: the saved payment method, for example "Visa ending in 4242". */
-		echo '<p class="beltoft-services-credit-saved">' . esc_html( sprintf( __( 'Paid from your account credit. Renewals use your saved payment method (%s).', 'beltoft-services' ), $name ) ) . '</p>';
+		echo '<p class="beltoft-services-credit-saved">' . esc_html( sprintf( __( 'Paid from your account credit. Renewals are paid from your account credit first, then from your saved payment method (%s).', 'beltoft-services' ), $name ) ) . '</p>';
 	}
 
 	/**

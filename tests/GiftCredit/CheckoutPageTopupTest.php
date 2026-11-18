@@ -376,7 +376,7 @@ class CheckoutPageTopupTest extends GiftCreditTestCase {
 		ob_start();
 		Checkout::saved_method_line();
 		$line = (string) ob_get_clean();
-		$this->assertStringContainsString( 'Paid from your account credit. Renewals use your saved payment method (', $line );
+		$this->assertStringContainsString( 'Paid from your account credit. Renewals are paid from your account credit first, then from your saved payment method (', $line );
 		$this->assertStringContainsString( 'ending in 4242', $line );
 		$this->assertStringNotContainsString( "\u{2014}", $line );
 		$this->assertNotNull( Checkout::saved_card( $user ) );
