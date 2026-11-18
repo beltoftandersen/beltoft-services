@@ -210,7 +210,11 @@ final class Tiles {
 	}
 
 	/**
-	 * The tiles of the operating systems a cluster lists.
+	 * The tiles of the operating systems a cluster lists: one tile per family (Ubuntu, Debian, AlmaLinux), with the
+	 * versions of that family in a select under the group. The tile's radio carries the VMID of the version chosen, so
+	 * the posted field and value are the same as with one tile per version. Newest version first in a family; the family
+	 * of the system checked shows that system, any other family shows its newest version. Tile order is the order of the
+	 * first template of each family in $options. A family with one version has no select.
 	 *
 	 * @param string             $cluster  Cluster id.
 	 * @param array<int, string> $options  VMID => label.
@@ -219,17 +223,66 @@ final class Tiles {
 	 */
 	public static function os_items( string $cluster, array $options, int $selected ): array {
 		$families = (array) ( Clusters::get( $cluster )['template_families'] ?? array() );
-		$items    = array();
+		$groups   = array();
 
 		foreach ( $options as $vmid => $label ) {
-			$parts   = self::os_parts( (string) $label );
-			$items[] = array(
+			$parts = self::os_parts( (string) $label );
+			$key   = strtolower( '' !== $parts[1] ? $parts[0] : (string) $label );
+
+			$groups[ $key ][] = array(
 				'value'   => (string) $vmid,
+				'label'   => (string) $label,
 				'name'    => $parts[0],
 				'line'    => $parts[1],
-				'logo'    => self::os_logo( (int) $vmid, (string) $label, (string) ( $families[ (int) $vmid ] ?? '' ) ),
-				'checked' => (int) $vmid === $selected,
-				'attrs'   => array( 'data-family' => (string) ( $families[ (int) $vmid ] ?? '' ) ),
+				'family'  => (string) ( $families[ (int) $vmid ] ?? '' ),
+				'version' => 1 === preg_match( '/(\d[\w.]*)(?:\s+LTS)?$/iD', trim( (string) $label ), $m ) ? $m[1] : '',
+			);
+		}
+
+		$items = array();
+
+		foreach ( $groups as $versions ) {
+			// Newest first; equal versions keep their order.
+			$order = array_keys( $versions );
+			usort(
+				$order,
+				static function ( $a, $b ) use ( $versions ): int {
+					return version_compare( $versions[ $b ]['version'], $versions[ $a ]['version'] ) ?: $a <=> $b;
+				}
+			);
+
+			$shown = $versions[ $order[0] ];
+
+			foreach ( $versions as $entry ) {
+				if ( (int) $entry['value'] === $selected ) {
+					$shown = $entry;
+				}
+			}
+
+			$attrs = array( 'data-family' => $shown['family'] );
+
+			if ( count( $versions ) > 1 ) {
+				$list = array();
+
+				foreach ( $order as $i ) {
+					$list[] = array(
+						'value'  => $versions[ $i ]['value'],
+						'label'  => $versions[ $i ]['label'],
+						'line'   => $versions[ $i ]['line'],
+						'family' => $versions[ $i ]['family'],
+					);
+				}
+
+				$attrs['data-versions'] = (string) wp_json_encode( $list );
+			}
+
+			$items[] = array(
+				'value'   => $shown['value'],
+				'name'    => $shown['name'],
+				'line'    => $shown['line'],
+				'logo'    => self::os_logo( (int) $shown['value'], $shown['label'], $shown['family'] ),
+				'checked' => (int) $shown['value'] === $selected,
+				'attrs'   => $attrs,
 			);
 		}
 
@@ -308,11 +361,52 @@ final class Tiles {
 
 		echo '</div>';
 
+		if ( 'os' === $kind ) {
+			self::print_version_row( $id, (array) ( $group['items'] ?? array() ) );
+		}
+
 		if ( '' !== (string) ( $group['note'] ?? '' ) ) {
 			echo '<p class="beltoft-services-tiles__note description" data-tiles-note hidden>' . esc_html( (string) $group['note'] ) . '</p>';
 		}
 
 		echo '</fieldset>';
+	}
+
+	/**
+	 * The version select of the system tiles: hidden until the script shows it for a family with more than one version.
+	 * It has no name; the script writes the version into the checked tile's value, which is what is posted. Without the
+	 * script the family's tile posts the version it shows.
+	 *
+	 * @param string                           $id    Id of the group.
+	 * @param array<int, array<string, mixed>> $items Items of the group.
+	 */
+	private static function print_version_row( string $id, array $items ): void {
+		$shown = null;
+		$any   = false;
+
+		foreach ( $items as $item ) {
+			$any = $any || ! empty( $item['attrs']['data-versions'] );
+
+			if ( ! empty( $item['checked'] ) ) {
+				$shown = $item;
+			}
+		}
+
+		if ( ! $any ) {
+			return;
+		}
+
+		$select = ( '' !== $id ? $id : 'beltoft-os' ) . '-version';
+		$list   = null !== $shown && ! empty( $shown['attrs']['data-versions'] ) ? json_decode( (string) $shown['attrs']['data-versions'], true ) : array();
+
+		echo '<p class="beltoft-services-tiles__versions form-row" data-tiles-os-version-row hidden><label for="' . esc_attr( $select ) . '">' . esc_html__( 'Version', 'beltoft-services' ) . '</label>';
+		echo '<select id="' . esc_attr( $select ) . '" data-tiles-os-version>';
+
+		foreach ( (array) $list as $entry ) {
+			echo '<option value="' . esc_attr( (string) $entry['value'] ) . '"' . selected( (string) $entry['value'], (string) $shown['value'], false ) . '>' . esc_html( (string) $entry['label'] ) . '</option>';
+		}
+
+		echo '</select></p>';
 	}
 
 	/**

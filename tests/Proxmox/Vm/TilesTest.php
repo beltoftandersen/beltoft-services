@@ -255,4 +255,99 @@ class TilesTest extends TestCase {
 		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/vm.js' );
 		$this->assertStringContainsString( "'radio' !== field.type || field.checked", $js );
 	}
+
+	private function os_cluster(): array {
+		$labels = array(
+			9000 => 'Ubuntu 24.04',
+			9001 => 'Debian 12',
+			9002 => 'Ubuntu 26.04 LTS',
+			9003 => 'Ubuntu 22.04',
+			9004 => 'AlmaLinux 9',
+			9005 => 'Debian 13',
+			9006 => 'Custom image',
+		);
+		update_option(
+			\BeltoftServices\Proxmox\Pve\Clusters::OPTION,
+			array(
+				'osv' => array(
+					'templates'         => $labels,
+					'template_families' => array( 9000 => 'ubuntu-24.04', 9001 => 'debian-12', 9002 => 'ubuntu-26.04', 9003 => 'ubuntu-22.04', 9004 => 'almalinux-9', 9005 => 'debian-13' ),
+				),
+			)
+		);
+
+		return $labels;
+	}
+
+	public function test_system_tiles_are_one_per_family_with_the_newest_version_first(): void {
+		$items = Tiles::os_items( 'osv', $this->os_cluster(), 9000 );
+
+		$this->assertSame( array( 'Ubuntu', 'Debian', 'AlmaLinux', 'Custom image' ), array_column( $items, 'name' ), 'One tile per family, in the order the families first appear.' );
+
+		$ubuntu = json_decode( $items[0]['attrs']['data-versions'], true );
+		$this->assertSame( array( '9002', '9000', '9003' ), array_column( $ubuntu, 'value' ), '26.04, 24.04, 22.04.' );
+		$this->assertSame( array( 'ubuntu-26.04', 'ubuntu-24.04', 'ubuntu-22.04' ), array_column( $ubuntu, 'family' ) );
+		$this->assertSame( array( '9005', '9001' ), array_column( json_decode( $items[1]['attrs']['data-versions'], true ), 'value' ), 'Debian 13 before 12.' );
+	}
+
+	public function test_the_checked_system_stays_checked_and_other_families_show_their_newest(): void {
+		$items = Tiles::os_items( 'osv', $this->os_cluster(), 9000 );
+
+		$this->assertSame( '9000', $items[0]['value'], 'The preselected system is the tile value.' );
+		$this->assertTrue( $items[0]['checked'] );
+		$this->assertSame( 'Version 24.04', $items[0]['line'] );
+		$this->assertSame( 'ubuntu-24.04', $items[0]['attrs']['data-family'] );
+		$this->assertSame( '9005', $items[1]['value'], 'Debian shows its newest version.' );
+		$this->assertFalse( $items[1]['checked'] );
+
+		$items = Tiles::os_items( 'osv', $this->os_cluster(), 9001 );
+		$this->assertSame( '9001', $items[1]['value'] );
+		$this->assertTrue( $items[1]['checked'] );
+		$this->assertFalse( $items[0]['checked'] );
+		$this->assertSame( '9002', $items[0]['value'] );
+	}
+
+	public function test_a_family_with_one_version_has_no_versions_list(): void {
+		$items = Tiles::os_items( 'osv', $this->os_cluster(), 9000 );
+
+		$this->assertArrayNotHasKey( 'data-versions', $items[2]['attrs'] );
+		$this->assertSame( '9004', $items[2]['value'] );
+		$this->assertArrayNotHasKey( 'data-versions', $items[3]['attrs'] );
+		$this->assertSame( 'Custom image', $items[3]['name'] );
+
+		ob_start();
+		Tiles::print_os( 'osv', array( 9004 => 'AlmaLinux 9', 9006 => 'Custom image' ), 9004, 'os', 'os-one' );
+		$html = (string) ob_get_clean();
+		$this->assertStringNotContainsString( 'data-tiles-os-version', $html, 'No select when no family has a second version.' );
+	}
+
+	public function test_the_posted_value_is_the_same_field_and_a_system_id_as_before(): void {
+		$labels = $this->os_cluster();
+
+		ob_start();
+		Tiles::print_os( 'osv', $labels, 9000, 'os', 'beltoft-vm-os' );
+		$html = (string) ob_get_clean();
+
+		$this->assertSame( 4, substr_count( $html, 'type="radio" name="os"' ), 'One radio per family, all in the same group named os.' );
+		$this->assertMatchesRegularExpression( '#<input[^>]*type="radio" name="os" value="9000" checked#', $html );
+		preg_match_all( '#type="radio" name="os" value="(\d+)"#', $html, $m );
+		foreach ( $m[1] as $value ) {
+			$this->assertArrayHasKey( (int) $value, $labels, 'Every posted value is a template id the cluster lists.' );
+		}
+
+		// The select has no name (it is never posted itself), is labelled and starts hidden for the script.
+		$this->assertMatchesRegularExpression( '#<p class="[^"]*" data-tiles-os-version-row hidden><label for="beltoft-vm-os-version">Version</label><select id="beltoft-vm-os-version" data-tiles-os-version>#', $html );
+		$this->assertDoesNotMatchRegularExpression( '#<select[^>]*name=#', $html );
+		$this->assertMatchesRegularExpression( '#<option value="9002">Ubuntu 26.04 LTS</option><option value="9000" selected=\'selected\'>Ubuntu 24.04</option><option value="9003">Ubuntu 22.04</option>#', $html );
+		$this->assertStringNotContainsString( '—', $html );
+		$this->assertStringNotContainsString( '·', $html );
+	}
+
+	public function test_the_script_writes_the_chosen_version_into_the_tile_value(): void {
+		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/tiles.js' );
+
+		$this->assertStringContainsString( 'radio.value = entry.value;', $js );
+		$this->assertStringContainsString( 'data-tiles-os-version', $js );
+		$this->assertSame( 3, substr_count( $js, 'refresh();' ), 'A version change refreshes the order summary through the existing listeners.' );
+	}
 }
