@@ -100,6 +100,7 @@ final class Definitions {
 			'list_server_plans' => self::read( 'Lists the server plans that can be ordered through Claude, pay as you go: id, name, CPU, memory and disk, price per hour and the max per month (excluding VAT), what daily backups add, the extra disk sizes with their price, the systems and the apps each plan offers. Use it before order_server.', $none, 20 ),
 			'list_dns_claims'  => self::read( 'Lists the domains the customer has asked us to host DNS for while the domain is registered elsewhere, with the state of each. Only when the site offers it.' . self::DATA, $none, 30 ),
 			'console_link'     => self::read( 'Gives the address of the console page of one server in the customer\'s dashboard. The customer opens it in the browser and logs in there. No console session is made here.', $by_id, 30 ),
+			'dedicated_info'   => self::read( 'Shows one dedicated server: which restart and power actions it offers, whether its rescue system is on (never its password), the reverse DNS names, the incoming firewall rules, and the systems a reinstall offers (reinstall_systems, exact names for dedicated_reinstall).' . self::DATA, $by_id, 30 ),
 			'hosting_info'     => self::read( 'Shows one hosting account: its websites (name, whether it has WordPress, PHP version, workers, addresses with their state, the database name, user and host, the scheduled jobs), the plan ceilings (websites, PHP workers, PHP memory, upload size, offered PHP versions) and what an external domain must point at, and the task the account is busy with now (task: a change runs in the background, one at a time) and the last change that failed (last).' . self::DATA, $by_id, 30 ),
 			'hosting_usage'    => self::read( 'Shows the usage of one hosting account: CPU, memory in use (without the file cache, in percent), disk and database size, and how full the storage is of the plan. Files and databases count together.' . self::DATA, $by_id, 30 ),
 			'list_hosting_backups' => self::read( 'Lists the backups of one hosting account (nightly and manual, with date, size and the volume id that restore_hosting_backup takes) and the safety copy of the last restore, if there is one.' . self::DATA, $by_id, 30 ),
@@ -214,6 +215,10 @@ final class Definitions {
 				true,
 				true
 			),
+			'dedicated_restart' => self::act( 'Restarts a dedicated server with a software restart: the system shuts down normally and starts again. Ask the customer first. A hardware reset needs dedicated_hard_reset.', $by_id, true ),
+			'dedicated_power_on' => self::act( 'Sends the Wake on LAN signal that switches on a dedicated server that is off. Only for servers that offer it (dedicated_info).', $by_id, false, true ),
+			'dedicated_set_rdns' => self::act( 'Sets, or with an empty name removes, the reverse DNS name of one address of a dedicated server: its IPv4 address, or an address inside its IPv6 network. The name must be a host name such as server.example.com.', self::obj( array( 'id' => $id, 'ip' => array( 'type' => 'string', 'maxLength' => 45, 'description' => 'The address.' ), 'ptr' => array( 'type' => 'string', 'maxLength' => 253, 'description' => 'The host name. Empty removes the name.' ) ), array( 'id', 'ip' ) ), false, true ),
+			'dedicated_rescue' => self::act( 'Switches the rescue system of a dedicated server on or off, optionally restarting the server into it with a software restart. It works only for servers where the customer gave an SSH key: the customer then logs in as root with the key. Without a key the rescue password is shown only in the dashboard, behind a code we email to the customer. Ask the customer first.', self::obj( array( 'id' => $id, 'on' => array( 'type' => 'boolean', 'description' => 'True to switch it on, false to switch it off.' ), 'restart' => array( 'type' => 'boolean', 'description' => 'With on: restart the server now so it starts in the rescue system. Default false: it starts in it the next time the server starts.' ) ), array( 'id', 'on' ) ), true ),
 			'add_site_domain'  => self::act( 'Adds a domain name to a website of a hosting account. A domain the customer holds on our name servers is pointed at the hosting at once; for another domain the result says which DNS records the customer must add. Connecting the name to the website runs in the background (queued: hosting_info shows the account\'s task until it is done; another change is refused until then). Ask the customer first.', self::obj( array( 'id' => $id, 'site' => array( 'type' => 'string', 'maxLength' => 32, 'description' => 'The website name, from hosting_info.' ), 'domain' => array( 'type' => 'string', 'maxLength' => 253, 'description' => 'The domain name, for example www.example.com.' ) ), array( 'id', 'site', 'domain' ) ), false ),
 			'set_php_version'  => self::act( 'Changes the PHP version of a website, and optionally its PHP memory limit and upload size (never above the plan). The website restarts its PHP. The change is queued and runs in the background (hosting_info shows the account\'s task; another change is refused until it is done). Ask the customer first.', self::obj( array( 'id' => $id, 'site' => array( 'type' => 'string', 'maxLength' => 32, 'description' => 'The website name, from hosting_info.' ), 'php' => array( 'type' => 'string', 'maxLength' => 8, 'description' => 'A version from hosting_info, for example 8.4.' ), 'memory_mb' => array( 'type' => 'integer', 'minimum' => 64, 'description' => 'PHP memory limit in MB. Optional.' ), 'upload_mb' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'Upload size in MB. Optional.' ) ), array( 'id', 'site', 'php' ) ), false, true ),
 			'clear_site_cache' => self::act( 'Clears the page cache of a website of a hosting account. Queued: it runs in the background, and another change of the account is refused until it is done (hosting_info shows the task).', self::obj( array( 'id' => $id, 'site' => array( 'type' => 'string', 'maxLength' => 32, 'description' => 'The website name, from hosting_info.' ) ), array( 'id', 'site' ) ), false, true ),
@@ -309,6 +314,49 @@ final class Definitions {
 			'restore_hosting_backup' => self::full(
 				'Restores a hosting account from one of its backups: the whole account, the files of one website or the database of one website. What was changed since is replaced. A safety copy is made first and the customer can undo it in the dashboard for 24 hours. Get the backup from list_hosting_backups.',
 				self::obj( array( 'id' => $id, 'scope' => array( 'type' => 'string', 'enum' => array( 'account', 'files', 'database' ) ), 'backup' => array( 'type' => 'string', 'maxLength' => 200, 'description' => 'The volume id of the backup, from list_hosting_backups.' ), 'site' => array( 'type' => 'string', 'maxLength' => 32, 'description' => 'The website name, for files and database.' ) ), array( 'id', 'scope', 'backup' ), true )
+			),
+			'dedicated_hard_reset' => self::full(
+				'Resets a dedicated server by force: a hardware reset, or the power button (press or hold). The server stops at once, like a power failure, and unsaved data is lost. Use dedicated_info for the actions the server offers. A normal restart is dedicated_restart.',
+				self::obj( array( 'id' => $id, 'type' => array( 'type' => 'string', 'enum' => array( 'hw', 'power', 'power_long' ), 'description' => 'hw: hardware reset. power: press the power button. power_long: hold the power button.' ) ), array( 'id', 'type' ), true )
+			),
+			'dedicated_set_firewall' => self::full(
+				'Replaces the incoming firewall rules of a dedicated server and switches the firewall on or off. The rules it has now are removed, so read dedicated_info first and send the rules to keep. A set of rules that does not accept SSH (TCP port 22) can lock the customer out.',
+				self::obj(
+					array(
+						'id'            => $id,
+						'status'        => array( 'type' => 'string', 'enum' => array( 'active', 'disabled' ) ),
+						'whitelist_hos' => array( 'type' => 'boolean', 'description' => 'Let the supplier\'s own services through. Optional: left as it is.' ),
+						'filter_ipv6'   => array( 'type' => 'boolean', 'description' => 'Filter IPv6 too. Optional: left as it is.' ),
+						'input'         => array(
+							'type'        => 'array',
+							'maxItems'    => 100,
+							'description' => 'The incoming rules. Each: action (accept or discard, required), optional name, ip_version (ipv4 or ipv6), src_ip and dst_ip (IPv4 only, address or network), src_port, dst_port (a port or a range such as 8000-8100), protocol (tcp, udp, gre, icmp, ipip, ah, esp; needs ip_version).',
+							'items'       => array(
+								'type'                 => 'object',
+								'additionalProperties' => false,
+								'properties'           => array(
+									'action'     => array( 'type' => 'string', 'enum' => array( 'accept', 'discard' ) ),
+									'name'       => array( 'type' => 'string', 'maxLength' => 80 ),
+									'ip_version' => array( 'type' => 'string', 'enum' => array( 'ipv4', 'ipv6' ) ),
+									'src_ip'     => array( 'type' => 'string', 'maxLength' => 45 ),
+									'dst_ip'     => array( 'type' => 'string', 'maxLength' => 45 ),
+									'src_port'   => array( 'type' => 'string', 'maxLength' => 11 ),
+									'dst_port'   => array( 'type' => 'string', 'maxLength' => 11 ),
+									'protocol'   => array( 'type' => 'string', 'enum' => array( 'tcp', 'udp', 'gre', 'icmp', 'ipip', 'ah', 'esp' ) ),
+								),
+								'required'             => array( 'action' ),
+							),
+						),
+					),
+					array( 'id', 'status', 'input' ),
+					true
+				),
+				false,
+				true
+			),
+			'dedicated_reinstall' => self::full(
+				'Erases all disks of a dedicated server and installs a system again. Everything on the server is lost and the server is down for about 15 minutes. The system is one of the exact names in dedicated_info (reinstall_systems). The customer then logs in with their SSH key, or with a new root password that is shown only in the dashboard.',
+				self::obj( array( 'id' => $id, 'image' => array( 'type' => 'string', 'maxLength' => 128, 'description' => 'The system, an exact name from dedicated_info (reinstall_systems).' ) ), array( 'id', 'image' ), true )
 			),
 			'delete_site'      => self::full(
 				'Deletes one website of a hosting account: its files, its database and its addresses, for good. The last website of an account cannot be deleted. The deletion is queued and runs in the background; hosting_info shows the website and its task until it is gone.',

@@ -29,6 +29,15 @@ final class Told {
 	 */
 	public static function phrase( string $name, array $args ): string {
 		switch ( $name ) {
+			case 'dedicated_hard_reset':
+				return __( 'reset the dedicated server by force, like a power failure', 'beltoft-services' );
+
+			case 'dedicated_set_firewall':
+				return __( 'replaced the incoming firewall rules of the dedicated server', 'beltoft-services' );
+
+			case 'dedicated_reinstall':
+				return __( 'reinstalled the dedicated server, which erases everything on it', 'beltoft-services' );
+
 			case 'delete_site':
 				/* translators: %s: website name. */
 				return sprintf( __( 'deleted the website %s with its files and its database', 'beltoft-services' ), sanitize_text_field( (string) ( $args['site'] ?? '' ) ) );

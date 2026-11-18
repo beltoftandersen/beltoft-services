@@ -86,7 +86,13 @@ final class DistField {
 				continue;
 			}
 
-			$list   = DistCatalog::for_product( $ref );
+			$list = DistCatalog::for_product( $ref );
+
+			// A product the supplier does not list (or lists nothing for) asks nothing: the plan's or the setting's system applies.
+			if ( array() === $list ) {
+				continue;
+			}
+
 			$shared = null === $shared ? $list : array_values( array_intersect( $shared, $list ) );
 		}
 

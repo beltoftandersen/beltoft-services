@@ -198,6 +198,7 @@ final class Plugin {
 		Api\Tokens::register();
 		Oauth\Server::register();
 		Mcp\Access::register();
+		Mcp\DedicatedTools::register();
 		Mcp\Endpoint::register();
 		Account\ApiTokens::register();
 		Account\Flash::register();

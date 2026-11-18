@@ -226,6 +226,14 @@
         "label": "Distribution to preinstall",
         "desc": "The name exactly as the supplier product lists it (optional). A plan can set its own. Empty: none is preinstalled."
     },
+    "dedicated_images": {
+        "tab": "dedicated",
+        "section": "dedicated",
+        "type": "textarea",
+        "default": "",
+        "label": "Systems for a reinstall",
+        "desc": "One image file name per line, exactly as the installer lists them (the result of ls \/root\/images in a rescue system). Used until a reinstall has read the real list from a rescue system. Empty and no list yet: the reinstall is not offered."
+    },
     "dedicated_max_servers": {
         "tab": "dedicated",
         "section": "dedicated",

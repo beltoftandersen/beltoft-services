@@ -364,7 +364,7 @@ final class ServerControls {
 	 * @param string $ptr Host name.
 	 */
 	public static function valid_ptr( string $ptr ): bool {
-		return 1 === preg_match( '/^(?=.{1,253}\.?$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}\.?$/iD', $ptr );
+		return \BeltoftServices\Domains\HostName::is_host( strtolower( rtrim( $ptr, '.' ) ), 253, true );
 	}
 
 	/**
@@ -377,7 +377,7 @@ final class ServerControls {
 	 */
 	public static function rdns_set( Resource $r, string $ip, string $ptr ) {
 		$own = self::own_address( $r, $ip );
-		$ptr = rtrim( trim( $ptr ), '.' );
+		$ptr = strtolower( rtrim( trim( $ptr ), '.' ) );
 
 		if ( '' === $own ) {
 			return self::refusal( 'dedicated_invalid', __( 'That address does not belong to this server.', 'beltoft-services' ), 400 );

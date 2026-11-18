@@ -283,7 +283,7 @@ final class ToolsMapTest extends McpTestCase {
 			'set_default_card', 'set_subscription_payment_method', 'delete_saved_card', 'add_card',
 			'reveal_server_password', 'reveal_database_password', 'reveal_app_login', 'database_ca_certificate', 'delete_mailbox', 'reset_mailbox_password', 'reveal_mailbox_password',
 			'domain_transfer_code', 'domain_unlock', 'console_ticket', 'account_password_and_email', 'connected_apps_and_limits',
-			'order_server', 'order_database', 'delete_server', 'delete_database', 'restore_hosting_backup', 'delete_site', 'delete_hosting_backup', 'reveal_hosting_database_password', 'hosting_scheduled_jobs',
+			'order_server', 'order_database', 'delete_server', 'delete_database', 'restore_hosting_backup', 'delete_site', 'dedicated_hard_reset', 'dedicated_firewall', 'dedicated_reinstall', 'dedicated_rescue_password', 'delete_hosting_backup', 'reveal_hosting_database_password', 'hosting_scheduled_jobs',
 		);
 
 		foreach ( $known as $capability ) {
