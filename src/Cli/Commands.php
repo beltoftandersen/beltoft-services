@@ -685,7 +685,7 @@ final class Commands {
 				}
 
 				$skipped = 'ready' !== $r->get( 'state' ) || true === $r->get( 'linked' ) || $r->on_hold();
-				$done    = $address === $r->get( 'ip6' ) && (int) $r->get( 'ipv6_at' ) > 0;
+				$done    = $address === $r->get( 'ip6' );
 
 				$items[] = array(
 					'cluster' => (string) $id,

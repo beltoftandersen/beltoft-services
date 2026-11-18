@@ -11,20 +11,23 @@ use BeltoftLicenses\Events;
 use BeltoftServices\Alerts;
 use BeltoftServices\Api\Routes;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * POST beltoft-services/v1/flows, sent every minute by the collector on the host: `{"v":1,"at":<unix>,"sources":{"<ipv4>":
+ * POST beltoft-services/v1/flows, sent every minute by the collector on the host: `{"v":1,"at":<unix>,"sources":{"<ipv4 or ipv6>":
  * {"entries","dsts","dports","unreplied","udp_dsts"}}}`, counts only, signed with `X-Beltoft-Signature` (hex
  * HMAC-SHA256 of the raw body with the wp-config constant BELTOFT_SERVICES_FLOW_SECRET). Without the constant the
  * route refuses everything. Checked in this order: the sending address (setting `flow_sources`), the body size, the
  * signature, the shape, the time (120 s), and a time not seen before (replay).
  *
- * Each address is mapped to its server through the IP pool (assigned addresses only; an unknown address, a server that
- * is not ready and an adopted (linked) server are ignored). The last 60 samples per server are kept in a transient. A
+ * Each address is mapped to its server: an IPv4 address through the IP pool (assigned addresses only), an IPv6 address
+ * through the cluster prefix and the VMID in it (Ipv6::vmid_for; any address of the server's /80 counts); an unknown
+ * address, a server that is not ready and an adopted (linked) server are ignored. A server that appears with both
+ * families in one body gets one sample, the counts added. The last 60 samples per server are kept in a transient. A
  * signal (scanning: addresses or ports; SYN flood: unanswered attempts; UDP flood: UDP destinations) counts when every one
  * of the last N one-minute samples is over its limit; a gap of more than 150 seconds between samples starts the count again.
  *
@@ -37,7 +40,7 @@ final class Flows {
 	public const SECRET = 'BELTOFT_SERVICES_FLOW_SECRET';
 
 	public const MAX_BYTES   = 65536;
-	public const MAX_SOURCES = 64;
+	public const MAX_SOURCES = 128;
 	public const WINDOW      = 120;
 	public const KEEP        = 60;
 	public const MAX_GAP     = 150;
@@ -144,7 +147,7 @@ final class Flows {
 	}
 
 	/**
-	 * The strict shape: v 1, an integer time, at most 64 IPv4 sources with the five counts as non-negative integers.
+	 * The strict shape: v 1, an integer time, at most 128 IPv4 or IPv6 sources with the five counts as non-negative integers.
 	 *
 	 * @param string $body Raw body.
 	 * @return array{at: int, sources: array<string, array<string, int>>}|null
@@ -165,7 +168,10 @@ final class Flows {
 		foreach ( $data['sources'] as $ip => $counts ) {
 			$ip = (string) $ip;
 
-			if ( false === filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) || ! is_array( $counts ) || count( $counts ) !== count( self::COUNTS ) ) {
+			// IPv6 keys are kept as the compressed text, so one spelling is one source.
+			$ip = false !== strpos( $ip, ':' ) ? (string) Ipv6::normalise( $ip ) : $ip;
+
+			if ( '' === $ip || false === filter_var( $ip, FILTER_VALIDATE_IP ) || false !== strpos( $ip, '%' ) || isset( $sources[ $ip ] ) || ! is_array( $counts ) || count( $counts ) !== count( self::COUNTS ) ) {
 				return null;
 			}
 
@@ -191,13 +197,29 @@ final class Flows {
 		$used = 0;
 
 		if ( null !== $data && 'off' !== (string) Settings::get( 'traffic_quarantine' ) ) {
-			foreach ( $data['sources'] as $ip => $counts ) {
-				$resource = self::resource_of( $ip );
+			$by_server = array();
 
-				if ( $resource ) {
-					self::ingest( $resource, $data['at'], $counts );
-					++$used;
+			foreach ( $data['sources'] as $ip => $counts ) {
+				$resource = self::resource_of( (string) $ip );
+
+				if ( ! $resource ) {
+					continue;
 				}
+
+				$id = $resource->id();
+
+				if ( ! isset( $by_server[ $id ] ) ) {
+					$by_server[ $id ] = array( $resource, array_fill_keys( self::COUNTS, 0 ) );
+				}
+
+				foreach ( self::COUNTS as $key ) {
+					$by_server[ $id ][1][ $key ] = min( self::MAX_COUNT, $by_server[ $id ][1][ $key ] + $counts[ $key ] );
+				}
+			}
+
+			foreach ( $by_server as list( $resource, $counts ) ) {
+				self::ingest( $resource, $data['at'], $counts );
+				++$used;
 			}
 		}
 
@@ -213,6 +235,14 @@ final class Flows {
 	 * @param string $ip Address.
 	 */
 	private static function resource_of( string $ip ): ?Resource {
+		if ( Ipv6::is_address( $ip ) ) {
+			$derived = Ipv6::vmid_for( $ip );
+			$id      = null === $derived ? 0 : (int) ( VmRecords::for_cluster( $derived['cluster'] )[ $derived['vmid'] ] ?? 0 );
+			$r       = $id > 0 ? Resource::find( $id ) : null;
+
+			return $r && ProxmoxDriver::ID === $r->get( 'driver' ) && 'ready' === $r->get( 'state' ) && true !== $r->get( 'linked' ) ? $r : null;
+		}
+
 		$row = IpPool::find( $ip );
 
 		if ( null === $row || 'assigned' !== $row['state'] || empty( $row['resource_id'] ) ) {

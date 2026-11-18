@@ -8,13 +8,16 @@
 
 namespace BeltoftServices\Tests\Proxmox\Network;
 
+use BeltoftServices\Cli\Commands;
 use BeltoftServices\Proxmox\Network\IpHistory;
+use BeltoftServices\Proxmox\Network\IpWho;
 use BeltoftServices\Proxmox\Network\Ipv6;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 
 require_once __DIR__ . '/FirewallTestCase.php';
+require_once dirname( __DIR__, 2 ) . '/Support/WpCliStub.php';
 
 class Ipv6BuildTest extends FirewallTestCase {
 
@@ -84,5 +87,61 @@ class Ipv6BuildTest extends FirewallTestCase {
 		$this->assertSame( array( $first->id(), $second->id() ), array_column( $log, 'resource_id' ) );
 		$this->assertNotNull( $log[0]['ended_at'] );
 		$this->assertNull( $log[1]['ended_at'] );
+	}
+
+	public function test_who_finds_the_holders_of_an_ipv6_address_through_the_log_and_the_derivation(): void {
+		$this->ipv6_on();
+		list( $first ) = $this->ready();
+		\BeltoftServices\Drivers\Registry::get( 'proxmox' )->delete( Resource::find( $first->id() ) );
+		list( $second ) = $this->ready();
+
+		foreach ( array( '2001:db8:430c:1:1388::1', '2001:DB8:430C:1:1388:0:0:1', '2001:db8:430c:1:1388:0:0:77' ) as $spelling ) {
+			$found = IpWho::lookup( $spelling );
+			$this->assertCount( 2, $found, $spelling );
+			$this->assertSame( array( (string) $first->id(), (string) $second->id() ), array_column( $found, 'resource_id' ), $spelling );
+			$this->assertSame( array( Ipv6::KIND, Ipv6::KIND ), array_column( $found, 'kind' ) );
+			$this->assertSame( '', $found[1]['until'] );
+			$this->assertNotSame( '', $found[0]['until'] );
+		}
+
+		$this->assertSame( array(), IpWho::lookup( '2001:db8:430c:1:9999::1' ) );
+		$this->assertSame( array(), IpWho::lookup( '2001:db8:ffff:1:1388::1' ) );
+	}
+
+	public function test_a_holder_before_the_log_is_found_through_the_derivation(): void {
+		$this->ipv6_on();
+		list( $r ) = $this->ready();
+
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test fixture.
+		$wpdb->query( 'DELETE FROM ' . \BeltoftServices\Proxmox\Vm\Schema::tables()['ip_log'] );
+
+		$found = IpWho::lookup( '2001:db8:430c:1:1388::1' );
+		$this->assertCount( 1, $found );
+		$this->assertSame( (string) $r->id(), $found[0]['resource_id'] );
+		$this->assertStringContainsString( 'held before holdings were logged', $found[0]['note'] );
+	}
+
+	public function test_the_commands_take_ipv6(): void {
+		\WP_CLI::reset();
+		$cli = new Commands();
+		$this->ipv6_on();
+		list( $r ) = $this->ready();
+
+		$cli->who( array( '2001:db8:430c:1:1388::1' ), array( 'format' => 'json' ) );
+		$this->assertStringContainsString( '"resource_id":"' . $r->id() . '"', str_replace( ' ', '', \WP_CLI::$lines[0][1] ?? '' ) );
+
+		try {
+			$cli->who( array( 'not-an-ip' ), array() );
+			$this->fail( 'A bad address is refused.' );
+		} catch ( \RuntimeException $e ) {
+			$this->assertStringContainsString( 'IPv4 or IPv6', $e->getMessage() );
+		}
+
+		\WP_CLI::reset();
+		$cli->ipv6_list( array(), array( 'format' => 'json' ) );
+		$out = (string) ( \WP_CLI::$lines[0][1] ?? '' );
+		$this->assertStringContainsString( '2001:db8:430c:1:1388::1', $out );
+		$this->assertStringContainsString( '"status":"done"', $out );
 	}
 }
