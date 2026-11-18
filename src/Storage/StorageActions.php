@@ -133,6 +133,10 @@ final class StorageActions {
 		$client   = StorageClients::for();
 		$snapshot = (string) ( $args['snapshot'] ?? '' );
 
+		if ( in_array( $action, array( self::SNAPSHOT, self::SNAPSHOT_DELETE, self::ROLLBACK ), true ) ) {
+			Boxes::forget_snapshots( $r ); // the page reads the list again after this action (also when it fails)
+		}
+
 		switch ( $action ) {
 			case self::SNAPSHOT:
 				$done = $client->create_snapshot( $id, 'manual-' . gmdate( 'Ymd-His' ) );
@@ -173,6 +177,10 @@ final class StorageActions {
 				return self::reset_password( $r, $id, $client );
 			default:
 				return StepResult::refused( array(), 'Refused: unknown action' );
+		}
+
+		if ( in_array( $action, array( self::SNAPSHOT, self::SNAPSHOT_DELETE, self::ROLLBACK ), true ) ) {
+			Boxes::forget_snapshots( $r ); // again after the call: a page read while it ran must not keep the old list
 		}
 
 		if ( is_wp_error( $done ) ) {

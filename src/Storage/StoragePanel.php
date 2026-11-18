@@ -246,7 +246,7 @@ final class StoragePanel {
 	 * @param Resource $r Resource.
 	 */
 	private static function snapshots( Resource $r ): void {
-		$list = StorageClients::for()->snapshots( Boxes::id( $r ) );
+		$list = Boxes::snapshots( $r );
 		$plan = (array) $r->get( 'storage_snapshot_plan' );
 
 		echo '<h3>' . esc_html__( 'Snapshots', 'beltoft-services' ) . '</h3>';

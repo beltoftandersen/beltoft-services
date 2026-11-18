@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.43.3
+Stable tag: 0.43.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.43.4 =
+* Backup storage: the account page reads the snapshot list at most once a minute per box (it was half a second on every load); taking, deleting or restoring a snapshot shows the new list at once.
 
 = 0.43.3 =
 * Backup storage: sizes count in steps of 1024 like the provider sells them (the 1 TB box no longer reads "1.1 TB"), and the default country is translated (Danish: Tyskland).

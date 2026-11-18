@@ -184,6 +184,44 @@ final class Boxes {
 		return ( $whole ? number_format_i18n( $value, 0 ) : number_format_i18n( $value, 1 ) ) . ' ' . $units[ $i ];
 	}
 
+	/** Transient prefix of the snapshot list a page shows (one minute per box). */
+	public const SNAPSHOTS_CACHE = 'beltoft_services_storage_snaps_';
+
+	/**
+	 * The box's snapshots for the account page: read from the provider at most once a minute per box (the read takes about half a
+	 * second and the page made it on every load, owner 2026-11-18: "page is a bit slow"). A take, delete or restore clears it
+	 * ({@see Boxes::forget_snapshots()}), so the customer sees the change at once; a planned snapshot shows within a minute.
+	 *
+	 * @param Resource $r Resource.
+	 * @return array<int, array<string, mixed>>|\WP_Error
+	 */
+	public static function snapshots( Resource $r ) {
+		$id  = self::id( $r );
+		$key = self::SNAPSHOTS_CACHE . $r->id();
+		$hit = get_transient( $key );
+
+		if ( is_array( $hit ) && ( $hit['box'] ?? '' ) === $id ) {
+			return (array) $hit['list'];
+		}
+
+		$list = StorageClients::for()->snapshots( $id );
+
+		if ( is_array( $list ) ) {
+			set_transient( $key, array( 'box' => $id, 'list' => $list ), MINUTE_IN_SECONDS );
+		}
+
+		return $list;
+	}
+
+	/**
+	 * Forgets the cached snapshot list of a box (after a take, delete or restore).
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function forget_snapshots( Resource $r ): void {
+		delete_transient( self::SNAPSHOTS_CACHE . $r->id() );
+	}
+
 	/**
 	 * Is this error "the box (or record) is not there"? For a delete that means it is done.
 	 *
