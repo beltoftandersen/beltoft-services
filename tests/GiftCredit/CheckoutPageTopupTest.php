@@ -15,6 +15,25 @@ use BeltoftServices\GiftCredit\Topup;
 
 require_once __DIR__ . '/GiftCreditTestCase.php';
 
+/**
+ * Stands in for the Stripe wallet tokens (type Stripe_GooglePay / Stripe_ApplePay, which Stripe for WooCommerce does not load in the test
+ * site): a card token that needs no expiry date and no card number.
+ */
+class TestWalletToken extends \WC_Payment_Token_CC {
+	protected $type = 'Stripe_GooglePay';
+
+	public function validate() {
+		return true;
+	}
+}
+
+/**
+ * The Apple Pay type.
+ */
+class TestAppleWalletToken extends TestWalletToken {
+	protected $type = 'Stripe_ApplePay';
+}
+
 class CheckoutPageTopupTest extends GiftCreditTestCase {
 
 	public function set_up(): void {
@@ -24,6 +43,7 @@ class CheckoutPageTopupTest extends GiftCreditTestCase {
 	}
 
 	public function tear_down(): void {
+		remove_all_filters( 'woocommerce_payment_token_class' );
 		remove_filter( 'bgca_auto_apply', '__return_true', 99 );
 		remove_all_filters( 'bgca_topup_limits' );
 		Checkout::reset();
@@ -174,6 +194,223 @@ class CheckoutPageTopupTest extends GiftCreditTestCase {
 		$this->assertFalse( Checkout::gateway_saves_card( false ), 'Only a checkout asks.' );
 		Checkout::applied( new \WC_Order(), 0, 'checkout' );
 		$this->assertFalse( Checkout::gateway_saves_card( false ), 'No cards used: nothing to keep.' );
+	}
+
+	// A saved card instead of the gateway.
+
+	/**
+	 * The gateway the test checkout posts.
+	 *
+	 * @var string
+	 */
+	private string $posted_gateway = 'stripe_cc';
+
+	/**
+	 * A customer with credit and a cart of one monthly subscription of 10; the gateway "stripe_cc" is a test gateway that can be charged later.
+	 */
+	private function subscription_cart( int $cents, ?string $year = '2099', string $price = '10', string $gateway_id = 'stripe_cc', string $class = '' ): int {
+		global $wpdb;
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery -- test fixture: tokens are not rolled back and user ids are reused.
+		$wpdb->query( "DELETE FROM {$wpdb->prefix}woocommerce_payment_tokenmeta" );
+		$wpdb->query( "DELETE FROM {$wpdb->prefix}woocommerce_payment_tokens" );
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery
+		wp_cache_flush();
+
+		$gateway           = new \BeltoftServices\Tests\Usage\UsageCardGateway( $gateway_id );
+		$gateway->supports = array_merge( $gateway->supports, array( 'add_payment_method', 'tokenization' ) );
+		WC()->payment_gateways()->payment_gateways[ $gateway_id ] = $gateway;
+		$this->posted_gateway = $gateway_id;
+
+		$user = $this->new_user();
+		wp_set_current_user( $user );
+		wc_load_cart();
+		WC()->cart->empty_cart();
+		$this->card( $user, $cents, Source::ORDER );
+
+		$product = new \WC_Product_Subscription();
+		$product->set_name( 'Box ' . wp_generate_password( 5, false ) );
+		$product->set_status( 'publish' );
+		$product->set_regular_price( $price );
+		$product->update_meta_data( '_subscription_price', $price );
+		$product->update_meta_data( '_subscription_period', 'month' );
+		$product->update_meta_data( '_subscription_period_interval', '1' );
+		$product->update_meta_data( '_subscription_length', '0' );
+		$product->save();
+
+		if ( null !== $year && '' !== $class ) {
+			// A wallet token of Stripe for WooCommerce, as the customer saved it: no expiry date and no card number are required.
+			add_filter(
+				'woocommerce_payment_token_class',
+				static fn( $name, $type ) => 'Stripe_GooglePay' === $type ? TestWalletToken::class : ( 'Stripe_ApplePay' === $type ? TestAppleWalletToken::class : $name ),
+				10,
+				2
+			);
+			$token = new $class();
+			$token->set_gateway_id( $gateway_id );
+			$token->set_token( 'pm_wallet_' . wp_generate_password( 6, false ) );
+			$token->set_user_id( $user );
+			$token->set_default( true );
+
+			if ( '' !== $year ) {
+				$token->set_card_type( 'visa' );
+				$token->set_last4( '4242' );
+				$token->set_expiry_month( '08' );
+				$token->set_expiry_year( $year );
+			}
+
+			$token->save();
+		} elseif ( null !== $year ) {
+			$token = new \WC_Payment_Token_CC();
+			$token->set_gateway_id( $gateway_id );
+			$token->set_token( 'pm_saved_' . wp_generate_password( 6, false ) );
+			$token->set_user_id( $user );
+			$token->set_card_type( 'visa' );
+			$token->set_last4( '4242' );
+			$token->set_expiry_month( '08' );
+			$token->set_expiry_year( $year );
+			$token->set_default( true );
+			$token->save();
+		}
+
+		WC()->cart->add_to_cart( $product->get_id() );
+		WC()->cart->calculate_totals();
+		Checkout::reset();
+
+		return $user;
+	}
+
+	/**
+	 * What the checkout does: the order from the cart, then the hooks in their order. Returns the order, the subscriptions of it
+	 * and whether the gateway is asked.
+	 *
+	 * @return array{0: \WC_Order, 1: \WC_Subscription[], 2: bool}
+	 */
+	private function check_out( int $user, ?callable $between = null ): array {
+		$id = WC()->checkout()->create_order(
+			array(
+				'payment_method'   => $this->posted_gateway,
+				'billing_email'    => self::MAIL,
+				'billing_country'  => 'DK',
+				'billing_first_name' => 'A',
+				'billing_last_name'  => 'B',
+				'customer_id'      => $user,
+			)
+		);
+		$this->assertIsInt( $id );
+		$order = wc_get_order( $id );
+
+		if ( $between ) {
+			$between();
+		}
+
+		do_action( 'woocommerce_checkout_order_processed', $id, array( 'payment_method' => $this->posted_gateway ), $order );
+
+		$order = wc_get_order( $id );
+		$subs  = array_values( wcs_get_subscriptions_for_order( $order, array( 'order_type' => 'parent' ) ) );
+
+		return array( $order, $subs, (bool) apply_filters( 'woocommerce_cart_needs_payment', $order->needs_payment(), WC()->cart ) );
+	}
+
+	public function test_a_saved_card_and_credit_for_all_means_no_card_is_asked_and_the_subscription_gets_the_card(): void {
+		$user = $this->subscription_cart( 5000 );
+		list( $order, $subs, $asked ) = $this->check_out( $user );
+
+		$this->assertSame( '0.00', wc_format_decimal( $order->get_total(), 2 ), 'The cards paid all.' );
+		$this->assertFalse( $asked );
+		$this->assertCount( 1, $subs );
+		$token = \WC_Payment_Tokens::get_customer_default_token( $user );
+		$this->assertSame( 'stripe_cc', $subs[0]->get_payment_method() );
+		$this->assertSame( $token->get_token(), $subs[0]->get_meta( '_payment_method_token', true ) );
+		$this->assertFalse( $subs[0]->is_manual() );
+	}
+
+	/**
+	 * @dataProvider wallets
+	 */
+	public function test_a_wallet_only_customer_is_not_asked_and_the_subscription_gets_the_wallet( string $gateway, string $class, string $year ): void {
+		$user = $this->subscription_cart( 5000, $year, '10', $gateway, $class );
+		$token = \WC_Payment_Tokens::get_customer_default_token( $user );
+		$this->assertInstanceOf( $class, $token );
+		$this->assertTrue( \BeltoftServices\Card\Card::usable( \BeltoftServices\Card\Card::summarize_token( $token ) ), 'A wallet token is usable, with or without an expiry date.' );
+
+		list( $order, $subs, $asked ) = $this->check_out( $user );
+
+		$this->assertSame( '0.00', wc_format_decimal( $order->get_total(), 2 ) );
+		$this->assertFalse( $asked );
+		$this->assertCount( 1, $subs );
+		$this->assertSame( $gateway, $subs[0]->get_payment_method(), 'The wallet\'s own gateway.' );
+		$this->assertSame( $token->get_token(), $subs[0]->get_meta( '_payment_method_token', true ) );
+		$this->assertFalse( $subs[0]->is_manual() );
+	}
+
+	/**
+	 * @return array<string, array{0: string, 1: string, 2: string}>
+	 */
+	public function wallets(): array {
+		return array(
+			'Google Pay'                 => array( 'stripe_googlepay', TestWalletToken::class, '2099' ),
+			'Apple Pay'                  => array( 'stripe_applepay', TestAppleWalletToken::class, '2099' ),
+			'Google Pay without expiry'  => array( 'stripe_googlepay', TestWalletToken::class, '' ),
+			'Apple Pay without expiry'   => array( 'stripe_applepay', TestAppleWalletToken::class, '' ),
+		);
+	}
+
+	public function test_an_expired_wallet_token_is_not_used(): void {
+		$user = $this->subscription_cart( 5000, '2001', '10', 'stripe_googlepay', TestWalletToken::class );
+		list( , , $asked ) = $this->check_out( $user );
+		$this->assertTrue( $asked );
+	}
+
+	public function test_without_a_saved_card_the_gateway_is_asked_as_before(): void {
+		$user = $this->subscription_cart( 5000, null );
+		list( , $subs, $asked ) = $this->check_out( $user );
+
+		$this->assertTrue( $asked );
+		$this->assertSame( '', (string) $subs[0]->get_meta( '_payment_method_token', true ) );
+	}
+
+	public function test_an_expired_saved_card_is_not_used_and_the_gateway_is_asked(): void {
+		$user = $this->subscription_cart( 5000, '2001' );
+		list( , $subs, $asked ) = $this->check_out( $user );
+
+		$this->assertTrue( $asked );
+		$this->assertSame( '', (string) $subs[0]->get_meta( '_payment_method_token', true ) );
+	}
+
+	public function test_a_card_that_is_deleted_after_the_cards_were_applied_falls_back_to_asking(): void {
+		$user = $this->subscription_cart( 5000 );
+		$token = \WC_Payment_Tokens::get_customer_default_token( $user );
+		// The cards are applied at 200; the card goes at 220.
+		add_action(
+			'woocommerce_checkout_order_processed',
+			static function () use ( $token ): void {
+				$token->delete();
+			},
+			220
+		);
+		list( , $subs, $asked ) = $this->check_out( $user );
+		remove_all_actions( 'woocommerce_checkout_order_processed', 220 );
+
+		$this->assertTrue( $asked, 'No silent manual renewal: the gateway is asked.' );
+		$this->assertSame( '', (string) $subs[0]->get_meta( '_payment_method_token', true ) );
+	}
+
+	public function test_partial_credit_asks_the_gateway_and_leaves_the_subscription_to_it(): void {
+		$user = $this->subscription_cart( 400 );
+		list( $order, $subs, $asked ) = $this->check_out( $user );
+
+		$this->assertGreaterThan( 0, (float) $order->get_total() );
+		$this->assertTrue( $asked );
+		$this->assertSame( '', (string) $subs[0]->get_meta( '_payment_method_token', true ), 'The gateway saves the card of a part payment.' );
+	}
+
+	public function test_a_cart_that_saves_no_card_is_not_touched_by_the_saved_card_rule(): void {
+		$user = $this->cart_with_card( 5000 );
+		Checkout::applied( new \WC_Order(), 1000, 'checkout' );
+		$this->assertFalse( Checkout::gateway_saves_card( false ) );
+		Checkout::saved_card_on_subscriptions( 0 );
+		Checkout::saved_card_on_subscriptions( 999999 );
+		$this->assertNull( Checkout::saved_card( $user ), 'No saved card.' );
 	}
 
 	// Page.

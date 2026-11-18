@@ -10,6 +10,7 @@ namespace BeltoftServices\GiftCredit;
 use Bgca\Pay;
 use Bgca\Wallet;
 use BeltoftServices\Billing\CartFlow;
+use BeltoftServices\Card\Card;
 use BeltoftServices\Currency;
 
 defined( 'ABSPATH' ) || exit;
@@ -22,6 +23,13 @@ defined( 'ABSPATH' ) || exit;
  * A cart that saves a card (a subscription, pay as you go) must still ask the gateway when the cards cover all of it: the card is saved for
  * the renewals. WooCommerce decides "needs payment" from the order total, so after the cards were put on the order of this request the
  * answer is yes ({@see Checkout::gateway_saves_card()}).
+ *
+ * Exception: a customer who already has a usable default saved card (a token of a gateway that charges subscriptions, active, not expired)
+ * is not asked when the cards cover the WHOLE order. The subscriptions of that order are put on the saved card instead
+ * ({@see Checkout::saved_card_on_subscriptions()}): WooCommerce Subscriptions makes them at priority 100 of
+ * woocommerce_checkout_order_processed, before the add-on pays from the cards (200), so they carry the posted gateway (or manual renewal),
+ * and this class writes the card on them at 250, when it is known that the cards paid everything and no gateway is called. A partial
+ * payment, or a card that stopped being usable, asks the gateway as before.
  */
 final class Checkout {
 
@@ -31,6 +39,13 @@ final class Checkout {
 	 * @var bool
 	 */
 	private static bool $ask_gateway = false;
+
+	/**
+	 * Orders of this request that the cards paid in full and whose subscriptions go on the saved card: order id => token id.
+	 *
+	 * @var array<int, int>
+	 */
+	private static array $saved_card_orders = array();
 
 	/**
 	 * Per request: forecasts by customer, currency, total and cart cap.
@@ -46,6 +61,8 @@ final class Checkout {
 		add_action( 'bgca_cards_applied', array( __CLASS__, 'applied' ), 10, 3 );
 		// After WooCommerce Subscriptions (10), the trial rule (20) and the usage rule (30).
 		add_filter( 'woocommerce_cart_needs_payment', array( __CLASS__, 'gateway_saves_card' ), 40 );
+		// After WooCommerce Subscriptions made the subscriptions (100) and the add-on put the cards on the order (200).
+		add_action( 'woocommerce_checkout_order_processed', array( __CLASS__, 'saved_card_on_subscriptions' ), 250, 3 );
 		add_action( 'woocommerce_review_order_before_order_total', array( __CLASS__, 'review_row' ) );
 		add_filter( 'woocommerce_cart_totals_order_total_html', array( __CLASS__, 'total_html' ), 10 );
 		add_filter( 'wc_stripe_cart_data', array( __CLASS__, 'stripe_cart_data' ), 20, 2 );
@@ -55,8 +72,9 @@ final class Checkout {
 	 * Forgets the forecasts of this request (a test, a change of cards).
 	 */
 	public static function reset(): void {
-		self::$memo        = array();
-		self::$ask_gateway = false;
+		self::$memo              = array();
+		self::$ask_gateway       = false;
+		self::$saved_card_orders = array();
 	}
 
 	/**
@@ -71,17 +89,84 @@ final class Checkout {
 
 		if ( 'checkout' === $context && (int) $cents > 0 && $order instanceof \WC_Order ) {
 			self::$ask_gateway = Rules::cart_saves_card( $cart );
+
+			// The cards paid it all and the customer has a card that can be charged: nothing to ask, the subscriptions get that card.
+			if ( self::$ask_gateway && (int) $order->get_id() > 0 && Wallet::cents( $order->get_total() ) < 1 ) {
+				$saved = self::saved_card( (int) $order->get_customer_id() );
+
+				if ( null !== $saved ) {
+					self::$ask_gateway                                = false;
+					self::$saved_card_orders[ (int) $order->get_id() ] = (int) $saved['token']->get_id();
+				}
+			}
 		}
 	}
 
 	/**
-	 * See the class comment.
+	 * The customer's default saved card when it can be charged now: a token of a gateway that supports subscriptions, the gateway is
+	 * active, the card is valid and not expired.
+	 *
+	 * @param int $user_id Customer.
+	 * @return array{token: \WC_Payment_Token, gateway: \WC_Payment_Gateway}|null
+	 */
+	public static function saved_card( int $user_id ): ?array {
+		$token = Card::default_token( $user_id );
+
+		if ( null === $token || ! Card::gateway_active( $token->get_gateway_id() ) || ! Card::usable( Card::summarize_token( $token ) ) ) {
+			return null;
+		}
+
+		$gateways = function_exists( 'WC' ) && WC()->payment_gateways() ? WC()->payment_gateways()->payment_gateways() : array();
+		$gateway  = $gateways[ $token->get_gateway_id() ] ?? null;
+
+		return $gateway instanceof \WC_Payment_Gateway ? array( 'token' => $token, 'gateway' => $gateway ) : null;
+	}
+
+	/**
+	 * Puts the saved card on the subscriptions of an order the cards paid in full ({@see Checkout::applied()}), so the renewals are charged
+	 * by themselves. Only these orders: an order that goes to a gateway keeps the payment method the gateway gave. If the card stopped
+	 * being usable since the cards were applied, nothing is written and the gateway is asked (no silent manual renewal).
+	 *
+	 * @param mixed $order_id Order id.
+	 * @param mixed $posted   Posted data.
+	 * @param mixed $order    Order.
+	 */
+	public static function saved_card_on_subscriptions( $order_id, $posted = array(), $order = null ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- action signature.
+		$order_id = (int) $order_id;
+
+		if ( $order_id < 1 || ! isset( self::$saved_card_orders[ $order_id ] ) || ! function_exists( 'wcs_get_subscriptions_for_order' ) ) {
+			return;
+		}
+
+		$order = wc_get_order( $order_id );
+		$saved = $order instanceof \WC_Order ? self::saved_card( (int) $order->get_customer_id() ) : null;
+
+		if ( null === $saved || (int) $saved['token']->get_id() !== self::$saved_card_orders[ $order_id ] || Wallet::cents( $order->get_total() ) > 0 ) {
+			unset( self::$saved_card_orders[ $order_id ] );
+			self::$ask_gateway = true;
+
+			return;
+		}
+
+		foreach ( wcs_get_subscriptions_for_order( $order, array( 'order_type' => 'parent' ) ) as $subscription ) {
+			Card::apply_token( $subscription, $saved['token'], $saved['gateway'] );
+		}
+	}
+
+	/**
+	 * See the class comment: a cart that saves a card asks the gateway, unless the order is on the customer's saved card.
 	 *
 	 * @param mixed $needs Whether a payment is needed.
 	 * @return mixed
 	 */
 	public static function gateway_saves_card( $needs ) {
-		return self::$ask_gateway ? true : $needs;
+		if ( self::$ask_gateway ) {
+			return true;
+		}
+
+		// An order the cards paid in full and whose subscriptions carry the saved card: WooCommerce Subscriptions would still ask for a
+		// payment (a recurring total above 0 on a zero order), but there is nothing to collect.
+		return array() !== self::$saved_card_orders ? false : $needs;
 	}
 
 	/**
