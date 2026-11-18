@@ -211,7 +211,7 @@ final class Tiles {
 
 	/**
 	 * The tiles of the operating systems a cluster lists: one tile per family (Ubuntu, Debian, AlmaLinux), with the
-	 * versions of that family in a select under the group. The tile's radio carries the VMID of the version chosen, so
+	 * versions of that family in a select inside the tile. The tile's radio carries the VMID of the version chosen, so
 	 * the posted field and value are the same as with one tile per version. Newest version first in a family; the family
 	 * of the system checked shows that system, any other family shows its newest version. Tile order is the order of the
 	 * first template of each family in $options. A family with one version has no select.
@@ -268,6 +268,7 @@ final class Tiles {
 					$list[] = array(
 						'value'  => $versions[ $i ]['value'],
 						'label'  => $versions[ $i ]['label'],
+						'short'  => trim( substr( $versions[ $i ]['label'], strlen( $versions[ $i ]['name'] ) ) ),
 						'line'   => $versions[ $i ]['line'],
 						'family' => $versions[ $i ]['family'],
 					);
@@ -344,7 +345,18 @@ final class Tiles {
 			echo '<span class="beltoft-services-tile__logo">' . ( $item['logo'] ?? '' ) . '</span>';
 			echo '<span class="beltoft-services-tile__name">' . esc_html( (string) ( $item['name'] ?? '' ) ) . '</span>';
 
-			if ( '' !== (string) ( $item['line'] ?? '' ) ) {
+			$versions = ! empty( $item['attrs']['data-versions'] ) ? json_decode( (string) $item['attrs']['data-versions'], true ) : array();
+
+			if ( 'os' === $kind && is_array( $versions ) && count( $versions ) > 1 ) {
+				// A family with several versions: a select in the tile where the version line would be. It has no name, the script writes the version into the tile's value.
+				echo '<select class="beltoft-services-tile__version" data-tiles-os-version aria-label="' . esc_attr( trim( (string) ( $item['name'] ?? '' ) . ' ' . __( 'Version', 'beltoft-services' ) ) ) . '">';
+
+				foreach ( $versions as $entry ) {
+					echo '<option value="' . esc_attr( (string) $entry['value'] ) . '"' . selected( (string) $entry['value'], (string) $item['value'], false ) . '>' . esc_html( (string) $entry['short'] ) . '</option>';
+				}
+
+				echo '</select>';
+			} elseif ( '' !== (string) ( $item['line'] ?? '' ) ) {
 				echo '<span class="beltoft-services-tile__line">' . esc_html( (string) $item['line'] ) . '</span>';
 			}
 
@@ -361,52 +373,11 @@ final class Tiles {
 
 		echo '</div>';
 
-		if ( 'os' === $kind ) {
-			self::print_version_row( $id, (array) ( $group['items'] ?? array() ) );
-		}
-
 		if ( '' !== (string) ( $group['note'] ?? '' ) ) {
 			echo '<p class="beltoft-services-tiles__note description" data-tiles-note hidden>' . esc_html( (string) $group['note'] ) . '</p>';
 		}
 
 		echo '</fieldset>';
-	}
-
-	/**
-	 * The version select of the system tiles: hidden until the script shows it for a family with more than one version.
-	 * It has no name; the script writes the version into the checked tile's value, which is what is posted. Without the
-	 * script the family's tile posts the version it shows.
-	 *
-	 * @param string                           $id    Id of the group.
-	 * @param array<int, array<string, mixed>> $items Items of the group.
-	 */
-	private static function print_version_row( string $id, array $items ): void {
-		$shown = null;
-		$any   = false;
-
-		foreach ( $items as $item ) {
-			$any = $any || ! empty( $item['attrs']['data-versions'] );
-
-			if ( ! empty( $item['checked'] ) ) {
-				$shown = $item;
-			}
-		}
-
-		if ( ! $any ) {
-			return;
-		}
-
-		$select = ( '' !== $id ? $id : 'beltoft-os' ) . '-version';
-		$list   = null !== $shown && ! empty( $shown['attrs']['data-versions'] ) ? json_decode( (string) $shown['attrs']['data-versions'], true ) : array();
-
-		echo '<p class="beltoft-services-tiles__versions form-row" data-tiles-os-version-row hidden><label for="' . esc_attr( $select ) . '">' . esc_html__( 'Version', 'beltoft-services' ) . '</label>';
-		echo '<select id="' . esc_attr( $select ) . '" data-tiles-os-version>';
-
-		foreach ( (array) $list as $entry ) {
-			echo '<option value="' . esc_attr( (string) $entry['value'] ) . '"' . selected( (string) $entry['value'], (string) $shown['value'], false ) . '>' . esc_html( (string) $entry['label'] ) . '</option>';
-		}
-
-		echo '</select></p>';
 	}
 
 	/**
