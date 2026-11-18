@@ -99,6 +99,25 @@ final class ManualServerPanel {
 	}
 
 	/**
+	 * The script of the card.
+	 */
+	public static function assets(): void {
+		wp_enqueue_script( 'beltoft-services-manual', plugins_url( 'assets/manual-server.js', BELTOFT_SERVICES_FILE ), array( \BeltoftServices\Account\Panel::HANDLE, \BeltoftServices\Status::HANDLE, \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/manual-server.js' ), true );
+		wp_localize_script(
+			'beltoft-services-manual',
+			'beltoftServicesManual',
+			array(
+				'strings' => array(
+					'failed'  => __( 'Something went wrong. Please try again.', 'beltoft-services' ),
+					'limit'   => __( 'Too many requests. Please wait and try again later.', 'beltoft-services' ),
+					'working' => __( 'Working...', 'beltoft-services' ),
+					'note'    => __( 'This is your root password. Keep it safe, and change it after you log in.', 'beltoft-services' ),
+				),
+			)
+		);
+	}
+
+	/**
 	 * The customer's card.
 	 *
 	 * @param Resource $r Resource.
@@ -129,6 +148,13 @@ final class ManualServerPanel {
 
 		if ( 'paused' === (string) $r->get( 'state' ) ) {
 			echo '<p class="bs-note">' . esc_html__( 'Your server is switched off because the usage account has an unpaid invoice. Pay it to switch the server on again.', 'beltoft-services' ) . '</p>';
+		}
+
+		if ( ManualServerDelivery::has_root_password( $r ) && $delivered ) {
+			self::assets();
+			echo '<p><button type="button" class="button bs-btn" data-manual-reveal>' . esc_html__( 'Show root password', 'beltoft-services' ) . '</button></p>';
+			echo '<p class="bs-note">' . esc_html__( 'We email you a code before the password is shown.', 'beltoft-services' ) . '</p>';
+			echo '<p data-manual-password hidden><input type="text" readonly size="40" data-manual-password-field aria-label="' . esc_attr__( 'Root password', 'beltoft-services' ) . '"> <button type="button" class="button bs-btn bs-btn--sm" data-manual-copy>' . esc_html__( 'Copy', 'beltoft-services' ) . '</button></p>';
 		}
 
 		$beltoft_services_delete_id = $r->id();
@@ -174,6 +200,7 @@ final class ManualServerPanel {
 		echo '<p><label>' . esc_html__( 'IP addresses (one or more, shown to the customer)', 'beltoft-services' ) . '<br><textarea name="ips" rows="3" cols="50">' . esc_textarea( implode( "\n", ManualServerDelivery::ips( $r ) ) ) . '</textarea></label></p>';
 		echo '<p><label>' . esc_html__( 'Login note for the customer (plain text, never a password)', 'beltoft-services' ) . '<br><textarea name="note" rows="3" cols="50" maxlength="' . (int) ManualServerDelivery::NOTE_MAX . '">' . esc_textarea( (string) $r->get( ManualServerDelivery::NOTE ) ) . '</textarea></label></p>';
 		echo '<p><label>' . esc_html__( 'Supplier server number (staff only, never shown)', 'beltoft-services' ) . '<br><input type="text" name="provider_number" size="20" maxlength="40" value="' . esc_attr( (string) $r->get( ManualServerDelivery::PROVIDER_NO ) ) . '"></label></p>';
+		echo '<p><label>' . esc_html__( 'Root password (optional, stored encrypted, shown to the customer only behind an emailed code)', 'beltoft-services' ) . '<br><input type="password" name="root_password" size="30" maxlength="' . (int) ManualServerDelivery::PASSWORD_MAX . '" autocomplete="new-password" value=""></label><br><span class="description">' . esc_html( ManualServerDelivery::has_root_password( $r ) ? __( 'A password is set. Type a new one to replace it, or leave this empty to keep it.', 'beltoft-services' ) : __( 'No password is set.', 'beltoft-services' ) ) . '</span></p>';
 		echo '<p><button type="submit" class="button button-primary">' . esc_html( $delivered ? __( 'Save the details', 'beltoft-services' ) : __( 'Mark ready and tell the customer', 'beltoft-services' ) ) . '</button></p>';
 		echo '</form>';
 	}
@@ -212,7 +239,8 @@ final class ManualServerPanel {
 				isset( $_POST['note'] ) ? sanitize_textarea_field( wp_unslash( $_POST['note'] ) ) : '',
 				isset( $_POST['provider_number'] ) ? sanitize_text_field( wp_unslash( $_POST['provider_number'] ) ) : '',
 				$user->exists() ? (string) $user->user_login : 'unknown',
-				(int) $r->get( ManualServerDelivery::READY_AT ) < 1
+				(int) $r->get( ManualServerDelivery::READY_AT ) < 1,
+				isset( $_POST['root_password'] ) ? (string) wp_unslash( $_POST['root_password'] ) : '' // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- a password is not sanitized; it is length and character checked, then encrypted.
 			);
 			$args   = array( 'license' => (int) ( $r->license()['id'] ?? 0 ) );
 

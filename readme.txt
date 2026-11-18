@@ -260,6 +260,7 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 = next =
 * Dedicated servers sold pay as you go and set up by hand: a new driver (`manual-server`, kind `dedicated`) that calls no API. A paid order waits while staff are mailed the plan, location and cost; "Mark ready" on the service (admin, with the IP addresses, a login note and the supplier server number, which is staff only) delivers it, starts the hourly meter and sends the service ready email. Pause, resume and cancel mail staff what to do by hand.
+* Optional root password: stored encrypted, shown to the customer only behind the emailed code (5 requests a minute), never in a mail, a page or the admin form.
 * Billing is the usage machinery of the servers: hours from the hour it is ready, the monthly price as the cap (product premium 0), the one-time setup fee is the price of the pay as you go variation and is charged at checkout, the new-account limits and thresholds apply as for a VPS.
 * My Account: a Dedicated servers tab with a card (name, specs, addresses, state) and a Cancel server block with a typed confirmation that says the data is deleted at once and billing stops. No assistant (MCP) tool cancels one.
 * Plan fields per variation: processor, memory, storage and country shown, and the supplier product and location code and the cost, which only staff see. Setting: hours the order promises delivery in (default 2); staff are mailed once when it is late.

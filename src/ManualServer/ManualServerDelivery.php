@@ -9,6 +9,7 @@ namespace BeltoftServices\ManualServer;
 
 use BeltoftLicenses\Events;
 use BeltoftServices\Alerts;
+use BeltoftServices\Crypto;
 use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
@@ -17,7 +18,7 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Meta of a manual server: `manual_requested_at`, `manual_ready_at` (set by Mark ready, the signal the driver waits for),
- * `manual_ips` (a list, shown to the customer), `manual_note` (plain text shown to the customer, never a password),
+ * `manual_root_password` (encrypted with Crypto, shown to the customer only behind the emailed code, never in a mail, log or the admin form), `manual_ips` (a list, shown to the customer), `manual_note` (plain text shown to the customer, never a password),
  * `manual_provider_number` (the supplier's server number, staff only), `manual_ready_by`, `manual_order_mailed`,
  * `manual_overdue_mailed`. Nothing here calls a supplier.
  */
@@ -27,6 +28,8 @@ final class ManualServerDelivery {
 	public const IPS          = 'manual_ips';
 	public const NOTE         = 'manual_note';
 	public const PROVIDER_NO  = 'manual_provider_number';
+	public const PASSWORD     = 'manual_root_password';
+	public const PASSWORD_MAX = 200;
 
 	public const MAX_IPS  = 16;
 	public const NOTE_MAX = 500;
@@ -60,6 +63,26 @@ final class ManualServerDelivery {
 		$ips = $r->get( self::IPS );
 
 		return is_array( $ips ) ? array_values( array_filter( array_map( 'strval', $ips ) ) ) : array();
+	}
+
+	/**
+	 * The decrypted root password, or null when none is set. Only the reveal route calls this.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function root_password( Resource $r ): ?string {
+		$stored = (string) $r->get( self::PASSWORD );
+
+		return '' === $stored ? null : Crypto::decrypt( $stored );
+	}
+
+	/**
+	 * Is a root password stored (the admin form and the card only ever learn this)?
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function has_root_password( Resource $r ): bool {
+		return '' !== (string) $r->get( self::PASSWORD );
 	}
 
 	/**
@@ -97,9 +120,10 @@ final class ManualServerDelivery {
 	 * @param string   $provider The supplier's server number (staff only).
 	 * @param string   $who      Admin login, for the history.
 	 * @param bool     $deliver  True for Mark ready.
+	 * @param string   $password Root password, '' keeps the stored one. Stored encrypted, never echoed.
 	 * @return true|\WP_Error
 	 */
-	public static function save( Resource $r, string $ips, string $note, string $provider, string $who, bool $deliver ) {
+	public static function save( Resource $r, string $ips, string $note, string $provider, string $who, bool $deliver, string $password = '' ) {
 		if ( ManualServerDriver::ID !== $r->get( 'driver' ) || ! $r->is_valid() ) {
 			return new \WP_Error( 'not_manual', __( 'This is not a dedicated server.', 'beltoft-services' ) );
 		}
@@ -120,12 +144,25 @@ final class ManualServerDelivery {
 			return new \WP_Error( 'bad_provider', __( 'The supplier server number may hold letters, digits and . _ - # / only.', 'beltoft-services' ) );
 		}
 
+		if ( '' !== $password && ( strlen( $password ) > self::PASSWORD_MAX || 1 === preg_match( '/[\x00-\x1f\x7f]/', $password ) ) ) {
+			return new \WP_Error( 'bad_password', __( 'The root password is too long or holds a control character.', 'beltoft-services' ) );
+		}
+
+		if ( '' !== $password && ! Crypto::available() ) {
+			return new \WP_Error( 'no_key', __( 'The encryption key is missing, so the password cannot be stored.', 'beltoft-services' ) );
+		}
+
 		$note = trim( mb_substr( sanitize_textarea_field( $note ), 0, self::NOTE_MAX ) );
 		$meta = array(
 			self::IPS         => $list,
 			self::NOTE        => $note,
 			self::PROVIDER_NO => $provider,
 		);
+
+		if ( '' !== $password ) {
+			$meta[ self::PASSWORD ] = Crypto::encrypt( $password );
+		}
+
 		$why  = '';
 
 		$stored = $r->locked(

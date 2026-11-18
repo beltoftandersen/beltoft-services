@@ -19,6 +19,7 @@ final class ManualServerSettings {
 		add_filter( 'beltoft_services_drivers', array( __CLASS__, 'add_drivers' ), 9 );
 		add_filter( 'beltoft_services_settings_fields', array( __CLASS__, 'fields' ), 9 );
 		ManualServerPanel::register();
+		ManualServerRoutes::register();
 	}
 
 	/**
