@@ -35,10 +35,28 @@ final class Boxes {
 	}
 
 	/**
-	 * A new main account password: long, with a special character so the provider accepts it.
+	 * A new main account password the provider accepts. Its policy: 12 to 128 characters from its allowed set, at least one
+	 * upper case letter, one lower case letter, one number and one special character. Letters, digits, "-" and "_" are all
+	 * allowed; one of each kind is placed for certain, the rest is random, then the order is shuffled.
 	 */
 	public static function make_password(): string {
-		return wp_generate_password( 24, false ) . '-' . wp_generate_password( 6, false );
+		$sets  = array( 'ABCDEFGHJKLMNPQRSTUVWXYZ', 'abcdefghijkmnopqrstuvwxyz', '23456789', '-_' );
+		$all   = implode( '', $sets );
+		$chars = array();
+		foreach ( $sets as $set ) {
+			$chars[] = $set[ random_int( 0, strlen( $set ) - 1 ) ];
+		}
+		while ( count( $chars ) < 30 ) {
+			$chars[] = $all[ random_int( 0, strlen( $all ) - 1 ) ];
+		}
+		for ( $i = count( $chars ) - 1; $i > 0; --$i ) {
+			$j           = random_int( 0, $i );
+			$t           = $chars[ $i ];
+			$chars[ $i ] = $chars[ $j ];
+			$chars[ $j ] = $t;
+		}
+
+		return implode( '', $chars );
 	}
 
 	/**

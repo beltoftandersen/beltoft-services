@@ -25,6 +25,18 @@ final class StorageReviewFixesTest extends StorageTestCase {
 		$this->settings( array( 'storage_alias_enabled' => 1, 'storage_alias_writer' => 'cloudflare', 'storage_alias_zone' => 'example.test', 'storage_alias_pattern' => 'backup{n}.{zone}' ) );
 	}
 
+	public function test_a_made_password_always_meets_the_provider_policy(): void {
+		for ( $i = 0; $i < 500; ++$i ) {
+			$p = Boxes::make_password();
+			$this->assertSame( 30, strlen( $p ) );
+			$this->assertMatchesRegularExpression( '/^[A-Za-z0-9\-_]+$/', $p, 'Only characters the provider allows.' );
+			$this->assertMatchesRegularExpression( '/[A-Z]/', $p );
+			$this->assertMatchesRegularExpression( '/[a-z]/', $p );
+			$this->assertMatchesRegularExpression( '/[0-9]/', $p );
+			$this->assertMatchesRegularExpression( '/[\-_]/', $p );
+		}
+	}
+
 	public function test_a_foreign_cname_at_the_alias_name_is_not_repointed(): void {
 		$r = $this->storage_resource();
 		FakeAliasDns::seed( 'backup' . $r->id() . '.example.test', 'CNAME', 'manual.example.net' );
