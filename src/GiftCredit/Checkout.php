@@ -226,6 +226,25 @@ final class Checkout {
 	}
 
 	/**
+	 * The saved method as the customer knows it: the token's own name, else our card summary ("Visa ending 4242, expires 12/30"),
+	 * with the wallet in front for a Google Pay or Apple Pay method ("Google Pay, Visa ending 4242, ...").
+	 *
+	 * @param \WC_Payment_Token   $token   Token.
+	 * @param \WC_Payment_Gateway $gateway Its gateway.
+	 */
+	public static function method_name( \WC_Payment_Token $token, \WC_Payment_Gateway $gateway ): string {
+		$name = trim( wp_strip_all_tags( (string) $token->get_display_name() ) );
+
+		if ( '' === $name ) {
+			$name = Card::describe( Card::summarize_token( $token ) );
+		}
+
+		$wallet = 1 === preg_match( '/(googlepay|applepay)$/', (string) $gateway->id ) ? trim( wp_strip_all_tags( (string) $gateway->get_title() ) ) : '';
+
+		return '' !== $wallet && false === stripos( $name, $wallet ) ? $wallet . ', ' . $name : $name;
+	}
+
+	/**
 	 * Where the payment methods would be: the line that tells the customer no card is needed.
 	 */
 	public static function saved_method_line(): void {
@@ -236,7 +255,7 @@ final class Checkout {
 			return;
 		}
 
-		$name = trim( wp_strip_all_tags( (string) $saved['token']->get_display_name() ) );
+		$name = self::method_name( $saved['token'], $saved['gateway'] );
 
 		/* translators: %s: the saved payment method, for example "Visa ending in 4242". */
 		echo '<p class="beltoft-services-credit-saved">' . esc_html( sprintf( __( 'Paid from your account credit. Renewals are paid from your account credit first, then from your saved payment method (%s).', 'beltoft-services' ), $name ) ) . '</p>';
