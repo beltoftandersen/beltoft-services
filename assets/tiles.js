@@ -55,49 +55,34 @@
 		}
 	}
 
-	// The select under the group lists the versions of the checked tile and is hidden when it has only one.
-	function osRow( group ) {
-		var row = group.querySelector( '[data-tiles-os-version-row]' );
-		var select = row ? row.querySelector( 'select' ) : null;
-		var radio = group.querySelector( 'input[type="radio"]:checked' );
-		var list = radio ? osEntries( radio ) : [];
+	// The select in the tile shows the version the tile holds.
+	function syncSelect( radio ) {
+		var select = radio.closest( 'label' ).querySelector( '[data-tiles-os-version]' );
 
-		if ( ! row || ! select ) {
-			return;
+		if ( select ) {
+			select.value = radio.value;
 		}
-
-		select.textContent = '';
-		row.hidden = list.length < 2;
-
-		list.forEach( function ( entry ) {
-			var option = document.createElement( 'option' );
-
-			option.value = entry.value;
-			option.textContent = entry.label;
-			option.selected = entry.value === radio.value;
-			select.appendChild( option );
-		} );
 	}
 
+	// A version select inside a tile: choosing a version checks that tile and gives it the version's value.
 	each( document.querySelectorAll( '[data-tiles="os"]' ), function ( group ) {
 		// First listener on the group, so what the app and refresh listeners below read is already up to date.
 		group.addEventListener( 'change', function ( event ) {
-			var radio = group.querySelector( 'input[type="radio"]:checked' );
+			var select = event.target;
+			var label = select && select.hasAttribute && select.hasAttribute( 'data-tiles-os-version' ) ? select.closest( 'label' ) : null;
+			var radio = label ? label.querySelector( 'input[type="radio"]' ) : null;
 
-			if ( event.target && event.target.hasAttribute( 'data-tiles-os-version' ) && radio ) {
-				osEntries( radio ).forEach( function ( entry ) {
-					if ( entry.value === event.target.value ) {
-						osSet( radio, entry );
-					}
-				} );
-			} else if ( ! event.target || 'radio' !== event.target.type ) {
+			if ( ! radio ) {
 				return;
 			}
 
-			osRow( group );
+			osEntries( radio ).forEach( function ( entry ) {
+				if ( entry.value === select.value ) {
+					osSet( radio, entry );
+				}
+			} );
+			radio.checked = true;
 		} );
-
-		osRow( group );
 	} );
 
 	function setup( apps ) {
@@ -187,6 +172,7 @@
 			if ( target ) {
 				target.radio.checked = true;
 				osSet( target.radio, target.entry );
+				syncSelect( target.radio );
 				changed( target.radio );
 			}
 		}
@@ -206,7 +192,7 @@
 				}
 
 				osSet( system, entry );
-				osRow( os );
+				syncSelect( system );
 
 				return true;
 			} );

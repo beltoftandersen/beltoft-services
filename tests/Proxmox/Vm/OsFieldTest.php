@@ -109,14 +109,14 @@ class OsFieldTest extends TestCase {
 		$html = $this->html();
 
 		$this->assertDoesNotMatchRegularExpression( '#<select[^>]*name=#', $html, 'Square radio tiles; the version select is never posted itself.' );
-		$this->assertStringContainsString( 'data-tiles-os-version', $html, 'The two Ubuntu versions are one tile with a version select.' );
+		$this->assertStringContainsString( 'data-tiles-os-version', $html, 'The two Ubuntu versions are one tile with a select inside it.' );
 		$this->assertStringContainsString( 'data-tiles="os"', $html );
 		$this->assertStringContainsString( 'Operating system', $html );
 		$this->assertSame( 1, preg_match_all( '#<input[^>]*type="radio"[^>]*name="' . OsField::POST_KEY . '"#', $html ), 'One radio input per family, posting under the same name.' );
 		$this->assertSame( 2, preg_match_all( '#<option value="900[01]"#', $html ), 'Both versions are in the select.' );
+		$this->assertDoesNotMatchRegularExpression( '#<tiles-row|data-tiles-os-version-row#', $html );
 		$this->assertMatchesRegularExpression( '#<input[^>]*type="radio"[^>]*value="9000"[^>]*checked#', $html, 'The default is preselected.' );
 		$this->assertDoesNotMatchRegularExpression( '#value="9001"[^>]*checked#', $html );
-		$this->assertStringContainsString( '>Version 26.04</span>', $html );
 		$this->assertStringContainsString( '<svg', $html, 'Ubuntu has its logo.' );
 		$this->assertStringContainsString( 'validate-required', $html, 'Marked required.' );
 
