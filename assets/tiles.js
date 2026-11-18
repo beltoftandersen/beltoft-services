@@ -7,6 +7,8 @@
  *    to refresh its order summary;
  *  - an app with more than one version gets a small version select under the tiles. At checkout that select is posted as
  *    it is; on the Reinstall tab ([data-tiles-merge]) it has no name and writes its choice into the checked tile's value.
+ *  - a system tile stands for a family (Ubuntu, Debian, AlmaLinux): the versions are a select under the tiles, and the
+ *    checked tile's value is the version chosen, so the posted field and value are what one tile per version posted.
  * No dependencies.
  */
 ( function () {
@@ -24,6 +26,79 @@
 			window.jQuery( document.body ).trigger( 'update_checkout' );
 		}
 	}
+
+	// -- System tiles: one tile per family, the versions in a select ---------------------------------
+
+	function osEntries( radio ) {
+		try {
+			var list = JSON.parse( radio.getAttribute( 'data-versions' ) || '[]' );
+
+			if ( list.length ) {
+				return list;
+			}
+		} catch ( e ) {
+			// A tile without versions stands for itself.
+		}
+
+		return [ { value: radio.value, family: radio.getAttribute( 'data-family' ) || '', label: '', line: '' } ];
+	}
+
+	// The tile takes this version: its value (what is posted), its family and the line under the name.
+	function osSet( radio, entry ) {
+		var line = radio.parentNode.querySelector( '.beltoft-services-tile__line' );
+
+		radio.value = entry.value;
+		radio.setAttribute( 'data-family', entry.family || '' );
+
+		if ( line && entry.line ) {
+			line.textContent = entry.line;
+		}
+	}
+
+	// The select under the group lists the versions of the checked tile and is hidden when it has only one.
+	function osRow( group ) {
+		var row = group.querySelector( '[data-tiles-os-version-row]' );
+		var select = row ? row.querySelector( 'select' ) : null;
+		var radio = group.querySelector( 'input[type="radio"]:checked' );
+		var list = radio ? osEntries( radio ) : [];
+
+		if ( ! row || ! select ) {
+			return;
+		}
+
+		select.textContent = '';
+		row.hidden = list.length < 2;
+
+		list.forEach( function ( entry ) {
+			var option = document.createElement( 'option' );
+
+			option.value = entry.value;
+			option.textContent = entry.label;
+			option.selected = entry.value === radio.value;
+			select.appendChild( option );
+		} );
+	}
+
+	each( document.querySelectorAll( '[data-tiles="os"]' ), function ( group ) {
+		// First listener on the group, so what the app and refresh listeners below read is already up to date.
+		group.addEventListener( 'change', function ( event ) {
+			var radio = group.querySelector( 'input[type="radio"]:checked' );
+
+			if ( event.target && event.target.hasAttribute( 'data-tiles-os-version' ) && radio ) {
+				osEntries( radio ).forEach( function ( entry ) {
+					if ( entry.value === event.target.value ) {
+						osSet( radio, entry );
+					}
+				} );
+			} else if ( ! event.target || 'radio' !== event.target.type ) {
+				return;
+			}
+
+			osRow( group );
+		} );
+
+		osRow( group );
+	} );
 
 	function setup( apps ) {
 		var form = apps.closest( 'form' );
@@ -88,21 +163,53 @@
 
 			each( wanted, function ( name ) {
 				each( os.querySelectorAll( 'input[type="radio"]' ), function ( radio ) {
-					if ( ! target && ! radio.disabled && name === family( radio ) ) {
-						target = radio;
+					if ( ! target && ! radio.disabled ) {
+						osEntries( radio ).forEach( function ( entry ) {
+							if ( ! target && name === entry.family ) {
+								target = { radio: radio, entry: entry };
+							}
+						} );
 					}
 				} );
 			} );
 
 			// Without family data (an older cluster setting) the group names the one app system.
 			if ( ! target && want ) {
-				target = os.querySelector( 'input[type="radio"][value="' + want + '"]' );
+				each( os.querySelectorAll( 'input[type="radio"]' ), function ( radio ) {
+					osEntries( radio ).forEach( function ( entry ) {
+						if ( ! target && entry.value === want ) {
+							target = { radio: radio, entry: entry };
+						}
+					} );
+				} );
 			}
 
 			if ( target ) {
-				target.checked = true;
-				changed( target );
+				target.radio.checked = true;
+				osSet( target.radio, target.entry );
+				changed( target.radio );
 			}
+		}
+
+		// A system tile was chosen: when the chosen app runs on another version of that family, take that version.
+		function fit() {
+			var wanted = families( checked( apps ) );
+			var system = checked( os );
+
+			if ( ! system || ! wanted.length || -1 !== wanted.indexOf( family( system ) ) ) {
+				return;
+			}
+
+			osEntries( system ).some( function ( entry ) {
+				if ( -1 === wanted.indexOf( entry.family ) ) {
+					return false;
+				}
+
+				osSet( system, entry );
+				osRow( os );
+
+				return true;
+			} );
 		}
 
 		// A system was chosen: when the chosen app does not run on it, choose no app and say why.
@@ -183,8 +290,12 @@
 
 		if ( os ) {
 			os.addEventListener( 'change', function ( event ) {
-				if ( event.target && 'radio' === event.target.type && event.isTrusted ) {
+				if ( ( event.target && 'radio' === event.target.type && event.isTrusted ) || ( event.target && event.target.hasAttribute( 'data-tiles-os-version' ) && event.isTrusted ) ) {
 					touched = true;
+					if ( 'radio' === event.target.type ) {
+						fit();
+					}
+
 					drop();
 					fill();
 					refresh();
@@ -222,7 +333,7 @@
 		}
 
 		os.addEventListener( 'change', function ( event ) {
-			if ( event.target && 'radio' === event.target.type && event.isTrusted ) {
+			if ( ( event.target && 'radio' === event.target.type && event.isTrusted ) || ( event.target && event.target.hasAttribute( 'data-tiles-os-version' ) && event.isTrusted ) ) {
 				refresh();
 			}
 		} );
