@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.44.1
+Stable tag: 0.45.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,14 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.45.0 =
+* Dedicated servers sold pay as you go and ordered automatically: a new driver (`manual-server`, kind `dedicated`). After payment the server is ordered through the supplier's Robot webservice (Server ordering: POST /order/server/transaction with the product, location, an IPv4 address, a generated root password and an optional distribution), followed until the transaction is ready, then delivered with the meter started, the service ready email and a card in My Account. Cancel posts the documented cancellation "now". A call whose outcome is unknown is never sent again; the by-hand "Mark ready" stays as the fallback, and is the whole flow while "Order dedicated servers automatically" is off.
+* The optional SSH public key of the VPS checkout is asked for dedicated servers too (the same field and checks, shared through the marker `TakesSshKey`). A given key is registered at the supplier (POST /key; an identical key that already exists is found with GET /key) and ordered as `authorized_key[]`; the documentation allows a key or a password, so then no root password exists.
+* Safety: live calls need the setting Live, a web service login stored encrypted, and the constant BELTOFT_SERVICES_DEDICATED_LIVE; the fake client and a test server mode (which refuses the real host) never spend money. A spend guard checks cost, paid setup fee and caps (servers, monthly cost, new orders a day; all 0 until set). `wp beltoft-services dedicated test-order` sends one order with the documented test flag.
+* Billing is the usage machinery of the servers: hours from the hour it is ready, the monthly price as the cap (product premium 0), the one-time setup fee is the price of the pay as you go variation and is charged at checkout, the new-account limits and thresholds apply as for a VPS.
+* My Account: a Dedicated servers tab with a card (name, specs, addresses, state), the root password behind the emailed code (stored encrypted, 5 requests a minute, never in a mail), and a Cancel server block with a typed confirmation that says the data is deleted at once and billing stops. No assistant (MCP) tool cancels one.
+* Plan fields per variation: processor, memory, storage and country shown, and the supplier product, location code, optional distribution and costs, which only staff see. The delivery promise is a setting in minutes (default 10); staff are mailed once when a server is later.
 
 = 0.44.1 =
 * Server order and reinstall forms: one tile per system family (Ubuntu, Debian, AlmaLinux) with a Version select; the posted value is unchanged.

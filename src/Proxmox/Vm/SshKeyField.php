@@ -11,6 +11,7 @@ use BeltoftServices\Checkout\BlockField;
 use BeltoftServices\Checkout\ClassicPost;
 use BeltoftServices\Checkout\OrderFieldMeta;
 use BeltoftServices\Drivers\Driver;
+use BeltoftServices\Drivers\TakesSshKey;
 use BeltoftServices\Product;
 
 defined( 'ABSPATH' ) || exit;
@@ -267,7 +268,7 @@ final class SshKeyField {
 	private static function is_vm_product( int $product_id ): bool {
 		$driver = Product::driver_for( $product_id );
 
-		return $driver && ProxmoxDriver::ID === $driver->id();
+		return $driver && ( $driver instanceof TakesSshKey || ProxmoxDriver::ID === $driver->id() );
 	}
 
 	/**
@@ -327,6 +328,23 @@ final class SshKeyField {
 	}
 
 	/**
+	 * The ids of the drivers that take a key (marker TakesSshKey).
+	 *
+	 * @return string[]
+	 */
+	private static function key_driver_ids(): array {
+		$ids = array( ProxmoxDriver::ID );
+
+		foreach ( \BeltoftServices\Drivers\Registry::all() as $id => $driver ) {
+			if ( $driver instanceof TakesSshKey ) {
+				$ids[] = (string) $id;
+			}
+		}
+
+		return array_values( array_unique( $ids ) );
+	}
+
+	/**
 	 * Ids of VM products and their variations: what the block field's rule compares the cart to.
 	 *
 	 * @return int[]
@@ -340,7 +358,7 @@ final class SshKeyField {
 				'fields'         => 'ids',
 				'no_found_rows'  => true,
 				'meta_key'       => Product::META_DRIVER, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- one small lookup of VM products.
-				'meta_value'     => ProxmoxDriver::ID, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+				'meta_value'     => self::key_driver_ids(), // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
 			)
 		);
 		$parents = array_map( 'intval', $parents );
@@ -555,7 +573,7 @@ final class SshKeyField {
 	 * @return mixed
 	 */
 	public static function initial_meta( $meta, $license, $driver ) {
-		if ( ! is_array( $meta ) || ! is_array( $license ) || ! $driver instanceof Driver || ProxmoxDriver::ID !== $driver->id() ) {
+		if ( ! is_array( $meta ) || ! is_array( $license ) || ! $driver instanceof Driver || ! ( $driver instanceof TakesSshKey || ProxmoxDriver::ID === $driver->id() ) ) {
 			return $meta;
 		}
 

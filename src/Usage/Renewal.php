@@ -399,6 +399,11 @@ final class Renewal {
 
 		$owner = null;
 
+		// A dedicated server has a fixed name of its own (dedicated-<8 characters>), not a vm- one.
+		if ( \BeltoftServices\ManualServer\ManualServerDriver::ID === $resource->get( 'driver' ) ) {
+			return self::label( $resource_id );
+		}
+
 		if ( \BeltoftServices\Proxmox\Disk\DiskDriver::ID === $resource->get( 'driver' ) ) {
 			$owner = Resource::for_license( (int) $resource->get( 'server_license' ) );
 		} elseif ( \BeltoftServices\Apps\AppLicenceDriver::ID === $resource->get( 'driver' ) ) {

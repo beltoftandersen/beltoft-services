@@ -321,6 +321,7 @@ final class Commands {
 			\WP_CLI::add_command( 'beltoft-services ssl', SslCommand::class );
 			\WP_CLI::add_command( 'beltoft-services licence-product', LicenceProductCommand::class );
 			\WP_CLI::add_command( 'beltoft-services hosting', HostingCommand::class );
+			\WP_CLI::add_command( 'beltoft-services dedicated', DedicatedCommand::class );
 		}
 	}
 
