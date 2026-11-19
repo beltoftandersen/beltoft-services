@@ -51,3 +51,8 @@
 }
 .beltoft-services-od-held { margin: 0 0 16px; }
 .beltoft-services-od-held[hidden] { display: none; }
+
+/* The WHOIS privacy box of a domain line in the order review. */
+.beltoft-services-whois { display: flex; align-items: flex-start; gap: 8px; margin: 0; font-weight: 400; line-height: 1.4; }
+.beltoft-services-whois input { flex: 0 0 auto; margin: 3px 0 0; }
+.beltoft-services-whois__note:not(:empty) { display: block; margin: 4px 0 0; font-size: 14px; }

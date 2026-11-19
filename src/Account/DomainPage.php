@@ -11,6 +11,8 @@ use BeltoftServices\Domains\Cart;
 use BeltoftServices\Domains\Clients;
 use BeltoftServices\Domains\DnsAdopt;
 use BeltoftServices\Domains\DomainDriver;
+use BeltoftServices\Domains\Dnssec;
+use BeltoftServices\Domains\WhoisPrivacy;
 use BeltoftServices\Domains\LiveDns;
 use BeltoftServices\Domains\Panels as DomainPanels;
 use BeltoftServices\Domains\Records;
@@ -111,12 +113,25 @@ final class DomainPage {
 			'fix'              => $dns_only ? null : TransferFix::view( $r ),
 			'zone_pending'     => $zone_here,
 			'adopt'            => $adopt,
+			// DNSSEC and WHOIS privacy: null when the extension or the registrar does not offer them (nothing is shown then).
+			'dnssec'           => $dns_only || ! $can ? null : Dnssec::view( $r ),
+			'whois'            => $dns_only || ! $can ? null : self::whois( $r ),
 		);
 
 		$data['tabs']   = self::tabs( $data );
 		$data['active'] = isset( $data['tabs'][ (string) ( $page['tab'] ?? '' ) ] ) ? (string) $page['tab'] : 'overview';
 
 		return $data;
+	}
+
+	/**
+	 * WHOIS privacy for the page: only where the registrar says the domain allows it (domainGetDomainResponseData.is_private_whois_allowed).
+	 *
+	 * @param Resource $r Domain service.
+	 * @return array{on: bool}|null
+	 */
+	private static function whois( Resource $r ): ?array {
+		return WhoisPrivacy::allowed( $r ) ? array( 'on' => WhoisPrivacy::enabled( $r ) ) : null;
 	}
 
 	/**
@@ -134,6 +149,10 @@ final class DomainPage {
 		}
 
 		$tabs['nameservers'] = __( 'Name servers', 'beltoft-services' );
+
+		if ( null !== $d['dnssec'] || null !== $d['whois'] ) {
+			$tabs['security'] = __( 'Security', 'beltoft-services' );
+		}
 
 		if ( ( $d['can'] && ! $d['dns_only'] ) || null !== $d['transfer_price'] ) {
 			$tabs['transfer'] = __( 'Transfer', 'beltoft-services' );

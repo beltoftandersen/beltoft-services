@@ -55,6 +55,8 @@ class FakeClient implements Client {
 			$name = strtolower( (string) ( $body['domain']['name'] ?? '' ) . '.' . (string) ( $body['domain']['extension'] ?? '' ) );
 			if ( isset( $state['domains'][ $name ] ) ) { return new \WP_Error( 'op_fake_taken', 'Fake domain already exists.' ); }
 			$domain = array( 'id' => ++$state['next_id'], 'full_name' => $name, 'status' => 'ACT', 'expiration_date' => gmdate( 'Y-m-d H:i:s', strtotime( '+1 year' ) ), 'owner_handle' => (string) ( $body['owner_handle'] ?? '' ), 'is_locked' => false );
+			$domain = $this->security_fields( $domain, $body );
+			if ( is_wp_error( $domain ) ) { return $domain; }
 			$state['domains'][ $name ] = $domain;
 			update_option( self::OPTION, $state, false );
 			return $domain;
@@ -65,7 +67,11 @@ class FakeClient implements Client {
 				if ( 'GET' === $method && '/authcode' === ( $match[2] ?? '' ) ) { return array( 'auth_code' => 'FAKE-CODE-' . $domain['id'] ); }
 				if ( 'GET' === $method ) { return $domain; }
 				if ( 'POST' === $method && '/renew' === ( $match[2] ?? '' ) ) { $domain['expiration_date'] = gmdate( 'Y-m-d H:i:s', strtotime( '+1 year', strtotime( $domain['expiration_date'] ) ) ); }
-				elseif ( 'PUT' === $method && '' === ( $match[2] ?? '' ) ) { $domain = array_merge( $domain, $body ); }
+				elseif ( 'PUT' === $method && '' === ( $match[2] ?? '' ) ) {
+					$updated = $this->security_fields( array_merge( $domain, array_diff_key( $body, array_flip( array( 'dnssec_keys', 'is_dnssec_enabled', 'is_private_whois_enabled' ) ) ) ), $body, $domain );
+					if ( is_wp_error( $updated ) ) { return $updated; }
+					$domain = $updated;
+				}
 				else { break; }
 				$state['domains'][ $name ] = $domain;
 				update_option( self::OPTION, $state, false );
@@ -80,8 +86,52 @@ class FakeClient implements Client {
 			if ( $dirty ) { update_option( self::OPTION, $state, false ); }
 			return $result;
 		}
+		if ( 'GET' === $method && '/tlds' === $path ) { return array( 'results' => self::tlds(), 'total' => count( self::tlds() ) ); }
 		if ( 'GET' === $method && '/resellers' === $path ) { return array( 'balance' => 1000, 'currency' => 'EUR' ); }
 		return new \WP_Error( 'fake_unconfigured', 'No fake registrar behavior is configured.' );
+	}
+
+	/**
+	 * The extensions of the fake list, with the fields the plugin reads (Openprovider swagger definition tldTld). The values are made up; .dk and .eu
+	 * allow no WHOIS privacy (the case the shop meets), .com and .net do.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function tlds(): array {
+		$price = static fn( float $v ): array => array( 'reseller' => array( 'price' => $v, 'currency' => 'EUR' ) );
+		$row   = static fn( string $name, bool $dnssec, array $algs, bool $whois ): array => array(
+			'name' => $name, 'status' => 'ACT',
+			'prices' => array( 'create_price' => $price( 9.0 ), 'renew_price' => $price( 9.0 ), 'transfer_price' => $price( 9.0 ) ),
+			'dnssec_allowed' => $dnssec, 'dnssec_keys_allowed' => $dnssec, 'dnssec_digests_allowed' => false, 'dnssec_algorithms' => $algs, 'dnssec_max_records_amount' => $dnssec ? 4 : 0,
+			'is_private_whois_allowed' => $whois,
+		);
+		return array( $row( 'com', true, array( 8, 13, 14 ), true ), $row( 'net', true, array( 8, 13 ), true ), $row( 'dk', true, array( 13 ), false ), $row( 'eu', true, array( 8, 13 ), false ) );
+	}
+
+	/**
+	 * DNSSEC and WHOIS privacy fields of a stored domain, as the registrar stores them (domainGetDomainResponseData): `dnssec` is
+	 * signedDelegation or unsigned, `is_private_whois_allowed` follows the extension list, and a request for privacy where it is not allowed
+	 * is refused. $old is the stored domain on an update.
+	 *
+	 * @param array<string, mixed>      $domain Domain to complete.
+	 * @param array<string, mixed>      $body   Request body (create, transfer or update).
+	 * @param array<string, mixed>|null $old    The stored domain, on an update.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private function security_fields( array $domain, array $body, ?array $old = null ): array|\WP_Error {
+		$tld     = (string) substr( strrchr( (string) $domain['full_name'], '.' ) ?: '', 1 );
+		$allowed = false;
+		foreach ( self::tlds() as $entry ) { if ( $entry['name'] === $tld ) { $allowed = (bool) $entry['is_private_whois_allowed']; } }
+		$domain['is_private_whois_allowed'] = $allowed;
+		$enabled = array_key_exists( 'is_private_whois_enabled', $body ) ? (bool) $body['is_private_whois_enabled'] : (bool) ( $old['is_private_whois_enabled'] ?? false );
+		if ( $enabled && ! $allowed ) { return new \WP_Error( 'op_fake_whois', 'Registrar request failed.', array( 'status' => 400, 'desc' => 'Whois privacy is not available for this extension.' ) ); }
+		$domain['is_private_whois_enabled'] = $enabled;
+		$keys = array_key_exists( 'dnssec_keys', $body ) ? array_values( (array) $body['dnssec_keys'] ) : (array) ( $old['dnssec_keys'] ?? array() );
+		if ( array_key_exists( 'is_dnssec_enabled', $body ) && ! $body['is_dnssec_enabled'] ) { $keys = array(); }
+		$domain['dnssec_keys']        = $keys;
+		$domain['is_dnssec_enabled']  = array() !== $keys;
+		$domain['dnssec']             = array() !== $keys ? 'signedDelegation' : 'unsigned';
+		return $domain;
 	}
 
 	/**

@@ -16,7 +16,7 @@ class CliTest extends TestCase {
 		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
 		\WP_CLI::reset();
 		( new Commands() )->domain_prices( array(), array() );
-		$this->assertStringContainsString( '2', \WP_CLI::text() );
+		$this->assertStringContainsString( '7', \WP_CLI::text() );
 	}
 
 	private function link( string $domain, string $id, FakeClient $fake ): ?\Throwable {

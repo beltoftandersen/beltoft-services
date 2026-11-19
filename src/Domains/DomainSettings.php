@@ -137,6 +137,7 @@ final class DomainSettings {
 	}
 
 	public static function sync_prices(): void {
-		Prices::sync();
+		// The list may not carry what an extension allows (DNSSEC, WHOIS privacy): the extensions in use are read one by one.
+		if ( ! is_wp_error( Prices::sync() ) ) { TldFacts::refresh_missing(); }
 	}
 }

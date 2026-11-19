@@ -187,6 +187,33 @@
 		}
 		request( 'POST', scope + '/actions/' + form.dataset.domainAction, args ).then( function ( queued ) { settle( panel, form, handle, queued ); } ).catch( function ( error ) { bs.fail( handle, error.message ); } );
 	} );
+	// WHOIS privacy is a switch: changing it sends the form. It only hides data, so no emailed code is asked.
+	document.addEventListener( 'change', function ( event ) {
+		var box = event.target && event.target.matches ? event.target : null;
+		if ( ! box || ! box.matches( 'input[data-domain-switch]' ) ) { return; }
+		var form = box.closest( 'form' );
+		if ( form ) { form.querySelector( 'input[name="enabled"]' ).value = box.checked ? '1' : '0'; form.requestSubmit(); }
+	} );
+	// DNSSEC changes registry data: the customer types the code we email first, then the change is queued with it (step_code).
+	document.addEventListener( 'submit', function ( event ) {
+		var form = event.target.closest( '[data-domain-dnssec]' );
+		if ( ! form ) { return; }
+		event.preventDefault();
+		var panel = form.closest( '[data-domain-resource]' );
+		var scope = panel.dataset.domainResource;
+		if ( bs && bs.locked( scope ) ) { return; }
+		var action = form.getAttribute( 'data-domain-dnssec' );
+		var args = {};
+		new FormData( form ).forEach( function ( value, key ) { args[ key ] = String( value ); } );
+		window.beltoftApi.stepUp( 'domain_dnssec', { holder: config } ).then( function ( code ) {
+			if ( ! code ) { return null; }
+			var handle = bs ? bs.busy( panel.dataset.updating || '', scope, form.querySelector( 'button[type=submit]' ) ) : null;
+			return window.beltoftApi.call( config.root + scope + '/actions/' + action, { method: 'POST', body: { args: args, step_code: code }, holder: config } ).then( unwrap ).then( function ( queued ) {
+				form.dataset.domainAction = action;
+				settle( panel, form, handle, queued );
+			} ).catch( function ( error ) { if ( bs ) { bs.fail( handle, error.message ); } } );
+		} );
+	} );
 	// The transfer code is shown after a second check: a code emailed to the account address (or a site's own factor).
 	document.addEventListener( 'click', function ( event ) {
 		var button = event.target.closest( '.beltoft-services-domain-auth' );

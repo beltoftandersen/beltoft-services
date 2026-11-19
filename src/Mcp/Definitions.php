@@ -201,11 +201,12 @@ final class Definitions {
 			'set_usage_alerts' => self::act( 'Turns the e-mails about high usage of one server on or off.', self::obj( array( 'id' => $id, 'on' => array( 'type' => 'boolean' ) ), array( 'id', 'on' ) ), false, true ),
 			'retry_app_install' => self::act( 'Tries again to install the app of a server whose installation failed or did not finish. It does not reinstall the server.', $by_id, false ),
 			'domain_settings'  => self::act(
-				'Changes a setting of one of the customer\'s domains: set_nameservers (mode ours; mode custom, with two to six hosts, needs Full access and a confirmation because the domain can go offline if the hosts are wrong: the first call returns a summary and a confirm value, show the summary to the customer and send the value only after their clear yes), lock (the transfer lock on), or check_delegation (looks at the name servers now). Ask the customer first. Moving a domain away is not possible here.',
+				'Changes a setting of one of the customer\'s domains: set_nameservers (mode ours; mode custom, with two to six hosts, needs Full access and a confirmation because the domain can go offline if the hosts are wrong: the first call returns a summary and a confirm value, show the summary to the customer and send the value only after their clear yes), lock (the transfer lock on), check_delegation (looks at the name servers now), or whois_privacy (WHOIS privacy on or off with enabled, only where the extension allows it, free). DNSSEC is not changed here: it needs a code emailed to the customer and is done in the dashboard. Ask the customer first. Moving a domain away is not possible here.',
 				self::obj(
 					array(
 						'id'     => $id,
-						'action' => array( 'type' => 'string', 'enum' => array( 'set_nameservers', 'lock', 'check_delegation' ) ),
+						'action' => array( 'type' => 'string', 'enum' => array( 'set_nameservers', 'lock', 'check_delegation', 'whois_privacy' ) ),
+						'enabled' => array( 'type' => 'boolean', 'description' => 'For whois_privacy: true for on, false for off.' ),
 						'mode'   => array( 'type' => 'string', 'enum' => array( 'ours', 'custom' ), 'description' => 'For set_nameservers.' ),
 						'hosts'  => array( 'type' => 'array', 'maxItems' => 6, 'items' => array( 'type' => 'string', 'maxLength' => 253 ), 'description' => 'For set_nameservers with mode custom.' ),
 					),

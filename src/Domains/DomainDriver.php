@@ -162,6 +162,8 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 					'autorenew' => 'off',
 					'is_dnssec_enabled' => false,
 				);
+				// WHOIS privacy (create and transfer request field is_private_whois_enabled): only for an extension that allows it; default on, free.
+				if ( WhoisPrivacy::order_allowed( $name ) ) { $body['is_private_whois_enabled'] = WhoisPrivacy::wanted( $r ); }
 				if ( str_ends_with( $name, '.dk' ) ) {
 					// The registry requires the registrant's acceptance of Punktum dk's terms with every .dk order, and the registrar fails an order without it.
 					$order = wc_get_order( (int) ( $r->license()['order_id'] ?? 0 ) );
@@ -221,7 +223,7 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 			}
 			$expiry = (string) ( $detail['expiration_date'] ?? '' );
 			$steps[] = 'active';
-			if ( ! $r->set( array( 'steps' => $steps, 'expires_at' => $expiry, 'registrar_status' => 'ACT' ) ) ) { return StepResult::retry( 3600, 'Domain status could not be saved.' ); }
+			if ( ! $r->set( array( 'steps' => $steps, 'expires_at' => $expiry, 'registrar_status' => 'ACT' ) + WhoisPrivacy::detail_meta( (array) $detail ) + Dnssec::detail_meta( (array) $detail ) ) ) { return StepResult::retry( 3600, 'Domain status could not be saved.' ); }
 			// The transfer is accepted: the code has done its work and is not kept.
 			if ( 'transfer' === $mode ) { self::forget_code( $r ); }
 		}

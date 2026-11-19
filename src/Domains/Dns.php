@@ -13,4 +13,6 @@ interface Dns {
 	public function replace_rrsets( string $zone, array $rrsets ): bool|\WP_Error;
 	/** @return array|\WP_Error DNSKEY entries in registrar format. */
 	public function secure( string $zone ): array|\WP_Error;
+	/** Stops signing the zone: no active signing key is left. true when the zone is unsigned (also when it was not signed). */
+	public function unsecure( string $zone ): bool|\WP_Error;
 }

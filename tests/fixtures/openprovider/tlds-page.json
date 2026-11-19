@@ -25,7 +25,16 @@
               "currency": "EUR"
             }
           }
-        }
+        },
+        "dnssec_allowed": true,
+        "dnssec_keys_allowed": true,
+        "dnssec_digests_allowed": false,
+        "dnssec_algorithms": [
+          8,
+          13
+        ],
+        "dnssec_max_records_amount": 0,
+        "is_private_whois_allowed": false
       },
       {
         "name": "6g.in",
@@ -50,7 +59,214 @@
               "currency": "EUR"
             }
           }
-        }
+        },
+        "dnssec_allowed": true,
+        "dnssec_keys_allowed": true,
+        "dnssec_digests_allowed": false,
+        "dnssec_algorithms": [
+          8,
+          13
+        ],
+        "dnssec_max_records_amount": 0,
+        "is_private_whois_allowed": false
+      },
+      {
+        "name": "com",
+        "status": "ACT",
+        "restrictions": null,
+        "prices": {
+          "create_price": {
+            "reseller": {
+              "price": 8.2,
+              "currency": "EUR"
+            }
+          },
+          "renew_price": {
+            "reseller": {
+              "price": 11.72,
+              "currency": "EUR"
+            }
+          },
+          "transfer_price": {
+            "reseller": {
+              "price": 8.2,
+              "currency": "EUR"
+            }
+          }
+        },
+        "dnssec_allowed": true,
+        "dnssec_keys_allowed": true,
+        "dnssec_digests_allowed": true,
+        "dnssec_algorithms": [
+          7,
+          8,
+          10,
+          13,
+          14,
+          15,
+          16,
+          17,
+          23,
+          253,
+          254
+        ],
+        "dnssec_max_records_amount": 0,
+        "is_private_whois_allowed": true
+      },
+      {
+        "name": "dk",
+        "status": "ACT",
+        "restrictions": null,
+        "prices": {
+          "create_price": {
+            "reseller": {
+              "price": 8.2,
+              "currency": "EUR"
+            }
+          },
+          "renew_price": {
+            "reseller": {
+              "price": 11.72,
+              "currency": "EUR"
+            }
+          },
+          "transfer_price": {
+            "reseller": {
+              "price": 8.2,
+              "currency": "EUR"
+            }
+          }
+        },
+        "dnssec_allowed": true,
+        "dnssec_keys_allowed": true,
+        "dnssec_digests_allowed": false,
+        "dnssec_algorithms": [
+          8,
+          13,
+          14,
+          15,
+          16
+        ],
+        "dnssec_max_records_amount": 0,
+        "is_private_whois_allowed": false
+      },
+      {
+        "name": "eu",
+        "status": "ACT",
+        "restrictions": null,
+        "prices": {
+          "create_price": {
+            "reseller": {
+              "price": 8.2,
+              "currency": "EUR"
+            }
+          },
+          "renew_price": {
+            "reseller": {
+              "price": 11.72,
+              "currency": "EUR"
+            }
+          },
+          "transfer_price": {
+            "reseller": {
+              "price": 8.2,
+              "currency": "EUR"
+            }
+          }
+        },
+        "dnssec_allowed": true,
+        "dnssec_keys_allowed": true,
+        "dnssec_digests_allowed": false,
+        "dnssec_algorithms": [
+          6,
+          8,
+          10,
+          13,
+          14,
+          15,
+          16
+        ],
+        "dnssec_max_records_amount": 0,
+        "is_private_whois_allowed": false
+      },
+      {
+        "name": "trade",
+        "status": "ACT",
+        "restrictions": null,
+        "prices": {
+          "create_price": {
+            "reseller": {
+              "price": 8.2,
+              "currency": "EUR"
+            }
+          },
+          "renew_price": {
+            "reseller": {
+              "price": 11.72,
+              "currency": "EUR"
+            }
+          },
+          "transfer_price": {
+            "reseller": {
+              "price": 8.2,
+              "currency": "EUR"
+            }
+          }
+        },
+        "dnssec_allowed": true,
+        "dnssec_keys_allowed": true,
+        "dnssec_digests_allowed": false,
+        "dnssec_algorithms": [
+          6,
+          8,
+          10,
+          12,
+          13,
+          14
+        ],
+        "dnssec_max_records_amount": 0,
+        "is_private_whois_allowed": true
+      },
+      {
+        "name": "de",
+        "status": "ACT",
+        "restrictions": null,
+        "prices": {
+          "create_price": {
+            "reseller": {
+              "price": 8.2,
+              "currency": "EUR"
+            }
+          },
+          "renew_price": {
+            "reseller": {
+              "price": 11.72,
+              "currency": "EUR"
+            }
+          },
+          "transfer_price": {
+            "reseller": {
+              "price": 8.2,
+              "currency": "EUR"
+            }
+          }
+        },
+        "dnssec_allowed": true,
+        "dnssec_keys_allowed": true,
+        "dnssec_digests_allowed": false,
+        "dnssec_algorithms": [
+          3,
+          5,
+          6,
+          7,
+          8,
+          10,
+          12,
+          13,
+          14
+        ],
+        "dnssec_max_records_amount": 0,
+        "is_private_whois_allowed": true
       }
     ]
   },

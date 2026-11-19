@@ -95,6 +95,22 @@ final class ActsTest extends McpTestCase {
 		$this->assertNotContains( 'Claude: rename requested (refused)', $this->history( $r ) );
 	}
 
+	public function test_domain_settings_changes_whois_privacy_and_cannot_touch_dnssec(): void {
+		$user   = self::factory()->user->create();
+		$domain = $this->domain( $user );
+		$domain->set( array( 'whois_privacy_allowed' => true, 'whois_privacy_enabled' => true ) );
+		$token = $this->oauth( $user, Tokens::ACTIONS );
+
+		$this->assertTrue( $this->tool( 'domain_settings', array( 'id' => $domain->id(), 'action' => 'whois_privacy' ), $token )['isError'], 'On or off must be said.' );
+		$this->assertFalse( Jobs::acting( $domain->id() ) );
+		$ok = $this->json( $this->tool( 'domain_settings', array( 'id' => $domain->id(), 'action' => 'whois_privacy', 'enabled' => false ), $token ) );
+		$this->assertTrue( $ok['requested'] );
+		$this->assertTrue( Jobs::acting( $domain->id() ) );
+
+		// DNSSEC is not an enum value of the tool, and the route refuses it for a tool.
+		$this->assertTrue( $this->tool( 'domain_settings', array( 'id' => $domain->id(), 'action' => 'dnssec_enable' ), $token )['isError'] );
+	}
+
 	public function test_domain_settings_runs_name_server_lock_and_delegation_through_the_domain_actions(): void {
 		$user   = self::factory()->user->create();
 		$domain = $this->domain( $user );
