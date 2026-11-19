@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * The list of live resources (activations whose kind belongs to a registered driver),
- * filtered by driver, state and failed-only. Each row links to its license screen, where the
+ * filtered by driver, state and failed-only, and searched (see search_ids()). Each row links to its license screen, where the
  * service panel has the actions.
  */
 final class Screen {
@@ -76,19 +76,23 @@ final class Screen {
 	/**
 	 * The list filters from the request; unknown values are dropped.
 	 *
-	 * @return array{driver: string, state: string, failed: bool}
+	 * @return array{driver: string, state: string, failed: bool, s: string, deleted: bool}
 	 */
 	public static function filters(): array {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only view parameters.
-		$driver = isset( $_GET['driver'] ) ? sanitize_key( wp_unslash( $_GET['driver'] ) ) : '';
-		$state  = isset( $_GET['state'] ) ? sanitize_key( wp_unslash( $_GET['state'] ) ) : '';
-		$failed = ! empty( $_GET['failed'] );
+		$driver  = isset( $_GET['driver'] ) ? sanitize_key( wp_unslash( $_GET['driver'] ) ) : '';
+		$state   = isset( $_GET['state'] ) ? sanitize_key( wp_unslash( $_GET['state'] ) ) : '';
+		$failed  = ! empty( $_GET['failed'] );
+		$search  = isset( $_GET['s'] ) && is_scalar( $_GET['s'] ) ? mb_substr( trim( sanitize_text_field( wp_unslash( (string) $_GET['s'] ) ) ), 0, 100 ) : '';
+		$deleted = ! empty( $_GET['deleted'] );
 		// phpcs:enable
 
 		return array(
-			'driver' => null !== Registry::get( $driver ) ? $driver : '',
-			'state'  => in_array( $state, Resource::STATES, true ) ? $state : '',
-			'failed' => $failed,
+			'driver'  => null !== Registry::get( $driver ) ? $driver : '',
+			'state'   => in_array( $state, Resource::STATES, true ) ? $state : '',
+			'failed'  => $failed,
+			's'       => $search,
+			'deleted' => $deleted,
 		);
 	}
 
@@ -107,42 +111,139 @@ final class Screen {
 	}
 
 	/**
-	 * Live resources matching the filters, newest first. A resource whose metadata is missing
-	 * reads as failed.
+	 * The kinds a driver filter names (every registered kind without one).
 	 *
-	 * @param array<string, mixed> $filters driver, state, failed.
+	 * @param string $driver Driver id or empty.
+	 * @return string[]
+	 */
+	private static function kinds( string $driver ): array {
+		if ( '' === $driver ) {
+			return Registry::kinds();
+		}
+
+		$one = Registry::get( $driver );
+
+		return $one ? array( $one->kind() ) : array();
+	}
+
+	/**
+	 * Does a loaded resource pass the driver, state and failed-only filters?
+	 *
+	 * @param Resource             $r       Resource.
+	 * @param array<string, mixed> $filters Filters.
+	 */
+	private static function passes( Resource $r, array $filters ): bool {
+		$driver = (string) ( $filters['driver'] ?? '' );
+		$state  = (string) ( $filters['state'] ?? '' );
+
+		if ( '' !== $driver && $r->is_valid() && $r->get( 'driver' ) !== $driver ) {
+			return false;
+		}
+
+		if ( '' !== $state && $r->get( 'state' ) !== $state ) {
+			return false;
+		}
+
+		return empty( $filters['failed'] ) || 'failed' === $r->get( 'state' );
+	}
+
+	/**
+	 * Ids of the services matching the search text, newest first, closed ones only with "include deleted".
+	 *
+	 * @param array<string, mixed> $filters driver, s, deleted.
+	 * @return int[]
+	 */
+	public static function search_ids( array $filters ): array {
+		$term = trim( (string) ( $filters['s'] ?? '' ) );
+
+		return Resource::search_ids( $term, self::kinds( (string) ( $filters['driver'] ?? '' ) ), ! empty( $filters['deleted'] ), self::matching_users( $term ) );
+	}
+
+	/**
+	 * Ids of the users a term names: email (partial), login, display name, billing first name, last name and company, or
+	 * "first last". A number or an IP address names none here (a number is a user id and is matched on the license).
+	 *
+	 * @param string $term Search text.
+	 * @return int[]
+	 */
+	private static function matching_users( string $term ): array {
+		if ( '' === $term || ctype_digit( $term ) || false !== filter_var( $term, FILTER_VALIDATE_IP ) ) {
+			return array();
+		}
+
+		$ids = get_users(
+			array(
+				'search'         => '*' . $term . '*',
+				'search_columns' => array( 'user_login', 'user_email', 'display_name', 'user_nicename' ),
+				'fields'         => 'ID',
+				'number'         => 200,
+			)
+		);
+
+		$billing = array( 'relation' => 'OR' );
+
+		foreach ( array( 'billing_first_name', 'billing_last_name', 'billing_company' ) as $key ) {
+			$billing[] = array(
+				'key'     => $key,
+				'value'   => $term,
+				'compare' => 'LIKE',
+			);
+		}
+
+		if ( preg_match( '/^(\S+)\s+(.+)$/u', $term, $m ) ) {
+			$billing[] = array(
+				'relation' => 'AND',
+				array(
+					'key'     => 'billing_first_name',
+					'value'   => $m[1],
+					'compare' => 'LIKE',
+				),
+				array(
+					'key'     => 'billing_last_name',
+					'value'   => $m[2],
+					'compare' => 'LIKE',
+				),
+			);
+		}
+
+		$more = get_users(
+			array(
+				'meta_query' => $billing, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- an admin search, one query.
+				'fields'     => 'ID',
+				'number'     => 200,
+			)
+		);
+
+		return array_values( array_unique( array_map( 'intval', array_merge( $ids, $more ) ) ) );
+	}
+
+	/**
+	 * Resources matching the filters, newest first. A resource whose metadata is missing reads as failed. Without a search
+	 * only live ones; a search finds closed ones too when the filters ask for them.
+	 *
+	 * @param array<string, mixed> $filters driver, state, failed, s, deleted.
 	 * @return Resource[]
 	 */
 	public static function resources( array $filters ): array {
-		$driver = (string) ( $filters['driver'] ?? '' );
-		$state  = (string) ( $filters['state'] ?? '' );
-		$failed = ! empty( $filters['failed'] );
-
-		if ( '' !== $driver ) {
-			$one   = Registry::get( $driver );
-			$kinds = $one ? array( $one->kind() ) : array();
-		} else {
-			$kinds = Registry::kinds();
-		}
-
+		$driver    = (string) ( $filters['driver'] ?? '' );
 		$resources = array();
 
-		foreach ( $kinds as $kind ) {
+		if ( '' !== trim( (string) ( $filters['s'] ?? '' ) ) ) {
+			foreach ( Resource::find_many( self::search_ids( $filters ) ) as $id => $r ) {
+				if ( self::passes( $r, $filters ) ) {
+					$resources[ $id ] = $r;
+				}
+			}
+
+			return array_values( $resources );
+		}
+
+		foreach ( self::kinds( $driver ) as $kind ) {
 			// One read per 500 ids (Resource::find_many), not one per resource.
 			foreach ( Resource::find_many( Resource::live_ids( $kind, 0, 0, 'DESC' ) ) as $id => $r ) {
-				if ( '' !== $driver && $r->is_valid() && $r->get( 'driver' ) !== $driver ) {
-					continue;
+				if ( self::passes( $r, $filters ) ) {
+					$resources[ $id ] = $r;
 				}
-
-				if ( '' !== $state && $r->get( 'state' ) !== $state ) {
-					continue;
-				}
-
-				if ( $failed && 'failed' !== $r->get( 'state' ) ) {
-					continue;
-				}
-
-				$resources[ $id ] = $r;
 			}
 		}
 
@@ -152,10 +253,10 @@ final class Screen {
 	}
 
 	/**
-	 * One page of the list and the total. With no filter only the ids are read for the count and the page, and only the
-	 * resources of the page are loaded; a filter reads them all (resources()).
+	 * One page of the list and the total. With no driver, state or failed filter only the ids are read for the count and the page, and only
+	 * the resources of the page are loaded; a filter reads them all (resources()).
 	 *
-	 * @param array<string, mixed> $filters  driver, state, failed.
+	 * @param array<string, mixed> $filters  driver, state, failed, s, deleted.
 	 * @param int                  $offset   First row.
 	 * @param int                  $per_page Rows.
 	 * @return array{items: Resource[], total: int}
@@ -170,20 +271,38 @@ final class Screen {
 			);
 		}
 
-		$ids = array();
+		if ( '' !== trim( (string) ( $filters['s'] ?? '' ) ) ) {
+			$ids = self::search_ids( $filters );
+		} else {
+			$ids = array();
 
-		foreach ( Registry::kinds() as $kind ) {
-			foreach ( Resource::live_ids( $kind, 0, 0, 'DESC' ) as $id ) {
-				$ids[ (int) $id ] = (int) $id;
+			foreach ( self::kinds( (string) ( $filters['driver'] ?? '' ) ) as $kind ) {
+				foreach ( Resource::live_ids( $kind, 0, 0, 'DESC' ) as $id ) {
+					$ids[ (int) $id ] = (int) $id;
+				}
 			}
+
+			krsort( $ids );
+			$ids = array_values( $ids );
 		}
 
-		krsort( $ids );
-
 		return array(
-			'items' => array_values( Resource::find_many( array_slice( array_values( $ids ), $offset, $per_page ) ) ),
+			'items' => array_values( Resource::find_many( array_slice( $ids, $offset, $per_page ) ) ),
 			'total' => count( $ids ),
 		);
+	}
+
+	/**
+	 * The search box, always shown (WP_List_Table::search_box() hides itself while the list is empty, which is when a search
+	 * most needs to stay).
+	 */
+	private static function search_box(): void {
+		$term = self::filters()['s'];
+
+		echo '<p class="search-box"><label class="screen-reader-text" for="bs-search">' . esc_html__( 'Search services', 'beltoft-services' ) . '</label>';
+		echo '<input type="search" id="bs-search" name="s" value="' . esc_attr( $term ) . '" size="34" placeholder="' . esc_attr__( 'IP, name, domain, customer, number', 'beltoft-services' ) . '">';
+		submit_button( __( 'Search services', 'beltoft-services' ), '', '', false, array( 'id' => 'bs-search-submit' ) );
+		echo '</p>';
 	}
 
 	/**
@@ -199,6 +318,7 @@ final class Screen {
 
 		echo '<div class="wrap"><h1>' . esc_html__( 'Services', 'beltoft-services' ) . '</h1>';
 		echo '<form method="get"><input type="hidden" name="page" value="' . esc_attr( self::PAGE ) . '">';
+		self::search_box();
 		$table->display();
 		echo '</form></div>';
 	}
