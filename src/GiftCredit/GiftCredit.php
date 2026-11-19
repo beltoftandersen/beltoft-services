@@ -67,8 +67,8 @@ final class GiftCredit {
 		// The add-on words the gift card plugin's customer texts as credit, and new card codes with the credit prefix, only while this is on.
 		add_filter( 'bgca_credit_wording', array( __CLASS__, 'credit_wording' ) );
 		add_filter( 'bgca_account_url', array( Page::class, 'url_filter' ) );
-		// Owner 2026-11-19: customers never read "gift card". A card an admin makes for a customer is credit, not a present: no gift card e-mail.
-		add_filter( 'bgcw_should_send_email_now', array( __CLASS__, 'no_gift_mail' ), 20, 1 );
+		// Owner 2026-11-19: customers never read "gift card". The card e-mail stays, worded as credit added to the account.
+		CreditMail::register();
 		add_filter( 'bgca_account_currency', array( Rules::class, 'account_currency' ), 10, 2 );
 		add_filter( 'beltoft_services_order_credit_cents', array( __CLASS__, 'order_credit_cents' ), 10, 2 );
 		add_filter( 'bgca_card_may_pay_line', array( PromoFlag::class, 'card_may_pay_line' ), 10, 4 );
@@ -134,15 +134,5 @@ final class GiftCredit {
 	 */
 	public static function order_credit_cents( $cents, $order = null ): int {
 		return $order instanceof \WC_Order ? max( (int) $cents, (int) $order->get_meta( '_bgca_applied_cents' ) ) : (int) $cents;
-	}
-
-	/**
-	 * Answer for the gift card plugin's filter bgcw_should_send_email_now: while gift credit is on, every card is account credit, so the
-	 * gift card e-mail ("You received a gift card") is not sent. The credit shows on the customer's Credit page.
-	 *
-	 * @param mixed $send Answer so far.
-	 */
-	public static function no_gift_mail( $send ): bool {
-		return self::active() ? false : (bool) $send;
 	}
 }
