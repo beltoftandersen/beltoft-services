@@ -126,6 +126,33 @@ final class SiteDomains {
 	}
 
 	/**
+	 * The names of many accounts in one read, oldest first.
+	 *
+	 * @param int[] $resource_ids Activation ids.
+	 * @return array<int, array<int, array<string, mixed>>> Activation id => names.
+	 */
+	public static function for_resources( array $resource_ids ): array {
+		global $wpdb;
+
+		$ids = array_values( array_unique( array_filter( array_map( 'intval', $resource_ids ), static fn( $id ) => $id > 0 ) ) );
+		$out = array();
+
+		if ( ! $ids ) {
+			return $out;
+		}
+
+		$marks = implode( ', ', array_fill( 0, count( $ids ), '%d' ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- read fresh; the placeholders are built to match the ids.
+		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM %i WHERE resource_id IN ( $marks ) ORDER BY id", array_merge( array( Schema::tables()['hosting_domains'] ), $ids ) ), ARRAY_A );
+
+		foreach ( is_array( $rows ) ? $rows : array() as $row ) {
+			$out[ (int) $row['resource_id'] ][] = self::typed( $row );
+		}
+
+		return $out;
+	}
+
+	/**
 	 * Sets the state of a name and the time it was looked at.
 	 *
 	 * @param string $host  Host name.
