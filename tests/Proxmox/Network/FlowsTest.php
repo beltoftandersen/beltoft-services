@@ -204,9 +204,9 @@ class FlowsTest extends FirewallTestCase {
 		$this->save_cluster( array( 'ipv6_prefix' => '2001:db8:430c:1::/64', 'fw_enabled' => '1', 'fw_ipfilter' => '1' ) );
 		$r = $this->server();
 		$this->assertTrue( $r->set( array( 'linked' => true ) ) );
-		$this->assertSame( 0, $this->post( $this->payload( array( '2001:db8:430c:1:1388::1' => $this->counts() ), time() - 1 ) )->get_data()['used'] );
+		$this->assertSame( 0, $this->post( $this->payload( array( '2001:db8:430c:1:1388::1' => $this->counts() ), time() - 21 ) )->get_data()['used'], 'Offsets not used by other tests: the replay list is shared in one second.' );
 		$this->assertTrue( $r->set( array( 'linked' => null, 'state' => 'paused' ) ) );
-		$this->assertSame( 0, $this->post( $this->payload( array( '2001:db8:430c:1:1388::1' => $this->counts() ), time() - 2 ) )->get_data()['used'] );
+		$this->assertSame( 0, $this->post( $this->payload( array( '2001:db8:430c:1:1388::1' => $this->counts() ), time() - 22 ) )->get_data()['used'] );
 	}
 
 	public function test_mode_off_stores_and_does_nothing(): void {
