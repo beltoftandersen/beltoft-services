@@ -235,4 +235,42 @@ class ServerPageTest extends MonitoringTestCase {
 		$this->assertStringContainsString( 'Read every 6 hours', $html );
 		$this->assertStringContainsString( 'style="width:50%"', $html );
 	}
+
+	public function test_the_ipv6_address_shows_only_when_the_server_has_one_and_says_when_it_waits_for_a_restart(): void {
+		$r = $this->ready_vm();
+		$r->set( array( 'server_name' => 'web-01', 'ip' => '192.0.2.10' ) );
+		Operations::remember_power( $r->id(), 'running' );
+
+		$html = $this->page( $r, (string) $r->license()['id'] );
+		$this->assertStringNotContainsString( 'IPv6', $html );
+
+		$r->set( array( 'ip6' => '2001:DB8:430c:1:1388:0:0:1' ) );
+		$html = $this->page( $r, (string) $r->license()['id'] );
+		$this->assertStringContainsString( '<dt>IPv6 address</dt><dd><code>2001:db8:430c:1:1388::1</code></dd>', $html );
+		$this->assertStringNotContainsString( 'Works after the next time', $html );
+		$this->assertStringContainsString( 'data-copy="ssh root@192.0.2.10"', $html, 'The log in line stays IPv4.' );
+	}
+
+	public function test_a_junk_ip6_meta_is_not_shown(): void {
+		$r = $this->ready_vm();
+		$r->set( array( 'ip' => '192.0.2.10', 'ip6' => '<b>x</b>' ) );
+		$this->assertSame( '', \BeltoftServices\Proxmox\Vm\Panels::ip6( \BeltoftServices\Resource::find( $r->id() ) ) );
+		$this->assertSame( '', \BeltoftServices\Mcp\Details::vm( \BeltoftServices\Resource::find( $r->id() ) )['ip6'] );
+
+		$r->set( array( 'ip6' => '2001:db8::5' ) );
+		$this->assertSame( '2001:db8::5', \BeltoftServices\Mcp\Details::vm( \BeltoftServices\Resource::find( $r->id() ) )['ip6'] );
+	}
+
+	public function test_the_ready_email_carries_the_ipv6_address_line_only_when_set(): void {
+		$r = $this->ready_vm();
+		$r->set( array( 'ip' => '192.0.2.10' ) );
+		$none = \BeltoftServices\Proxmox\Vm\EmailDetails::details( array(), 'beltoft_services_ready', \BeltoftServices\Resource::find( $r->id() ) );
+		$this->assertArrayNotHasKey( 'IPv6 address', $none );
+		$this->assertSame( '192.0.2.10', $none['IP address'] );
+
+		$r->set( array( 'ip6' => '2001:db8::5' ) );
+		$some = \BeltoftServices\Proxmox\Vm\EmailDetails::details( array(), 'beltoft_services_ready', \BeltoftServices\Resource::find( $r->id() ) );
+		$this->assertSame( '2001:db8::5', $some['IPv6 address'] );
+		$this->assertSame( array( 'IP address', 'IPv6 address' ), array_slice( array_keys( array_intersect_key( $some, array_flip( array( 'IP address', 'IPv6 address' ) ) ) ), 0, 2 ) );
+	}
 }

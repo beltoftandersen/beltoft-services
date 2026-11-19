@@ -223,6 +223,11 @@ final class EmailDetails {
 
 		if ( false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
 			$details[ __( 'IP address', 'beltoft-services' ) ] = $ip;
+
+			if ( '' !== Panels::ip6( $r ) ) {
+				$details[ __( 'IPv6 address', 'beltoft-services' ) ] = Panels::ip6( $r );
+			}
+
 			$details[ __( 'Log in', 'beltoft-services' ) ]     = 'ssh ' . Provision::LOGIN_USER . '@' . $ip;
 		}
 

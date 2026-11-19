@@ -124,6 +124,7 @@ class DbPhase4Test extends TestCase {
 		remove_all_filters( 'beltoft_services_key' );
 		remove_all_filters( 'beltoft_services_proxmox_client' );
 		remove_all_filters( 'beltoft_services_proxmox_pause' );
+		remove_all_filters( 'beltoft_services_db_ipv6' );
 		remove_all_filters( 'pre_wp_mail' );
 		delete_option( Clusters::OPTION );
 		$this->wipe();
@@ -928,8 +929,17 @@ class DbPhase4Test extends TestCase {
 			'multicast'              => array( '224.0.0.1', null ),
 			'reserved'               => array( '240.0.0.1', null ),
 			'this network'           => array( '0.0.0.5', null ),
-			'ipv6'                   => array( '2001:db8::1', null ),
-			'ipv6 range'             => array( '2001:db8::/32', null ),
+			'ipv6'                   => array( '2001:DB8::1', '2001:db8::1/128' ),
+			'ipv6 range'             => array( '2001:db8:1:ffff::/48', null ),
+			'ipv6 range first'       => array( '2001:db8:1::/48', '2001:db8:1::/48' ),
+			'ipv6 /32 is too wide'   => array( '2001:db8::/32', null ),
+			'ipv6 anywhere'          => array( '::/0', null ),
+			'ipv6 loopback'          => array( '::1', null ),
+			'ipv6 link local'        => array( 'fe80::1', null ),
+			'ipv6 unique local'      => array( 'fd00::1', null ),
+			'ipv6 multicast'         => array( 'ff02::1', null ),
+			'ipv6 junk'              => array( '2001:db8::zz', null ),
+			'ipv6 with zone'         => array( 'fe80::1%eth0', null ),
 			'a name'                 => array( 'example.com', null ),
 			'bad octet'              => array( '256.1.1.1', null ),
 			'bad mask'               => array( '203.0.113.0/33', null ),
@@ -943,6 +953,7 @@ class DbPhase4Test extends TestCase {
 	 * @dataProvider cidr_table
 	 */
 	public function test_allow_list_validation_table( string $input, ?string $expected ): void {
+		add_filter( 'beltoft_services_db_ipv6', '__return_true' );
 		$this->assertSame( $expected, DbAccess::normalise( $input ) );
 	}
 
@@ -1065,7 +1076,7 @@ class DbPhase4Test extends TestCase {
 		$r   = $this->db_with_ip();
 		$rev = (int) $r->get( DbAccess::REV );
 
-		foreach ( array( '10.0.0.4', '0.0.0.0/0', '198.50.0.0/15', '2001:db8::1', '203.0.113.9/24' ) as $bad ) {
+		foreach ( array( '10.0.0.4', '0.0.0.0/0', '198.50.0.0/15', 'fe80::1', '2001:db8::/32', '203.0.113.9/24' ) as $bad ) {
 			$reply = $this->post( $r, array( 'op' => 'add', 'cidr' => $bad ) );
 			$this->assertSame( 422, $reply->get_status(), $bad );
 		}
@@ -1256,5 +1267,138 @@ class DbPhase4Test extends TestCase {
 		WC()->cart->empty_cart();
 		wc_clear_notices();
 		wp_set_current_user( 0 );
+	}
+
+	// -- IPv6 -----------------------------------------------------------------------------------------
+
+	private const DB_V6 = '2001:db8:430c:1:1388::1';
+
+	/** A cluster with a prefix, and the switch for database IPv6 turned on (it is off by default, see Ipv6::databases()). */
+	private function ipv6_cluster(): void {
+		add_filter( 'beltoft_services_db_ipv6', '__return_true' );
+		$this->save_cluster( array( 'ipv6_prefix' => '2001:db8:430c:1::/64', 'fw_enabled' => '1', 'fw_ipfilter' => '1' ) );
+	}
+
+	public function test_databases_get_no_ipv6_while_the_switch_is_off(): void {
+		$this->save_cluster( array( 'ipv6_prefix' => '2001:db8:430c:1::/64', 'fw_enabled' => '1', 'fw_ipfilter' => '1' ) );
+		$r = $this->db_with_ip();
+
+		$this->assertStringNotContainsString( 'ip6', (string) $this->fake->vm( 5000 )['config']['ipconfig0'] );
+		$this->assertNull( Resource::find( $r->id() )->get( 'ip6' ) );
+		$this->assertSame( '', DbAccess::view( $r )['address6'] );
+		$this->assertNull( DbAccess::normalise( '2001:db8::1' ) );
+		$listen = array_values( array_filter( $this->guest_jobs(), static fn( $j ) => 'listen' === $j['job']['op'] ) );
+		$this->assertArrayNotHasKey( 'listen6', $listen[0]['job'] );
+	}
+
+	public function test_a_database_without_the_add_on_has_no_ipv6_and_a_cluster_without_a_prefix_changes_nothing(): void {
+		$this->ipv6_cluster();
+		$r = $this->ready_db();
+
+		$this->assertNull( $r->get( 'ip6' ) );
+		$this->assertArrayNotHasKey( 'ipconfig0', (array) $this->fake->vm( 5000 )['config'] );
+
+		$this->save_cluster( array( 'ipv6_prefix' => '' ) );
+		$this->pool( 3 );
+		$this->assertTrue( $this->add_ip( $r )->is_done() );
+		$this->assertSame( 'ip=192.0.2.10/24,gw=192.0.2.1', $this->fake->vm( 5000 )['config']['ipconfig0'] );
+		$this->assertNull( Resource::find( $r->id() )->get( 'ip6' ) );
+		$listen = array_values( array_filter( $this->guest_jobs(), static fn( $j ) => 'listen' === $j['job']['op'] ) );
+		$this->assertArrayNotHasKey( 'listen6', $listen[0]['job'] );
+	}
+
+	public function test_the_add_on_gives_the_database_an_ipv6_address_and_removing_it_takes_it_back(): void {
+		$this->ipv6_cluster();
+		$r = $this->db_with_ip();
+
+		$this->assertSame( 'ip=192.0.2.10/24,gw=192.0.2.1,ip6=' . self::DB_V6 . '/64,gw6=2001:db8:430c:1::1', $this->fake->vm( 5000 )['config']['ipconfig0'] );
+		$this->assertSame( self::DB_V6, Resource::find( $r->id() )->get( 'ip6' ) );
+		$this->assertCount( 1, \BeltoftServices\Proxmox\Network\IpHistory::for_address( self::DB_V6 ) );
+
+		$listen = array_values( array_filter( $this->guest_jobs(), static fn( $j ) => 'listen' === $j['job']['op'] ) );
+		$this->assertSame( array( self::DB_V6 ), $listen[0]['job']['listen6'] );
+		$this->assertNotContains( self::DB_V6, $listen[0]['job']['listen'], 'The IPv4 list is what an older guest reads.' );
+
+		$this->assertTrue( $this->remove_ip( $r )->is_done() );
+		$this->assertArrayNotHasKey( 'ipconfig0', (array) $this->fake->vm( 5000 )['config'] );
+		$this->assertNull( Resource::find( $r->id() )->get( 'ip6' ) );
+		$this->assertNotNull( \BeltoftServices\Proxmox\Network\IpHistory::for_address( self::DB_V6 )[0]['ended_at'] );
+	}
+
+	public function test_a_restore_puts_the_ipv6_part_of_the_public_card_back_and_leaves_a_written_address_when_the_cluster_turns_it_off(): void {
+		$this->ipv6_cluster();
+		$r      = $this->db_with_ip();
+		$config = $this->fake->vm( 5000 )['config'];
+		$cluster = (array) Clusters::get( 'lab' );
+
+		$this->assertNull( DbIp::nic_repair( $r, $cluster, $config ), 'Right as it is.' );
+
+		$old              = $config;
+		$old['ipconfig0'] = 'ip=192.0.2.10/24,gw=192.0.2.1';
+		$repair           = DbIp::nic_repair( $r, $cluster, $old );
+		$this->assertSame( 'ip=192.0.2.10/24,gw=192.0.2.1,ip6=' . self::DB_V6 . '/64,gw6=2001:db8:430c:1::1', $repair['ipconfig0'] );
+
+		$spelled              = $config;
+		$spelled['ipconfig0'] = 'ip=192.0.2.10/24,gw=192.0.2.1,ip6=2001:DB8:430c:1:1388:0:0:1/64,gw6=2001:db8:430c:1:0:0:0:1';
+		$this->assertNull( DbIp::nic_repair( $r, $cluster, $spelled ), 'The same address spelled another way.' );
+
+		$wrong              = $config;
+		$wrong['ipconfig0'] = 'ip=192.0.2.10/24,gw=192.0.2.1,ip6=2001:db8:430c:1:9999::1/64,gw6=2001:db8:430c:1::1';
+		$this->assertNotNull( DbIp::nic_repair( $r, $cluster, $wrong ), 'A wrong IPv6 address is replaced.' );
+
+		$off = $cluster;
+		$off['ipv6_prefix'] = '';
+		$this->assertNull( DbIp::nic_repair( $r, $off, $config ), 'IPv6 off: a written address is left alone.' );
+
+		$bad4              = $config;
+		$bad4['ipconfig0'] = 'ip=192.0.2.99/24,gw=192.0.2.1,ip6=' . self::DB_V6 . '/64,gw6=2001:db8:430c:1::1';
+		$this->assertNotNull( DbIp::nic_repair( $r, $cluster, $bad4 ), 'The IPv4 part must be the pool\'s.' );
+	}
+
+	public function test_an_ipv6_entry_is_applied_to_the_firewall_and_goes_to_the_guest_in_its_own_list(): void {
+		$this->ipv6_cluster();
+		$r = $this->db_with_ip();
+
+		$this->assertSame( 202, $this->post( $r, array( 'op' => 'add', 'cidr' => '2001:DB8:1::/48', 'label' => 'Office v6' ) )->get_status() );
+		$this->assertSame( 202, $this->post( $r, array( 'op' => 'add', 'cidr' => '203.0.113.7' ) )->get_status() );
+		$this->assertSame( 202, $this->post( $r, array( 'op' => 'add', 'cidr' => '2a01:4f8::7' ) )->get_status() );
+		$this->assertTrue( $this->apply( $r )->is_done() );
+
+		$entries = DbAccess::entries( Resource::find( $r->id() ) );
+		$this->assertSame( array( '2001:db8:1::/48', '203.0.113.7/32', '2a01:4f8::7/128' ), array_column( $entries, 'cidr' ) );
+		$view = DbAccess::view( Resource::find( $r->id() ) );
+		$this->assertSame( array( '2001:db8:1::/48', '203.0.113.7', '2a01:4f8::7' ), array_column( $view['entries'], 'cidr' ), 'The customer reads a single host without its length.' );
+		$this->assertSame( self::DB_V6, $view['address6'] );
+
+		$this->assertEqualsCanonicalizing( array( 'bs-db:2001:db8:1::/48', 'bs-db:203.0.113.7', 'bs-db:2a01:4f8::7' ), $this->net0_rules() );
+		$this->assertTrue( $this->fake->fake_inbound_allowed( 5000, 'tcp', 5432, '2001:db8:1:77::5', 'net0' ) );
+		$this->assertTrue( $this->fake->fake_inbound_allowed( 5000, 'tcp', 5432, '2a01:4f8::7', 'net0' ) );
+		$this->assertFalse( $this->fake->fake_inbound_allowed( 5000, 'tcp', 5432, '2a01:4f8::8', 'net0' ) );
+		$this->assertFalse( $this->fake->fake_inbound_allowed( 5000, 'tcp', 5432, '2001:db8:2::5', 'net0' ) );
+
+		$job = json_decode( (string) $this->fake->guest_file( 5000, DbGuest::JOB ), true );
+		$this->assertSame( array( '203.0.113.7/32' ), $job['allow'] );
+		$this->assertSame( array( '2001:db8:1::/48', '2a01:4f8::7/128' ), $job['allow6'] );
+
+		// A second apply writes no rule again, and removing an IPv6 entry closes it.
+		$before = count( $this->fake->calls() );
+		$this->assertTrue( $this->apply( $r )->is_done() );
+		$this->assertSame( 0, count( array_filter( array_slice( $this->fake->calls(), $before ), static fn( $c ) => 'POST' === $c['method'] && '/firewall/rules' === substr( $c['path'], -15 ) ) ) );
+
+		$this->assertSame( 202, $this->post( $r, array( 'op' => 'remove', 'cidr' => '2001:db8:1::/48' ) )->get_status() );
+		$this->assertTrue( $this->apply( $r )->is_done() );
+		$this->assertFalse( $this->fake->fake_inbound_allowed( 5000, 'tcp', 5432, '2001:db8:1:77::5', 'net0' ) );
+	}
+
+	public function test_open_to_everyone_is_one_rule_for_both_families(): void {
+		$this->ipv6_cluster();
+		$r = $this->db_with_ip();
+
+		$this->assertSame( 202, $this->post( $r, array( 'op' => 'world_on', 'confirm' => DbAccess::CONFIRM_WORLD ) )->get_status() );
+		$this->assertTrue( $this->apply( $r )->is_done() );
+
+		$this->assertSame( array( 'bs-db:world' ), $this->net0_rules() );
+		$this->assertTrue( $this->fake->fake_inbound_allowed( 5000, 'tcp', 5432, '203.0.113.7', 'net0' ) );
+		$this->assertTrue( $this->fake->fake_inbound_allowed( 5000, 'tcp', 5432, '2001:db8:2::5', 'net0' ) );
 	}
 }

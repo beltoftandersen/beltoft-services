@@ -321,40 +321,109 @@ final class Firewall {
 	}
 
 	/**
-	 * The PVE parameters of a customer rule.
+	 * The PVE parameters of a customer rule for one family, or both when it names no source.
 	 *
-	 * @param array<string, mixed> $rule Rule.
+	 * @param array<string, mixed> $rule    Rule.
+	 * @param string               $tag     Comment.
+	 * @param string               $proto   Protocol on the wire: tcp, udp, icmp or icmpv6.
+	 * @param string[]             $sources Sources (one family); empty: anyone.
 	 * @return array<string, mixed>
 	 */
-	private static function params( array $rule ): array {
+	private static function params( array $rule, string $tag, string $proto, array $sources ): array {
 		$p = array(
 			'type'    => 'in',
 			'action'  => 'ACCEPT',
-			'proto'   => $rule['proto'],
+			'proto'   => $proto,
 			'iface'   => 'net0',
 			'enable'  => 1,
-			'comment' => self::TAG_CUSTOMER . $rule['id'],
+			'comment' => $tag,
 		);
 
 		if ( 'icmp' !== $rule['proto'] ) {
 			$p['dport'] = $rule['from'] === $rule['to'] ? (string) $rule['from'] : $rule['from'] . ':' . $rule['to'];
 		}
 
-		if ( $rule['sources'] ) {
-			$p['source'] = implode( ',', $rule['sources'] );
+		if ( $sources ) {
+			$p['source'] = implode( ',', $sources );
 		}
 
 		return $p;
 	}
 
 	/**
-	 * Does a rule Proxmox lists say what the stored rule says?
+	 * The Proxmox rules one stored rule turns into, by comment. A stored rule is one entry for the customer; Proxmox
+	 * wants a source list to be of one family and `icmp` to be IPv4 only (IPv6 ping is `icmpv6`):
+	 * - no source: one rule for both families (`bs-fw:<id>`), and for a ping, when the cluster has IPv6 on, an `icmpv6` twin (`bs-fw:<id>:6`);
+	 * - IPv4 sources: `bs-fw:<id>`; IPv6 sources: `bs-fw:<id>:6` (a ping with IPv6 sources is `icmpv6`);
+	 * - both families named: both rules.
+	 * A cluster with IPv6 off writes exactly what it always wrote for IPv4 (and no twin).
+	 *
+	 * @param array<string, mixed> $rule Stored rule.
+	 * @param bool                 $v6   Whether the cluster has IPv6 on.
+	 * @return array<string, array<string, mixed>> Comment => parameters.
+	 */
+	private static function expand( array $rule, bool $v6 ): array {
+		$tag     = self::TAG_CUSTOMER . $rule['id'];
+		$sources = array_values( array_map( 'strval', (array) $rule['sources'] ) );
+		$four    = array_values( array_filter( $sources, static fn( $s ) => false === strpos( $s, ':' ) ) );
+		$six     = array_values( array_filter( $sources, static fn( $s ) => false !== strpos( $s, ':' ) ) );
+		$ping    = 'icmp' === $rule['proto'];
+		$out     = array();
+
+		if ( ! $sources ) {
+			$out[ $tag ] = self::params( $rule, $tag, (string) $rule['proto'], array() );
+
+			if ( $ping && $v6 ) {
+				$out[ $tag . ':6' ] = self::params( $rule, $tag . ':6', 'icmpv6', array() );
+			}
+
+			return $out;
+		}
+
+		if ( $four ) {
+			$out[ $tag ] = self::params( $rule, $tag, (string) $rule['proto'], $four );
+		}
+
+		if ( $six ) {
+			$out[ $tag . ':6' ] = self::params( $rule, $tag . ':6', $ping ? 'icmpv6' : (string) $rule['proto'], $six );
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Every Proxmox rule the stored rules ask for: comment => parameters.
+	 *
+	 * @param array<int, array<string, mixed>> $desired Stored rules.
+	 * @return array<string, array<string, mixed>>
+	 */
+	private function wanted( array $desired ): array {
+		$v6  = null !== Ipv6::prefix_bytes( $this->cluster );
+		$out = array();
+
+		foreach ( $desired as $rule ) {
+			$out += self::expand( $rule, $v6 );
+		}
+
+		return $out;
+	}
+
+	/**
+	 * The label of a stored rule for the history line: ping, a port or a port range.
+	 *
+	 * @param array<string, mixed> $rule Stored rule.
+	 */
+	private static function label_of( array $rule ): string {
+		return 'icmp' === $rule['proto'] ? 'ping' : ( $rule['from'] === $rule['to'] ? (string) $rule['from'] : $rule['from'] . '-' . $rule['to'] );
+	}
+
+	/**
+	 * Does a rule Proxmox lists say what the wanted rule says?
 	 *
 	 * @param array<string, mixed> $remote Listed rule.
-	 * @param array<string, mixed> $rule   Stored rule.
+	 * @param array<string, mixed> $want   Wanted rule (self::params()).
 	 */
-	private static function same( array $remote, array $rule ): bool {
-		$want = self::params( $rule );
+	private static function same( array $remote, array $want ): bool {
 		$have = array(
 			'type'   => (string) ( $remote['type'] ?? '' ),
 			'action' => (string) ( $remote['action'] ?? '' ),
@@ -375,7 +444,8 @@ final class Firewall {
 		);
 
 		foreach ( array( &$have, &$want ) as &$side ) {
-			$parts = array_filter( explode( ',', $side['source'] ) );
+			// An IPv6 source is compared by value: Proxmox may list it with another spelling.
+			$parts = array_map( static fn( $part ) => Ipv6::is_address( explode( '/', $part )[0] ) ? Ipv6::normalise( explode( '/', $part )[0] ) . ( isset( explode( '/', $part )[1] ) ? '/' . explode( '/', $part )[1] : '' ) : $part, array_filter( explode( ',', $side['source'] ) ) );
 			sort( $parts );
 			$side['source'] = implode( ',', $parts );
 		}
@@ -445,29 +515,35 @@ final class Firewall {
 		}
 
 		// Add what is missing.
-		$remote = self::tagged( $rules, self::TAG_CUSTOMER );
+		$remote  = self::tagged( $rules, self::TAG_CUSTOMER );
+		$labelled = array();
 
 		foreach ( $desired as $rule ) {
-			$found = false;
+			foreach ( self::expand( $rule, null !== Ipv6::prefix_bytes( $this->cluster ) ) as $tag => $params ) {
+				$found = false;
 
-			foreach ( $remote as $listed ) {
-				if ( self::TAG_CUSTOMER . $rule['id'] === (string) $listed['comment'] && self::same( $listed, $rule ) ) {
-					$found = true;
-					break;
+				foreach ( $remote as $listed ) {
+					if ( $tag === (string) $listed['comment'] && self::same( $listed, $params ) ) {
+						$found = true;
+						break;
+					}
+				}
+
+				if ( $found ) {
+					continue;
+				}
+
+				$answer = $this->write( 'POST', $base . '/rules', $params );
+
+				if ( is_wp_error( $answer ) ) {
+					return $this->stop( $answer );
+				}
+
+				if ( ! isset( $labelled[ $rule['id'] ] ) ) {
+					$labelled[ $rule['id'] ]    = true;
+					$this->changed['opened'][] = self::label_of( $rule );
 				}
 			}
-
-			if ( $found ) {
-				continue;
-			}
-
-			$answer = $this->write( 'POST', $base . '/rules', self::params( $rule ) );
-
-			if ( is_wp_error( $answer ) ) {
-				return $this->stop( $answer );
-			}
-
-			$this->changed['opened'][] = 'icmp' === $rule['proto'] ? 'ping' : ( $rule['from'] === $rule['to'] ? (string) $rule['from'] : $rule['from'] . '-' . $rule['to'] );
 		}
 
 		$done = $this->remove_obsolete( $base, $desired );
@@ -498,11 +574,7 @@ final class Firewall {
 	 * @return true|StepResult
 	 */
 	private function remove_obsolete( string $base, array $desired ) {
-		$by_tag = array();
-
-		foreach ( $desired as $rule ) {
-			$by_tag[ self::TAG_CUSTOMER . $rule['id'] ] = $rule;
-		}
+		$by_tag = $this->wanted( $desired );
 
 		for ( $guard = 0; $guard < self::MAX_CEILING + 10; $guard++ ) {
 			$rules = $this->read_list( $base . '/rules' );
@@ -544,7 +616,14 @@ final class Firewall {
 			$listed = $target['listed'];
 
 			if ( empty( $by_tag[ (string) $listed['comment'] ] ) ) {
-				$this->changed['closed'][] = 'icmp' === ( $listed['proto'] ?? '' ) ? 'ping' : (string) str_replace( ':', '-', (string) ( $listed['dport'] ?? '' ) );
+				$label = in_array( $listed['proto'] ?? '', array( 'icmp', 'icmpv6' ), true ) ? 'ping' : (string) str_replace( ':', '-', (string) ( $listed['dport'] ?? '' ) );
+
+				// A stored rule with two Proxmox rules (both families) is one entry for the customer: the IPv6 half is not counted again.
+				$twin = '6' === substr( (string) $listed['comment'], -1 ) && ':6' === substr( (string) $listed['comment'], -2 ) ? substr( (string) $listed['comment'], 0, -2 ) : '';
+
+				if ( '' === $twin || ! in_array( $twin, array_map( static fn( $r ) => (string) ( is_array( $r ) ? ( $r['comment'] ?? '' ) : '' ), $rules ), true ) ) {
+					$this->changed['closed'][] = $label;
+				}
 			}
 		}
 
@@ -566,6 +645,12 @@ final class Firewall {
 			'policy_out' => $this->policy_out(),
 			'macfilter'  => 1,
 		);
+
+		// With IPv6 on, neighbour discovery is allowed and the guest may not send router advertisements: written, not left to the defaults.
+		if ( null !== Ipv6::prefix_bytes( $this->cluster ) ) {
+			$want['ndp']  = 1;
+			$want['radv'] = 0;
+		}
 
 		if ( ! empty( $this->cluster['fw_ipfilter'] ) ) {
 			$ready = $this->ipfilter_sets( $base, $v );
@@ -695,16 +780,17 @@ final class Firewall {
 		}
 
 		$remote = self::tagged( $rules, self::TAG_CUSTOMER );
+		$wanted = $this->wanted( $desired );
 
-		if ( count( $remote ) !== count( $desired ) ) {
+		if ( count( $remote ) !== count( $wanted ) ) {
 			return false;
 		}
 
-		foreach ( $desired as $rule ) {
+		foreach ( $wanted as $tag => $params ) {
 			$found = false;
 
 			foreach ( $remote as $listed ) {
-				if ( self::TAG_CUSTOMER . $rule['id'] === (string) $listed['comment'] && self::same( $listed, $rule ) ) {
+				if ( $tag === (string) $listed['comment'] && self::same( $listed, $params ) ) {
 					$found = true;
 				}
 			}

@@ -21,7 +21,7 @@ final class IpHistory {
 	/**
 	 * Opens a holding.
 	 *
-	 * @param string $kind        'public' or 'private'.
+	 * @param string $kind        'public', 'public6' or 'private'.
 	 * @param string $address     Address.
 	 * @param int    $resource_id Activation id.
 	 */
@@ -43,9 +43,26 @@ final class IpHistory {
 	}
 
 	/**
+	 * Opens a holding unless the resource already has this address open: a build step that runs twice logs it once.
+	 *
+	 * @param string $kind        Kind.
+	 * @param string $address     Address.
+	 * @param int    $resource_id Activation id.
+	 */
+	public static function start_once( string $kind, string $address, int $resource_id ): void {
+		foreach ( self::for_address( $address ) as $row ) {
+			if ( $row['kind'] === $kind && $row['resource_id'] === $resource_id && null === $row['ended_at'] ) {
+				return;
+			}
+		}
+
+		self::start( $kind, $address, $resource_id );
+	}
+
+	/**
 	 * Closes the open holdings of a resource.
 	 *
-	 * @param string $kind        'public' or 'private'.
+	 * @param string $kind        'public', 'public6' or 'private'.
 	 * @param int    $resource_id Activation id.
 	 */
 	public static function end( string $kind, int $resource_id ): void {

@@ -12,7 +12,9 @@ use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Network\Firewall;
+use BeltoftServices\Proxmox\Network\IpHistory;
 use BeltoftServices\Proxmox\Network\IpPool;
+use BeltoftServices\Proxmox\Network\Ipv6;
 use BeltoftServices\Proxmox\Network\NetConfig;
 use BeltoftServices\Proxmox\Pve\Prepares;
 use BeltoftServices\Proxmox\Pve\Steps;
@@ -129,7 +131,8 @@ final class DbIp {
 		$row = IpPool::for_resource( $r->id() );
 
 		if ( null !== $row && 'assigned' === $row['state'] ) {
-			$want = self::public_params( $cluster, $row, (string) ( $config['net0'] ?? '' ) );
+			$record = VmRecords::for_resource( $r->id() );
+			$want   = self::public_params( $cluster, $row, (string) ( $config['net0'] ?? '' ), null === $record ? 0 : (int) $record['vmid'] );
 
 			return self::matches( $config, $want ) ? null : $want;
 		}
@@ -155,9 +158,10 @@ final class DbIp {
 	 * @param array<string, mixed> $cluster Cluster.
 	 * @param array<string, mixed> $ip      Pool row.
 	 * @param string               $net0    The VM's net0 now ('' for none).
+	 * @param int                  $vmid    The VMID: with it, a cluster that has IPv6 on and Ipv6::databases() (off), ipconfig0 carries the IPv6 address too (0: IPv4 only).
 	 * @return array<string, string>
 	 */
-	public static function public_params( array $cluster, array $ip, string $net0 ): array {
+	public static function public_params( array $cluster, array $ip, string $net0, int $vmid = 0 ): array {
 		$props = NetConfig::parse( $net0 );
 
 		if ( array() === $props ) {
@@ -173,8 +177,10 @@ final class DbIp {
 
 		$gateway = null !== $ip['gateway'] && '' !== $ip['gateway'] ? $ip['gateway'] : (string) $cluster['gateway'];
 
+		$ip6 = $vmid > 0 && Ipv6::databases() ? Ipv6::ipconfig( $cluster, $vmid ) : '';
+
 		return array(
-			'ipconfig0' => 'ip=' . $ip['address'] . '/' . (int) $cluster['prefix'] . ',gw=' . $gateway,
+			'ipconfig0' => 'ip=' . $ip['address'] . '/' . (int) $cluster['prefix'] . ',gw=' . $gateway . ( '' === $ip6 ? '' : ',' . $ip6 ),
 			'net0'      => NetConfig::format( $props ),
 		);
 	}
@@ -189,7 +195,13 @@ final class DbIp {
 		$have   = NetConfig::parse( (string) ( $config['net0'] ?? '' ) );
 		$expect = NetConfig::parse( $want['net0'] );
 
-		return (string) ( $config['ipconfig0'] ?? '' ) === $want['ipconfig0']
+		$have_ip = (string) ( $config['ipconfig0'] ?? '' );
+
+		// The IPv4 part must be exactly as wanted. The IPv6 part is compared only when one is wanted (a cluster that turned IPv6 off leaves a written address alone) and by value, not by spelling.
+		$want_keys = Ipv6::keys( $want['ipconfig0'] );
+		$ip6_ok    = '' === $want_keys['ip6'] || Ipv6::keys( $have_ip ) === $want_keys;
+
+		return Ipv6::strip( $have_ip ) === Ipv6::strip( $want['ipconfig0'] ) && $ip6_ok
 			&& ( $have['bridge'] ?? '' ) === ( $expect['bridge'] ?? '' ) && ( $have['tag'] ?? '' ) === ( $expect['tag'] ?? '' ) && '1' === ( $have['firewall'] ?? '' );
 	}
 
@@ -427,7 +439,14 @@ final class DbIp {
 			$listen[] = $public;
 		}
 
-		return array( 'v' => 1, 'request' => $request, 'op' => 'listen', 'listen' => $listen );
+		$job = array( 'v' => 1, 'request' => $request, 'op' => 'listen', 'listen' => $listen );
+
+		// The IPv6 address is a list of its own (`listen6`): a guest that does not know the key keeps listening on the IPv4 addresses only.
+		if ( Ipv6::databases() && '' !== $public && Ipv6::is_address( (string) $r->get( 'ip6' ) ) ) {
+			$job['listen6'] = array( (string) Ipv6::normalise( (string) $r->get( 'ip6' ) ) );
+		}
+
+		return $job;
 	}
 
 	/**
@@ -740,7 +759,7 @@ final class DbIp {
 			return $this->abort( 'db_ip: the address reservation is gone' );
 		}
 
-		$want = self::public_params( $this->cluster, $ip, (string) ( $v['config']['net0'] ?? '' ) );
+		$want = self::public_params( $this->cluster, $ip, (string) ( $v['config']['net0'] ?? '' ), (int) $record['vmid'] );
 
 		if ( ! self::matches( (array) $v['config'], $want ) ) {
 			if ( Settings::get( 'pause_all' ) ) {
@@ -765,8 +784,14 @@ final class DbIp {
 			}
 		}
 
-		if ( ! VmRecords::set_ip( $this->r->id(), $ip['id'] ) || ! IpPool::assign( $this->r->id() ) || ! $this->r->set( array( 'ip' => $ip['address'] ) ) ) {
+		$ip6 = Ipv6::databases() ? Ipv6::address( $this->cluster, (int) $record['vmid'] ) : null;
+
+		if ( ! VmRecords::set_ip( $this->r->id(), $ip['id'] ) || ! IpPool::assign( $this->r->id() ) || ! $this->r->set( array( 'ip' => $ip['address'], 'ip6' => $ip6 ) ) ) {
 			return StepResult::retry( 0, 'db_ip: the address could not be recorded as in use' );
+		}
+
+		if ( null !== $ip6 ) {
+			IpHistory::start_once( Ipv6::KIND, $ip6, $this->r->id() );
 		}
 
 		return null;
@@ -805,10 +830,11 @@ final class DbIp {
 		// Only now, with the removal seen.
 		VmRecords::clear_ip( $this->r->id() );
 
-		if ( ! $this->r->set( array( 'ip' => null ) ) ) {
+		if ( ! $this->r->set( array( 'ip' => null, 'ip6' => null ) ) ) {
 			return StepResult::retry( 0, 'db_ip: progress could not be stored' );
 		}
 
+		IpHistory::end( Ipv6::KIND, $this->r->id() );
 		IpPool::release( $this->r->id() );
 
 		return null;

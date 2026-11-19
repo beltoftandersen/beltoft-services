@@ -75,13 +75,13 @@ final class FirewallRoute {
 	}
 
 	/**
-	 * The address the customer is using (IPv4 only), or ''. In a call from a connected app the visitor is the app's
+	 * The address the customer is using (IPv4 or IPv6), or ''. In a call from a connected app the visitor is the app's
 	 * server, and the model's word for the customer's address is not trusted, so there is none there (see put()).
 	 */
 	private static function my_ip(): string {
 		$ip = self::app_call() ? '' : ( isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( (string) $_SERVER['REMOTE_ADDR'] ) ) : '' );
 
-		return false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ? $ip : '';
+		return false !== filter_var( $ip, FILTER_VALIDATE_IP ) && false === strpos( $ip, '%' ) ? (string) ( Ipv6::normalise( $ip ) ?? $ip ) : '';
 	}
 
 	/**

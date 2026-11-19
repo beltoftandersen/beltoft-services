@@ -41,7 +41,9 @@ trait FirewallIpfilter {
 
 		$names = array_column( $list, 'name' );
 
-		foreach ( $sets as $name => $address ) {
+		foreach ( $sets as $name => $addresses ) {
+			$wanted = array_map( array( self::class, 'ipset_key' ), (array) $addresses );
+
 			if ( ! in_array( $name, $names, true ) ) {
 				$answer = $this->write( 'POST', $base . '/ipset', array( 'name' => $name ) );
 
@@ -56,13 +58,13 @@ trait FirewallIpfilter {
 				return $this->stop( $entries );
 			}
 
-			$has = false;
+			$has = array();
 
 			foreach ( $entries as $entry ) {
 				$cidr = (string) ( $entry['cidr'] ?? '' );
 
-				if ( $cidr === $address || $cidr === $address . '/32' ) {
-					$has = true;
+				if ( in_array( self::ipset_key( $cidr ), $wanted, true ) && ! isset( $has[ self::ipset_key( $cidr ) ] ) ) {
+					$has[ self::ipset_key( $cidr ) ] = true;
 					continue;
 				}
 
@@ -73,7 +75,11 @@ trait FirewallIpfilter {
 				}
 			}
 
-			if ( ! $has ) {
+			foreach ( (array) $addresses as $address ) {
+				if ( isset( $has[ self::ipset_key( $address ) ] ) ) {
+					continue;
+				}
+
 				$answer = $this->write( 'POST', $base . '/ipset/' . $name, array( 'cidr' => $address ) );
 
 				if ( is_wp_error( $answer ) ) {
@@ -87,9 +93,12 @@ trait FirewallIpfilter {
 				return $this->stop( $entries );
 			}
 
-			$cidrs = array_map( static fn( $e ) => (string) ( $e['cidr'] ?? '' ), $entries );
+			$cidrs = array_map( static fn( $e ) => self::ipset_key( (string) ( $e['cidr'] ?? '' ) ), $entries );
+			sort( $cidrs );
+			$sorted = $wanted;
+			sort( $sorted );
 
-			if ( array( $address ) !== $cidrs && array( $address . '/32' ) !== $cidrs ) {
+			if ( $sorted !== $cidrs ) {
 				return false;
 			}
 		}
@@ -123,7 +132,7 @@ trait FirewallIpfilter {
 	 *
 	 * @param Resource $r           Resource.
 	 * @param bool     $private_nic Whether the VM has a private NIC (net1).
-	 * @return array<string, string>|null Set name => address.
+	 * @return array<string, string|string[]>|null Set name => address; ipfilter-net0 is a list of the IPv4 and the IPv6 address when the server has both.
 	 */
 	public static function expected_ipsets( Resource $r, bool $private_nic ): ?array {
 		$sets = array();
@@ -136,6 +145,12 @@ trait FirewallIpfilter {
 			}
 
 			$sets['ipfilter-net0'] = $ip;
+			$ip6                   = (string) $r->get( 'ip6' );
+
+			// The IPv6 address goes in the same set: with ipfilter on, the guest may send from its own addresses only, so the set must never lack the IPv6 one once the guest has it.
+			if ( Ipv6::is_address( $ip6 ) ) {
+				$sets['ipfilter-net0'] = array( $ip, (string) Ipv6::normalise( $ip6 ) );
+			}
 		}
 
 		if ( $private_nic ) {
@@ -149,6 +164,23 @@ trait FirewallIpfilter {
 		}
 
 		return $sets ? $sets : null;
+	}
+
+	/**
+	 * An ipset entry as a comparable key: IPv4 without /32, IPv6 compressed and without /128.
+	 *
+	 * @param string $cidr Entry as written or as Proxmox lists it.
+	 */
+	public static function ipset_key( string $cidr ): string {
+		$cidr = trim( $cidr );
+
+		if ( false !== strpos( $cidr, ':' ) ) {
+			$address = preg_replace( '#/128$#D', '', $cidr );
+
+			return Ipv6::normalise( (string) $address ) ?? $cidr;
+		}
+
+		return (string) preg_replace( '#/32$#D', '', $cidr );
 	}
 
 	/**

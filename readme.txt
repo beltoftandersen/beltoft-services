@@ -258,6 +258,13 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 == Changelog ==
 
+= 0.47.0 =
+* IPv6 for new servers when the cluster has an IPv6 prefix (off by default). A cluster gets two fields, the /64 and the gateway; each new server gets one address in it, made from its VMID (nothing is allocated, a reinstall or a restore keeps it). Existing servers and databases are never given an address.
+* Firewall: customers can name IPv6 addresses and networks as sources; one rule is one Proxmox rule per address family, and a ping rule gets an IPv6 ping twin; neighbour discovery is written on and router advertisements from the guest off; the anti-spoofing set holds both addresses.
+* Databases: no IPv6 for now; the access list takes IPv4 only.
+* Abuse monitoring: the host counts are accepted for IPv6 sources too (mapped to the server by prefix and VMID), the lookup `wp beltoft-services who` takes IPv6, a log row `public6` records who held an address.
+* The server page, the ready email, the MCP details and the admin panel show the IPv6 address. The REST list of services is unchanged.
+
 = 0.46.3 =
 * Credit: the e-mail of a new card says credit added to your account, with no gift card wording.
 

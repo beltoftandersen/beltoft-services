@@ -14,6 +14,7 @@ use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Disk\DiskPanels;
 use BeltoftServices\Proxmox\Network\Firewall;
 use BeltoftServices\Proxmox\Network\FirewallRules;
+use BeltoftServices\Proxmox\Network\Ipv6;
 use BeltoftServices\Proxmox\Network\Monitor;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\Ownership;
@@ -234,6 +235,15 @@ final class Panels {
 	}
 
 	/**
+	 * The server's IPv6 address (meta ip6, written when the address is in its configuration), or ''.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function ip6( Resource $r ): string {
+		return Ipv6::normalise( (string) $r->get( 'ip6' ) ) ?? '';
+	}
+
+	/**
 	 * The account panel.
 	 *
 	 * @param Resource $r Resource.
@@ -255,6 +265,7 @@ final class Panels {
 			'page'       => $page,
 			'can_reset'  => null !== $page && $r->accepts_actions() && array_key_exists( 'reset_password', Actions::offered( $r ) ),
 			'ip'         => false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ? $ip : '',
+			'ip6'        => self::ip6( $r ),
 			'plan'       => array(
 				'cores'     => (int) ( $plan['cores'] ?? 0 ),
 				'memory_mb' => (int) ( $plan['memory_mb'] ?? 0 ),
@@ -575,6 +586,7 @@ final class Panels {
 			__( 'Node', 'beltoft-services' )          => null === $record ? '' : $record['node'],
 			__( 'VMID', 'beltoft-services' )          => null === $record ? '' : (string) $record['vmid'],
 			__( 'IP address', 'beltoft-services' )    => (string) $r->get( 'ip' ),
+			__( 'IPv6 address', 'beltoft-services' )  => self::ip6( $r ),
 			__( 'Ownership tag', 'beltoft-services' ) => Ownership::tag( $r ),
 			__( 'Power', 'beltoft-services' )         => null === $status ? '' : (string) $status['power'],
 			__( 'Size', 'beltoft-services' )          => sprintf(
