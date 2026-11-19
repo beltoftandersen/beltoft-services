@@ -101,4 +101,11 @@ class ParkedEdgeTest extends HostingCase {
 		$this->assertStringContainsString( '2 names sent to 1 node', wp_json_encode( \WP_CLI::$lines ) );
 		$this->assertSame( array( 'one.example', 'www.one.example' ), $this->agent->state()['parked'] );
 	}
+
+	public function test_the_job_reads_each_node_with_its_secrets_decrypted(): void {
+		// The agent client needs the decrypted client certificate, key and CA for mutual TLS; Nodes::all() keeps them encrypted.
+		$src = (string) file_get_contents( dirname( __DIR__, 2 ) . '/src/Hosting/ParkedEdge.php' );
+		$this->assertStringContainsString( 'Nodes::get(', $src );
+		$this->assertDoesNotMatchRegularExpression( '/foreach\s*\(\s*Nodes::all\(\)\s+as\s+\$id\s*=>\s*\$node/', $src );
+	}
 }

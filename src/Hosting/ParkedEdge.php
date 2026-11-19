@@ -103,8 +103,12 @@ final class ParkedEdge {
 		$hosts = self::hosts();
 		$ok    = true;
 
-		foreach ( Nodes::all() as $id => $node ) {
-			if ( empty( $node['enabled'] ) ) {
+		foreach ( array_keys( Nodes::all() ) as $id ) {
+			// Nodes::get() gives the node with its secrets decrypted (agent client certificate, key, CA): the agent client
+			// needs them for mutual TLS. Nodes::all() keeps them encrypted, which a fake agent never noticed (2026-11-19,
+			// production: every push answered no_client).
+			$node = Nodes::get( (string) $id );
+			if ( null === $node || empty( $node['enabled'] ) ) {
 				continue;
 			}
 
