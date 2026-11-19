@@ -66,10 +66,19 @@ class PageAndUsageTest extends GiftCreditTestCase {
 		$this->assertNotSame( Page::url(), Account::url() );
 	}
 
-	public function test_no_gift_card_email_while_gift_credit_is_on(): void {
-		$this->assertFalse( apply_filters( 'bgcw_should_send_email_now', true, 1, null ) );
-		$this->settings( array( 'gift_credit' => 0 ) );
-		$this->assertTrue( apply_filters( 'bgcw_should_send_email_now', true, 1, null ) );
+	public function test_the_card_email_says_credit_added_and_never_gift(): void {
+		$email = WC()->mailer()->get_emails()['BGCW_Gift_Card_Delivery'] ?? null;
+		$this->assertInstanceOf( \WC_Email::class, $email );
+		$email->gift_card                 = (object) array( 'id' => 1, 'code' => 'CR-1234-ABCD', 'initial_amount' => '25.00', 'balance' => '25.00', 'currency' => 'EUR', 'sender_name' => '', 'message' => '', 'expires_at' => null, 'recipient_email' => 'a@example.org' );
+		$email->placeholders['{amount}'] = '€25.00';
+
+		$this->assertSame( '€25.00 credit added to your account', $email->get_subject() );
+		$this->assertSame( 'Credit added to your account', $email->get_heading() );
+		$html = $email->get_content_html();
+		$this->assertStringContainsString( 'This credit has been added to your account.', $html );
+		$this->assertStringContainsString( 'CR-1234-ABCD', $html );
+		$this->assertDoesNotMatchRegularExpression( '/gift/i', wp_strip_all_tags( $email->get_subject() . $email->get_heading() . $html . $email->get_content_plain() ) );
+		$this->assertFalse( has_filter( 'bgcw_should_send_email_now', array( \BeltoftServices\GiftCredit\GiftCredit::class, 'no_gift_mail' ) ), 'The e-mail is still sent.' );
 	}
 
 	public function test_the_credit_page_never_says_gift_card(): void {

@@ -103,7 +103,8 @@ final class SecretsTest extends McpTestCase {
 		$this->assertSame( self::SERVER_PASSWORD, $done['password'] );
 		$this->assertTrue( $done['shown_once'] );
 		$this->assertStringContainsString( 'now in this conversation', $done['note'] );
-		$this->assertStringContainsString( 'reset_server_password', $done['note'] );
+		$this->assertStringContainsString( 'in the dashboard', $done['note'] );
+		$this->assertStringNotContainsString( 'reset_server_password', $done['note'] );
 		$this->assertFalse( Access::revealable( Resource::find( $r->id() ) ), 'The stored value is wiped, as the dashboard does.' );
 
 		// History: what happened, never the value.
@@ -180,7 +181,8 @@ final class SecretsTest extends McpTestCase {
 
 		$done = $this->json( $this->tool( 'reveal_database_password', $args + array( 'confirm' => $first['confirm'] ), $full ) );
 		$this->assertSame( self::PASSWORD, $done['password'] );
-		$this->assertStringContainsString( 'reset_database_password', $done['note'] );
+		$this->assertStringContainsString( 'in the dashboard', $done['note'] );
+		$this->assertStringNotContainsString( 'reset_database_password', $done['note'] );
 		$this->assertContains( 'Claude: database password shown', $this->history( $db ) );
 		$this->assertCount( 1, $this->mails );
 		$this->assertSame( 'A connected app showed your database password', $this->mails[0]['subject'] );

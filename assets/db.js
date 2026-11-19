@@ -142,7 +142,16 @@
 	function reset( box, panel, button ) {
 		var input = box.querySelector( '[data-db-confirm]' );
 
-		run( panel, button, db.strings.working, '/actions/db_reset_password', JSON.stringify( { args: { confirm: input ? input.value : '' } } ), 'db_reset_password', button.getAttribute( 'data-db-after' ), input );
+		if ( S.locked( scopeOf( panel ) ) ) {
+			return;
+		}
+
+		// A new password needs the code we email the customer: asked first, sent as step_code, used up when the job is queued.
+		window.beltoftApi.stepUp( 'password_reset', { holder: account } ).then( function ( code ) {
+			if ( code ) {
+				run( panel, button, db.strings.working, '/actions/db_reset_password', JSON.stringify( { args: { confirm: input ? input.value : '' }, step_code: code } ), 'db_reset_password', button.getAttribute( 'data-db-after' ), input );
+			}
+		} );
 	}
 
 	// Shut down and Start: the server's own actions. Shut down asks first. The page is read again when the job has run.

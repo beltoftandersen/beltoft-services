@@ -51,17 +51,63 @@
 		return ( ( +p[ 0 ] << 24 ) >>> 0 ) + ( +p[ 1 ] << 16 ) + ( +p[ 2 ] << 8 ) + ( +p[ 3 ] );
 	}
 
+	/* An IPv6 address as eight 16-bit groups, or null. */
+	function groups6( ip ) {
+		var halves = ip.split( '::' );
+
+		if ( halves.length > 2 || ! /^[0-9a-f:]+$/i.test( ip ) ) {
+			return null;
+		}
+
+		var head = halves[ 0 ] ? halves[ 0 ].split( ':' ) : [];
+		var tail = halves.length === 2 && halves[ 1 ] ? halves[ 1 ].split( ':' ) : [];
+		var fill = 8 - head.length - tail.length;
+
+		if ( ( halves.length === 1 && head.length !== 8 ) || ( halves.length === 2 && fill < 1 ) ) {
+			return null;
+		}
+
+		var all = head.concat( new Array( halves.length === 2 ? fill : 0 ).fill( '0' ), tail );
+
+		return all.map( function ( g ) {
+			return parseInt( g || '0', 16 );
+		} );
+	}
+
+	/* The address is in the source when both are of one family and the first len bits agree. */
 	function covers( sources, ip ) {
 		if ( ! ip ) {
 			return false;
 		}
 
+		var mine = ip.indexOf( ':' ) >= 0 ? groups6( ip ) : null;
+
 		return sources.some( function ( source ) {
 			var bits = source.split( '/' );
-			var len = bits[ 1 ] ? +bits[ 1 ] : 32;
-			var mask = len === 0 ? 0 : ( 0xFFFFFFFF << ( 32 - len ) ) >>> 0;
 
-			return ( ipToInt( ip ) & mask ) >>> 0 === ( ipToInt( bits[ 0 ] ) & mask ) >>> 0;
+			if ( bits[ 0 ].indexOf( ':' ) >= 0 || ip.indexOf( ':' ) >= 0 ) {
+				var net = bits[ 0 ].indexOf( ':' ) >= 0 ? groups6( bits[ 0 ] ) : null;
+				var left = bits[ 1 ] ? +bits[ 1 ] : 128;
+
+				if ( ! mine || ! net ) {
+					return false;
+				}
+
+				for ( var i = 0; i < 8 && left > 0; i++, left -= 16 ) {
+					var mask = left >= 16 ? 0xFFFF : ( 0xFFFF << ( 16 - left ) ) & 0xFFFF;
+
+					if ( ( mine[ i ] & mask ) !== ( net[ i ] & mask ) ) {
+						return false;
+					}
+				}
+
+				return true;
+			}
+
+			var len = bits[ 1 ] ? +bits[ 1 ] : 32;
+			var mask4 = len === 0 ? 0 : ( 0xFFFFFFFF << ( 32 - len ) ) >>> 0;
+
+			return ( ipToInt( ip ) & mask4 ) >>> 0 === ( ipToInt( bits[ 0 ] ) & mask4 ) >>> 0;
 		} );
 	}
 

@@ -93,6 +93,8 @@ defined( 'ABSPATH' ) || exit;
  *   vmid => { at "HH:MM", offset_minutes, disk_mb }; empty unless set_backup_slots()).
  * - mail.smtp: configured (true), user. The sender is kept by container (host and user only, never the password).
  * - edge.apply: routes (count). Replaces the routes of the account; an empty list removes them.
+ * - edge.parked: parked (count), skipped (count). Sets the whole list of parked names (domain parking): every earlier parked name
+ *   is dropped; a name that an account's routes hold is skipped, never replaced. An empty list clears them. Kept in state()['parked'].
  * - every other listed operation: ok (true) and no state change (modelled: accepted, nothing done).
  *
  * Seeding and scripting: fail_next(), pending(). Inspection: calls() (secrets masked), state().
@@ -296,6 +298,7 @@ class FakeAgent implements Agent {
 			'routes'  => array( 'routes', true ),
 		),
 		'edge.cert_push'    => array( 'host' => array( 'host', true ) ),
+		'edge.parked'       => array( 'hosts' => array( 'parked_hosts', true ) ),
 		'edge.storage_backup' => array(),
 		'backup.prepare'    => array(
 			'vmid'  => array( 'vmid', true ),
@@ -389,6 +392,7 @@ class FakeAgent implements Agent {
 			'sites' => array(),
 			'dbs'   => array(),
 			'edge'  => array(),
+			'parked' => array(),
 			'smtp'  => array(),
 			'db_sizes' => array(),
 			'memory'   => array(),
@@ -1004,6 +1008,18 @@ class FakeAgent implements Agent {
 				}
 
 				return true;
+			case 'parked_hosts':
+				if ( ! is_array( $value ) || ! array_is_list( $value ) || count( $value ) > 5000 ) {
+					return false;
+				}
+
+				foreach ( $value as $host ) {
+					if ( ! self::valid( 'host', $host ) ) {
+						return false;
+					}
+				}
+
+				return true;
 			case 'routes':
 				if ( ! is_array( $value ) || count( $value ) > 200 ) {
 					return false;
@@ -1494,6 +1510,21 @@ class FakeAgent implements Agent {
 				}
 
 				return array( 'routes' => count( $args['routes'] ) );
+
+			case 'edge.parked':
+				$held = array();
+
+				foreach ( (array) $this->state['edge'] as $routes ) {
+					foreach ( (array) $routes as $route ) {
+						$held[ (string) $route['host'] ] = true;
+					}
+				}
+
+				$parked = array_values( array_unique( array_filter( $args['hosts'], static fn( $host ) => ! isset( $held[ $host ] ) ) ) );
+				sort( $parked );
+				$this->state['parked'] = $parked;
+
+				return array( 'parked' => count( $parked ), 'skipped' => count( array_unique( $args['hosts'] ) ) - count( $parked ) );
 		}
 
 		return array( 'ok' => true );

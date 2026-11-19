@@ -136,7 +136,9 @@ class FlowsTest extends FirewallTestCase {
 
 		foreach (
 			array(
-				'not an ipv4'      => array( 'fe80::1' => $ok ),
+				'a bad ipv6'       => array( '2001:db8::zz' => $ok ),
+				'an ipv6 with zone' => array( 'fe80::1%eth0' => $ok ),
+				'one source twice'  => array( '2001:db8::1' => $ok, '2001:0db8:0:0:0:0:0:1' => $ok ),
 				'a name'           => array( 'example.com' => $ok ),
 				'a negative count' => array( '192.0.2.10' => $this->counts( array( 'dsts' => -1 ) ) ),
 				'a string count'   => array( '192.0.2.10' => $this->counts( array( 'dsts' => '5' ) ) ),
@@ -149,10 +151,10 @@ class FlowsTest extends FirewallTestCase {
 		}
 
 		$many = array();
-		for ( $i = 1; $i <= 65; $i++ ) {
+		for ( $i = 1; $i <= 129; $i++ ) {
 			$many[ '192.0.2.' . $i ] = $ok;
 		}
-		$this->assertSame( 400, $this->post( $this->payload( $many ) )->get_status(), 'At most 64 sources.' );
+		$this->assertSame( 400, $this->post( $this->payload( $many ) )->get_status(), 'At most 128 sources.' );
 
 		$this->assertSame( 400, $this->post( array(), null, '{"v":1,"at":' . time() . ',"sources":{},"x":1}' )->get_status(), 'No extra keys.' );
 		$this->assertSame( 400, $this->post( array(), null, '{"v":2,"at":' . time() . ',"sources":{}}' )->get_status(), 'Version 1 only.' );
@@ -174,6 +176,37 @@ class FlowsTest extends FirewallTestCase {
 		$this->assertTrue( $r->set( array( 'linked' => null, 'state' => 'paused' ) ) );
 		$this->assertSame( 0, $this->post( $this->payload( array( (string) $r->get( 'ip' ) => $this->counts() ), time() - 2 ) )->get_data()['used'], 'Not ready.' );
 		$this->assertSame( array(), Flows::samples( $r->id() ) );
+	}
+
+	public function test_an_ipv6_source_is_mapped_to_its_server_through_the_vmid_and_added_to_the_ipv4_counts(): void {
+		$this->save_cluster( array( 'ipv6_prefix' => '2001:db8:430c:1::/64', 'fw_enabled' => '1', 'fw_ipfilter' => '1' ) );
+		$r    = $this->server();
+		$ip6  = (string) $r->get( 'ip6' );
+		$this->assertSame( '2001:db8:430c:1:1388::1', $ip6 );
+
+		$sources = array(
+			(string) $r->get( 'ip' )                  => $this->counts( array( 'dsts' => 10, 'entries' => 40 ) ),
+			'2001:DB8:430c:1:1388::1'                 => $this->counts( array( 'dsts' => 7, 'entries' => 5 ) ),
+			'2001:db8:430c:1:1388:0:0:77'             => $this->counts( array( 'dsts' => 1, 'entries' => 1 ) ),
+			'2001:db8:430c:1:1389::1'                 => $this->counts(),
+			'2001:db8:ffff:1:1388::1'                 => $this->counts(),
+			'2001:db8:430c:1::1'                      => $this->counts(),
+		);
+		$this->assertSame( 1, $this->post( $this->payload( $sources ) )->get_data()['used'], 'One sample for the server; the other VMID, other prefix and host block are ignored.' );
+
+		$samples = Flows::samples( $r->id() );
+		$this->assertCount( 1, $samples );
+		$this->assertSame( 18, $samples[0]['dsts'] );
+		$this->assertSame( 46, $samples[0]['entries'] );
+	}
+
+	public function test_an_ipv6_source_of_a_busy_or_adopted_server_is_ignored(): void {
+		$this->save_cluster( array( 'ipv6_prefix' => '2001:db8:430c:1::/64', 'fw_enabled' => '1', 'fw_ipfilter' => '1' ) );
+		$r = $this->server();
+		$this->assertTrue( $r->set( array( 'linked' => true ) ) );
+		$this->assertSame( 0, $this->post( $this->payload( array( '2001:db8:430c:1:1388::1' => $this->counts() ), time() - 1 ) )->get_data()['used'] );
+		$this->assertTrue( $r->set( array( 'linked' => null, 'state' => 'paused' ) ) );
+		$this->assertSame( 0, $this->post( $this->payload( array( '2001:db8:430c:1:1388::1' => $this->counts() ), time() - 2 ) )->get_data()['used'] );
 	}
 
 	public function test_mode_off_stores_and_does_nothing(): void {
@@ -277,6 +310,25 @@ class FlowsTest extends FirewallTestCase {
 		$this->run_jobs();
 
 		return Resource::find( $r->id() );
+	}
+
+	public function test_a_quarantine_on_an_ipv6_cluster_adds_no_ipv6_allow_rule_so_all_ipv6_traffic_out_is_dropped(): void {
+		$this->save_cluster( array( 'ipv6_prefix' => '2001:db8:430c:1::/64', 'fw_enabled' => '1', 'fw_ipfilter' => '1' ) );
+		$r     = $this->server();
+		$vmid  = (int) $r->get( 'vmid' );
+		$fresh = $this->quarantine( $r );
+
+		$this->assertTrue( Quarantine::active( $fresh ) );
+		$this->assertSame( 'DROP', $this->options( $r )['policy_out'] );
+
+		foreach ( $this->fake->vm( $vmid )['firewall_rules'] as $rule ) {
+			if ( 'out' === ( $rule['type'] ?? '' ) && 'ACCEPT' === ( $rule['action'] ?? '' ) ) {
+				$this->assertStringNotContainsString( ':', (string) ( $rule['dest'] ?? '' ), 'No outgoing accept rule names an IPv6 address.' );
+				$this->assertNotSame( 'icmpv6', (string) ( $rule['proto'] ?? '' ) );
+			}
+		}
+
+		$this->assertFalse( $this->fake->fake_outbound_allowed( $vmid, 'tcp', 443 ) );
 	}
 
 	public function test_mode_on_blocks_outgoing_traffic_and_tells_everyone(): void {

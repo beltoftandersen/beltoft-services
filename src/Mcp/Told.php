@@ -63,12 +63,6 @@ final class Told {
 			case 'reset_firewall':
 				return __( 'reset the firewall to its default rules', 'beltoft-services' );
 
-			case 'reset_server_password':
-				return __( 'made a new password for the server', 'beltoft-services' );
-
-			case 'reset_database_password':
-				return __( 'made a new password for the database', 'beltoft-services' );
-
 			case 'delete_mailbox':
 				/* translators: %s: mailbox address. */
 				return sprintf( __( 'deleted the mailbox %s and every message in it', 'beltoft-services' ), sanitize_email( (string) ( $args['email'] ?? '' ) ) );

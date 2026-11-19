@@ -468,6 +468,65 @@ class ClustersTest extends TestCase {
 		$this->assertSame( 'fake', $d['client'] );
 	}
 
+	/**
+	 * Input with IPv6 on (documentation prefix) and the firewall switches it needs.
+	 *
+	 * @param array<string, mixed> $over Overrides.
+	 * @return array<string, mixed>
+	 */
+	private function ipv6_input( array $over = array() ): array {
+		return $this->input( array_merge( array( 'ipv6_prefix' => '2001:DB8:430c:1::/64', 'fw_enabled' => '1', 'fw_ipfilter' => '1' ), $over ) );
+	}
+
+	public function test_ipv6_is_off_by_default_and_a_cluster_stored_before_still_loads(): void {
+		$d = Clusters::defaults();
+		$this->assertSame( '', $d['ipv6_prefix'] );
+		$this->assertSame( '', $d['ipv6_gateway'] );
+
+		update_option( Clusters::OPTION, array( 'old' => array( 'label' => 'Old', 'client' => 'fake' ) ) );
+		$this->assertSame( '', Clusters::all()['old']['ipv6_prefix'] );
+
+		$this->assertTrue( Clusters::save( 'lab', $this->input() ) );
+		$this->assertSame( '', Clusters::get( 'lab' )['ipv6_prefix'] );
+	}
+
+	public function test_ipv6_prefix_is_validated_and_normalised(): void {
+		$this->assertTrue( Clusters::save( 'lab', $this->ipv6_input() ) );
+		$this->assertSame( '2001:db8:430c:1::/64', Clusters::get( 'lab' )['ipv6_prefix'] );
+
+		foreach ( array( '2001:db8::/48', '2001:db8::1/64', '192.0.2.0/24', 'nonsense', '2001:db8:430c:1::' ) as $bad ) {
+			$this->assertWPError( Clusters::save( 'bad', $this->ipv6_input( array( 'ipv6_prefix' => $bad ) ) ), $bad );
+		}
+
+		$this->assertTrue( Clusters::save( 'lab', $this->ipv6_input( array( 'ipv6_prefix' => '' ) ) ) );
+		$this->assertSame( '', Clusters::get( 'lab' )['ipv6_prefix'] );
+	}
+
+	public function test_two_clusters_cannot_share_a_prefix(): void {
+		$this->assertTrue( Clusters::save( 'lab', $this->ipv6_input() ) );
+		$this->assertWPError( Clusters::save( 'other', $this->ipv6_input() ) );
+		$this->assertTrue( Clusters::save( 'other', $this->ipv6_input( array( 'ipv6_prefix' => '2001:db8:9999:1::/64' ) ) ) );
+		$this->assertTrue( Clusters::save( 'lab', $this->ipv6_input() ), 'saving a cluster again is not a clash with itself' );
+	}
+
+	public function test_ipv6_gateway_is_inside_the_prefix_and_in_the_host_block(): void {
+		$this->assertTrue( Clusters::save( 'lab', $this->ipv6_input( array( 'ipv6_gateway' => '2001:DB8:430c:1::5' ) ) ) );
+		$this->assertSame( '2001:db8:430c:1::5', Clusters::get( 'lab' )['ipv6_gateway'] );
+
+		foreach ( array( '2001:db8:9999:1::1', '2001:db8:430c:1:c8::1', '2001:db8:430c:1::', '192.0.2.1', 'x' ) as $bad ) {
+			$this->assertWPError( Clusters::save( 'lab', $this->ipv6_input( array( 'ipv6_gateway' => $bad ) ) ), $bad );
+		}
+	}
+
+	public function test_ipv6_needs_vmids_that_fit_and_the_ipfilter(): void {
+		$this->assertWPError( Clusters::save( 'lab', $this->ipv6_input( array( 'vmid_max' => '70000', 'templates' => '4000 = X' ) ) ) );
+		$this->assertWPError( Clusters::save( 'lab', $this->ipv6_input( array( 'fw_ipfilter' => '0' ) ) ) );
+		$this->assertWPError( Clusters::save( 'lab', $this->ipv6_input( array( 'fw_enabled' => '0' ) ) ) );
+		$this->assertTrue( Clusters::save( 'lab', $this->ipv6_input( array( 'fw_enabled' => '0', 'fw_pilot' => '12' ) ) ) );
+		// With IPv6 off none of it matters.
+		$this->assertTrue( Clusters::save( 'plain', $this->input( array( 'vmid_max' => '70000', 'templates' => '4000 = X' ) ) ) );
+	}
+
 	public function test_cluster_in_use_cannot_be_deleted(): void {
 		Clusters::save( 'lab', $this->input() );
 		Clusters::save( 'other', $this->input() );

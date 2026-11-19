@@ -322,6 +322,7 @@ final class Commands {
 			\WP_CLI::add_command( 'beltoft-services licence-product', LicenceProductCommand::class );
 			\WP_CLI::add_command( 'beltoft-services hosting', HostingCommand::class );
 			\WP_CLI::add_command( 'beltoft-services dedicated', DedicatedCommand::class );
+			\WP_CLI::add_command( 'beltoft-services parking', ParkingCommand::class );
 		}
 	}
 
@@ -576,7 +577,7 @@ final class Commands {
 	}
 
 	/**
-	 * Shows who holds an IPv4 address, or held it at a time (for abuse reports). Read-only.
+	 * Shows who holds an IPv4 or IPv6 address, or held it at a time (for abuse reports). Read-only.
 	 *
 	 * Looks in the IP pool, the private networks and the holding log: resource, license, customer
 	 * (id, name, email), product and resource state. Without --at every holding is listed, the
@@ -587,7 +588,7 @@ final class Commands {
 	 * ## OPTIONS
 	 *
 	 * <ip>
-	 * : The IPv4 address, public or private.
+	 * : The address: IPv4 (public or private) or IPv6. An IPv6 address inside a server's own /80 is looked up as that server's.
 	 *
 	 * [--at=<datetime>]
 	 * : Who held it then. UTC unless the text names a zone, e.g. "2026-10-29 14:30" or "2026-10-29T14:30:00+02:00".
@@ -612,8 +613,8 @@ final class Commands {
 	public function who( array $args, array $assoc_args ): void {
 		$ip = trim( (string) ( $args[0] ?? '' ) );
 
-		if ( false === filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
-			\WP_CLI::error( 'Give an IPv4 address.' );
+		if ( false === filter_var( $ip, FILTER_VALIDATE_IP ) || false !== strpos( $ip, '%' ) ) {
+			\WP_CLI::error( 'Give an IPv4 or IPv6 address.' );
 		}
 
 		$at = null;

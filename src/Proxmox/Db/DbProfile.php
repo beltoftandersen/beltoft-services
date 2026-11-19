@@ -12,6 +12,7 @@ use BeltoftServices\Proxmox\Network\PrivateNets;
 use BeltoftServices\Proxmox\Network\PrivateNic;
 use BeltoftServices\Proxmox\Vm\BuildProfile;
 use BeltoftServices\Proxmox\Vm\PostBuildMeta;
+use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -73,7 +74,9 @@ final class DbProfile implements BuildProfile {
 			return array();
 		}
 
-		return null === $ip ? $nic : $nic + DbIp::public_params( $cluster, $ip, $net0 );
+		$record = null === $ip ? null : VmRecords::for_resource( $this->r->id() );
+
+		return null === $ip ? $nic : $nic + DbIp::public_params( $cluster, $ip, $net0, null === $record ? 0 : (int) $record['vmid'] );
 	}
 
 	public function cicustom( array $cluster ): ?string {

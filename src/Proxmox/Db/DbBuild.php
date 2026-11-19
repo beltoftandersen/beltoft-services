@@ -10,9 +10,11 @@ namespace BeltoftServices\Proxmox\Db;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Proxmox\Network\Firewall;
 use BeltoftServices\Proxmox\Network\IpPool;
+use BeltoftServices\Proxmox\Network\Ipv6;
 use BeltoftServices\Proxmox\Network\PrivateNets;
 use BeltoftServices\Proxmox\Network\PrivateNic;
 use BeltoftServices\Proxmox\Pve\Client;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -222,6 +224,13 @@ final class DbBuild {
 		$job    = 'init' === $op
 			? DbEngines::for_resource( $this->r )->init_job( $this->r, $request, $listen, $cidr )
 			: array( 'v' => 1, 'request' => $request, 'op' => 'reset_password' );
+
+		// The IPv6 address of a database with the public IP add-on, as a list of its own that an older guest ignores.
+		$ip6 = null === $public || ! Ipv6::databases() ? null : Ipv6::address( (array) Clusters::get( (string) $record['cluster'] ), (int) $record['vmid'] );
+
+		if ( 'init' === $op && null !== $ip6 ) {
+			$job['listen6'] = array( $ip6 );
+		}
 
 		$sent = DbJob::send( $this->client, $record, $job );
 

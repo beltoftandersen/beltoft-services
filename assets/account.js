@@ -17,9 +17,12 @@
 		return;
 	}
 
-	function request( method, path ) {
-		return window.beltoftApi.call( config.root + path, { method: method, body: 'POST' === method ? '{}' : undefined, holder: config } );
+	function request( method, path, code ) {
+		return window.beltoftApi.call( config.root + path, { method: method, body: 'POST' === method ? ( code ? JSON.stringify( { step_code: code } ) : '{}' ) : undefined, holder: config } );
 	}
+
+	// The actions that need the code we email the customer first (the server and the database check it again).
+	var stepActions = { reset_password: 'password_reset', db_reset_password: 'password_reset' };
 
 	function retryAfter( result ) {
 		var seconds = parseInt( result.response.headers.get( 'Retry-After' ), 10 );
@@ -208,29 +211,43 @@
 			return;
 		}
 
-		handle = bs.busy( own[ action + 'Start' ] || config.strings.working, id, button );
+		function go( code ) {
+			handle = bs.busy( own[ action + 'Start' ] || config.strings.working, id, button );
 
-		request( 'POST', id + '/actions/' + encodeURIComponent( action ) ).then( function ( result ) {
-			var message;
+			request( 'POST', id + '/actions/' + encodeURIComponent( action ), code ).then( function ( result ) {
+				var message;
 
-			if ( 202 === result.status ) {
-				// The bar keeps saying so, and the buttons stay locked, until the page reloads at the end.
-				panel.beltoftWork = handle;
-				settle( panel, 5 );
-				return;
+				if ( 202 === result.status ) {
+					// The bar keeps saying so, and the buttons stay locked, until the page reloads at the end.
+					panel.beltoftWork = handle;
+					settle( panel, 5 );
+					return;
+				}
+
+				if ( result.expired ) {
+					message = config.strings.expired;
+				} else if ( 429 === result.status ) {
+					message = config.strings.tooMany;
+				} else {
+					message = 403 === result.status ? ( result.data && 'step_up' === result.data.code && result.data.message ? result.data.message : config.strings.refused ) : config.strings.failed;
+				}
+
+				bs.fail( handle, message );
+			} ).catch( function () {
+				bs.fail( handle, config.strings.failed );
+			} );
+		}
+
+		if ( ! stepActions[ action ] ) {
+			go( '' );
+
+			return;
+		}
+
+		window.beltoftApi.stepUp( stepActions[ action ], { holder: config } ).then( function ( code ) {
+			if ( code ) {
+				go( code );
 			}
-
-			if ( result.expired ) {
-				message = config.strings.expired;
-			} else if ( 429 === result.status ) {
-				message = config.strings.tooMany;
-			} else {
-				message = 403 === result.status ? config.strings.refused : config.strings.failed;
-			}
-
-			bs.fail( handle, message );
-		} ).catch( function () {
-			bs.fail( handle, config.strings.failed );
 		} );
 	}
 

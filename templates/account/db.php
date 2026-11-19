@@ -189,6 +189,9 @@ $beltoft_services_db_wait = array(
 			<h4><?php esc_html_e( 'Public IP address', 'beltoft-services' ); ?></h4>
 			<?php if ( '' !== $beltoft_services_access['address'] ) : ?>
 				<p><?php esc_html_e( 'Address:', 'beltoft-services' ); ?> <code><?php echo esc_html( (string) $beltoft_services_access['address'] ); ?></code> <?php esc_html_e( 'Port:', 'beltoft-services' ); ?> <code><?php echo esc_html( (string) $view['port'] ); ?></code></p>
+				<?php if ( '' !== (string) ( $beltoft_services_access['address6'] ?? '' ) ) : ?>
+					<p><?php esc_html_e( 'IPv6 address:', 'beltoft-services' ); ?> <code><?php echo esc_html( (string) $beltoft_services_access['address6'] ); ?></code></p>
+				<?php endif; ?>
 				<?php if ( $beltoft_services_access['removing'] ) : ?>
 					<p><?php esc_html_e( 'The public IP address is being removed. Your database restarts once.', 'beltoft-services' ); ?></p>
 				<?php elseif ( '' !== $beltoft_services_access['remove_url'] ) : ?>

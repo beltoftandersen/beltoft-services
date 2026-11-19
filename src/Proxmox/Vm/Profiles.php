@@ -30,7 +30,7 @@ final class Profiles {
 		 * @param BuildProfile $profile The default (VpsProfile).
 		 * @param Resource     $r       The resource.
 		 */
-		$default = DbDriver::ID === $r->get( 'driver' ) ? new DbProfile( $r ) : new VpsProfile();
+		$default = DbDriver::ID === $r->get( 'driver' ) ? new DbProfile( $r ) : new VpsProfile( $r );
 		$profile = apply_filters( 'beltoft_services_build_profile', $default, $r );
 
 		return $profile instanceof BuildProfile ? $profile : $default;

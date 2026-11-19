@@ -489,6 +489,8 @@ class FakeClient extends FakePve {
 					'policy_out' => array( 'enum', false, array( 'values' => array( 'ACCEPT', 'REJECT', 'DROP' ) ) ),
 					'macfilter'  => array( 'bool' ),
 					'ipfilter'   => array( 'bool' ),
+					'ndp'        => array( 'bool' ),
+					'radv'       => array( 'bool' ),
 					'digest'     => array( 'string', false, array( 'max' => 40 ) ),
 				),
 			),
@@ -938,7 +940,7 @@ class FakeClient extends FakePve {
 			}
 
 			if ( ( 'vga' === $key || 1 === preg_match( '/^net\d+$/D', (string) $key ) ) && is_string( $value ) && ! empty( $this->state['hold_net_rate'][ $id ] ) && 'running' === $this->state['vms'][ $id ]['status'] && isset( $this->state['vms'][ $id ]['config'][ $key ] ) ) {
-				// A rate change on a running NIC, or a display change, waits for the next restart (modelled).
+				// A rate change on a running NIC or a display change waits for the next restart (modelled). ipconfig0 is not pending in real PVE: the config shows it at once and the guest sees it after the next start or reboot.
 				$this->state['net_pending'][ $id ][ $key ] = $value;
 				continue;
 			}
@@ -1716,9 +1718,9 @@ class FakeClient extends FakePve {
 	 * the real host does (the owner saw an unset policy accept on 2026-10-29).
 	 *
 	 * @param int         $vmid  VMID.
-	 * @param string      $proto tcp, udp or icmp.
-	 * @param int         $port  Destination port (ignored for icmp).
-	 * @param string      $src   Source IPv4 address.
+	 * @param string      $proto tcp, udp, icmp (a ping over IPv4) or icmpv6 (a ping over IPv6).
+	 * @param int         $port  Destination port (ignored for icmp and icmpv6).
+	 * @param string      $src   Source IPv4 or IPv6 address (the family of the packet).
 	 * @param string      $iface Interface the packet arrives on.
 	 */
 	public function fake_inbound_allowed( int $vmid, string $proto, int $port, string $src, string $iface = 'net0' ): bool {
@@ -1742,7 +1744,7 @@ class FakeClient extends FakePve {
 				continue;
 			}
 
-			if ( 'icmp' !== $proto && ! self::port_in( (string) ( $rule['dport'] ?? '' ), $port ) ) {
+			if ( ! in_array( $proto, array( 'icmp', 'icmpv6' ), true ) && ! self::port_in( (string) ( $rule['dport'] ?? '' ), $port ) ) {
 				continue;
 			}
 
@@ -1818,22 +1820,42 @@ class FakeClient extends FakePve {
 	}
 
 	/**
-	 * Is the address in a rule's source (empty, an address, a network, or a comma list of them)?
+	 * Is the address in a rule's source (empty, an address, a network, or a comma list of them)? Families do not mix:
+	 * an IPv4 address is never in an IPv6 item and the reverse.
 	 *
 	 * @param string $spec Spec.
-	 * @param string $addr IPv4 address.
+	 * @param string $addr IPv4 or IPv6 address.
 	 */
 	private static function source_in( string $spec, string $addr ): bool {
 		if ( '' === $spec ) {
 			return true;
 		}
 
-		foreach ( explode( ',', $spec ) as $item ) {
-			$bits = explode( '/', trim( $item ) );
-			$len  = isset( $bits[1] ) ? (int) $bits[1] : 32;
-			$mask = 0 === $len ? 0 : ( -1 << ( 32 - $len ) ) & 0xFFFFFFFF;
+		$packed = inet_pton( $addr );
 
-			if ( ( ip2long( $addr ) & $mask ) === ( ip2long( $bits[0] ) & $mask ) ) {
+		foreach ( explode( ',', $spec ) as $item ) {
+			$bits  = explode( '/', trim( $item ) );
+			$net   = inet_pton( $bits[0] );
+			$total = false !== $net ? strlen( $net ) * 8 : 0;
+
+			if ( false === $net || false === $packed || strlen( $net ) !== strlen( $packed ) ) {
+				continue;
+			}
+
+			$len  = isset( $bits[1] ) ? (int) $bits[1] : $total;
+			$same = true;
+
+			for ( $i = 0; $i < strlen( $net ); $i++ ) {
+				$keep = max( 0, min( 8, $len - 8 * $i ) );
+				$mask = ( 0xFF << ( 8 - $keep ) ) & 0xFF;
+
+				if ( ( ord( $net[ $i ] ) & $mask ) !== ( ord( $packed[ $i ] ) & $mask ) ) {
+					$same = false;
+					break;
+				}
+			}
+
+			if ( $same ) {
 				return true;
 			}
 		}

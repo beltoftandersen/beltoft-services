@@ -43,7 +43,7 @@ final class MoneyTools {
 		'retry_app_install', 'domain_settings', 'add_site_domain', 'set_php_version', 'clear_site_cache', 'create_hosting_backup', 'create_mailbox',
 		'add_email_alias', 'remove_email_alias', 'ssl_resend_email', 'email_dns_check', 'set_auto_renew', 'free_license_site', 'cancel_unpaid_order',
 		'update_billing_address', 'delete_snapshot', 'rollback_snapshot', 'restore_backup', 'reinstall_server', 'replace_ssh_key', 'reset_firewall',
-		'reset_server_password', 'reset_database_password', 'set_database_eviction_policy', 'delete_mailbox',
+		'set_database_eviction_policy', 'delete_mailbox',
 		'restore_hosting_backup', 'delete_site', 'dedicated_info', 'dedicated_restart', 'dedicated_power_on', 'dedicated_set_rdns', 'dedicated_rescue', 'dedicated_hard_reset', 'dedicated_set_firewall', 'dedicated_reinstall', 'cancel_subscription', 'delete_server', 'delete_database', 'set_default_payment_method',
 		'reveal_server_password', 'reveal_database_password', 'reveal_app_login', 'get_database_ca_certificate',
 	);

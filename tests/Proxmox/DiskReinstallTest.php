@@ -385,4 +385,33 @@ class DiskReinstallTest extends BackupTestCase {
 		$this->assertNotContains( self::BOOT, $this->images() );
 		$this->assertWPError( $this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'scsi0' => 'disk-store:0,import-from=disk-store:vm-9000-disk-0,format=qcow2' ) ), 'An occupied slot is not overwritten.' );
 	}
+
+	private function ipv6_on(): void {
+		$stored        = get_option( \BeltoftServices\Proxmox\Pve\Clusters::OPTION );
+		$stored['lab'] = array_merge( $stored['lab'], array( 'ipv6_prefix' => '2001:db8:430c:1::/64', 'fw_enabled' => 1, 'fw_ipfilter' => 1 ) );
+		update_option( \BeltoftServices\Proxmox\Pve\Clusters::OPTION, $stored, false );
+	}
+
+	public function test_a_reinstall_keeps_the_ipv6_address_on_both_paths(): void {
+		$this->ipv6_on();
+		$server = $this->ready_vm();
+		$ip6    = '2001:db8:430c:1:1388::1';
+		$this->assertSame( $ip6, Resource::find( $server->id() )->get( 'ip6' ) );
+		$this->assertStringContainsString( ',ip6=' . $ip6 . '/64,gw6=2001:db8:430c:1::1', $this->config()['ipconfig0'] );
+
+		// The whole VM is deleted and cloned again.
+		$this->reinstall( $server );
+		$this->rebuild( $server->id() );
+		$this->assertStringContainsString( ',ip6=' . $ip6 . '/64,gw6=2001:db8:430c:1::1', $this->config()['ipconfig0'] );
+		$this->assertSame( $ip6, Resource::find( $server->id() )->get( 'ip6' ) );
+		$this->assertCount( 1, \BeltoftServices\Proxmox\Network\IpHistory::for_address( $ip6 ) );
+
+		// Only the boot disk is replaced (an extra disk exists).
+		$this->real_boot();
+		$this->disk_for( Resource::find( $server->id() ) );
+		$this->reinstall( Resource::find( $server->id() ) );
+		$this->rebuild( $server->id() );
+		$this->assertStringContainsString( ',ip6=' . $ip6 . '/64,gw6=2001:db8:430c:1::1', $this->config()['ipconfig0'] );
+		$this->assertSame( $ip6, Resource::find( $server->id() )->get( 'ip6' ) );
+	}
 }

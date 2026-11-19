@@ -159,6 +159,11 @@ trait RestoreSteps {
 			}
 		}
 
+		// A server built with IPv6 (meta ip6) gets the address written back when the backup's ipconfig0 lacks it (the IPv4 part stays the backup's); an IPv4-only server is never given one. A failure here does not stop the restore.
+		if ( ! DbActions::is_db( $this->r ) && true !== $this->r->get( 'linked' ) ) {
+			( new Operations( $this->r ) )->reconcile_ipv6();
+		}
+
 		// The backup or snapshot carries the VM name it had then: the server's own name is written back, in one call.
 		$named = $this->reapply_name( $record );
 
