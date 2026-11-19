@@ -149,6 +149,7 @@ final class Panels {
 			__( 'Delegation checked', 'beltoft-services' ) => $r->get( 'delegation_checked' ) ? wp_date( 'Y-m-d H:i', (int) $r->get( 'delegation_checked' ) ) : '',
 			__( 'Last sync', 'beltoft-services' ) => $r->get( 'last_sync' ) ? wp_date( 'Y-m-d H:i', (int) $r->get( 'last_sync' ) ) : '',
 		) );
+		$details = (array) apply_filters( 'beltoft_services_domain_admin_details', $details, $r );
 		if ( 'dns' === $r->get( 'driver' ) ) {
 			$details = array_merge( $details, self::dns_rows( $r ) );
 		}

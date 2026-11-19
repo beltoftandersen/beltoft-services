@@ -72,6 +72,7 @@ final class Emails {
 		'BeltoftServices_SslActionNeeded' => SslActionNeeded::class,
 		'BeltoftServices_SslReissued' => SslReissued::class,
 		'BeltoftServices_SslExpiring' => SslExpiring::class,
+		'BeltoftServices_DomainUnpaid' => DomainUnpaid::class,
 	);
 
 	/**
@@ -175,7 +176,17 @@ final class Emails {
 				self::send( self::ready_email_id( $r ), $r );
 			} elseif ( 'paused' === $new && 'paused' !== $told && ( 'ready' === $told || 'ready' === $old ) ) {
 				$r->set( array( 'notified' => 'paused' ) );
-				self::send( 'beltoft_services_paused', $r );
+
+				/**
+				 * Whether the generic "paused" email is sent for this resource. A feature that tells the customer in its own, more exact words
+				 * (a domain whose renewal was not paid still works until its expiry) answers false and sends those itself.
+				 *
+				 * @param bool     $send Whether to send the generic email.
+				 * @param Resource $r    The resource that was paused.
+				 */
+				if ( apply_filters( 'beltoft_services_send_paused_email', true, $r ) ) {
+					self::send( 'beltoft_services_paused', $r );
+				}
 			} elseif ( 'deleted' === $new && ! Retention::is_registration( $r ) && ( '' !== $told || null !== $r->get( 'warned_at' ) ) && ! self::replaced( $r ) ) {
 				// The resource is closed by now; its row stays as history.
 				$r->set( array( 'notified' => 'deleted' ) );

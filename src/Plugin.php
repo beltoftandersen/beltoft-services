@@ -161,6 +161,7 @@ final class Plugin {
 		Domains\Panels::register();
 		Domains\RecordRoutes::register();
 		Domains\Sync::register();
+		Domains\Unpaid::register();
 		Domains\Security::register();
 		Domains\EmailDetails::register();
 		Proxmox\Pve\ClustersScreen::register();
