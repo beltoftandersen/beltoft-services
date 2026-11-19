@@ -36,6 +36,8 @@ const window = {
 			reads.gets++;
 			return Promise.reject( new Error( 'offline' ) );
 		},
+		// The reset asks for the emailed code first (0.47.0): the test types one.
+		stepUp: () => Promise.resolve( '123456' ),
 	},
 	beltoftStatus: {
 		locked: () => false,
