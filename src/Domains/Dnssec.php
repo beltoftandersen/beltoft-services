@@ -36,7 +36,7 @@ final class Dnssec {
 
 	/**
 	 * Flags of a DNSKEY (RFC 4034 section 2.1: zone key 256, zone key with the secure entry point bit 257) and its protocol (RFC 4034 section
-	 * 2.1.2: 3). The registrar's spec lists the fields but not their values: see the open questions in the architecture notes.
+	 * 2.1.2: 3). The registrar's spec lists the fields but not their values; a live key read 2026-11-19 (mindthetrash.trade) has protocol 3, flags 257, alg 13 and a base64 pub_key of 88 characters, which fits.
 	 */
 	public const FLAGS    = array( 256, 257 );
 	public const PROTOCOL = 3;

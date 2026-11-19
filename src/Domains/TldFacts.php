@@ -16,10 +16,13 @@ defined( 'ABSPATH' ) || exit;
  * - dnssec_max_records_amount: "Indicates, how many DNSSEC records are allowed for the extension"
  * - is_private_whois_allowed: "Indicates, if whois privacy protection service is available for the extension"
  *
- * A field the registrar did not send counts as not allowed, never as allowed: nothing is offered on a guess. The stored list may lack the fields
- * (the recorded list answer in tests/fixtures/openprovider/tlds-page.json has none), so the extensions in use are read one by one.
+ * A field the registrar did not send counts as not allowed, never as allowed: nothing is offered on a guess. Both GET /tlds and GET /tlds/{name} carry the fields
+ * (read live 2026-11-19); the list is the main source and the one-by-one read stays as a safety net for an entry that lacks them.
  */
 final class TldFacts {
+	/** Keys we allow when the registrar names no maximum (our own limit, not Openprovider's). */
+	public const OWN_MAX_KEYS = 8;
+
 
 	/**
 	 * The facts of one entry, stored beside its prices. An entry that carries none of the fields gives nothing (unknown, so nothing is
@@ -89,7 +92,7 @@ final class TldFacts {
 
 	/**
 	 * What a customer may enter as DNSSEC key data when the DNS is hosted elsewhere, or null when nothing may be entered. Needs DNSSEC
-	 * allowed, keys allowed (domainDnssecKey carries the key, not a digest), a list of algorithms and a record limit above zero.
+	 * allowed, keys allowed (domainDnssecKey carries the key, not a digest) and a list of algorithms. The record limit is the registrar's when it names one, else OWN_MAX_KEYS.
 	 *
 	 * @param string $domain Full domain name.
 	 * @return array{algs: int[], max: int}|null
@@ -100,7 +103,9 @@ final class TldFacts {
 		if ( true !== ( $d['allowed'] ?? false ) || true !== ( $d['keys'] ?? false ) ) { return null; }
 		$algs = array_values( array_filter( array_map( 'intval', (array) ( $d['algs'] ?? array() ) ), static fn( $a ) => $a >= 0 ) );
 		$max  = (int) ( $d['max'] ?? 0 );
-		return array() !== $algs && $max > 0 ? array( 'algs' => $algs, 'max' => $max ) : null;
+		// 0 or missing means Openprovider gives no maximum (read live 2026-11-19: every extension says 0, yet a .trade domain holds a key):
+		// then our own cap applies.
+		return array() !== $algs ? array( 'algs' => $algs, 'max' => $max > 0 ? $max : self::OWN_MAX_KEYS ) : null;
 	}
 
 	/**

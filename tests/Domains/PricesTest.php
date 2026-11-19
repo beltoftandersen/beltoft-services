@@ -27,7 +27,14 @@ class PricesTest extends TestCase {
 		$fake = new FakeClient();
 		$fake->reply( 'GET', '/tlds', $fixture['data'] );
 		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
-		$this->assertSame( 2, Prices::sync() );
+		$this->assertSame( 7, Prices::sync() );
+		// The recorded list answer carries the DNSSEC and WHOIS fields (read live 2026-11-19): max 0 means no maximum.
+		$this->assertTrue( \BeltoftServices\Domains\TldFacts::dnssec_allowed( 'x.trade' ) );
+		$this->assertTrue( \BeltoftServices\Domains\TldFacts::whois_allowed( 'x.de' ) );
+		$this->assertFalse( \BeltoftServices\Domains\TldFacts::whois_allowed( 'x.dk' ) );
+		$this->assertFalse( \BeltoftServices\Domains\TldFacts::whois_allowed( 'x.eu' ) );
+		$this->assertSame( array( 8, 13, 14, 15, 16 ), \BeltoftServices\Domains\TldFacts::external_keys( 'x.dk' )['algs'] );
+		$this->assertSame( \BeltoftServices\Domains\TldFacts::OWN_MAX_KEYS, \BeltoftServices\Domains\TldFacts::external_keys( 'x.com' )['max'] );
 		$this->assertSame( 16, Prices::price( '5g.in' ) );
 		$this->assertSame( 16, Prices::price( '6g.in' ) );
 		$old = get_option( Prices::OPTION );

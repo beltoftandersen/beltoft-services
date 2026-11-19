@@ -128,13 +128,20 @@ class DnssecTest extends TestCase {
 		$this->assertSame( array( 'dnssec_key_add' ), array_keys( Dnssec::offered( $custom ) ) );
 		$custom->set( array( 'registry_ds_keys' => array( array( 'flags' => 257, 'protocol' => 3, 'alg' => 13, 'pub_key' => 'AAAA' ) ) ) );
 		$this->assertSame( array( 'dnssec_key_add', 'dnssec_key_remove' ), array_keys( Dnssec::offered( Resource::find( $custom->id() ) ) ) );
-		foreach ( array( array( 'keys' => false ), array( 'algs' => array() ), array( 'max' => 0 ) ) as $none ) {
+		foreach ( array( array( 'keys' => false ), array( 'algs' => array() ) ) as $none ) {
 			$this->table();
 			$rows = get_option( Prices::OPTION );
 			$rows['com']['dnssec'] = array_merge( $rows['com']['dnssec'], $none );
 			update_option( Prices::OPTION, $rows );
-			$this->assertSame( array(), Dnssec::offered( Resource::find( $custom->id() ) ), 'Digest-only, no algorithm list or no room: nothing to type in.' );
+			$this->assertSame( array(), Dnssec::offered( Resource::find( $custom->id() ) ), 'Keys not allowed or no algorithm list: nothing to type in.' );
 		}
+		// A maximum of 0 means the registrar names none: our own cap applies.
+		$this->table();
+		$rows = get_option( Prices::OPTION );
+		$rows['com']['dnssec']['max'] = 0;
+		update_option( Prices::OPTION, $rows );
+		$this->assertSame( TldFacts::OWN_MAX_KEYS, TldFacts::external_keys( self::NAME )['max'] );
+		$this->assertArrayHasKey( 'dnssec_key_add', Dnssec::offered( Resource::find( $custom->id() ) ) );
 		$external = $this->domain( 'ext-example.com', array( 'dns_external' => true ) );
 		$this->table();
 		$this->assertArrayHasKey( 'dnssec_key_add', Dnssec::offered( $external ) );
