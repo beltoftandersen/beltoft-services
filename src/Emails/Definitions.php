@@ -225,6 +225,12 @@ final class Definitions {
 				'subject'     => __( 'Your certificate for {domain_name} ends soon', 'beltoft-services' ),
 				'heading'     => __( 'Your certificate ends soon', 'beltoft-services' ),
 			),
+			'beltoft_services_domain_unpaid' => array(
+				'title'       => __( 'Domain renewal not paid', 'beltoft-services' ),
+				'description' => __( 'Sent when the renewal of a domain is not paid: when the payment fails, a week before the domain expires, after it has expired, when the restore period is about to end, when the renewal is paid after a reminder and when the restore period is over. It names the domain, the dates, the price and what to do.', 'beltoft-services' ),
+				'subject'     => __( 'Your domain {domain_name} must be renewed', 'beltoft-services' ),
+				'heading'     => __( 'Your domain must be renewed', 'beltoft-services' ),
+			),
 		);
 	}
 }

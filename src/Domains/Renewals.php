@@ -89,7 +89,7 @@ final class Renewals {
 		$baseline = '' === $baseline ? $active_expiry : $baseline;
 		$detail = Clients::registrar()->request( 'GET', '/domains/' . $id );
 		if ( is_wp_error( $detail ) ) { return StepResult::retry( 3600, 'The transfer renewal could not be checked.' ); }
-		$expiry = (string) ( $detail['expiration_date'] ?? '' );
+		$expiry = RestoreFacts::expiry_of( (array) $detail );
 		if ( self::later( $expiry, $baseline ) ) {
 			return StepResult::done( array( 'expires_at' => $expiry, 'transfer_renewed' => true, 'prepaid_expiry' => null ), 'Prepaid transfer year renewed' );
 		}
@@ -117,7 +117,7 @@ final class Renewals {
 		}
 		$detail = Clients::registrar()->request( 'GET', '/domains/' . $id );
 		if ( is_wp_error( $detail ) ) { return StepResult::retry( 3600, 'The prepaid renewal is awaiting registry confirmation.' ); }
-		$expiry = (string) ( $detail['expiration_date'] ?? '' );
+		$expiry = RestoreFacts::expiry_of( (array) $detail );
 		return self::later( $expiry, $baseline ) ? StepResult::done( array( 'expires_at' => $expiry, 'transfer_renewed' => true, 'prepaid_expiry' => null ), 'Prepaid transfer year renewed' ) : StepResult::retry( 3600, 'The prepaid renewal is awaiting registry confirmation.' );
 	}
 
@@ -134,7 +134,7 @@ final class Renewals {
 		if ( '' === $id ) { return StepResult::retry( 3600, 'The registrar id is unavailable.' ); }
 		$detail = Clients::registrar()->request( 'GET', '/domains/' . $id );
 		if ( is_wp_error( $detail ) ) { return StepResult::retry( 3600, 'The registrar renewal could not be checked.' ); }
-		$expiry = (string) ( $detail['expiration_date'] ?? '' );
+		$expiry = RestoreFacts::expiry_of( (array) $detail );
 		if ( self::later( $expiry, $baseline ) ) { return self::finish_renewal( $r, $order_id, $expiry, $done, $started ); }
 		if ( isset( $started[ $order_id ] ) ) { return StepResult::retry( 3600, 'A renewal request is awaiting registry confirmation.' ); }
 		$blocked = SpendGuard::guard_renewal( $r, (string) $r->get( 'domain' ), SpendGuard::item_of_order( $order, (string) $r->get( 'domain' ) ), $order_id );
@@ -151,7 +151,7 @@ final class Renewals {
 		}
 		$detail = Clients::registrar()->request( 'GET', '/domains/' . $id );
 		if ( is_wp_error( $detail ) ) { return StepResult::retry( 3600, 'The registrar renewal is awaiting confirmation.' ); }
-		$expiry = (string) ( $detail['expiration_date'] ?? '' );
+		$expiry = RestoreFacts::expiry_of( (array) $detail );
 		return self::later( $expiry, $baseline ) ? self::finish_renewal( $r, $order_id, $expiry, $done, $started ) : StepResult::retry( 3600, 'A renewal request is awaiting registry confirmation.' );
 	}
 
@@ -170,6 +170,8 @@ final class Renewals {
 		$r->set( array( 'expires_at' => $expiry ) );
 		$dates = self::set_dates( $r );
 		if ( ! $dates->is_done() ) { return $dates; }
+		/** A paid renewal finished: the domain now runs to $expiry. */
+		do_action( 'beltoft_services_domain_renewed', $r, $expiry );
 		return StepResult::done( array_merge( $dates->meta(), array( 'renewed_orders' => $done, 'renew_started' => $started, 'expires_at' => $expiry ) ), 'Domain renewed after paid subscription order ' . $order_id );
 	}
 

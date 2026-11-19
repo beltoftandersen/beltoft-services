@@ -1179,6 +1179,24 @@
         "max": 100,
         "label": "Alert when a mailbox is this full, in percent"
     },
+    "domain_unpaid_notices": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "checkbox",
+        "default": 0,
+        "label": "Notices for domains whose renewal is not paid",
+        "desc": "On: a domain whose renewal could not be paid gets a plain email that says it still works until its expiry date (not \"paused\"), a reminder a week before, and after the expiry the notices about restoring it and when that ends. The domain page shows the renewal state, the restore period and the reactivation fee. Off: the generic paused email, as before. Staff alerts are sent either way."
+    },
+    "domain_reactivation_markup_percent": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "number",
+        "default": 30,
+        "min": 0,
+        "max": 500,
+        "label": "Reactivation fee markup, in percent of the registrar restore cost",
+        "desc": "The fee for restoring an expired domain is the registrar restore cost plus this markup, on top of the normal renewal. No fee before the expiry, and none while the registrar restores free of charge."
+    },
     "console": {
         "tab": "proxmox",
         "section": "proxmox",

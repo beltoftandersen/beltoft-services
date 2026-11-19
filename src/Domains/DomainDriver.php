@@ -194,7 +194,7 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 			if ( '' === $remote_id || ! ctype_digit( $remote_id ) ) { return StepResult::retry( 3600, 'Registrar did not return a domain id.' ); }
 			$steps[] = 'order';
 			$meta = array( 'remote_id' => $remote_id, 'steps' => $steps, 'ordered_at' => time() );
-			if ( 'transfer' === $mode ) { $meta['transfer_expiry_before'] = (string) ( $ordered['expiration_date'] ?? '' ); }
+			if ( 'transfer' === $mode ) { $meta['transfer_expiry_before'] = RestoreFacts::expiry_of( (array) $ordered ); }
 			if ( $r->get( 'transfer_fix' ) ) { $meta += array( 'transfer_fix' => null, 'transfer_fix_sent' => null, 'transfer_fix_since' => null ); }
 			if ( ! $r->set( $meta ) ) { return StepResult::retry( 3600, 'The registrar order id could not be saved.' ); }
 		}
@@ -219,7 +219,7 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 				}
 				return StepResult::wait( self::registry_delay( time() - $since ), 'The registry is still processing this domain.', $since + 14 * DAY_IN_SECONDS, array( 'pending_since' => $since ) );
 			}
-			$expiry = (string) ( $detail['expiration_date'] ?? '' );
+			$expiry = RestoreFacts::expiry_of( (array) $detail );
 			$steps[] = 'active';
 			if ( ! $r->set( array( 'steps' => $steps, 'expires_at' => $expiry, 'registrar_status' => 'ACT' ) ) ) { return StepResult::retry( 3600, 'Domain status could not be saved.' ); }
 			// The transfer is accepted: the code has done its work and is not kept.
