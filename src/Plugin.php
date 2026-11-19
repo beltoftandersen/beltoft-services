@@ -265,6 +265,7 @@ final class Plugin {
 		Proxmox\Network\IpPoolScreen::register();
 		Admin\Panel::register();
 		Admin\Screen::register();
+		Admin\LicenceServiceColumn::register();
 		Emails\Emails::register();
 		Usage\UsageDisk::register();
 		Usage\CoreHooks::register();

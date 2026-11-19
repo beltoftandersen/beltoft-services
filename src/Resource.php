@@ -291,6 +291,86 @@ final class Resource {
 	}
 
 	/**
+	 * The live resources of many licenses, one read (beltoft-licenses 0.8.10 and newer; one read per license before). A license
+	 * without one is left out.
+	 *
+	 * @param int[] $license_ids License ids.
+	 * @return array<int, Resource[]> License id => live resources, oldest first.
+	 */
+	public static function live_for_licenses( array $license_ids ): array {
+		$ids = array_values( array_unique( array_filter( array_map( 'intval', $license_ids ), static fn( $id ) => $id > 0 ) ) );
+		$out = array();
+
+		if ( ! $ids ) {
+			return $out;
+		}
+
+		$found = method_exists( Licenses::class, 'resources_for' ) ? Licenses::resources_for( $ids ) : array_combine( $ids, array_map( static fn( $id ) => Licenses::resources( $id ), $ids ) );
+
+		foreach ( (array) $found as $license_id => $rows ) {
+			foreach ( (array) $rows as $row ) {
+				$out[ (int) $license_id ][] = new self( $row );
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * The newest closed (ended) resources of many licenses, at most $per_license each, for naming services that no longer exist.
+	 * Two reads for all licenses (ids, then rows).
+	 *
+	 * @param int[] $license_ids License ids.
+	 * @param int   $per_license Most resources per license.
+	 * @return array<int, Resource[]> License id => closed resources, newest first.
+	 */
+	public static function closed_for_licenses( array $license_ids, int $per_license = 3 ): array {
+		global $wpdb;
+
+		$ids = array_values( array_unique( array_filter( array_map( 'intval', $license_ids ), static fn( $id ) => $id > 0 ) ) );
+
+		if ( ! $ids || $per_license < 1 ) {
+			return array();
+		}
+
+		$marks = implode( ', ', array_fill( 0, count( $ids ), '%d' ) );
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- custom table, one query; the placeholders are built to match the ids.
+		$found = (array) $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT id, license_id FROM %i WHERE license_id IN ( $marks ) AND deactivated_at IS NOT NULL AND kind <> 'site' ORDER BY id DESC",
+				array_merge( array( Install::tables()['activations'] ), $ids )
+			),
+			ARRAY_A
+		);
+		// phpcs:enable
+
+		$pick = array();
+		$by   = array();
+
+		foreach ( $found as $row ) {
+			$license_id = (int) $row['license_id'];
+
+			if ( count( $by[ $license_id ] ?? array() ) < $per_license ) {
+				$by[ $license_id ][] = (int) $row['id'];
+				$pick[]              = (int) $row['id'];
+			}
+		}
+
+		$rows = Licenses::activations( $pick );
+		$out  = array();
+
+		foreach ( $by as $license_id => $activation_ids ) {
+			foreach ( $activation_ids as $id ) {
+				if ( isset( $rows[ $id ] ) ) {
+					$out[ $license_id ][] = new self( $rows[ $id ] );
+				}
+			}
+		}
+
+		return $out;
+	}
+
+	/**
 	 * A state in words, translated.
 	 *
 	 * @param string $state State (see STATES).
@@ -425,6 +505,20 @@ final class Resource {
 	 */
 	public static function ended_state_fragments(): array {
 		return array( '"state":"failed"', '"state":"deleting"', '"state":"deleted"' );
+	}
+
+	/**
+	 * When the resource was closed (its activation ended), as stored (UTC), or empty while it is live.
+	 */
+	public function ended_at(): string {
+		return (string) ( $this->row['deactivated_at'] ?? '' );
+	}
+
+	/**
+	 * The activation kind (the kind of its driver).
+	 */
+	public function kind(): string {
+		return (string) ( $this->row['kind'] ?? '' );
 	}
 
 	/**
