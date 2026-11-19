@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.47.1
+Stable tag: 0.48.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,11 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.48.0 =
+* Admin: the license list has a Service column that names the domain, server, database, website, mailbox domain, certificate, app licence, key or dedicated server of each license (needs beltoft-licenses 0.8.12; on an older version the column is not shown).
+* Domains: unpaid renewals, phases 1 and 2. The registrar's renewal date and restore facts are read and kept, staff are alerted about domains near deletion, and the reminders N1 to N7, the reactivation fee and the domain page lines are built behind the setting domain_unpaid_notices (off by default). The fee in kroner uses the fixed rate in domain_fee_dkk_rate.
+* Domains: the daily price sync keeps the DNSSEC and WHOIS privacy facts read one TLD at a time, and each refresh reads up to 150 more TLDs (missing or older than 30 days first), so every TLD gets them within a few weeks.
 
 = 0.47.1 =
 * Domains: a customer can switch DNSSEC on or off for a domain on our name servers and add or remove external DNSSEC keys (needs the emailed code, purpose domain_dnssec; our own cap of 8 keys applies when the registrar maximum is 0).
