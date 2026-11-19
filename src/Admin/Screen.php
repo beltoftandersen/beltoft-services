@@ -8,6 +8,7 @@
 namespace BeltoftServices\Admin;
 
 use BeltoftServices\Drivers\Registry;
+use BeltoftServices\Proxmox\Network\IpWho;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -156,7 +157,22 @@ final class Screen {
 	public static function search_ids( array $filters ): array {
 		$term = trim( (string) ( $filters['s'] ?? '' ) );
 
-		return Resource::search_ids( $term, self::kinds( (string) ( $filters['driver'] ?? '' ) ), ! empty( $filters['deleted'] ), self::matching_users( $term ) );
+		return Resource::search_ids( $term, self::kinds( (string) ( $filters['driver'] ?? '' ) ), ! empty( $filters['deleted'] ), self::matching_users( $term ), self::address_holders( $term ) );
+	}
+
+	/**
+	 * Resources that hold or held an address according to the plugin's own address tables (pool, holding log, a server's
+	 * reserved IPv6), through the abuse lookup that owns them. Empty for a term that is not an address.
+	 *
+	 * @param string $term Search text.
+	 * @return int[]
+	 */
+	private static function address_holders( string $term ): array {
+		if ( false === filter_var( $term, FILTER_VALIDATE_IP ) ) {
+			return array();
+		}
+
+		return array_map( static fn( array $h ) => (int) $h['resource_id'], IpWho::lookup( $term ) );
 	}
 
 	/**

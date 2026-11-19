@@ -429,9 +429,10 @@ final class Resource {
 	 * @param string[] $kinds           Activation kinds to look in.
 	 * @param bool     $include_deleted Also closed (deactivated) resources.
 	 * @param int[]    $user_ids        Users whose licenses match too.
+	 * @param int[]    $resource_ids    Resources found by other means (the address tables) that match too.
 	 * @return int[]
 	 */
-	public static function search_ids( string $term, array $kinds, bool $include_deleted = false, array $user_ids = array() ): array {
+	public static function search_ids( string $term, array $kinds, bool $include_deleted = false, array $user_ids = array(), array $resource_ids = array() ): array {
 		global $wpdb;
 
 		$term  = trim( $term );
@@ -496,6 +497,13 @@ final class Resource {
 		if ( $user_ids ) {
 			$conds[] = 'l.user_id IN ( ' . implode( ', ', array_fill( 0, count( $user_ids ), '%d' ) ) . ' )';
 			$args    = array_merge( $args, $user_ids );
+		}
+
+		$resource_ids = array_values( array_unique( array_filter( array_map( 'intval', $resource_ids ), static fn( $id ) => $id > 0 ) ) );
+
+		if ( $resource_ids ) {
+			$conds[] = 'a.id IN ( ' . implode( ', ', array_fill( 0, count( $resource_ids ), '%d' ) ) . ' )';
+			$args    = array_merge( $args, $resource_ids );
 		}
 
 		$sql  = 'SELECT a.id FROM %i a LEFT JOIN %i l ON l.id = a.license_id WHERE a.kind IN ( ' . implode( ', ', array_fill( 0, count( $kinds ), '%s' ) ) . " ) AND a.kind <> 'site'";

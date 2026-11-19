@@ -257,4 +257,22 @@ final class SearchTest extends TestCase {
 
 		$this->assertStringContainsString( 'name="s"', $html );
 	}
+
+	public function test_address_tables_find_the_holder_and_earlier_holders_without_meta(): void {
+		$held   = $this->service();
+		$earlier = $this->service();
+		$earlier->close();
+
+		\BeltoftServices\Proxmox\Network\IpPool::add( '198.51.100.201' );
+		\BeltoftServices\Proxmox\Network\IpPool::take( '198.51.100.201', $held->id() );
+		\BeltoftServices\Proxmox\Network\IpHistory::start( 'public', '198.51.100.202', $earlier->id() );
+		\BeltoftServices\Proxmox\Network\IpHistory::end( 'public', $earlier->id() );
+		\BeltoftServices\Proxmox\Network\IpHistory::start( 'public6', '2001:db8:1::5', $earlier->id() );
+		\BeltoftServices\Proxmox\Network\IpHistory::end( 'public6', $earlier->id() );
+
+		$this->assertSame( array( $held->id() ), $this->found( '198.51.100.201' ), 'The current holder comes from the pool, the meta has no address.' );
+		$this->assertSame( array(), $this->found( '198.51.100.202' ), 'An earlier holder is a deleted service.' );
+		$this->assertSame( array( $earlier->id() ), $this->found( '198.51.100.202', array( 'deleted' => true ) ) );
+		$this->assertSame( array( $earlier->id() ), $this->found( '2001:db8:1::5', array( 'deleted' => true ) ) );
+	}
 }
