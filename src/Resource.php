@@ -616,13 +616,6 @@ final class Resource {
 	}
 
 	/**
-	 * When the resource was closed (its activation ended), as stored (UTC), or empty while it is live.
-	 */
-	public function ended_at(): string {
-		return (string) ( $this->row['deactivated_at'] ?? '' );
-	}
-
-	/**
 	 * The activation kind (the kind of its driver).
 	 */
 	public function kind(): string {
