@@ -178,7 +178,7 @@ final class Prices {
 					return new \WP_Error( 'empty_list', 'Registrar TLD list was empty; the saved prices were kept.' );
 				}
 
-				update_option( self::OPTION, $table, false );
+				update_option( self::OPTION, TldFacts::carry( $table, get_option( self::OPTION, array() ) ), false );
 				\BeltoftServices\Alerts::quietly( array( __CLASS__, 'alert_below_cost' ) );
 				return count( $table );
 			}
@@ -238,6 +238,6 @@ final class Prices {
 		}
 		if ( $values['create'] < 0 || $values['renew'] < 0 || $values['transfer'] < 0 ) { return new \WP_Error( 'bad_response', 'Registrar price is negative.' ); }
 		$restricted = ! empty( $entry['restrictions'] );
-		return array( $tld, array( 'create' => $values['create'], 'renew' => $values['renew'], 'transfer' => $values['transfer'], 'transfer_known' => $transfer_known, 'restricted' => $restricted, 'price' => self::rule( $values['create'], $values['renew'] ) ) + TldFacts::from_entry( $entry ) );
+		return array( $tld, array( 'create' => $values['create'], 'renew' => $values['renew'], 'transfer' => $values['transfer'], 'transfer_known' => $transfer_known, 'restricted' => $restricted, 'price' => self::rule( $values['create'], $values['renew'] ) ) + TldFacts::from_entry( $entry ) + RestoreFacts::from_tld_entry( $entry ) );
 	}
 }

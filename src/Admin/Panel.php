@@ -419,7 +419,7 @@ final class Panel {
 		$warned   = $r->get( 'warned_at' );
 		$format   = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
 
-		echo '<h2>' . esc_html__( 'Service', 'beltoft-services' ) . '</h2>';
+		echo '<h2 id="' . esc_attr( 'beltoft-service-' . $r->id() ) . '">' . esc_html__( 'Service', 'beltoft-services' ) . '</h2>';
 
 		if ( $r->folded_into() > 0 ) {
 			echo '<p class="description"><strong>' . esc_html__( 'Folded into the domain registration.', 'beltoft-services' ) . '</strong> ' . esc_html__( 'The customer does not see this service and is sent no email about it. It never changes the DNS zone.', 'beltoft-services' ) . '</p>';

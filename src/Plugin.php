@@ -161,6 +161,7 @@ final class Plugin {
 		Domains\Panels::register();
 		Domains\RecordRoutes::register();
 		Domains\Sync::register();
+		Domains\Unpaid::register();
 		Domains\Security::register();
 		Domains\EmailDetails::register();
 		Proxmox\Pve\ClustersScreen::register();
@@ -266,6 +267,7 @@ final class Plugin {
 		Proxmox\Network\IpPoolScreen::register();
 		Admin\Panel::register();
 		Admin\Screen::register();
+		Admin\LicenceServiceColumn::register();
 		Emails\Emails::register();
 		Usage\UsageDisk::register();
 		Usage\CoreHooks::register();

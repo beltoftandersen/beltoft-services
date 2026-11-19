@@ -72,6 +72,7 @@ if ( $d['dns_only'] ) {
 				?>
 			</dd></div>
 		</dl>
+		<?php do_action( 'beltoft_services_domain_overview_end', $r, $d ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- the plugin's own prefix. ?>
 		<?php if ( $d['dns_only'] && true === $d['parent_ds'] && 'ours' !== $d['delegation'] ) : ?>
 			<p class="beltoft-services-domain__note"><?php esc_html_e( 'This domain uses DNSSEC at your registrar. Remove the DS record there before you change the name servers, then wait a day.', 'beltoft-services' ); ?></p>
 		<?php endif; ?>
