@@ -14,6 +14,7 @@ use BeltoftServices\Jobs;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Progress;
 use BeltoftServices\Resource;
+use BeltoftServices\StepUp;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -247,6 +248,27 @@ final class Routes {
 		}
 
 		/**
+		 * The step-up purpose (StepUp) of an action that needs the code we email the customer, or '' for none. The check is made here, so
+		 * the dashboard and a REST token pass through the same code; the code is used up only when the action is queued.
+		 *
+		 * @param string   $purpose  '' or a purpose registered on beltoft_services_stepup_purposes.
+		 * @param Resource $resource Resource.
+		 * @param string   $action   Action name.
+		 */
+		$step = (string) apply_filters( 'beltoft_services_action_step_up', '', $resource, $action );
+
+		if ( '' !== $step ) {
+			$demand = StepUp::demand( $request, $step );
+
+			if ( $demand instanceof \WP_Error ) {
+				$response = self::error( 'step_up', $demand->get_error_message(), 403 );
+				$response->header( 'Cache-Control', 'no-store' );
+
+				return $response;
+			}
+		}
+
+		/**
 		 * A driver's refusal of an action that is offered but whose arguments are not acceptable
 		 * (a missing confirmation, an invalid key), answered at once instead of by a background job.
 		 *
@@ -265,7 +287,13 @@ final class Routes {
 		}
 
 		// The card shows "requested" at once; the job clears the mark when it has run.
-		$started = Jobs::start_action( $resource, $action, (string) $offered[ $action ], $args );
+		// The code is used up inside the start, once the service is free and just before the job is queued: a busy service costs no code.
+		$prepare = '' === $step ? null : static function () use ( $step ) {
+			return StepUp::consume( get_current_user_id(), $step )
+				? true
+				: new \WP_Error( 'step_up', StepUp::refusal( get_current_user_id(), $step ), array( 'status' => 403 ) );
+		};
+		$started = Jobs::start_action( $resource, $action, (string) $offered[ $action ], $args, $prepare );
 
 		if ( is_wp_error( $started ) ) {
 			return self::not_queued( $started );

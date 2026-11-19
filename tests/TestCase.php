@@ -555,4 +555,27 @@ abstract class TestCase extends \WP_UnitTestCase {
 			\BeltoftServices\Proxmox\Network\PrivateNets::add( 3000 + $i, '10.77.' . $i . '.0/28' );
 		}
 	}
+
+	/**
+	 * Sends the emailed step-up code of a purpose to a customer (the mail is captured, never sent) and returns the code.
+	 *
+	 * @param int    $user_id Customer.
+	 * @param string $purpose Purpose.
+	 */
+	protected function emailed_step_code( int $user_id, string $purpose ): string {
+		$mails   = array();
+		$capture = static function ( $pre, $atts ) use ( &$mails ) {
+			$mails[] = $atts;
+
+			return true;
+		};
+		add_filter( 'pre_wp_mail', $capture, 10, 2 );
+		$sent = \BeltoftServices\StepUp::send( $user_id, $purpose );
+		remove_filter( 'pre_wp_mail', $capture, 10 );
+
+		$this->assertTrue( $sent );
+		$this->assertSame( 1, preg_match( '/\b(\d{6})\b/', wp_strip_all_tags( (string) end( $mails )['message'] ), $m ), 'The mail has a six digit code.' );
+
+		return $m[1];
+	}
 }
