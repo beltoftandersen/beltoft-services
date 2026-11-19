@@ -23,6 +23,12 @@ final class TldFacts {
 	/** Keys we allow when the registrar names no maximum (our own limit, not Openprovider's). */
 	public const OWN_MAX_KEYS = 8;
 
+	/** Extensions read one by one per refresh beyond the ones in use, so the whole list is described within a few weeks. */
+	public const BATCH = 150;
+
+	/** Facts older than this are read again (seconds). */
+	public const STALE = 30 * DAY_IN_SECONDS;
+
 
 	/**
 	 * The facts of one entry, stored beside its prices. An entry that carries none of the fields gives nothing (unknown, so nothing is
@@ -53,8 +59,27 @@ final class TldFacts {
 	}
 
 	/**
+	 * Keeps the facts read one by one (GET /tlds/{name}) when the list replaces the table: the list sends no DNSSEC or WHOIS fields for
+	 * most extensions, and without this every daily price sync wiped them.
+	 *
+	 * @param array<string, mixed> $table New table from the list.
+	 * @param mixed                $old   The saved table.
+	 * @return array<string, mixed>
+	 */
+	public static function carry( array $table, $old ): array {
+		if ( ! is_array( $old ) ) { return $table; }
+		foreach ( $table as $tld => $row ) {
+			if ( ! is_array( $row ) || isset( $row['dnssec'] ) || ! is_array( $old[ $tld ]['dnssec'] ?? null ) ) { continue; }
+			$table[ $tld ]['dnssec'] = $old[ $tld ]['dnssec'];
+			$table[ $tld ]['whois']  = (bool) ( $old[ $tld ]['whois'] ?? false );
+			if ( isset( $old[ $tld ]['facts_at'] ) ) { $table[ $tld ]['facts_at'] = (int) $old[ $tld ]['facts_at']; }
+		}
+		return $table;
+	}
+
+	/**
 	 * Asks the registrar for the extensions that matter (the featured ones and those of live domains) when the list did not say what they
-	 * allow: GET /tlds/{name} (Openprovider swagger path /v1/tlds/{name}, answer tldGetTldResponse with data tldTld). Never throws; an
+	 * allow, then for up to BATCH other extensions without facts or with facts older than STALE (oldest first): GET /tlds/{name} (Openprovider swagger path /v1/tlds/{name}, answer tldGetTldResponse with data tldTld). Never throws; an
 	 * extension that cannot be read is tried again at the next price refresh.
 	 *
 	 * @return int Extensions filled in.
@@ -68,12 +93,24 @@ final class TldFacts {
 			$t = $r ? Prices::tld_of( strtolower( (string) $r->get( 'domain' ) ) ) : '';
 			if ( '' !== $t ) { $want[] = $t; }
 		}
-		$done = 0;
+		$asks = array();
 		foreach ( array_unique( array_filter( $want ) ) as $tld ) {
-			if ( ! is_array( $table[ $tld ] ?? null ) || isset( $table[ $tld ]['dnssec'] ) ) { continue; }
+			if ( is_array( $table[ $tld ] ?? null ) && ! isset( $table[ $tld ]['dnssec'] ) ) { $asks[] = (string) $tld; }
+		}
+		$now  = time();
+		$rest = array();
+		foreach ( $table as $tld => $row ) {
+			if ( ! is_array( $row ) || in_array( (string) $tld, $asks, true ) ) { continue; }
+			$at = isset( $row['dnssec'] ) ? (int) ( $row['facts_at'] ?? 0 ) : -1;
+			if ( $at < 0 || ( $at > 0 && $now - $at > self::STALE ) ) { $rest[ (string) $tld ] = $at; }
+		}
+		asort( $rest );
+		$asks = array_merge( $asks, array_slice( array_keys( $rest ), 0, self::BATCH ) );
+		$done = 0;
+		foreach ( $asks as $tld ) {
 			$reply = Clients::registrar()->request( 'GET', '/tlds/' . rawurlencode( $tld ) );
 			if ( is_wp_error( $reply ) || ! is_array( $reply ) ) { continue; }
-			$table[ $tld ] += self::from_entry( $reply, true );
+			$table[ $tld ] = array_merge( $table[ $tld ], self::from_entry( $reply, true ), array( 'facts_at' => $now ) );
 			++$done;
 		}
 		if ( $done > 0 ) { update_option( Prices::OPTION, $table, false ); }
