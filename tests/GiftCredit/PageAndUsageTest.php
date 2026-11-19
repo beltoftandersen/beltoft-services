@@ -66,6 +66,16 @@ class PageAndUsageTest extends GiftCreditTestCase {
 		$this->assertNotSame( Page::url(), Account::url() );
 	}
 
+	public function test_no_gift_card_email_while_gift_credit_is_on(): void {
+		$this->assertFalse( apply_filters( 'bgcw_should_send_email_now', true, 1, null ) );
+		$this->settings( array( 'gift_credit' => 0 ) );
+		$this->assertTrue( apply_filters( 'bgcw_should_send_email_now', true, 1, null ) );
+	}
+
+	public function test_the_credit_page_never_says_gift_card(): void {
+		$this->assertDoesNotMatchRegularExpression( '/gift/i', wp_strip_all_tags( Page::html() ) );
+	}
+
 	public function test_codes_in_the_coupon_field_go_to_credit_only_while_gift_credit_is_on(): void {
 		$this->assertTrue( apply_filters( 'bgca_coupon_field_attaches', true, 1, 'X' ) );
 		$this->settings( array( 'gift_credit' => 0 ) );
