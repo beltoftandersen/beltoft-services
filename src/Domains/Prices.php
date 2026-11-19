@@ -178,7 +178,7 @@ final class Prices {
 					return new \WP_Error( 'empty_list', 'Registrar TLD list was empty; the saved prices were kept.' );
 				}
 
-				update_option( self::OPTION, $table, false );
+				update_option( self::OPTION, TldFacts::carry( $table, get_option( self::OPTION, array() ) ), false );
 				\BeltoftServices\Alerts::quietly( array( __CLASS__, 'alert_below_cost' ) );
 				return count( $table );
 			}

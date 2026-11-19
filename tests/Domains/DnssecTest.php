@@ -99,6 +99,39 @@ class DnssecTest extends TestCase {
 		$this->assertCount( 2, $op->calls() );
 	}
 
+	public function test_facts_read_one_by_one_survive_the_daily_list_and_the_rest_are_read_in_batches(): void {
+		$this->settings( array( 'domain_featured_tlds' => 'com' ) );
+		$eur = array( 'product' => array( 'price' => 10, 'currency' => 'EUR' ), 'reseller' => array( 'price' => 10, 'currency' => 'EUR' ) );
+		$op  = new FakeClient();
+		$list = array( 'results' => array(
+			array( 'name' => 'com', 'status' => 'ACT', 'prices' => array( 'create_price' => $eur, 'renew_price' => $eur ), 'dnssec_allowed' => true, 'dnssec_keys_allowed' => true, 'dnssec_algorithms' => array( 13 ), 'is_private_whois_allowed' => true ),
+			array( 'name' => 'eu', 'status' => 'ACT', 'prices' => array( 'create_price' => $eur, 'renew_price' => $eur ) ),
+			array( 'name' => 'de', 'status' => 'ACT', 'prices' => array( 'create_price' => $eur, 'renew_price' => $eur ) ),
+		) );
+		$op->reply( 'GET', '/tlds', $list );
+		$op->reply( 'GET', '/tlds', $list );
+		$eu = array( 'name' => 'eu', 'dnssec_allowed' => true, 'dnssec_keys_allowed' => true, 'dnssec_algorithms' => array( 13 ), 'is_private_whois_allowed' => false );
+		$op->reply( 'GET', '/tlds/eu', $eu );
+		$op->reply( 'GET', '/tlds/eu', $eu );
+		$op->reply( 'GET', '/tlds/de', array( 'name' => 'de', 'dnssec_allowed' => true, 'dnssec_keys_allowed' => true, 'dnssec_algorithms' => array( 8 ), 'is_private_whois_allowed' => true ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $op );
+		$this->assertSame( 3, Prices::sync() );
+		$this->assertSame( 2, TldFacts::refresh_missing(), 'Extensions neither featured nor in use are read in the batch.' );
+		$this->assertTrue( TldFacts::dnssec_allowed( 'a.eu' ) );
+		$this->assertFalse( TldFacts::whois_allowed( 'a.eu' ) );
+		$this->assertTrue( TldFacts::whois_allowed( 'a.de' ) );
+
+		$this->assertSame( 3, Prices::sync() );
+		$this->assertTrue( TldFacts::dnssec_allowed( 'a.eu' ), 'The next list keeps the facts read one by one.' );
+		$this->assertTrue( TldFacts::whois_allowed( 'a.de' ) );
+		$this->assertSame( 0, TldFacts::refresh_missing(), 'Fresh facts are not read again.' );
+
+		$table = get_option( Prices::OPTION );
+		$table['eu']['facts_at'] = time() - TldFacts::STALE - 60;
+		update_option( Prices::OPTION, $table );
+		$this->assertSame( 1, TldFacts::refresh_missing(), 'Old facts are read again.' );
+	}
+
 	// -- Offered only where it is allowed ---------------------------------------------------------------
 
 	public function test_nothing_is_offered_for_an_extension_without_dnssec(): void {
