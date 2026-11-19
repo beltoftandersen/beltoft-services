@@ -17,6 +17,27 @@ final class ReactivationFee {
 	/** Setting: the markup on the restore cost, in percent (default 30). */
 	public const MARKUP_SETTING = 'domain_reactivation_markup_percent';
 
+	/** Setting: the owner's fixed rate, kroner per euro (empty: no kroner figure). */
+	public const DKK_RATE_SETTING = 'domain_fee_dkk_rate';
+
+	/** The fixed EUR to DKK rate, or null when the owner has set none. */
+	public static function dkk_rate(): ?float {
+		$value = Settings::get( self::DKK_RATE_SETTING );
+
+		return is_numeric( $value ) && (float) $value > 0 ? (float) $value : null;
+	}
+
+	/**
+	 * The fee in kroner, excluding tax: the euro fee times the fixed rate, rounded up to whole kroner. Null without a rate.
+	 *
+	 * @param float $eur Fee in euro, excluding tax.
+	 */
+	public static function dkk( float $eur ): ?float {
+		$rate = self::dkk_rate();
+
+		return null === $rate ? null : (float) ceil( round( $eur * $rate, 6 ) );
+	}
+
 	/** The markup in percent. */
 	public static function markup_percent(): float {
 		$value = Settings::get( self::MARKUP_SETTING );
@@ -80,12 +101,12 @@ final class ReactivationFee {
 			/**
 			 * The reactivation fee in a currency other than the shop's, excluding tax, or null when the site has no figure for it.
 			 *
-			 * @param float|null $amount   Amount in $currency, null by default.
+			 * @param float|null $amount   Amount in $currency; for DKK the fixed rate setting's figure, else null.
 			 * @param float      $base     The fee in the shop's currency, excluding tax.
 			 * @param string     $currency Currency code.
 			 * @param string     $domain   Full domain name.
 			 */
-			$amount = apply_filters( 'beltoft_services_domain_reactivation_fee', null, $excl, $currency, $domain );
+			$amount = apply_filters( 'beltoft_services_domain_reactivation_fee', 'DKK' === $currency ? self::dkk( $excl ) : null, $excl, $currency, $domain );
 
 			if ( is_numeric( $amount ) ) {
 				return \BeltoftServices\Billing\TaxNote::text( (float) $amount, 2, $product, $currency, false );

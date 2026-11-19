@@ -59,6 +59,13 @@ final class Unpaid {
 			'desc'    => __( 'The fee for restoring an expired domain is the registrar restore cost plus this markup, on top of the normal renewal. No fee before the expiry, and none while the registrar restores free of charge.', 'beltoft-services' ),
 		);
 
+		$fields[ ReactivationFee::DKK_RATE_SETTING ] = $base + array(
+			'type'    => 'text',
+			'default' => '',
+			'label'   => __( 'Reactivation fee: kroner per euro', 'beltoft-services' ),
+			'desc'    => __( 'A fixed rate you set, for example 7.46. When set, the fee shown to a customer in kroner is the euro fee times this rate, rounded up to whole kroner, with VAT shown as for other prices. Empty: the fee is shown in euro.', 'beltoft-services' ),
+		);
+
 		return $fields;
 	}
 

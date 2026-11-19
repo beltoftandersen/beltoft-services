@@ -93,4 +93,26 @@ class ReactivationFeeTest extends TestCase {
 		add_filter( 'beltoft_services_domain_reactivation_fee', static fn( $amount, $base, $currency ) => 'DKK' === $currency ? 170.0 : $amount, 10, 3 );
 		$this->assertStringContainsString( '170', ReactivationFee::text( 22.83, 'DKK', 'example.dk' ) );
 	}
+
+	public function test_the_fixed_dkk_rate_rounds_up_to_whole_kroner(): void {
+		$this->assertNull( ReactivationFee::dkk_rate() );
+		$this->assertNull( ReactivationFee::dkk( 22.83 ), 'No rate, no kroner figure.' );
+		$this->settings( array( 'domain_fee_dkk_rate' => '7.46' ) );
+		$this->assertSame( 7.46, ReactivationFee::dkk_rate() );
+		$this->assertSame( 171.0, ReactivationFee::dkk( 22.83 ), '170.3118 rounds up.' );
+		$this->assertSame( 112.0, ReactivationFee::dkk( 15.0 ), '111.9 rounds up.' );
+		$this->assertSame( 0.0, ReactivationFee::dkk( 0.0 ) );
+		$this->settings( array( 'domain_fee_dkk_rate' => '10' ) );
+		$this->assertSame( 150.0, ReactivationFee::dkk( 15.0 ), 'An exact figure is not pushed up.' );
+	}
+
+	public function test_dkk_text_uses_the_rate_when_set_and_euro_when_empty(): void {
+		$this->assertStringContainsString( '22.83', ReactivationFee::text( 22.83, 'DKK', 'example.dk' ) );
+		$this->settings( array( 'domain_fee_dkk_rate' => '7.46' ) );
+		$text = ReactivationFee::text( 22.83, 'DKK', 'example.dk' );
+		$this->assertStringContainsString( '171', $text );
+		$this->assertStringNotContainsString( '22.83', $text );
+		add_filter( 'beltoft_services_domain_reactivation_fee', static fn( $amount, $base, $currency ) => 200.0, 10, 3 );
+		$this->assertStringContainsString( '200', ReactivationFee::text( 22.83, 'DKK', 'example.dk' ), 'The filter still has the last word.' );
+	}
 }
