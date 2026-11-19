@@ -86,7 +86,7 @@ final class Backups {
 	/**
 	 * Days a managed database's backups are kept when its plan names none: a database is always backed up.
 	 */
-	public const DB_DEFAULT_DAYS = 7;
+	public const DB_DEFAULT_DAYS = 30;
 
 	/**
 	 * Cluster settings (token secret decrypted).
