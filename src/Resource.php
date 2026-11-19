@@ -474,7 +474,7 @@ final class Resource {
 				$args[]  = $like( $term );
 			}
 
-			if ( preg_match( '/^vm-([0-9a-f]{4,})$/i', $term, $m ) ) {
+			if ( preg_match( '/^vm-([0-9a-f]{4,})$/iD', $term, $m ) ) {
 				$conds[] = 'a.meta LIKE %s';
 				$args[]  = $like( '"uuid":"' . strtolower( $m[1] ) );
 			}

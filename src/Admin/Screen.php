@@ -206,7 +206,7 @@ final class Screen {
 			);
 		}
 
-		if ( preg_match( '/^(\S+)\s+(.+)$/u', $term, $m ) ) {
+		if ( preg_match( '/^(\S+)\s+(.+)$/uD', $term, $m ) ) {
 			$billing[] = array(
 				'relation' => 'AND',
 				array(

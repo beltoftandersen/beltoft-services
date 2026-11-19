@@ -1407,7 +1407,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit
 /* Security tab of a domain: DNSSEC keys and the WHOIS privacy switch. */
 div.beltoft-services-domain ul.beltoft-services-domain__keys { display: grid; gap: 8px; margin: 0 0 16px; padding: 0; list-style: none; }
 div.beltoft-services-domain ul.beltoft-services-domain__keys li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; }
-div.beltoft-services-domain code.beltoft-services-domain__keytext { flex: 1 1 100%; overflow-wrap: anywhere; font-size: 13px; }
+div.beltoft-services-domain code.beltoft-services-domain__keytext { flex: 1 1 100%; overflow-wrap: anywhere; font-size: var(--bs-fs-small); }
 div.beltoft-services-domain form.beltoft-services-domain__keyform { display: grid; gap: 12px; max-width: 480px; margin: 0 0 8px; }
 div.beltoft-services-domain form.beltoft-services-domain__keyform label { display: grid; gap: 4px; }
 div.beltoft-services-domain__dnssec, div.beltoft-services-domain__whois { margin: 0 0 24px; }
