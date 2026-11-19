@@ -245,12 +245,12 @@ class DbPhase5Test extends TestCase {
 
 	// -- Backups on by default -------------------------------------------------------------------
 
-	public function test_a_database_is_backed_up_without_a_backup_plan_and_keeps_seven_days_by_default(): void {
+	public function test_a_database_is_backed_up_without_a_backup_plan_and_keeps_thirty_days_by_default(): void {
 		$r = $this->ready_db();
 
 		$this->assertSame( 0, (int) ( (array) $r->get( 'plan' ) )['backup_days'], 'The plan names no backup days.' );
 		$this->assertTrue( Backups::enabled( $r ) );
-		$this->assertSame( 7, Backups::days( $r ) );
+		$this->assertSame( 30, Backups::days( $r ) );
 		$this->assertTrue( Backups::due( $r, time() ) );
 	}
 
@@ -316,7 +316,7 @@ class DbPhase5Test extends TestCase {
 
 		BackupJobs::backup();
 
-		$this->assertSame( 'keep-daily=7', $this->calls( 'DELETE', '/prunebackups' )[0]['params']['prune-backups'] );
+		$this->assertSame( 'keep-daily=30', $this->calls( 'DELETE', '/prunebackups' )[0]['params']['prune-backups'] );
 	}
 
 	public function test_a_database_that_is_not_ready_or_busy_is_left_alone(): void {

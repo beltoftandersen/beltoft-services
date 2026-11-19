@@ -114,19 +114,19 @@ $beltoft_services_first   = $credit['topup']['amounts'][0] ?? 0;
 	</form>
 	<?php endif; ?>
 
-	<?php // Owner 2026-11-19: one field for a gift card code and a campaign code (the add-on's Attach::code() tries a campaign code first, then a gift card); the coupon field at checkout takes the same codes. ?>
+	<?php // Owner 2026-11-19: one field for every code that adds credit (the add-on's Attach::code() tries a campaign code first, then a gift card); the coupon field at checkout takes the same codes. ?>
 	<form class="beltoft-services-credit__code" method="post" action="<?php echo esc_url( \BeltoftServices\GiftCredit\Page::url() ); ?>" novalidate data-bs-working="<?php esc_attr_e( 'Checking the code…', 'beltoft-services' ); ?>">
 		<div class="beltoft-services-ov__head">
 			<h3 class="beltoft-services-credit__legend"><?php esc_html_e( 'Have a code?', 'beltoft-services' ); ?></h3>
 		</div>
 		<div class="beltoft-services-credit__coderow">
-			<label class="screen-reader-text" for="beltoft-credit-code"><?php esc_html_e( 'Gift card or campaign code', 'beltoft-services' ); ?></label>
+			<label class="screen-reader-text" for="beltoft-credit-code"><?php esc_html_e( 'Code', 'beltoft-services' ); ?></label>
 			<input id="beltoft-credit-code" type="text" name="bgca_code" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
 			<?php wp_nonce_field( Attach::NONCE ); ?>
 			<input type="hidden" name="<?php echo esc_attr( Attach::ACTION ); ?>" value="1">
 			<button type="submit" class="button beltoft-services-credit__submit"><?php esc_html_e( 'Add to my credit', 'beltoft-services' ); ?></button>
 		</div>
-		<p class="beltoft-services-credit__note"><?php esc_html_e( 'A gift card or campaign code adds its amount to your credit. You can also type it in the coupon field at checkout.', 'beltoft-services' ); ?></p>
+		<p class="beltoft-services-credit__note"><?php esc_html_e( 'A code adds its amount to your credit. You can also type it in the coupon field at checkout.', 'beltoft-services' ); ?></p>
 	</form>
 
 	<div class="beltoft-services-ov__head beltoft-services-credit__historyhead">

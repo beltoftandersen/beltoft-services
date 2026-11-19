@@ -148,7 +148,7 @@ class DbPickerTest extends BackupTestCase {
 		$this->assertStringContainsString( '8 GB RAM', $html );
 		$this->assertStringContainsString( '120 GB data disk', $html );
 		$this->assertStringContainsString( 'PostgreSQL 18', $html );
-		$this->assertStringContainsString( 'Daily backups, kept 7 days', $html );
+		$this->assertStringContainsString( 'Daily backups, kept 30 days', $html );
 		$this->assertStringContainsString( 'excluding VAT', $html );
 		$this->assertStringContainsString( 'name="' . DbPicker::FIELD . '"', $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
