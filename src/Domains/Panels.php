@@ -33,7 +33,8 @@ final class Panels {
 	public static function buttons( $buttons, $r ) {
 		if ( is_array( $buttons ) && $r instanceof Resource && in_array( $r->get( 'driver' ), array( 'domain', 'dns' ), true ) ) {
 			// The panel shows these itself, next to what they change.
-			unset( $buttons['set_records'], $buttons['set_nameservers'], $buttons['lock'], $buttons['unlock'], $buttons['check_delegation'] );
+			unset( $buttons['set_records'], $buttons['set_nameservers'], $buttons['lock'], $buttons['unlock'], $buttons['check_delegation'], $buttons[ WhoisPrivacy::ACTION ] );
+			foreach ( Dnssec::ACTIONS as $action ) { unset( $buttons[ $action ] ); }
 		}
 		return $buttons;
 	}

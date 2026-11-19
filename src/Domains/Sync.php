@@ -39,7 +39,7 @@ final class Sync {
 			$expiry = (string) ( $reply['expiration_date'] ?? '' );
 			if ( 'ACT' !== $status ) { Alerts::admin( $r, 'Domain status changed at the registrar.' ); }
 			if ( '' !== $expiry && $r->get( 'expires_at' ) && $expiry !== $r->get( 'expires_at' ) ) { Alerts::admin( $r, 'Domain expiry changed at the registrar.' ); }
-			$r->set( array( 'registrar_status' => $status, 'expires_at' => '' !== $expiry ? $expiry : $r->get( 'expires_at' ), 'is_locked' => (bool) ( $reply['is_locked'] ?? $r->get( 'is_locked' ) ), 'last_sync' => time() ) );
+			$r->set( array( 'registrar_status' => $status, 'expires_at' => '' !== $expiry ? $expiry : $r->get( 'expires_at' ), 'is_locked' => (bool) ( $reply['is_locked'] ?? $r->get( 'is_locked' ) ), 'last_sync' => time() ) + WhoisPrivacy::detail_meta( $reply ) + Dnssec::detail_meta( $reply ) );
 		}
 		update_option( self::CURSOR, count( $batch ) < 50 ? 0 : (int) end( $batch ), false );
 		Health::balance();

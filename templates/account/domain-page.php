@@ -270,6 +270,78 @@ if ( $d['dns_only'] ) {
 		</section>
 	<?php endif; ?>
 
+	<?php if ( isset( $beltoft_tabs['security'] ) ) : ?>
+		<?php $beltoft_open( 'security' ); ?>
+			<?php if ( $d['dnssec'] ) : ?>
+				<?php $beltoft_dnssec = $d['dnssec']; ?>
+				<div class="beltoft-services-domain__dnssec" data-dnssec>
+					<h4 class="beltoft-services-domain__title"><?php esc_html_e( 'DNSSEC', 'beltoft-services' ); ?></h4>
+					<?php if ( $beltoft_dnssec['ours'] ) : ?>
+						<p class="beltoft-services-domain__note"><?php esc_html_e( 'DNSSEC signs the DNS records of your domain, so a visitor can check that the answer really comes from your domain. Your domain uses our name servers, so we sign the records and give the registry the key.', 'beltoft-services' ); ?></p>
+						<?php if ( $beltoft_dnssec['turning_off'] ) : ?>
+							<p class="beltoft-services-domain__note"><?php esc_html_e( 'DNSSEC is being turned off. This takes about a day: the registry drops the key first, and the records stay signed until visitors no longer hold it, so nobody loses your website.', 'beltoft-services' ); ?></p>
+						<?php else : ?>
+							<p class="beltoft-services-domain__note"><strong><?php echo esc_html( $beltoft_dnssec['on'] ? __( 'DNSSEC is on.', 'beltoft-services' ) : __( 'DNSSEC is off.', 'beltoft-services' ) ); ?></strong></p>
+							<?php if ( isset( $beltoft_dnssec['offered']['dnssec_enable'] ) ) : ?>
+								<form class="beltoft-services-domain-dnssec" data-domain-dnssec="dnssec_enable"><button type="submit" class="button"><?php esc_html_e( 'Turn on DNSSEC', 'beltoft-services' ); ?></button></form>
+								<p class="beltoft-services-domain__note"><?php esc_html_e( 'We email you a code to confirm. Turning it on signs your records and then gives the registry the key. This can take a few minutes.', 'beltoft-services' ); ?></p>
+							<?php elseif ( isset( $beltoft_dnssec['offered']['dnssec_disable'] ) ) : ?>
+								<form class="beltoft-services-domain-dnssec" data-domain-dnssec="dnssec_disable"><button type="submit" class="button"><?php esc_html_e( 'Turn off DNSSEC', 'beltoft-services' ); ?></button></form>
+								<p class="beltoft-services-domain__note"><?php esc_html_e( 'We email you a code to confirm. The registry drops the key first. This takes about a day, so that no visitor loses your website.', 'beltoft-services' ); ?></p>
+							<?php endif; ?>
+						<?php endif; ?>
+					<?php else : ?>
+						<p class="beltoft-services-domain__note"><?php esc_html_e( 'Your domain uses other name servers. If your DNS provider signs your domain with DNSSEC, enter the key it gives you here, so the registry knows it. We do not sign your records.', 'beltoft-services' ); ?></p>
+						<?php if ( $beltoft_dnssec['keys'] ) : ?>
+							<ul class="beltoft-services-domain__keys">
+								<?php foreach ( $beltoft_dnssec['keys'] as $beltoft_key ) : ?>
+									<li>
+										<code><?php echo esc_html( sprintf( /* translators: 1: flags, 2: protocol, 3: algorithm number */ __( 'Flags %1$d, protocol %2$d, algorithm %3$d', 'beltoft-services' ), $beltoft_key['flags'], $beltoft_key['protocol'], $beltoft_key['alg'] ) ); ?></code>
+										<code class="beltoft-services-domain__keytext"><?php echo esc_html( $beltoft_key['pub_key'] ); ?></code>
+										<?php if ( ! $beltoft_key['readonly'] && isset( $beltoft_dnssec['offered']['dnssec_key_remove'] ) ) : ?>
+											<form class="beltoft-services-domain-dnssec" data-domain-dnssec="dnssec_key_remove"><input type="hidden" name="key_id" value="<?php echo esc_attr( $beltoft_key['id'] ); ?>"><button type="submit" class="beltoft-services-domain__link"><?php esc_html_e( 'Remove key', 'beltoft-services' ); ?></button></form>
+										<?php endif; ?>
+									</li>
+								<?php endforeach; ?>
+							</ul>
+						<?php else : ?>
+							<p class="beltoft-services-domain__note"><?php esc_html_e( 'No DNSSEC key is set.', 'beltoft-services' ); ?></p>
+						<?php endif; ?>
+						<?php if ( isset( $beltoft_dnssec['offered']['dnssec_key_add'] ) && ! $beltoft_dnssec['full'] ) : ?>
+							<form class="beltoft-services-domain-dnssec beltoft-services-domain__keyform" data-domain-dnssec="dnssec_key_add">
+								<label><?php esc_html_e( 'Flags', 'beltoft-services' ); ?>
+									<select name="flags"><option value="257">257</option><option value="256">256</option></select></label>
+								<label><?php esc_html_e( 'Protocol', 'beltoft-services' ); ?>
+									<select name="protocol"><option value="3">3</option></select></label>
+								<label><?php esc_html_e( 'Algorithm', 'beltoft-services' ); ?>
+									<select name="alg">
+										<?php foreach ( $beltoft_dnssec['algs'] as $beltoft_alg ) : ?>
+											<option value="<?php echo esc_attr( (string) $beltoft_alg ); ?>"><?php echo esc_html( (string) $beltoft_alg ); ?></option>
+										<?php endforeach; ?>
+									</select></label>
+								<label><?php esc_html_e( 'Public key', 'beltoft-services' ); ?>
+									<textarea name="pub_key" rows="3" autocomplete="off" spellcheck="false" required></textarea></label>
+								<button type="submit" class="button"><?php esc_html_e( 'Add key', 'beltoft-services' ); ?></button>
+							</form>
+							<p class="beltoft-services-domain__note"><?php echo esc_html( sprintf( /* translators: %d: the number of keys the extension allows */ _n( 'This extension allows %d key. We email you a code to confirm a change.', 'This extension allows up to %d keys. We email you a code to confirm a change.', $beltoft_dnssec['max'], 'beltoft-services' ), $beltoft_dnssec['max'] ) ); ?></p>
+						<?php elseif ( $beltoft_dnssec['full'] ) : ?>
+							<p class="beltoft-services-domain__note"><?php esc_html_e( 'The most keys this extension allows are set. Remove one to add another.', 'beltoft-services' ); ?></p>
+						<?php endif; ?>
+					<?php endif; ?>
+				</div>
+			<?php endif; ?>
+			<?php if ( $d['whois'] ) : ?>
+				<div class="beltoft-services-domain__whois" data-whois>
+					<h4 class="beltoft-services-domain__title"><?php esc_html_e( 'WHOIS privacy', 'beltoft-services' ); ?></h4>
+					<form class="beltoft-services-domain-form" data-domain-action="whois_privacy">
+						<input type="hidden" name="enabled" value="<?php echo $d['whois']['on'] ? '0' : '1'; ?>">
+						<label class="beltoft-services-domain__choice"><input type="checkbox" data-domain-switch<?php checked( $d['whois']['on'] ); ?>> <?php esc_html_e( 'WHOIS privacy (free): hides your name, address, email and phone in the public WHOIS.', 'beltoft-services' ); ?></label>
+					</form>
+				</div>
+			<?php endif; ?>
+		</section>
+	<?php endif; ?>
+
 	<?php if ( isset( $beltoft_tabs['transfer'] ) ) : ?>
 		<?php $beltoft_open( 'transfer' ); ?>
 			<?php if ( null !== $d['transfer_price'] ) : ?>
@@ -322,7 +394,7 @@ if ( $d['dns_only'] ) {
 	<?php
 	// A tab an extension added (the danger zone is one) prints its pane here.
 	foreach ( $beltoft_tabs as $beltoft_slug => $beltoft_title ) {
-		if ( in_array( $beltoft_slug, array( 'overview', 'dns', 'nameservers', 'transfer' ), true ) ) {
+		if ( in_array( $beltoft_slug, array( 'overview', 'dns', 'nameservers', 'security', 'transfer' ), true ) ) {
 			continue;
 		}
 		$beltoft_open( (string) $beltoft_slug );

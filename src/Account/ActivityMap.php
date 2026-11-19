@@ -355,6 +355,15 @@ final class ActivityMap {
 				return __( 'Transfer lock changed', 'beltoft-services' );
 			case 'set_records':
 				return __( 'DNS records changed', 'beltoft-services' );
+			case 'dnssec_enable':
+				return __( 'DNSSEC turned on', 'beltoft-services' );
+			case 'dnssec_disable':
+				return __( 'DNSSEC turned off', 'beltoft-services' );
+			case 'dnssec_key_add':
+			case 'dnssec_key_remove':
+				return __( 'DNSSEC keys changed', 'beltoft-services' );
+			case 'whois_privacy':
+				return __( 'WHOIS privacy changed', 'beltoft-services' );
 			case 'adopt_switch':
 				return __( 'Switched to our DNS', 'beltoft-services' );
 		}

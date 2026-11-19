@@ -76,8 +76,16 @@ final class Prices {
 		return (bool) apply_filters( 'beltoft_services_domain_free_transfer', $free, $domain );
 	}
 
+	/** The stored row of the extension a full domain ends with (see TldFacts), or null. */
+	public static function row( string $domain ): ?array {
+		$domain = strtolower( $domain );
+		$tld    = self::tld_of( $domain );
+		$table  = get_option( self::OPTION, array() );
+		return '' !== $tld && is_array( $table ) && is_array( $table[ $tld ] ?? null ) ? $table[ $tld ] : null;
+	}
+
 	/** The table extension a full domain ends with, or ''. */
-	private static function tld_of( string $domain ): string {
+	public static function tld_of( string $domain ): string {
 		$table = get_option( self::OPTION, array() );
 		$tlds = is_array( $table ) ? array_keys( $table ) : array();
 		usort( $tlds, static fn( $a, $b ) => strlen( (string) $b ) <=> strlen( (string) $a ) );
@@ -230,6 +238,6 @@ final class Prices {
 		}
 		if ( $values['create'] < 0 || $values['renew'] < 0 || $values['transfer'] < 0 ) { return new \WP_Error( 'bad_response', 'Registrar price is negative.' ); }
 		$restricted = ! empty( $entry['restrictions'] );
-		return array( $tld, array( 'create' => $values['create'], 'renew' => $values['renew'], 'transfer' => $values['transfer'], 'transfer_known' => $transfer_known, 'restricted' => $restricted, 'price' => self::rule( $values['create'], $values['renew'] ) ) );
+		return array( $tld, array( 'create' => $values['create'], 'renew' => $values['renew'], 'transfer' => $values['transfer'], 'transfer_known' => $transfer_known, 'restricted' => $restricted, 'price' => self::rule( $values['create'], $values['renew'] ) ) + TldFacts::from_entry( $entry ) );
 	}
 }

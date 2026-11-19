@@ -133,6 +133,17 @@ final class Zone {
 		return $result;
 	}
 
+	/**
+	 * The customer's DNSSEC switch on, for a domain on our name servers: signs the zone, waits until every name server serves the keys, then
+	 * publishes them at the registry (PUT dnssec_keys and is_dnssec_enabled true, Openprovider domainUpdateDomainRequest). The keys reach the
+	 * registry only after the zone is signed. No parking offer: a switch changes nothing in the records.
+	 *
+	 * @param Resource $r Domain service.
+	 */
+	public static function sign( Resource $r ): StepResult {
+		return self::ensure_zone( $r, false, true );
+	}
+
 	private static function ensure_zone( Resource $r, bool $switching_to_ours, bool $publish_ds ): StepResult {
 		$name = (string) $r->get( 'domain' );
 		$nameservers = self::nameservers();

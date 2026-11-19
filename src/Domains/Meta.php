@@ -44,6 +44,8 @@ final class Meta {
 			if ( 'transfer' === $mode && in_array( $data['dns'] ?? '', TransferDns::CHOICES, true ) ) { $meta['transfer_dns'] = (string) $data['dns']; }
 			// A free transfer: the line carries the promise and was paid 0. A paid line never takes the free path, whatever its stamp says.
 			if ( 'transfer' === $mode && ! empty( $data['free_transfer'] ) && 0.0 === round( SpendGuard::paid( $item ), 2 ) ) { $meta['transfer_free'] = true; }
+			// WHOIS privacy of the line: what the customer chose at checkout (on by default); an extension without it carries no key.
+			if ( in_array( $mode, array( 'register', 'transfer' ), true ) && array_key_exists( WhoisPrivacy::LINE_KEY, $data ) ) { $meta[ WhoisPrivacy::LINE_KEY ] = (bool) $data[ WhoisPrivacy::LINE_KEY ]; }
 			$meta['order_item_id'] = (int) $item->get_id();
 			break;
 		}
