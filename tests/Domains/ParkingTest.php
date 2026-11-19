@@ -145,6 +145,18 @@ class ParkingTest extends TestCase {
 		$this->assertSame( array(), $this->dns->zone( 'noparking-a.example' )['rrsets'] );
 	}
 
+	public function test_a_site_with_nothing_configured_has_parking_off_and_inert(): void {
+		delete_option( \BeltoftServices\Settings::OPTION );
+		$this->assertSame( '', (string) \BeltoftServices\Settings::get( 'parking_ipv4' ) );
+		$this->assertSame( '', (string) \BeltoftServices\Settings::get( 'parking_ipv6' ) );
+		$this->assertFalse( Parking::enabled() );
+		$this->assertSame( array(), Parking::addresses() );
+		$this->assertSame( array(), Parking::sweep( true ) );
+		$this->assertSame( 'off', Parking::park( 'unconfigured.example' ) );
+		$this->assertFalse( get_option( \BeltoftServices\Hosting\ParkedEdge::PENDING, false ) );
+		$this->assertCount( 0, as_get_scheduled_actions( array( 'hook' => \BeltoftServices\Hosting\ParkedEdge::HOOK, 'status' => 'pending', 'per_page' => 10 ) ) );
+	}
+
 	public function test_only_one_family_is_written_when_only_one_address_is_set(): void {
 		$this->settings( array( 'parking_ipv6' => '' ) );
 		$this->parked_service( 'v4only-a.example' );
