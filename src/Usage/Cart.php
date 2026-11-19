@@ -188,6 +188,32 @@ final class Cart {
 	}
 
 	/**
+	 * An account without a card whose customer does hold a saved card (the token events that link it were missed, for example a
+	 * card saved before the account moved off a retired provider): the account takes the default card now, so a customer with a
+	 * saved card is never asked to add one. True when the account has a card afterwards.
+	 *
+	 * @param int              $user_id Customer.
+	 * @param \WC_Subscription $account Usage account.
+	 */
+	private static function follow_saved_card( int $user_id, \WC_Subscription $account ): bool {
+		if ( null === \BeltoftServices\Card\Card::default_token( $user_id ) ) {
+			return false;
+		}
+
+		try {
+			\BeltoftServices\Card\Card::sync( $user_id, false );
+		} catch ( \Throwable $e ) {
+			unset( $e );
+
+			return false;
+		}
+
+		$fresh = wcs_get_subscription( $account->get_id() );
+
+		return $fresh instanceof \WC_Subscription && Account::has_card( $fresh );
+	}
+
+	/**
 	 * Why this order of pay-as-you-go services is refused: a list of plain messages, empty when it may go on.
 	 *
 	 * @param int    $user_id  Customer (0 for a guest who is registering).
@@ -206,7 +232,7 @@ final class Cart {
 		if ( $account ) {
 			if ( $account->has_status( 'on-hold' ) ) {
 				$problems[] = __( 'Your usage account has an unpaid invoice. Pay it before you order more pay as you go services.', 'beltoft-services' );
-			} elseif ( ! Account::has_card( $account ) ) {
+			} elseif ( ! Account::has_card( $account ) && ! self::follow_saved_card( $user_id, $account ) ) {
 				$problems[] = __( 'Pay as you go needs a card saved on your usage account. Add one under your payment methods first.', 'beltoft-services' );
 			}
 		} else {

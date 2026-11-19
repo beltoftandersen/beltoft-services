@@ -354,6 +354,39 @@ class CardTest extends UsageTestCase {
 		$this->assertCount( 1, WC()->cart->get_cart(), 'No second account line.' );
 	}
 
+	public function test_a_saved_card_the_account_missed_is_taken_when_a_server_is_ordered(): void {
+		// The owner's case 2026-11-19: the account still on the retired provider, charged manually, and a Google Pay card saved
+		// while nothing linked it. Ordering must take that card, not ask for one.
+		add_filter( 'beltoft_services_card_token_meta', static fn( $meta ) => $meta + array( '_wc_stripe_customer' => 'cus_1' ) );
+		$user    = $this->new_user();
+		$account = $this->legacy_account( $user );
+		$account->set_requires_manual_renewal( true );
+		$account->save();
+		remove_action( 'woocommerce_new_payment_token', array( Card::class, 'token_event' ), 20 );
+		remove_action( 'woocommerce_payment_token_set_default', array( Card::class, 'token_event' ), 5 );
+		$token = $this->token( $user, 'pm_g', '2099', 'visa', 'stripe_googlepay' );
+		\WC_Payment_Tokens::set_users_default( $user, $token->get_id() );
+		add_action( 'woocommerce_new_payment_token', array( Card::class, 'token_event' ), 20, 2 );
+		add_action( 'woocommerce_payment_token_set_default', array( Card::class, 'token_event' ), 5, 2 );
+		$this->assertFalse( Account::has_card( $this->fresh( $account ) ), 'Nothing linked the card yet.' );
+
+		$this->assertSame( array(), Cart::problems( $user, '', 1 ) );
+
+		$account = $this->fresh( $account );
+		$this->assertSame( 'stripe_googlepay', $account->get_payment_method() );
+		$this->assertSame( 'pm_g', $account->get_meta( '_payment_method_token' ) );
+		$this->assertFalse( $account->is_manual() );
+	}
+
+	public function test_an_account_without_a_card_and_no_saved_card_is_still_refused(): void {
+		$user    = $this->new_user();
+		$account = $this->legacy_account( $user );
+		$account->set_requires_manual_renewal( true );
+		$account->save();
+
+		$this->assertSame( array( 'Pay as you go needs a card saved on your usage account. Add one under your payment methods first.' ), Cart::problems( $user, '', 1 ) );
+	}
+
 	// ------------------------------------------------------------------ the page.
 
 	/**
