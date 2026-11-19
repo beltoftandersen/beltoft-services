@@ -352,24 +352,25 @@ final class McpTest extends McpTestCase {
 		}
 	}
 
-	public function test_reset_database_password_returns_no_password_and_is_written_to_the_history(): void {
+	public function test_password_resets_are_not_tools_because_they_need_the_emailed_code(): void {
 		$db    = $this->database();
 		$user  = $this->owner( $db );
 		$token = $this->oauth( $user, Tokens::FULL );
+		$tools = \BeltoftServices\Mcp\Tools::definitions();
+		$listed = array_column( $this->rpc( 'tools/list', array(), $token )['result']['tools'], 'name' );
 
-		$this->assertTrue( $this->tool( 'reset_database_password', array( 'id' => $db->id() ), $this->oauth( $user, Tokens::ACTIONS ) )['isError'], 'Actions access is not enough.' );
+		foreach ( array( 'reset_server_password', 'reset_database_password' ) as $name ) {
+			$this->assertArrayNotHasKey( $name, $tools, $name );
+			$this->assertNotContains( $name, $listed, $name );
+			$reply = $this->rpc( 'tools/call', array( 'name' => $name, 'arguments' => array( 'id' => $db->id() ) ), $token );
+			$this->assertArrayHasKey( 'error', $reply, $name );
+		}
 
-		$first = $this->json( $this->tool( 'reset_database_password', array( 'id' => $db->id() ), $token ) );
-		$this->assertTrue( $first['requires_confirmation'] );
-		$this->assertFalse( Jobs::acting( $db->id() ), 'Nothing runs before the confirmation.' );
-		$result = $this->tool( 'reset_database_password', array( 'id' => $db->id(), 'confirm' => $first['confirm'] ), $token );
-		$data   = $this->json( $result );
-
-		$this->assertTrue( $data['requested'] );
-		$this->assertStringContainsString( 'not shown here', $data['message'] );
-		$this->assertStringNotContainsString( self::PASSWORD, $this->text( $result ) );
-		$this->assertTrue( Jobs::acting( $db->id() ), 'The reset was queued.' );
-		$this->assertNotEmpty( array_filter( Events::for_license( (int) $db->license()['id'] ), static fn( $e ) => str_contains( $e['message'], 'Claude: new database password requested' ) ) );
+		$this->assertStringContainsString( 'emailed', \BeltoftServices\Mcp\ActionMap::EXCLUDED['reset_password'] );
+		$this->assertStringContainsString( 'emailed', \BeltoftServices\Mcp\ActionMap::EXCLUDED['db_reset_password'] );
+		$this->assertArrayNotHasKey( 'reset_password', \BeltoftServices\Mcp\ActionMap::ACTIONS );
+		$this->assertArrayNotHasKey( 'db_reset_password', \BeltoftServices\Mcp\ActionMap::ACTIONS );
+		$this->assertFalse( Jobs::acting( $db->id() ) );
 	}
 
 	public function test_actions_need_the_actions_scope(): void {
@@ -400,7 +401,7 @@ final class McpTest extends McpTestCase {
 		$this->assertContains( 'Claude: reboot requested', $messages );
 
 		// An action the server does not offer is refused by the same check as the dashboard.
-		$this->assertTrue( $this->tool( 'reset_database_password', array( 'id' => $server->id() ), $this->oauth( $user, Tokens::FULL ) )['isError'] );
+		$this->assertTrue( $this->tool( 'set_database_eviction_policy', array( 'id' => $server->id(), 'policy' => 'noeviction' ), $this->oauth( $user, Tokens::FULL ) )['isError'] );
 	}
 
 	public function test_dns_tools_read_write_and_delete_with_the_safe_write_rules(): void {

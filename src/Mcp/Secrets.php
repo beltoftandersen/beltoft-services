@@ -65,7 +65,7 @@ final class Secrets {
 		switch ( $name ) {
 			case 'reveal_server_password':
 				if ( ! Access::revealable( $r ) ) {
-					return new \WP_Error( 'beltoft_services_tool', __( 'There is no password to show. It has been shown already or it is no longer available. reset_server_password makes a new one.', 'beltoft-services' ) );
+					return new \WP_Error( 'beltoft_services_tool', __( 'There is no password to show. It has been shown already or it is no longer available. The customer can make a new one in the dashboard.', 'beltoft-services' ) );
 				}
 
 				/* translators: %s: server name. */
@@ -74,7 +74,7 @@ final class Secrets {
 
 			case 'reveal_database_password':
 				if ( DbDriver::ID !== $r->get( 'driver' ) || ! DbRoutes::revealable( $r ) ) {
-					return new \WP_Error( 'beltoft_services_tool', __( 'There is no password to show. It has been shown already or it is no longer available. reset_database_password makes a new one.', 'beltoft-services' ) );
+					return new \WP_Error( 'beltoft_services_tool', __( 'There is no password to show. It has been shown already or it is no longer available. The customer can make a new one in the dashboard.', 'beltoft-services' ) );
 				}
 
 				/* translators: %s: database name. */
@@ -151,8 +151,8 @@ final class Secrets {
 		}
 
 		$change = 'reveal_database_password' === $name
-			? 'To change it, use reset_database_password, or the customer does it in the dashboard.'
-			: ( 'reveal_server_password' === $name ? 'To change it, use reset_server_password, or the customer does it in the dashboard.' : 'The customer can change it in the app itself after logging in.' );
+			? 'To change it, the customer makes a new password in the dashboard.'
+			: ( 'reveal_server_password' === $name ? 'To change it, the customer makes a new password in the dashboard.' : 'The customer can change it in the app itself after logging in.' );
 
 		if ( 'reveal_app_login' === $name ) {
 			return array( 'login' => $value, 'shown_once' => true, 'note' => 'This login is now in this conversation. We no longer have it. ' . $change );

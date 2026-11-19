@@ -70,6 +70,7 @@ final class Plugin {
 		Http\Connections::register();
 		Http\ConnectionsScreen::register();
 		Proxmox\Pve\ProxmoxSettings::register();
+		Proxmox\Pve\ResetStepUp::register();
 		Hosting\HostingSettings::register();
 		Hosting\NodesScreen::register();
 		Hosting\Stock::register();

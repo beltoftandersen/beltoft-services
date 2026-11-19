@@ -229,7 +229,17 @@ class ActionsTest extends TestCase {
 		$request = new \WP_REST_Request( 'POST', '/beltoft-services/v1/resources/' . $id . '/actions/' . $action );
 		$request->set_param( 'args', $args );
 
-		return rest_get_server()->dispatch( $request );
+		// These tests are about the action, not the emailed code (ResetStepUpTest has that): a site's own check says yes.
+		if ( in_array( $action, \BeltoftServices\Proxmox\Pve\ResetStepUp::ACTIONS, true ) ) {
+			$request->set_param( 'step_code', '123456' );
+			add_filter( 'beltoft_services_step_up_verify', '__return_true' );
+		}
+
+		try {
+			return rest_get_server()->dispatch( $request );
+		} finally {
+			remove_filter( 'beltoft_services_step_up_verify', '__return_true' );
+		}
 	}
 
 	private function rebuild_to_ready( int $id ): void {
@@ -923,6 +933,64 @@ class ActionsTest extends TestCase {
 		$this->assertCount( 3, $stamps );
 		Resource::find( $r->id() )->set( array( 'reset_times' => array( time() - HOUR_IN_SECONDS - 5, time() - 10, time() - 5 ) ) );
 		$this->assertSame( 202, $this->route( $r->id(), $owner, 'reset_password' )->get_status() );
+	}
+
+	/**
+	 * The route with a body parameter, without the test shortcut of route().
+	 */
+	private function route_with_code( int $id, int $user, string $action, ?string $code ): \WP_REST_Response {
+		wp_set_current_user( $user );
+		$request = new \WP_REST_Request( 'POST', '/beltoft-services/v1/resources/' . $id . '/actions/' . $action );
+		$request->set_param( 'args', array() );
+
+		if ( null !== $code ) {
+			$request->set_param( 'step_code', $code );
+		}
+
+		return rest_get_server()->dispatch( $request );
+	}
+
+	public function test_a_server_password_reset_needs_the_emailed_code_and_uses_it_up_once(): void {
+		list( $r, $owner ) = $this->ready();
+		$purpose           = \BeltoftServices\Proxmox\Pve\ResetStepUp::PURPOSE;
+
+		// No code, a wrong code: refused with 403 step_up, nothing queued, no reset counted.
+		$none = $this->route_with_code( $r->id(), $owner, 'reset_password', null );
+		$this->assertSame( 403, $none->get_status() );
+		$this->assertSame( 'step_up', $none->get_data()['code'] );
+		$code  = $this->emailed_step_code( $owner, $purpose );
+		$wrong = '000000' === $code ? '111111' : '000000';
+		$this->assertSame( 403, $this->route_with_code( $r->id(), $owner, 'reset_password', $wrong )->get_status() );
+		$this->assertFalse( Jobs::acting( $r->id() ) );
+		$this->assertSame( array(), (array) Resource::find( $r->id() )->get( 'reset_times' ) );
+
+		// A code sent for another purpose does not work.
+		$other = $this->emailed_step_code( $owner, 'api_token' );
+		$this->assertSame( 403, $this->route_with_code( $r->id(), $owner, 'reset_password', $other )->get_status() );
+
+		// The right code queues it, and is used up.
+		$this->assertSame( 202, $this->route_with_code( $r->id(), $owner, 'reset_password', $code )->get_status() );
+		$this->assertTrue( Jobs::acting( $r->id() ) );
+		\BeltoftServices\Progress::clear( Resource::find( $r->id() ) );
+		$again = $this->route_with_code( $r->id(), $owner, 'reset_password', $code );
+		$this->assertSame( 403, $again->get_status(), 'The same code works once.' );
+	}
+
+	public function test_a_refused_or_busy_server_reset_does_not_use_the_code_up(): void {
+		list( $r, $owner ) = $this->ready();
+		$code              = $this->emailed_step_code( $owner, \BeltoftServices\Proxmox\Pve\ResetStepUp::PURPOSE );
+
+		// Another action is pending: 409, the code is still good.
+		$this->assertSame( 202, $this->route( $r->id(), $owner, 'reboot' )->get_status() );
+		$this->assertSame( 409, $this->route_with_code( $r->id(), $owner, 'reset_password', $code )->get_status() );
+		\BeltoftServices\Progress::clear( Resource::find( $r->id() ) );
+		$this->assertSame( 202, $this->route_with_code( $r->id(), $owner, 'reset_password', $code )->get_status() );
+	}
+
+	public function test_other_server_actions_need_no_code(): void {
+		list( $r, $owner ) = $this->ready();
+
+		$this->assertSame( 202, $this->route_with_code( $r->id(), $owner, 'reboot', null )->get_status() );
 	}
 
 	// -- Panels --------------------------------------------------------------------------------------

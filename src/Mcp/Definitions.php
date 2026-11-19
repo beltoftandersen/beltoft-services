@@ -293,14 +293,6 @@ final class Definitions {
 				false,
 				true
 			),
-			'reset_server_password' => self::full(
-				'Makes a new password for a server. The old password stops working. The new one is not shown here: reveal_server_password shows it once, when it is ready.',
-				self::obj( array( 'id' => $id ), array( 'id' ), true )
-			),
-			'reset_database_password' => self::full(
-				'Makes a new password for a managed database. The old one stops working. The new one is not shown here: reveal_database_password shows it once, when it is ready.',
-				self::obj( array( 'id' => $id ), array( 'id' ), true )
-			),
 			'set_database_eviction_policy' => self::full(
 				'Sets what a Valkey database does when its memory is full: the choice decides whether writes fail or data is dropped. Read database details with service_details first.',
 				self::obj( array( 'id' => $id, 'policy' => array( 'type' => 'string', 'maxLength' => 40, 'description' => 'The policy, for example noeviction or allkeys-lru, as the database offers it.' ) ), array( 'id', 'policy' ), true ),
@@ -421,12 +413,12 @@ final class Definitions {
 
 			// -- Full access: secrets, shown once. Each needs the customer's confirmation ----------
 			'reveal_server_password' => self::full(
-				'Shows the password of a server once. The value then is in this conversation and we no longer have it. Use reset_server_password first if there is none to show.',
+				'Shows the password of a server once. The value then is in this conversation and we no longer have it. If there is none to show, the customer makes a new password in the dashboard.',
 				self::obj( array( 'id' => $id ), array( 'id' ), true ),
 				true
 			),
 			'reveal_database_password' => self::full(
-				'Shows the password of a managed database once. The value then is in this conversation and we no longer have it. Use reset_database_password first if there is none to show.',
+				'Shows the password of a managed database once. The value then is in this conversation and we no longer have it. If there is none to show, the customer makes a new password in the dashboard.',
 				self::obj( array( 'id' => $id ), array( 'id' ), true ),
 				true
 			),

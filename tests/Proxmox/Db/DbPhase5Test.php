@@ -928,7 +928,17 @@ class DbPhase5Test extends TestCase {
 		$request = new \WP_REST_Request( 'POST', '/beltoft-services/v1/resources/' . $r->id() . '/actions/' . $action );
 		$request->set_param( 'args', $args );
 
-		return rest_get_server()->dispatch( $request );
+		// These tests are about the action, not the emailed code (ResetStepUpTest has that): a site's own check says yes.
+		if ( in_array( $action, \BeltoftServices\Proxmox\Pve\ResetStepUp::ACTIONS, true ) ) {
+			$request->set_param( 'step_code', '123456' );
+			add_filter( 'beltoft_services_step_up_verify', '__return_true' );
+		}
+
+		try {
+			return rest_get_server()->dispatch( $request );
+		} finally {
+			remove_filter( 'beltoft_services_step_up_verify', '__return_true' );
+		}
 	}
 
 	/**
@@ -1159,6 +1169,50 @@ class DbPhase5Test extends TestCase {
 		$html = $this->page( Resource::find( $r->id() ), 'overview' );
 		$this->assertStringNotContainsString( 'data-db-power', $html );
 		$this->assertStringNotContainsString( 'A stopped database is still billed', $html );
+	}
+
+	private function route_with_code( Resource $r, ?string $code ): \WP_REST_Response {
+		wp_set_current_user( $this->owner_of( $r ) );
+		$request = new \WP_REST_Request( 'POST', '/beltoft-services/v1/resources/' . $r->id() . '/actions/db_reset_password' );
+		$request->set_param( 'args', array( 'confirm' => 'NEW PASSWORD' ) );
+
+		if ( null !== $code ) {
+			$request->set_param( 'step_code', $code );
+		}
+
+		return rest_get_server()->dispatch( $request );
+	}
+
+	public function test_a_new_database_password_needs_the_emailed_code_and_uses_it_up_once(): void {
+		$r     = $this->running_db();
+		$owner = $this->owner_of( $r );
+
+		$none = $this->route_with_code( $r, null );
+		$this->assertSame( 403, $none->get_status() );
+		$this->assertSame( 'step_up', $none->get_data()['code'] );
+
+		$code  = $this->emailed_step_code( $owner, \BeltoftServices\Proxmox\Pve\ResetStepUp::PURPOSE );
+		$wrong = '000000' === $code ? '111111' : '000000';
+		$this->assertSame( 403, $this->route_with_code( $r, $wrong )->get_status() );
+		$this->assertFalse( Jobs::acting( $r->id() ) );
+
+		// A typed word that is wrong is refused (422) and the code is still good.
+		wp_set_current_user( $owner );
+		$bad = new \WP_REST_Request( 'POST', '/beltoft-services/v1/resources/' . $r->id() . '/actions/db_reset_password' );
+		$bad->set_param( 'args', array( 'confirm' => 'nope' ) );
+		$bad->set_param( 'step_code', $code );
+		$this->assertSame( 422, rest_get_server()->dispatch( $bad )->get_status() );
+
+		$this->assertSame( 202, $this->route_with_code( $r, $code )->get_status() );
+		$this->assertTrue( Jobs::acting( $r->id() ) );
+		\BeltoftServices\Progress::clear( Resource::find( $r->id() ) );
+		Resource::find( $r->id() )->set( array( 'db_reset_request' => null ) );
+		$this->assertSame( 403, $this->route_with_code( $r, $code )->get_status(), 'The same code works once.' );
+	}
+
+	public function test_showing_the_database_password_needs_no_new_code(): void {
+		$this->assertNotContains( 'db_reveal', \BeltoftServices\Proxmox\Pve\ResetStepUp::ACTIONS );
+		$this->assertSame( '', apply_filters( 'beltoft_services_action_step_up', '', $this->running_db(), 'db_set_policy' ) );
 	}
 
 	public function test_a_new_password_the_memory_policy_and_the_access_list_wait_for_a_start(): void {

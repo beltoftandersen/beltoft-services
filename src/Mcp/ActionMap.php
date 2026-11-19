@@ -40,7 +40,6 @@ final class ActionMap {
 		'app_retry'          => 'retry_app_install',
 		'private_attach'     => 'private_network',
 		'private_detach'     => 'private_network',
-		'db_reset_password'  => 'reset_database_password',
 		'set_nameservers'    => 'domain_settings',
 		'lock'               => 'domain_settings',
 		'check_delegation'   => 'domain_settings',
@@ -50,7 +49,6 @@ final class ActionMap {
 		'reinstall'          => 'reinstall_server',
 		'replace_ssh_key'    => 'replace_ssh_key',
 		'fw_reset'           => 'reset_firewall',
-		'reset_password'     => 'reset_server_password',
 		'db_set_policy'      => 'set_database_eviction_policy',
 		'ssl_resend_email'   => 'ssl_resend_email',
 	);
@@ -69,6 +67,8 @@ final class ActionMap {
 		'storage_snapshot_delete' => 'never: a snapshot can be the last copy after a mistake or an attack; deleting one is only done in the dashboard',
 		'storage_snapshot_plan' => 'never: backup storage is changed in the dashboard only in this version (no tool, no API token)',
 		'storage_access'    => 'never: switching access of backup storage is only done in the dashboard',
+		'reset_password'    => 'never: a new server password needs the code emailed to the account address, so it is only available in the dashboard',
+		'db_reset_password' => 'never: a new database password needs the code emailed to the account address, so it is only available in the dashboard',
 		'ssl_cancel'        => 'never: cancelling is irreversible and ends in a refund a person decides; it is only done in the dashboard',
 	);
 

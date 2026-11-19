@@ -212,8 +212,14 @@ final class HardeningTest extends McpTestCase {
 
 		$this->assertEqualsCanonicalizing( $full_only, Tokens::full_only_actions() );
 
-		foreach ( array( 'fw_reset', 'db_set_policy', 'reset_password', 'snapshot_delete', 'snapshot_rollback', 'restore', 'reinstall', 'replace_ssh_key' ) as $must ) {
+		foreach ( array( 'fw_reset', 'db_set_policy', 'snapshot_delete', 'snapshot_rollback', 'restore', 'reinstall', 'replace_ssh_key' ) as $must ) {
 			$this->assertContains( $must, $full_only, $must );
+		}
+
+		// The two password resets need the emailed code: dashboard only, for every token.
+		foreach ( array( 'reset_password', 'db_reset_password' ) as $dashboard ) {
+			$this->assertContains( $dashboard, Tokens::dashboard_only_actions(), $dashboard );
+			$full_only[] = $dashboard;
 		}
 
 		foreach ( $full_only as $action ) {

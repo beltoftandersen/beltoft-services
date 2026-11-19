@@ -343,7 +343,7 @@
 	}
 
 	// One request per click: a busy panel does not start another. field: the input a refusal is shown under.
-	function send( panel, action, args, button, dialog, info, field ) {
+	function send( panel, action, args, button, dialog, info, field, code ) {
 		var handle;
 
 		if ( panel.beltoftPending || bs.locked( scopeOf( panel ) ) ) {
@@ -353,7 +353,14 @@
 		panel.beltoftPending = true;
 		handle = bs.busy( info && info.start ? info.start : vm.strings.working, scopeOf( panel ), button || null );
 
-		post( panel, 'actions/' + encodeURIComponent( action ), { args: args } ).then( function ( response ) {
+		var body = { args: args };
+
+		// The emailed code of a password reset (see askReset); the server checks it and uses it up when the job is queued.
+		if ( code ) {
+			body.step_code = code;
+		}
+
+		post( panel, 'actions/' + encodeURIComponent( action ), body ).then( function ( response ) {
 			// An action that needs a purchase first (a reinstall to a paid app) answers with the checkout address.
 			if ( 200 === response.status ) {
 				if ( response.data.redirect ) {
@@ -564,9 +571,16 @@
 		}
 
 		bs.confirm( { title: s.resetTitle, confirm: s.resetYes, text: s.resetText, danger: true } ).then( function ( yes ) {
-			if ( yes ) {
-				send( panel, 'reset_password', {}, null, null, describe( 'reset_password', '' ) );
+			if ( ! yes ) {
+				return null;
 			}
+
+			// A new password needs the code we email the customer, as showing a mailbox password does.
+			return window.beltoftApi.stepUp( 'password_reset', { holder: account } ).then( function ( code ) {
+				if ( code ) {
+					send( panel, 'reset_password', {}, null, null, describe( 'reset_password', '' ), null, code );
+				}
+			} );
 		} );
 	}
 

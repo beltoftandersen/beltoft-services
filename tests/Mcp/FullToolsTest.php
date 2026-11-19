@@ -162,8 +162,8 @@ final class FullToolsTest extends McpTestCase {
 		$this->assertSame( 'replace_ssh_key', $this->driver->calls( 'act' )[0]['args'][0] );
 	}
 
-	public function test_reset_the_firewall_and_the_server_password_return_nothing_secret(): void {
-		$r     = $this->offering( array( 'fw_reset', 'reset_password' ) );
+	public function test_reset_the_firewall_returns_nothing_secret(): void {
+		$r     = $this->offering( array( 'fw_reset' ) );
 		$token = $this->oauth( $this->owner( $r ), Tokens::FULL );
 
 		list( $sum, $done ) = $this->confirmed( 'reset_firewall', array( 'id' => $r->id() ), $token );
@@ -171,13 +171,7 @@ final class FullToolsTest extends McpTestCase {
 		$this->assertTrue( $this->json( $done )['requested'] );
 
 		$this->run_jobs();
-		list( $sum, $done ) = $this->confirmed( 'reset_server_password', array( 'id' => $r->id() ), $token );
-		$this->assertStringContainsString( 'old password stops working at once', $sum['summary'] );
-		$out = $this->json( $done );
-		$this->assertTrue( $out['requested'] );
-		$this->assertStringContainsString( 'not shown here', $out['message'] );
-		$this->run_jobs();
-		$this->assertSame( array( 'fw_reset', 'reset_password' ), array_map( static fn( $c ) => $c['args'][0], $this->driver->calls( 'act' ) ) );
+		$this->assertSame( array( 'fw_reset' ), array_map( static fn( $c ) => $c['args'][0], $this->driver->calls( 'act' ) ) );
 	}
 
 	public function test_the_memory_full_policy_of_a_valkey_database(): void {
@@ -348,7 +342,7 @@ final class FullToolsTest extends McpTestCase {
 	}
 
 	public function test_a_summary_never_holds_a_password_a_link_with_a_nonce_or_a_dash(): void {
-		$r     = $this->offering( array( 'snapshot_delete', 'snapshot_rollback', 'restore', 'reinstall', 'replace_ssh_key', 'fw_reset', 'reset_password' ) );
+		$r     = $this->offering( array( 'snapshot_delete', 'snapshot_rollback', 'restore', 'reinstall', 'replace_ssh_key', 'fw_reset' ) );
 		$token = $this->oauth( $this->owner( $r ), Tokens::FULL );
 		$texts = array();
 
@@ -358,7 +352,6 @@ final class FullToolsTest extends McpTestCase {
 			array( 'restore_backup', array( 'id' => $r->id(), 'backup' => 'backup:backup/vm/100/x' ) ),
 			array( 'reinstall_server', array( 'id' => $r->id() ) ),
 			array( 'reset_firewall', array( 'id' => $r->id() ) ),
-			array( 'reset_server_password', array( 'id' => $r->id() ) ),
 		) as $call ) {
 			$texts[] = $this->text( $this->tool( $call[0], $call[1], $token ) );
 		}

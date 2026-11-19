@@ -18,7 +18,6 @@ use BeltoftServices\Apps\AppReinstallPaid;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Db\DbAccess;
-use BeltoftServices\Proxmox\Db\DbActions;
 use BeltoftServices\Proxmox\Db\DbPolicy;
 use BeltoftServices\Proxmox\Network\Firewall;
 use BeltoftServices\Proxmox\Snapshot\Snapshots;
@@ -54,13 +53,6 @@ final class ServerActions {
 			case 'restore_backup':
 				return self::summary_restore( $r, (string) $args['backup'], $label );
 
-			case 'reset_database_password':
-				return self::checked( $r, $action, array(), sprintf(
-					/* translators: %s: database name. */
-					__( 'Make a new password for database %s. The old password stops working at once, so every application that connects with it must be changed. The new password is not shown here: it can be shown once afterwards, with the customer\'s yes again.', 'beltoft-services' ),
-					$label
-				) );
-
 			case 'reinstall_server':
 				return self::summary_reinstall( $r, $args, $label );
 
@@ -71,13 +63,6 @@ final class ServerActions {
 				return self::checked( $r, $action, array(), sprintf(
 					/* translators: %s: server name. */
 					__( 'Start the firewall of server %s again from its default rules. The rules the customer has set are removed. Anything the default rules do not allow is blocked, and the change runs in the background.', 'beltoft-services' ),
-					$label
-				) );
-
-			case 'reset_server_password':
-				return self::checked( $r, $action, array(), sprintf(
-					/* translators: %s: server name. */
-					__( 'Make a new password for server %s. The old password stops working at once, so anything that logs in with it must be changed. The new password is not shown here: it can be shown once afterwards, with the customer\'s yes again. A password can be reset three times an hour.', 'beltoft-services' ),
 					$label
 				) );
 
@@ -120,16 +105,6 @@ final class ServerActions {
 
 			case 'reset_firewall':
 				return self::send( $args, 'fw_reset', array(), 'firewall reset requested' );
-
-			case 'reset_server_password':
-				$done = Tools::action( (int) $args['id'], 'reset_password', array(), 'server password reset requested', true );
-
-				return $done instanceof \WP_Error ? $done : array( 'requested' => true, 'message' => 'Done. A new password is being made. It is not shown here. Once the server has it, reveal_server_password shows it once, after the customer\'s yes.' );
-
-			case 'reset_database_password':
-				$done = Tools::action( (int) $args['id'], DbActions::RESET, array( 'confirm' => DbActions::CONFIRM ), 'new database password requested', true );
-
-				return $done instanceof \WP_Error ? $done : array( 'requested' => true, 'message' => 'Done. A new password is being made. It is not shown here. Once the database has it, reveal_database_password shows it once, after the customer\'s yes.' );
 
 			case 'set_database_eviction_policy':
 				return self::send( $args, DbPolicy::ACTION, array( 'policy' => (string) $args['policy'] ), 'memory-full policy change requested' );
