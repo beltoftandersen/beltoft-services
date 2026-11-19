@@ -54,7 +54,8 @@ class PageAndUsageTest extends GiftCreditTestCase {
 		$this->assertStringContainsString( '15.00', $html, 'Paid credit.' );
 		$this->assertStringContainsString( '4.00', $html, 'Free credit.' );
 		$this->assertStringContainsString( 'name="bgca_amount"', $html, 'The top-up form of the add-on.' );
-		$this->assertStringNotContainsString( 'name="bgca_code"', $html, 'Codes are typed in the coupon field at checkout.' );
+		$this->assertStringContainsString( 'name="bgca_code"', $html, 'One field for gift card and campaign codes (owner 2026-11-19).' );
+		$this->assertStringContainsString( \Bgca\Attach::ACTION, $html );
 		$this->assertStringContainsString( TopUp::ACTION, $html );
 		$this->assertStringContainsString( Page::url(), $html );
 	}
