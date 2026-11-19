@@ -43,6 +43,7 @@ final class ActionMap {
 		'set_nameservers'    => 'domain_settings',
 		'lock'               => 'domain_settings',
 		'check_delegation'   => 'domain_settings',
+		'whois_privacy'      => 'domain_settings',
 		'snapshot_delete'    => 'delete_snapshot',
 		'snapshot_rollback'  => 'rollback_snapshot',
 		'restore'            => 'restore_backup',
@@ -58,6 +59,10 @@ final class ActionMap {
 	 */
 	public const EXCLUDED = array(
 		'unlock'            => 'never: a domain transfer is only possible in the dashboard',
+		'dnssec_enable'     => 'never: DNSSEC changes the keys the registry holds and needs the code emailed to the account address, so it is only available in the dashboard',
+		'dnssec_disable'    => 'never: DNSSEC changes the keys the registry holds and needs the code emailed to the account address, so it is only available in the dashboard',
+		'dnssec_key_add'    => 'never: DNSSEC changes the keys the registry holds and needs the code emailed to the account address, so it is only available in the dashboard',
+		'dnssec_key_remove' => 'never: DNSSEC changes the keys the registry holds and needs the code emailed to the account address, so it is only available in the dashboard',
 		'set_records'       => 'route: DNS records have their own tools (dns_upsert_record, dns_delete_record)',
 		'fw_apply'          => 'route: the firewall has its own tool (set_firewall)',
 		'ssl_reissue'       => 'never: a reissue replaces the key and the certificate that works; it is done in the dashboard, where the key is taken once',
@@ -113,6 +118,7 @@ final class ActionMap {
 		'reveal_hosting_database_password' => 'never: showing the database password of a hosting account needs the code emailed to the account address, so it is only available in the dashboard',
 		'dedicated_rescue_password'  => 'never: the rescue password of a dedicated server needs the code emailed to the account address, so it is only available in the dashboard',
 		'hosting_scheduled_jobs'      => 'never: a scheduled job runs code on the hosting, so it is only set in the dashboard; hosting_info lists the jobs read only',
+		'domain_dnssec'               => 'never: DNSSEC changes the keys the registry holds and needs the code emailed to the account address, so it is only available in the dashboard',
 		'domain_transfer_code'        => 'never: the transfer code of a domain is only available in the dashboard, behind its password step',
 		'reset_mailbox_password'     => 'never: a new mailbox password needs the code emailed to the account address, so it is only available in the dashboard',
 		'reveal_mailbox_password'    => 'never: showing a mailbox password needs the code emailed to the account address, so it is only available in the dashboard',

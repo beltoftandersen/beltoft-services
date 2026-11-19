@@ -80,7 +80,7 @@ class DomainsAreaTest extends TestCase {
 		$this->assertSame( $area->url( $license ), $area->url( $license, 'bogus' ) );
 		$this->assertSame( home_url() . '?domains=add', $area->url_add() );
 		$this->assertSame( home_url() . '?domains', $area->url_list() );
-		$this->assertSame( array( 'dns', 'nameservers', 'transfer', 'danger' ), $area->tabs() );
+		$this->assertSame( array( 'dns', 'nameservers', 'security', 'transfer', 'danger' ), $area->tabs() );
 		add_filter( 'beltoft_services_domain_page_tabs', static fn( $tabs ) => array_merge( $tabs, array( 'extra' ) ) );
 		$this->assertContains( 'extra', $area->tabs() );
 		add_filter( 'beltoft_services_domains_slug', static fn() => 'names' );

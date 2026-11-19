@@ -419,6 +419,114 @@ final class Resource {
 	}
 
 	/**
+	 * Ids of the resources of the given kinds that match a search term, newest first. One query over the activation row
+	 * (its domain, live domain, the whole stored meta) and its license (key, email, user, order, subscription); a term
+	 * that is an IP address matches that address exactly in the meta (a longer address is not found by a shorter
+	 * one), a number also matches the activation id, license id, order, subscription and VM id, and vm-<hex> finds the
+	 * uuid it was made from. Users found elsewhere (login, name) come in as $user_ids and match through the license.
+	 *
+	 * @param string   $term            Search term (trimmed here; empty finds nothing).
+	 * @param string[] $kinds           Activation kinds to look in.
+	 * @param bool     $include_deleted Also closed (deactivated) resources.
+	 * @param int[]    $user_ids        Users whose licenses match too.
+	 * @param int[]    $resource_ids    Resources found by other means (the address tables) that match too.
+	 * @return int[]
+	 */
+	public static function search_ids( string $term, array $kinds, bool $include_deleted = false, array $user_ids = array(), array $resource_ids = array() ): array {
+		global $wpdb;
+
+		$term  = trim( $term );
+		$kinds = array_values( array_filter( array_map( 'strval', $kinds ), 'strlen' ) );
+
+		if ( '' === $term || ! $kinds ) {
+			return array();
+		}
+
+		$like   = static fn( string $v ): string => '%' . $wpdb->esc_like( $v ) . '%';
+		$conds  = array();
+		$args   = array();
+		$ip     = false !== filter_var( $term, FILTER_VALIDATE_IP ) ? $term : '';
+		$packed = '' !== $ip ? inet_pton( $ip ) : false;
+		$digits = ctype_digit( $term ) && strlen( $term ) <= 12;
+
+		if ( '' !== $ip ) {
+			$forms = array_unique( array_filter( array( $ip, false !== $packed ? (string) inet_ntop( $packed ) : '' ) ) );
+
+			foreach ( $forms as $form ) {
+				$conds[] = '( a.meta LIKE %s OR a.meta LIKE %s )';
+				$args[]  = $like( '"' . $form . '"' );
+				$args[]  = $like( '"' . $form . '/' );
+			}
+
+			$conds[] = 'a.domain = %s';
+			$args[]  = $ip;
+		} else {
+			$encoded = trim( (string) wp_json_encode( $term ), '"' );
+
+			// A number is an id, not a piece of text: it would match half of the meta (addresses, sizes).
+			foreach ( $digits ? array() : array_unique( array( $term, $encoded ) ) as $form ) {
+				$conds[] = 'a.meta LIKE %s';
+				$args[]  = $like( $form );
+			}
+
+			foreach ( array( 'a.domain', 'a.live_domain', 'l.email', 'l.license_key' ) as $column ) {
+				$conds[] = $column . ' LIKE %s';
+				$args[]  = $like( $term );
+			}
+
+			if ( preg_match( '/^vm-([0-9a-f]{4,})$/iD', $term, $m ) ) {
+				$conds[] = 'a.meta LIKE %s';
+				$args[]  = $like( '"uuid":"' . strtolower( $m[1] ) );
+			}
+		}
+
+		if ( $digits ) {
+			$n = (int) $term;
+
+			foreach ( array( 'a.id', 'a.license_id', 'l.order_id', 'l.subscription_id', 'l.user_id' ) as $column ) {
+				$conds[] = $column . ' = %d';
+				$args[]  = $n;
+			}
+
+			$conds[] = 'a.meta REGEXP %s';
+			$args[]  = '"vmid":"?' . $n . '"?[,}]';
+		}
+
+		$user_ids = array_values( array_unique( array_filter( array_map( 'intval', $user_ids ), static fn( $id ) => $id > 0 ) ) );
+
+		if ( $user_ids ) {
+			$conds[] = 'l.user_id IN ( ' . implode( ', ', array_fill( 0, count( $user_ids ), '%d' ) ) . ' )';
+			$args    = array_merge( $args, $user_ids );
+		}
+
+		$resource_ids = array_values( array_unique( array_filter( array_map( 'intval', $resource_ids ), static fn( $id ) => $id > 0 ) ) );
+
+		if ( $resource_ids ) {
+			$conds[] = 'a.id IN ( ' . implode( ', ', array_fill( 0, count( $resource_ids ), '%d' ) ) . ' )';
+			$args    = array_merge( $args, $resource_ids );
+		}
+
+		$sql  = 'SELECT a.id FROM %i a LEFT JOIN %i l ON l.id = a.license_id WHERE a.kind IN ( ' . implode( ', ', array_fill( 0, count( $kinds ), '%s' ) ) . " ) AND a.kind <> 'site'";
+		$sql .= $include_deleted ? '' : ' AND a.deactivated_at IS NULL';
+		$sql .= ' AND ( ' . implode( ' OR ', $conds ) . ' ) ORDER BY a.id DESC';
+
+		$tables = Install::tables();
+		$args   = array_merge( array( $tables['activations'], $tables['licenses'] ), $kinds, $args );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- the licenses tables, always fresh; fixed fragments, every value a placeholder.
+		$rows = $wpdb->get_col( $wpdb->prepare( $sql, $args ) );
+
+		return array_map( 'intval', (array) $rows );
+	}
+
+	/**
+	 * When the resource was closed (its activation ended), as stored (UTC), or empty while it is live.
+	 */
+	public function ended_at(): string {
+		return (string) ( $this->row['deactivated_at'] ?? '' );
+	}
+
+	/**
 	 * The fragments that mark a resource as ended by its own state, for ids_with_meta_value( ..., $any_of ).
 	 *
 	 * @return string[]

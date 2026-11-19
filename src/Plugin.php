@@ -143,6 +143,7 @@ final class Plugin {
 		Domains\TldRules::register();
 		Domains\DkAgreement::register();
 		Domains\OrderDomain::register();
+		Domains\OrderWhois::register();
 		Domains\Meta::register();
 		Domains\Renewals::register();
 		Domains\Actions::register();

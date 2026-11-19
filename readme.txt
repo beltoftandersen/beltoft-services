@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.47.0
+Stable tag: 0.47.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,11 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.47.1 =
+* Domains: a customer can switch DNSSEC on or off for a domain on our name servers and add or remove external DNSSEC keys (needs the emailed code, purpose domain_dnssec; our own cap of 8 keys applies when the registrar maximum is 0).
+* Domains: WHOIS privacy is free, ticked by default at checkout where the TLD allows it, and can be switched on the domain page. The TLD facts (DNSSEC and WHOIS privacy support) come from the registrar's TLD list.
+* Admin: WooCommerce > Services search finds a service by IP (also the IP pool and the holding log), name, customer, domain or number, with an option to include deleted services.
 
 = 0.47.0 =
 * IPv6 for new servers when the cluster has an IPv6 prefix (off by default). A cluster gets two fields, the /64 and the gateway; each new server gets one address in it, made from its VMID (nothing is allocated, a reinstall or a restore keeps it). Existing servers and databases are never given an address.

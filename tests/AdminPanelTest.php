@@ -602,6 +602,8 @@ final class AdminPanelTest extends TestCase {
 				'driver' => 'other',
 				'state'  => '',
 				'failed' => true,
+				's'       => '',
+				'deleted' => false,
 			),
 			Screen::filters()
 		);

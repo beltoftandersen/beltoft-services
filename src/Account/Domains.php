@@ -34,7 +34,7 @@ final class Domains extends ServiceArea {
 	/**
 	 * The tabs of a domain page after the overview, by address part.
 	 */
-	public const TABS = array( 'dns', 'nameservers', 'transfer', 'danger' );
+	public const TABS = array( 'dns', 'nameservers', 'security', 'transfer', 'danger' );
 
 	/**
 	 * The value after the endpoint that is the add page.

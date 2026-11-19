@@ -35,7 +35,7 @@
     "scripts|list": "beltoft-services-domain",
     "scripts|page": "beltoft-services-dns-editor,beltoft-services-domain",
     "slug|filter": "names",
-    "tabs": "[\"dns\",\"nameservers\",\"transfer\",\"danger\"]",
+    "tabs": "[\"dns\",\"nameservers\",\"security\",\"transfer\",\"danger\"]",
     "type_of|dns": "domains",
     "type_of|reg": "domains",
     "url_add": "{home}?domains=add",

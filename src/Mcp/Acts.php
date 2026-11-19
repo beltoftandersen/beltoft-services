@@ -189,7 +189,7 @@ final class Acts {
 	}
 
 	/**
-	 * A setting of a domain: name servers, transfer lock, a check of the name servers. Never the unlock.
+	 * A setting of a domain: name servers, transfer lock, a check of the name servers, WHOIS privacy. Never the unlock, never DNSSEC (it needs the emailed code).
 	 *
 	 * @param array<string, mixed> $args Arguments.
 	 * @return array<string, mixed>|\WP_Error
@@ -204,6 +204,14 @@ final class Acts {
 			if ( isset( $args['hosts'] ) ) {
 				$send['hosts'] = implode( ',', array_map( 'strval', (array) $args['hosts'] ) );
 			}
+		}
+
+		if ( 'whois_privacy' === $action ) {
+			if ( ! isset( $args['enabled'] ) || ! is_bool( $args['enabled'] ) ) {
+				return new \WP_Error( 'beltoft_services_tool', __( 'Say whether WHOIS privacy should be on (enabled true) or off (enabled false).', 'beltoft-services' ) );
+			}
+
+			$send['enabled'] = $args['enabled'] ? '1' : '0';
 		}
 
 		return Tools::action( (int) $args['id'], $action, $send, str_replace( '_', ' ', $action ) . ' requested' );

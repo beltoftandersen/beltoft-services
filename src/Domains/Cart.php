@@ -129,7 +129,7 @@ final class Cart {
 			'methods' => \WP_REST_Server::CREATABLE,
 			'callback' => array( __CLASS__, 'rest_add' ),
 			'permission_callback' => '__return_true',
-			'args' => array( 'domain' => array( 'type' => 'string', 'required' => true ), 'mode' => array( 'type' => 'string', 'required' => true ), 'auth_code' => array( 'type' => 'string' ), 'dns' => array( 'type' => 'string' ), 'mail_for' => array( 'type' => 'integer' ) ),
+			'args' => array( 'domain' => array( 'type' => 'string', 'required' => true ), 'mode' => array( 'type' => 'string', 'required' => true ), 'auth_code' => array( 'type' => 'string' ), 'dns' => array( 'type' => 'string' ), 'mail_for' => array( 'type' => 'integer' ), 'whois_privacy' => array( 'type' => 'boolean' ) ),
 		) );
 	}
 
@@ -140,7 +140,7 @@ final class Cart {
 		if ( \BeltoftServices\RateLimit::exceeded( \BeltoftServices\RateLimit::visitor(), 'domain-cart', (int) apply_filters( 'beltoft_services_domain_cart_limit', 20 ) ) ) {
 			return new \WP_Error( 'rate_limited', __( 'Too many requests. Please wait a minute.', 'beltoft-services' ), array( 'status' => 429 ) );
 		}
-		$result = self::add_line( (string) $request['domain'], (string) $request['mode'], (string) ( $request['auth_code'] ?? '' ), (string) ( $request['dns'] ?? '' ), (int) ( $request['mail_for'] ?? 0 ) );
+		$result = self::add_line( (string) $request['domain'], (string) $request['mode'], (string) ( $request['auth_code'] ?? '' ), (string) ( $request['dns'] ?? '' ), (int) ( $request['mail_for'] ?? 0 ), null === $request->get_param( 'whois_privacy' ) ? true : rest_sanitize_boolean( $request->get_param( 'whois_privacy' ) ) );
 		if ( is_wp_error( $result ) ) { return $result; }
 		return new \WP_REST_Response( $result, ! empty( $result['added'] ) ? 201 : 200 );
 	}
@@ -151,7 +151,7 @@ final class Cart {
 	 *
 	 * @return array{added: bool, already_in_cart?: bool, checkout_url: string}|\WP_Error
 	 */
-	public static function add_line( string $domain, string $mode, string $auth_code = '', string $dns = '', int $mail_for = 0 ): array|\WP_Error {
+	public static function add_line( string $domain, string $mode, string $auth_code = '', string $dns = '', int $mail_for = 0, bool $whois = true ): array|\WP_Error {
 		// A locked domain cannot be transferred: asked again now (a few seconds at most); the cached answer stands in when that fails.
 		if ( 'transfer' === $mode ) {
 			$name = Search::normalise( $domain );
@@ -159,7 +159,7 @@ final class Cart {
 			$known = TransferDns::fresh_registrar( $name );
 			if ( ! empty( $known['locked'] ) ) { return new \WP_Error( 'domain_locked', TransferDns::locked_message( $domain ), array( 'status' => 422 ) ); }
 		}
-		$data = self::line_data( $domain, $mode, $auth_code, $dns, $mail_for );
+		$data = self::line_data( $domain, $mode, $auth_code, $dns, $mail_for, $whois );
 		if ( is_wp_error( $data ) ) { return $data; }
 		// WooCommerce leaves its cart unloaded on custom REST routes.
 		if ( ! WC()->cart && function_exists( 'wc_load_cart' ) ) { wc_load_cart(); }
@@ -216,7 +216,7 @@ final class Cart {
 		return array( 'added' => true, 'checkout_url' => wc_get_checkout_url() );
 	}
 
-	public static function line_data( string $domain, string $mode, string $auth_code = '', string $dns = '', int $mail_for = 0 ): array|\WP_Error {
+	public static function line_data( string $domain, string $mode, string $auth_code = '', string $dns = '', int $mail_for = 0, bool $whois = true ): array|\WP_Error {
 		$domain = Search::normalise( $domain );
 		if ( is_wp_error( $domain ) ) { return $domain; }
 		if ( ! in_array( $mode, array( 'register', 'transfer', 'dns' ), true ) ) { return new \WP_Error( 'bad_mode', __( 'Choose registration, transfer or DNS hosting.', 'beltoft-services' ) ); }
@@ -235,6 +235,8 @@ final class Cart {
 		// The line carries the currency its price is worked out in, so a cart that is re-priced to another currency cannot keep it.
 		$data = array( 'beltoft_services_domain' => array( 'domain' => $domain, 'mode' => $mode ), Currency::CART_KEY => Currency::current() );
 		if ( 'transfer' === $mode && '' !== $dns ) { $data['beltoft_services_domain']['dns'] = $dns; }
+		// WHOIS privacy is free and on unless the customer says no, for an extension that allows it (tldTld.is_private_whois_allowed); no other extension carries the key.
+		if ( in_array( $mode, array( 'register', 'transfer' ), true ) && WhoisPrivacy::order_allowed( $domain ) ) { $data['beltoft_services_domain'][ WhoisPrivacy::LINE_KEY ] = $whois; }
 		// Free now, or not: the line keeps what was promised when it was added, and apply_prices() drops it if the rule stops holding.
 		if ( 'transfer' === $mode && Prices::free_transfer( $domain ) ) { $data['beltoft_services_domain']['free_transfer'] = true; }
 		if ( 'transfer' === $mode ) {

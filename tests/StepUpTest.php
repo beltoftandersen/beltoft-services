@@ -250,9 +250,11 @@ final class StepUpTest extends TestCase {
 	public function test_purposes_are_the_three_registered_ones_and_a_third_can_be_added(): void {
 		// The core three are always there; the hosting files purpose joins once the hosting area has registered its filter.
 		$this->assertEmpty( array_diff( array( 'api_token', 'transfer_code', 'oauth_full' ), StepUp::purposes() ) );
-		$this->assertEmpty( array_diff( StepUp::purposes(), array( 'api_token', 'transfer_code', 'oauth_full', 'hosting_files', 'hosting_database', 'mail_password', 'ssl_key', 'storage_password', 'storage_restore', 'manual_password', 'dedicated_power', 'dedicated_firewall', 'dedicated_reinstall', 'dedicated_rescue', 'password_reset' ) ) );
+		$this->assertEmpty( array_diff( StepUp::purposes(), array( 'api_token', 'transfer_code', 'oauth_full', 'hosting_files', 'hosting_database', 'mail_password', 'ssl_key', 'storage_password', 'storage_restore', 'manual_password', 'dedicated_power', 'dedicated_firewall', 'dedicated_reinstall', 'dedicated_rescue', 'password_reset', 'domain_dnssec' ) ) );
 		$this->assertSame( 'api_token', ApiTokens::PURPOSE );
 		$this->assertSame( 'transfer_code', AuthCodeRoute::PURPOSE );
+		$this->assertContains( 'domain_dnssec', StepUp::purposes() );
+		$this->assertSame( 'domain_dnssec', \BeltoftServices\Domains\Dnssec::PURPOSE );
 
 		$user = $this->customer();
 		$this->assertWPError( StepUp::send( $user, 'third' ), 'Unknown until registered.' );

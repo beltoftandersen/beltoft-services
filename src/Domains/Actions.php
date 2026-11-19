@@ -13,6 +13,7 @@ final class Actions {
 	public static function register(): void {
 		add_filter( 'beltoft_services_action_refusal', array( __CLASS__, 'refusal' ), 10, 4 );
 		add_filter( 'beltoft_services_action_resumable', array( __CLASS__, 'resumable' ), 10, 3 );
+		Dnssec::register();
 	}
 
 	/**
@@ -34,7 +35,7 @@ final class Actions {
 			'set_nameservers' => __( 'Change name servers', 'beltoft-services' ),
 			'lock' => __( 'Lock transfer', 'beltoft-services' ),
 			'unlock' => __( 'Unlock transfer', 'beltoft-services' ),
-		);
+		) + Dnssec::offered( $r ) + WhoisPrivacy::offered( $r );
 	}
 
 	public static function refusal( $refusal, $r, $action, $args ) {
@@ -44,6 +45,8 @@ final class Actions {
 	}
 
 	private static function validate( Resource $r, string $action, array $args ): bool|\WP_Error {
+		if ( in_array( $action, Dnssec::ACTIONS, true ) ) { return Dnssec::validate( $r, $action, $args ); }
+		if ( WhoisPrivacy::ACTION === $action ) { return isset( self::offered( $r )[ $action ] ) ? WhoisPrivacy::validate( $r, $args ) : new \WP_Error( 'unavailable', __( 'This action is unavailable.', 'beltoft-services' ) ); }
 		if ( 'set_records' === $action && $r->get( 'dns_external' ) ) { return new \WP_Error( 'dns_external', __( 'This domain\'s DNS is hosted elsewhere.', 'beltoft-services' ) ); }
 		if ( 'set_records' === $action && $r->get( 'records_off' ) ) { return new \WP_Error( 'paused', __( 'DNS hosting is paused.', 'beltoft-services' ) ); }
 		if ( ! isset( self::offered( $r )[ $action ] ) ) { return new \WP_Error( 'unavailable', __( 'This action is unavailable.', 'beltoft-services' ) ); }
@@ -82,6 +85,8 @@ final class Actions {
 	public static function run( Resource $r, string $action, array $args ): StepResult {
 		if ( 'adopt_switch' === $action ) { return DnsAdopt::run_switch( $r ); }
 		if ( 'dns_import' === $action ) { return RecordImport::run_job( $r ); }
+		if ( in_array( $action, Dnssec::ACTIONS, true ) ) { return Dnssec::run( $r, $action, $args ); }
+		if ( WhoisPrivacy::ACTION === $action ) { return WhoisPrivacy::run( $r, $args ); }
 		$valid = self::validate( $r, $action, $args );
 		if ( is_wp_error( $valid ) ) { return StepResult::fail( $valid->get_error_message() ); }
 		$name = (string) $r->get( 'domain' );

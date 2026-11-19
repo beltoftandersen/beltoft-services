@@ -1403,3 +1403,11 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit
 /* Wide screen: a line that shows while its place at the top is scrolled away sticks under the fixed site header (status.js sets left and width and keeps the room of the state line). */
 .bs-loader.is-stuck { position: fixed; z-index: 100000; top: var(--bs-header-offset, 0px); box-sizing: border-box; min-width: 0; max-width: none; padding: var(--bs-space-2) var(--bs-space-3); overflow: hidden; border: 1px solid var(--bs-line); border-radius: var(--bs-radius); background: var(--bs-warm); box-shadow: 0 6px 24px color-mix(in srgb, var(--bs-dark) 16%, transparent); }
 .bs-loader.is-stuck .bs-loader__bar { bottom: 0; border-radius: 0; }
+
+/* Security tab of a domain: DNSSEC keys and the WHOIS privacy switch. */
+div.beltoft-services-domain ul.beltoft-services-domain__keys { display: grid; gap: 8px; margin: 0 0 16px; padding: 0; list-style: none; }
+div.beltoft-services-domain ul.beltoft-services-domain__keys li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; }
+div.beltoft-services-domain code.beltoft-services-domain__keytext { flex: 1 1 100%; overflow-wrap: anywhere; font-size: var(--bs-fs-small); }
+div.beltoft-services-domain form.beltoft-services-domain__keyform { display: grid; gap: 12px; max-width: 480px; margin: 0 0 8px; }
+div.beltoft-services-domain form.beltoft-services-domain__keyform label { display: grid; gap: 4px; }
+div.beltoft-services-domain__dnssec, div.beltoft-services-domain__whois { margin: 0 0 24px; }

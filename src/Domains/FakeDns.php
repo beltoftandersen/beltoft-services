@@ -70,4 +70,13 @@ class FakeDns implements Dns {
 		$this->save();
 		return array( array( 'flags' => 257, 'protocol' => 3, 'alg' => 13, 'pub_key' => 'FAKE-DNSKEY' ) );
 	}
+	public function unsecure( string $zone ): bool|\WP_Error {
+		$this->load();
+		$zone = strtolower( rtrim( $zone, '.' ) );
+		$this->calls[] = array( 'unsecure', $zone );
+		if ( ! isset( $this->zones[ $zone ] ) ) { return new \WP_Error( 'zone_missing', 'Zone does not exist.' ); }
+		$this->zones[ $zone ]['secured'] = false;
+		$this->save();
+		return true;
+	}
 }

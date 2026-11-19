@@ -87,4 +87,23 @@ class LiveDns implements Dns {
 		}
 		return array( array( 'flags' => (int) $parts[0], 'protocol' => (int) $parts[1], 'alg' => (int) $parts[2], 'pub_key' => $parts[3] ) );
 	}
+
+	/**
+	 * Stops signing: PowerDNS zone property dnssec false (the counterpart of secure()). The answer is not trusted: the zone's crypto keys
+	 * are read afterwards and any active key is an error, so a PowerDNS that only flipped the flag never reads as unsigned.
+	 */
+	public function unsecure( string $zone ): bool|\WP_Error {
+		$current = $this->call( 'GET', $this->path( $zone ) );
+		if ( is_wp_error( $current ) ) { return $current; }
+		if ( ! empty( $current['dnssec'] ) ) {
+			$off = $this->call( 'PUT', $this->path( $zone ), array( 'dnssec' => false ) );
+			if ( is_wp_error( $off ) ) { return $off; }
+		}
+		$keys = $this->call( 'GET', $this->path( $zone ) . '/cryptokeys' );
+		if ( is_wp_error( $keys ) ) { return $keys; }
+		foreach ( $keys as $key ) {
+			if ( is_array( $key ) && ! empty( $key['active'] ) ) { return new \WP_Error( 'still_signed', 'DNS still has an active signing key.' ); }
+		}
+		return true;
+	}
 }
