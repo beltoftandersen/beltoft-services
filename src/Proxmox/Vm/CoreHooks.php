@@ -204,6 +204,9 @@ final class CoreHooks {
 		if ( ! isset( $drivers[ 'proxmox-snapshots' ] ) ) {
 			$drivers[ 'proxmox-snapshots' ] = new SnapshotDriver();
 		}
+		if ( ! isset( $drivers[ \BeltoftServices\Proxmox\Managed\ManagedDriver::ID ] ) ) {
+			$drivers[ \BeltoftServices\Proxmox\Managed\ManagedDriver::ID ] = new \BeltoftServices\Proxmox\Managed\ManagedDriver();
+		}
 		if ( ! isset( $drivers[ 'proxmox-app' ] ) ) {
 			$drivers[ 'proxmox-app' ] = new AppLicenceDriver();
 		}

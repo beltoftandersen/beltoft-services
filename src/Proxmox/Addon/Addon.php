@@ -9,6 +9,8 @@ use BeltoftServices\Proxmox\Disk\DiskDriver;
 use BeltoftServices\Proxmox\Disk\DiskMeta;
 use BeltoftServices\Apps\AppLicence;
 use BeltoftServices\Apps\AppLicenceKeep;
+use BeltoftServices\Proxmox\Managed\ManagedDriver;
+use BeltoftServices\Proxmox\Managed\ManagedMeta;
 use BeltoftServices\Proxmox\Snapshot\SnapshotMeta;
 use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
 
@@ -78,6 +80,7 @@ final class Addon {
 			new self( DiskDriver::ID, 'disk', 'disk', '_disk_', 'beltoft-services-disk', true, false, 'ASC', 'Parent server deleted; extra disk no longer available', DiskMeta::after_parent_deleted( ... ), false ),
 			new self( SnapshotDriver::ID, 'snapshot', 'snapshot', '_snapshots_', 'beltoft-services-snapshots', false, true, 'ASC', 'Parent server deleted; snapshot slots no longer available', SnapshotMeta::after_parent_deleted( ... ) ),
 			new self( AppLicenceDriver::ID, 'applic', 'applic', '_applic_', AppLicenceCart::NONCE, true, false, 'DESC', 'Parent server deleted; app licence no longer available', AppLicence::after_parent_deleted( ... ), true, AppLicenceKeep::for_deleted_server( ... ) ),
+			new self( ManagedDriver::ID, 'managed', 'managed', '_managed_', 'beltoft-services-managed', false, true, 'ASC', 'Parent server deleted; managed server service no longer available', ManagedMeta::after_parent_deleted( ... ) ),
 		);
 	}
 

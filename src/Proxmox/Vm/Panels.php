@@ -279,6 +279,35 @@ final class Panels {
 	}
 
 	/**
+	 * What the Managed server block shows: whether the server is managed, or the link that adds the service (and its price).
+	 * Null when the site sells none and the server has none (an adopted server gets no block).
+	 *
+	 * @param Resource $r Resource.
+	 * @return array{active: bool, add_url: string, add_price: string}|null
+	 */
+	public static function managed_panel( Resource $r ): ?array {
+		if ( true === $r->get( 'linked' ) ) {
+			return null;
+		}
+
+		if ( \BeltoftServices\Proxmox\Managed\ManagedMeta::is_managed( $r ) ) {
+			return array( 'active' => true, 'add_url' => '', 'add_price' => '' );
+		}
+
+		$url = \BeltoftServices\Proxmox\Managed\ManagedCart::add_url( $r );
+
+		if ( '' === $url ) {
+			return null;
+		}
+
+		$product = \BeltoftServices\Proxmox\Managed\ManagedCart::product();
+		$price   = null === $product ? '' : (string) \BeltoftServices\Currency::with_resource( $r, static fn() => wp_strip_all_tags( wc_price( (float) wc_get_price_to_display( $product ) ) ), '' );
+
+		/* translators: %s: monthly price such as 299 kr. */
+		return array( 'active' => false, 'add_url' => $url, 'add_price' => '' === $price ? '' : sprintf( __( '%s / month', 'beltoft-services' ), $price ) );
+	}
+
+	/**
 	 * The account panel.
 	 *
 	 * @param Resource $r Resource.
@@ -302,6 +331,7 @@ final class Panels {
 			'ip'         => false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ? $ip : '',
 			'ip6'        => self::ip6( $r ),
 			'ipv4'       => self::ipv4_panel( $r ),
+			'managed'    => self::managed_panel( $r ),
 			'plan'       => array(
 				'cores'     => (int) ( $plan['cores'] ?? 0 ),
 				'memory_mb' => (int) ( $plan['memory_mb'] ?? 0 ),

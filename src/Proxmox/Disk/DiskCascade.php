@@ -213,6 +213,11 @@ final class DiskCascade {
 			return sprintf( $again ? __( 'Snapshot slots subscription #%d is active again with this server.', 'beltoft-services' ) : __( 'Snapshot slots subscription #%d ends with this server.', 'beltoft-services' ), $id );
 		}
 
+		if ( \BeltoftServices\Proxmox\Managed\ManagedDriver::ID === $driver ) {
+			/* translators: %d: add-on subscription number. */
+			return sprintf( $again ? __( 'Managed server subscription #%d is active again with this server.', 'beltoft-services' ) : __( 'Managed server subscription #%d ends with this server.', 'beltoft-services' ), $id );
+		}
+
 		if ( AppLicenceDriver::ID === $driver ) {
 			/* translators: %d: add-on subscription number. */
 			return sprintf( $again ? __( 'App licence subscription #%d is active again with this server.', 'beltoft-services' ) : __( 'App licence subscription #%d ends with this server.', 'beltoft-services' ), $id );

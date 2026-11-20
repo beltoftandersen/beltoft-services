@@ -290,13 +290,13 @@ final class Servers {
 
 		$driver = (string) $resource->get( 'driver' );
 
-		if ( DiskDriver::ID !== $driver && SnapshotDriver::ID !== $driver && \BeltoftServices\Apps\AppLicenceDriver::ID !== $driver ) {
+		if ( DiskDriver::ID !== $driver && SnapshotDriver::ID !== $driver && \BeltoftServices\Apps\AppLicenceDriver::ID !== $driver && \BeltoftServices\Proxmox\Managed\ManagedDriver::ID !== $driver ) {
 			return null;
 		}
 
 		return array(
 			'license_id' => max( 0, (int) $resource->get( 'server_license' ) ),
-			'tab'        => DiskDriver::ID === $driver ? 'disks' : ( SnapshotDriver::ID === $driver ? 'snapshots' : \BeltoftServices\Apps\AppTab::SLUG ),
+			'tab'        => DiskDriver::ID === $driver ? 'disks' : ( SnapshotDriver::ID === $driver ? 'snapshots' : ( \BeltoftServices\Proxmox\Managed\ManagedDriver::ID === $driver ? '' : \BeltoftServices\Apps\AppTab::SLUG ) ),
 			'resource'   => $resource,
 		);
 	}

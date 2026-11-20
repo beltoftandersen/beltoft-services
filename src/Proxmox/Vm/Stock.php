@@ -210,7 +210,7 @@ final class Stock {
 	private static function availability( \WC_Product $product ): bool {
 		$driver = Product::driver_for( $product->get_id() );
 
-		if ( $driver && in_array( $driver->id(), array( SnapshotDriver::ID, AppLicenceDriver::ID ), true ) ) {
+		if ( $driver && in_array( $driver->id(), array( SnapshotDriver::ID, AppLicenceDriver::ID, \BeltoftServices\Proxmox\Managed\ManagedDriver::ID ), true ) ) {
 			return true; // Slots and app licences need no address.
 		}
 

@@ -204,6 +204,28 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 		</dl>
 		<?php $beltoft_services_note(); ?>
 	<?php endif; ?>
+	<?php if ( ! empty( $managed ) && $forms ) : ?>
+		<div class="beltoft-services-vm__managed">
+			<h4><?php esc_html_e( 'Managed server', 'beltoft-services' ); ?></h4>
+			<?php if ( $managed['active'] ) : ?>
+				<p class="description"><?php esc_html_e( 'This server is managed: we keep it up to date, answer its alerts and check its backups. Help with your own software is billed per started 15 minutes.', 'beltoft-services' ); ?></p>
+			<?php else : ?>
+				<p class="description"><?php esc_html_e( 'We keep the server up to date, answer its alerts and check its backups. Help with your own software is billed per started 15 minutes.', 'beltoft-services' ); ?></p>
+				<p>
+					<a class="button woocommerce-button bs-btn" href="<?php echo esc_url( $managed['add_url'] ); ?>">
+						<?php
+						echo esc_html(
+							'' === $managed['add_price']
+								? __( 'Add managed server', 'beltoft-services' )
+								/* translators: %s: price such as 299 kr. / month */
+								: sprintf( __( 'Add managed server (%s)', 'beltoft-services' ), $managed['add_price'] )
+						);
+						?>
+					</a>
+				</p>
+			<?php endif; ?>
+		</div>
+	<?php endif; ?>
 	<?php if ( ! empty( $ipv4 ) && $forms ) : ?>
 		<div class="beltoft-services-vm__ipv4">
 			<h4><?php esc_html_e( 'IPv4 address', 'beltoft-services' ); ?></h4>

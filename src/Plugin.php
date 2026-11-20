@@ -253,6 +253,8 @@ final class Plugin {
 		Proxmox\Disk\DiskCart::register();
 		Proxmox\Snapshot\SnapshotMeta::register();
 		Proxmox\Snapshot\SnapshotCart::register();
+		Proxmox\Managed\ManagedMeta::register();
+		Proxmox\Managed\ManagedCart::register();
 		Proxmox\Disk\DiskField::register();
 		Proxmox\Vm\Actions::register();
 		Proxmox\Db\DbActions::register();

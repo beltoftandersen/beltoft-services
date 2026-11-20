@@ -115,9 +115,9 @@ final class EmailDetails {
 			return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Databases::class )->url( $license );
 		}
 
-		if ( DiskDriver::ID === $driver || SnapshotDriver::ID === $driver || AppLicenceDriver::ID === $driver ) {
+		if ( DiskDriver::ID === $driver || SnapshotDriver::ID === $driver || AppLicenceDriver::ID === $driver || \BeltoftServices\Proxmox\Managed\ManagedDriver::ID === $driver ) {
 			$server = Resource::for_license( (int) $r->get( 'server_license' ) );
-			$tab    = DiskDriver::ID === $driver ? 'disks' : ( SnapshotDriver::ID === $driver ? 'snapshots' : 'app' );
+			$tab    = DiskDriver::ID === $driver ? 'disks' : ( SnapshotDriver::ID === $driver ? 'snapshots' : ( \BeltoftServices\Proxmox\Managed\ManagedDriver::ID === $driver ? '' : 'app' ) );
 		} elseif ( ProxmoxDriver::ID === $driver && ! $gone ) {
 			$server = $r;
 			$tab    = isset( $data['snapshot_reason'] ) ? 'snapshots' : ( isset( $data['app_domain'] ) ? 'app' : '' );
@@ -205,6 +205,13 @@ final class EmailDetails {
 			}
 			/* translators: %d: days a snapshot is kept */
 			$details[ __( 'Kept', 'beltoft-services' ) ] = sprintf( _n( 'Snapshots are kept %d day.', 'Snapshots are kept %d days.', $days, 'beltoft-services' ), $days );
+			return $details;
+		}
+		if ( \BeltoftServices\Proxmox\Managed\ManagedDriver::ID === $r->get( 'driver' ) ) {
+			$server = \BeltoftServices\Proxmox\Managed\ManagedMeta::server_of( $r );
+			if ( $server ) {
+				$details[ __( 'Server', 'beltoft-services' ) ] = self::server_name( $server );
+			}
 			return $details;
 		}
 		if ( DbDriver::ID === $r->get( 'driver' ) ) {
