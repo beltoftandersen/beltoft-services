@@ -158,7 +158,7 @@ final class OrderHandoffTest extends TestCase {
 		$this->assertStringContainsString( 'data-next="' . esc_url( OrderHandoff::target( $order ) ) . '"', $html );
 		$this->assertStringContainsString( 'data-track=', $html );
 		$this->assertTrue( wp_script_is( 'beltoft-services-handoff', 'enqueued' ) );
-		$this->assertContains( 'bs-handoff', OrderHandoff::body_class( array() ) );
+		$this->assertContains( 'bs-handoff-on', OrderHandoff::body_class( array() ) );
 
 		wp_dequeue_script( 'beltoft-services-handoff' );
 		$_GET['key'] = 'wc_order_wrong';

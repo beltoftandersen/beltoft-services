@@ -37,7 +37,7 @@ final class OrderHandoff {
 	/**
 	 * Body class of an order received page that gets the hand-off, so the template can hide its normal content.
 	 */
-	public const BODY_CLASS = 'bs-handoff';
+	public const BODY_CLASS = 'bs-handoff-on';
 
 	/**
 	 * Hooks.
