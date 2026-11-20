@@ -167,7 +167,7 @@ final class OverviewOrderTest extends TestCase {
 		$first = $this->section();
 		$this->assertStringContainsString( 'Everything in your order is ready', $first );
 		$this->assertStringNotContainsString( 'data-order-closing hidden', $first );
-		$this->assertMatchesRegularExpression( '#bs-order__closing-list.*Open your server.*Open your server.*</ul>#s', $first, 'Each service has its open button under the line.' );
+		$this->assertMatchesRegularExpression( '#data-order-closing-list>\s*<li><a[^>]*>[^<]+</a></li>\s*<li><a[^>]*>[^<]+</a></li>\s*</ul>#', $first, 'Each service has its open button under the line.' );
 		$this->assertArrayHasKey( $order->get_id(), (array) get_user_meta( $this->user, OverviewOrder::SEEN, true ) );
 
 		$this->assertSame( '', $this->section(), 'The first load after it was seen leaves it out.' );

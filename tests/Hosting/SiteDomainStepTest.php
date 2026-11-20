@@ -82,6 +82,13 @@ final class SiteDomainStepTest extends HostingCase {
 		return array( Resource::find( $host->id() ), $domain );
 	}
 
+	/**
+	 * The first mail as one line of plain words (a plain-text mail wraps its lines).
+	 */
+	private function mail_text(): string {
+		return trim( (string) preg_replace( '/\s+/', ' ', wp_strip_all_tags( (string) $this->mails[0]['message'] ) ) );
+	}
+
 	private function ready( Resource $r ): void {
 		$r->set( array( 'state' => 'ready', 'desired' => 'ready' ) );
 		SiteNewDomain::on_state_changed( Resource::find( $r->id() ), 'provisioning', 'ready' );
@@ -195,9 +202,9 @@ final class SiteDomainStepTest extends HostingCase {
 		$this->ready( $domain );
 
 		$this->assertCount( 1, $this->mails );
-		$this->assertStringContainsString( 'now runs on fresh.example', wp_strip_all_tags( (string) $this->mails[0]['message'] ) );
-		$this->assertStringContainsString( 'login address is now on the domain', wp_strip_all_tags( (string) $this->mails[0]['message'] ) );
-		$this->assertStringContainsString( 'https certificate follows', wp_strip_all_tags( (string) $this->mails[0]['message'] ) );
+		$this->assertStringContainsString( 'now runs on fresh.example', $this->mail_text() );
+		$this->assertStringContainsString( 'login address is now on the domain', $this->mail_text() );
+		$this->assertStringContainsString( 'https certificate follows', $this->mail_text() );
 
 		$host = Resource::find( $host->id() );
 		SiteNewDomain::sweep( $host );
@@ -225,7 +232,7 @@ final class SiteDomainStepTest extends HostingCase {
 
 		$this->assertSame( 'expired', Resource::find( $host->id() )->get( SiteNewDomain::META_DONE ) );
 		$this->assertCount( 1, $this->mails );
-		$this->assertStringContainsString( 'was not ready within 7 days', wp_strip_all_tags( (string) $this->mails[0]['message'] ) );
+		$this->assertStringContainsString( 'was not ready within 7 days', $this->mail_text() );
 		$this->assertContains( SiteNewDomain::hint( Resource::find( $host->id() ) ), array_column( HostingView::notices( Resource::find( $host->id() ) ), 'text' ) );
 	}
 
