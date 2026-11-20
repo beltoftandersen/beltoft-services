@@ -64,6 +64,7 @@ final class HostingEmail {
 			'domains'      => $domains,
 			'dns_records'  => $records,
 			'has_email'    => null !== SiteMail::child_of( $r ),
+			'new_domain'   => SiteNewDomain::pending_text( $r ),
 		);
 	}
 }

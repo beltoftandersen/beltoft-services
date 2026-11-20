@@ -57,7 +57,18 @@ final class HostingSettings {
 	 * @return mixed
 	 */
 	public static function thankyou_row( $row, $r, $license = null, $group = '' ) {
-		if ( ! is_array( $row ) || ! $r instanceof Resource || HostingDriver::ID !== (string) $r->get( 'driver' ) || 'ready' !== $group ) {
+		if ( ! is_array( $row ) || ! $r instanceof Resource || HostingDriver::ID !== (string) $r->get( 'driver' ) ) {
+			return $row;
+		}
+
+		// A domain of the same order joins the website by itself: say so while the account is made and after.
+		$pending = 'failed' === $group ? '' : SiteNewDomain::pending_text( $r );
+
+		if ( 'ready' !== $group ) {
+			if ( '' !== $pending ) {
+				$row['message'] = $pending;
+			}
+
 			return $row;
 		}
 
@@ -75,6 +86,10 @@ final class HostingSettings {
 			/* translators: %s: WordPress user name. */
 			? sprintf( __( 'Log in to WordPress from your hosting in My Account with one click. It signs you in as %s without a password. You can also set a WordPress password there.', 'beltoft-services' ), (string) $facts['admin_user'] )
 			: __( 'Log in to WordPress from your hosting in My Account with one click. No password is needed. You can also set a WordPress password there.', 'beltoft-services' ) );
+
+		if ( '' !== $pending ) {
+			$row['message'] = $pending . ' ' . $row['message'];
+		}
 
 		return $row;
 	}

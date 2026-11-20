@@ -767,6 +767,37 @@ class CheckoutTest extends HostingCase {
 		$this->assertSame( 'fresh.example', \BeltoftServices\Hosting\LiteMail::own_domain( Resource::find( $host->id() ) ) );
 	}
 
+	public function test_the_thank_you_row_and_the_welcome_mail_say_the_domain_joins_by_itself_until_it_has(): void {
+		list( $host, $domain ) = $this->order_with_domain( 'fresh.example' );
+		$line = 'Your website starts on a temporary address. fresh.example is connected to it automatically when the domain registration is done.';
+
+		$this->assertSame( $line, SiteNewDomain::pending_text( $host ) );
+		$this->assertSame( $line, \BeltoftServices\Hosting\HostingEmail::values( $host )['new_domain'] );
+
+		$getting = \BeltoftServices\Hosting\HostingSettings::thankyou_row( array( 'message' => '' ), $host, null, 'getting-ready' );
+		$this->assertSame( $line, $getting['message'] );
+		$failed = \BeltoftServices\Hosting\HostingSettings::thankyou_row( array( 'message' => 'x' ), $host, null, 'failed' );
+		$this->assertSame( 'x', $failed['message'], 'A failed account keeps its own message.' );
+
+		$this->make_ready( $host );
+		$ready = \BeltoftServices\Hosting\HostingSettings::thankyou_row( array( 'message' => '' ), Resource::find( $host->id() ), null, 'ready' );
+		$this->assertStringStartsWith( $line . ' ', $ready['message'] );
+
+		// Joined: the line is gone everywhere.
+		$this->make_ready( $domain );
+		$host = Resource::find( $host->id() );
+		$this->assertSame( '', SiteNewDomain::pending_text( $host ) );
+		$this->assertSame( '', \BeltoftServices\Hosting\HostingEmail::values( $host )['new_domain'] );
+		$after = \BeltoftServices\Hosting\HostingSettings::thankyou_row( array( 'message' => '' ), $host, null, 'ready' );
+		$this->assertStringNotContainsString( 'temporary address', $after['message'] );
+	}
+
+	public function test_an_expired_wait_says_nothing(): void {
+		list( $host ) = $this->order_with_domain( 'late.example' );
+		$host->set( array( SiteNewDomain::META_UNTIL => time() - 10 ) );
+		$this->assertSame( '', SiteNewDomain::pending_text( Resource::find( $host->id() ) ) );
+	}
+
 	public function test_a_domain_that_is_ready_before_the_account_joins_when_the_account_is_ready(): void {
 		list( $host, $domain ) = $this->order_with_domain( 'early.example' );
 

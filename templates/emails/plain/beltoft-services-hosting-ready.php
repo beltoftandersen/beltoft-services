@@ -9,7 +9,7 @@
  * @var string              $email_heading      Heading.
  * @var string              $customer_name      Customer's first name, or ''.
  * @var string              $account_url        The service in My Account.
- * @var array<string,mixed> $hosting            site_name, site_url, admin_url, admin_user, admin_email, sftp_host, sftp_port, sftp_user, ssh, domains, dns_records, has_email.
+ * @var array<string,mixed> $hosting            site_name, site_url, admin_url, admin_user, admin_email, sftp_host, sftp_port, sftp_user, ssh, domains, dns_records, has_email, new_domain.
  * @var string              $additional_content Additional content from the email's settings.
  * @var \WC_Email           $email              The email.
  */
@@ -27,6 +27,10 @@ require BELTOFT_SERVICES_PATH . 'templates/parts/emails/plain-heading.php';
 require BELTOFT_SERVICES_PATH . 'templates/parts/emails/plain-greeting.php';
 
 echo __( 'Your hosting is set up and your website is online.', 'beltoft-services' ) . "\n\n";
+
+if ( ! empty( $beltoft_services_h['new_domain'] ) ) {
+	echo esc_html( $beltoft_services_h['new_domain'] ) . "\n\n";
+}
 
 if ( ! empty( $beltoft_services_h['site_url'] ) ) {
 	echo __( 'Your website:', 'beltoft-services' ) . ' ' . esc_url_raw( $beltoft_services_h['site_url'] ) . "\n";

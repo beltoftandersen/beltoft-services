@@ -102,6 +102,34 @@ final class SiteNewDomain {
 	}
 
 	/**
+	 * The domain of the order that is still waiting to join the website, or ''. Used by the thank-you page and the
+	 * welcome email to say that the website starts on its temporary address and the domain follows by itself.
+	 *
+	 * @param Resource $r Hosting resource.
+	 */
+	public static function pending( Resource $r ): string {
+		$name = (string) $r->get( self::META_DOMAIN );
+
+		if ( '' === $name || $r->get( self::META_DONE ) || time() > (int) $r->get( self::META_UNTIL ) ) {
+			return '';
+		}
+
+		return $name;
+	}
+
+	/**
+	 * The customer text for a pending domain, or '' when none is pending.
+	 *
+	 * @param Resource $r Hosting resource.
+	 */
+	public static function pending_text( Resource $r ): string {
+		$name = self::pending( $r );
+
+		/* translators: %s: domain name. */
+		return '' === $name ? '' : sprintf( __( 'Your website starts on a temporary address. %s is connected to it automatically when the domain registration is done.', 'beltoft-services' ), \BeltoftServices\Domains\HostName::display( $name ) );
+	}
+
+	/**
 	 * Attaches the domain when everything is in place.
 	 *
 	 * @param Resource $r Hosting resource.

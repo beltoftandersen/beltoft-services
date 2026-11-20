@@ -9,7 +9,7 @@
  * @var string              $email_heading      Heading.
  * @var string              $customer_name      Customer's first name, or ''.
  * @var string              $account_url        The service in My Account.
- * @var array<string,mixed> $hosting            site_name, site_url, admin_url, admin_user, admin_email, sftp_host, sftp_port, sftp_user, ssh, domains, dns_records, has_email.
+ * @var array<string,mixed> $hosting            site_name, site_url, admin_url, admin_user, admin_email, sftp_host, sftp_port, sftp_user, ssh, domains, dns_records, has_email, new_domain.
  * @var string              $additional_content Additional content from the email's settings.
  * @var \WC_Email           $email              The email.
  */
@@ -24,6 +24,9 @@ do_action( 'woocommerce_email_header', $email_heading, $email ); // phpcs:ignore
 
 <?php require BELTOFT_SERVICES_PATH . 'templates/parts/emails/html-greeting.php'; ?>
 <p><?php esc_html_e( 'Your hosting is set up and your website is online.', 'beltoft-services' ); ?></p>
+<?php if ( ! empty( $beltoft_services_h['new_domain'] ) ) : ?>
+<p><?php echo esc_html( $beltoft_services_h['new_domain'] ); ?></p>
+<?php endif; ?>
 <?php if ( ! empty( $beltoft_services_h['site_url'] ) ) : ?>
 <table cellspacing="0" cellpadding="6" style="width:100%;margin-bottom:16px" border="1">
 	<tr>
