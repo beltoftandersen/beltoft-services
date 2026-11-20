@@ -46,6 +46,7 @@ final class Ipv4Meta {
 	 */
 	public static function register(): void {
 		add_filter( 'beltoft_services_initial_meta', array( __CLASS__, 'initial_meta' ), 10, 3 );
+		add_filter( 'user_has_cap', array( __CLASS__, 'guard_cancel' ), 20, 4 );
 	}
 
 	/**
@@ -294,6 +295,54 @@ final class Ipv4Meta {
 		}
 
 		return array_values( array_unique( $out ) );
+	}
+
+	/**
+	 * May the main address of a server be taken away by the customer: the server keeps another address (IPv6) and no extra address
+	 * depends on it. A database has no other way in, but loses only its public address.
+	 *
+	 * @param Resource $parent Server or database.
+	 */
+	public static function main_removable( Resource $parent ): bool {
+		return self::is_db( $parent ) || ( '' !== (string) $parent->get( 'ip6' ) && array() === self::extra_addresses( $parent ) );
+	}
+
+	/**
+	 * Filter user_has_cap: the customer cannot change (so cannot cancel) the subscription of the main address of a server while
+	 * that would leave extra addresses without it or the server without any address. The plugin's own cancels (a deleted
+	 * server takes its add-ons with it) do not ask a capability.
+	 *
+	 * @param mixed $allcaps Capabilities.
+	 * @param mixed $caps    Required capabilities.
+	 * @param mixed $args    Capability, user, subscription id.
+	 * @return mixed
+	 */
+	public static function guard_cancel( $allcaps, $caps = array(), $args = array() ) {
+		if ( ! is_array( $allcaps ) || ! is_array( $args ) || 'edit_shop_subscription_status' !== ( $args[0] ?? '' ) || empty( $args[2] ) || ! function_exists( 'wcs_get_subscription' ) ) {
+			return $allcaps;
+		}
+
+		$subscription = wcs_get_subscription( (int) $args[2] );
+
+		if ( ! $subscription instanceof \WC_Subscription || ! $subscription->has_status( 'active' ) ) {
+			return $allcaps;
+		}
+
+		foreach ( Licenses::where( 'subscription_id', (int) $subscription->get_id() ) as $license ) {
+			$addon = Resource::for_license( (int) $license['id'] );
+
+			if ( ! $addon || Ipv4Driver::ID !== $addon->get( 'driver' ) || 'main' !== $addon->get( self::ROLE ) ) {
+				continue;
+			}
+
+			$parent = self::parent_of( $addon );
+
+			if ( $parent && ! self::is_db( $parent ) && ! self::main_removable( $parent ) ) {
+				$allcaps['edit_shop_subscription_status'] = false;
+			}
+		}
+
+		return $allcaps;
 	}
 
 	/**

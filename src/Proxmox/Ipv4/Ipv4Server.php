@@ -157,7 +157,10 @@ final class Ipv4Server {
 
 		$have = (string) ( $v['config']['ipconfig0'] ?? '' );
 		$vmid = (int) $record['vmid'];
-		$ip6  = Ipv6::ipconfig( $this->cluster, $vmid );
+		// The IPv6 part only when the server has IPv6 (meta `ip6`): the server keeps whatever IPv6 state it had.
+		$fresh = Resource::find( $this->r->id() ) ?? $this->r;
+		$has6  = '' !== (string) $fresh->get( 'ip6' );
+		$ip6   = $has6 ? Ipv6::ipconfig( $this->cluster, $vmid ) : '';
 
 		if ( $add ) {
 			$row = IpPool::for_resource( $this->r->id() );
@@ -169,6 +172,10 @@ final class Ipv4Server {
 			}
 
 			$want = ( new VpsProfile( $this->r ) )->network_params( $this->cluster, $row, (string) ( $v['config']['net0'] ?? '' ) )['ipconfig0'];
+
+			if ( ! $has6 ) {
+				$want = Ipv6::strip( $want );
+			}
 		} else {
 			$want = $ip6;
 		}

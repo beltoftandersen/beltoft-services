@@ -168,6 +168,37 @@ class Ipv4ServerTest extends FirewallTestCase {
 		unset( $before );
 	}
 
+	public function test_a_server_without_ipv6_never_gets_ipv6_written_and_its_main_address_cannot_be_taken_away(): void {
+		$basic = $this->server( 0 );
+		$sub   = wcs_create_subscription( array( 'customer_id' => (int) $basic->license()['user_id'], 'billing_period' => 'month', 'billing_interval' => 1, 'status' => 'active' ) );
+		$this->assertInstanceOf( \WC_Subscription::class, $sub );
+
+		// The customer removed IPv6 earlier: no meta, no ip6 in the config.
+		$this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'ipconfig0' => '' ) );
+		$basic->set( array( 'ip6' => null ) );
+
+		$product = $this->service_product( Ipv4Driver::ID, array(), array( 'slug' => 'ipv4-x' . wp_generate_password( 4, false ) ) );
+		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $basic->license()['user_id'], 'subscription_id' => $sub->get_id() ) );
+		$addon   = Resource::create( $license, Registry::get( Ipv4Driver::ID ), Product::plan( $product->get_id() ), array( 'server_license' => (int) $basic->license()['id'] ) );
+		$this->settle( $addon );
+		$addon  = Resource::find( $addon->id() );
+		$server = Resource::find( $basic->id() );
+
+		$this->assertSame( 'ready', $addon->get( 'state' ), (string) $addon->get( 'last_error' ) );
+		$this->assertStringNotContainsString( 'ip6=', $this->config()['ipconfig0'], 'Adding the first IPv4 address does not bring IPv6 back.' );
+		$this->assertFalse( Ipv4Meta::main_removable( $server ), 'Taking the only address away would leave the server unreachable.' );
+
+		$user = (int) $basic->license()['user_id'];
+		$this->assertFalse( user_can( $user, 'edit_shop_subscription_status', $sub->get_id() ), 'The customer cannot cancel it.' );
+
+		// A run that gets there anyway keeps the address.
+		$before = $this->config()['ipconfig0'];
+		Jobs::queue_act( $server->id(), \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_REMOVE );
+		$this->run_jobs();
+		$this->assertSame( $before, $this->config()['ipconfig0'] );
+		$this->assertSame( (string) $addon->get( Ipv4Meta::ADDRESS ), (string) Resource::find( $server->id() )->get( 'ip' ) );
+	}
+
 	public function test_a_second_address_on_a_basic_server_is_an_extra_one(): void {
 		$basic = $this->server( 0 );
 		$one   = $this->addon( $basic );
