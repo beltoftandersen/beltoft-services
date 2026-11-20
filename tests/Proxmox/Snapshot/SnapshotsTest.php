@@ -377,7 +377,7 @@ class SnapshotsTest extends SnapshotsTestCase {
 	public function test_the_driver_takes_the_internal_actions_and_the_expiry_deletes_only_what_is_due(): void {
 		$driver = Registry::get( 'proxmox' );
 		$this->assertInstanceOf( InternalActions::class, $driver );
-		$this->assertSame( array( 'snapshot_expire', 'snapshot_purge', 'snapshot_sync', 'fw_quarantine', 'fw_quarantine_lift' ), $driver->internal_actions() );
+		$this->assertSame( array( 'snapshot_expire', 'snapshot_purge', 'snapshot_sync', 'fw_quarantine', 'fw_quarantine_lift', 'ipv4_main_add', 'ipv4_main_remove', 'ipv4_sync' ), $driver->internal_actions() );
 
 		$r   = $this->server();
 		$old = $this->take( $r, 'old' );

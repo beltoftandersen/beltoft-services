@@ -248,7 +248,7 @@ final class ProxmoxSettings {
 		);
 		$fields['ipv4_alert_email'] = $base + array(
 			'type'    => 'email',
-			'default' => (string) get_option( 'admin_email' ),
+			'default' => '',
 			'label'   => __( 'Send low IPv4 pool mails to', 'beltoft-services' ),
 			'desc'    => __( 'The address that gets a mail when the free IPv4 addresses run low, are all used, or a customer met "no address is free". Empty: the failure alert address. Adding addresses is done by hand: buy them, add them on the IP pool screen and run the host script for the new range.', 'beltoft-services' ),
 		);
