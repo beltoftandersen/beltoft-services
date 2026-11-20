@@ -160,6 +160,9 @@ final class OrderHandoffTest extends TestCase {
 		$this->assertTrue( wp_script_is( 'beltoft-services-handoff', 'enqueued' ) );
 		$this->assertContains( 'bs-handoff-on', OrderHandoff::body_class( array() ) );
 
+		$this->assertSame( 'normal.php', OrderHandoff::swap( 'normal.php', 'checkout/thankyou.php', array( 'order' => $order ) ), 'The shortcode printed it: the normal content stays under it.' );
+
+		( new \ReflectionProperty( OrderHandoff::class, 'placed' ) )->setValue( null, false );
 		wp_dequeue_script( 'beltoft-services-handoff' );
 		$_GET['key'] = 'wc_order_wrong';
 		$this->assertNull( OrderHandoff::page_order(), 'A wrong key is not the order.' );

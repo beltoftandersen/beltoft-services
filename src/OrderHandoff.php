@@ -40,6 +40,12 @@ final class OrderHandoff {
 	public const BODY_CLASS = 'bs-handoff-on';
 
 	/**
+	 * True once the shortcode printed the hand-off on this request: the page then keeps WooCommerce's normal thank-you
+	 * content (it still runs, so every hook of it fires) and the page template hides it by the body class.
+	 */
+	private static bool $placed = false;
+
+	/**
 	 * Hooks.
 	 */
 	public static function register(): void {
@@ -183,6 +189,7 @@ final class OrderHandoff {
 		}
 
 		self::enqueue();
+		self::$placed = true;
 
 		ob_start();
 		include BELTOFT_SERVICES_PATH . 'templates/order/handoff.php';
@@ -220,6 +227,11 @@ final class OrderHandoff {
 		}
 
 		$order = $args['order'] ?? null;
+
+		// The template of the page placed the shortcode above this content: the normal content stays, the page hides it.
+		if ( self::$placed ) {
+			return $template;
+		}
 
 		return $order instanceof \WC_Order && self::applies( $order ) ? BELTOFT_SERVICES_PATH . 'templates/order/handoff.php' : $template;
 	}
