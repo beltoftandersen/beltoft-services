@@ -232,7 +232,7 @@
         "type": "textarea",
         "default": "",
         "label": "Systems for a reinstall",
-        "desc": "One image file name per line, exactly as the installer lists them (the result of ls \/root\/images in a rescue system). Used until a reinstall has read the real list from a rescue system. Empty and no list yet: the reinstall is not offered."
+        "desc": "One image file name per line, exactly as the installer lists them (the result of ls /root/images in a rescue system). Used until a reinstall has read the real list from a rescue system. Empty and no list yet: the reinstall is not offered."
     },
     "dedicated_max_servers": {
         "tab": "dedicated",
@@ -335,6 +335,14 @@
         "min": 1,
         "label": "Database extra storage step (GB)",
         "desc": "The extra storage of a database variation must be a multiple of this, or it is not offered and a switch to it is refused."
+    },
+    "db_ipv6": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "checkbox",
+        "default": 0,
+        "label": "IPv6 for databases",
+        "desc": "A database with a public IP address also gets an IPv6 address (on a cluster that has an IPv6 prefix), the access list takes IPv6 addresses, and customers can add or remove IPv6. Turn it on only after the database templates have the guest script that listens on IPv6 (listen6 and allow6). An older template ignores them."
     },
     "disk_reserve_gb": {
         "tab": "proxmox",
