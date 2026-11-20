@@ -94,4 +94,49 @@ final class Ipv4PendingLineTest extends UsageTestCase {
 		$this->assertTrue( \BeltoftServices\Usage\BillingField::swap( true )['ok'] );
 		$this->assertSame( 1, $fired );
 	}
+
+	public function test_checkout_reads_the_target_once_however_many_lines(): void {
+		add_filter( 'beltoft_services_ipv4_max_per_server', static fn() => 5 );
+		$this->server( 'u-None' );
+
+		foreach ( range( 1, 3 ) as $ignore ) {
+			$this->put( $this->item( 'u' ) );
+		}
+
+		$reads = 0;
+		$count = static function ( $max ) use ( &$reads ) {
+			++$reads;
+			return $max;
+		};
+		add_filter( 'beltoft_services_ipv4_max_per_server', $count, 99 );
+		Ipv4Cart::checkout_validation( array(), new \WP_Error() );
+		remove_filter( 'beltoft_services_ipv4_max_per_server', $count, 99 );
+
+		$this->assertSame( 1, $reads, 'The target scans the cart: once per validation, not per line.' );
+	}
+
+	public function test_the_add_on_product_is_looked_up_once_per_request_and_again_after_a_save(): void {
+		AddonCart::reset_products();
+		$queries = 0;
+		$count   = static function ( $posts, $query ) use ( &$queries ) {
+			if ( 'product' === $query->get( 'post_type' ) && '' !== (string) $query->get( 'meta_key' ) ) {
+				++$queries;
+			}
+
+			return $posts;
+		};
+		add_filter( 'posts_pre_query', $count, 10, 2 );
+
+		for ( $i = 0; $i < 5; $i++ ) {
+			$this->assertNotNull( Ipv4Cart::product( true ) );
+			$this->assertNotNull( Ipv4Cart::product( false ) );
+		}
+
+		$this->assertSame( 2, $queries, 'One lookup per billing.' );
+		$this->ip['u']->set_regular_price( '0' );
+		$this->ip['u']->save();
+		Ipv4Cart::product( true );
+		$this->assertSame( 3, $queries, 'A saved product starts the lookup again.' );
+		remove_filter( 'posts_pre_query', $count, 10 );
+	}
 }

@@ -303,9 +303,10 @@ final class Ipv4Cart {
 	 * @param \WP_Error            $errors Errors.
 	 */
 	public static function checkout_validation( array $data, \WP_Error $errors ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- action signature.
-		$count = array();
-		$lines = 0;
-		$new   = 0;
+		$count  = array();
+		$lines  = 0;
+		$new    = 0;
+		$target = false; // Read once, for the first line that needs it (it scans the cart).
 
 		foreach ( WC()->cart ? WC()->cart->get_cart() : array() as $item ) {
 			if ( ! self::ipv4_product( (int) ( $item['product_id'] ?? 0 ) ) || ! isset( $item[ self::addon()->cart_uid() ] ) ) {
@@ -316,7 +317,7 @@ final class Ipv4Cart {
 			$link = $item[ self::addon()->cart_for() ] ?? null;
 
 			if ( 'cart_server' === $link ) {
-				$target = Ipv4Field::target();
+				$target = false === $target ? Ipv4Field::target() : $target;
 
 				if ( null !== $target && ! self::line_billing_ok( $item ) ) {
 					$errors->add( 'ipv4_billing', __( 'This IPv4 address is not sold with the billing of this server or database. Add it from the page of the service.', 'beltoft-services' ) );
