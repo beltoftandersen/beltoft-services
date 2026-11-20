@@ -219,4 +219,36 @@ final class DiskDriver implements Driver, ProvisionSteps, \BeltoftServices\Drive
 
 		return array( $real, $monthly * $real / $planned );
 	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public function usage_delete(): ?array {
+		return array(
+			'kind'    => 'disk',
+			'text'    => __( 'Removing deletes the extra disk and all its data, including the snapshots that include it. It cannot be undone. Billing stops in the hour it is removed. The server and the usage account are not touched.', 'beltoft-services' ),
+			'billing' => __( 'The disk is billed by the hour while it exists. Remove it to stop the charge.', 'beltoft-services' ),
+			'stopped' => __( 'A stopped server is still billed. Delete it to stop the charge.', 'beltoft-services' ),
+			'busy'    => __( 'Something is still running on this disk, such as a setup or a resize. Please try again when it has finished.', 'beltoft-services' ),
+		);
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public function usage_breakdown(): ?array {
+		return array(
+			'extra' => array(
+				'key'      => 'disk',
+				'label'    => __( 'Extra disk', 'beltoft-services' ),
+				/* translators: %d: disk size in gigabytes */
+				'sized'    => __( 'Extra disk, %d GB', 'beltoft-services' ),
+				'size_key' => 'disk_gb',
+			),
+		);
+	}
 }

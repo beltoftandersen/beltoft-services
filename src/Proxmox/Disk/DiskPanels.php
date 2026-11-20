@@ -14,7 +14,6 @@ use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 use BeltoftServices\Usage\CustomerDelete;
 use BeltoftServices\Usage\Rates;
-use BeltoftServices\Usage\UsageDisk;
 
 defined( 'ABSPATH' ) || exit;
 

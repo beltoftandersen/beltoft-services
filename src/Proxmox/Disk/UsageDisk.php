@@ -5,7 +5,7 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Usage;
+namespace BeltoftServices\Proxmox\Disk;
 
 use BeltoftLicenses\Events;
 use BeltoftLicenses\Licenses;
@@ -13,10 +13,9 @@ use BeltoftServices\Alerts;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Pve\Clusters;
-use BeltoftServices\Proxmox\Disk\DiskDriver;
-use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
+use BeltoftServices\Usage\Rates;
 
 defined( 'ABSPATH' ) || exit;
 

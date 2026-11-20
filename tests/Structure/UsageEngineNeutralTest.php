@@ -11,23 +11,11 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Pay as you go is an engine that drivers hook into (Drivers\UsageItems). A driver id or an activation kind written as a literal in
- * src/Usage is a product named by the engine. Today's leaks are listed in ALLOWED (file => literals); the list only shrinks, and a
- * stale entry fails the test.
+ * src/Usage is a product named by the engine, and so is a driver class of a feature (Proxmox\Disk\DiskDriver and the like). Nothing is allowed.
  */
 class UsageEngineNeutralTest extends TestCase {
 
 	private const LITERALS = array( 'proxmox', 'proxmox-db', 'proxmox-disk', 'proxmox-ipv4', 'vm', 'db', 'disk', 'ipv4' );
-
-	/**
-	 * Not yet moved into the drivers: the wording of the customer's delete by kind, the disk-only grow, and the plan parts of a
-	 * server or database in the cart breakdown (the quote of an extra disk).
-	 *
-	 * @var array<string, string[]>
-	 */
-	private const ALLOWED = array(
-		'src/Usage/CustomerDelete.php' => array( 'vm', 'db', 'disk', 'ipv4' ),
-		'src/Usage/Breakdown.php'      => array( 'disk' ),
-	);
 
 	/**
 	 * @return array<string, string[]>
@@ -60,11 +48,20 @@ class UsageEngineNeutralTest extends TestCase {
 	public function test_the_engine_names_no_driver_or_kind(): void {
 		$found = $this->found();
 
-		foreach ( self::ALLOWED as $file => $literals ) {
-			$this->assertSame( $literals, $found[ $file ] ?? array(), "$file no longer matches its allowance: shrink ALLOWED." );
-			unset( $found[ $file ] );
+		$this->assertSame( array(), $found, 'The usage engine names a driver id or a kind: let the driver declare it (Drivers\UsageItems).' );
+	}
+
+	public function test_the_engine_uses_no_driver_class_of_a_feature(): void {
+		$root = dirname( __DIR__, 2 );
+		$bad  = array();
+		$it   = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $root . '/src/Usage', \FilesystemIterator::SKIP_DOTS ) );
+
+		foreach ( $it as $file ) {
+			if ( 'php' === $file->getExtension() && preg_match( '/\\\\(?:Proxmox|Apps|ManualServer|Hosting|Domains|Mail|Ssl|Storage|Licences|Support)\\\\(?:\w+\\\\)*\w*Driver\b/', (string) file_get_contents( $file->getPathname() ) ) ) {
+				$bad[] = substr( $file->getPathname(), strlen( $root ) + 1 );
+			}
 		}
 
-		$this->assertSame( array(), $found, 'The usage engine names a driver or a kind: let the driver declare it (Drivers\UsageItems).' );
+		$this->assertSame( array(), $bad, 'A driver class of a feature is named in src/Usage: ask the driver through Drivers\UsageItems instead.' );
 	}
 }

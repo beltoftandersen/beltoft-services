@@ -363,4 +363,91 @@ class ProxmoxDriver implements Driver, StopsOnDelete, NeedsBilling, InternalActi
 	public function usage_billing_choice(): bool {
 		return true;
 	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public function usage_delete(): ?array {
+		return array(
+			'kind'    => 'server',
+			'text'    => __( 'Deleting removes the server and all its data, including snapshots and backups. It cannot be undone. Billing stops in the hour it is deleted.', 'beltoft-services' ),
+			'billing' => __( 'A stopped server is still billed. Delete it to stop the charge.', 'beltoft-services' ),
+			'stopped' => __( 'A stopped server is still billed. Delete it to stop the charge.', 'beltoft-services' ),
+			'busy'    => __( 'Something is still running on this server, such as a setup, a reinstall or a restore. Please try again when it has finished.', 'beltoft-services' ),
+			'blocker' => self::delete_blocker( ... ),
+			'word'    => static function ( Resource $r ): string {
+				// A server is confirmed with the name its page shows: the customer's name for it, else vm-<first 8 characters of its uuid>.
+				$name = trim( Provision::vm_name( $r ) );
+
+				return 'vm-' === $name ? '' : $name;
+			},
+			'licence' => self::delete_licence_note( ... ),
+		);
+	}
+
+	/**
+	 * A server with an extra disk is deleted after the disk.
+	 *
+	 * @param Resource $r Server.
+	 */
+	private static function delete_blocker( Resource $r ): ?string {
+		foreach ( \BeltoftServices\Proxmox\Disk\DiskMeta::for_server( $r ) as $disk ) {
+			if ( 'deleted' !== $disk->get( 'state' ) ) {
+				return __( 'This server has an extra disk. Remove the disk first, then delete the server.', 'beltoft-services' );
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * One sentence for a server with a paid app licence of its own subscription: the licence stays on the account until the end of
+	 * the month paid and can be used on a new server. '' for a licence still billed by the hour with its server (sold before the
+	 * licence became monthly), where the hourly billing note is already true.
+	 *
+	 * @param Resource $r Server.
+	 */
+	private static function delete_licence_note( Resource $r ): string {
+		$licence = \BeltoftServices\Apps\AppLicence::current( $r );
+
+		if ( ! $licence || \BeltoftServices\Apps\AppLicence::usage_billed( $licence ) || 'ended' === \BeltoftServices\Apps\AppLicence::state( $licence ) ) {
+			return '';
+		}
+
+		$until = \BeltoftServices\Apps\AppLicenceKeep::keepable( $licence ) ? \BeltoftServices\Apps\AppLicenceKeep::paid_until_text( $licence ) : '';
+
+		if ( '' === $until ) {
+			// Nothing to keep (the paid time is over): the licence ends with the server.
+			return __( 'The app licence ends with the server.', 'beltoft-services' );
+		}
+
+		/* translators: %s: date */
+		return sprintf( __( 'The app licence stays on your account until %s, the end of the month you paid for, and can be used on a new server until then. It is not renewed unless it is used.', 'beltoft-services' ), $until );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public function usage_breakdown(): ?array {
+		return array(
+			'single_line' => false,
+			'data_disk'   => false,
+			'parts'       => static function ( \WC_Product_Variation $usage, \WC_Product_Variation $full, callable $price ): array {
+				$base    = $price( $full );
+				$backups = 0.0;
+
+				if ( (int) ( Product::plan( $usage->get_parent_id(), $full->get_id() )['backup_days'] ?? 0 ) > 0 ) {
+					$without = Backups::sibling( $full, false );
+					$backups = $without ? $price( $full ) - $price( $without ) : 0.0;
+					$base    = $without ? $price( $without ) : $price( $full );
+				}
+
+				return array( 'base' => $base, 'ip' => 0.0, 'storage' => 0.0, 'backups' => $backups, 'gb' => 0 );
+			},
+		);
+	}
 }

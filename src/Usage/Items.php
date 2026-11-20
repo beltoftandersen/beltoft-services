@@ -139,6 +139,36 @@ final class Items {
 	}
 
 	/**
+	 * The delete description (UsageItems::usage_delete()) of a resource's driver, or null.
+	 *
+	 * @param Resource $r Resource.
+	 * @return array<string, mixed>|null
+	 */
+	public static function delete_of( Resource $r ): ?array {
+		$driver = self::driver_of( $r );
+
+		return null === $driver ? null : $driver->usage_delete();
+	}
+
+	/**
+	 * The delete description for a kind word (what the pages and tools pass around), or null.
+	 *
+	 * @param string $kind Kind word.
+	 * @return array<string, mixed>|null
+	 */
+	public static function delete_for( string $kind ): ?array {
+		foreach ( self::drivers() as $driver ) {
+			$spec = $driver->usage_delete();
+
+			if ( null !== $spec && $kind === $spec['kind'] ) {
+				return $spec;
+			}
+		}
+
+		return null;
+	}
+
+	/**
 	 * Is the item titled with its product and plan on an invoice (a server, a database)?
 	 *
 	 * @param string $item Item.

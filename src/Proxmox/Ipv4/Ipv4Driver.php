@@ -397,4 +397,20 @@ final class Ipv4Driver implements Driver, \BeltoftServices\Drivers\UsageItems {
 	public function usage_is_addon(): bool {
 		return true;
 	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public function usage_delete(): ?array {
+		return array(
+			'kind'    => 'ipv4',
+			'text'    => __( 'Removing takes the IPv4 address away from the server or database and gives it back. Anything that connects through it stops working. Billing stops in the hour it is removed. The service and the usage account are not touched.', 'beltoft-services' ),
+			'billing' => __( 'The address is billed by the hour while you have it, and never more than the monthly price. Remove it to stop the charge.', 'beltoft-services' ),
+			'stopped' => __( 'A stopped server is still billed. Delete it to stop the charge.', 'beltoft-services' ),
+			'busy'    => __( 'This IPv4 address is still being set up or changed. Please try again when it has finished.', 'beltoft-services' ),
+			'blocker' => Ipv4Meta::removal_blocker( ... ),
+		);
+	}
 }

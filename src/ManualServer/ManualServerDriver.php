@@ -244,4 +244,22 @@ final class ManualServerDriver implements Driver, StopsOnDelete, NeedsBilling, \
 	public function usage_reference( Resource $r ): ?string {
 		return \BeltoftServices\Usage\Renewal::label( $r->id() );
 	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public function usage_delete(): ?array {
+		return array(
+			'kind'    => 'dedicated',
+			'text'    => __( 'Cancelling ends the server at once. All its data is deleted at once and cannot be brought back. It cannot be undone. Billing stops in the hour you cancel.', 'beltoft-services' ),
+			'billing' => __( 'The server is billed by the hour from the hour it is ready, and never more than the monthly price in a calendar month. Cancel it to stop the charge.', 'beltoft-services' ),
+			'stopped' => __( 'A stopped server is still billed. Delete it to stop the charge.', 'beltoft-services' ),
+			'busy'    => __( 'Something is still running on this database, such as a setup or a restore. Please try again when it has finished.', 'beltoft-services' ),
+			// A dedicated server is cancelled once it is delivered; a lapsed (paused) one may be cancelled too, to stop the billing.
+			'early'   => static fn( Resource $r ): ?string => in_array( (string) $r->get( 'state' ), array( 'ready', 'paused' ), true ) ? null : __( 'Your server is still being set up. Please contact support if you want to cancel it before it is delivered.', 'beltoft-services' ),
+			'idle'    => static fn( Resource $r ): bool => null === $r->pending_desire(),
+		);
+	}
 }

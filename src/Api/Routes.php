@@ -406,7 +406,7 @@ final class Routes {
 			return self::error( 'beltoft_services_forbidden', __( 'This service is not available.', 'beltoft-services' ), 403 );
 		}
 
-		$done = \BeltoftServices\Usage\UsageDisk::grow( $resource, $user_id );
+		$done = \BeltoftServices\Proxmox\Disk\UsageDisk::grow( $resource, $user_id );
 
 		if ( $done instanceof \WP_Error ) {
 			$data = $done->get_error_data();

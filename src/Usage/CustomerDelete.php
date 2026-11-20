@@ -11,8 +11,6 @@ use BeltoftLicenses\Events;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Jobs;
 use BeltoftServices\Progress;
-use BeltoftServices\Proxmox\Disk\DiskMeta;
-use BeltoftServices\Proxmox\Vm\ServerName;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -44,17 +42,6 @@ final class CustomerDelete {
 	 * The history text of the deletion.
 	 */
 	public const EVENT = 'Customer deleted the service';
-
-	/**
-	 * Driver kind => what the customer calls it.
-	 */
-	private const KINDS = array(
-		'vm' => 'server',
-		'db' => 'database',
-		'disk' => 'disk',
-		'ipv4' => 'ipv4',
-		'dedicated' => 'dedicated',
-	);
 
 	/**
 	 * Handle of the script of the Delete block.
@@ -93,14 +80,14 @@ final class CustomerDelete {
 	 * @return string server, database, disk (a pay as you go extra disk), or '' when it is none of them (a monthly service, a domain).
 	 */
 	public static function kind( Resource $r ): string {
-		$driver  = \BeltoftServices\Drivers\Registry::get( (string) $r->get( 'driver' ) );
+		$spec    = Items::delete_of( $r );
 		$license = $r->license();
 
-		if ( ! $driver || ! $license || 'usage' !== (string) ( $license['source'] ?? '' ) || ! $r->is_live() || ! $r->is_valid() ) {
+		if ( null === $spec || ! $license || 'usage' !== (string) ( $license['source'] ?? '' ) || ! $r->is_live() || ! $r->is_valid() ) {
 			return '';
 		}
 
-		return self::KINDS[ $driver->kind() ] ?? '';
+		return (string) $spec['kind'];
 	}
 
 	/**
@@ -109,10 +96,11 @@ final class CustomerDelete {
 	 * @param Resource $r Resource.
 	 */
 	public static function word( Resource $r ): string {
-		// A server is confirmed with the name its page shows: the customer's name for it, else vm-<first 8 characters of its uuid>.
-		$name = 'server' === self::kind( $r ) ? trim( \BeltoftServices\Proxmox\Vm\Provision::vm_name( $r ) ) : '';
+		// The driver may ask for a name (a server is confirmed with the name its page shows).
+		$word = Items::delete_of( $r )['word'] ?? null;
+		$name = is_callable( $word ) ? trim( (string) $word( $r ) ) : '';
 
-		return '' !== $name && 'vm-' !== $name ? $name : self::CONFIRM;
+		return '' !== $name ? $name : self::CONFIRM;
 	}
 
 	/**
@@ -139,35 +127,25 @@ final class CustomerDelete {
 			return __( 'This service is already being deleted.', 'beltoft-services' );
 		}
 
-		// A dedicated server is cancelled once it is delivered; a lapsed (paused) one may be cancelled too, to stop the billing.
-		if ( 'dedicated' === $kind && ! in_array( (string) $r->get( 'state' ), array( 'ready', 'paused' ), true ) ) {
-			return __( 'Your server is still being set up. Please contact support if you want to cancel it before it is delivered.', 'beltoft-services' );
+		$spec  = (array) Items::delete_of( $r );
+		$early = $spec['early'] ?? null;
+		$why   = is_callable( $early ) ? $early( $r ) : null;
+
+		if ( null !== $why ) {
+			return $why;
 		}
 
-		if ( 'dedicated' === $kind ? null !== $r->pending_desire() : ( 'ready' !== $r->get( 'state' ) || null !== $r->pending_desire() || ! empty( Progress::build( $r )['active'] ) ) ) {
-			if ( 'ipv4' === $kind ) {
-				return __( 'This IPv4 address is still being set up or changed. Please try again when it has finished.', 'beltoft-services' );
-			}
+		$idle = $spec['idle'] ?? null;
+		$free = is_callable( $idle ) ? $idle( $r ) : ( 'ready' === $r->get( 'state' ) && null === $r->pending_desire() && empty( Progress::build( $r )['active'] ) );
 
-			if ( 'disk' === $kind ) {
-				return __( 'Something is still running on this disk, such as a setup or a resize. Please try again when it has finished.', 'beltoft-services' );
-			}
-
-			return 'server' === $kind
-				? __( 'Something is still running on this server, such as a setup, a reinstall or a restore. Please try again when it has finished.', 'beltoft-services' )
-				: __( 'Something is still running on this database, such as a setup or a restore. Please try again when it has finished.', 'beltoft-services' );
+		if ( ! $free ) {
+			return (string) $spec['busy'];
 		}
 
-		if ( 'ipv4' === $kind ) {
-			return \BeltoftServices\Proxmox\Ipv4\Ipv4Meta::removal_blocker( $r );
-		}
+		$extra = $spec['blocker'] ?? null;
 
-		if ( 'server' === $kind ) {
-			foreach ( DiskMeta::for_server( $r ) as $disk ) {
-				if ( 'deleted' !== $disk->get( 'state' ) ) {
-					return __( 'This server has an extra disk. Remove the disk first, then delete the server.', 'beltoft-services' );
-				}
-			}
+		if ( is_callable( $extra ) ) {
+			return $extra( $r );
 		}
 
 		return null;
@@ -179,21 +157,7 @@ final class CustomerDelete {
 	 * @param string $kind server or database.
 	 */
 	public static function text( string $kind ): string {
-		if ( 'ipv4' === $kind ) {
-			return __( 'Removing takes the IPv4 address away from the server or database and gives it back. Anything that connects through it stops working. Billing stops in the hour it is removed. The service and the usage account are not touched.', 'beltoft-services' );
-		}
-
-		if ( 'disk' === $kind ) {
-			return __( 'Removing deletes the extra disk and all its data, including the snapshots that include it. It cannot be undone. Billing stops in the hour it is removed. The server and the usage account are not touched.', 'beltoft-services' );
-		}
-
-		if ( 'dedicated' === $kind ) {
-			return __( 'Cancelling ends the server at once. All its data is deleted at once and cannot be brought back. It cannot be undone. Billing stops in the hour you cancel.', 'beltoft-services' );
-		}
-
-		return 'database' === $kind
-			? __( 'Deleting removes the database and all its data, including backups. It cannot be undone. Billing stops in the hour it is deleted.', 'beltoft-services' )
-			: __( 'Deleting removes the server and all its data, including snapshots and backups. It cannot be undone. Billing stops in the hour it is deleted.', 'beltoft-services' );
+		return (string) ( Items::delete_for( $kind ) ?? Items::delete_for( 'server' ) )['text'];
 	}
 
 	/**
@@ -204,25 +168,9 @@ final class CustomerDelete {
 	 * @param Resource $r Resource.
 	 */
 	public static function licence_note( Resource $r ): string {
-		if ( 'server' !== self::kind( $r ) ) {
-			return '';
-		}
+		$note = Items::delete_of( $r )['licence'] ?? null;
 
-		$licence = \BeltoftServices\Apps\AppLicence::current( $r );
-
-		if ( ! $licence || \BeltoftServices\Apps\AppLicence::usage_billed( $licence ) || 'ended' === \BeltoftServices\Apps\AppLicence::state( $licence ) ) {
-			return '';
-		}
-
-		$until = \BeltoftServices\Apps\AppLicenceKeep::keepable( $licence ) ? \BeltoftServices\Apps\AppLicenceKeep::paid_until_text( $licence ) : '';
-
-		if ( '' === $until ) {
-			// Nothing to keep (the paid time is over): the licence ends with the server.
-			return __( 'The app licence ends with the server.', 'beltoft-services' );
-		}
-
-		/* translators: %s: date */
-		return sprintf( __( 'The app licence stays on your account until %s, the end of the month you paid for, and can be used on a new server until then. It is not renewed unless it is used.', 'beltoft-services' ), $until );
+		return is_callable( $note ) ? (string) $note( $r ) : '';
 	}
 
 	/**
@@ -231,21 +179,7 @@ final class CustomerDelete {
 	 * @param string $kind server or database.
 	 */
 	public static function billing_note( string $kind ): string {
-		if ( 'ipv4' === $kind ) {
-			return __( 'The address is billed by the hour while you have it, and never more than the monthly price. Remove it to stop the charge.', 'beltoft-services' );
-		}
-
-		if ( 'disk' === $kind ) {
-			return __( 'The disk is billed by the hour while it exists. Remove it to stop the charge.', 'beltoft-services' );
-		}
-
-		if ( 'dedicated' === $kind ) {
-			return __( 'The server is billed by the hour from the hour it is ready, and never more than the monthly price in a calendar month. Cancel it to stop the charge.', 'beltoft-services' );
-		}
-
-		return 'database' === $kind
-			? __( 'The database is billed every hour it exists. Delete it to stop the charge.', 'beltoft-services' )
-			: __( 'A stopped server is still billed. Delete it to stop the charge.', 'beltoft-services' );
+		return (string) ( Items::delete_for( $kind ) ?? Items::delete_for( 'server' ) )['billing'];
 	}
 
 	/**
@@ -254,9 +188,7 @@ final class CustomerDelete {
 	 * @param string $kind server or database.
 	 */
 	public static function stopped_note( string $kind ): string {
-		return 'database' === $kind
-			? __( 'A stopped database is still billed. Delete it to stop the charge.', 'beltoft-services' )
-			: __( 'A stopped server is still billed. Delete it to stop the charge.', 'beltoft-services' );
+		return (string) ( Items::delete_for( $kind ) ?? Items::delete_for( 'server' ) )['stopped'];
 	}
 
 	/**

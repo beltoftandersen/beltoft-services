@@ -32,6 +32,7 @@ define( 'BELTOFT_SERVICES_VERSION', '0.49.0' );
 define(
 	'BELTOFT_SERVICES_CLASS_ALIASES',
 	array(
+		'BeltoftServices\\Usage\\UsageDisk'   => 'BeltoftServices\\Proxmox\\Disk\\UsageDisk',
 		'BeltoftServices\\Credit\\CheckoutCredit' => 'BeltoftServices\\GiftCredit\\Checkout',
 		'BeltoftServices\\Credit\\Topup'          => 'BeltoftServices\\GiftCredit\\Topup',
 		'BeltoftServices\\Proxmox\\AppField'    => 'BeltoftServices\\Apps\\AppField',

@@ -28,6 +28,24 @@ trait UsageDefaults {
 	}
 
 	/**
+	 * Nothing in the cart breakdown.
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public function usage_breakdown(): ?array {
+		return null;
+	}
+
+	/**
+	 * Not deletable here.
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public function usage_delete(): ?array {
+		return null;
+	}
+
+	/**
 	 * The default label.
 	 *
 	 * @param Resource $r Resource.

@@ -276,7 +276,7 @@ final class Plugin {
 		Admin\Screen::register();
 		Admin\LicenceServiceColumn::register();
 		Emails\Emails::register();
-		Usage\UsageDisk::register();
+		Proxmox\Disk\UsageDisk::register();
 		Usage\CoreHooks::register();
 		Usage\Meter::register();
 		Usage\Counted\Views::register();

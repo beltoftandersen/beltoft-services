@@ -51,6 +51,28 @@ interface UsageItems {
 	public function usage_billing_choice(): bool;
 
 	/**
+	 * What this driver adds to the cart breakdown of a pay as you go line, or null for nothing. Keys: `parts` (callable(
+	 * \WC_Product_Variation $usage, \WC_Product_Variation $full, callable $price ): array{base, ip, storage, backups, gb}, the monthly
+	 * amounts of a line this driver sells: it makes the driver a line of the breakdown), `single_line` (the plan and its add-ons are one
+	 * ledger item), `data_disk` (the disk is worded as a data disk), and `extra` (an add-on that has a row of its own in the quote of a
+	 * new service: key, label, sized, size_key).
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public function usage_breakdown(): ?array;
+
+	/**
+	 * How the customer deletes a pay as you go resource of this driver, or null when it cannot be deleted here. Keys: `kind` (the word
+	 * pages and tools use), `text`, `billing`, `stopped` (strings), `busy` (why it cannot be deleted while it works), optional
+	 * `early` (callable( Resource ): ?string, a refusal checked before busy), `idle` (callable( Resource ): bool, replaces the
+	 * ready and nothing-running test), `blocker` (callable( Resource ): ?string, a refusal after it), `word` (callable( Resource ): string,
+	 * the word to type, '' for the default) and `licence` (callable( Resource ): string, a line about a licence kept).
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public function usage_delete(): ?array;
+
+	/**
 	 * What a resource is called on an invoice, or null for the default (the server's name, else the product's).
 	 *
 	 * @param Resource $r Resource.
