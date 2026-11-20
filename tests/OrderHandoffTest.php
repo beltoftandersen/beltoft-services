@@ -148,21 +148,30 @@ final class OrderHandoffTest extends TestCase {
 		remove_filter( 'beltoft_services_order_handoff_target', $page );
 	}
 
-	public function test_a_theme_that_draws_the_page_itself_gets_the_whole_hand_off_page(): void {
+	public function test_the_shortcode_prints_the_hand_off_and_loads_the_script_only_when_it_applies(): void {
 		$order = $this->order();
 		set_query_var( 'order-received', $order->get_id() );
 		$_GET['key'] = $order->get_order_key();
 
-		$this->assertSame( $order->get_id(), OrderHandoff::page_order()->get_id() );
-		$this->assertStringEndsWith( 'templates/order/handoff-page.php', OrderHandoff::page( 'theme-index.php' ) );
+		$html = do_shortcode( '[' . OrderHandoff::SHORTCODE . ']' );
+		$this->assertStringContainsString( 'data-bs-handoff', $html );
+		$this->assertStringContainsString( 'data-next="' . esc_url( OrderHandoff::target( $order ) ) . '"', $html );
+		$this->assertStringContainsString( 'data-track=', $html );
+		$this->assertTrue( wp_script_is( 'beltoft-services-handoff', 'enqueued' ) );
+		$this->assertContains( 'bs-handoff', OrderHandoff::body_class( array() ) );
 
+		wp_dequeue_script( 'beltoft-services-handoff' );
 		$_GET['key'] = 'wc_order_wrong';
 		$this->assertNull( OrderHandoff::page_order(), 'A wrong key is not the order.' );
-		$this->assertSame( 'theme-index.php', OrderHandoff::page( 'theme-index.php' ) );
+		$this->assertSame( '', do_shortcode( '[' . OrderHandoff::SHORTCODE . ']' ) );
+		$this->assertSame( array(), OrderHandoff::body_class( array() ) );
 
 		$_GET['key'] = $order->get_order_key();
 		$this->settings( array( OrderHandoff::SETTING => 0 ) );
-		$this->assertSame( 'theme-index.php', OrderHandoff::page( 'theme-index.php' ), 'Off: the theme page stays.' );
+		$this->assertSame( '', do_shortcode( '[' . OrderHandoff::SHORTCODE . ']' ), 'Off: nothing.' );
+		$this->assertSame( array( 'x' ), OrderHandoff::body_class( array( 'x' ) ) );
+		$this->assertFalse( wp_script_is( 'beltoft-services-handoff', 'enqueued' ) );
+
 		unset( $_GET['key'] );
 		set_query_var( 'order-received', '' );
 		$this->assertNull( OrderHandoff::page_order(), 'Any other page has no order.' );

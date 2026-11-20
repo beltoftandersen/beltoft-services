@@ -30,13 +30,24 @@ final class OrderHandoff {
 	public const ARG = 'order';
 
 	/**
+	 * Shortcode a page builder's order received template places.
+	 */
+	public const SHORTCODE = 'beltoft_services_order_handoff';
+
+	/**
+	 * Body class of an order received page that gets the hand-off, so the template can hide its normal content.
+	 */
+	public const BODY_CLASS = 'bs-handoff';
+
+	/**
 	 * Hooks.
 	 */
 	public static function register(): void {
 		add_filter( 'beltoft_services_settings_fields', array( __CLASS__, 'settings_fields' ), 8 );
 		add_filter( 'wc_get_template', array( __CLASS__, 'swap' ), 10, 5 );
-		// A page builder that draws the order received page itself never loads checkout/thankyou.php: the whole page is replaced.
-		add_filter( 'template_include', array( __CLASS__, 'page' ), 99 );
+		// A page builder draws the order received page itself and never loads checkout/thankyou.php: its template places the shortcode.
+		add_shortcode( self::SHORTCODE, array( __CLASS__, 'shortcode' ) );
+		add_filter( 'body_class', array( __CLASS__, 'body_class' ) );
 		add_action( 'template_redirect', array( __CLASS__, 'no_cache' ), 30 );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ), 20 );
 	}
@@ -162,21 +173,37 @@ final class OrderHandoff {
 	}
 
 	/**
-	 * Filter template_include: the whole order received page becomes the hand-off page when the order gets the hand-off.
-	 *
-	 * @param mixed $template Template file.
-	 * @return mixed
+	 * The shortcode: the hand-off content on the order received request of an order that gets it, nothing otherwise.
 	 */
-	public static function page( $template ) {
+	public static function shortcode(): string {
 		$order = self::page_order();
 
 		if ( null === $order || ! self::applies( $order ) ) {
-			return $template;
+			return '';
 		}
 
-		$theme = locate_template( array( 'beltoft-services/order/handoff-page.php' ) );
+		self::enqueue();
 
-		return '' !== $theme ? $theme : BELTOFT_SERVICES_PATH . 'templates/order/handoff-page.php';
+		ob_start();
+		include BELTOFT_SERVICES_PATH . 'templates/order/handoff.php';
+
+		return (string) ob_get_clean();
+	}
+
+	/**
+	 * Filter body_class: a marker on a page that gets the hand-off.
+	 *
+	 * @param mixed $classes Classes.
+	 * @return mixed
+	 */
+	public static function body_class( $classes ) {
+		$order = self::page_order();
+
+		if ( is_array( $classes ) && null !== $order && self::applies( $order ) ) {
+			$classes[] = self::BODY_CLASS;
+		}
+
+		return $classes;
 	}
 
 	/**
@@ -231,6 +258,13 @@ final class OrderHandoff {
 			return;
 		}
 
+		self::enqueue();
+	}
+
+	/**
+	 * Enqueues the script (footer, so it can also be called while the content is drawn).
+	 */
+	private static function enqueue(): void {
 		wp_enqueue_script( 'beltoft-services-handoff', plugins_url( 'assets/handoff.js', BELTOFT_SERVICES_FILE ), array(), Assets::version( 'assets/handoff.js' ), true );
 	}
 
