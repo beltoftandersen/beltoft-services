@@ -172,7 +172,8 @@ final class PaygSplit {
 				array(
 					'post_type'        => 'product_variation',
 					'post_parent'      => $pid,
-					'post_status'      => array( 'publish', 'private', 'draft', 'pending' ),
+					// Trashed ones too: a live licence may still point at one, and it must get the monthly marker.
+					'post_status'      => array( 'publish', 'private', 'draft', 'pending', 'future', 'trash' ),
 					'fields'           => 'ids',
 					'nopaging'         => true,
 					'orderby'          => 'ID',
@@ -429,17 +430,19 @@ final class PaygSplit {
 	 * @param bool                 $keep     The monthly variations stay on sale and the parent gets no flag.
 	 */
 	private static function write_flags( array &$manifest, int $pid, array $p, bool $keep = false ): void {
-		if ( ! $keep && ! in_array( (string) get_post_meta( $pid, Rates::META_BILLING, true ), array( Rates::KIND_HOURLY, Rates::KIND_COUNTED ), true ) ) {
-			self::put( $manifest, $pid, Rates::META_BILLING, $p['kind'] );
-		}
-
 		foreach ( $p['monthly'] as $vid ) {
 			self::put( $manifest, $vid, Rates::META_BILLING, Rates::KIND_MONTHLY );
 
 			if ( ! $keep && 'publish' === get_post_status( $vid ) ) {
 				$manifest['status'][] = array( $vid, 'publish' );
+				self::save( $manifest );
 				wp_update_post( array( 'ID' => $vid, 'post_status' => 'private' ) );
 			}
+		}
+
+		// The parent flag last: until every monthly variation has its marker, none of them may read as pay as you go.
+		if ( ! $keep && ! in_array( (string) get_post_meta( $pid, Rates::META_BILLING, true ), array( Rates::KIND_HOURLY, Rates::KIND_COUNTED ), true ) ) {
+			self::put( $manifest, $pid, Rates::META_BILLING, $p['kind'] );
 		}
 	}
 
@@ -467,7 +470,9 @@ final class PaygSplit {
 			}
 		}
 
+		// Recorded and saved BEFORE the write, so a run killed here is still undone exactly.
 		$manifest['meta'][] = array( $id, $key, $old );
+		self::save( $manifest );
 		update_post_meta( $id, $key, $value );
 	}
 

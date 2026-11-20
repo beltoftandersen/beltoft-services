@@ -273,6 +273,19 @@ class PaygSplitTest extends UsageTestCase {
 		$this->assertTrue( Rates::is_counted( $v['counted']->get_id() ) );
 	}
 
+	public function test_a_trashed_monthly_variation_gets_the_marker_and_stays_monthly(): void {
+		$v  = $this->twin_shop();
+		$id = $v['m-Daily']->get_id();
+		wp_trash_post( $id );
+
+		$this->assertTrue( PaygSplit::run( true )['ok'] );
+
+		$this->assertSame( 'monthly', get_post_meta( $id, Rates::META_BILLING, true ) );
+		$this->assertFalse( Rates::is_usage( $id ) );
+		$this->assertTrue( PaygSplit::run( false, true )['ok'] );
+		$this->assertSame( '', get_post_meta( $id, Rates::META_BILLING, true ) );
+	}
+
 	public function test_a_live_monthly_subscription_is_left_alone(): void {
 		$v = $this->twin_shop();
 

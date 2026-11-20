@@ -270,6 +270,53 @@ final class Offers {
 	 * @param \WC_Product_Variable  $product   Parent.
 	 * @param \WC_Product_Variation $variation Variation.
 	 */
+	/**
+	 * Attributes whose value is the same on every plan on sale (e.g. a Billing value left over from before pay as you go got its own
+	 * product): they tell the customer nothing, so the plan name leaves them out.
+	 *
+	 * @param \WC_Product_Variable $product Product.
+	 * @return array<string, true>
+	 */
+	private static function same_everywhere( \WC_Product_Variable $product ): array {
+		static $memo = array();
+		$pid = $product->get_id();
+
+		if ( isset( $memo[ $pid ] ) ) {
+			return $memo[ $pid ];
+		}
+
+		$seen = array();
+		$on   = 0;
+
+		foreach ( $product->get_children() as $id ) {
+			$v = wc_get_product( $id );
+
+			if ( ! $v instanceof \WC_Product_Variation || 'publish' !== $v->get_status() ) {
+				continue;
+			}
+
+			++$on;
+
+			foreach ( $v->get_attributes() as $key => $value ) {
+				$seen[ $key ][ (string) $value ] = true;
+			}
+		}
+
+		$out = array();
+
+		if ( $on > 1 ) {
+			foreach ( $seen as $key => $values ) {
+				if ( 1 === count( $values ) && '' !== (string) array_key_first( $values ) ) {
+					$out[ $key ] = true;
+				}
+			}
+		}
+
+		$memo[ $pid ] = $out;
+
+		return $out;
+	}
+
 	public static function label( \WC_Product_Variable $product, \WC_Product_Variation $variation ): string {
 		$mine    = $variation->get_attributes();
 		$sibling = Backups::sibling( $variation, true, false );
@@ -285,6 +332,7 @@ final class Offers {
 			}
 		}
 
+		$skip += self::same_everywhere( $product );
 		$words = array();
 
 		foreach ( $mine as $key => $value ) {

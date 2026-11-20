@@ -792,4 +792,42 @@ class ServerPickerTest extends BackupTestCase {
 		$this->assertSame( 'keep', $this->server_lines()[0][ Picked::KEY ]['name'] );
 		$this->assertSame( $this->v['a-Daily']->get_id(), (int) $this->server_lines()[0]['variation_id'] );
 	}
+
+	public function test_a_billing_value_shared_by_every_plan_is_left_out_of_the_plan_name(): void {
+		$product = new \WC_Product_Variable();
+		$product->set_name( 'Left over ' . wp_generate_password( 4, false ) );
+		$product->set_status( 'publish' );
+		$attrs = array();
+		foreach ( array( 'Size' => array( 'Small', 'Large' ), 'Billing' => array( 'Monthly', 'Pay as you go' ) ) as $name => $opts ) {
+			$a = new \WC_Product_Attribute();
+			$a->set_name( $name );
+			$a->set_options( $opts );
+			$a->set_visible( true );
+			$a->set_variation( true );
+			$attrs[] = $a;
+		}
+		$product->set_attributes( $attrs );
+		$product->save();
+		$vs = array();
+		foreach ( array( 'Small', 'Large' ) as $size ) {
+			$v = new \WC_Product_Variation();
+			$v->set_parent_id( $product->get_id() );
+			$v->set_attributes( array( 'size' => $size, 'billing' => 'Pay as you go' ) );
+			$v->set_regular_price( '0' );
+			$v->set_status( 'publish' );
+			$v->save();
+			$vs[] = $v;
+		}
+		// A monthly plan off sale does not count.
+		$m = new \WC_Product_Variation();
+		$m->set_parent_id( $product->get_id() );
+		$m->set_attributes( array( 'size' => 'Small', 'billing' => 'Monthly' ) );
+		$m->set_regular_price( '9' );
+		$m->set_status( 'private' );
+		$m->save();
+		$product = wc_get_product( $product->get_id() );
+
+		$this->assertSame( 'Small', \BeltoftServices\Proxmox\Vm\Offers::label( $product, $vs[0] ) );
+		$this->assertSame( 'Large', \BeltoftServices\Proxmox\Vm\Offers::label( $product, $vs[1] ) );
+	}
 }
