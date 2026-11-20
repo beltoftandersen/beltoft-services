@@ -81,6 +81,42 @@ final class PaygCommand {
 	}
 
 	/**
+	 * One-off: turns the twin products into pay as you go products (plan 2026-11-20-payg-own-product.md, part D).
+	 *
+	 * Copies each pay as you go variation's old monthly price into its own meta, flags the parent, marks every monthly variation
+	 * monthly and private, and refuses (and undoes) when a figure differs. Dry run unless --apply. Idempotent.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--apply]
+	 * : Write the changes.
+	 *
+	 * [--rollback]
+	 * : Restore the stored manifest exactly.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp beltoft-services payg split
+	 *     wp beltoft-services payg split --apply
+	 *
+	 * @param string[]              $args       Positional arguments.
+	 * @param array<string, string> $assoc_args Flags.
+	 */
+	public function split( array $args, array $assoc_args ): void {
+		$result = PaygSplit::run( isset( $assoc_args['apply'] ), isset( $assoc_args['rollback'] ) );
+
+		foreach ( $result['lines'] as $line ) {
+			\WP_CLI::log( $line );
+		}
+
+		if ( ! $result['ok'] ) {
+			\WP_CLI::error( 'The split did not finish.' );
+		}
+
+		\WP_CLI::success( 'Done.' );
+	}
+
+	/**
 	 * Finds a product by id or SKU.
 	 *
 	 * @param string $ref Id or SKU.
