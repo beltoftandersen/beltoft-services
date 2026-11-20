@@ -142,23 +142,12 @@ final class Renewal {
 		$name    = (string) $resource->get( 'server_name' );
 		$product = wc_get_product( (int) ( $resource->license()['product_id'] ?? 0 ) );
 
-		// The licence of an app is shown with its server: "web1 (Plesk)".
-		if ( \BeltoftServices\Apps\AppLicenceDriver::ID === $resource->get( 'driver' ) ) {
-			$server = \BeltoftServices\Apps\AppLicence::server_of( $resource );
-			$name   = $server ? (string) $server->get( 'server_name' ) : '';
-			$label  = $product ? $product->get_name() : '#' . $resource_id;
+		// An app licence and an extra disk are shown with their server: the driver says how.
+		$own = Items::driver_of( $resource ) ?? null;
+		$text = null === $own ? null : $own->usage_label( $resource );
 
-			return '' !== $name ? sprintf( '%1$s (%2$s)', $name, $label ) : $label;
-		}
-
-		// An extra disk is shown with its server ("Extra disk for web1"): its own product name says nothing to the customer.
-		if ( \BeltoftServices\Proxmox\Disk\DiskDriver::ID === $resource->get( 'driver' ) ) {
-			$server = Resource::for_license( (int) $resource->get( 'server_license' ) );
-			$name   = $server ? (string) $server->get( 'server_name' ) : '';
-			$name   = '' === $name && $server && '' !== (string) $server->get( 'uuid' ) ? 'vm-' . substr( (string) $server->get( 'uuid' ), 0, 8 ) : $name;
-			$parent = $server ? wc_get_product( (int) ( $server->license()['product_id'] ?? 0 ) ) : null;
-
-			return '' !== $name ? $name : ( $parent ? $parent->get_name() : ( $product ? $product->get_name() : '#' . $resource_id ) );
+		if ( null !== $text ) {
+			return $text;
 		}
 
 		// A server without a name of its own is called as on its page: vm-<first 8 characters of the uuid>.
@@ -185,16 +174,7 @@ final class Renewal {
 			return Items::title( $counted );
 		}
 
-		$labels = array(
-			'server'    => __( 'server', 'beltoft-services' ),
-			'database'  => __( 'database', 'beltoft-services' ),
-			'backups'   => __( 'backups', 'beltoft-services' ),
-			'disk'      => __( 'extra disk', 'beltoft-services' ),
-			'snapshots' => __( 'snapshot slots', 'beltoft-services' ),
-			'app'       => __( 'app licence', 'beltoft-services' ),
-		);
-
-		return $labels[ $item ] ?? $item;
+		return Items::words( $item, 'label' );
 	}
 
 	/**
@@ -397,20 +377,14 @@ final class Renewal {
 			return '#' . $resource_id;
 		}
 
-		$owner = null;
+		$own  = Items::driver_of( $resource );
+		$text = null === $own ? null : $own->usage_reference( $resource );
 
-		// A dedicated server has a fixed name of its own (dedicated-<8 characters>), not a vm- one.
-		if ( \BeltoftServices\ManualServer\ManualServerDriver::ID === $resource->get( 'driver' ) ) {
-			return self::label( $resource_id );
+		if ( null !== $text ) {
+			return $text;
 		}
 
-		if ( \BeltoftServices\Proxmox\Disk\DiskDriver::ID === $resource->get( 'driver' ) ) {
-			$owner = Resource::for_license( (int) $resource->get( 'server_license' ) );
-		} elseif ( \BeltoftServices\Apps\AppLicenceDriver::ID === $resource->get( 'driver' ) ) {
-			$owner = \BeltoftServices\Apps\AppLicence::server_of( $resource );
-		}
-
-		$uuid = (string) ( $owner ?? $resource )->get( 'uuid' );
+		$uuid = (string) $resource->get( 'uuid' );
 
 		return '' !== $uuid ? 'vm-' . substr( $uuid, 0, 8 ) : self::label( $resource_id );
 	}
@@ -441,7 +415,7 @@ final class Renewal {
 			return sprintf( /* translators: 1: what is counted with its step ("Orders processed, step 2"), 2: service name. */ _x( '%1$s (%2$s)', 'usage invoice line title', 'beltoft-services' ), Items::title( $counted ), $label );
 		}
 
-		if ( in_array( $item, array( 'server', 'database' ), true ) ) {
+		if ( Items::is_plan( $item ) ) {
 			$resource  = Resource::find( $resource_id );
 			$licence   = $resource ? $resource->license() : array();
 			$parent    = wc_get_product( (int) ( $licence['product_id'] ?? 0 ) );
@@ -459,13 +433,7 @@ final class Renewal {
 			return self::line_subject( $item, $label );
 		}
 
-		$words = array(
-			'backups'   => __( 'Backups', 'beltoft-services' ),
-			'disk'      => __( 'Extra disk', 'beltoft-services' ),
-			'snapshots' => __( 'Snapshot slots', 'beltoft-services' ),
-			'app'       => __( 'App licence', 'beltoft-services' ),
-		);
-		$what  = ( $words[ $item ] ?? $item ) . ( 'hour' === $unit ? '' : ' ' . trim( self::quantity_note( $quantity, $unit ), ' ()' ) );
+		$what  = Items::words( $item, 'word' ) . ( 'hour' === $unit ? '' : ' ' . trim( self::quantity_note( $quantity, $unit ), ' ()' ) );
 
 		return sprintf( /* translators: 1: product and plan, 2: server or database name. */ _x( '%1$s (%2$s)', 'usage invoice line title', 'beltoft-services' ), $what, $label );
 	}
@@ -483,25 +451,14 @@ final class Renewal {
 			return sprintf( /* translators: 1: what is counted with its step ("Orders processed, step 2"), 2: service name. */ _x( '%1$s (%2$s)', 'usage invoice line title', 'beltoft-services' ), Items::title( $counted ), $label );
 		}
 
-		if ( 'server' === $item ) {
-			/* translators: %s: server name. */
-			return sprintf( __( 'Server %s', 'beltoft-services' ), $label );
-		}
+		$subject = (string) ( Items::hourly( $item )['subject'] ?? '' );
 
-		if ( 'database' === $item ) {
-			/* translators: %s: database name. */
-			return sprintf( __( 'Database %s', 'beltoft-services' ), $label );
+		if ( '' !== $subject ) {
+			return sprintf( $subject, $label );
 		}
-
-		$words = array(
-			'backups'   => __( 'Backups', 'beltoft-services' ),
-			'disk'      => __( 'Extra disk', 'beltoft-services' ),
-			'snapshots' => __( 'Snapshot slots', 'beltoft-services' ),
-			'app'       => __( 'App licence', 'beltoft-services' ),
-		);
 
 		/* translators: 1: item (Backups, Extra disk), 2: server name. */
-		return sprintf( __( '%1$s for %2$s', 'beltoft-services' ), $words[ $item ] ?? $item, $label );
+		return sprintf( __( '%1$s for %2$s', 'beltoft-services' ), Items::words( $item, 'word' ), $label );
 	}
 
 	/**

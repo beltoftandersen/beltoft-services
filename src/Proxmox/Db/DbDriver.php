@@ -10,6 +10,7 @@ namespace BeltoftServices\Proxmox\Db;
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
+use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Network\Ipv6Switch;
 use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
@@ -266,5 +267,65 @@ class DbDriver extends ProxmoxDriver {
 
 	public function render_account( Resource $r ): void {
 		DbCard::render( $r );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @param Resource              $r       Resource.
+	 * @param \WC_Product_Variation $v       Variation.
+	 * @param float                 $monthly Monthly price.
+	 * @param float                 $premium Premium.
+	 */
+	public function usage_items( Resource $r, \WC_Product_Variation $v, float $monthly, float $premium ): array { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- interface.
+		// One item: the variation's price already holds the extra storage the plan was bought with, so the hourly rate is that price / 730 and the cap that price.
+		return array( array( 'item' => 'database', 'quantity' => 1.0, 'unit' => 'hour', 'rate' => \BeltoftServices\Usage\Rates::hourly( $monthly, $premium ) ) );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function usage_words(): array {
+		/* translators: %s: database name. */
+		return array( 'database' => array( 'label' => __( 'database', 'beltoft-services' ), 'word' => __( 'Database', 'beltoft-services' ), 'plan' => true, 'subject' => __( 'Database %s', 'beltoft-services' ) ) );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public function usage_delete(): ?array {
+		return array(
+			'kind'    => 'database',
+			'text'    => __( 'Deleting removes the database and all its data, including backups. It cannot be undone. Billing stops in the hour it is deleted.', 'beltoft-services' ),
+			'billing' => __( 'The database is billed every hour it exists. Delete it to stop the charge.', 'beltoft-services' ),
+			'stopped' => __( 'A stopped database is still billed. Delete it to stop the charge.', 'beltoft-services' ),
+			'busy'    => __( 'Something is still running on this database, such as a setup or a restore. Please try again when it has finished.', 'beltoft-services' ),
+		);
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public function usage_breakdown(): ?array {
+		return array(
+			'single_line' => true,
+			'data_disk'   => true,
+			'parts'       => static function ( \WC_Product_Variation $usage, \WC_Product_Variation $full, callable $price ): array {
+				$bare    = DbDisk::ladder( $full )[0] ?? $full;
+				$no_ip   = DbIp::plan_wants( Product::plan( $usage->get_parent_id(), $bare->get_id() ) ) ? \BeltoftServices\Proxmox\Backup\Backups::sibling_by( $bare, 'public_ip', false ) : null;
+
+				return array(
+					'base'    => $no_ip ? $price( $no_ip ) : $price( $bare ),
+					'ip'      => $no_ip ? $price( $bare ) - $price( $no_ip ) : 0.0,
+					'storage' => $price( $full ) - $price( $bare ),
+					'backups' => 0.0,
+					'gb'      => DbDisk::extra( Product::plan( $usage->get_parent_id(), $full->get_id() ) ),
+				);
+			},
+		);
 	}
 }

@@ -12,6 +12,7 @@ use BeltoftServices\Drivers\NeedsBilling;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Drivers\StopsOnDelete;
 use BeltoftServices\Reconciler;
+use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -22,7 +23,9 @@ defined( 'ABSPATH' ) || exit;
  * the service to `ready`, which starts the hourly meter and sends the service ready email. Pause, resume and delete only
  * tell staff what to do by hand. A delete ends the activation, and with it the billing, at once.
  */
-final class ManualServerDriver implements Driver, StopsOnDelete, NeedsBilling, \BeltoftServices\Drivers\TakesSshKey, \BeltoftServices\Drivers\InternalActions {
+final class ManualServerDriver implements Driver, StopsOnDelete, NeedsBilling, \BeltoftServices\Drivers\TakesSshKey, \BeltoftServices\Drivers\InternalActions, \BeltoftServices\Drivers\UsageItems {
+
+	use \BeltoftServices\Drivers\UsageDefaults;
 	public const ID   = 'manual-server';
 	public const KIND = 'dedicated';
 
@@ -202,5 +205,61 @@ final class ManualServerDriver implements Driver, StopsOnDelete, NeedsBilling, \
 	 */
 	public function render_admin( Resource $r ): void {
 		ManualServerPanel::admin( $r );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @param Resource              $r       Resource.
+	 * @param \WC_Product_Variation $v       Variation.
+	 * @param float                 $monthly Monthly price.
+	 * @param float                 $premium Premium.
+	 */
+	public function usage_items( Resource $r, \WC_Product_Variation $v, float $monthly, float $premium ): array { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- interface.
+		// A dedicated server: one item, the variation's price / 730 an hour. With the product premium 0 the monthly cap is the monthly price.
+		return array( array( 'item' => 'server', 'quantity' => 1.0, 'unit' => 'hour', 'rate' => \BeltoftServices\Usage\Rates::hourly( $monthly, $premium ) ) );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function usage_words(): array {
+		return ProxmoxDriver::server_words();
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function usage_billing_choice(): bool {
+		return true;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * A dedicated server has a fixed name of its own (dedicated-<8 characters>), not a vm- one.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public function usage_reference( Resource $r ): ?string {
+		return \BeltoftServices\Usage\Renewal::label( $r->id() );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public function usage_delete(): ?array {
+		return array(
+			'kind'    => 'dedicated',
+			'text'    => __( 'Cancelling ends the server at once. All its data is deleted at once and cannot be brought back. It cannot be undone. Billing stops in the hour you cancel.', 'beltoft-services' ),
+			'billing' => __( 'The server is billed by the hour from the hour it is ready, and never more than the monthly price in a calendar month. Cancel it to stop the charge.', 'beltoft-services' ),
+			'stopped' => __( 'A stopped server is still billed. Delete it to stop the charge.', 'beltoft-services' ),
+			'busy'    => __( 'Something is still running on this database, such as a setup or a restore. Please try again when it has finished.', 'beltoft-services' ),
+			// A dedicated server is cancelled once it is delivered; a lapsed (paused) one may be cancelled too, to stop the billing.
+			'early'   => static fn( Resource $r ): ?string => in_array( (string) $r->get( 'state' ), array( 'ready', 'paused' ), true ) ? null : __( 'Your server is still being set up. Please contact support if you want to cancel it before it is delivered.', 'beltoft-services' ),
+			'idle'    => static fn( Resource $r ): bool => null === $r->pending_desire(),
+		);
 	}
 }

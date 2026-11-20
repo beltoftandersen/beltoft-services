@@ -17,7 +17,10 @@ defined( 'ABSPATH' ) || exit;
  * server up to date, answers its alerts and checks its backups while the resource is ready and its licence is active
  * (ManagedMeta::counts). The admin is told when one starts, so the work is picked up.
  */
-final class ManagedDriver implements Driver {
+final class ManagedDriver implements Driver, \BeltoftServices\Drivers\UsageItems {
+
+	use \BeltoftServices\Drivers\UsageDefaults;
+
 	public const ID = 'proxmox-managed';
 
 	public function id(): string {
@@ -129,5 +132,24 @@ final class ManagedDriver implements Driver {
 		echo '<tr><th scope="row">' . esc_html__( 'Server license', 'beltoft-services' ) . '</th><td>' . esc_html( (string) $r->get( 'server_license' ) ) . '</td></tr>';
 		echo '<tr><th scope="row">' . esc_html__( 'Server resource', 'beltoft-services' ) . '</th><td>' . esc_html( $server ? (string) $server->id() : '' ) . '</td></tr>';
 		echo '</tbody></table>';
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @param Resource              $r       Resource.
+	 * @param \WC_Product_Variation $v       Variation.
+	 * @param float                 $monthly Monthly price.
+	 * @param float                 $premium Premium.
+	 */
+	public function usage_items( Resource $r, \WC_Product_Variation $v, float $monthly, float $premium ): array { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- interface.
+		return array( array( 'item' => 'managed', 'quantity' => 1.0, 'unit' => 'hour', 'rate' => \BeltoftServices\Usage\Rates::hourly( $monthly, $premium ) ) );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function usage_words(): array {
+		return array( 'managed' => array( 'label' => __( 'managed server', 'beltoft-services' ), 'word' => __( 'Managed server', 'beltoft-services' ) ) );
 	}
 }

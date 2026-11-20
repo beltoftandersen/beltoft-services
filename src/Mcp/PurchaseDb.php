@@ -109,12 +109,8 @@ final class PurchaseDb {
 			return $quote;
 		}
 
-		// The choices must be ones that can be bought now. A public IPv4 address is an add-on of its own, bought in the dashboard.
+		// The choices must be ones that can be bought now.
 		$with = wc_get_product( (int) $plan['variation_id'] );
-
-		if ( $ip ) {
-			return $fail( Pricing::ipv4_text() );
-		}
 
 		if ( $gb > 0 && $with instanceof \WC_Product_Variation ) {
 			$step = DbDisk::ladder( $with )[ $gb ] ?? null;
@@ -143,6 +139,11 @@ final class PurchaseDb {
 
 			if ( $gb > 0 && ! DbDiskField::swap( $gb )['ok'] ) {
 				return __( 'The extra storage could not be added. Choose another size or try again later.', 'beltoft-services' );
+			}
+
+			// The pay as you go IPv4 address is a cart line of its own, chosen the way the checkout's address line chooses it.
+			if ( $ip && ! \BeltoftServices\Proxmox\Ipv4\Ipv4Field::choose( 1 )['ok'] ) {
+				return __( 'The IPv4 address could not be added. Order without it, or add it later in the dashboard.', 'beltoft-services' );
 			}
 
 			return null;

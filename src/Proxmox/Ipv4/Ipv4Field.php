@@ -14,6 +14,7 @@ use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Vm\Panels;
 use BeltoftServices\Proxmox\Vm\VpsProfile;
+use BeltoftServices\Usage\Rates;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -45,7 +46,7 @@ final class Ipv4Field {
 	 * @return array{kind: string, max: int, box: bool}|null Null: no line.
 	 */
 	public static function target(): ?array {
-		if ( null === Ipv4Cart::product() ) {
+		if ( null === Ipv4Cart::product( Ipv4Cart::cart_parent_usage() ) ) {
 			return null;
 		}
 
@@ -89,8 +90,8 @@ final class Ipv4Field {
 			return;
 		}
 
-		$product = Ipv4Cart::product();
-		$price   = $product instanceof \WC_Product_Variation ? Panels::price_text( $product ) : ( $product ? wp_strip_all_tags( wc_price( (float) wc_get_price_to_display( $product ) ) ) . Panels::per( $product ) : '' );
+		$product = Ipv4Cart::product( Ipv4Cart::cart_parent_usage() );
+		$price   = $product instanceof \WC_Product_Variation && Rates::is_usage( $product ) ? Rates::addon_terms( $product ) : ( $product instanceof \WC_Product_Variation ? Panels::price_text( $product ) : ( $product ? wp_strip_all_tags( wc_price( (float) wc_get_price_to_display( $product ) ) ) . Panels::per( $product ) : '' ) );
 		$chosen  = self::chosen();
 		$free    = IpPool::available_for_addon() > 0 || $chosen > 0;
 		/* translators: %s: the price, such as 19 kr. a month */
@@ -191,7 +192,7 @@ final class Ipv4Field {
 	public static function choose( int $count ): array {
 		$target  = self::target();
 		$cart    = function_exists( 'WC' ) ? WC()->cart : null;
-		$product = Ipv4Cart::product();
+		$product = Ipv4Cart::product( Ipv4Cart::cart_parent_usage() );
 
 		if ( null === $target || ! $cart || null === $product ) {
 			return array( 'ok' => false, 'count' => 0 );
@@ -228,6 +229,25 @@ final class Ipv4Field {
 		}
 
 		return array( 'ok' => true, 'count' => self::chosen() );
+	}
+
+	/**
+	 * After the billing of the cart's server was swapped (BillingField), the address lines follow: each goes back as its twin of the
+	 * other billing, or leaves the cart when there is none (as DiskField::rematch() does).
+	 */
+	public static function rematch(): void {
+		$count = self::chosen();
+		$usage = Ipv4Cart::cart_parent_usage();
+
+		foreach ( $count > 0 && WC()->cart ? WC()->cart->get_cart() : array() as $key => $item ) {
+			if ( 'cart_server' === ( $item['beltoft_services_ipv4_for'] ?? null ) && Rates::is_usage( (int) ( $item['variation_id'] ?? 0 ) ) !== $usage ) {
+				WC()->cart->remove_cart_item( (string) $key );
+			}
+		}
+
+		if ( $count > 0 && self::chosen() < $count ) {
+			self::choose( $count );
+		}
 	}
 
 	/**

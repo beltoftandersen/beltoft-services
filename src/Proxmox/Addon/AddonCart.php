@@ -180,9 +180,10 @@ final class AddonCart {
 	/**
 	 * The published, purchasable subscription (a variation or a simple product) of an add-on kind that is one product, or null.
 	 *
-	 * @param string $driver_id Driver id of the add-on.
+	 * @param string    $driver_id Driver id of the add-on.
+	 * @param bool|null $usage     True: the pay as you go variation, false: the monthly one, null: whichever the product has (a kind with one billing).
 	 */
-	public static function single_product( string $driver_id ): ?\WC_Product {
+	public static function single_product( string $driver_id, ?bool $usage = null ): ?\WC_Product {
 		if ( ! class_exists( '\\WC_Subscriptions_Product' ) ) {
 			return null;
 		}
@@ -193,8 +194,15 @@ final class AddonCart {
 			$product = wc_get_product( $id );
 
 			if ( $product instanceof \WC_Product_Variable ) {
-				foreach ( $product->get_available_variations( 'objects' ) as $variation ) {
-					if ( \WC_Subscriptions_Product::is_subscription( $variation ) && $variation->is_purchasable() ) {
+				// A pay as you go variation has no price at checkout, so WooCommerce hides it from the available ones: read the children.
+				$variations = true === $usage ? array_filter( array_map( 'wc_get_product', $product->get_children() ) ) : $product->get_available_variations( 'objects' );
+
+				foreach ( $variations as $variation ) {
+					if ( ! $variation instanceof \WC_Product_Variation || ( null !== $usage && \BeltoftServices\Usage\Rates::is_usage( $variation ) !== $usage ) ) {
+						continue;
+					}
+
+					if ( ( true === $usage || \WC_Subscriptions_Product::is_subscription( $variation ) ) && 'publish' === $variation->get_status() && $variation->is_purchasable() ) {
 						return $variation;
 					}
 				}

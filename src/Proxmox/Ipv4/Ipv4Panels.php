@@ -50,7 +50,7 @@ final class Ipv4Panels {
 			return null;
 		}
 
-		$product = Ipv4Cart::product();
+		$product = Ipv4Cart::product_for( $parent );
 		$entries = Ipv4Meta::addresses( $parent );
 		$db      = Ipv4Meta::is_db( $parent );
 
@@ -63,7 +63,9 @@ final class Ipv4Panels {
 
 		foreach ( $entries as $entry ) {
 			$addon        = $entry['addon'];
-			$subscription = function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( (int) ( $addon->license()['subscription_id'] ?? 0 ) ) : null;
+			// A pay as you go address has no subscription of its own: it is removed through the usage engine (CustomerDelete), like a pay as you go disk.
+			$usage        = 'usage' === (string) ( $addon->license()['source'] ?? '' );
+			$subscription = ! $usage && function_exists( 'wcs_get_subscription' ) ? wcs_get_subscription( (int) ( $addon->license()['subscription_id'] ?? 0 ) ) : null;
 			$actions      = $subscription instanceof \WC_Subscription && function_exists( 'wcs_get_all_user_actions_for_subscription' ) ? wcs_get_all_user_actions_for_subscription( $subscription, get_current_user_id() ) : array();
 			$ending       = $subscription instanceof \WC_Subscription && $subscription->has_status( 'pending-cancel' );
 			$extras      += 'extra' === $entry['role'] ? 1 : 0;
@@ -77,6 +79,7 @@ final class Ipv4Panels {
 				'live'       => $entry['live'],
 				'ending'     => $ending ? self::end_date( $subscription ) : '',
 				'remove_url' => $entry['live'] && ! $ending && ! $locked && '' === Ipv4Server::working( $parent ) ? (string) ( $actions['cancel']['url'] ?? '' ) : '',
+				'delete_id'  => $usage && $entry['live'] && null === \BeltoftServices\Usage\CustomerDelete::blocker( $addon ) ? $addon->id() : 0,
 				'undo_url'   => $ending ? (string) ( $actions['reactivate']['url'] ?? '' ) : '',
 			);
 		}
@@ -87,7 +90,7 @@ final class Ipv4Panels {
 
 		if ( '' !== $add_url && null !== $product ) {
 			$variation = $product instanceof \WC_Product_Variation ? $product : null;
-			$price     = null === $variation ? '' : (string) \BeltoftServices\Currency::with_resource( $parent, static fn() => Panels::price_text( $variation ), '' );
+			$price     = null === $variation ? '' : (string) \BeltoftServices\Currency::with_resource( $parent, static fn() => \BeltoftServices\Usage\Rates::is_usage( $variation ) ? \BeltoftServices\Usage\Rates::addon_terms( $variation ) : Panels::price_text( $variation ), '' );
 		}
 
 		return array(
@@ -157,7 +160,7 @@ final class Ipv4Panels {
 	 * The database page's part: the answer DbAccess::view() gives for the address buttons.
 	 *
 	 * @param Resource $db Database.
-	 * @return array{add_url: string, add_price: string, sold_out: bool, remove_url: string, adding: bool, removing: bool}
+	 * @return array{add_url: string, add_price: string, sold_out: bool, remove_url: string, delete_id: int, adding: bool, removing: bool}
 	 */
 	public static function database( Resource $db ): array {
 		$view    = self::view( $db );
@@ -169,6 +172,7 @@ final class Ipv4Panels {
 			'add_price'  => null === $view || '' !== $address ? '' : $view['add_price'],
 			'sold_out'   => '' === $address && null !== $view && $view['sold_out'],
 			'remove_url' => null === $row ? '' : (string) $row['remove_url'],
+			'delete_id'  => null === $row ? 0 : (int) $row['delete_id'],
 			'adding'     => '' === $address && Ipv4Meta::db_wants( $db ),
 			'removing'   => 'remove' === \BeltoftServices\Proxmox\Db\DbIp::action( $db ),
 		);

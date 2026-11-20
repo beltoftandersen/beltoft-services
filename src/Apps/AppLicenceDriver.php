@@ -19,7 +19,10 @@ defined( 'ABSPATH' ) || exit;
  * What it does is keep the link to the server and tell a later vendor driver when the licence changes
  * (see AppLicence for the event and how a vendor plugs in).
  */
-final class AppLicenceDriver implements Driver {
+final class AppLicenceDriver implements Driver, \BeltoftServices\Drivers\UsageItems {
+
+	use \BeltoftServices\Drivers\UsageDefaults;
+
 	public const ID = 'proxmox-app';
 
 	/** The server wait ends after this many seconds without the server's license appearing in the order. */
@@ -296,5 +299,52 @@ final class AppLicenceDriver implements Driver {
 		}
 
 		echo '</tbody></table>';
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @param Resource              $r       Resource.
+	 * @param \WC_Product_Variation $v       Variation.
+	 * @param float                 $monthly Monthly price.
+	 * @param float                 $premium Premium.
+	 */
+	public function usage_items( Resource $r, \WC_Product_Variation $v, float $monthly, float $premium ): array { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- interface.
+		return array( array( 'item' => 'app', 'quantity' => 1.0, 'unit' => 'hour', 'rate' => \BeltoftServices\Usage\Rates::hourly( $monthly, $premium ) ) );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function usage_words(): array {
+		return array( 'app' => array( 'label' => __( 'app licence', 'beltoft-services' ), 'word' => __( 'App licence', 'beltoft-services' ) ) );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * A licence is shown with its server: "web1 (Plesk)".
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public function usage_label( Resource $r ): ?string {
+		$product = wc_get_product( (int) ( $r->license()['product_id'] ?? 0 ) );
+		$server  = AppLicence::server_of( $r );
+		$name    = $server ? (string) $server->get( 'server_name' ) : '';
+		$label   = $product ? $product->get_name() : '#' . $r->id();
+
+		return '' !== $name ? sprintf( '%1$s (%2$s)', $name, $label ) : $label;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public function usage_reference( Resource $r ): ?string {
+		$server = AppLicence::server_of( $r );
+		$uuid   = (string) ( $server ?? $r )->get( 'uuid' );
+
+		return '' !== $uuid ? 'vm-' . substr( $uuid, 0, 8 ) : null;
 	}
 }

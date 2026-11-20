@@ -7,12 +7,16 @@ use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Drivers\ProvisionSteps;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
+use BeltoftServices\Product;
 use BeltoftServices\Resource;
+use BeltoftServices\Usage\Rates;
 
 defined( 'ABSPATH' ) || exit;
 
 /** One subscription and resource per extra disk. */
-final class DiskDriver implements Driver, ProvisionSteps {
+final class DiskDriver implements Driver, ProvisionSteps, \BeltoftServices\Drivers\UsageItems {
+
+	use \BeltoftServices\Drivers\UsageDefaults;
 	public const ID = 'proxmox-disk';
 
 	/** Use the server retention default unless the disk product sets its own period. */
@@ -123,5 +127,128 @@ final class DiskDriver implements Driver, ProvisionSteps {
 
 	public function render_admin( Resource $r ): void {
 		DiskPanels::admin( $r );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @param Resource              $r       Resource.
+	 * @param \WC_Product_Variation $v       Variation.
+	 * @param float                 $monthly Monthly price.
+	 * @param float                 $premium Premium.
+	 */
+	public function usage_items( Resource $r, \WC_Product_Variation $v, float $monthly, float $premium ): array {
+		list( $gb, $basis ) = self::usage_basis( $r, $v, $monthly );
+
+		return $gb > 0 ? array( array( 'item' => 'disk', 'quantity' => $gb, 'unit' => 'GB', 'rate' => Rates::hourly( $basis / $gb, $premium ) ) ) : array();
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function usage_words(): array {
+		return array( 'disk' => array( 'label' => __( 'extra disk', 'beltoft-services' ), 'word' => __( 'Extra disk', 'beltoft-services' ) ) );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function usage_is_addon(): bool {
+		return true;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * An extra disk is shown with its server ("Extra disk for web1"): its own product name says nothing to the customer.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public function usage_label( Resource $r ): ?string {
+		$server  = Resource::for_license( (int) $r->get( 'server_license' ) );
+		$name    = $server ? (string) $server->get( 'server_name' ) : '';
+		$name    = '' === $name && $server && '' !== (string) $server->get( 'uuid' ) ? 'vm-' . substr( (string) $server->get( 'uuid' ), 0, 8 ) : $name;
+		$parent  = $server ? wc_get_product( (int) ( $server->license()['product_id'] ?? 0 ) ) : null;
+		$product = wc_get_product( (int) ( $r->license()['product_id'] ?? 0 ) );
+
+		return '' !== $name ? $name : ( $parent ? $parent->get_name() : ( $product ? $product->get_name() : '#' . $r->id() ) );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public function usage_reference( Resource $r ): ?string {
+		$server = Resource::for_license( (int) $r->get( 'server_license' ) );
+		$uuid   = (string) ( $server ?? $r )->get( 'uuid' );
+
+		return '' !== $uuid ? 'vm-' . substr( $uuid, 0, 8 ) : null;
+	}
+
+	/**
+	 * The size and the monthly price an extra disk is metered by. Normally the licence's variation: its plan size and its
+	 * price. While a grow is pending (the plan asks for more than the disk really has, `size_gb` being what the driver
+	 * measured) the disk is metered by the size it really has, at the price of the variation of that size (or, when no such
+	 * variation exists, the same price per GB), so the customer pays for the larger size only from the hour the disk is larger.
+	 *
+	 * @param Resource              $r       Disk.
+	 * @param \WC_Product_Variation $v       The licence's variation.
+	 * @param float                 $monthly Its monthly price.
+	 * @return array{0: float, 1: float} GB and the monthly price for that many.
+	 */
+	private static function usage_basis( Resource $r, \WC_Product_Variation $v, float $monthly ): array {
+		$planned = (float) ( ( (array) $r->get( 'plan' ) )['disk_gb'] ?? 0 );
+		$real    = (float) $r->get( 'size_gb' );
+
+		if ( $planned <= 0 || $real <= 0 || $real >= $planned ) {
+			return array( $planned, $monthly );
+		}
+
+		foreach ( DiskField::sizes_for( true ) as $candidate ) {
+			$size = (float) ( Product::plan( $candidate->get_parent_id(), $candidate->get_id() )['disk_gb'] ?? 0 );
+
+			if ( $candidate->get_parent_id() === $v->get_parent_id() && $size === $real ) {
+				$price = Rates::monthly( $candidate );
+
+				if ( null !== $price ) {
+					return array( $real, $price );
+				}
+			}
+		}
+
+		return array( $real, $monthly * $real / $planned );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public function usage_delete(): ?array {
+		return array(
+			'kind'    => 'disk',
+			'text'    => __( 'Removing deletes the extra disk and all its data, including the snapshots that include it. It cannot be undone. Billing stops in the hour it is removed. The server and the usage account are not touched.', 'beltoft-services' ),
+			'billing' => __( 'The disk is billed by the hour while it exists. Remove it to stop the charge.', 'beltoft-services' ),
+			'stopped' => __( 'A stopped server is still billed. Delete it to stop the charge.', 'beltoft-services' ),
+			'busy'    => __( 'Something is still running on this disk, such as a setup or a resize. Please try again when it has finished.', 'beltoft-services' ),
+		);
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public function usage_breakdown(): ?array {
+		return array(
+			'extra' => array(
+				'key'      => 'disk',
+				'label'    => __( 'Extra disk', 'beltoft-services' ),
+				/* translators: %d: disk size in gigabytes */
+				'sized'    => __( 'Extra disk, %d GB', 'beltoft-services' ),
+				'size_key' => 'disk_gb',
+			),
+		);
 	}
 }

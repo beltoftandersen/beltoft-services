@@ -9,15 +9,12 @@ namespace BeltoftServices\Usage;
 
 use BeltoftServices\Billing\TaxNote;
 use BeltoftServices\Billing\CartFlow;
+use BeltoftServices\Drivers\Registry;
+use BeltoftServices\Drivers\UsageItems;
 use BeltoftServices\LineNames;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Backup\BackupField;
-use BeltoftServices\Proxmox\Db\DbDisk;
 use BeltoftServices\Proxmox\Db\DbDiskField;
-use BeltoftServices\Proxmox\Db\DbDriver;
-use BeltoftServices\Proxmox\Db\DbIp;
-use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -63,6 +60,37 @@ final class Breakdown {
 	}
 
 	/**
+	 * What the driver of a breakdown line declares (UsageItems::usage_breakdown()): parts, single_line, data_disk, extra.
+	 *
+	 * @param string $driver Driver id.
+	 * @return array<string, mixed>
+	 */
+	private static function declared( string $driver ): array {
+		$found = Registry::get( $driver );
+
+		return $found instanceof UsageItems ? (array) $found->usage_breakdown() : array();
+	}
+
+	/**
+	 * The add-ons that have a row of their own in a breakdown, as the drivers declare them: key (the part), label, sized label, size key.
+	 *
+	 * @return array<int, array{key: string, label: string, sized: string, size_key: string}>
+	 */
+	private static function extras(): array {
+		$out = array();
+
+		foreach ( Items::drivers() as $driver ) {
+			$extra = ( (array) $driver->usage_breakdown() )['extra'] ?? null;
+
+			if ( is_array( $extra ) ) {
+				$out[] = $extra;
+			}
+		}
+
+		return $out;
+	}
+
+	/**
 	 * The driver id of a pay-as-you-go server or database variation, or ''.
 	 *
 	 * @param mixed $product Product of a line.
@@ -73,9 +101,8 @@ final class Breakdown {
 		}
 
 		$driver = Product::driver_for( $product->get_parent_id() );
-		$id     = $driver ? $driver->id() : '';
 
-		return in_array( $id, array( DbDriver::ID, ProxmoxDriver::ID ), true ) ? $id : '';
+		return $driver instanceof UsageItems && isset( ( (array) $driver->usage_breakdown() )['parts'] ) ? $driver->id() : '';
 	}
 
 	/**
@@ -111,24 +138,14 @@ final class Breakdown {
 
 		$premium = Rates::premium( $usage->get_parent_id() );
 		$price   = static fn( \WC_Product_Variation $v ): float => (float) wc_get_price_excluding_tax( $v );
-		$ip      = 0.0;
-		$storage = 0.0;
-		$backups = 0.0;
-		$gb      = 0;
-		$base    = $price( $full );
 
-		if ( DbDriver::ID === $kind ) {
-			$bare    = DbDisk::ladder( $full )[0] ?? $full;
-			$storage = $price( $full ) - $price( $bare );
-			$gb      = DbDisk::extra( Product::plan( $usage->get_parent_id(), $full->get_id() ) );
-			$no_ip   = DbIp::plan_wants( Product::plan( $usage->get_parent_id(), $bare->get_id() ) ) ? Backups::sibling_by( $bare, 'public_ip', false ) : null;
-			$ip      = $no_ip ? $price( $bare ) - $price( $no_ip ) : 0.0;
-			$base    = $no_ip ? $price( $no_ip ) : $price( $bare );
-		} elseif ( (int) ( Product::plan( $usage->get_parent_id(), $full->get_id() )['backup_days'] ?? 0 ) > 0 ) {
-			$without = Backups::sibling( $full, false );
-			$backups = $without ? $price( $full ) - $price( $without ) : 0.0;
-			$base    = $without ? $price( $without ) : $price( $full );
-		}
+		// The driver works out the plan and its add-ons of its own line.
+		$own     = ( self::declared( $kind )['parts'] )( $usage, $full, $price );
+		$base    = (float) $own['base'];
+		$ip      = (float) $own['ip'];
+		$storage = (float) $own['storage'];
+		$backups = (float) $own['backups'];
+		$gb      = (int) $own['gb'];
 
 		return array(
 			'plan'       => Rates::cap( $base, $premium ),
@@ -198,7 +215,7 @@ final class Breakdown {
 		}
 
 		if ( (int) ( $plan['disk_gb'] ?? 0 ) > 0 ) {
-			$parts[] = DbDriver::ID === $kind
+			$parts[] = ! empty( self::declared( $kind )['data_disk'] )
 				/* translators: %d: data disk size in gigabytes */
 				? sprintf( __( '%d GB data disk', 'beltoft-services' ), (int) $plan['disk_gb'] )
 				/* translators: %d: disk size in gigabytes */
@@ -233,10 +250,11 @@ final class Breakdown {
 			$rows[] = array( __( 'Daily backups', 'beltoft-services' ), Rates::plus_per_month_line( (float) $parts['backups'], $tax, $shown['backups'] ?? null ) );
 		}
 
-		// The extra disk of a new server is a cart line of its own: its row is added by the caller that quotes it (parts['disk']).
-		if ( ( $parts['disk'] ?? 0 ) > 0 ) {
-			/* translators: %d: extra disk in GB */
-			$rows[] = array( ( $parts['disk_gb'] ?? 0 ) > 0 ? sprintf( __( 'Extra disk, %d GB', 'beltoft-services' ), (int) $parts['disk_gb'] ) : __( 'Extra disk', 'beltoft-services' ), Rates::plus_per_month_line( (float) $parts['disk'], $tax, $shown['disk'] ?? null ) );
+		// An add-on that is a cart line of its own (the extra disk of a new server): its row is added by the caller that quotes it (parts[key]).
+		foreach ( self::extras() as $extra ) {
+			if ( ( $parts[ $extra['key'] ] ?? 0 ) > 0 ) {
+				$rows[] = array( ( $parts[ $extra['size_key'] ] ?? 0 ) > 0 ? sprintf( $extra['sized'], (int) $parts[ $extra['size_key'] ] ) : $extra['label'], Rates::plus_per_month_line( (float) $parts[ $extra['key'] ], $tax, $shown[ $extra['key'] ] ?? null ) );
+			}
 		}
 
 		return $rows;
@@ -260,8 +278,10 @@ final class Breakdown {
 
 		$get   = static fn( string $key ): float => (float) ( $parts[ $key ] ?? 0 );
 		// A database is one ledger item (one line) whose cap is the maximum itself; a server's plan is its own line.
-		$first = DbDriver::ID === (string) ( $parts['driver'] ?? '' ) ? max( 0.0, $get( 'max' ) - $get( 'backups' ) - $get( 'disk' ) ) : $get( 'plan' ) + $get( 'ip' ) + $get( 'storage' );
-		$lines = array( $first, $get( 'backups' ), $get( 'disk' ) );
+		$keys   = array_merge( array( 'backups' ), array_column( self::extras(), 'key' ) );
+		$added  = array_sum( array_map( $get, $keys ) );
+		$first = ! empty( self::declared( (string) ( $parts['driver'] ?? '' ) )['single_line'] ) ? max( 0.0, $get( 'max' ) - $added ) : $get( 'plan' ) + $get( 'ip' ) + $get( 'storage' );
+		$lines = array_merge( array( $first ), array_map( $get, $keys ) );
 		$raw   = 0.0;
 
 		foreach ( $lines as $excl ) {
@@ -272,7 +292,7 @@ final class Breakdown {
 		$own    = array();
 		$others = 0.0;
 
-		foreach ( array( 'ip', 'storage', 'backups', 'disk' ) as $key ) {
+		foreach ( array_merge( array( 'ip', 'storage' ), $keys ) as $key ) {
 			$own[ $key ] = $get( $key ) > 0 ? round( TaxNote::usage_figure( $get( $key ), $usage ), 2 ) : 0.0;
 			$others     += $own[ $key ];
 		}

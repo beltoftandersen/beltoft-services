@@ -246,22 +246,33 @@ final class Pricing {
 	}
 
 	/**
+	 * The pay as you go IPv4 address that can be ordered with a new database now, or the refusal.
+	 *
+	 * @return \WC_Product_Variation|string
+	 */
+	public static function ipv4_twin() {
+		$twin = \BeltoftServices\Proxmox\Ipv4\Ipv4Cart::product( true );
+
+		if ( ! $twin instanceof \WC_Product_Variation || null === Rates::for_usage( $twin ) ) {
+			return self::ipv4_text();
+		}
+
+		return \BeltoftServices\Proxmox\Ipv4\Ipv4Cart::in_stock() ? $twin : __( 'No IPv4 address is free right now.', 'beltoft-services' );
+	}
+
+	/**
 	 * The Breakdown parts of a database plan with the choices.
 	 *
 	 * @param int  $plan_id Plan id.
-	 * @param bool $ip      With the public IPv4 address.
+	 * @param bool $ip      Unused (an address is added to the quote by quote()).
 	 * @param int  $gb      Extra storage in GB.
 	 * @return array<string, mixed>|string The parts, or the refusal.
 	 */
-	private static function database_parts( int $plan_id, bool $ip, int $gb ) {
+	private static function database_parts( int $plan_id, bool $ip, int $gb ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- kept for the callers.
 		$target = wc_get_product( $plan_id );
 
 		if ( ! $target instanceof \WC_Product_Variation ) {
 			return __( 'This plan is not offered.', 'beltoft-services' );
-		}
-
-		if ( $ip ) {
-			return self::ipv4_text();
 		}
 
 		if ( $gb > 0 ) {
@@ -362,13 +373,27 @@ final class Pricing {
 				return $fail( __( 'Backups of a database are included.', 'beltoft-services' ) );
 			}
 
-			$got = self::database_parts( $id, $ip, $gb );
+			$address = $ip ? self::ipv4_twin() : null;
+
+			if ( is_string( $address ) ) {
+				return $fail( $address );
+			}
+
+			$got = self::database_parts( $id, false, $gb );
 
 			if ( is_string( $got ) ) {
 				return $fail( $got );
 			}
 
 			$parts = $got;
+
+			if ( $address instanceof \WC_Product_Variation ) {
+				// The address is a cart line of its own at checkout, billed by the hour with the database: its price and cap are added.
+				$rates          = (array) Rates::for_usage( $address );
+				$parts['ip']    = (float) $parts['ip'] + (float) ( $rates['cap'] ?? 0 );
+				$parts['max']    = (float) $parts['max'] + (float) ( $rates['cap'] ?? 0 );
+				$parts['hourly'] = (float) $parts['hourly'] + (float) ( $rates['hourly'] ?? 0 );
+			}
 			$name  = (string) DbPicker::plans()[ $id ]['name'];
 			$kind  = 'database';
 		} else {

@@ -16,7 +16,10 @@ defined( 'ABSPATH' ) || exit;
  * in Proxmox. The slots count while the resource is ready and its license is active (SnapshotMeta). When a pack
  * is paused, updated or deleted, the server's snapshots are checked against the slots it has left (D7).
  */
-final class SnapshotDriver implements Driver {
+final class SnapshotDriver implements Driver, \BeltoftServices\Drivers\UsageItems {
+
+	use \BeltoftServices\Drivers\UsageDefaults;
+
 	public const ID = 'proxmox-snapshots';
 
 	public function id(): string {
@@ -154,5 +157,24 @@ final class SnapshotDriver implements Driver {
 		SnapshotMeta::clamp_server( $r );
 
 		return StepResult::done();
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @param Resource              $r       Resource.
+	 * @param \WC_Product_Variation $v       Variation.
+	 * @param float                 $monthly Monthly price.
+	 * @param float                 $premium Premium.
+	 */
+	public function usage_items( Resource $r, \WC_Product_Variation $v, float $monthly, float $premium ): array { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- interface.
+		return array( array( 'item' => 'snapshots', 'quantity' => 1.0, 'unit' => 'pack', 'rate' => \BeltoftServices\Usage\Rates::hourly( $monthly, $premium ) ) );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function usage_words(): array {
+		return array( 'snapshots' => array( 'label' => __( 'snapshot slots', 'beltoft-services' ), 'word' => __( 'Snapshot slots', 'beltoft-services' ) ) );
 	}
 }

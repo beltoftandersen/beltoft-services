@@ -203,6 +203,11 @@ $beltoft_services_db_wait = array(
 				<?php elseif ( '' !== $beltoft_services_access['remove_url'] ) : ?>
 					<p class="description"><?php esc_html_e( 'Applications that connect through this address will stop working when it is removed. Your database restarts once, which takes about a minute.', 'beltoft-services' ); ?></p>
 					<p><a class="button woocommerce-button" href="<?php echo esc_url( (string) $beltoft_services_access['remove_url'] ); ?>"><?php esc_html_e( 'Remove the IPv4 address', 'beltoft-services' ); ?></a></p>
+				<?php elseif ( ! empty( $beltoft_services_access['delete_id'] ) ) : ?>
+					<?php
+					$beltoft_services_delete_id = (int) $beltoft_services_access['delete_id'];
+					include BELTOFT_SERVICES_PATH . 'templates/account/delete.php';
+					?>
 				<?php endif; ?>
 			<?php elseif ( $beltoft_services_access['adding'] ) : ?>
 				<p><?php esc_html_e( 'Your public IP address is being added. Your database restarts once, which takes about a minute. The address appears here when it is ready. You can leave this page.', 'beltoft-services' ); ?></p>
