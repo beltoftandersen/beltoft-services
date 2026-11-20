@@ -87,15 +87,29 @@ final class SiteNewDomain {
 			return;
 		}
 
-		// The wait is over and the domain never became ready: say so once (attempt() only gets as far as the deadline when it is ready).
-		if ( time() > (int) $r->get( self::META_UNTIL ) ) {
-			$r->set( array( self::META_DONE => 'expired' ) );
-			self::tell( $r, 'domain_expired' );
-
-			return;
-		}
-
+		// Last look first: a domain that is ready is handled by attempt() (it ends the wait itself when the deadline passed).
 		self::attempt( $r );
+
+		$r = Resource::find( $r->id() ) ?? $r;
+
+		// The wait is over and the domain never became ready: end it (and say so once when it only just ended).
+		if ( ! $r->get( self::META_DONE ) && time() > (int) $r->get( self::META_UNTIL ) ) {
+			self::expire( $r );
+		}
+	}
+
+	/**
+	 * Ends the wait as expired. The customer is told only when the deadline passed within the last two days: an old order
+	 * (found by a sweep long after) is closed silently, so a deploy does not mail months-old orders.
+	 *
+	 * @param Resource $r Hosting resource.
+	 */
+	private static function expire( Resource $r ): void {
+		$r->set( array( self::META_DONE => 'expired' ) );
+
+		if ( time() - (int) $r->get( self::META_UNTIL ) <= 2 * DAY_IN_SECONDS ) {
+			self::tell( $r, 'domain_expired' );
+		}
 	}
 
 	/**
@@ -190,8 +204,7 @@ final class SiteNewDomain {
 		}
 
 		if ( time() > (int) $r->get( self::META_UNTIL ) ) {
-			$r->set( array( self::META_DONE => 'expired' ) );
-			self::tell( $r, 'domain_expired' );
+			self::expire( $r );
 
 			return;
 		}
@@ -268,8 +281,16 @@ final class SiteNewDomain {
 	 * @param Resource $r Hosting resource.
 	 */
 	public static function expired_text( Resource $r ): string {
+		$name = HostName::display( (string) $r->get( self::META_DOMAIN ) );
+		$days = (int) \BeltoftServices\Hosting\SiteField::WAIT_DAYS;
+
+		if ( 'transfer' === self::domain_mode( $r ) ) {
+			/* translators: 1: domain name, 2: days. */
+			return sprintf( __( 'The domain %1$s was not ready within %2$d days, so it was not connected. Connect it from this page when the transfer is done.', 'beltoft-services' ), $name, $days );
+		}
+
 		/* translators: 1: domain name, 2: days. */
-		return sprintf( __( 'The domain %1$s was not ready within %2$d days, so it was not connected. Connect it from this page when the transfer is done.', 'beltoft-services' ), HostName::display( (string) $r->get( self::META_DOMAIN ) ), (int) \BeltoftServices\Hosting\SiteField::WAIT_DAYS );
+		return sprintf( __( 'The domain %1$s was not ready within %2$d days, so it was not connected. Connect it from this page when the registration is done.', 'beltoft-services' ), $name, $days );
 	}
 
 	/**
@@ -300,7 +321,7 @@ final class SiteNewDomain {
 		}
 
 		$r->set( array( self::META_TOLD => time() ) );
-		Emails::send( 'beltoft_services_hosting_notice', $r, array( 'hosting_notice' => $kind, 'site' => (string) $r->get( self::META_DOMAIN ), 'days' => (int) SiteField::WAIT_DAYS ) );
+		Emails::send( 'beltoft_services_hosting_notice', $r, array( 'hosting_notice' => $kind, 'site' => (string) $r->get( self::META_DOMAIN ), 'days' => (int) SiteField::WAIT_DAYS, 'mode' => self::domain_mode( $r ) ) );
 	}
 
 	/**

@@ -57,7 +57,7 @@ if ( 'storage_warning' === $beltoft_services_k ) {
 } elseif ( 'domain_expired' === $beltoft_services_k ) {
 	/* translators: 1: domain name, 2: days. */
 	echo wp_strip_all_tags( sprintf( __( 'The domain %1$s was not ready within %2$d days, so it was not connected to your website.', 'beltoft-services' ), $beltoft_services_n['site'], (int) $beltoft_services_n['days'] ) ) . "\n\n";
-	echo __( 'Your website keeps running on its temporary address. Connect the domain from your hosting page when the transfer is done.', 'beltoft-services' ) . "\n\n";
+	echo ( 'transfer' === ( $beltoft_services_n['mode'] ?? '' ) ? __( 'Your website keeps running on its temporary address. Connect the domain from your hosting page when the transfer is done.', 'beltoft-services' ) : __( 'Your website keeps running on its temporary address. Connect the domain from your hosting page when the registration is done.', 'beltoft-services' ) ) . "\n\n";
 }
 
 echo __( 'Open your hosting in My Account:', 'beltoft-services' ) . ' ' . esc_url_raw( $account_url ) . "\n\n";

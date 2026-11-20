@@ -246,6 +246,31 @@ final class SiteDomainStepTest extends HostingCase {
 		$this->assertContains( SiteNewDomain::hint( Resource::find( $host->id() ) ), array_column( HostingView::notices( Resource::find( $host->id() ) ), 'text' ) );
 	}
 
+	public function test_an_old_order_is_closed_silently_by_the_sweep(): void {
+		list( $host, $domain ) = $this->order_with_domain( 'old.example' );
+		$this->ready( $host );
+		$host->set( array( SiteNewDomain::META_UNTIL => time() - 90 * DAY_IN_SECONDS ) );
+
+		SiteNewDomain::sweep( Resource::find( $host->id() ) );
+
+		$this->assertSame( 'expired', Resource::find( $host->id() )->get( SiteNewDomain::META_DONE ) );
+		$this->assertCount( 0, $this->mails, 'A months-old order is not mailed.' );
+	}
+
+	public function test_the_expired_text_and_mail_follow_registration_or_transfer(): void {
+		list( $host, $domain ) = $this->order_with_domain( 'late.example' );
+		$this->ready( $host );
+		$host->set( array( SiteNewDomain::META_UNTIL => time() - 5 ) );
+		$this->assertStringContainsString( 'when the registration is done', SiteNewDomain::hint( Resource::find( $host->id() ) ) );
+
+		SiteNewDomain::sweep( Resource::find( $host->id() ) );
+		$this->assertStringContainsString( 'when the registration is done', $this->mail_text() );
+		$this->assertStringNotContainsString( 'transfer', $this->mail_text() );
+
+		$domain->set( array( 'mode' => 'transfer' ) );
+		$this->assertStringContainsString( 'when the transfer is done', SiteNewDomain::hint( Resource::find( $host->id() ) ) );
+	}
+
 	public function test_the_new_strings_have_no_em_dash_en_dash_or_middle_dot(): void {
 		foreach ( array( 'src/Hosting/SiteDomainStep.php', 'src/Hosting/SiteNewDomain.php', 'src/Account/OverviewOrder.php', 'templates/account/overview/new-order.php', 'templates/order/handoff.php', 'templates/emails/beltoft-services-hosting-notice.php' ) as $file ) {
 			$this->assertDoesNotMatchRegularExpression( '/[\x{2014}\x{2013}\x{00B7}]/u', (string) file_get_contents( BELTOFT_SERVICES_PATH . $file ), $file );

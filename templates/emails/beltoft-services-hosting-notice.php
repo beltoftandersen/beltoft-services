@@ -46,7 +46,7 @@ do_action( 'woocommerce_email_header', $email_heading, $email ); // phpcs:ignore
 <p><?php esc_html_e( 'The WordPress login address is now on the domain, and the https certificate follows within a few minutes. It can take a little longer before the domain works everywhere.', 'beltoft-services' ); ?></p>
 <?php elseif ( 'domain_expired' === $beltoft_services_k ) : ?>
 <p><?php echo esc_html( sprintf( /* translators: 1: domain name, 2: days. */ __( 'The domain %1$s was not ready within %2$d days, so it was not connected to your website.', 'beltoft-services' ), $beltoft_services_n['site'], (int) $beltoft_services_n['days'] ) ); ?></p>
-<p><?php esc_html_e( 'Your website keeps running on its temporary address. Connect the domain from your hosting page when the transfer is done.', 'beltoft-services' ); ?></p>
+<p><?php echo esc_html( ( 'transfer' === ( $beltoft_services_n['mode'] ?? '' ) ? __( 'Your website keeps running on its temporary address. Connect the domain from your hosting page when the transfer is done.', 'beltoft-services' ) : __( 'Your website keeps running on its temporary address. Connect the domain from your hosting page when the registration is done.', 'beltoft-services' ) ) ); ?></p>
 <?php endif; ?>
 <p><a href="<?php echo esc_url( $account_url ); ?>"><?php esc_html_e( 'Open your hosting in My Account', 'beltoft-services' ); ?></a></p>
 <?php
