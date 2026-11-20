@@ -792,6 +792,12 @@ class CheckoutTest extends HostingCase {
 		$this->assertStringNotContainsString( 'temporary address', $after['message'] );
 	}
 
+	public function test_a_transfer_says_transfer(): void {
+		list( $host, $domain ) = $this->order_with_domain( 'moving.example' );
+		$domain->set( array( 'mode' => 'transfer' ) );
+		$this->assertSame( 'Your website starts on a temporary address. moving.example is connected to it automatically when the transfer of the domain is done.', SiteNewDomain::pending_text( Resource::find( $host->id() ) ) );
+	}
+
 	public function test_an_expired_wait_says_nothing(): void {
 		list( $host ) = $this->order_with_domain( 'late.example' );
 		$host->set( array( SiteNewDomain::META_UNTIL => time() - 10 ) );

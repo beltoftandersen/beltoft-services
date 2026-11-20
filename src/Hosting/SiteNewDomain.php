@@ -125,8 +125,37 @@ final class SiteNewDomain {
 	public static function pending_text( Resource $r ): string {
 		$name = self::pending( $r );
 
-		/* translators: %s: domain name. */
-		return '' === $name ? '' : sprintf( __( 'Your website starts on a temporary address. %s is connected to it automatically when the domain registration is done.', 'beltoft-services' ), \BeltoftServices\Domains\HostName::display( $name ) );
+		if ( '' === $name ) {
+			return '';
+		}
+
+		$shown = \BeltoftServices\Domains\HostName::display( $name );
+
+		return 'transfer' === self::domain_mode( $r )
+			/* translators: %s: domain name. */
+			? sprintf( __( 'Your website starts on a temporary address. %s is connected to it automatically when the transfer of the domain is done.', 'beltoft-services' ), $shown )
+			/* translators: %s: domain name. */
+			: sprintf( __( 'Your website starts on a temporary address. %s is connected to it automatically when the domain registration is done.', 'beltoft-services' ), $shown );
+	}
+
+	/**
+	 * How the order's domain comes to us: register or transfer ('' when its resource is not found).
+	 *
+	 * @param Resource $r Hosting resource.
+	 */
+	private static function domain_mode( Resource $r ): string {
+		$name  = (string) $r->get( self::META_DOMAIN );
+		$order = (int) ( $r->license()['order_id'] ?? 0 );
+
+		foreach ( $order > 0 ? Licenses::where( 'order_id', $order ) : array() as $other ) {
+			$one = Resource::for_license( (int) $other['id'] );
+
+			if ( $one && 'domain' === $one->get( 'driver' ) && $name === (string) $one->get( 'domain' ) ) {
+				return (string) $one->get( 'mode' );
+			}
+		}
+
+		return '';
 	}
 
 	/**
