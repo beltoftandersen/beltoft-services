@@ -219,7 +219,7 @@ final class OrderHandoffTest extends TestCase {
 		$this->assertStringContainsString( 'eventTimeout: EVENT_TIMEOUT', $js );
 		$this->assertStringContainsString( 'EVENT_TIMEOUT = 3800', $js );
 		$this->assertStringContainsString( 'MAX = 4000', $js );
-		$this->assertStringContainsString( 'MIN = 1500', $js );
+		$this->assertStringContainsString( 'MIN = 2000', $js );
 		$this->assertStringContainsString( 'location.replace', $js );
 		$this->assertStringNotContainsString( 'wp_redirect', (string) file_get_contents( BELTOFT_SERVICES_PATH . 'src/OrderHandoff.php' ) );
 	}
