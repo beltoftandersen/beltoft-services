@@ -377,6 +377,21 @@ final class AppOwnDomainTest extends MonitoringTestCase {
 		$this->assertArrayNotHasKey( 'app_domain_old', $meta, 'No record of ours to remove.' );
 	}
 
+	public function test_reinstall_with_an_app_is_refused_on_a_server_without_ipv4(): void {
+		$r = $this->waiting( array( 'app_id' => 'wordpress' ) );
+		$args = array( 'app_version' => 'keep', 'app_domain_mode' => 'none' );
+		$this->assertNull( AppReinstall::check( null, $r, $args ), 'A server with an address reinstalls.' );
+
+		IpPool::release( $r->id() );
+		$plan              = (array) $r->get( 'plan' );
+		$plan['public_ip'] = 0;
+		$this->assertTrue( $r->set( array( 'ip' => null, 'plan' => $plan ) ) );
+		$r = Resource::find( $r->id() );
+
+		$this->assertSame( 'This app needs an IPv4 address. Add one to the server.', AppReinstall::check( null, $r, $args ) );
+		$this->assertNull( AppReinstall::check( null, $r, array( 'app_version' => 'none' ) ), 'No app: nothing needs the address.' );
+	}
+
 	public function test_reinstall_with_no_domain_forgets_a_live_own_name_without_a_note_about_a_record(): void {
 		$r = $this->waiting( array( 'app_domain_dns' => 'live', 'app_domain' => self::NAME, 'app_domain_made' => false, 'app_state' => 'ready' ) );
 		$meta = AppReinstall::meta( array(), $r, array( 'app_version' => 'keep', 'app_domain_mode' => 'none' ) );

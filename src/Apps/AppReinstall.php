@@ -5,6 +5,7 @@ namespace BeltoftServices\Apps;
 
 use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Domains\ZoneAccess;
+use BeltoftServices\Proxmox\Ipv4\Ipv4Meta;
 use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Vm\OsField;
@@ -628,6 +629,9 @@ final class AppReinstall {
 				return $why;
 			}
 			$pick = self::plain_pick( $r, $args['app_version'] ?? '' );
+			if ( is_array( $pick ) && ! Ipv4Meta::has_main( $r ) ) {
+				return self::needs_ipv4_text();
+			}
 			$choice = self::domain_choice( $r, $args, is_array( $pick ) ? (array) Apps::definition( $pick[0] ) : array() );
 			return is_string( $choice ) ? $choice : self::domain_release_refusal( $r, $choice );
 		}
@@ -646,6 +650,11 @@ final class AppReinstall {
 
 		if ( '' === $version ) {
 			return self::domain_release_refusal( $r, array( 'mode' => 'none' ) );
+		}
+
+		// A one-click app needs an IPv4 address: a server of an IPv6-only plan has none until the add-on gives it one.
+		if ( ! Ipv4Meta::has_main( $r ) ) {
+			return self::needs_ipv4_text();
 		}
 
 		$full    = Apps::version( (string) $r->get( 'app_id' ), $version );
@@ -679,6 +688,13 @@ final class AppReinstall {
 
 		$choice = self::domain_choice( $r, $args, (array) $options['app'] );
 		return is_string( $choice ) ? $choice : self::domain_release_refusal( $r, $choice );
+	}
+
+	/**
+	 * The refusal of an app on a server that has no IPv4 address.
+	 */
+	public static function needs_ipv4_text(): string {
+		return __( 'This app needs an IPv4 address. Add one to the server.', 'beltoft-services' );
 	}
 
 	/**

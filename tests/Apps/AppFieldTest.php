@@ -325,6 +325,14 @@ class AppFieldTest extends TestCase {
 		$this->assertSame( array( 'Apps are not available for this server. Choose none.' ), $this->check( array( AppField::POST_APP => 'docker' ) ), 'An app that is no longer offered is not silently dropped.' );
 	}
 
+	public function test_an_app_on_a_server_without_ipv4_is_refused_and_not_offered(): void {
+		WC()->cart->add_to_cart( $this->vm( array( 'public_ip' => 0 ) )->get_id() );
+
+		$this->assertNull( AppField::offer(), 'No tiles for an IPv6-only plan without the IPv4 address in the cart.' );
+		$this->assertSame( array( 'This app needs an IPv4 address. Add one to the server.' ), $this->check( array( AppField::POST_APP => 'docker' ) ) );
+		$this->assertSame( array(), $this->check( array( AppField::POST_APP => '' ) ) );
+	}
+
 	// -- Operating system and storage ----------------------------------------------------------
 
 	public function test_an_app_sets_the_operating_system_on_the_line_whatever_was_posted(): void {
