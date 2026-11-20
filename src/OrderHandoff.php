@@ -123,11 +123,28 @@ final class OrderHandoff {
 			return '';
 		}
 
-		if ( ! ThankYou::resources( $order ) || ! function_exists( 'wc_get_page_permalink' ) ) {
+		// The services are made just after payment, in the background, so they are often not there yet when this page loads: an
+		// order with a service product qualifies at once and the overview shows "Setting up your order" until they appear.
+		if ( ( ! ThankYou::resources( $order ) && ! self::has_service_lines( $order ) ) || ! function_exists( 'wc_get_page_permalink' ) ) {
 			return '';
 		}
 
 		return add_query_arg( self::ARG, $order->get_id(), wc_get_page_permalink( 'myaccount' ) );
+	}
+
+	/**
+	 * Does the order hold a line of a service product (a product with a driver)?
+	 *
+	 * @param \WC_Order $order Order.
+	 */
+	public static function has_service_lines( \WC_Order $order ): bool {
+		foreach ( $order->get_items() as $item ) {
+			if ( $item instanceof \WC_Order_Item_Product && Product::is_service( (int) ( $item->get_variation_id() ?: $item->get_product_id() ) ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

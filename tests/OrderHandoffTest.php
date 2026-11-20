@@ -63,6 +63,21 @@ final class OrderHandoffTest extends TestCase {
 		}
 	}
 
+	public function test_a_paid_order_whose_services_are_not_made_yet_gets_it_from_its_service_line(): void {
+		$user    = self::factory()->user->create();
+		$order   = wc_create_order( array( 'customer_id' => $user, 'status' => 'processing' ) );
+		$product = $this->service_product( 'fake', array(), array( 'slug' => 'ho-' . wp_generate_password( 6, false ) ) );
+		$order->add_product( wc_get_product( $product->get_id() ), 1 );
+		$order->save();
+		wp_set_current_user( $user );
+		$order = wc_get_order( $order->get_id() );
+
+		$this->assertSame( array(), \BeltoftServices\ThankYou::resources( $order ), 'No licence or resource yet, as right after payment.' );
+		$this->assertTrue( OrderHandoff::has_service_lines( $order ) );
+		$this->assertTrue( OrderHandoff::applies( $order ) );
+		$this->assertSame( add_query_arg( 'order', $order->get_id(), wc_get_page_permalink( 'myaccount' ) ), OrderHandoff::target( $order ) );
+	}
+
 	public function test_the_setting_is_off_by_default_and_off_gives_the_normal_page(): void {
 		$this->assertSame( 0, (int) \BeltoftServices\Settings::fields()[ OrderHandoff::SETTING ]['default'] );
 
