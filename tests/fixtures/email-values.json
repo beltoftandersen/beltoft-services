@@ -353,7 +353,8 @@
             "ssh": false,
             "domains": [],
             "dns_records": [],
-            "has_email": false
+            "has_email": false,
+            "new_domain": ""
         },
         "hosting_malware": {
             "before": "",
