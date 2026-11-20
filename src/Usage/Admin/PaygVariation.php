@@ -263,7 +263,7 @@ final class PaygVariation {
 				continue;
 			}
 
-			if ( ! is_numeric( $posted ) || (float) $posted <= 0 ) {
+			if ( ! is_numeric( $posted ) || (float) $posted <= 0 || ! is_finite( (float) $posted ) ) {
 				/* translators: 1: the plan, 2: currency code */
 				self::refuse( sprintf( __( '%1$s, %2$s: the monthly price must be a number above 0. Nothing in this plan was saved.', 'beltoft-services' ), $label, $code ), $variation->get_id() );
 
