@@ -261,6 +261,7 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 = 0.49.0 =
 * IPv4 address add-on: one add-on for servers and databases, taken from the site's own address pool. A server can have extra addresses; a server with IPv6 only gets its main address from the add-on; a database gets its public address from it. A mail goes out when the pool runs low.
 * VPS Basic: servers with IPv6 only. Managed server add-on per server and Priority support per account.
+* Hosting ordered with a new domain: the thank-you page and the welcome email say the website starts on a temporary address and the domain is connected by itself when it is registered.
 * Customers can add or remove IPv6 on a server (one restart). Databases can get IPv6 behind the setting db_ipv6 (off).
 
 = 0.48.1 =
