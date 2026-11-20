@@ -306,7 +306,22 @@ final class Ipv4Driver implements Driver, \BeltoftServices\Drivers\UsageItems {
 		// A failed parent that may still have a machine keeps the address held (the pool screen releases it by hand, as for any
 		// failed resource); a deleted one is gone.
 		if ( '' !== $address && null !== $parent && 'failed' === $parent->get( 'state' ) && null !== VmRecords::for_resource( $parent->id() ) ) {
-			return StepResult::wait( 300, 'The server or database failed: the IPv4 address stays held until it is deleted.', time() + 7 * DAY_IN_SECONDS );
+			// The deadline is stored once, so the wait ends: after it the delete fails (the admin is told by the failure path).
+			$until = (int) $r->get( 'parent_failed_until' );
+
+			if ( $until < 1 ) {
+				$until = time() + 7 * DAY_IN_SECONDS;
+
+				if ( ! $r->set( array( 'parent_failed_until' => $until ) ) ) {
+					return StepResult::retry( 60, 'The wait deadline could not be stored.' );
+				}
+			}
+
+			if ( time() < $until ) {
+				return StepResult::wait( 300, 'The server or database failed: the IPv4 address stays held until it is deleted.', $until );
+			}
+
+			return StepResult::fail( 'The server or database failed and was not deleted within seven days: the IPv4 address is still held. Release it from the pool screen when the server is gone.' );
 		}
 
 		if ( '' === $address || null === $parent || in_array( $parent->get( 'state' ), array( 'failed', 'deleted', 'deleting' ), true ) ) {

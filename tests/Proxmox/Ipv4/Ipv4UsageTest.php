@@ -201,4 +201,26 @@ class Ipv4UsageTest extends Ipv4TestCase {
 		$view = Ipv4Panels::view( Resource::find( $server->id() ) );
 		$this->assertSame( 0, end( $view['addresses'] )['delete_id'] );
 	}
+
+	public function test_the_wait_for_a_failed_parent_ends(): void {
+		$server = $this->parent( true );
+		$addon  = $this->address( $server, true );
+		$parent = Resource::find( $server->id() );
+		$parent->set( array( 'state' => 'failed' ) );
+		$driver = Registry::get( Ipv4Driver::ID );
+
+		$first = $driver->delete( Resource::find( $addon->id() ) );
+		$this->assertSame( 'wait', $first->wait_until() > time() ? 'wait' : 'no' );
+		$until = (int) Resource::find( $addon->id() )->get( 'parent_failed_until' );
+		$this->assertGreaterThan( time(), $until );
+
+		$driver->delete( Resource::find( $addon->id() ) );
+		$this->assertSame( $until, (int) Resource::find( $addon->id() )->get( 'parent_failed_until' ), 'The deadline is stored once.' );
+
+		Resource::find( $addon->id() )->set( array( 'parent_failed_until' => time() - 1 ) );
+		$last = $driver->delete( Resource::find( $addon->id() ) );
+		$this->assertFalse( $last->is_retry() );
+		$this->assertFalse( $last->is_done() );
+		$this->assertStringContainsString( 'seven days', $last->error() );
+	}
 }
