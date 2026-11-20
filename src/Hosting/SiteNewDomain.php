@@ -9,6 +9,7 @@ namespace BeltoftServices\Hosting;
 
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Domains\HostName;
+use BeltoftServices\Emails\Emails;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -32,6 +33,13 @@ final class SiteNewDomain {
 	public const META_UNTIL  = 'site_new_domain_until';
 	public const META_DONE   = 'site_new_domain_done';
 	public const META_WHY    = 'site_new_domain_why';
+	public const META_AT     = 'site_new_domain_at';
+	public const META_TOLD   = 'site_new_domain_told';
+
+	/**
+	 * Days the account page keeps the "now runs on your domain" notice.
+	 */
+	public const JOINED_NOTICE_DAYS = 14;
 
 	/**
 	 * Hooks.
@@ -75,9 +83,19 @@ final class SiteNewDomain {
 	 * @param Resource $r Hosting resource.
 	 */
 	public static function sweep( Resource $r ): void {
-		if ( '' !== (string) $r->get( self::META_DOMAIN ) && ! $r->get( self::META_DONE ) ) {
-			self::attempt( $r );
+		if ( '' === (string) $r->get( self::META_DOMAIN ) || $r->get( self::META_DONE ) ) {
+			return;
 		}
+
+		// The wait is over and the domain never became ready: say so once (attempt() only gets as far as the deadline when it is ready).
+		if ( time() > (int) $r->get( self::META_UNTIL ) ) {
+			$r->set( array( self::META_DONE => 'expired' ) );
+			self::tell( $r, 'domain_expired' );
+
+			return;
+		}
+
+		self::attempt( $r );
 	}
 
 	/**
@@ -173,6 +191,7 @@ final class SiteNewDomain {
 
 		if ( time() > (int) $r->get( self::META_UNTIL ) ) {
 			$r->set( array( self::META_DONE => 'expired' ) );
+			self::tell( $r, 'domain_expired' );
 
 			return;
 		}
@@ -190,7 +209,8 @@ final class SiteNewDomain {
 		$row = SiteDomains::find( $name );
 
 		if ( is_array( $out ) || ( null !== $row && $row['resource_id'] === $r->id() ) ) {
-			$r->set( array( self::META_DONE => 'joined' ) );
+			$r->set( array( self::META_DONE => 'joined', self::META_AT => time() ) );
+			self::tell( $r, 'domain_joined' );
 
 			return;
 		}
@@ -228,6 +248,62 @@ final class SiteNewDomain {
 	}
 
 	/**
+	 * Did the wait end without the domain joining (the deadline passed, or it was refused)?
+	 *
+	 * @param Resource $r Hosting resource.
+	 */
+	public static function not_joined( Resource $r ): bool {
+		if ( '' === (string) $r->get( self::META_DOMAIN ) ) {
+			return false;
+		}
+
+		$done = (string) $r->get( self::META_DONE );
+
+		return in_array( $done, array( 'refused', 'expired' ), true ) || ( '' === $done && time() > (int) $r->get( self::META_UNTIL ) );
+	}
+
+	/**
+	 * The text for a wait that ended with the domain not connected: why, and what to do.
+	 *
+	 * @param Resource $r Hosting resource.
+	 */
+	public static function expired_text( Resource $r ): string {
+		/* translators: 1: domain name, 2: days. */
+		return sprintf( __( 'The domain %1$s was not ready within %2$d days, so it was not connected. Connect it from this page when the transfer is done.', 'beltoft-services' ), HostName::display( (string) $r->get( self::META_DOMAIN ) ), (int) \BeltoftServices\Hosting\SiteField::WAIT_DAYS );
+	}
+
+	/**
+	 * The notice for the account page after the domain joined the website (for a while), or ''.
+	 *
+	 * @param Resource $r Hosting resource.
+	 */
+	public static function joined_text( Resource $r ): string {
+		$at = (int) $r->get( self::META_AT );
+
+		if ( 'joined' !== (string) $r->get( self::META_DONE ) || $at < time() - self::JOINED_NOTICE_DAYS * DAY_IN_SECONDS ) {
+			return '';
+		}
+
+		/* translators: %s: domain name. */
+		return sprintf( __( 'Your website now runs on %s. The WordPress login address is now on the domain, and the https certificate follows within a few minutes.', 'beltoft-services' ), HostName::display( (string) $r->get( self::META_DOMAIN ) ) );
+	}
+
+	/**
+	 * Tells the customer once, by email, how the wait ended.
+	 *
+	 * @param Resource $r    Hosting resource.
+	 * @param string   $kind domain_joined or domain_expired (kinds of HostingNotice).
+	 */
+	private static function tell( Resource $r, string $kind ): void {
+		if ( $r->get( self::META_TOLD ) ) {
+			return;
+		}
+
+		$r->set( array( self::META_TOLD => time() ) );
+		Emails::send( 'beltoft_services_hosting_notice', $r, array( 'hosting_notice' => $kind, 'site' => (string) $r->get( self::META_DOMAIN ), 'days' => (int) SiteField::WAIT_DAYS ) );
+	}
+
+	/**
 	 * The hint for the account page when the order's domain was not connected, or an empty string.
 	 *
 	 * @param Resource $r Hosting resource.
@@ -235,8 +311,12 @@ final class SiteNewDomain {
 	public static function hint( Resource $r ): string {
 		$name = (string) $r->get( self::META_DOMAIN );
 
-		if ( '' === $name || 'refused' !== (string) $r->get( self::META_DONE ) ) {
+		if ( '' === $name ) {
 			return '';
+		}
+
+		if ( 'refused' !== (string) $r->get( self::META_DONE ) ) {
+			return self::not_joined( $r ) ? self::expired_text( $r ) : '';
 		}
 
 		/* translators: 1: domain name, 2: reason. */

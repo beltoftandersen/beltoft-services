@@ -41,6 +41,12 @@ do_action( 'woocommerce_email_header', $email_heading, $email ); // phpcs:ignore
 <?php elseif ( 'php_switched' === $beltoft_services_k ) : ?>
 <p><?php echo esc_html( sprintf( /* translators: 1: website, 2: old PHP version, 3: new PHP version. */ __( 'PHP %2$s lost security support, so the website %1$s now runs on PHP %3$s.', 'beltoft-services' ), $beltoft_services_n['site'], $beltoft_services_n['php'], $beltoft_services_n['php_default'] ) ); ?></p>
 <p><?php echo esc_html( sprintf( /* translators: %d: days. */ _n( 'If something does not work, you can go back to the old version in My Account for %d day.', 'If something does not work, you can go back to the old version in My Account for %d days.', (int) $beltoft_services_n['days'], 'beltoft-services' ), (int) $beltoft_services_n['days'] ) ); ?></p>
+<?php elseif ( 'domain_joined' === $beltoft_services_k ) : ?>
+<p><?php echo esc_html( sprintf( /* translators: %s: domain name. */ __( 'Your website now runs on %s.', 'beltoft-services' ), $beltoft_services_n['site'] ) ); ?></p>
+<p><?php esc_html_e( 'The WordPress login address is now on the domain, and the https certificate follows within a few minutes. It can take a little longer before the domain works everywhere.', 'beltoft-services' ); ?></p>
+<?php elseif ( 'domain_expired' === $beltoft_services_k ) : ?>
+<p><?php echo esc_html( sprintf( /* translators: 1: domain name, 2: days. */ __( 'The domain %1$s was not ready within %2$d days, so it was not connected to your website.', 'beltoft-services' ), $beltoft_services_n['site'], (int) $beltoft_services_n['days'] ) ); ?></p>
+<p><?php esc_html_e( 'Your website keeps running on its temporary address. Connect the domain from your hosting page when the transfer is done.', 'beltoft-services' ); ?></p>
 <?php endif; ?>
 <p><a href="<?php echo esc_url( $account_url ); ?>"><?php esc_html_e( 'Open your hosting in My Account', 'beltoft-services' ); ?></a></p>
 <?php

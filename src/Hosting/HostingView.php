@@ -138,6 +138,10 @@ final class HostingView {
 			$out[] = array( 'class' => 'beltoft-hosting-notice', 'text' => SiteNewDomain::hint( $r ) );
 		}
 
+		if ( '' !== SiteNewDomain::joined_text( $r ) ) {
+			$out[] = array( 'class' => 'beltoft-hosting-notice', 'text' => SiteNewDomain::joined_text( $r ) );
+		}
+
 		foreach ( Addons::unconnected_domains( $r ) as $paid ) {
 			$out[] = array(
 				'class' => 'beltoft-hosting-notice',
