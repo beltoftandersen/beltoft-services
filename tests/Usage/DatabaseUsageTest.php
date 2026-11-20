@@ -261,7 +261,9 @@ class DatabaseUsageTest extends UsageTestCase {
 
 		$html = $this->picker_page();
 
-		$this->assertStringContainsString( '<span class="beltoft-services-plan__name">Small, Pay as you go</span>', $html, 'The public IP answer is not part of the plan name.' );
+		// Size and Billing are the same on every plan on sale, so the name is the product's; the public IP answer is never part of it.
+		$this->assertStringContainsString( '<span class="beltoft-services-plan__name">' . esc_html( wc_get_product( $v['m-0-0']->get_parent_id() )->get_name() ) . '</span>', $html );
+		$this->assertStringNotContainsString( 'Pay as you go</span>', $html );
 		$this->assertStringContainsString( '<b>' . Rates::cap_money( 25.0 ) . '</b> <span>max per month, excl. VAT</span>', $html );
 		$this->assertStringContainsString( 'beltoft-services-plan__hourly">' . Rates::per_hour( 25 / 730 ), str_replace( "\n", '', $html ) );
 		$this->assertStringContainsString( 'data-card-cap="' . Rates::cap_money( 25.0 ) . '"', $html );
