@@ -4,7 +4,7 @@
  * The page is the order received page, so the tag manager plugin has already put the purchase event in the dataLayer.
  * This script pushes one more message behind it with an eventCallback: the tag manager calls it when the tags of that
  * message are done, or after eventTimeout. A blocked or missing tag manager never calls it, so a timer leaves the page
- * at the latest after about 2.2 seconds; the screen shows at least 0.6 seconds so it does not flash. The move is
+ * at the latest after 4 seconds; the screen shows at least 1.5 seconds so the customer sees it. The move is
  * location.replace (the hand-off stays out of the history, Back does not bounce the customer forward again) and it
  * happens once. No dependencies.
  */
