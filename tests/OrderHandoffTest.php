@@ -223,4 +223,38 @@ final class OrderHandoffTest extends TestCase {
 		$this->assertStringContainsString( 'location.replace', $js );
 		$this->assertStringNotContainsString( 'wp_redirect', (string) file_get_contents( BELTOFT_SERVICES_PATH . 'src/OrderHandoff.php' ) );
 	}
+
+	public function test_the_fallback_template_keeps_the_thank_you_hooks_firing_inside_a_hidden_wrapper(): void {
+		$order = $this->order();
+		$fired = array();
+		$gate  = 'woocommerce_thankyou_' . $order->get_payment_method();
+		$one   = static function ( $id ) use ( &$fired ) {
+			$fired[] = 'gateway';
+			echo 'GATEWAY-OUTPUT';
+		};
+		$two   = static function ( $id ) use ( &$fired ) {
+			$fired[] = 'general:' . $id;
+		};
+		add_action( $gate, $one );
+		add_action( 'woocommerce_thankyou', $two );
+
+		ob_start();
+		include BELTOFT_SERVICES_PATH . 'templates/order/handoff.php';
+		$html = (string) ob_get_clean();
+
+		$this->assertSame( array( 'gateway', 'general:' . $order->get_id() ), $fired );
+		$this->assertMatchesRegularExpression( '#<div hidden data-bs-handoff-hooks>GATEWAY-OUTPUT#', $html );
+
+		// With the shortcode the normal content stays and fires them itself: not twice.
+		$fired = array();
+		( new \ReflectionProperty( OrderHandoff::class, 'placed' ) )->setValue( null, true );
+		ob_start();
+		include BELTOFT_SERVICES_PATH . 'templates/order/handoff.php';
+		ob_end_clean();
+		( new \ReflectionProperty( OrderHandoff::class, 'placed' ) )->setValue( null, false );
+		$this->assertSame( array(), $fired );
+
+		remove_action( $gate, $one );
+		remove_action( 'woocommerce_thankyou', $two );
+	}
 }

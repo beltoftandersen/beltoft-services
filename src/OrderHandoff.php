@@ -46,6 +46,13 @@ final class OrderHandoff {
 	private static bool $placed = false;
 
 	/**
+	 * Did the shortcode print the hand-off on this request (WooCommerce's normal thank-you content then stays and runs its hooks)?
+	 */
+	public static function placed(): bool {
+		return self::$placed;
+	}
+
+	/**
 	 * Hooks.
 	 */
 	public static function register(): void {
