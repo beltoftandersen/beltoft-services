@@ -1330,6 +1330,18 @@ class DbPhase4Test extends TestCase {
 		$this->assertNotNull( \BeltoftServices\Proxmox\Network\IpHistory::for_address( self::DB_V6 )[0]['ended_at'] );
 	}
 
+	public function test_a_repair_leaves_ipv6_out_when_the_database_has_none(): void {
+		$this->ipv6_cluster();
+		$r = $this->db_with_ip();
+		$r->set( array( 'ip6' => null ) );
+		$r       = Resource::find( $r->id() );
+		$cluster = (array) Clusters::get( 'lab' );
+		$config  = $this->fake->vm( 5000 )['config'];
+
+		$config['ipconfig0'] = 'ip=192.0.2.10/24,gw=192.0.2.1';
+		$this->assertNull( DbIp::nic_repair( $r, $cluster, $config ), 'No IPv6 was given, none is wanted.' );
+	}
+
 	public function test_a_restore_puts_the_ipv6_part_of_the_public_card_back_and_leaves_a_written_address_when_the_cluster_turns_it_off(): void {
 		$this->ipv6_cluster();
 		$r      = $this->db_with_ip();

@@ -290,10 +290,13 @@ final class Ipv6Switch {
 		}
 
 		$restarted = ! empty( $this->op()['restarted'] );
+		$failed    = ! empty( $this->op()['failed'] );
 
 		$this->r->set( array( self::OP => null ) );
 
-		if ( $restarted ) {
+		if ( $failed ) {
+			$text = __( 'The address was changed, but the server did not restart. It takes the change when it restarts.', 'beltoft-services' );
+		} elseif ( $restarted ) {
 			$text = $add ? __( 'IPv6 was added and the server restarted.', 'beltoft-services' ) : __( 'IPv6 was removed and the server restarted.', 'beltoft-services' );
 		} else {
 			$text = $add ? __( 'IPv6 was added. The server is off, so it takes the address when it starts.', 'beltoft-services' ) : __( 'IPv6 was removed. The server is off, so the change takes effect when it starts.', 'beltoft-services' );
@@ -475,7 +478,12 @@ final class Ipv6Switch {
 		}
 
 		if ( true !== $done ) {
-			return StepResult::done( array( Jobs::TEXT => __( 'The address was changed, but the server did not restart in time. It takes the change when it restarts.', 'beltoft-services' ) ), 'Ipv6 changed; the reboot did not finish' );
+			// The config is right; the server takes it when it restarts. Go on to the end so the operation is cleared.
+			$op            = $this->op();
+			$op['skipped'] = true;
+			$op['failed']  = true;
+
+			return $this->r->set( array( self::OP => $op ) ) ? null : StepResult::retry( 0, 'ipv6: progress could not be stored' );
 		}
 
 		$op              = $this->op();

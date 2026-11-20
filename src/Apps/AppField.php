@@ -11,11 +11,13 @@ use BeltoftServices\Domains\ZoneAccess;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Disk\DiskField;
+use BeltoftServices\Proxmox\Ipv4\Ipv4Field;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Proxmox\Vm\Picked;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Proxmox\Vm\Tiles;
+use BeltoftServices\Proxmox\Vm\VpsProfile;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -81,7 +83,19 @@ final class AppField {
 			return null;
 		}
 
-		return self::offer_for( (int) ( $server['item']['product_id'] ?? 0 ), (int) ( $server['item']['variation_id'] ?? 0 ) );
+		$offer = self::offer_for( (int) ( $server['item']['product_id'] ?? 0 ), (int) ( $server['item']['variation_id'] ?? 0 ) );
+
+		// An app needs an IPv4 address: on an IPv6-only plan the apps are offered only while the IPv4 address is in the cart.
+		return null !== $offer && self::lacks_ipv4( $offer ) ? null : $offer;
+	}
+
+	/**
+	 * Is the new server of an IPv6-only plan with no IPv4 address in the cart?
+	 *
+	 * @param array<string, mixed> $offer The offer (its plan).
+	 */
+	private static function lacks_ipv4( array $offer ): bool {
+		return ! VpsProfile::plan_has_ipv4( (array) $offer['plan'] ) && 0 === Ipv4Field::chosen();
 	}
 
 	/**
@@ -545,6 +559,15 @@ final class AppField {
 			if ( AppLicenceCart::lines() > 0 ) {
 				$errors->add( 'beltoft_services_app', __( 'An app licence is in your cart but no app is chosen. Remove the licence or choose the app.', 'beltoft-services' ) );
 			}
+
+			return;
+		}
+
+		$server = DiskField::cart_server();
+		$raw    = null === $server ? null : self::offer_for( (int) ( $server['item']['product_id'] ?? 0 ), (int) ( $server['item']['variation_id'] ?? 0 ) );
+
+		if ( null === $offer && null !== $raw && self::lacks_ipv4( $raw ) ) {
+			$errors->add( 'beltoft_services_app', AppReinstall::needs_ipv4_text() );
 
 			return;
 		}

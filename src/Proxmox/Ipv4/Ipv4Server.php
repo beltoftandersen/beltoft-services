@@ -90,8 +90,17 @@ final class Ipv4Server {
 
 		$op = $this->op();
 
+		// A sync never replaces a main address change in progress: the change is finished first (its firewall phase covers the
+		// extras), then the sync runs again.
+		$resync = false;
+
+		if ( self::SYNC === $action && in_array( $op['action'] ?? '', array( self::MAIN_ADD, self::MAIN_REMOVE ), true ) ) {
+			$action = (string) $op['action'];
+			$resync = true;
+		}
+
 		if ( ( $op['action'] ?? '' ) !== $action ) {
-			$op = array( 'action' => $action, 'phase' => self::SYNC === $action ? 'firewall' : 'config', 'started' => time() );
+			$op = array( 'action' => $action, 'phase' => self::SYNC === $action ? 'firewall' : 'config', 'started' => microtime( true ) );
 
 			if ( ! $this->r->set( array( self::OP => $op ) ) ) {
 				return StepResult::retry( 0, 'ipv4: progress could not be stored' );
@@ -123,8 +132,12 @@ final class Ipv4Server {
 			}
 		}
 
-		// `ipv4_synced` is the start time of the last run that ended: an add-on that asked for a run waits for one that started after its request.
-		$this->r->set( array( self::OP => null, self::SYNCED => (int) ( $this->op()['started'] ?? time() ) ) );
+		// `ipv4_synced` is the start time (with microseconds, so a run in the same second as a request is told apart) of the last run that ended: an add-on that asked for a run waits for one that started after its request.
+		$this->r->set( array( self::OP => null, self::SYNCED => (float) ( $this->op()['started'] ?? microtime( true ) ) ) );
+
+		if ( $resync ) {
+			Jobs::queue_act( $this->r->id(), self::SYNC );
+		}
 
 		return StepResult::done( array(), self::MAIN_ADD === $action ? 'IPv4 address added to the server' : ( self::MAIN_REMOVE === $action ? 'IPv4 address removed from the server' : 'Extra IPv4 addresses synced' ) );
 	}
@@ -157,7 +170,10 @@ final class Ipv4Server {
 
 		$have = (string) ( $v['config']['ipconfig0'] ?? '' );
 		$vmid = (int) $record['vmid'];
-		$ip6  = Ipv6::ipconfig( $this->cluster, $vmid );
+		// The IPv6 part only when the server has IPv6 (meta `ip6`): the server keeps whatever IPv6 state it had.
+		$fresh = Resource::find( $this->r->id() ) ?? $this->r;
+		$has6  = '' !== (string) $fresh->get( 'ip6' );
+		$ip6   = $has6 ? Ipv6::ipconfig( $this->cluster, $vmid ) : '';
 
 		if ( $add ) {
 			$row = IpPool::for_resource( $this->r->id() );
@@ -169,6 +185,10 @@ final class Ipv4Server {
 			}
 
 			$want = ( new VpsProfile( $this->r ) )->network_params( $this->cluster, $row, (string) ( $v['config']['net0'] ?? '' ) )['ipconfig0'];
+
+			if ( ! $has6 ) {
+				$want = Ipv6::strip( $want );
+			}
 		} else {
 			$want = $ip6;
 		}

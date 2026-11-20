@@ -202,6 +202,45 @@ class Ipv4CartTest extends BackupTestCase {
 		$this->assertFalse( $errors->has_errors(), $errors->get_error_message() );
 	}
 
+	public function test_cart_server_lines_respect_the_limit_and_a_cart_with_a_server_and_a_database(): void {
+		$this->product();
+		$this->server_in_cart( true );
+		Ipv4Field::choose( 1 );
+		$this->assertSame( 1, $this->lines() );
+
+		// A crafted repeat add beyond the limit of 1 is refused.
+		$v = Ipv4Cart::product();
+		$this->assertFalse( Ipv4Cart::validate( true, $v->get_parent_id(), 1, $v->get_id(), array(), array( 'beltoft_services_ipv4_for' => 'cart_server' ) ) );
+
+		// Lines beyond the limit are refused at checkout.
+		WC()->cart->add_to_cart( $v->get_parent_id(), 1, $v->get_id(), array( 'attribute_plan' => 'Monthly' ), array( 'beltoft_services_ipv4_for' => 'cart_server' ) );
+		$errors = new \WP_Error();
+		Ipv4Cart::checkout_validation( array(), $errors );
+		$this->assertContains( 'ipv4_limit', $errors->get_error_codes() );
+
+		// A database joins the server: the address lines have no owner any more.
+		WC()->cart->empty_cart();
+		$this->server_in_cart( true );
+		Ipv4Field::choose( 1 );
+		$this->add_line( $this->database() );
+		$this->assertTrue( Ipv4Field::both() );
+		$this->assertNull( Ipv4Field::target() );
+		$errors = new \WP_Error();
+		Ipv4Cart::checkout_validation( array(), $errors );
+		$this->assertTrue( $errors->has_errors() );
+		$this->assertStringContainsString( 'dashboard', $errors->get_error_message() );
+		$this->assertFalse( Ipv4Cart::validate( true, $v->get_parent_id(), 1, $v->get_id(), array(), array( 'beltoft_services_ipv4_for' => 'cart_server' ) ) );
+
+		// The server goes, the database stays with limit 1: extra lines are trimmed.
+		WC()->cart->empty_cart();
+		$this->server_in_cart();
+		Ipv4Field::choose( 3 );
+		$this->add_line( $this->database() );
+		$server_key = \BeltoftServices\Proxmox\Disk\DiskField::cart_server()['key'] ?? null;
+		WC()->cart->remove_cart_item( (string) $server_key );
+		$this->assertLessThanOrEqual( 1, $this->lines() );
+	}
+
 	public function test_removing_the_server_takes_its_address_lines_with_it(): void {
 		$this->product();
 		$this->server_in_cart();

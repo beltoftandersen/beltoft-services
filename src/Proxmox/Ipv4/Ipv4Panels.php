@@ -68,8 +68,8 @@ final class Ipv4Panels {
 			$ending       = $subscription instanceof \WC_Subscription && $subscription->has_status( 'pending-cancel' );
 			$extras      += 'extra' === $entry['role'] ? 1 : 0;
 
-			// The first address of a server is its main one: while extras are left it cannot be taken away alone.
-			$locked = 'main' === $entry['role'] && ! $db && array() !== Ipv4Meta::extra_addresses( $parent );
+			// The first address of a server is its main one: while extras are left it cannot be taken away alone, nor when the server has no IPv6 to keep.
+			$locked = 'main' === $entry['role'] && ! $db && ! Ipv4Meta::main_removable( $parent );
 
 			$rows[] = array(
 				'address'    => $entry['address'],

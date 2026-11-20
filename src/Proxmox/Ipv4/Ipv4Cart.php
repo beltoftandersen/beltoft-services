@@ -180,12 +180,30 @@ final class Ipv4Cart {
 			return false;
 		}
 
+		if ( 'cart_server' === $link ) {
+			$target = Ipv4Field::target();
+
+			if ( null === $target ) {
+				wc_add_notice( Ipv4Field::both() ? self::both_text() : __( 'Choose the IPv4 address for a server or a database in your account.', 'beltoft-services' ), 'error' );
+				return false;
+			}
+
+			if ( self::in_cart( 'cart_server' ) >= (int) $target['max'] ) {
+				wc_add_notice( __( 'This server or database cannot take another IPv4 address.', 'beltoft-services' ), 'error' );
+				return false;
+			}
+		}
+
 		if ( is_int( $link ) && ! self::room( Resource::for_license( $link ), self::in_cart( $link ) ) ) {
 			wc_add_notice( __( 'This server or database cannot take another IPv4 address.', 'beltoft-services' ), 'error' );
 			return false;
 		}
 
 		return true;
+	}
+
+	private static function both_text(): string {
+		return __( 'An IPv4 address cannot be bought together with a new server and a new database in one order. Buy the addresses from your dashboard after the order.', 'beltoft-services' );
 	}
 
 	/**
@@ -223,6 +241,7 @@ final class Ipv4Cart {
 	public static function checkout_validation( array $data, \WP_Error $errors ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- action signature.
 		$count = array();
 		$lines = 0;
+		$new   = 0;
 
 		foreach ( WC()->cart ? WC()->cart->get_cart() : array() as $item ) {
 			if ( ! self::ipv4_product( (int) ( $item['product_id'] ?? 0 ) ) || ! isset( $item[ self::addon()->cart_uid() ] ) ) {
@@ -233,6 +252,14 @@ final class Ipv4Cart {
 			$link = $item[ self::addon()->cart_for() ] ?? null;
 
 			if ( 'cart_server' === $link ) {
+				$target = Ipv4Field::target();
+
+				if ( null === $target ) {
+					$errors->add( 'ipv4_parent_unavailable', Ipv4Field::both() ? self::both_text() : __( 'The server or database for the IPv4 address is no longer available.', 'beltoft-services' ) );
+				} elseif ( ++$new > (int) $target['max'] ) {
+					$errors->add( 'ipv4_limit', __( 'This server or database cannot take another IPv4 address.', 'beltoft-services' ) );
+				}
+
 				continue;
 			}
 

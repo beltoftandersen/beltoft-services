@@ -51,6 +51,11 @@ final class Ipv4Field {
 
 		$server = DiskField::cart_server();
 
+		// A new server and a new database in one cart: an address line could not say which one it is for.
+		if ( null !== $server && null !== DbIpField::new_database() ) {
+			return null;
+		}
+
 		if ( null !== $server ) {
 			$dedicated = VpsProfile::plan_has_ipv4( Product::plan( (int) ( $server['item']['product_id'] ?? 0 ), (int) ( $server['item']['variation_id'] ?? 0 ) ) );
 
@@ -58,6 +63,13 @@ final class Ipv4Field {
 		}
 
 		return null !== DbIpField::new_database() ? array( 'kind' => 'db', 'max' => 1, 'box' => true ) : null;
+	}
+
+	/**
+	 * Does the cart hold both a new server and a new database (no address line is possible then)?
+	 */
+	public static function both(): bool {
+		return null !== DiskField::cart_server() && null !== DbIpField::new_database();
 	}
 
 	/**
@@ -226,12 +238,13 @@ final class Ipv4Field {
 			return;
 		}
 
-		if ( null !== DiskField::cart_server() || null !== DbIpField::new_database() ) {
-			return;
-		}
+		// What the lines may be now: none without exactly one new server or database, else up to its limit.
+		$target = self::target();
+		$max    = null === $target ? 0 : (int) $target['max'];
+		$kept   = 0;
 
 		foreach ( WC()->cart->get_cart() as $key => $item ) {
-			if ( 'cart_server' === ( $item['beltoft_services_ipv4_for'] ?? null ) ) {
+			if ( 'cart_server' === ( $item['beltoft_services_ipv4_for'] ?? null ) && ++$kept > $max ) {
 				WC()->cart->remove_cart_item( (string) $key );
 			}
 		}
