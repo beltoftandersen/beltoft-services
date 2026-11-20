@@ -69,7 +69,7 @@ final class CartSwapTest extends UsageTestCase {
 			if ( isset( $item['beltoft_services_disk_for'] ) ) {
 				$out['disk'] = (int) $item['variation_id'];
 				++$out['lines'];
-			} elseif ( (int) $item['product_id'] === $this->v['m-None']->get_parent_id() ) {
+			} elseif ( (int) $item['product_id'] === $this->v['u-None']->get_parent_id() ) {
 				$out['server'] = (int) $item['variation_id'];
 				++$out['lines'];
 			}

@@ -71,7 +71,7 @@ final class AccountCssScaleTest extends TestCase {
 	}
 
 	/** Sheets of public order forms and pages: they may load without account.css, so colours carry a fallback. */
-	private const PUBLIC_FILES = array( 'picker', 'tiles', 'mail-setup', 'order-domain', 'billing-field', 'site-field', 'app-field', 'dk-agreement', 'payg-breakdown', 'thankyou' );
+	private const PUBLIC_FILES = array( 'picker', 'tiles', 'mail-setup', 'order-domain', 'site-field', 'app-field', 'dk-agreement', 'payg-breakdown', 'thankyou' );
 
 	/** @return array<string,string> token => value of the account.css token block */
 	private function tokens(): array {
