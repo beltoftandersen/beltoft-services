@@ -41,6 +41,8 @@ final class AppLicenceCart {
 		add_action( 'woocommerce_check_cart_items', array( __CLASS__, 'normalise' ), 1 );
 		add_action( 'woocommerce_cart_item_removed', array( __CLASS__, 'clean_orphan' ) );
 		add_action( 'wc_ajax_' . self::AJAX, array( __CLASS__, 'ajax' ) );
+		// A paid app's tier follows the billing choice of the cart's server: its usage sibling for pay as you go, else the monthly one.
+		add_action( 'beltoft_services_billing_swapped', array( __CLASS__, 'rematch' ), 10 );
 	}
 
 	/**

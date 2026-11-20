@@ -82,4 +82,16 @@ final class Ipv4PendingLineTest extends UsageTestCase {
 		Ipv4Cart::checkout_validation( array(), $errors );
 		$this->assertContains( 'ipv4_billing', $errors->get_error_codes() );
 	}
+
+	public function test_the_billing_swap_is_announced_and_each_feature_follows_in_order(): void {
+		$this->assertSame( 10, has_action( 'beltoft_services_billing_swapped', array( \BeltoftServices\Apps\AppLicenceCart::class, 'rematch' ) ) );
+		$this->assertSame( 20, has_action( 'beltoft_services_billing_swapped', array( \BeltoftServices\Proxmox\Disk\DiskField::class, 'rematch' ) ) );
+		$this->assertSame( 30, has_action( 'beltoft_services_billing_swapped', array( \BeltoftServices\Proxmox\Ipv4\Ipv4Field::class, 'rematch' ) ) );
+
+		$this->server( 'm-None' );
+		$fired = 0;
+		add_action( 'beltoft_services_billing_swapped', static function () use ( &$fired ): void { ++$fired; }, 40 );
+		$this->assertTrue( \BeltoftServices\Usage\BillingField::swap( true )['ok'] );
+		$this->assertSame( 1, $fired );
+	}
 }
