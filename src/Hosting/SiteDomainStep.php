@@ -119,10 +119,14 @@ final class SiteDomainStep {
 				return $base + array( 'status' => 'skipped', 'text' => SiteNewDomain::hint( $r ) );
 			}
 
-			return $base + array(
-				'status' => $ready ? 'current' : 'todo',
-				'text'   => SiteNewDomain::pending_text( $r ),
-				'link'   => '',
+			// A pending domain joins by itself: no link to connect it by hand (array_merge, a union would keep the base link).
+			return array_merge(
+				$base,
+				array(
+					'status' => $ready ? 'current' : 'todo',
+					'text'   => SiteNewDomain::pending_text( $r ),
+					'link'   => '',
+				)
 			);
 		}
 

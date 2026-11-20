@@ -139,6 +139,16 @@ final class SiteDomainStepTest extends HostingCase {
 		$this->assertStringContainsString( 'fresh.example', $row['message'] );
 	}
 
+	public function test_a_pending_domain_has_no_link_and_no_connect_by_hand_note(): void {
+		list( $host ) = $this->order_with_domain( 'fresh.example' );
+		$this->ready( $host );
+		$row = $this->row( $host );
+
+		$this->assertSame( 'current', $this->last( $row )['status'] );
+		$this->assertEmpty( $row['progress']['link'], 'A domain that joins by itself has no link.' );
+		$this->assertStringNotContainsString( 'Connect it from your hosting page', wp_json_encode( $row['progress'] ) );
+	}
+
 	public function test_a_joined_domain_ticks_the_step(): void {
 		list( $host, $domain ) = $this->order_with_domain( 'fresh.example' );
 		$this->ready( $host );
