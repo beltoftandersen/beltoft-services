@@ -35,6 +35,71 @@ class PaygSplitTest extends UsageTestCase {
 	}
 
 	/**
+	 * The OLD shape the split converts: a VPS with a Billing attribute (Monthly, Pay as you go) and a Backups attribute (None, Daily).
+	 * Monthly: 15 without and 18 with backups. Pay as you go: price 0, meta billing = usage.
+	 *
+	 * @param string $premium Premium percent on the product ('' for the default).
+	 * @return array<string, \WC_Product_Variation> Keys: m-None, m-Daily, u-None, u-Daily.
+	 */
+	private function old_twin_product( string $premium = '' ): array {
+		$product = new \WC_Product_Variable();
+		$product->set_name( 'VPS ' . wp_generate_password( 5, false ) );
+		$product->set_status( 'publish' );
+
+		$billing = new \WC_Product_Attribute();
+		$billing->set_name( 'Billing' );
+		$billing->set_options( array( 'Monthly', 'Pay as you go' ) );
+		$billing->set_visible( true );
+		$billing->set_variation( true );
+
+		$backups = new \WC_Product_Attribute();
+		$backups->set_name( 'Backups' );
+		$backups->set_options( array( 'None', 'Daily' ) );
+		$backups->set_visible( true );
+		$backups->set_variation( true );
+
+		$product->set_attributes( array( $billing, $backups ) );
+		$product->update_meta_data( Product::META_DRIVER, 'proxmox' );
+		$product->update_meta_data( \BeltoftLicenses\Software::META_LICENSED, 'yes' );
+		$product->update_meta_data( \BeltoftLicenses\Software::META_SLUG, 'vps-' . wp_generate_password( 5, false ) );
+
+		if ( '' !== $premium ) {
+			$product->update_meta_data( Rates::META_PREMIUM, $premium );
+		}
+
+		foreach ( array( 'cluster' => 'lab', 'template' => 9000, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 30 ) as $key => $value ) {
+			$product->update_meta_data( Product::META_PLAN . $key, (string) $value );
+		}
+
+		$product->save();
+		Product::remember_slug( (string) $product->get_meta( \BeltoftLicenses\Software::META_SLUG ) );
+
+		$out = array();
+
+		foreach ( array( 'm' => 'Monthly', 'u' => 'Pay as you go' ) as $short => $billing_value ) {
+			foreach ( array( 'None' => '15', 'Daily' => '18' ) as $b => $price ) {
+				$v = new \WC_Product_Variation();
+				$v->set_parent_id( $product->get_id() );
+				$v->set_attributes( array( 'billing' => $billing_value, 'backups' => $b ) );
+				$v->set_regular_price( 'm' === $short ? $price : '0' );
+				$v->set_status( 'publish' );
+				$v->update_meta_data( Product::META_PLAN . 'backup_days', 'Daily' === $b ? '7' : '0' );
+
+				if ( 'u' === $short ) {
+					$v->update_meta_data( Rates::META_BILLING, 'usage' );
+				}
+
+				$v->save();
+				$out[ $short . '-' . $b ] = $v;
+			}
+		}
+
+		\WC_Product_Variable::sync( $product->get_id() );
+
+		return $out;
+	}
+
+	/**
 	 * A twin-shaped product: hourly with a Backups attribute, a sale price on one twin, DKK prices, a counted variation and a live
 	 * monthly subscription on a monthly variation, plus a live pay as you go server.
 	 *
@@ -46,7 +111,7 @@ class PaygSplitTest extends UsageTestCase {
 		$this->fake_runner();
 		add_filter( 'beltoft_services_currencies', static fn( $codes ) => array_merge( (array) $codes, array( 'DKK' ) ) );
 
-		$v = $this->usage_product();
+		$v = $this->old_twin_product();
 		$v['m-None']->set_sale_price( '12' );
 		$v['m-None']->save();
 		$this->fake_price( $v['m-None']->get_id(), 'DKK', '112.5' );
@@ -183,6 +248,29 @@ class PaygSplitTest extends UsageTestCase {
 		foreach ( array( 'u-None', 'u-Daily', 'counted' ) as $k ) {
 			$this->assertSame( 'publish', get_post_status( $v[ $k ]->get_id() ) );
 		}
+	}
+
+	public function test_a_kept_product_keeps_its_monthly_plans_on_sale_and_every_figure(): void {
+		$v = $this->twin_shop();
+
+		$r = PaygSplit::run( true, false, array( $v['parent'] ) );
+		$this->assertTrue( $r['ok'], implode( "\n", $r['lines'] ) );
+
+		$this->assertSame( '', get_post_meta( $v['parent'], Rates::META_BILLING, true ) );
+		$this->assertSame( 12.0, Rates::monthly( wc_get_product( $v['u-None']->get_id() ) ) );
+
+		foreach ( array( 'm-None', 'm-Daily' ) as $k ) {
+			$id = $v[ $k ]->get_id();
+			clean_post_cache( $id );
+			$this->assertSame( 'publish', get_post_status( $id ) );
+			$this->assertFalse( Rates::is_usage( $id ) );
+		}
+
+		foreach ( array( 'u-None', 'u-Daily' ) as $k ) {
+			$this->assertTrue( Rates::is_usage( $v[ $k ]->get_id() ) );
+		}
+
+		$this->assertTrue( Rates::is_counted( $v['counted']->get_id() ) );
 	}
 
 	public function test_a_live_monthly_subscription_is_left_alone(): void {

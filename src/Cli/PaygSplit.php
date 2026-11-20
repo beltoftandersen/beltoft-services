@@ -22,7 +22,9 @@ defined( 'ABSPATH' ) || exit;
  * 1. the parent gets the flag `_beltoft_services_billing` (usage, or counted when all its pay as you go variations are counted);
  * 2. every hourly pay as you go variation gets the monthly price its twin gave the OLD code (excluding tax, per currency) in its own
  *    meta, so Rates::monthly() and Rates::items() answer the old figures;
- * 3. every monthly variation gets the own marker `monthly` and goes private (off sale, never deleted); a live subscription on it stays;
+ * 3. every monthly variation gets the own marker `monthly` and goes private (off sale, never deleted); a live subscription on it stays.
+ *    A product named in $keep (products that still sell monthly, e.g. a licence sold monthly on every server) keeps its monthly
+ *    variations on sale and gets no parent flag: its pay as you go variations keep their own flag;
  * 4. the figures before and after are compared for every variation and live resource in every currency; any difference undoes the run.
  *
  * Every change is written to one manifest (option) with the old value, so rollback restores exactly. A second run changes nothing.
@@ -37,10 +39,13 @@ final class PaygSplit {
 	 * Runs the migration.
 	 *
 	 * @param bool $apply    False: a dry run that writes nothing.
-	 * @param bool $rollback Restore the stored manifest instead.
+	 * @param bool  $rollback Restore the stored manifest instead.
+	 * @param int[] $keep     Products whose monthly variations stay on sale (no parent flag).
 	 * @return array{ok: bool, lines: string[]}
 	 */
-	public static function run( bool $apply, bool $rollback = false ): array {
+	public static function run( bool $apply, bool $rollback = false, array $keep = array() ): array {
+		$keep = array_map( 'intval', $keep );
+
 		if ( $rollback ) {
 			return self::rollback_run();
 		}
@@ -82,7 +87,7 @@ final class PaygSplit {
 		}
 
 		$before = self::figures( true, $scope );
-		$lines  = array_merge( $lines, self::describe( $scope, $before, $apply ) );
+		$lines  = array_merge( $lines, self::describe( $scope, $before, $apply, $keep ) );
 
 		if ( ! $apply ) {
 			$lines[] = 'Dry run: nothing written. Run with --apply.';
@@ -107,7 +112,7 @@ final class PaygSplit {
 
 		// Step B: the parent flag, the monthly marker and the monthly variations off sale.
 		foreach ( $scope as $pid => $p ) {
-			self::write_flags( $manifest, $pid, $p );
+			self::write_flags( $manifest, $pid, $p, in_array( (int) $pid, $keep, true ) );
 			self::resync( $pid );
 			self::save( $manifest );
 		}
@@ -421,16 +426,17 @@ final class PaygSplit {
 	 * @param array<string, mixed> $manifest Manifest (changed).
 	 * @param int                  $pid      Parent id.
 	 * @param array<string, mixed> $p        Scope of the product.
+	 * @param bool                 $keep     The monthly variations stay on sale and the parent gets no flag.
 	 */
-	private static function write_flags( array &$manifest, int $pid, array $p ): void {
-		if ( ! in_array( (string) get_post_meta( $pid, Rates::META_BILLING, true ), array( Rates::KIND_HOURLY, Rates::KIND_COUNTED ), true ) ) {
+	private static function write_flags( array &$manifest, int $pid, array $p, bool $keep = false ): void {
+		if ( ! $keep && ! in_array( (string) get_post_meta( $pid, Rates::META_BILLING, true ), array( Rates::KIND_HOURLY, Rates::KIND_COUNTED ), true ) ) {
 			self::put( $manifest, $pid, Rates::META_BILLING, $p['kind'] );
 		}
 
 		foreach ( $p['monthly'] as $vid ) {
 			self::put( $manifest, $vid, Rates::META_BILLING, Rates::KIND_MONTHLY );
 
-			if ( 'publish' === get_post_status( $vid ) ) {
+			if ( ! $keep && 'publish' === get_post_status( $vid ) ) {
 				$manifest['status'][] = array( $vid, 'publish' );
 				wp_update_post( array( 'ID' => $vid, 'post_status' => 'private' ) );
 			}
@@ -512,11 +518,15 @@ final class PaygSplit {
 	 * @param bool                             $apply  Whether it is applied.
 	 * @return string[]
 	 */
-	private static function describe( array $scope, array $before, bool $apply ): array {
+	private static function describe( array $scope, array $before, bool $apply, array $keep = array() ): array {
 		$lines = array();
 
 		foreach ( $scope as $pid => $p ) {
-			$lines[] = sprintf( '#%d %s: parent flag "%s", %d pay as you go, %d counted, %d monthly variations go off sale.', $pid, get_the_title( $pid ), $p['kind'], count( $p['payg'] ), count( $p['counted'] ), count( $p['monthly'] ) );
+			if ( in_array( (int) $pid, $keep, true ) ) {
+				$lines[] = sprintf( '#%d %s: kept as it is (monthly stays on sale, no parent flag), %d pay as you go, %d counted, %d monthly variations marked monthly.', $pid, get_the_title( $pid ), count( $p['payg'] ), count( $p['counted'] ), count( $p['monthly'] ) );
+			} else {
+				$lines[] = sprintf( '#%d %s: parent flag "%s", %d pay as you go, %d counted, %d monthly variations go off sale.', $pid, get_the_title( $pid ), $p['kind'], count( $p['payg'] ), count( $p['counted'] ), count( $p['monthly'] ) );
+			}
 
 			foreach ( $p['payg'] as $vid ) {
 				$parts = array();

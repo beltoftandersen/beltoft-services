@@ -94,16 +94,24 @@ final class PaygCommand {
 	 * [--rollback]
 	 * : Restore the stored manifest exactly.
 	 *
+	 * [--keep-monthly=<ids>]
+	 * : Comma separated product ids that still sell monthly: their monthly variations stay on sale and the product gets no flag.
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     wp beltoft-services payg split
 	 *     wp beltoft-services payg split --apply
+	 *     wp beltoft-services payg split --apply --keep-monthly=124,878
 	 *
 	 * @param string[]              $args       Positional arguments.
 	 * @param array<string, string> $assoc_args Flags.
 	 */
 	public function split( array $args, array $assoc_args ): void {
-		$result = PaygSplit::run( isset( $assoc_args['apply'] ), isset( $assoc_args['rollback'] ) );
+		$result = PaygSplit::run(
+			isset( $assoc_args['apply'] ),
+			isset( $assoc_args['rollback'] ),
+			array_filter( array_map( 'intval', explode( ',', (string) ( $assoc_args['keep-monthly'] ?? '' ) ) ) )
+		);
 
 		foreach ( $result['lines'] as $line ) {
 			\WP_CLI::log( $line );
