@@ -8,6 +8,8 @@
 
 namespace BeltoftServices\Tests\Mcp;
 
+require_once dirname( __DIR__ ) . '/Support/Ipv4Product.php';
+
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Account\DbPicker;
 use BeltoftServices\Api\Tokens;
@@ -24,6 +26,9 @@ require_once __DIR__ . '/DatabaseFixture.php';
  * Purchase tool tests for databases.
  */
 final class PurchaseDbTest extends UsageTestCase {
+
+	use \BeltoftServices\Tests\Support\Ipv4Product;
+
 
 	use CallsTools;
 	use DatabaseFixture;
@@ -239,5 +244,40 @@ final class PurchaseDbTest extends UsageTestCase {
 		$this->assertSame( 'usage', $licenses[0]['source'] );
 		$this->assertSame( $this->account->get_id(), (int) $licenses[0]['subscription_id'] );
 		$this->assertNotNull( $done['service_id'] );
+	}
+
+	/**
+	 * A pay as you go IPv4 address is a line of its own with the database: billed by the hour, on the usage account, like an extra disk.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_a_public_ipv4_is_ordered_with_the_database_as_its_own_pay_as_you_go_line(): void {
+		$twin = $this->ipv4_product()['u'];
+
+		for ( $i = 1; $i <= 4; $i++ ) {
+			\BeltoftServices\Proxmox\Network\IpPool::add( '198.51.100.' . $i );
+		}
+
+		$token = $this->oauth( $this->user, Tokens::FULL );
+		wp_set_current_user( 0 );
+		$args  = $this->args( array( 'public_ipv4' => true ) );
+
+		$first = $this->json( $this->tool( 'order_database', $args, $token ) );
+		$this->assertStringContainsString( 'Public IPv4 address: yes', $first['summary'] );
+		$this->assertStringContainsString( '+€2.04 / month', $first['summary'] );
+		$done = $this->json( $this->tool( 'order_database', $args + array( 'confirm' => $first['confirm'] ), $token ) );
+
+		$this->assertTrue( $done['ordered'], wp_json_encode( $done ) );
+		$order = $this->orders( $this->user )[0];
+		$this->assertEquals( 0, $order->get_total() );
+		$variations = array_map( static fn( $item ) => (int) $item->get_variation_id(), array_values( $order->get_items() ) );
+		$this->assertContains( $twin->get_id(), $variations, 'The pay as you go address, never the monthly one.' );
+		$this->assertContains( $this->db['u-0-0']->get_id(), $variations );
+
+		foreach ( Licenses::where( 'order_id', $order->get_id() ) as $license ) {
+			$this->assertSame( 'usage', $license['source'] );
+			$this->assertSame( $this->account->get_id(), (int) $license['subscription_id'] );
+		}
 	}
 }

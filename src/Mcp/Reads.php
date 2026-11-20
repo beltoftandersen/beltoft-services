@@ -247,7 +247,7 @@ final class Reads {
 			'addresses'   => array_map( static fn( array $row ) => array( 'address' => $row['address'], 'role' => $row['role'], 'in_use' => $row['live'] ), null === $view ? array() : $view['addresses'] ),
 			'can_add'     => null !== $view && '' !== $view['add_url'],
 			'sold_out'    => null !== $view && $view['sold_out'],
-			'how_to_add'  => __( 'Add or remove an IPv4 address from the server or the database page in the dashboard. Claude cannot buy it yet.', 'beltoft-services' ),
+			'how_to_add'  => __( 'Add or remove an IPv4 address from the server or the database page in the dashboard. A new database can be ordered with one (order_database).', 'beltoft-services' ),
 		);
 	}
 

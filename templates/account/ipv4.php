@@ -30,6 +30,11 @@ defined( 'ABSPATH' ) || exit;
 					</span>
 					<?php if ( '' !== $beltoft_services_row['remove_url'] ) : ?>
 						<a class="button woocommerce-button bs-btn" href="<?php echo esc_url( $beltoft_services_row['remove_url'] ); ?>"><?php esc_html_e( 'Remove', 'beltoft-services' ); ?></a>
+					<?php elseif ( $beltoft_services_row['delete_id'] > 0 ) : ?>
+						<?php
+						$beltoft_services_delete_id = (int) $beltoft_services_row['delete_id'];
+						include BELTOFT_SERVICES_PATH . 'templates/account/delete.php';
+						?>
 					<?php elseif ( '' !== $beltoft_services_row['undo_url'] ) : ?>
 						<a class="button woocommerce-button bs-btn" href="<?php echo esc_url( $beltoft_services_row['undo_url'] ); ?>"><?php esc_html_e( 'Keep it', 'beltoft-services' ); ?></a>
 					<?php endif; ?>

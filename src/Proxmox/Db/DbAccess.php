@@ -417,6 +417,7 @@ final class DbAccess {
 			'add_price' => $ipv4['add_price'],
 			'sold_out'  => $ipv4['sold_out'],
 			'remove_url' => $ipv4['remove_url'],
+			'delete_id'  => $ipv4['delete_id'],
 			'ipv6'      => \BeltoftServices\Proxmox\Network\Ipv6Switch::view( $r ),
 		);
 	}

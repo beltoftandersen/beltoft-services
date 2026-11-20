@@ -99,24 +99,24 @@ final class Cart {
 	}
 
 	/**
-	 * Pay-as-you-go services ordered in the cart, for the new-account limit: like usage_units(), without extra disks, which
-	 * belong to a server.
+	 * Pay-as-you-go services ordered in the cart, for the new-account limit: like usage_units(), without extra disks and IPv4 addresses, which
+	 * belong to a server or a database.
 	 *
 	 * @param \WC_Cart|null $cart Cart (default: the current one).
 	 */
 	public static function service_units( ?\WC_Cart $cart = null ): int {
 		$cart  = $cart ? $cart : ( function_exists( 'WC' ) ? WC()->cart : null );
-		$disks = 0;
+		$addons = 0;
 
 		foreach ( $cart ? $cart->get_cart() : array() as $item ) {
 			$driver = \BeltoftServices\Product::driver_for( (int) ( $item['product_id'] ?? 0 ) );
 
-			if ( $driver && \BeltoftServices\Proxmox\Disk\DiskDriver::ID === $driver->id() && ! CartFlow::has_value( $item, CartFlow::EXISTING_SERVICE ) && ! empty( $item['variation_id'] ) && Rates::is_usage( (int) $item['variation_id'] ) ) {
-				$disks += (int) $item['quantity'];
+			if ( $driver instanceof \BeltoftServices\Drivers\UsageItems && $driver->usage_is_addon() && ! CartFlow::has_value( $item, CartFlow::EXISTING_SERVICE ) && ! empty( $item['variation_id'] ) && Rates::is_usage( (int) $item['variation_id'] ) ) {
+				$addons += (int) $item['quantity'];
 			}
 		}
 
-		return max( 0, self::usage_units( $cart ) - $disks );
+		return max( 0, self::usage_units( $cart ) - $addons );
 	}
 
 	/**

@@ -52,6 +52,7 @@ final class CustomerDelete {
 		'vm' => 'server',
 		'db' => 'database',
 		'disk' => 'disk',
+		'ipv4' => 'ipv4',
 		'dedicated' => 'dedicated',
 	);
 
@@ -144,6 +145,10 @@ final class CustomerDelete {
 		}
 
 		if ( 'dedicated' === $kind ? null !== $r->pending_desire() : ( 'ready' !== $r->get( 'state' ) || null !== $r->pending_desire() || ! empty( Progress::build( $r )['active'] ) ) ) {
+			if ( 'ipv4' === $kind ) {
+				return __( 'This IPv4 address is still being set up or changed. Please try again when it has finished.', 'beltoft-services' );
+			}
+
 			if ( 'disk' === $kind ) {
 				return __( 'Something is still running on this disk, such as a setup or a resize. Please try again when it has finished.', 'beltoft-services' );
 			}
@@ -151,6 +156,10 @@ final class CustomerDelete {
 			return 'server' === $kind
 				? __( 'Something is still running on this server, such as a setup, a reinstall or a restore. Please try again when it has finished.', 'beltoft-services' )
 				: __( 'Something is still running on this database, such as a setup or a restore. Please try again when it has finished.', 'beltoft-services' );
+		}
+
+		if ( 'ipv4' === $kind ) {
+			return \BeltoftServices\Proxmox\Ipv4\Ipv4Meta::removal_blocker( $r );
 		}
 
 		if ( 'server' === $kind ) {
@@ -170,6 +179,10 @@ final class CustomerDelete {
 	 * @param string $kind server or database.
 	 */
 	public static function text( string $kind ): string {
+		if ( 'ipv4' === $kind ) {
+			return __( 'Removing takes the IPv4 address away from the server or database and gives it back. Anything that connects through it stops working. Billing stops in the hour it is removed. The service and the usage account are not touched.', 'beltoft-services' );
+		}
+
 		if ( 'disk' === $kind ) {
 			return __( 'Removing deletes the extra disk and all its data, including the snapshots that include it. It cannot be undone. Billing stops in the hour it is removed. The server and the usage account are not touched.', 'beltoft-services' );
 		}
@@ -218,6 +231,10 @@ final class CustomerDelete {
 	 * @param string $kind server or database.
 	 */
 	public static function billing_note( string $kind ): string {
+		if ( 'ipv4' === $kind ) {
+			return __( 'The address is billed by the hour while you have it, and never more than the monthly price. Remove it to stop the charge.', 'beltoft-services' );
+		}
+
 		if ( 'disk' === $kind ) {
 			return __( 'The disk is billed by the hour while it exists. Remove it to stop the charge.', 'beltoft-services' );
 		}

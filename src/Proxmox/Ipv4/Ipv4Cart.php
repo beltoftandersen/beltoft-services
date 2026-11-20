@@ -14,7 +14,11 @@ use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Addon\Addon;
 use BeltoftServices\Proxmox\Addon\AddonCart;
 use BeltoftServices\Proxmox\Network\IpPool;
+use BeltoftServices\Proxmox\Disk\DiskCart;
+use BeltoftServices\Proxmox\Disk\DiskField;
+use BeltoftServices\Proxmox\Db\DbIpField;
 use BeltoftServices\Resource;
+use BeltoftServices\Usage\Rates;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -39,10 +43,34 @@ final class Ipv4Cart {
 	}
 
 	/**
-	 * The published, purchasable subscription of the IPv4 address, or null.
+	 * The published, purchasable IPv4 address of one billing: the monthly subscription, or its pay as you go twin, or null.
+	 *
+	 * @param bool $usage Pay as you go.
 	 */
-	public static function product(): ?\WC_Product {
-		return AddonCart::single_product( Ipv4Driver::ID );
+	public static function product( bool $usage = false ): ?\WC_Product {
+		return AddonCart::single_product( Ipv4Driver::ID, $usage );
+	}
+
+	/**
+	 * The IPv4 address sold with a parent: billing follows it, as an extra disk's does (pay as you go server or database, pay as you go address).
+	 *
+	 * @param Resource $parent Server or database.
+	 */
+	public static function product_for( Resource $parent ): ?\WC_Product {
+		return self::product( DiskCart::usage_server( $parent->license() ) );
+	}
+
+	/**
+	 * Is the new server or database of the cart pay as you go?
+	 */
+	public static function cart_parent_usage(): bool {
+		if ( null !== DiskField::cart_server() ) {
+			return DiskField::cart_server_usage();
+		}
+
+		$db = DbIpField::new_database();
+
+		return null !== $db && Rates::is_usage( (int) ( $db['item']['variation_id'] ?? 0 ) );
 	}
 
 	/**
@@ -78,7 +106,7 @@ final class Ipv4Cart {
 	 * @param Resource $parent Server or database.
 	 */
 	public static function add_url( Resource $parent ): string {
-		$product = self::product();
+		$product = self::product_for( $parent );
 
 		if ( null === $product || ! function_exists( 'wcs_get_subscription' ) || ! self::parent_ok( $parent ) || ! self::room( $parent ) || ! self::in_stock() ) {
 			return '';
@@ -174,6 +202,14 @@ final class Ipv4Cart {
 			return false;
 		}
 
+		// Billing follows the parent: a pay as you go server or database gets the pay as you go address, a monthly one the monthly address.
+		$bought = wc_get_product( (int) $variation_id > 0 ? (int) $variation_id : (int) $product_id );
+
+		if ( ( $bought && Rates::is_usage( $bought ) ) !== ( is_int( $link ) ? DiskCart::usage_server( (array) Licenses::find( $link ) ) : self::cart_parent_usage() ) ) {
+			wc_add_notice( __( 'This IPv4 address is not sold with the billing of this server or database. Add it from the page of the service.', 'beltoft-services' ), 'error' );
+			return false;
+		}
+
 		if ( ! self::in_stock() ) {
 			Ipv4Alerts::sold_out();
 			wc_add_notice( __( 'No IPv4 address is free right now.', 'beltoft-services' ), 'error' );
@@ -249,7 +285,7 @@ final class Ipv4Cart {
 		}
 
 		// A new dedicated server in the same cart takes its own address first and brings its own share of the reserve.
-		$server       = $lines > 0 ? \BeltoftServices\Proxmox\Disk\DiskField::cart_server() : null;
+		$server       = $lines > 0 ? DiskField::cart_server() : null;
 		$takes_server = null !== $server && \BeltoftServices\Proxmox\Vm\VpsProfile::plan_has_ipv4( Product::plan( (int) ( $server['item']['product_id'] ?? 0 ), (int) ( $server['item']['variation_id'] ?? 0 ) ) );
 
 		if ( $lines > 0 && IpPool::free_count() < $lines + ( $takes_server ? 1 : IpPool::reserve_for_vps() ) ) {

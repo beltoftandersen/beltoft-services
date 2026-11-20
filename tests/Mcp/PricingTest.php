@@ -8,6 +8,8 @@
 
 namespace BeltoftServices\Tests\Mcp;
 
+require_once dirname( __DIR__ ) . '/Support/Ipv4Product.php';
+
 use BeltoftServices\Api\Tokens;
 use BeltoftServices\Mcp\Endpoint;
 use BeltoftServices\Product;
@@ -28,6 +30,7 @@ final class PricingTest extends UsageTestCase {
 	use CallsTools;
 	use \BeltoftServices\Tests\Support\FakeCurrency;
 	use DatabaseFixture;
+	use \BeltoftServices\Tests\Support\Ipv4Product;
 
 	/**
 	 * @var int
@@ -163,6 +166,23 @@ final class PricingTest extends UsageTestCase {
 
 		$this->assertTrue( $out['isError'] );
 		$this->assertStringContainsString( 'add-on with its own subscription', wp_json_encode( $out ) );
+	}
+
+	public function test_a_public_ipv4_is_priced_as_a_pay_as_you_go_line_of_the_database_quote(): void {
+		$this->ipv4_product();
+
+		for ( $i = 1; $i <= 4; $i++ ) {
+			\BeltoftServices\Proxmox\Network\IpPool::add( '198.51.100.' . $i );
+		}
+
+		$quote = $this->call( 'price_quote', array( 'plan' => $this->db['m-0-0']->get_id(), 'public_ipv4' => true ) );
+
+		$this->assertEquals( 47.04, $quote['max_per_month'], 'The plan plus the address at its cap (the monthly price).' );
+		$this->assertEquals( array( 45.0, 2.04 ), array_column( $quote['lines'], 'per_month' ) );
+		$this->assertSame( 'Public IPv4 address', $quote['lines'][1]['label'] );
+
+		// A server has no address in a quote or an order here: it is added in the dashboard.
+		$this->assertTrue( $this->tool( 'price_quote', array( 'plan' => (int) $this->server['m-None']->get_id(), 'public_ipv4' => true ), $this->read() )['isError'] );
 	}
 
 	public function test_the_quote_of_a_plan_alone_and_of_a_server_with_backups(): void {

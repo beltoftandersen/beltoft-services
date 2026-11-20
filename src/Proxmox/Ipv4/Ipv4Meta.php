@@ -327,6 +327,26 @@ final class Ipv4Meta {
 	}
 
 	/**
+	 * Why an address cannot be removed now, or null: the main address of a server is the way out while extra addresses are left, and
+	 * the parent must not be changing.
+	 *
+	 * @param Resource $addon Add-on.
+	 */
+	public static function removal_blocker( Resource $addon ): ?string {
+		$parent = self::parent_of( $addon );
+
+		if ( null !== $parent && 'main' === $addon->get( self::ROLE ) && ! self::is_db( $parent ) && array() !== self::extra_addresses( $parent ) ) {
+			return __( 'Remove the extra IPv4 addresses first. The first address is the main address of the server.', 'beltoft-services' );
+		}
+
+		if ( null !== $parent && '' !== Ipv4Server::working( $parent ) ) {
+			return __( 'An IPv4 address is being changed. Please try again when it is done.', 'beltoft-services' );
+		}
+
+		return null;
+	}
+
+	/**
 	 * Does the server count as a VPS (not a database)?
 	 *
 	 * @param Resource $r Resource.

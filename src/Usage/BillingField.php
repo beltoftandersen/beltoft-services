@@ -13,7 +13,6 @@ use BeltoftServices\Proxmox\Backup\BackupField;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Proxmox\Vm\OsField;
-use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -31,9 +30,6 @@ final class BillingField {
 	public const AJAX   = 'beltoft_services_billing';
 	public const NONCE  = 'beltoft-services-billing';
 	public const HANDLE = 'beltoft-services-billing-field';
-
-	/** Products of these drivers have the Billing choice (a pay as you go sibling variation, found from the Billing attribute). */
-	private const DRIVERS = array( ProxmoxDriver::ID, \BeltoftServices\Proxmox\Db\DbDriver::ID, \BeltoftServices\ManualServer\ManualServerDriver::ID );
 
 	/**
 	 * Hooks.
@@ -104,7 +100,7 @@ final class BillingField {
 			$driver = Product::driver_for( (int) ( $item['product_id'] ?? 0 ) );
 
 			// Servers and databases only: an email plan or a plugin licence never has this choice, whatever its attributes.
-			if ( ! $driver || ! in_array( $driver->id(), self::DRIVERS, true ) ) {
+			if ( ! $driver instanceof \BeltoftServices\Drivers\UsageItems || ! $driver->usage_billing_choice() ) {
 				continue;
 			}
 
@@ -305,6 +301,7 @@ final class BillingField {
 		if ( $added ) {
 			\BeltoftServices\Apps\AppLicenceCart::rematch();
 			DiskField::rematch();
+			\BeltoftServices\Proxmox\Ipv4\Ipv4Field::rematch();
 		}
 
 		$cart->calculate_totals();

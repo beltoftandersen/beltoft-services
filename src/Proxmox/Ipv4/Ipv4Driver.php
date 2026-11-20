@@ -32,7 +32,10 @@ defined( 'ABSPATH' ) || exit;
  * and wait until it shows. delete: the parent is made to match without the address first (firewall first, one restart for
  * a main address), and the address goes back to our pool after that.
  */
-final class Ipv4Driver implements Driver {
+final class Ipv4Driver implements Driver, \BeltoftServices\Drivers\UsageItems {
+
+	use \BeltoftServices\Drivers\UsageDefaults;
+
 	public const ID = 'proxmox-ipv4';
 
 	/** Meta: when the action on the parent was queued, and how often. */
@@ -367,5 +370,31 @@ final class Ipv4Driver implements Driver {
 		echo '<tr><th scope="row">' . esc_html__( 'Server or database license', 'beltoft-services' ) . '</th><td>' . esc_html( (string) $r->get( 'server_license' ) ) . '</td></tr>';
 		echo '<tr><th scope="row">' . esc_html__( 'Parent resource', 'beltoft-services' ) . '</th><td>' . esc_html( $parent ? (string) $parent->id() : '' ) . '</td></tr>';
 		echo '</tbody></table>';
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @param Resource              $r       Resource.
+	 * @param \WC_Product_Variation $v       Variation.
+	 * @param float                 $monthly Monthly price.
+	 * @param float                 $premium Premium.
+	 */
+	public function usage_items( Resource $r, \WC_Product_Variation $v, float $monthly, float $premium ): array { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- interface.
+		return array( array( 'item' => 'ipv4', 'quantity' => 1.0, 'unit' => 'hour', 'rate' => \BeltoftServices\Usage\Rates::hourly( $monthly, $premium ) ) );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function usage_words(): array {
+		return array( 'ipv4' => array( 'label' => __( 'IPv4 address', 'beltoft-services' ), 'word' => __( 'IPv4 address', 'beltoft-services' ) ) );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function usage_is_addon(): bool {
+		return true;
 	}
 }

@@ -131,7 +131,7 @@ final class Estimate {
 	 * @param string $label Service name.
 	 */
 	private static function subject( string $item, string $label ): string {
-		return in_array( $item, array( 'server', 'database' ), true ) ? $label : Renewal::line_subject( $item, $label );
+		return Items::is_plan( $item ) ? $label : Renewal::line_subject( $item, $label );
 	}
 
 	/**

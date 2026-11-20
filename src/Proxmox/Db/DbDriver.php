@@ -267,4 +267,25 @@ class DbDriver extends ProxmoxDriver {
 	public function render_account( Resource $r ): void {
 		DbCard::render( $r );
 	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @param Resource              $r       Resource.
+	 * @param \WC_Product_Variation $v       Variation.
+	 * @param float                 $monthly Monthly price.
+	 * @param float                 $premium Premium.
+	 */
+	public function usage_items( Resource $r, \WC_Product_Variation $v, float $monthly, float $premium ): array { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- interface.
+		// One item: the variation's price already holds the extra storage the plan was bought with, so the hourly rate is that price / 730 and the cap that price.
+		return array( array( 'item' => 'database', 'quantity' => 1.0, 'unit' => 'hour', 'rate' => \BeltoftServices\Usage\Rates::hourly( $monthly, $premium ) ) );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function usage_words(): array {
+		/* translators: %s: database name. */
+		return array( 'database' => array( 'label' => __( 'database', 'beltoft-services' ), 'word' => __( 'Database', 'beltoft-services' ), 'plan' => true, 'subject' => __( 'Database %s', 'beltoft-services' ) ) );
+	}
 }

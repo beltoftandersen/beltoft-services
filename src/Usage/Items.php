@@ -7,13 +7,17 @@
 
 namespace BeltoftServices\Usage;
 
+use BeltoftServices\Drivers\Registry;
+use BeltoftServices\Drivers\UsageItems;
+use BeltoftServices\Resource;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
  * A counted item is billed per unit, not per hour, and has no monthly cap. Its ledger item is a base name and, for the second step
  * of a price in steps and later, an underscore and the step number (`order`, `order_2`, `order_3`). The base names and their words
  * are here and can be added to through the filter `beltoft_services_usage_item_defs`; the hourly items (server, database, ...)
- * keep their own lists in Renewal.
+ * are declared by the drivers (Drivers\UsageItems), read here.
  */
 final class Items {
 
@@ -75,5 +79,71 @@ final class Items {
 
 		/* translators: 1: number, 2: the unit word, such as "order" or "orders". */
 		return sprintf( __( '%1$s %2$s', 'beltoft-services' ), number_format_i18n( $n ), 1 === $n ? $def['singular'] : $def['plural'] );
+	}
+
+	/**
+	 * The drivers the usage engine bills: every registered driver that implements UsageItems. The one registration point: a new pay as
+	 * you go product needs a pay as you go variation (meta `_beltoft_services_billing`) and a driver that implements UsageItems.
+	 *
+	 * @return array<string, UsageItems> Driver id => driver.
+	 */
+	public static function drivers(): array {
+		$out = array();
+
+		foreach ( Registry::all() as $id => $driver ) {
+			if ( $driver instanceof UsageItems ) {
+				$out[ (string) $id ] = $driver;
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * The driver of a resource when the usage engine bills it.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function driver_of( Resource $r ): ?UsageItems {
+		$driver = Registry::get( (string) $r->get( 'driver' ) );
+
+		return $driver instanceof UsageItems ? $driver : null;
+	}
+
+	/**
+	 * The words of an hourly item, declared by the drivers that bill it: label, word, plan, subject.
+	 *
+	 * @param string $item Item.
+	 * @return array<string, mixed>
+	 */
+	public static function hourly( string $item ): array {
+		foreach ( self::drivers() as $driver ) {
+			$words = $driver->usage_words();
+
+			if ( isset( $words[ $item ] ) ) {
+				return $words[ $item ];
+			}
+		}
+
+		return array();
+	}
+
+	/**
+	 * One field of an hourly item's words, the item name itself when it has none.
+	 *
+	 * @param string $item  Item.
+	 * @param string $field label or word.
+	 */
+	public static function words( string $item, string $field ): string {
+		return (string) ( self::hourly( $item )[ $field ] ?? $item );
+	}
+
+	/**
+	 * Is the item titled with its product and plan on an invoice (a server, a database)?
+	 *
+	 * @param string $item Item.
+	 */
+	public static function is_plan( string $item ): bool {
+		return ! empty( self::hourly( $item )['plan'] );
 	}
 }

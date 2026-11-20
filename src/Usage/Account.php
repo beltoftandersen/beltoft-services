@@ -405,7 +405,9 @@ final class Account {
 				static function ( int $id ): bool {
 					$r = Resource::find( $id );
 
-					return $r && \BeltoftServices\Proxmox\Disk\DiskDriver::ID !== (string) $r->get( 'driver' );
+					$driver = $r ? Items::driver_of( $r ) : null;
+
+					return $r && ! ( $driver && $driver->usage_is_addon() );
 				}
 			)
 		);

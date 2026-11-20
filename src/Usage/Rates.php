@@ -10,14 +10,6 @@ namespace BeltoftServices\Usage;
 use BeltoftServices\Billing\TaxNote;
 use BeltoftServices\Currency;
 use BeltoftServices\Product;
-use BeltoftServices\Apps\AppLicenceDriver;
-use BeltoftServices\Proxmox\Backup\Backups;
-use BeltoftServices\Proxmox\Db\DbDriver;
-use BeltoftServices\Proxmox\Disk\DiskDriver;
-use BeltoftServices\Proxmox\Disk\DiskField;
-use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
-use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
-use BeltoftServices\ManualServer\ManualServerDriver;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -400,6 +392,19 @@ final class Rates {
 	}
 
 	/**
+	 * What a pay as you go add-on variation (an extra disk size, an IPv4 address) costs at most in a month, for a tile or a line:
+	 * "+€4.40 per month at most, billed by the hour". Empty when the variation has no pay as you go price.
+	 *
+	 * @param \WC_Product_Variation $variation Pay as you go variation.
+	 */
+	public static function addon_terms( \WC_Product_Variation $variation ): string {
+		$rates = self::for_usage( $variation );
+
+		/* translators: %s: monthly amount such as +€4.40 per month */
+		return null === $rates ? '' : sprintf( __( '%s at most, billed by the hour', 'beltoft-services' ), self::plus_per_month( $rates['cap'], $variation ) );
+	}
+
+	/**
 	 * The one sentence that says how pay as you go is billed.
 	 */
 	public static function billed_note(): string {
@@ -540,15 +545,7 @@ final class Rates {
 
 	/**
 	 * What a pay-as-you-go resource is billed for each hour: a list of items with their quantity, unit and
-	 * rate per unit and hour.
-	 *
-	 * - a database: one `database` item at the plan's variation price (public IP and extra storage included) / 730;
-	 * - a server (VM): one `server` item and, when its plan has backups and a variation without
-	 *   them exists, a `backups` item priced at the difference;
-	 * - an extra disk: `disk`, in GB;
-	 * - a snapshot pack: `snapshots`, one pack;
-	 * - the licence of a paid app on the server: `app`, one licence, at the tier's monthly price (its monthly sibling's)
-	 *   x (1 + premium) / 730, capped like the others at that price x (1 + premium) a month.
+	 * rate per unit and hour. The items are the driver's own (Drivers\UsageItems::usage_items()); the ledger item names are theirs.
 	 *
 	 * @param Resource $r Resource.
 	 * @return array<int, array{item: string, quantity: float, unit: string, rate: float}>
@@ -569,86 +566,9 @@ final class Rates {
 			return array();
 		}
 
-		$premium = self::premium( $v->get_parent_id() );
-		$driver  = $r->get( 'driver' );
-		$out     = array();
+		$driver = Items::driver_of( $r );
 
-		if ( DbDriver::ID === $driver ) {
-			// One item: the variation's price already holds the public IP and the extra storage the plan was bought with, so
-			// the hourly rate is that price / 730 and the cap that price (the add-ons are variation attributes, not products).
-			$out[] = array( 'item' => 'database', 'quantity' => 1.0, 'unit' => 'hour', 'rate' => self::hourly( $monthly, $premium ) );
-		} elseif ( ProxmoxDriver::ID === $driver ) {
-			$server = $monthly;
-			$extra  = 0.0;
-
-			if ( Backups::days( $r ) > 0 ) {
-				$without = Backups::sibling( $v, false );
-				$base    = $without ? self::monthly( $without ) : null;
-
-				if ( null !== $base && $monthly > $base ) {
-					$server = $base;
-					$extra  = $monthly - $base;
-				}
-			}
-
-			$out[] = array( 'item' => 'server', 'quantity' => 1.0, 'unit' => 'hour', 'rate' => self::hourly( $server, $premium ) );
-
-			if ( $extra > 0 && Backups::enabled( $r ) ) {
-				$out[] = array( 'item' => 'backups', 'quantity' => 1.0, 'unit' => 'hour', 'rate' => self::hourly( $extra, $premium ) );
-			}
-		} elseif ( ManualServerDriver::ID === $driver ) {
-			// A dedicated server: one item, the variation's price / 730 an hour. With the product premium 0 the monthly cap is the monthly price.
-			$out[] = array( 'item' => 'server', 'quantity' => 1.0, 'unit' => 'hour', 'rate' => self::hourly( $monthly, $premium ) );
-		} elseif ( DiskDriver::ID === $driver ) {
-			list( $gb, $basis ) = self::disk_basis( $r, $v, $monthly );
-
-			if ( $gb > 0 ) {
-				$out[] = array( 'item' => 'disk', 'quantity' => $gb, 'unit' => 'GB', 'rate' => self::hourly( $basis / $gb, $premium ) );
-			}
-		} elseif ( SnapshotDriver::ID === $driver ) {
-			$out[] = array( 'item' => 'snapshots', 'quantity' => 1.0, 'unit' => 'pack', 'rate' => self::hourly( $monthly, $premium ) );
-		} elseif ( \BeltoftServices\Proxmox\Ipv4\Ipv4Driver::ID === $driver ) {
-			$out[] = array( 'item' => 'ipv4', 'quantity' => 1.0, 'unit' => 'hour', 'rate' => self::hourly( $monthly, $premium ) );
-		} elseif ( \BeltoftServices\Proxmox\Managed\ManagedDriver::ID === $driver ) {
-			$out[] = array( 'item' => 'managed', 'quantity' => 1.0, 'unit' => 'hour', 'rate' => self::hourly( $monthly, $premium ) );
-		} elseif ( AppLicenceDriver::ID === $driver ) {
-			$out[] = array( 'item' => 'app', 'quantity' => 1.0, 'unit' => 'hour', 'rate' => self::hourly( $monthly, $premium ) );
-		}
-
-		return $out;
-	}
-
-	/**
-	 * The size and the monthly price an extra disk is metered by. Normally the licence's variation: its plan size and its
-	 * price. While a grow is pending (the plan asks for more than the disk really has, `size_gb` being what the driver
-	 * measured) the disk is metered by the size it really has, at the price of the variation of that size (or, when no such
-	 * variation exists, the same price per GB), so the customer pays for the larger size only from the hour the disk is larger.
-	 *
-	 * @param Resource              $r       Disk.
-	 * @param \WC_Product_Variation $v       The licence's variation.
-	 * @param float                 $monthly Its monthly price.
-	 * @return array{0: float, 1: float} GB and the monthly price for that many.
-	 */
-	private static function disk_basis( Resource $r, \WC_Product_Variation $v, float $monthly ): array {
-		$planned = (float) ( ( (array) $r->get( 'plan' ) )['disk_gb'] ?? 0 );
-		$real    = (float) $r->get( 'size_gb' );
-
-		if ( $planned <= 0 || $real <= 0 || $real >= $planned ) {
-			return array( $planned, $monthly );
-		}
-
-		foreach ( DiskField::sizes_for( true ) as $candidate ) {
-			$size = (float) ( Product::plan( $candidate->get_parent_id(), $candidate->get_id() )['disk_gb'] ?? 0 );
-
-			if ( $candidate->get_parent_id() === $v->get_parent_id() && $size === $real ) {
-				$price = self::monthly( $candidate );
-
-				if ( null !== $price ) {
-					return array( $real, $price );
-				}
-			}
-		}
-
-		return array( $real, $monthly * $real / $planned );
+		// Each driver declares its own hourly items (Drivers\UsageItems).
+		return null === $driver ? array() : $driver->usage_items( $r, $v, $monthly, self::premium( $v->get_parent_id() ) );
 	}
 }

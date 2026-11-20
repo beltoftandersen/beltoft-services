@@ -119,7 +119,7 @@ final class DiskPanels {
 				}
 				$url = DiskCart::add_url( $server, $variation );
 				if ( $url ) {
-					$price = $server_usage ? self::usage_terms_of( $variation ) : Panels::price_text( $variation );
+					$price = $server_usage ? Rates::addon_terms( $variation ) : Panels::price_text( $variation );
 					// A pay as you go size is taxed on the invoice whatever the product says: its words follow the display alone.
 					$vat   = $server_usage ? ( 'incl' === \BeltoftServices\Billing\TaxNote::display() ? 'incl' : 'excl' ) : \BeltoftServices\Billing\TaxNote::vat_mode( $variation );
 					$add[] = array( 'size' => $size, 'url' => $url, 'price' => $price, 'vat' => $vat );
@@ -130,18 +130,6 @@ final class DiskPanels {
 	}
 
 	/**
-	 * What a pay as you go size costs at most in a month, for a tile: "+€4.40 per month, billed by the hour".
-	 *
-	 * @param \WC_Product_Variation $variation Pay as you go disk variation.
-	 */
-	private static function usage_terms_of( \WC_Product_Variation $variation ): string {
-		$rates = Rates::for_usage( $variation );
-
-		/* translators: %s: monthly amount such as +€4.40 per month */
-		return null === $rates ? '' : sprintf( __( '%s at most, billed by the hour', 'beltoft-services' ), Rates::plus_per_month( $rates['cap'], $variation ) );
-	}
-
-	/**
 	 * What a pay as you go disk costs now, the way a tile shows it.
 	 *
 	 * @param Resource $disk Disk.
@@ -149,7 +137,7 @@ final class DiskPanels {
 	private static function usage_terms( Resource $disk ): string {
 		$variation = wc_get_product( (int) ( $disk->license()['variation_id'] ?? 0 ) );
 
-		return $variation instanceof \WC_Product_Variation ? self::usage_terms_of( $variation ) : '';
+		return $variation instanceof \WC_Product_Variation ? Rates::addon_terms( $variation ) : '';
 	}
 
 	/**
