@@ -27,6 +27,11 @@ final class BillingActions {
 	public const NAMES = array( 'cancel_subscription', 'remove_addon', 'set_default_payment_method' );
 
 	/**
+	 * Pay as you go add-ons removed through CustomerDelete, as the dashboard does (their licence sits on the usage account).
+	 */
+	private const USAGE_ADDONS = array( 'disk', 'ipv4' );
+
+	/**
 	 * The summary of one of the tools.
 	 *
 	 * @param string               $name    Tool.
@@ -67,11 +72,13 @@ final class BillingActions {
 					return $r;
 				}
 
-				// A pay as you go disk is deleted as a server is: its licence sits on the usage account, which is never cancelled here.
-				if ( 'disk' === CustomerDelete::kind( $r ) ) {
+				// A pay as you go disk or IPv4 address is deleted as a server is: its licence sits on the usage account, which is never cancelled here.
+				$kind = CustomerDelete::kind( $r );
+
+				if ( in_array( $kind, self::USAGE_ADDONS, true ) ) {
 					$done = CustomerDelete::run( $r, $user_id, '', true );
 
-					return $done instanceof \WP_Error ? new \WP_Error( 'beltoft_services_tool', $done->get_error_message() ) : array( 'deleting' => true, 'message' => 'The extra disk is being removed. This takes a minute. Billing stops in the hour it is removed. The server and the usage account were not touched.' );
+					return $done instanceof \WP_Error ? new \WP_Error( 'beltoft_services_tool', $done->get_error_message() ) : array( 'deleting' => true, 'message' => 'ipv4' === $kind ? 'The IPv4 address is being removed. This takes a minute. Billing stops in the hour it is removed. The server or database and the usage account were not touched.' : 'The extra disk is being removed. This takes a minute. Billing stops in the hour it is removed. The server and the usage account were not touched.' );
 				}
 
 				return self::cancel( $user_id, (int) ( $r->license()['subscription_id'] ?? 0 ), 'add-on removed' );
@@ -119,14 +126,14 @@ final class BillingActions {
 			return $r;
 		}
 
-		$why = Subscriptions::addon_blocker( $r );
+		$why = in_array( CustomerDelete::kind( $r ), self::USAGE_ADDONS, true ) ? '' : Subscriptions::addon_blocker( $r );
 
 		if ( '' !== $why ) {
 			return new \WP_Error( 'beltoft_services_tool', $why );
 		}
 
 		// Any other pay as you go add-on shares the usage account's subscription: cancelling that would end every service on it.
-		if ( 'usage' === (string) ( $r->license()['source'] ?? '' ) && 'disk' !== CustomerDelete::kind( $r ) ) {
+		if ( 'usage' === (string) ( $r->license()['source'] ?? '' ) && ! in_array( CustomerDelete::kind( $r ), self::USAGE_ADDONS, true ) ) {
 			return new \WP_Error( 'beltoft_services_tool', __( 'This add-on is billed by the hour with the usage account and is removed in the dashboard. Nothing was cancelled.', 'beltoft-services' ) );
 		}
 
@@ -147,12 +154,21 @@ final class BillingActions {
 			return $r;
 		}
 
-		if ( 'disk' === CustomerDelete::kind( $r ) ) {
+		$kind = CustomerDelete::kind( $r );
+
+		if ( in_array( $kind, self::USAGE_ADDONS, true ) ) {
 			$why = CustomerDelete::blocker( $r );
 
-			return null !== $why ? new \WP_Error( 'beltoft_services_tool', $why ) : array(
-				/* translators: 1: the disk's name, 2: what removing does, 3: the billing rule. */
-				'text'  => sprintf( __( 'Remove the extra disk %1$s. %2$s %3$s', 'beltoft-services' ), Irreversible::name( $r ), CustomerDelete::text( 'disk' ), CustomerDelete::billing_note( 'disk' ) ),
+			if ( null !== $why ) {
+				return new \WP_Error( 'beltoft_services_tool', $why );
+			}
+
+			return array(
+				'text'  => 'ipv4' === $kind
+					/* translators: 1: the address, 2: what removing does, 3: the billing rule. */
+					? sprintf( __( 'Remove the IPv4 address %1$s. %2$s %3$s', 'beltoft-services' ), Irreversible::name( $r ), CustomerDelete::text( 'ipv4' ), CustomerDelete::billing_note( 'ipv4' ) )
+					/* translators: 1: the disk's name, 2: what removing does, 3: the billing rule. */
+					: sprintf( __( 'Remove the extra disk %1$s. %2$s %3$s', 'beltoft-services' ), Irreversible::name( $r ), CustomerDelete::text( 'disk' ), CustomerDelete::billing_note( 'disk' ) ),
 				'state' => $r->id() . '|' . $r->get( 'state' ),
 			);
 		}

@@ -233,4 +233,27 @@ class Ipv4UsageTest extends Ipv4TestCase {
 		$this->assertSame( Renewal::reference( $server->id() ), Renewal::reference( $addon->id() ) );
 		$this->assertNotSame( '#' . $addon->id(), Renewal::reference( $addon->id() ) );
 	}
+
+	public function test_the_mcp_removes_a_pay_as_you_go_address_like_the_dashboard(): void {
+		$server = $this->parent( true );
+		$addon  = $this->address( $server, true );
+		$user   = (int) $addon->license()['user_id'];
+
+		$sum = \BeltoftServices\Mcp\BillingActions::summary( 'remove_addon', array( 'id' => $addon->id() ), $user );
+		$this->assertIsArray( $sum, is_wp_error( $sum ) ? $sum->get_error_message() : '' );
+		$this->assertStringContainsString( 'IPv4 address', $sum['text'] );
+		$this->assertStringContainsString( 'billed by the hour', $sum['text'] );
+
+		$gone = \BeltoftServices\Mcp\DeleteService::summary( 'delete_server', array( 'id' => $addon->id() ), $user );
+		$this->assertWPError( $gone );
+		$this->assertStringContainsString( 'remove_addon', $gone->get_error_message() );
+
+		$done = \BeltoftServices\Mcp\BillingActions::run( 'remove_addon', array( 'id' => $addon->id() ), $user );
+		$this->assertIsArray( $done, is_wp_error( $done ) ? $done->get_error_message() : '' );
+		$this->assertTrue( $done['deleting'] );
+		$this->assertStringContainsString( 'IPv4 address', $done['message'] );
+		$this->settle( $addon );
+		$this->assertSame( 'deleted', Resource::find( $addon->id() )->get( 'state' ) );
+		$this->assertSame( 'ready', Resource::find( $server->id() )->get( 'state' ), 'The server was not touched.' );
+	}
 }
