@@ -1418,6 +1418,8 @@ div.beltoft-services-domain__dnssec, div.beltoft-services-domain__whois { margin
 .bs-handoff__text, .bs-handoff__skip { margin: 0; color: var(--bs-muted); font-size: var(--bs-fs-body); line-height: var(--bs-lh-text); }
 .bs-handoff__loader { padding-bottom: var(--bs-space-3); }
 .bs-handoff__loader .bs-loader__bar { bottom: 0; }
+/* The heading already says it: the loader label stays for screen readers only. */
+.bs-handoff__loader .bs-loader__text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 @media (max-width: 600px) {
 	.bs-handoff { margin: var(--bs-space-5) var(--bs-space-4); padding: var(--bs-space-4); }
 }
