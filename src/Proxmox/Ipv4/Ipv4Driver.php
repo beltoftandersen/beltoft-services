@@ -414,6 +414,30 @@ final class Ipv4Driver implements Driver, \BeltoftServices\Drivers\UsageItems {
 
 	/**
 	 * {@inheritDoc}
+	 *
+	 * An address is shown with its server or database ("IPv4 address for web1"): its own product name says nothing to the customer.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public function usage_label( Resource $r ): ?string {
+		$parent = Ipv4Meta::parent_of( $r );
+
+		return null === $parent ? null : \BeltoftServices\Usage\Renewal::label( $parent->id() );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public function usage_reference( Resource $r ): ?string {
+		$parent = Ipv4Meta::parent_of( $r );
+
+		return null === $parent ? null : \BeltoftServices\Usage\Renewal::reference( $parent->id() );
+	}
+
+	/**
+	 * {@inheritDoc}
 	 */
 	public function usage_is_addon(): bool {
 		return true;

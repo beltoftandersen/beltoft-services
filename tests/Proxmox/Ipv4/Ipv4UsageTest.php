@@ -223,4 +223,14 @@ class Ipv4UsageTest extends Ipv4TestCase {
 		$this->assertFalse( $last->is_done() );
 		$this->assertStringContainsString( 'seven days', $last->error() );
 	}
+
+	public function test_the_invoice_names_the_server_of_the_address(): void {
+		$server = $this->parent( true );
+		$server->set( array( 'server_name' => 'web1' ) );
+		$addon = $this->address( $server, true );
+		$this->assertSame( 'web1', Renewal::label( $addon->id() ), 'Through Renewal with a real resource.' );
+		$this->assertSame( 'IPv4 address for web1', Renewal::line_subject( 'ipv4', Renewal::label( $addon->id() ) ) );
+		$this->assertSame( Renewal::reference( $server->id() ), Renewal::reference( $addon->id() ) );
+		$this->assertNotSame( '#' . $addon->id(), Renewal::reference( $addon->id() ) );
+	}
 }
