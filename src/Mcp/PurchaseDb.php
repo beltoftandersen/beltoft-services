@@ -31,7 +31,7 @@ final class PurchaseDb {
 	public const NAME = 'order_database';
 
 	/**
-	 * A plan from its id (the plan's variation or its pay as you go variation) or its exact name.
+	 * A plan from its variation id or its exact name.
 	 *
 	 * @param string $given Id or name.
 	 * @return array<string, mixed>|string The plan, or the refusal.
@@ -42,7 +42,7 @@ final class PurchaseDb {
 
 		if ( ctype_digit( $given ) ) {
 			foreach ( $plans as $plan ) {
-				if ( (int) $given === (int) $plan['variation_id'] || ( ! empty( $plan['usage'] ) && (int) $given === (int) $plan['usage']['variation_id'] ) ) {
+				if ( (int) $given === (int) $plan['variation_id'] ) {
 					return $plan;
 				}
 			}
@@ -128,10 +128,7 @@ final class PurchaseDb {
 
 		$direct = $state['direct'];
 		$put    = static function () use ( $plan, $ip, $gb ): ?string {
-			// The usage variation of the plan is bought (monthly is not offered), as the database page does.
-			$bought               = $plan;
-			$bought['variation_id'] = (int) $plan['usage']['variation_id'];
-			$added                = DbPicker::add_to_cart( $bought );
+			$added = DbPicker::add_to_cart( $plan );
 
 			if ( null !== $added ) {
 				return $added;

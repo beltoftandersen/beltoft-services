@@ -17,18 +17,8 @@
 	var row = form.querySelector( '[data-picker-backups]' );
 	var box = row ? row.querySelector( 'input[type="checkbox"]' ) : null;
 	var label = row ? row.querySelector( '[data-picker-backups-label]' ) : null;
-	var billing = form.querySelector( '[data-picker-billing]' );
-	var usage = billing ? billing.querySelector( 'input[value="usage"]' ) : null;
-	var monthly = billing ? billing.querySelector( 'input[value="monthly"]' ) : null;
-	var usageLabel = billing ? billing.querySelector( '[data-picker-usage-label]' ) : null;
-	var monthlyLabel = billing ? billing.querySelector( '[data-picker-monthly-label]' ) : null;
-	var usageLine = billing ? billing.querySelector( '[data-picker-usage-line]' ) : null;
-	var paygOnly = form.hasAttribute( 'data-picker-payg-only' );
 	var summary = form.querySelector( '[data-picker-summary]' );
 	var submit = form.querySelector( '[data-picker-submit]' );
-	// Whether the customer picked a billing tile (a posted form that failed counts as picked).
-	var touched = !! billing && billing.hasAttribute( 'data-picker-touched' );
-
 	function each( list, run ) {
 		Array.prototype.forEach.call( list, run );
 	}
@@ -147,8 +137,6 @@
 		var plan;
 		var has;
 		var withBackups;
-		var hasUsage;
-		var suffix;
 
 		if ( ! radio ) {
 			if ( submit ) {
@@ -178,50 +166,11 @@
 		}
 
 		withBackups = has && box && box.checked;
-		hasUsage = '1' === radio.getAttribute( 'data-has-usage' );
-
-		if ( billing ) {
-			// The box stays put above the plans: a plan without Pay as you go greys that choice out instead of hiding the box.
-			if ( usage ) {
-				usage.disabled = ! hasUsage;
-				usage.closest( '[data-picker-usage-tile]' ).classList.toggle( 'is-disabled', ! hasUsage );
-			}
-
-			// Pay as you go is the default while the customer has not chosen: it follows the plan (and backups) until then.
-			if ( usage && ! touched ) {
-				usage.checked = hasUsage && ! ( withBackups && '1' !== radio.getAttribute( 'data-has-usage-backups' ) );
-				if ( monthly ) {
-					monthly.checked = ! usage.checked;
-				}
-			} else if ( ! hasUsage && monthly ) {
-				monthly.checked = true;
-			}
-
-			if ( monthlyLabel ) {
-				monthlyLabel.textContent = ( withBackups && radio.getAttribute( 'data-monthly-label-backups' ) ) || radio.getAttribute( 'data-monthly-label' ) || '';
-			}
-
-			if ( usageLine ) {
-				usageLine.hidden = ! hasUsage;
-			}
-
-			if ( ! hasUsage && usageLabel ) {
-				usageLabel.textContent = '';
-			}
-
-			suffix = withBackups && '1' === radio.getAttribute( 'data-has-usage-backups' ) ? '-backups' : '';
-
-			if ( hasUsage && usageLabel ) {
-				usageLabel.textContent = radio.getAttribute( 'data-usage-label' + suffix ) || '';
-			}
-
-		}
-
-		// Monthly not offered: the cards show the cap and the hourly rate, with or without backups.
+		// A pay as you go card shows the cap and the hourly rate, with or without backups.
 		each( plans, function ( card ) {
 			var cap = card.parentNode.querySelector( '.beltoft-services-plan__price b' );
 			var hourly = card.parentNode.querySelector( '.beltoft-services-plan__hourly' );
-			var suffix = withBackups && '1' === card.getAttribute( 'data-has-usage-backups' ) ? '-backups' : '';
+			var suffix = withBackups && card.getAttribute( 'data-has-backups' ) === '1' ? '-backups' : '';
 
 			if ( cap && hourly ) {
 				cap.textContent = card.getAttribute( 'data-card-cap' + suffix ) || cap.textContent;
@@ -230,11 +179,7 @@
 		} );
 
 		if ( summary ) {
-			if ( hasUsage && ( paygOnly || ( usage && usage.checked ) ) && ! ( paygOnly && withBackups && '1' !== radio.getAttribute( 'data-has-usage-backups' ) ) ) {
-				summary.textContent = radio.getAttribute( 'data-summary-usage' + ( withBackups ? '-backups' : '' ) ) || '';
-			} else {
-				summary.textContent = ( withBackups ? radio.getAttribute( 'data-summary-backups' ) : radio.getAttribute( 'data-summary' ) ) || '';
-			}
+			summary.textContent = ( withBackups ? radio.getAttribute( 'data-summary-backups' ) : radio.getAttribute( 'data-summary' ) ) || '';
 		}
 
 		if ( submit ) {
@@ -252,17 +197,6 @@
 		box.addEventListener( 'change', update );
 	}
 
-	each( billing ? billing.querySelectorAll( 'input[type="radio"]' ) : [], function ( radio ) {
-		radio.addEventListener( 'change', function ( event ) {
-			// Only a real click counts as the customer's choice, not the script's own changes.
-			if ( event.isTrusted ) {
-				touched = true;
-			}
-
-			update();
-		} );
-	} );
-
 	// What the server said about the last post: shown in the status bar and under its field (the line the page printed is taken away).
 	function problems() {
 		var fields = {
@@ -270,7 +204,6 @@
 			ssh_key: '[name="beltoft_services_ssh_key"]',
 			plan: 'input[name="beltoft_services_picker_plan"]:checked, input[name="beltoft_services_picker_plan"]',
 			backups: '[data-picker-backups] input[type="checkbox"]',
-			billing: '[data-picker-billing] input:checked, [data-picker-billing] input',
 			os: '[data-tiles="os"] input:checked, [data-tiles="os"] input',
 			app: '[data-tiles="app"] input:checked, [data-tiles="app"] input'
 		};

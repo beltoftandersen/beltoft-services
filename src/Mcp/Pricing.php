@@ -23,8 +23,7 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Read only. The amounts come from Rates and Breakdown, the same code the checkout uses, so Claude quotes what the
- * website shows. Prices exclude VAT. Monthly billing is not offered to customers (setting offer_monthly), so a plan
- * without a pay as you go price is left out unless the site shows Monthly.
+ * website shows. Prices exclude VAT. Only pay as you go plans are listed: a plan of a monthly product is not sold here.
  */
 final class Pricing {
 
@@ -106,11 +105,10 @@ final class Pricing {
 		$out = array();
 
 		foreach ( Offers::plans() as $plan ) {
-			if ( empty( $plan['usage'] ) && ! Rates::monthly_offered() ) {
+			if ( empty( $plan['usage'] ) ) {
 				continue;
 			}
 
-			$usage = (array) ( $plan['usage'] ?? array() );
 			$row   = array(
 				'variation_id' => (int) $plan['variation_id'],
 				'name'         => (string) $plan['name'],
@@ -120,14 +118,7 @@ final class Pricing {
 				'in_stock'     => (bool) $plan['in_stock'],
 			);
 
-			if ( array() !== $usage ) {
-				$row['price'] = self::payg( (float) $usage['hourly'], (float) $usage['cap'] );
-			}
-
-			if ( Rates::monthly_offered() ) {
-				$row['monthly'] = array( 'price' => (float) $plan['price'], 'period' => (string) $plan['period'], 'excl_vat' => true );
-			}
-
+			$row['price']   = self::payg( (float) $plan['usage']['hourly'], (float) $plan['usage']['cap'] );
 			$row['backups'] = self::server_backups( $plan );
 			$row['options'] = ServerDisk::options( $plan );
 			$out[]          = $row;
@@ -145,11 +136,11 @@ final class Pricing {
 	public static function server_backups( array $plan ): array {
 		$usage = (array) ( $plan['usage'] ?? array() );
 
-		if ( empty( $plan['backups'] ) || (int) ( $usage['backups_variation_id'] ?? 0 ) < 1 ) {
+		if ( empty( $plan['backups'] ) || array() === $usage ) {
 			return array( 'available' => false );
 		}
 
-		$parts = self::parts_of( (int) $usage['backups_variation_id'] );
+		$parts = self::parts_of( (int) $plan['backups']['variation_id'] );
 
 		return array(
 			'available'         => true,
@@ -169,7 +160,7 @@ final class Pricing {
 		$out = array();
 
 		foreach ( DbPicker::plans() as $plan ) {
-			if ( empty( $plan['usage'] ) && ! Rates::monthly_offered() ) {
+			if ( empty( $plan['usage'] ) ) {
 				continue;
 			}
 
@@ -185,14 +176,7 @@ final class Pricing {
 				'in_stock'     => (bool) $plan['in_stock'],
 			);
 
-			if ( ! empty( $plan['usage'] ) ) {
-				$row['price'] = self::payg( (float) $plan['usage']['hourly'], (float) $plan['usage']['cap'] );
-			}
-
-			if ( Rates::monthly_offered() ) {
-				$row['monthly'] = array( 'price' => (float) $plan['price'], 'period' => (string) $plan['period'], 'excl_vat' => true );
-			}
-
+			$row['price']   = self::payg( (float) $plan['usage']['hourly'], (float) $plan['usage']['cap'] );
 			$row['options'] = self::database_options( (int) $plan['variation_id'] );
 			$out[]          = $row;
 		}
@@ -289,8 +273,7 @@ final class Pricing {
 			$target = $step;
 		}
 
-		$usage = Rates::is_usage( $target ) ? $target : Rates::sibling( $target, true ); // Part C: plans are the pay as you go variations, the sibling goes.
-		$parts = $usage ? Breakdown::parts( $usage ) : null;
+		$parts = Breakdown::parts( $target );
 
 		return $parts ?? __( 'This plan has no pay as you go price.', 'beltoft-services' );
 	}
@@ -345,14 +328,11 @@ final class Pricing {
 				}
 			}
 
-			$usage = (array) ( $server['usage'] ?? array() );
-			$vid   = $backups ? (int) ( $usage['backups_variation_id'] ?? 0 ) : (int) ( $usage['variation_id'] ?? 0 );
-
-			if ( $vid < 1 ) {
-				return $fail( $backups ? __( 'This plan has no daily backups.', 'beltoft-services' ) : __( 'This plan has no pay as you go price.', 'beltoft-services' ) );
+			if ( empty( $server['usage'] ) || ( $backups && empty( $server['backups'] ) ) ) {
+				return $fail( $backups && ! empty( $server['usage'] ) ? __( 'This plan has no daily backups.', 'beltoft-services' ) : __( 'This plan has no pay as you go price.', 'beltoft-services' ) );
 			}
 
-			$parts = self::parts_of( $vid );
+			$parts = self::parts_of( $backups ? (int) $server['backups']['variation_id'] : (int) $server['variation_id'] );
 			$name  = (string) $server['name'];
 			$kind  = 'server';
 

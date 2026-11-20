@@ -31,6 +31,15 @@ final class Product {
 	public const FIELD_PICKER    = '_beltoft_services_picker_shown';
 
 	/**
+	 * Is a product shown in the pickers (server, database)? An explicit "no" turns it off; one that never saved the box is on.
+	 *
+	 * @param int $product_id Product id.
+	 */
+	public static function in_picker( int $product_id ): bool {
+		return 'no' !== get_post_meta( $product_id, self::META_PICKER, true );
+	}
+
+	/**
 	 * Hooks for the product editor and the beltoft-licenses filters.
 	 */
 	public static function register(): void {

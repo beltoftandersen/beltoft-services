@@ -163,7 +163,7 @@ final class DiskCart {
 		$subscription = wcs_get_subscription( (int) ( $license['subscription_id'] ?? 0 ) );
 		$current = (int) $disk->get( 'size_gb' );
 		$next = null;
-		foreach ( DiskField::sizes() as $variation ) {
+		foreach ( DiskField::sizes_for( false ) as $variation ) {
 			if ( $variation->get_parent_id() !== (int) ( $license['product_id'] ?? 0 ) ) {
 				continue;
 			}

@@ -144,7 +144,7 @@ final class Purchase {
 			$id = (int) $given;
 
 			foreach ( $plans as $plan ) {
-				if ( $id === (int) $plan['variation_id'] || ( ! empty( $plan['usage'] ) && $id === (int) $plan['usage']['variation_id'] ) ) {
+				if ( $id === (int) $plan['variation_id'] ) {
 					return $plan;
 				}
 			}
@@ -222,7 +222,6 @@ final class Purchase {
 		$values  = array(
 			'plan'      => (string) $plan['variation_id'],
 			'backups'   => $backups ? '1' : '',
-			'billing'   => 'usage',
 			'os'        => self::system_id( $plan, (string) ( $args['os'] ?? '' ) ),
 			'app'       => $app,
 			'version'   => $version,
@@ -244,7 +243,7 @@ final class Purchase {
 		}
 
 		$usage   = (array) $plan['usage'];
-		$target  = $backups ? (int) $usage['backups_variation_id'] : (int) $usage['variation_id'];
+		$target  = $backups ? (int) ( $plan['backups']['variation_id'] ?? 0 ) : (int) $plan['variation_id'];
 		$variant = $target > 0 ? wc_get_product( $target ) : null;
 
 		if ( ! $variant instanceof \WC_Product || (int) $checked['variation_id'] !== $target || '' === (string) $variant->get_price() || (float) $variant->get_price() > 0 ) {

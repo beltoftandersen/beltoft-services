@@ -93,21 +93,25 @@ final class CoreHooks {
 	}
 
 	/**
-	 * The "Show in the server picker" box of a server product.
+	 * The "Show in the picker" box of a server or database product.
 	 *
 	 * @param mixed $product   The product being edited, null for a new one.
 	 * @param mixed $driver_id The saved driver id.
 	 */
 	public static function picker_field( $product = null, $driver_id = '' ): void {
-		if ( ProxmoxDriver::ID !== $driver_id ) {
+		if ( ProxmoxDriver::ID !== $driver_id && DbDriver::ID !== $driver_id ) {
 			return;
 		}
+
+		$server = ProxmoxDriver::ID === $driver_id;
 
 		woocommerce_wp_checkbox(
 			array(
 				'id'          => Product::META_PICKER,
-				'label'       => __( 'Show in the server picker', 'beltoft-services' ),
-				'description' => __( 'Offer this product on the customer\'s New server page in My account. Its variations without backups are the plans.', 'beltoft-services' ),
+				'label'       => $server ? __( 'Show in the server picker', 'beltoft-services' ) : __( 'Show in the database picker', 'beltoft-services' ),
+				'description' => $server
+					? __( 'Offer this product on the customer\'s New server page in My account. Its variations without backups are the plans.', 'beltoft-services' )
+					: __( 'Offer this product on the customer\'s New database page in My account. Its variations are the plans.', 'beltoft-services' ),
 				'value'       => $product && 'no' === $product->get_meta( Product::META_PICKER ) ? 'no' : 'yes',
 			)
 		);

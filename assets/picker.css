@@ -28,23 +28,7 @@
 .beltoft-services-picker__backups input[type="checkbox"] { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--bs-dark, #10241b); }
 .beltoft-services-picker__rate { color: var(--bs-muted, #5a635d); font-size: 14px; }
 /* Billing: its own box at the top, before the plans. Two tiles in the language of the plan tiles; the chosen one is navy. */
-.beltoft-services-picker .beltoft-services-picker__form fieldset.beltoft-services-picker__billing { min-width: 0; margin: 0; padding: 16px 24px 24px; border: 0; background: var(--bs-surface, #fff); }
 /* The legend sits inside the box, not on its border. */
-.beltoft-services-picker .beltoft-services-picker__form fieldset.beltoft-services-picker__billing > legend.beltoft-services-picker__legend { float: left; width: 100%; margin: 0 0 12px; padding: 0; }
-.beltoft-services-picker__billing > legend + * { clear: both; }
-.beltoft-services-picker__bills { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.beltoft-services-bill { position: relative; display: block; margin: 0; padding: 0; cursor: pointer; }
-.beltoft-services-bill .beltoft-services-bill__input { position: absolute; top: 0; left: 0; width: 1px; height: 1px; margin: 0; opacity: 0; }
-.beltoft-services-bill__face { display: flex; flex-direction: column; justify-content: center; gap: 4px; box-sizing: border-box; height: 100%; min-height: 76px; padding: 16px 16px; background: var(--bs-warm, #eeebe3); color: var(--bs-ink, #17201b); transition: background-color .15s ease, color .15s ease; }
-.beltoft-services-bill:hover .beltoft-services-bill__face { background: var(--bs-line, #e2ded5); }
-.beltoft-services-bill__name { font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); }
-.beltoft-services-bill .beltoft-services-picker__rate { color: inherit; font-size: 14px; line-height: 1.4; opacity: 0.8; }
-.beltoft-services-bill .beltoft-services-bill__input:checked + .beltoft-services-bill__face, .beltoft-services-bill:hover .beltoft-services-bill__input:checked + .beltoft-services-bill__face { background: var(--bs-surface, #fff); color: var(--bs-ink, #17201b); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bs-dark, #10241b) 22%, transparent), 0 1px 4px color-mix(in srgb, var(--bs-dark, #10241b) 10%, transparent); }
-.beltoft-services-bill .beltoft-services-bill__input:focus-visible + .beltoft-services-bill__face { outline: 2px solid var(--bs-focus, #10241b); outline-offset: 2px; }
-.beltoft-services-bill.is-disabled { cursor: not-allowed; }
-.beltoft-services-bill.is-disabled .beltoft-services-bill__face, .beltoft-services-bill.is-disabled:hover .beltoft-services-bill__face { background: var(--bs-warm, #eeebe3); color: var(--bs-ink, #17201b); }
-@media (max-width: 478px) { .beltoft-services-picker__bills { grid-template-columns: 1fr; } }
-@media (prefers-reduced-motion: reduce) { .beltoft-services-bill__face { transition: none; } }
 .beltoft-services-picker [hidden] { display: none !important; }
 .beltoft-services-picker__soldout { margin: 0 0 8px; color: var(--bs-muted, #5a635d); }
 .beltoft-services-picker__blocked { margin: 8px 0 0; color: var(--bs-muted, #5a635d); font-size: 14px; }

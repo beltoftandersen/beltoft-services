@@ -22,7 +22,6 @@ final class DiskField {
 		add_action( 'wc_ajax_' . self::AJAX, array( __CLASS__, 'ajax' ) );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
 		add_action( 'woocommerce_cart_item_removed', array( __CLASS__, 'clean_orphan' ) );
-		add_action( 'beltoft_services_billing_swapped', array( __CLASS__, 'rematch' ), 20 );
 	}
 
 	/** The sole new server in the cart, independent of whether backups are offered. */
@@ -45,18 +44,23 @@ final class DiskField {
 		return $found;
 	}
 
-	/** Published, purchasable variations whose plan specifies a positive disk size. */
+	/** Published, purchasable variations whose plan specifies a positive disk size: pay as you go ones, and subscriptions. */
 	public static function sizes(): array {
 		$ids = get_posts( array( 'post_type' => 'product', 'post_status' => 'publish', 'fields' => 'ids', 'posts_per_page' => 30, 'meta_key' => Product::META_DRIVER, 'meta_value' => DiskDriver::ID ) ); // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key,WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Service catalogue is small and bounded.
 		$out = array();
 		foreach ( $ids as $id ) {
 			$product = wc_get_product( $id );
-			if ( ! $product instanceof \WC_Product_Variable || ! class_exists( '\\WC_Subscriptions_Product' ) || ! \WC_Subscriptions_Product::is_subscription( $product ) ) {
+			if ( ! $product instanceof \WC_Product_Variable ) {
 				continue;
 			}
-			foreach ( $product->get_available_variations( 'objects' ) as $variation ) {
+			// The children, not the available variations: WooCommerce hides a pay as you go variation (it has no price at checkout).
+			foreach ( array_map( 'wc_get_product', $product->get_children() ) as $variation ) {
+				if ( ! $variation instanceof \WC_Product_Variation || 'publish' !== $variation->get_status() ) {
+					continue;
+				}
 				$plan = Product::plan( (int) $id, $variation->get_id() );
-				if ( \WC_Subscriptions_Product::is_subscription( $variation ) && $variation->is_purchasable() && $variation->is_in_stock() && (int) ( $plan['disk_gb'] ?? 0 ) > 0 ) {
+				$sold = Rates::is_usage( $variation ) || ( class_exists( '\\WC_Subscriptions_Product' ) && \WC_Subscriptions_Product::is_subscription( $variation ) );
+				if ( $sold && $variation->is_purchasable() && $variation->is_in_stock() && (int) ( $plan['disk_gb'] ?? 0 ) > 0 ) {
 					$out[ $variation->get_id() ] = $variation;
 				}
 			}
@@ -65,29 +69,14 @@ final class DiskField {
 	}
 
 	/**
-	 * The sizes sold with a server, billing following the server (as an app licence's tier does): the pay as you go twin of each
-	 * monthly size for a pay as you go server, the monthly size for a monthly one. A size with no twin is not offered to a pay as you
-	 * go server, so no monthly subscription lands in a pay as you go order.
+	 * The sizes sold with a server: those of the kind of the server (a pay as you go server gets pay as you go sizes, a monthly one
+	 * monthly sizes), so no monthly subscription lands in a pay as you go order.
 	 *
 	 * @param bool $usage Whether the server is pay as you go.
 	 * @return array<int, \WC_Product_Variation> Variation id => variation.
 	 */
 	public static function sizes_for( bool $usage ): array {
-		if ( ! $usage ) {
-			return self::sizes();
-		}
-
-		$out = array();
-
-		foreach ( self::sizes() as $monthly ) {
-			$twin = Rates::sibling( $monthly, true );
-
-			if ( $twin && 'publish' === $twin->get_status() && $twin->is_purchasable() && $twin->is_in_stock() ) {
-				$out[ $twin->get_id() ] = $twin;
-			}
-		}
-
-		return $out;
+		return array_filter( self::sizes(), static fn( $variation ) => Rates::is_usage( $variation ) === $usage );
 	}
 
 	/**
@@ -97,33 +86,6 @@ final class DiskField {
 		$server = self::cart_server();
 
 		return null !== $server && Rates::is_usage( (int) ( $server['item']['variation_id'] ?? 0 ) );
-	}
-
-	/**
-	 * After the server's billing was swapped, the chosen disk follows: its twin of the other billing, or no disk when it has none.
-	 */
-	public static function rematch(): void {
-		$key = self::selected_key();
-
-		if ( '' === $key || ! self::cart_server() ) {
-			return;
-		}
-
-		$usage = self::cart_server_usage();
-		$id    = (int) ( WC()->cart->get_cart()[ $key ]['variation_id'] ?? 0 );
-
-		if ( isset( self::sizes_for( $usage )[ $id ] ) ) {
-			return;
-		}
-
-		$current = wc_get_product( $id );
-		$twin    = $current instanceof \WC_Product_Variation ? Rates::sibling( $current, $usage ) : null;
-
-		if ( $twin && isset( self::sizes_for( $usage )[ $twin->get_id() ] ) ) {
-			self::choose( $twin->get_id() );
-		} else {
-			WC()->cart->remove_cart_item( $key );
-		}
 	}
 
 	/** The variation id of the chosen extra disk, 0 for none. */

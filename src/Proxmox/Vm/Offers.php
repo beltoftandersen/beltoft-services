@@ -47,7 +47,7 @@ final class Offers {
 	public static function is_offered( int $product_id ): bool {
 		$driver = Product::driver_for( $product_id );
 
-		if ( ! $driver || ProxmoxDriver::ID !== $driver->id() || 'publish' !== get_post_status( $product_id ) || 'no' === get_post_meta( $product_id, Product::META_PICKER, true ) ) {
+		if ( ! $driver || ProxmoxDriver::ID !== $driver->id() || 'publish' !== get_post_status( $product_id ) || ! Product::in_picker( $product_id ) ) {
 			return false;
 		}
 
@@ -171,35 +171,46 @@ final class Offers {
 			return null;
 		}
 
-		// A pay-as-you-go variation is the billing choice of its plan, never a plan (its price is 0).
-		if ( Rates::is_usage( $variation ) ) {
-			return null;
-		}
-
+		$payg    = Rates::is_usage( $variation );
 		$numbers = Product::plan( $product->get_id(), $id );
 
 		// A variation with backups is the option of its plan, not a plan.
-		if ( (int) ( $numbers['backup_days'] ?? 0 ) > 0 || '' === (string) $variation->get_price() ) {
+		if ( (int) ( $numbers['backup_days'] ?? 0 ) > 0 ) {
+			return null;
+		}
+
+		// A pay as you go plan is priced by its monthly figure (its own price is 0), another plan by its price.
+		$price = $payg ? Rates::monthly( $variation ) : ( '' === (string) $variation->get_price() ? null : (float) wc_get_price_excluding_tax( $variation ) );
+
+		if ( null === $price ) {
 			return null;
 		}
 
 		$sibling = '' !== (string) ( Clusters::get( (string) ( $numbers['cluster'] ?? '' ) )['backup_storage'] ?? '' ) ? Backups::sibling( $variation, true, true ) : null;
+		$rates   = $payg ? Rates::for_usage( $variation ) : null;
+		$extra   = $payg && $sibling ? Rates::for_usage( $sibling ) : null;
 		$backups = null;
 
-		if ( null !== $sibling ) {
+		// A pay as you go plan offers backups only when the variation with backups has a figure of its own.
+		if ( null !== $sibling && ( ! $payg || null !== $extra ) ) {
 			$backups = array(
 				'variation_id' => $sibling->get_id(),
-				'extra'        => max( 0.0, (float) wc_get_price_excluding_tax( $sibling ) - (float) wc_get_price_excluding_tax( $variation ) ),
+				'extra'        => $payg ? max( 0.0, (float) Rates::monthly( $sibling ) - $price ) : max( 0.0, (float) wc_get_price_excluding_tax( $sibling ) - $price ),
 				'days'         => (int) ( Product::plan( $product->get_id(), $sibling->get_id() )['backup_days'] ?? 0 ),
 			);
 		}
 
 		return array(
-			'usage'        => self::usage( $variation, $sibling ),
+			'usage'        => null === $rates ? null : array(
+				'hourly'         => $rates['hourly'],
+				'cap'            => $rates['cap'],
+				'backups_hourly' => null === $extra ? 0.0 : $extra['hourly'],
+				'backups_cap'    => null === $extra ? 0.0 : $extra['cap'],
+			),
 			'product_id'   => $product->get_id(),
 			'variation_id' => $id,
 			'name'         => self::label( $product, $variation ),
-			'price'        => (float) wc_get_price_excluding_tax( $variation ),
+			'price'        => $price,
 			'period'       => self::period( $variation ),
 			'cores'        => (int) ( $numbers['cores'] ?? 0 ),
 			'memory_mb'    => (int) ( $numbers['memory_mb'] ?? 0 ),
@@ -209,39 +220,6 @@ final class Offers {
 			'backups'      => $backups,
 			'note'         => self::note( $product, $variation ),
 		);
-	}
-
-	/**
-	 * The pay-as-you-go option of a plan: the variation to buy and what it costs, also with backups. Null when the plan has none.
-	 *
-	 * @param \WC_Product_Variation      $variation Monthly plan.
-	 * @param \WC_Product_Variation|null $with      Its monthly variation with backups.
-	 * @return array{variation_id: int, hourly: float, cap: float, backups_variation_id: int, backups_hourly: float, backups_cap: float}|null
-	 */
-	private static function usage( \WC_Product_Variation $variation, ?\WC_Product_Variation $with ): ?array {
-		$rates = Rates::for_plan( $variation );
-
-		if ( null === $rates ) {
-			return null;
-		}
-
-		$out   = array(
-			'variation_id'         => $rates['variation_id'],
-			'hourly'               => $rates['hourly'],
-			'cap'                  => $rates['cap'],
-			'backups_variation_id' => 0,
-			'backups_hourly'       => 0.0,
-			'backups_cap'          => 0.0,
-		);
-		$extra = $with ? Rates::for_plan( $with ) : null;
-
-		if ( null !== $extra ) {
-			$out['backups_variation_id'] = $extra['variation_id'];
-			$out['backups_hourly']       = $extra['hourly'];
-			$out['backups_cap']          = $extra['cap'];
-		}
-
-		return $out;
 	}
 
 	/**
@@ -309,10 +287,8 @@ final class Offers {
 
 		$words = array();
 
-		$billing = Rates::billing_key( $mine );
-
 		foreach ( $mine as $key => $value ) {
-			if ( isset( $skip[ $key ] ) || DbDisk::is_attribute( (string) $key ) || 1 === preg_match( '/^(attribute_)?(pa_)?' . preg_quote( DbIpField::ATTRIBUTE, '/' ) . '$/Di', (string) $key ) || (string) $key === $billing || '' === (string) $value ) {
+			if ( isset( $skip[ $key ] ) || DbDisk::is_attribute( (string) $key ) || 1 === preg_match( '/^(attribute_)?(pa_)?' . preg_quote( DbIpField::ATTRIBUTE, '/' ) . '$/Di', (string) $key ) || '' === (string) $value ) {
 				continue;
 			}
 

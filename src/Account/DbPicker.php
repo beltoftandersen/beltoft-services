@@ -99,14 +99,22 @@ final class DbPicker {
 		foreach ( is_array( $filtered ) ? $filtered : $ids as $id ) {
 			$product = wc_get_product( (int) $id );
 
-			if ( ! $product instanceof \WC_Product_Variable || 'publish' !== $product->get_status() ) {
+			if ( ! $product instanceof \WC_Product_Variable || 'publish' !== $product->get_status() || ! Product::in_picker( $product->get_id() ) ) {
 				continue;
 			}
 
 			foreach ( $product->get_children() as $child ) {
 				$variation = wc_get_product( (int) $child );
 
-				if ( ! $variation instanceof \WC_Product_Variation || 'publish' !== $variation->get_status() || '' === (string) $variation->get_price() || Rates::is_usage( $variation ) ) {
+				if ( ! $variation instanceof \WC_Product_Variation || 'publish' !== $variation->get_status() ) {
+					continue;
+				}
+
+				// A pay as you go plan is priced by its monthly figure (its own price is 0), another plan by its price.
+				$rates = Rates::for_usage( $variation );
+				$price = Rates::is_usage( $variation ) ? Rates::monthly( $variation ) : ( '' === (string) $variation->get_price() ? null : (float) wc_get_price_excluding_tax( $variation ) );
+
+				if ( null === $price ) {
 					continue;
 				}
 
@@ -123,7 +131,7 @@ final class DbPicker {
 					'product_id'   => $product->get_id(),
 					'variation_id' => $variation->get_id(),
 					'name'         => Offers::label( $product, $variation ),
-					'price'        => (float) wc_get_price_excluding_tax( $variation ),
+					'price'        => $price,
 					'period'       => Offers::period( $variation ),
 					'cores'        => (int) ( $numbers['cores'] ?? 0 ),
 					'memory_mb'    => (int) ( $numbers['memory_mb'] ?? 0 ),
@@ -134,7 +142,7 @@ final class DbPicker {
 					'backup_days'  => 0 === $days ? Backups::DB_DEFAULT_DAYS : $days,
 					// WooCommerce's own stock status, and a private network for the customer: a database cannot be built without one (a pool, not node capacity).
 					'in_stock'     => Offers::in_stock( $variation ) && \BeltoftServices\Proxmox\Network\PrivateNets::available_for( get_current_user_id(), (string) ( $numbers['cluster'] ?? '' ) ),
-					'usage'        => Rates::for_plan( $variation, false ), // A sold-out card keeps its price; process() refuses it.
+					'usage'        => $rates, // A sold-out card keeps its price; process() refuses it.
 				);
 			}
 		}
@@ -193,11 +201,6 @@ final class DbPicker {
 		 */
 		if ( ! apply_filters( 'beltoft_services_db_picker_can_buy', true, $plan, $user ) ) {
 			return $fail( 'plan', __( 'This plan cannot be ordered right now.', 'beltoft-services' ) );
-		}
-
-		// Monthly not offered: a plan with a pay as you go option is bought pay as you go (checkout enforces it too).
-		if ( ! Rates::monthly_offered() && ! empty( $plan['usage'] ) ) {
-			$plan['variation_id'] = (int) $plan['usage']['variation_id'];
 		}
 
 		$added = self::add_to_cart( $plan );
@@ -337,7 +340,7 @@ final class DbPicker {
 
 		self::error( 'form' );
 
-		echo '<form class="beltoft-services-picker__form" method="post" action="' . esc_url( self::url() ) . '"' . ( Rates::monthly_offered() ? '' : ' data-picker-payg-only' ) . '>';
+		echo '<form class="beltoft-services-picker__form" method="post" action="' . esc_url( self::url() ) . '">';
 		wp_nonce_field( self::NONCE, self::FIELD );
 
 		if ( count( $engines ) > 1 ) {
@@ -365,7 +368,7 @@ final class DbPicker {
 		echo '</fieldset>';
 
 		echo '<div class="beltoft-services-picker__go">';
-		echo '<p class="beltoft-services-picker__summary" data-picker-summary aria-live="polite">' . esc_html( isset( $plans[ $selected ] ) ? self::summary( $plans[ $selected ], self::payg_only( $plans[ $selected ] ) ) : '' ) . '</p>';
+		echo '<p class="beltoft-services-picker__summary" data-picker-summary aria-live="polite">' . esc_html( isset( $plans[ $selected ] ) ? self::summary( $plans[ $selected ] ) : '' ) . '</p>';
 		echo '<button type="submit" class="beltoft-services-picker__button" data-picker-submit' . ( $unavailable ? ' data-picker-blocked aria-describedby="beltoft-services-picker-blocked"' : '' ) . ( isset( $plans[ $selected ] ) && ! $unavailable ? '' : ' disabled' ) . '>' . esc_html__( 'Continue to checkout', 'beltoft-services' ) . '</button>';
 
 		if ( $unavailable ) {
@@ -500,10 +503,9 @@ final class DbPicker {
 	 * One line for the chosen plan: "Starter: €25.00 per month excluding VAT".
 	 *
 	 * @param array<string, mixed> $plan  Plan.
-	 * @param bool                 $usage Pay as you go.
 	 */
-	private static function summary( array $plan, bool $usage = false ): string {
-		if ( $usage && ! empty( $plan['usage'] ) ) {
+	private static function summary( array $plan ): string {
+		if ( ! empty( $plan['usage'] ) ) {
 			/* translators: 1: plan name, 2: price such as "€0.0226 per hour, max €16.50 per month excluding VAT" */
 			return sprintf( __( '%1$s, pay as you go: %2$s', 'beltoft-services' ), (string) $plan['name'], Rates::terms( (float) $plan['usage']['hourly'], (float) $plan['usage']['cap'], ServerPicker::tax_of( $plan ) ) );
 		}
@@ -537,14 +539,12 @@ final class DbPicker {
 			'data-summary'     => self::summary( $plan ),
 			'data-has-backups' => '0',
 			'data-engine'      => self::engine_id( $plan ),
-			'data-has-usage'   => ! empty( $plan['usage'] ) ? '1' : '0',
 		);
 
 		if ( ! empty( $plan['usage'] ) ) {
 			$attrs += array(
-				'data-card-cap'      => Rates::cap_money( (float) $plan['usage']['cap'], $tax ),
-				'data-card-hourly'   => Rates::per_hour( (float) $plan['usage']['hourly'], $tax ),
-				'data-summary-usage' => self::summary( $plan, true ),
+				'data-card-cap'    => Rates::cap_money( (float) $plan['usage']['cap'], $tax ),
+				'data-card-hourly' => Rates::per_hour( (float) $plan['usage']['hourly'], $tax ),
 			);
 		}
 
@@ -561,7 +561,7 @@ final class DbPicker {
 		echo '<span class="beltoft-services-plan__face">';
 		echo '<span class="beltoft-services-plan__name">' . esc_html( (string) $plan['name'] ) . '</span>';
 
-		if ( self::payg_only( $plan ) ) {
+		if ( ! empty( $plan['usage'] ) ) {
 			echo ServerPicker::payg_spans( (float) $plan['usage']['cap'], (float) $plan['usage']['hourly'], $tax, 'db-picker-payg' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
 		} else {
 			echo ServerPicker::price_span( (float) $plan['price'], (string) $plan['period'], $tax, 'db-picker' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside.
@@ -583,15 +583,6 @@ final class DbPicker {
 		}
 
 		echo '</span></label>';
-	}
-
-	/**
-	 * Is the plan shown by its hourly rate only: monthly is not offered and the plan has a pay as you go option.
-	 *
-	 * @param array<string, mixed> $plan Plan.
-	 */
-	private static function payg_only( array $plan ): bool {
-		return ! Rates::monthly_offered() && ! empty( $plan['usage'] );
 	}
 
 	/**
