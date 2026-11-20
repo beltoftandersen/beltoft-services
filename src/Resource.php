@@ -447,6 +447,27 @@ final class Resource {
 	}
 
 	/**
+	 * How many live resources (not closed, not a site) run on these variations of a product.
+	 *
+	 * @param int[] $variation_ids Variation ids.
+	 */
+	public static function count_live_on_variations( array $variation_ids ): int {
+		global $wpdb;
+
+		$ids = array_values( array_filter( array_map( 'intval', $variation_ids ) ) );
+
+		if ( ! $ids ) {
+			return 0;
+		}
+
+		$tables = Install::tables();
+		$sql    = 'SELECT COUNT(*) FROM %i a JOIN %i l ON l.id = a.license_id WHERE a.deactivated_at IS NULL AND a.kind <> \'site\' AND l.variation_id IN ( ' . implode( ', ', array_fill( 0, count( $ids ), '%d' ) ) . ' )';
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- the licenses tables, always fresh; fixed fragments, every value a placeholder.
+		return (int) $wpdb->get_var( $wpdb->prepare( $sql, array_merge( array( $tables['activations'], $tables['licenses'] ), $ids ) ) );
+	}
+
+	/**
 	 * Is any live resource (of any kind) holding a value under a key? Set means present and not null.
 	 *
 	 * @param string $key Meta key.

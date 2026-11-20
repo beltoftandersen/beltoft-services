@@ -117,4 +117,37 @@ class UsageEngineNeutralTest extends TestCase {
 
 		$this->assertSame( $expected, $found, 'src/Usage names a class of a feature: the feature hooks the engine instead (do_action / a driver method).' );
 	}
+
+	public function test_the_product_editor_is_scanned_like_the_rest_of_the_engine(): void {
+		$root = dirname( __DIR__, 2 );
+		$dir  = $root . '/src/Usage/Admin';
+
+		$this->assertDirectoryExists( $dir );
+		$this->assertNotEmpty( glob( $dir . '/*.php' ), 'src/Usage/Admin holds the pay as you go product editor and is scanned like the rest of src/Usage.' );
+
+		$scanned = array();
+		$it      = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $root . '/src/Usage', \FilesystemIterator::SKIP_DOTS ) );
+
+		foreach ( $it as $file ) {
+			$scanned[] = $file->getPathname();
+		}
+
+		foreach ( glob( $dir . '/*.php' ) as $file ) {
+			$this->assertContains( $file, $scanned );
+		}
+	}
+
+	public function test_the_editor_asks_the_markers_and_never_names_a_driver_or_a_kind(): void {
+		$root = dirname( __DIR__, 2 );
+		$code = '';
+
+		foreach ( glob( $root . '/src/Usage/Admin/*.php' ) as $file ) {
+			$code .= (string) file_get_contents( $file );
+		}
+
+		$this->assertStringContainsString( 'CountsUsage', $code, 'the per unit choice follows the marker interface' );
+		$this->assertStringContainsString( 'UsageItems', $code, 'the hourly choice follows the driver contract' );
+		$this->assertSame( 0, preg_match( '/Http\\\\HttpDriver|ProxmoxDriver|Ipv4Driver|ManualServerDriver/', $code ) );
+		$this->assertSame( 0, preg_match( '/zerolang|beltoft\.net|odoowoo/i', $code ), 'the plugin stays generic: no site or add-on names' );
+	}
 }
