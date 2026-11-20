@@ -347,6 +347,35 @@ final class Progress {
 	}
 
 	/**
+	 * How far along a payload is, in whole percent: the finished steps of all steps (assets/handoff-flow in thankyou.js
+	 * counts the same way in the browser). A ready service is 100; no steps and not ready is 0 (the line then moves).
+	 *
+	 * @param array<string, mixed> $payload Result of build().
+	 * @param bool                 $ready   Whether the service is ready.
+	 */
+	public static function percent( array $payload, bool $ready = false ): int {
+		$steps = (array) ( $payload['steps'] ?? array() );
+
+		if ( $ready && empty( $payload['active'] ) ) {
+			return 100;
+		}
+
+		if ( ! $steps ) {
+			return $ready ? 100 : 0;
+		}
+
+		$done = 0;
+
+		foreach ( $steps as $step ) {
+			if ( in_array( $step['status'] ?? '', array( 'done', 'skipped' ), true ) ) {
+				++$done;
+			}
+		}
+
+		return (int) round( 100 * $done / count( $steps ) );
+	}
+
+	/**
 	 * Is a provision a reinstall? The wipe marker is gone once the old system is erased, but a
 	 * server only provisions again after it has been reinstalled (its first build never set
 	 * last_reinstall_at).
@@ -568,6 +597,7 @@ final class Progress {
 			'current' => __( 'In progress', 'beltoft-services' ),
 			'failed'  => __( 'Failed', 'beltoft-services' ),
 			'todo'    => __( 'Waiting', 'beltoft-services' ),
+			'skipped' => __( 'Not connected', 'beltoft-services' ),
 		);
 
 		return $labels[ $status ] ?? '';

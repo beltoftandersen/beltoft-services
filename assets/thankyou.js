@@ -1,91 +1,310 @@
 /**
- * Live progress of the services on the order received page.
+ * Live progress of the services of an order: on the order received page and in the order section of the My Account overview.
  *
- * One request per interval to the order progress route (the block carries its URL, with the order
- * key) serves every service row. Each row's progress block is drawn by assets/progress.js; the row
- * itself switches to "Ready" with its link to the card when the service is ready. All texts come
- * from the server. No dependencies.
+ * One request per interval to the order progress route (the block carries its URL; the overview's route is the customer's own
+ * and the block carries the wp_rest nonce) serves every service row. Each row's progress block is drawn by assets/progress.js;
+ * the row itself switches to "Ready" with its link to the card when the service is ready. In the overview (data-bs-flow) the
+ * row also has a track that fills with the finished steps, the dashboard bar says the same through window.beltoftStatus, and a
+ * closing line with each service's link shows when nothing is running any more. All texts come from the server. No dependencies.
  */
 ( function () {
 	'use strict';
 
-	var root = document.querySelector( '[data-beltoft-services-order]' );
-	var url = root ? root.getAttribute( 'data-progress-url' ) : '';
-	var shared = null;
-	var sharedAt = 0;
+	var roots = document.querySelectorAll( '[data-beltoft-services-order]' );
 
-	if ( ! root || ! url || ! window.BeltoftServicesProgress || ! window.fetch ) {
+	if ( ! roots.length || ! window.BeltoftServicesProgress || ! window.fetch ) {
 		return;
 	}
 
-	function load() {
-		if ( shared && Date.now() - sharedAt < 1500 ) {
-			return shared;
-		}
+	function countSteps( rows ) {
+		var out = { done: 0, all: 0 };
 
-		sharedAt = Date.now();
-		shared = window.fetch( url, { credentials: 'same-origin' } ).then( function ( response ) {
-			return response.ok ? response.json() : null;
-		} ).catch( function () {
-			return null;
+		rows.forEach( function ( row ) {
+			var steps = row.progress && row.progress.steps ? row.progress.steps : [];
+
+			out.all += steps.length;
+			steps.forEach( function ( step ) {
+				if ( 'done' === step.status || 'skipped' === step.status ) {
+					out.done += 1;
+				}
+			} );
 		} );
 
-		return shared;
+		return out;
 	}
 
-	function apply( item, row ) {
-		var state = item.querySelector( '[data-service-state]' );
-		var message = item.querySelector( '[data-service-message]' );
-		var open = item.querySelector( '[data-service-open]' );
+	// Same count as Progress::percent().
+	function percent( progress, ready ) {
+		var steps = progress && progress.steps ? progress.steps : [];
+		var counted;
 
-		item.className = 'beltoft-service is-' + row.group;
-
-		if ( state && state.textContent !== row.label ) {
-			state.textContent = row.label;
+		if ( ready && ! ( progress && progress.active ) ) {
+			return 100;
 		}
 
-		if ( message ) {
-			message.textContent = row.message || '';
-			message.hidden = ! row.message;
+		if ( ! steps.length ) {
+			return ready ? 100 : 0;
 		}
 
-		if ( open ) {
-			open.hidden = ! row.ready;
-		}
+		counted = countSteps( [ { progress: progress } ] );
+
+		return Math.round( 100 * counted.done / counted.all );
 	}
 
-	Array.prototype.forEach.call( root.querySelectorAll( '[data-service]' ), function ( item ) {
-		var id = item.getAttribute( 'data-service' );
-		var block = item.querySelector( '[data-progress]' );
-		var phase = block ? block.getAttribute( 'data-phase' ) : 'idle';
+	// running, ready, mixed or failed: the same rule as OverviewOrder::state().
+	function stateOf( rows ) {
+		var ready = 0;
+		var failed = 0;
+		var i;
 
-		// A service that is ready or has stopped needs no polling.
-		if ( ! block || ( 'queued' !== phase && 'running' !== phase ) ) {
+		if ( ! rows.length ) {
+			return 'running';
+		}
+
+		for ( i = 0; i < rows.length; i++ ) {
+			if ( rows[ i ].progress && rows[ i ].progress.active ) {
+				return 'running';
+			}
+
+			if ( 'failed' === rows[ i ].group ) {
+				failed += 1;
+			} else if ( rows[ i ].ready ) {
+				ready += 1;
+			} else {
+				return 'running';
+			}
+		}
+
+		if ( ! failed ) {
+			return 'ready';
+		}
+
+		return ready ? 'mixed' : 'failed';
+	}
+
+	function setupRoot( root ) {
+		var url = root.getAttribute( 'data-progress-url' );
+		var nonce = root.getAttribute( 'data-nonce' );
+		var flow = root.hasAttribute( 'data-bs-flow' );
+		var section = flow ? root.closest( '[data-bs-order]' ) : null;
+		var known = parseInt( root.getAttribute( 'data-known' ) || '0', 10 );
+		var order = root.getAttribute( 'data-order' ) || '';
+		var shared = null;
+		var sharedAt = 0;
+		var handle = null;
+
+		if ( ! url ) {
 			return;
 		}
 
-		window.BeltoftServicesProgress.mount( block, {
-			interval: 5000,
-			source: function () {
-				return load().then( function ( body ) {
-					var rows = body && body.services ? body.services : [];
-					var row = null;
+		// Services made after the page was served: the server draws them, so the page loads once more (never twice in a minute).
+		function reloadOnce() {
+			var key = 'beltoftOrderReload' + order;
 
-					rows.forEach( function ( candidate ) {
-						if ( String( candidate.id ) === id ) {
-							row = candidate;
-						}
-					} );
+			try {
+				if ( Date.now() - parseInt( window.sessionStorage.getItem( key ) || '0', 10 ) < 60000 ) {
+					return;
+				}
 
-					if ( ! row ) {
-						return null;
-					}
-
-					apply( item, row );
-
-					return row.progress;
-				} );
+				window.sessionStorage.setItem( key, String( Date.now() ) );
+			} catch ( error ) {
+				return;
 			}
+
+			window.location.reload();
+		}
+
+		function bar( rows ) {
+			var counted;
+			var text;
+
+			if ( ! flow || ! window.beltoftStatus ) {
+				return;
+			}
+
+			counted = countSteps( rows );
+			text = section ? section.querySelector( '[data-order-closing-text]' ) : null;
+
+			if ( 'running' === stateOf( rows ) ) {
+				if ( ! handle ) {
+					handle = window.beltoftStatus.busy( root.getAttribute( 'data-bar-text' ) || 'Setting up your order', null, null, { lock: false } );
+				}
+
+				window.beltoftStatus.progress( handle, counted.all ? counted.done / counted.all : 0.06 );
+			} else if ( handle ) {
+				window.beltoftStatus.done( handle, text ? text.textContent : '' );
+				handle = null;
+			}
+		}
+
+		function closing( rows ) {
+			var box = section ? section.querySelector( '[data-order-closing]' ) : null;
+			var state = stateOf( rows );
+			var failed = 0;
+			var text;
+			var list;
+
+			if ( ! box || 'running' === state ) {
+				return;
+			}
+
+			rows.forEach( function ( row ) {
+				if ( 'failed' === row.group ) {
+					failed += 1;
+				}
+			} );
+
+			text = box.querySelector( '[data-order-closing-text]' );
+			list = box.querySelector( '[data-order-closing-list]' );
+
+			if ( 'ready' === state ) {
+				text.textContent = box.getAttribute( 'data-text-ready' );
+			} else if ( 'mixed' === state ) {
+				text.textContent = box.getAttribute( failed > 1 ? 'data-text-mixed-many' : 'data-text-mixed-one' ).replace( '2', String( failed ) );
+			} else {
+				text.textContent = box.getAttribute( 'data-text-failed' );
+			}
+
+			while ( list.firstChild ) {
+				list.removeChild( list.firstChild );
+			}
+
+			rows.forEach( function ( row ) {
+				var item = root.querySelector( '[data-service="' + row.id + '"]' );
+				var source = item ? item.querySelector( 'failed' === row.group ? '.beltoft-service__name' : '[data-service-open] a' ) : null;
+				var li;
+				var a;
+
+				if ( ! source || ( 'failed' !== row.group && ! row.ready ) ) {
+					return;
+				}
+
+				li = document.createElement( 'li' );
+				a = document.createElement( 'a' );
+				a.setAttribute( 'href', row.url || '#' );
+				a.textContent = source.textContent;
+				li.appendChild( a );
+				list.appendChild( li );
+			} );
+
+			box.hidden = false;
+			section.setAttribute( 'data-state', state );
+			section.className = section.className.replace( /\bis-(running|ready|mixed|failed)\b/, 'is-' + state );
+		}
+
+		function seen( rows ) {
+			if ( rows.length > known && root.querySelectorAll( '[data-service]' ).length < rows.length ) {
+				reloadOnce();
+			}
+
+			bar( rows );
+			closing( rows );
+		}
+
+		function load() {
+			var headers = nonce ? { 'X-WP-Nonce': nonce } : {};
+
+			if ( shared && Date.now() - sharedAt < 1500 ) {
+				return shared;
+			}
+
+			sharedAt = Date.now();
+			shared = window.fetch( url, { credentials: 'same-origin', headers: headers } ).then( function ( response ) {
+				var fresh = response.headers.get( 'X-WP-Nonce' );
+
+				if ( fresh ) {
+					nonce = fresh;
+				}
+
+				return response.ok ? response.json() : null;
+			} ).then( function ( body ) {
+				if ( body && body.services ) {
+					seen( body.services );
+				}
+
+				return body;
+			} ).catch( function () {
+				return null;
+			} );
+
+			return shared;
+		}
+
+		function apply( item, row ) {
+			var state = item.querySelector( '[data-service-state]' );
+			var message = item.querySelector( '[data-service-message]' );
+			var open = item.querySelector( '[data-service-open]' );
+			var track = item.querySelector( '[data-flow-track]' );
+			var value;
+
+			item.className = 'beltoft-service' + ( flow ? ' bs-flow' : '' ) + ' is-' + row.group;
+
+			if ( state && state.textContent !== row.label ) {
+				state.textContent = row.label;
+			}
+
+			if ( message ) {
+				message.textContent = row.message || '';
+				message.hidden = ! row.message;
+			}
+
+			if ( open ) {
+				open.hidden = ! row.ready;
+			}
+
+			if ( track ) {
+				value = percent( row.progress, row.ready );
+				track.setAttribute( 'aria-valuenow', String( value ) );
+				track.firstChild.style.width = value + '%';
+			}
+		}
+
+		// Nothing to follow yet: ask until the services exist, then the page reloads.
+		if ( ! root.querySelector( '[data-service]' ) ) {
+			( function again() {
+				window.setTimeout( function () {
+					load().then( again );
+				}, 4000 );
+			}() );
+
+			return;
+		}
+
+		Array.prototype.forEach.call( root.querySelectorAll( '[data-service]' ), function ( item ) {
+			var id = item.getAttribute( 'data-service' );
+			var block = item.querySelector( '[data-progress]' );
+			var phase = block ? block.getAttribute( 'data-phase' ) : 'idle';
+
+			// A service that is ready or has stopped needs no polling.
+			if ( ! block || ( 'queued' !== phase && 'running' !== phase ) ) {
+				return;
+			}
+
+			window.BeltoftServicesProgress.mount( block, {
+				interval: 5000,
+				source: function () {
+					return load().then( function ( body ) {
+						var rows = body && body.services ? body.services : [];
+						var row = null;
+
+						rows.forEach( function ( candidate ) {
+							if ( String( candidate.id ) === id ) {
+								row = candidate;
+							}
+						} );
+
+						if ( ! row ) {
+							return null;
+						}
+
+						apply( item, row );
+
+						return row.progress;
+					} );
+				}
+			} );
 		} );
-	} );
+	}
+
+	Array.prototype.forEach.call( roots, setupRoot );
 }() );

@@ -317,6 +317,7 @@ final class OverviewData {
 
 			$items[] = array(
 				'tone'  => 'busy',
+				'license' => (int) $id,
 				'sep'   => ':',
 				'state' => __( 'Working', 'beltoft-services' ),
 				'name'  => $names[ $id ] ?? View::product_name( $license ),
@@ -356,7 +357,7 @@ final class OverviewData {
 	 *
 	 * @param array<string, mixed> $license License row.
 	 */
-	private static function follow_url( array $license ): string {
+	public static function follow_url( array $license ): string {
 		if ( Servers::is_server( $license ) || self::in_servers_tab( $license ) ) {
 			return ServerLinks::url( $license );
 		}

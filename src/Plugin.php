@@ -77,6 +77,7 @@ final class Plugin {
 		Hosting\HostingCapacity::register();
 		Hosting\SiteField::register();
 		Hosting\SiteNewDomain::register();
+		Hosting\SiteDomainStep::register();
 		Hosting\CartRule::register();
 		Hosting\Languages::register();
 		Hosting\HostingSwitch::register();
@@ -186,6 +187,8 @@ final class Plugin {
 		Account\ServerPicker::register();
 		Account\DbPicker::register();
 		Account\Overview::register();
+		Account\OrderTarget::register();
+		Account\OverviewOrder::register();
 		Account\Billing::register();
 		Account\PageHead::register();
 		Account\UsageView::register();

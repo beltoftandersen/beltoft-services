@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
  * of that kind. Nothing here calls Proxmox or a registrar: it reads the license rows, the resource meta,
  * the status the power job already cached, the subscriptions and the license history.
  *
- * Shortcodes: beltoft_services_attention, _servers, _databases, _hosting, _domains, _licenses, _apps, _mail, _next_payment, _activity, _welcome,
+ * Shortcodes: beltoft_services_new_order, _attention, _servers, _databases, _hosting, _domains, _licenses, _apps, _mail, _next_payment, _activity, _welcome,
  * and _overview (all of them). The templates are in templates/account/overview/ and can be copied to
  * yourtheme/beltoft-services/account/overview/. On the WooCommerce Dashboard endpoint the whole overview is
  * printed by woocommerce_account_dashboard, unless the beltoft_services_overview_auto filter says false (a site
@@ -28,6 +28,7 @@ final class Overview {
 	 * Section => shortcode tag.
 	 */
 	public const SECTIONS = array(
+		'new_order'    => 'beltoft_services_new_order',
 		'attention'    => 'beltoft_services_attention',
 		'servers'      => 'beltoft_services_servers',
 		'databases'    => 'beltoft_services_databases',
@@ -126,6 +127,7 @@ final class Overview {
 	public static function reset(): void {
 		OverviewData::reset();
 		OverviewActivity::reset();
+		OverviewOrder::reset();
 		self::$printed = false;
 	}
 
@@ -201,8 +203,14 @@ final class Overview {
 		$data = self::data();
 
 		switch ( $section ) {
+			case 'new_order':
+				return OverviewOrder::html();
 			case 'attention':
-				return $data['attention'] ? self::template( 'overview/attention.php', array( 'items' => $data['attention'] ) ) : '';
+				// What the order section already shows is not listed again.
+				$shown     = OverviewOrder::licenses();
+				$attention = array_values( array_filter( $data['attention'], static fn( $item ) => ! in_array( (int) ( $item['license'] ?? 0 ), $shown, true ) ) );
+
+				return $attention ? self::template( 'overview/attention.php', array( 'items' => $attention ) ) : '';
 			case 'servers':
 				if ( $data['servers'] ) {
 					\BeltoftServices\Monitoring\LiveUsage::enqueue();

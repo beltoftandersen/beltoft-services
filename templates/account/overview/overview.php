@@ -33,6 +33,7 @@ if ( array() === $beltoft_services_filled[0] || array() === $beltoft_services_fi
 <div class="beltoft-services-overview">
 	<?php
 	// The sections are escaped where they are built (templates/account/overview/*.php).
+	echo $parts['new_order'] ?? ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 	echo $parts['attention']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 	echo $parts['welcome']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 	?>

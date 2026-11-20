@@ -54,9 +54,27 @@ final class ThankYou {
 	}
 
 	/**
-	 * Registers the order progress route.
+	 * Registers the order progress routes.
 	 */
 	public static function routes(): void {
+		register_rest_route(
+			Plugin::REST_NAMESPACE,
+			'/my/orders/(?P<id>\d+)/progress',
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => array( __CLASS__, 'my_progress' ),
+				// The callback checks that the visitor is the order's customer; the cookie and nonce are WordPress's.
+				'permission_callback' => '__return_true',
+				'args'                => array(
+					'id' => array(
+						'type'     => 'integer',
+						'minimum'  => 1,
+						'required' => true,
+					),
+				),
+			)
+		);
+
 		register_rest_route(
 			Plugin::REST_NAMESPACE,
 			'/orders/(?P<id>\d+)/progress',
@@ -81,12 +99,29 @@ final class ThankYou {
 	}
 
 	/**
-	 * GET orders/<id>/progress?key=: the progress of the order's services.
+	 * GET my/orders/<id>/progress: the same answer for the logged-in customer of the order, with no key (the overview of My Account).
 	 *
 	 * @param \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response
 	 */
-	public static function progress( \WP_REST_Request $request ): \WP_REST_Response {
+	public static function my_progress( \WP_REST_Request $request ): \WP_REST_Response {
+		if ( self::limited() ) {
+			return self::reply( array( 'code' => 'beltoft_services_rate_limited', 'message' => __( 'Too many requests. Please wait a minute and try again.', 'beltoft-services' ) ), 429 );
+		}
+
+		$order = function_exists( 'wc_get_order' ) ? wc_get_order( (int) $request['id'] ) : null;
+
+		if ( ! $order instanceof \WC_Order || ! is_user_logged_in() || (int) $order->get_customer_id() !== get_current_user_id() ) {
+			return self::reply( array( 'code' => 'beltoft_services_forbidden', 'message' => __( 'This order is not available.', 'beltoft-services' ) ), 403 );
+		}
+
+		return self::services_reply( $order );
+	}
+
+	/**
+	 * Is this visitor over the rate limit of the order progress routes?
+	 */
+	private static function limited(): bool {
 		/**
 		 * Requests per visitor address and minute to the order progress route (0 turns it off).
 		 *
@@ -94,7 +129,36 @@ final class ThankYou {
 		 */
 		$max = (int) apply_filters( 'beltoft_services_order_progress_rate_limit', self::RATE_LIMIT );
 
-		if ( RateLimit::exceeded( RateLimit::visitor(), 'beltoft-services:order-progress', $max, MINUTE_IN_SECONDS ) ) {
+		return RateLimit::exceeded( RateLimit::visitor(), 'beltoft-services:order-progress', $max, MINUTE_IN_SECONDS );
+	}
+
+	/**
+	 * The one answer of both progress routes: the order's services, fixed texts and state only.
+	 *
+	 * @param \WC_Order $order Order.
+	 */
+	private static function services_reply( \WC_Order $order ): \WP_REST_Response {
+		$rows = array_map( array( __CLASS__, 'row' ), self::resources( $order ) );
+
+		/**
+		 * An order's progress was served to someone who may see it (the key holder or the customer).
+		 *
+		 * @param \WC_Order                        $order Order.
+		 * @param array<int, array<string, mixed>> $rows  The rows served.
+		 */
+		do_action( 'beltoft_services_order_progress_served', $order, $rows );
+
+		return self::reply( array( 'services' => $rows ), 200 );
+	}
+
+	/**
+	 * GET orders/<id>/progress?key=: the progress of the order's services.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response
+	 */
+	public static function progress( \WP_REST_Request $request ): \WP_REST_Response {
+		if ( self::limited() ) {
 			return self::reply( array( 'code' => 'beltoft_services_rate_limited', 'message' => __( 'Too many requests. Please wait a minute and try again.', 'beltoft-services' ) ), 429 );
 		}
 
@@ -106,7 +170,7 @@ final class ThankYou {
 			return self::reply( array( 'code' => 'beltoft_services_forbidden', 'message' => __( 'This order is not available.', 'beltoft-services' ) ), 403 );
 		}
 
-		return self::reply( array( 'services' => array_map( array( __CLASS__, 'row' ), self::resources( $order ) ) ), 200 );
+		return self::services_reply( $order );
 	}
 
 	/**
