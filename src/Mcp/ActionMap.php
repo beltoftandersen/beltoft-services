@@ -74,6 +74,8 @@ final class ActionMap {
 		'storage_access'    => 'never: switching access of backup storage is only done in the dashboard',
 		'reset_password'    => 'never: a new server password needs the code emailed to the account address, so it is only available in the dashboard',
 		'db_reset_password' => 'never: a new database password needs the code emailed to the account address, so it is only available in the dashboard',
+		'ipv6_add'          => 'never: adding or removing IPv6 restarts the server and makes its SSH host keys again, so it is only done in the dashboard',
+		'ipv6_remove'       => 'never: adding or removing IPv6 restarts the server and makes its SSH host keys again, so it is only done in the dashboard',
 		'ssl_cancel'        => 'never: cancelling is irreversible and ends in a refund a person decides; it is only done in the dashboard',
 	);
 

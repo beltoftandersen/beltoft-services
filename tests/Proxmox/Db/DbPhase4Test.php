@@ -1406,4 +1406,68 @@ class DbPhase4Test extends TestCase {
 		$this->assertTrue( $this->fake->fake_inbound_allowed( 5000, 'tcp', 5432, '203.0.113.7', 'net0' ) );
 		$this->assertTrue( $this->fake->fake_inbound_allowed( 5000, 'tcp', 5432, '2001:db8:2::5', 'net0' ) );
 	}
+
+	// -- The customer's IPv6 switch on a database --------------------------------------------------------
+
+	/** A database with the public IP add-on that was built while IPv6 for databases was off, on a cluster that has a prefix. */
+	private function db_without_ipv6(): Resource {
+		$this->save_cluster( array( 'ipv6_prefix' => '2001:db8:430c:1::/64', 'fw_enabled' => '1', 'fw_ipfilter' => '1' ) );
+
+		return $this->db_with_ip();
+	}
+
+	public function test_the_ipv6_switch_is_not_offered_while_databases_have_no_ipv6(): void {
+		$r = $this->db_without_ipv6();
+
+		$this->assertFalse( \BeltoftServices\Proxmox\Network\Ipv6Switch::applies( $r ) );
+		$this->assertArrayNotHasKey( 'ipv6_add', \BeltoftServices\Proxmox\Db\DbActions::offered( $r ) );
+		$this->assertFalse( \BeltoftServices\Proxmox\Network\Ipv6Switch::view( $r )['show'] );
+	}
+
+	public function test_add_and_remove_ipv6_on_a_database_restart_it_once_and_tell_the_guest(): void {
+		$r = $this->db_without_ipv6();
+		add_filter( 'beltoft_services_db_ipv6', '__return_true' );
+		$r = Resource::find( $r->id() );
+
+		$this->assertArrayHasKey( 'ipv6_add', \BeltoftServices\Proxmox\Db\DbActions::offered( $r ) );
+		$this->assertArrayNotHasKey( 'ipv6_remove', \BeltoftServices\Proxmox\Db\DbActions::offered( $r ) );
+		$this->assertTrue( DbAccess::view( $r )['ipv6']['can_add'] );
+
+		$mark = count( $this->fake->calls() );
+		$res  = $this->drive( $r, 'ipv6_add' );
+		$this->assertTrue( $res->is_done(), $res->error() );
+
+		$this->assertSame( 'ip=192.0.2.10/24,gw=192.0.2.1,ip6=' . self::DB_V6 . '/64,gw6=2001:db8:430c:1::1', $this->fake->vm( 5000 )['config']['ipconfig0'] );
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( self::DB_V6, $fresh->get( 'ip6' ) );
+		$this->assertNull( $fresh->get( 'ipv6_op' ) );
+		$this->assertNull( $fresh->get( DbIp::RESYNC ), 'The guest was told, the marker is gone.' );
+		$this->assertContains( self::DB_V6, array_column( (array) $this->fake->vm( 5000 )['firewall_ipsets']['ipfilter-net0'], 'cidr' ) );
+		$reboots = array_filter( array_slice( $this->fake->calls(), $mark ), static fn( $c ) => 'POST' === $c['method'] && '/status/reboot' === substr( $c['path'], -14 ) );
+		$this->assertCount( 1, $reboots );
+
+		$listen = array_values( array_filter( $this->guest_jobs(), static fn( $j ) => 'listen' === $j['job']['op'] ) );
+		$last   = end( $listen );
+		$this->assertSame( array( self::DB_V6 ), $last['job']['listen6'] );
+
+		$this->assertArrayHasKey( 'ipv6_remove', \BeltoftServices\Proxmox\Db\DbActions::offered( $fresh ) );
+		$res = $this->drive( $fresh, 'ipv6_remove' );
+		$this->assertTrue( $res->is_done(), $res->error() );
+		$this->assertSame( 'ip=192.0.2.10/24,gw=192.0.2.1', $this->fake->vm( 5000 )['config']['ipconfig0'] );
+		$this->assertNull( Resource::find( $r->id() )->get( 'ip6' ) );
+		$listen = array_values( array_filter( $this->guest_jobs(), static fn( $j ) => 'listen' === $j['job']['op'] ) );
+		$last   = end( $listen );
+		$this->assertArrayNotHasKey( 'listen6', $last['job'], 'The guest is told to stop listening on IPv6.' );
+		$this->assertNotNull( \BeltoftServices\Proxmox\Network\IpHistory::for_address( self::DB_V6 )[0]['ended_at'] );
+	}
+
+	public function test_the_ipv6_switch_of_a_database_needs_a_prefix(): void {
+		$r = $this->db_without_ipv6();
+		add_filter( 'beltoft_services_db_ipv6', '__return_true' );
+		$r = Resource::find( $r->id() );
+
+		$this->save_cluster( array( 'ipv6_prefix' => '' ) );
+		$this->assertFalse( \BeltoftServices\Proxmox\Network\Ipv6Switch::applies( $r ) );
+		$this->assertNotNull( \BeltoftServices\Proxmox\Vm\Actions::check( $r, 'ipv6_add', array() ) );
+	}
 }

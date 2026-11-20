@@ -225,6 +225,7 @@ final class Plugin {
 		Proxmox\Network\FirewallRoute::register();
 		Proxmox\Network\FirewallTab::register();
 		Proxmox\Network\NetworkTab::register();
+		Proxmox\Network\Ipv6Tab::register();
 		Proxmox\Vm\Switches::register();
 		Proxmox\Vm\Upgrades::register();
 		Proxmox\Vm\Credentials::register();

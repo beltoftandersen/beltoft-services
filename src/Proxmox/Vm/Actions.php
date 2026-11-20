@@ -16,6 +16,7 @@ use BeltoftServices\Proxmox\Db\DbRestore;
 use BeltoftServices\Proxmox\Disk\DiskMeta;
 use BeltoftServices\Proxmox\Network\Firewall;
 use BeltoftServices\Proxmox\Network\FirewallRules;
+use BeltoftServices\Proxmox\Network\Ipv6Switch;
 use BeltoftServices\Proxmox\Network\PrivateAttach;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\Prepares;
@@ -93,6 +94,8 @@ final class Actions {
 		'fw_reset'          => array( 5, HOUR_IN_SECONDS ),
 		'private_attach'    => array( 5, HOUR_IN_SECONDS ),
 		'private_detach'    => array( 5, HOUR_IN_SECONDS ),
+		'ipv6_add'          => array( 5, HOUR_IN_SECONDS ),
+		'ipv6_remove'       => array( 5, HOUR_IN_SECONDS ),
 	);
 
 	/**
@@ -173,7 +176,7 @@ final class Actions {
 		}
 
 		$out[ ServerName::ACTION ] = __( 'Rename', 'beltoft-services' );
-		$out = array_merge( $out, Policy::offered( $r ), FirewallRules::offered( $r ), PrivateAttach::offered( $r ) );
+		$out = array_merge( $out, Policy::offered( $r ), FirewallRules::offered( $r ), PrivateAttach::offered( $r ), Ipv6Switch::offered( $r ) );
 
 		// A restore that has begun is finished even when the plan lost its backups meanwhile.
 		if ( Backups::enabled( $r ) || is_array( $r->get( 'restore' ) ) ) {
@@ -221,7 +224,7 @@ final class Actions {
 	 */
 	public static function buttons( $actions, $resource, $context = 'card' ) {
 		if ( is_array( $actions ) && $resource instanceof Resource && ProxmoxDriver::ID === $resource->get( 'driver' ) ) {
-			unset( $actions[ AppInstall::RETRY ], $actions[ ServerName::ACTION ], $actions['replace_ssh_key'], $actions['reinstall'], $actions['restore'], $actions['backup_delete'], $actions['snapshot_take'], $actions['snapshot_delete'], $actions['snapshot_rollback'], $actions['fw_apply'], $actions['fw_reset'], $actions[ PrivateAttach::ATTACH ], $actions[ PrivateAttach::DETACH ] );
+			unset( $actions[ AppInstall::RETRY ], $actions[ ServerName::ACTION ], $actions['replace_ssh_key'], $actions['reinstall'], $actions['restore'], $actions['backup_delete'], $actions['snapshot_take'], $actions['snapshot_delete'], $actions['snapshot_rollback'], $actions['fw_apply'], $actions['fw_reset'], $actions[ PrivateAttach::ATTACH ], $actions[ PrivateAttach::DETACH ], $actions[ Ipv6Switch::ADD ], $actions[ Ipv6Switch::REMOVE ] );
 
 			if ( 'page' === $context ) {
 				unset( $actions['start'], $actions['shutdown'], $actions['reboot'], $actions['reset_password'] );
@@ -318,6 +321,10 @@ final class Actions {
 
 		if ( in_array( $action, PrivateAttach::ACTIONS, true ) ) {
 			return PrivateAttach::check( $r, $action, $args );
+		}
+
+		if ( Ipv6Switch::is_action( $action ) ) {
+			return Ipv6Switch::check( $r, $action );
 		}
 
 		if ( 'reinstall' === $action ) {
@@ -594,6 +601,9 @@ final class Actions {
 			case \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_REMOVE:
 			case \BeltoftServices\Proxmox\Ipv4\Ipv4Server::SYNC:
 				return ( new \BeltoftServices\Proxmox\Ipv4\Ipv4Server( $this->r, $this ) )->run( $action, $record, $v );
+			case Ipv6Switch::ADD:
+			case Ipv6Switch::REMOVE:
+				return ( new Ipv6Switch( $this->r, $this ) )->run( $action, $record, $v );
 			default:
 				return ( new Reinstall( $this->r, $this ) )->reinstall( $record, $args );
 		}
