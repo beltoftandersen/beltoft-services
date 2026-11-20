@@ -93,10 +93,7 @@ final class PricingTest extends UsageTestCase {
 		$this->assertArrayNotHasKey( 'monthly', $plan, 'Monthly is hidden.' );
 		$this->assertArrayNotHasKey( 'period', $plan );
 
-		$ip = $plan['options']['public_ipv4'];
-		$this->assertEquals( 5.0, $ip['max_per_month'] );
-		$this->assertEqualsWithDelta( 5 / 730, $ip['hourly'], 0.0001 );
-		$this->assertStringContainsString( '+€5 per month', $ip['text'] );
+		$this->assertNull( $plan['options']['public_ipv4'], 'An IPv4 address is an add-on of its own, bought in the dashboard.' );
 
 		$this->assertCount( 1, $plan['options']['extra_storage'] );
 		$step = $plan['options']['extra_storage'][0];
@@ -147,19 +144,25 @@ final class PricingTest extends UsageTestCase {
 		$this->assertEquals( 3.0, $listed['backups']['adds']['max_per_month'] );
 	}
 
-	public function test_the_quote_of_a_database_with_ip_and_50_gb_is_the_checkouts_breakdown(): void {
-		$quote = $this->call( 'price_quote', array( 'plan' => $this->db['m-0-0']->get_id(), 'public_ipv4' => true, 'extra_storage_gb' => 50 ) );
-		$parts = Breakdown::parts( $this->db['u-50-1'] );
+	public function test_the_quote_of_a_database_with_50_gb_is_the_checkouts_breakdown(): void {
+		$quote = $this->call( 'price_quote', array( 'plan' => $this->db['m-0-0']->get_id(), 'extra_storage_gb' => 50 ) );
+		$parts = Breakdown::parts( $this->db['u-50-0'] );
 
-		$this->assertEquals( 54.0, $quote['max_per_month'] );
+		$this->assertEquals( 49.0, $quote['max_per_month'] );
 		$this->assertEquals( $parts['max'], $quote['max_per_month'] );
 		$this->assertSame( round( $parts['hourly'], 4 ), $quote['hourly'] );
-		$this->assertStringContainsString( '€0.0740 per hour', $quote['hourly_text'] );
-		$this->assertSame( '€54', $quote['max_per_month_text'] );
-		$this->assertEquals( array( 45.0, 5.0, 4.0 ), array_column( $quote['lines'], 'per_month' ) );
-		$this->assertSame( array( '€45 / month', '+€5 / month', '+€4 / month' ), array_column( $quote['lines'], 'text' ) );
+		$this->assertSame( '€49', $quote['max_per_month_text'] );
+		$this->assertEquals( array( 45.0, 4.0 ), array_column( $quote['lines'], 'per_month' ) );
+		$this->assertSame( array( '€45 / month', '+€4 / month' ), array_column( $quote['lines'], 'text' ) );
 		$this->assertTrue( $quote['excl_vat'] );
 		$this->assertSame( 'database', $quote['kind'] );
+	}
+
+	public function test_a_public_ipv4_is_not_part_of_a_quote(): void {
+		$out = $this->tool( 'price_quote', array( 'plan' => $this->db['m-0-0']->get_id(), 'public_ipv4' => true ), $this->read() );
+
+		$this->assertTrue( $out['isError'] );
+		$this->assertStringContainsString( 'add-on with its own subscription', wp_json_encode( $out ) );
 	}
 
 	public function test_the_quote_of_a_plan_alone_and_of_a_server_with_backups(): void {

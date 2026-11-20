@@ -245,37 +245,26 @@ final class Panels {
 	}
 
 	/**
-	 * THE HOOK POINT for "add an IPv4 address" on a server with IPv6 only. Nothing sells an address yet: the filter
-	 * `beltoft_services_server_ipv4` is the one place the future shared "extra IPv4" model plugs in. It gets null and the
-	 * server, and returns null (no block) or an array with `add_url` (where the customer buys one), `add_price` (the price
-	 * text, such as "+19 kr. / month") and optionally `busy` (a change is in progress). Only a ready server with no IPv4
-	 * and an IPv6 address is asked.
+	 * The block "IPv4 addresses" of a server: the filter `beltoft_services_server_ipv4` answers it (the IPv4 add-on, Ipv4Panels).
+	 * Null: no block (an adopted server, or nothing to sell and nothing bought). The array is passed on as the add-on gave it.
 	 *
-	 * @param Resource $r Resource.
-	 * @return array{busy: bool, add_url: string, add_price: string}|null
+	 * @param Resource $r Server.
+	 * @return array<string, mixed>|null
 	 */
 	public static function ipv4_panel( Resource $r ): ?array {
-		if ( true === $r->get( 'linked' ) || '' !== (string) $r->get( 'ip' ) || '' === self::ip6( $r ) ) {
+		if ( true === $r->get( 'linked' ) ) {
 			return null;
 		}
 
 		/**
-		 * Filters the "add an IPv4 address" block of a server with IPv6 only.
+		 * Filters the "IPv4 addresses" block of a server.
 		 *
-		 * @param array|null $panel Null (none) or array( add_url, add_price, busy ).
+		 * @param array|null $panel Null (none) or the block, see Ipv4\Ipv4Panels::view().
 		 * @param Resource   $r     The server.
 		 */
 		$panel = apply_filters( 'beltoft_services_server_ipv4', null, $r );
 
-		if ( ! is_array( $panel ) || ( '' === (string) ( $panel['add_url'] ?? '' ) && empty( $panel['busy'] ) ) ) {
-			return null;
-		}
-
-		return array(
-			'busy'      => ! empty( $panel['busy'] ),
-			'add_url'   => (string) ( $panel['add_url'] ?? '' ),
-			'add_price' => (string) ( $panel['add_price'] ?? '' ),
-		);
+		return is_array( $panel ) ? $panel : null;
 	}
 
 	/**

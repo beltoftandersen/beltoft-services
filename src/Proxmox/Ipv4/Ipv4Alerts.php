@@ -8,6 +8,7 @@
 namespace BeltoftServices\Proxmox\Ipv4;
 
 use BeltoftServices\Alerts;
+use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
@@ -37,10 +38,19 @@ final class Ipv4Alerts {
 
 	/**
 	 * The pool changed: mail when it is low or empty. Called from IpPool after every write.
-	 *
-	 * @param int $free Free addresses.
 	 */
-	public static function pool_changed( int $free ): void {
+	public static function pool_changed(): void {
+		/**
+		 * Whether the pool mails are sent at all (default true).
+		 *
+		 * @param bool $on Whether they are on.
+		 */
+		if ( ! apply_filters( 'beltoft_services_ipv4_alerts', true ) ) {
+			return;
+		}
+
+		$free = IpPool::free_now();
+
 		if ( $free <= 0 ) {
 			self::send( 'empty', 'No free IPv4 address is left', array( 'No free IPv4 address is left in the pool. IPv4 add-ons and new dedicated servers cannot be sold until more are added.' ) );
 			return;

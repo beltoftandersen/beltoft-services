@@ -525,7 +525,7 @@ class DbDiskTest extends TestCase {
 
 	// -- The shop side: switches, stock, the picker ----------------------------------------------
 
-	public function test_a_switch_to_less_total_disk_is_refused_and_a_larger_one_or_the_public_ip_is_let_through(): void {
+	public function test_a_switch_to_less_total_disk_is_refused_and_a_larger_one_is_let_through(): void {
 		$v = $this->ladder_variations();
 		$r = $this->db_on_ladder( 'e100-0', false );
 		$this->assertSame( 120, DbDisk::promised_gb( $r ) );
@@ -542,9 +542,7 @@ class DbDiskTest extends TestCase {
 		$this->assertSame( '', $ask( $v['e250-0'] ), 'Larger is let through.' );
 		$this->assertSame( '', $ask( $v['e100-0'] ), 'The same disk is let through.' );
 
-		// The public IP switch is unchanged: refused only when no address can be given.
-		$this->assertStringContainsString( 'No public IP address is available', $ask( $v['e100-1'] ) );
-		$this->pool( 2 );
+		// The public IP is an add-on of its own now: a switch is judged by the storage alone.
 		$this->assertSame( '', $ask( $v['e100-1'] ) );
 		$this->assertStringContainsString( "can't be made smaller", $ask( $v['e50-1'] ) );
 	}

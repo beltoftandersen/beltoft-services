@@ -227,26 +227,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 		</div>
 	<?php endif; ?>
 	<?php if ( ! empty( $ipv4 ) && $forms ) : ?>
-		<div class="beltoft-services-vm__ipv4">
-			<h4><?php esc_html_e( 'IPv4 address', 'beltoft-services' ); ?></h4>
-			<?php if ( $ipv4['busy'] ) : ?>
-				<p class="description"><?php esc_html_e( 'The IPv4 address is being changed. The server restarts once.', 'beltoft-services' ); ?></p>
-			<?php elseif ( '' !== $ipv4['add_url'] ) : ?>
-				<p class="description"><?php esc_html_e( 'This server has an IPv6 address. Add an IPv4 address if visitors or services must reach the server over IPv4. Some services, for example GitHub, cannot be reached from a server with IPv6 only.', 'beltoft-services' ); ?></p>
-				<p>
-					<a class="button woocommerce-button bs-btn" href="<?php echo esc_url( $ipv4['add_url'] ); ?>">
-						<?php
-						echo esc_html(
-							'' === $ipv4['add_price']
-								? __( 'Add an IPv4 address', 'beltoft-services' )
-								/* translators: %s: price difference such as +€2.55 / month */
-								: sprintf( __( 'Add an IPv4 address (%s)', 'beltoft-services' ), $ipv4['add_price'] )
-						);
-						?>
-					</a>
-				</p>
-			<?php endif; ?>
-		</div>
+		<?php include BELTOFT_SERVICES_PATH . 'templates/account/ipv4.php'; ?>
 	<?php endif; ?>
 	<?php if ( '' !== (string) ( $cost ?? '' ) ) : ?><p class="beltoft-services-cost"><?php echo esc_html( $cost ); ?></p><?php endif; ?>
 

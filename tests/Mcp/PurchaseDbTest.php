@@ -178,12 +178,11 @@ final class PurchaseDbTest extends UsageTestCase {
 		$this->assertTrue( $this->tool( 'order_database', array( 'plan' => '999999' ), $token )['isError'] );
 	}
 
-	public function test_a_public_ipv4_is_refused_while_no_address_is_free(): void {
-		set_transient( \BeltoftServices\Proxmox\Network\IpPool::FREE_TRANSIENT, 0, MINUTE_IN_SECONDS );
+	public function test_a_public_ipv4_is_not_ordered_here(): void {
 		$out = $this->tool( 'order_database', $this->args( array( 'public_ipv4' => true ) ), $this->oauth( $this->user, Tokens::FULL ) );
 
 		$this->assertTrue( $out['isError'] );
-		$this->assertStringContainsString( 'No public IPv4 address is free', wp_json_encode( $out ) );
+		$this->assertStringContainsString( 'add-on with its own subscription', wp_json_encode( $out ) );
 	}
 
 	public function test_a_customer_without_a_usage_account_gets_a_link_and_nothing_is_ordered(): void {

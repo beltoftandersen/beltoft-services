@@ -33,6 +33,7 @@ class Ipv4ServerTest extends FirewallTestCase {
 		parent::set_up();
 
 		$this->mails = array();
+		remove_all_filters( 'beltoft_services_ipv4_alerts' );
 		add_filter(
 			'pre_wp_mail',
 			function ( $pre, $atts ) {

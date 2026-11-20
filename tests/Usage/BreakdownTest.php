@@ -10,7 +10,6 @@ namespace BeltoftServices\Tests\Usage;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Backup\BackupField;
 use BeltoftServices\Proxmox\Db\DbDiskField;
-use BeltoftServices\Proxmox\Db\DbIpField;
 use BeltoftServices\Usage\Breakdown;
 use BeltoftServices\Usage\Rates;
 
@@ -264,7 +263,6 @@ class BreakdownTest extends UsageTestCase {
 	public function test_the_database_labels_show_the_monthly_maximum(): void {
 		$v = $this->db();
 
-		$this->assertSame( 'Public IPv4 address, +€5 per month', DbIpField::label( $v['u-0-0'], $v['u-0-1'], '+€0.0068 / hour' ) );
 		$this->assertSame( '+50 GB, +€4 per month', DbDiskField::step_label( 50, $v['u-0-0'], $v['u-50-0'] ) );
 		$this->assertSame( '+50 GB, +€4 per month', DbDiskField::step_label( 50, $v['u-0-1'], $v['u-50-1'] ) );
 	}
@@ -272,7 +270,6 @@ class BreakdownTest extends UsageTestCase {
 	public function test_the_monthly_labels_keep_their_wording(): void {
 		$v = $this->db();
 
-		$this->assertSame( 'Public IPv4 address (+€5.00)', DbIpField::label( $v['m-0-0'], $v['m-0-1'], '+€5.00' ) );
 		$this->assertSame( '+50 GB (+€4.00)', preg_replace( '/ \/ month|\/month/', '', DbDiskField::step_label( 50, $v['m-0-0'], $v['m-50-0'] ) ) );
 	}
 

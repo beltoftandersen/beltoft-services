@@ -241,7 +241,6 @@ final class Plugin {
 		Apps\AppReinstall::register();
 		Apps\AppTab::register();
 		Proxmox\Backup\BackupField::register();
-		Proxmox\Db\DbIpField::register();
 		Proxmox\Db\DbDiskField::register();
 		Proxmox\Disk\DiskMeta::register();
 		// The cascade runs after the server's own clean-up (CoreHooks, Credentials), as the three old cascades did.
@@ -257,6 +256,8 @@ final class Plugin {
 		Proxmox\Managed\ManagedCart::register();
 		Proxmox\Ipv4\Ipv4Meta::register();
 		Proxmox\Ipv4\Ipv4Cart::register();
+		Proxmox\Ipv4\Ipv4Panels::register();
+		Proxmox\Ipv4\Ipv4Field::register();
 		Support\Priority::register();
 		Proxmox\Disk\DiskField::register();
 		Proxmox\Vm\Actions::register();

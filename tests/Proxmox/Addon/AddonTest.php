@@ -12,11 +12,13 @@ use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
 use BeltoftServices\Proxmox\Vm\Stock;
 
 class AddonTest extends \WP_UnitTestCase {
-	public function test_the_three_add_ons_keep_their_keys(): void {
+	public function test_the_add_ons_keep_their_keys(): void {
 		$golden = array(
 			'disk'     => array( DiskDriver::ID, 'beltoft_services_disk_for', 'beltoft_services_disk_uid', '_beltoft_services_disk_uid', '_beltoft_services_disk_server', '_disk_', 'beltoft-services-disk', true, false, 'ASC' ),
 			'snapshot' => array( SnapshotDriver::ID, 'beltoft_services_snapshot_for', 'beltoft_services_snapshot_uid', '_beltoft_services_snapshot_uid', '_beltoft_services_snapshot_server', '_snapshots_', 'beltoft-services-snapshots', false, true, 'ASC' ),
 			'applic'   => array( AppLicenceDriver::ID, AppLicence::CART_FOR, AppLicence::CART_UID, AppLicence::ITEM_UID, AppLicence::ITEM_SERVER, '_applic_', AppLicenceCart::NONCE, true, false, 'DESC' ),
+			'managed'  => array( \BeltoftServices\Proxmox\Managed\ManagedDriver::ID, 'beltoft_services_managed_for', 'beltoft_services_managed_uid', '_beltoft_services_managed_uid', '_beltoft_services_managed_server', '_managed_', 'beltoft-services-managed', false, true, 'ASC' ),
+			'ipv4'     => array( \BeltoftServices\Proxmox\Ipv4\Ipv4Driver::ID, 'beltoft_services_ipv4_for', 'beltoft_services_ipv4_uid', '_beltoft_services_ipv4_uid', '_beltoft_services_ipv4_server', '_ipv4_', 'beltoft-services-ipv4', true, true, 'ASC' ),
 		);
 		$seen   = array();
 		foreach ( Addon::all() as $a ) {
@@ -25,12 +27,12 @@ class AddonTest extends \WP_UnitTestCase {
 		$this->assertSame( $golden, $seen );
 	}
 
-	public function test_the_order_is_disk_snapshot_applic(): void {
-		$this->assertSame( array( 'disk', 'snapshot', 'applic' ), array_map( static fn( Addon $a ) => $a->kind, Addon::all() ) );
+	public function test_the_order_is_disk_snapshot_applic_managed_ipv4(): void {
+		$this->assertSame( array( 'disk', 'snapshot', 'applic', 'managed', 'ipv4' ), array_map( static fn( Addon $a ) => $a->kind, Addon::all() ) );
 	}
 
 	public function test_driver_ids_match_the_stock_list(): void {
-		$this->assertSame( array( DiskDriver::ID, SnapshotDriver::ID, AppLicenceDriver::ID ), Addon::driver_ids() );
+		$this->assertSame( array( DiskDriver::ID, SnapshotDriver::ID, AppLicenceDriver::ID, \BeltoftServices\Proxmox\Managed\ManagedDriver::ID, \BeltoftServices\Proxmox\Ipv4\Ipv4Driver::ID ), Addon::driver_ids() );
 		$this->assertSame( Addon::driver_ids(), Stock::addon_drivers() );
 		$this->assertSame( 'snapshot', Addon::for_driver( SnapshotDriver::ID )->kind );
 		$this->assertNull( Addon::for_driver( 'proxmox' ) );

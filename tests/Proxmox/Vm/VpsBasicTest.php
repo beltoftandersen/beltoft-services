@@ -171,17 +171,20 @@ class VpsBasicTest extends FirewallTestCase {
 		$this->assertTrue( is_wp_error( $bad ) || false === $bad );
 	}
 
-	public function test_the_ipv4_hook_is_empty_until_something_plugs_in(): void {
+	public function test_the_ipv4_block_comes_from_the_filter_for_every_own_server(): void {
 		$this->ipv6_on();
 		$r = $this->basic( 0 );
-		$this->assertNull( Panels::ipv4_panel( $r ) );
+		$this->assertNull( Panels::ipv4_panel( $r ), 'Nothing sells an address here (no product): no block.' );
 
 		add_filter( 'beltoft_services_server_ipv4', static fn() => array( 'add_url' => 'https://example.test/add', 'add_price' => '+19 kr. / month' ) );
 		$this->assertSame( 'https://example.test/add', Panels::ipv4_panel( $r )['add_url'] );
-
-		$with4 = $this->basic( 1 );
-		$this->assertNull( Panels::ipv4_panel( $with4 ), 'A server that has IPv4 is never asked.' );
 		remove_all_filters( 'beltoft_services_server_ipv4' );
+
+		$r->set( array( 'linked' => true ) );
+		add_filter( 'beltoft_services_server_ipv4', static fn() => array( 'add_url' => 'https://example.test/add' ) );
+		$this->assertNull( Panels::ipv4_panel( Resource::find( $r->id() ) ), 'An adopted server is never asked.' );
+		remove_all_filters( 'beltoft_services_server_ipv4' );
+		\BeltoftServices\Proxmox\Ipv4\Ipv4Panels::register();
 	}
 
 }

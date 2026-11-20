@@ -21,7 +21,6 @@ use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Db\DbDisk;
 use BeltoftServices\Proxmox\Db\DbDriver;
-use BeltoftServices\Proxmox\Db\DbIp;
 use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Proxmox\Snapshot\PanelData;
 use BeltoftServices\Proxmox\Vm\Offers;
@@ -234,6 +233,24 @@ final class Reads {
 	 * @param int $user_id Customer.
 	 * @return array<string, mixed>|\WP_Error
 	 */
+	/**
+	 * The IPv4 addresses of a server or a database: the ones it has through the add-on, and whether one more can be added
+	 * (it is added in the dashboard: the add-on has its own subscription).
+	 *
+	 * @param Resource $r Server or database.
+	 * @return array<string, mixed>
+	 */
+	public static function ipv4_of( Resource $r ): array {
+		$view = \BeltoftServices\Proxmox\Ipv4\Ipv4Panels::view( $r );
+
+		return array(
+			'addresses'   => array_map( static fn( array $row ) => array( 'address' => $row['address'], 'role' => $row['role'], 'in_use' => $row['live'] ), null === $view ? array() : $view['addresses'] ),
+			'can_add'     => null !== $view && '' !== $view['add_url'],
+			'sold_out'    => null !== $view && $view['sold_out'],
+			'how_to_add'  => __( 'Add or remove an IPv4 address from the server or the database page in the dashboard. Claude cannot buy it yet.', 'beltoft-services' ),
+		);
+	}
+
 	private static function usage( int $user_id ) {
 		$live = Tools::route( 'GET', '/usage', array(), null, null );
 
@@ -665,8 +682,7 @@ final class Reads {
 				'note'             => __( 'Storage can be made larger from the database page in the dashboard, never smaller. It is billed by the hour with the database and capped. Claude cannot grow it yet.', 'beltoft-services' ),
 			);
 
-			$ip                = DbIp::sibling( $r, true );
-			$out['public_ipv4'] = $ip && $current ? array( 'enabled' => false, 'adds' => Pricing::addon_between( $current, $ip ) ) : array( 'enabled' => null === DbIp::sibling( $r, false ) ? false : true );
+			$out['public_ipv4'] = self::ipv4_of( $r );
 		}
 
 		return $out;

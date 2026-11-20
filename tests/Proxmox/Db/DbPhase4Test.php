@@ -390,10 +390,10 @@ class DbPhase4Test extends TestCase {
 		$this->pool( 2 );
 
 		$this->assertSame( 1, IpPool::reserve_for_vps(), 'The default keeps one address for servers.' );
-		$this->assertSame( 1, IpPool::available_for_db() );
+		$this->assertSame( 1, IpPool::available_for_addon() );
 		$this->assertNotNull( IpPool::hold( 9001, 1 ), 'Two free: one may go.' );
 		$this->assertNull( IpPool::hold( 9002, 1 ), 'One free is the reserve.' );
-		$this->assertSame( 0, IpPool::available_for_db() );
+		$this->assertSame( 0, IpPool::available_for_addon() );
 		$this->assertNotNull( IpPool::hold( 9001, 1 ), 'A resource that holds an address keeps it.' );
 		$this->assertNotNull( IpPool::hold( 9002 ), 'A server (no reserve) takes the last one.' );
 		$this->assertSame( 0, IpPool::free_count() );
@@ -401,9 +401,9 @@ class DbPhase4Test extends TestCase {
 
 	public function test_the_reserve_is_a_setting(): void {
 		$this->pool( 1 );
-		$this->assertSame( 0, IpPool::available_for_db() );
+		$this->assertSame( 0, IpPool::available_for_addon() );
 		$this->settings( array( 'ip_reserve_for_vps' => 0 ) );
-		$this->assertSame( 1, IpPool::available_for_db() );
+		$this->assertSame( 1, IpPool::available_for_addon() );
 		$this->assertArrayHasKey( 'ip_reserve_for_vps', apply_filters( 'beltoft_services_settings_fields', array() ) );
 	}
 
@@ -435,31 +435,6 @@ class DbPhase4Test extends TestCase {
 		Stock::sync();
 		$this->assertFalse( $open( $with ) );
 	}
-	public function test_a_switch_to_the_add_on_is_refused_when_no_address_can_be_given(): void {
-		$this->pool( 1 );
-		$r   = $this->ready_db();
-		$sub = wcs_create_subscription( array( 'customer_id' => (int) $r->license()['user_id'], 'billing_period' => 'month', 'billing_interval' => 1 ) );
-		$this->assertInstanceOf( \WC_Subscription::class, $sub );
-		global $wpdb;
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture.
-		$wpdb->update( $wpdb->prefix . 'beltoft_licenses', array( 'subscription_id' => $sub->get_id() ), array( 'id' => (int) $r->license()['id'] ) );
-
-		$product = (int) $r->license()['product_id'];
-		$target  = array_merge( (array) $r->get( 'plan' ), array( 'public_ip' => 1 ) );
-
-		$this->assertStringContainsString( 'No public IP address is available', DbIp::switch_error( $sub->get_id(), $product, $target, null ) );
-		$this->assertSame( '', DbIp::switch_error( $sub->get_id(), $product, array_merge( $target, array( 'public_ip' => 0 ) ), null ), 'A switch to a plan without the add-on is never refused.' );
-		$this->pool( 2 );
-		$this->assertSame( '', DbIp::switch_error( $sub->get_id(), $product, $target, null ) );
-
-		// A stopped database cannot take the new address in its guest: the switch waits until it runs.
-		\BeltoftServices\Proxmox\Vm\Operations::remember_power( $r->id(), 'stopped' );
-		$this->assertStringContainsString( 'Start the database', DbIp::switch_error( $sub->get_id(), $product, $target, null ) );
-		$this->assertSame( '', DbIp::switch_error( $sub->get_id(), $product, array_merge( $target, array( 'public_ip' => 0 ) ), null ), 'Taking the add-on away is not held by the power.' );
-		\BeltoftServices\Proxmox\Vm\Operations::remember_power( $r->id(), 'running' );
-		$this->assertSame( '', DbIp::switch_error( $sub->get_id(), $product, $target, null ) );
-	}
-
 	// -- The profile and the build ---------------------------------------------------------------
 
 	public function test_the_profile_asks_for_an_address_only_with_the_add_on(): void {
@@ -807,91 +782,58 @@ class DbPhase4Test extends TestCase {
 
 	public function test_a_paid_database_takes_the_last_address_even_though_the_shop_keeps_it_for_servers(): void {
 		$this->pool( 1 );
-		$this->assertSame( 0, IpPool::available_for_db() );
+		$this->assertSame( 0, IpPool::available_for_addon() );
 		$r = $this->ready_db( array( 'public_ip' => 1 ) );
 		$this->assertSame( '192.0.2.10', DbAccess::public_address( $r ) );
 		$this->assertSame( 0, IpPool::free_count() );
 	}
 
-	// -- The variation pair ----------------------------------------------------------------------
+	// -- The add-on product ----------------------------------------------------------------------
 
 	/**
-	 * A variable database product with a Public IP attribute (No, Yes) and a subscription on the plan without.
-	 *
-	 * @return array{0: Resource, 1: array<string, \WC_Product_Variation>}
+	 * The IPv4 address add-on product: one monthly subscription, 19 a month.
 	 */
-	private function database_on_pair(): array {
-		$product = new \WC_Product_Variable();
-		$product->set_name( 'Database ' . wp_generate_password( 5, false ) );
+	private function ipv4_product(): \WC_Product_Variation {
+		$product = new \WC_Product_Variable_Subscription();
+		$product->set_name( 'IPv4 address ' . wp_generate_password( 5, false ) );
 		$product->set_status( 'publish' );
-
 		$attribute = new \WC_Product_Attribute();
-		$attribute->set_name( 'Public IP' );
-		$attribute->set_options( array( 'No', 'Yes' ) );
-		$attribute->set_visible( true );
+		$attribute->set_name( 'Plan' );
+		$attribute->set_options( array( 'Monthly' ) );
 		$attribute->set_variation( true );
 		$product->set_attributes( array( $attribute ) );
-		$product->update_meta_data( Product::META_DRIVER, 'proxmox-db' );
+		$product->update_meta_data( Product::META_DRIVER, 'proxmox-ipv4' );
 		$product->update_meta_data( \BeltoftLicenses\Software::META_LICENSED, 'yes' );
-		$product->update_meta_data( \BeltoftLicenses\Software::META_SLUG, 'db-' . wp_generate_password( 5, false ) );
-
-		foreach ( array( 'cluster' => 'lab', 'template' => 9100, 'engine' => 'postgres', 'major' => 18, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20 ) as $key => $value ) {
-			$product->update_meta_data( Product::META_PLAN . $key, (string) $value );
-		}
-
+		$product->update_meta_data( \BeltoftLicenses\Software::META_SLUG, 'ipv4-' . wp_generate_password( 5, false ) );
 		$product->save();
-		Product::remember_slug( (string) $product->get_meta( \BeltoftLicenses\Software::META_SLUG ) );
+		$variation = new \WC_Product_Subscription_Variation();
+		$variation->set_parent_id( $product->get_id() );
+		$variation->set_attributes( array( 'plan' => 'Monthly' ) );
+		$variation->set_regular_price( '19' );
+		$variation->update_meta_data( '_subscription_price', '19' );
+		$variation->update_meta_data( '_subscription_period', 'month' );
+		$variation->update_meta_data( '_subscription_period_interval', '1' );
+		$variation->update_meta_data( '_subscription_length', '0' );
+		$variation->set_status( 'publish' );
+		$variation->save();
+		\WC_Product_Variable::sync( $product->get_id() );
+		Stock::sync();
 
-		$variations = array();
-
-		foreach ( array( 'No' => array( '12', '0' ), 'Yes' => array( '16', '1' ) ) as $label => $set ) {
-			$v = new \WC_Product_Variation();
-			$v->set_parent_id( $product->get_id() );
-			$v->set_attributes( array( 'public-ip' => $label ) );
-			$v->set_regular_price( $set[0] );
-			$v->set_status( 'publish' );
-			$v->update_meta_data( Product::META_PLAN . 'public_ip', $set[1] );
-			$v->save();
-			$variations[ $label ] = $v;
-		}
-
-		$owner = self::factory()->user->create( array( 'user_email' => self::OWNER ) );
-		$sub   = wcs_create_subscription( array( 'customer_id' => $owner, 'billing_period' => 'month', 'billing_interval' => 1 ) );
-		$this->assertInstanceOf( \WC_Subscription::class, $sub );
-		$sub->add_product( $variations['No'], 1 );
-		$sub->save();
-
-		$parent  = wc_get_product( $product->get_id() );
-		$license = $this->service_license( $parent, array( 'product_slug' => (string) $parent->get_meta( \BeltoftLicenses\Software::META_SLUG ), 'variation_id' => $variations['No']->get_id(), 'user_id' => $owner, 'subscription_id' => $sub->get_id(), 'fire' => false, 'email' => self::OWNER ) );
-		$r       = Resource::create( $license, Registry::get( 'proxmox-db' ), Product::plan( $parent->get_id(), $variations['No']->get_id() ) );
-		$this->assertInstanceOf( Resource::class, $r );
-		$this->assertTrue( $r->set( array( 'state' => 'ready', 'desired' => 'ready', 'db_state' => 'ready', 'db_address' => '10.64.0.2' ) ) );
-
-		return array( Resource::find( $r->id() ), $variations );
+		return wc_get_product( $variation->get_id() );
 	}
 
-	public function test_the_add_on_is_a_switch_to_the_sibling_variation_with_its_price(): void {
-		list( $r, $v ) = $this->database_on_pair();
+	public function test_the_access_tab_offers_the_add_on_with_its_price_and_the_restart_note(): void {
+		$this->ipv4_product();
+		$this->pool( 3 );
+		$r = $this->ready_db();
+		wp_set_current_user( (int) $r->license()['user_id'] );
 		add_filter( 'woocommerce_subscriptions_can_item_be_switched_by_user', '__return_true' );
 
-		$this->assertSame( $v['Yes']->get_id(), DbIp::sibling( $r, true )->get_id() );
-		$this->assertNull( DbIp::sibling( $r, false ), 'The plan has no add-on to remove.' );
-
-		$url  = DbIp::switch_url( $r, true );
-		$args = array();
-		wp_parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $args );
-		$this->assertSame( wc_get_checkout_url(), strtok( $url, '?' ) );
-		$this->assertSame( (string) $v['Yes']->get_id(), (string) $args['variation_id'] );
-		$this->assertArrayHasKey( 'switch-subscription', $args );
-		$this->assertStringContainsString( '4.00', DbIp::price_label( $r, true ) );
-		$this->assertStringStartsWith( '+', DbIp::price_label( $r, true ) );
-
-		// The tab offers it with the price and the restart note, when an address can be given.
-		$this->pool( 2 );
 		$html = $this->card( $r );
-		$this->assertStringContainsString( 'Add a public IP address', $html );
+		$this->assertStringContainsString( 'Add an IPv4 address', $html );
 		$this->assertStringContainsString( 'restarts once', $html );
-		$this->assertStringContainsString( 'variation_id=' . $v['Yes']->get_id(), html_entity_decode( $html ) );
+		$this->assertStringContainsString( 'beltoft_services_ipv4_for=' . (int) $r->license()['id'], html_entity_decode( $html ) );
+		$this->assertStringContainsString( '19', $html );
 
 		// With no address to give, it says so and offers nothing.
 		global $wpdb;
@@ -899,9 +841,70 @@ class DbPhase4Test extends TestCase {
 		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i', Schema::tables()['ips'] ) );
 		delete_transient( IpPool::FREE_TRANSIENT );
 		$html = $this->card( $r );
-		$this->assertStringContainsString( 'No public IP address is available right now', $html );
-		$this->assertStringNotContainsString( 'Add a public IP address', $html );
+		$this->assertStringContainsString( 'No IPv4 address is free right now', $html );
+		$this->assertStringNotContainsString( 'Add an IPv4 address', $html );
 		remove_all_filters( 'woocommerce_subscriptions_can_item_be_switched_by_user' );
+	}
+
+	/**
+	 * An IPv4 add-on resource for a database, as the order of the add-on would make it.
+	 */
+	private function ipv4_addon( Resource $db ): Resource {
+		$product = $this->service_product( 'proxmox-ipv4', array(), array( 'slug' => 'ipv4-' . wp_generate_password( 5, false ) ) );
+		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => (int) $db->license()['user_id'], 'email' => self::OWNER ) );
+		$addon   = Resource::create( $license, Registry::get( 'proxmox-ipv4' ), Product::plan( $product->get_id() ), array( 'server_license' => (int) $db->license()['id'] ) );
+		$this->assertInstanceOf( Resource::class, $addon );
+
+		return $addon;
+	}
+
+	public function test_the_ipv4_addon_puts_the_address_on_the_database_and_takes_it_off(): void {
+		$this->pool( 3 );
+		$r      = $this->ready_db();
+		$addon  = $this->ipv4_addon( $r );
+		$driver = Registry::get( 'proxmox-ipv4' );
+
+		$first = $driver->provision( Resource::find( $addon->id() ) );
+		$this->assertTrue( $first->is_poll(), $first->error() );
+		$addon = Resource::find( $addon->id() );
+		$this->assertSame( 'main', $addon->get( \BeltoftServices\Proxmox\Ipv4\Ipv4Meta::ROLE ) );
+		$row = IpPool::for_resource( $r->id() );
+		$this->assertSame( 'held', $row['state'], 'The address is held by the database itself, the way a main address is.' );
+		$this->assertSame( $row['address'], (string) $addon->get( \BeltoftServices\Proxmox\Ipv4\Ipv4Meta::ADDRESS ) );
+		$this->assertSame( '', DbAccess::public_address( Resource::find( $r->id() ) ) );
+		$this->assertTrue( DbIp::wants( Resource::find( $r->id() ) ) );
+
+		// The database's own action puts it on the VM, one restart, and the guest listens on it.
+		$done = $this->drive( $r, DbIp::SYNC_ACTION );
+		$this->assertTrue( $done->is_done(), $done->error() );
+		$this->assertSame( $row['address'], DbAccess::public_address( Resource::find( $r->id() ) ) );
+		$this->assertNotEmpty( $this->calls( 'POST', '/status/shutdown' ) );
+
+		$second = $driver->provision( Resource::find( $addon->id() ) );
+		$this->assertTrue( $second->is_done(), $second->error() );
+
+		// Taking it away: the add-on says so, the database's action removes the NIC, then the address is back in the pool.
+		$gone = $driver->delete( Resource::find( $addon->id() ) );
+		$this->assertTrue( $gone->is_poll(), $gone->error() );
+		$this->assertFalse( DbIp::wants( Resource::find( $r->id() ) ), 'The ended add-on no longer counts.' );
+		$removed = $this->drive( $r, DbIp::SYNC_ACTION );
+		$this->assertTrue( $removed->is_done(), $removed->error() );
+		$this->assertSame( '', DbAccess::public_address( Resource::find( $r->id() ) ) );
+		$this->assertSame( 'free', IpPool::find( $row['address'] )['state'] );
+		$this->assertTrue( $driver->delete( Resource::find( $addon->id() ) )->is_done() );
+	}
+
+	public function test_a_second_ipv4_addon_on_one_database_is_not_delivered(): void {
+		$this->pool( 3 );
+		$r      = $this->ready_db();
+		$driver = Registry::get( 'proxmox-ipv4' );
+		$one    = $this->ipv4_addon( $r );
+		$this->assertTrue( $driver->provision( Resource::find( $one->id() ) )->is_poll() );
+
+		$two = $driver->provision( Resource::find( $this->ipv4_addon( $r )->id() ) );
+
+		$this->assertTrue( $two->is_failed() );
+		$this->assertStringContainsString( 'cannot take another IPv4 address', $two->error() );
 	}
 
 	// -- The allow-list --------------------------------------------------------------------------
@@ -1182,10 +1185,12 @@ class DbPhase4Test extends TestCase {
 	}
 
 	public function test_the_access_tab_without_an_address_offers_the_add_on_or_says_sold_out(): void {
+		$this->ipv4_product();
 		$r = $this->ready_db();
+		wp_set_current_user( (int) $r->license()['user_id'] );
 		$html = $this->card( $r );
 
-		$this->assertStringContainsString( 'No public IP address is available right now', $html, 'The pool is empty.' );
+		$this->assertStringContainsString( 'No IPv4 address is free right now', $html, 'The pool is empty.' );
 		$this->assertStringNotContainsString( 'data-db-access-add', $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
 	}
@@ -1240,7 +1245,7 @@ class DbPhase4Test extends TestCase {
 		$this->assertStringContainsString( 'coming soon', DbNeedsServer::message( false ) );
 		$this->assertStringNotContainsString( 'add-on', DbNeedsServer::message( false ) );
 
-		$this->database_on_pair();
+		$this->ipv4_product();
 		$this->assertStringNotContainsString( 'coming soon', DbNeedsServer::message( true ) );
 		$this->assertStringNotContainsString( 'coming soon', DbNeedsServer::message( false ) );
 		$this->assertStringContainsString( 'add-on', DbNeedsServer::message( false ) );

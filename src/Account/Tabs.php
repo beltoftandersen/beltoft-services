@@ -90,7 +90,7 @@ final class Tabs {
 				'slug'  => ServerLinks::slug(),
 				'label' => __( 'VPS', 'beltoft-services' ),
 				'empty' => __( 'You have no servers yet.', 'beltoft-services' ),
-				'match' => static fn( $license ): bool => self::has_kind( $license, array( 'vm', 'disk', 'snapshot', 'applic' ) ),
+				'match' => static fn( $license ): bool => self::has_kind( $license, array( 'vm', 'disk', 'snapshot', 'applic', 'managed', 'ipv4' ) ),
 			),
 		);
 

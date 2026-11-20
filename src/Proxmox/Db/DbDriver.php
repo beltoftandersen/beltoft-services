@@ -73,7 +73,7 @@ class DbDriver extends ProxmoxDriver {
 			'memory_mb'   => $fields['memory_mb'],
 			'disk_gb'     => array( 'number', __( 'Data disk (GB)', 'beltoft-services' ), __( 'The disk the database lives on. It is part of the backup. Extra storage is added to it.', 'beltoft-services' ), 20, true ),
 			'backup_days' => $fields['backup_days'],
-			'public_ip'   => array( 'number', __( 'Public IP', 'beltoft-services' ), __( '0 or 1. 1 gives the database a public IPv4 address (an add-on: make a variation pair that differs only in this field). Access is closed until the customer adds addresses to the allow-list.', 'beltoft-services' ), 0, true ),
+			'public_ip'   => array( 'number', __( 'Public IP', 'beltoft-services' ), __( 'Only for a database built before the IPv4 address add-on: 1 means it has a public IPv4 address. New databases get theirs from the add-on, not from this field. Access is closed until the customer adds addresses to the allow-list.', 'beltoft-services' ), 0, true ),
 			DbDisk::FIELD => array( 'number', __( 'Extra storage (GB)', 'beltoft-services' ), __( 'Storage added to the data disk (an add-on: variations of one plan that differ only in this field and in the attribute "Extra storage", slug extra-storage). The data disk is the data disk above plus this. It can only grow.', 'beltoft-services' ), 0, true ),
 		);
 
@@ -91,6 +91,7 @@ class DbDriver extends ProxmoxDriver {
 		return DbActions::offered( $r );
 	}
 
+
 	public function act( Resource $r, string $action, array $args ): StepResult {
 		// Shut down and start: the server's own actions, after the database's checks again under the lock.
 		if ( DbPower::is_power( $action ) ) {
@@ -104,6 +105,11 @@ class DbDriver extends ProxmoxDriver {
 			DbPower::after( $r, $action, $result );
 
 			return $result;
+		}
+
+		// The IPv4 add-on asks for the address to be put on the VM or taken off it (see Ipv4\Ipv4Driver).
+		if ( DbIp::SYNC_ACTION === $action ) {
+			return ( new DbIp( Resource::find( $r->id() ) ?? $r ) )->run();
 		}
 
 		if ( DbActions::RESTORE === $action ) {
@@ -220,10 +226,10 @@ class DbDriver extends ProxmoxDriver {
 	}
 
 	/**
-	 * The job that brings the firewall and the guest to the stored allow-list. Queued by the route that stored it.
+	 * The jobs only the plugin queues: the one that brings the firewall and the guest to the stored allow-list (queued by the route that stored it), and the one that puts the IPv4 add-on's address on the VM or takes it off (queued by the add-on).
 	 */
 	public function internal_actions(): array {
-		return array( DbAccess::APPLY );
+		return array( DbAccess::APPLY, DbIp::SYNC_ACTION );
 	}
 
 	public function render_account( Resource $r ): void {

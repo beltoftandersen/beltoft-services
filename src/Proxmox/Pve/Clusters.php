@@ -526,7 +526,7 @@ final class Clusters {
 
 		$nameservers6 = array();
 
-		$given6 = array_key_exists( 'nameservers6', $input ) ? (string) $input['nameservers6'] : implode( ',', (array) ( $clean['nameservers6'] ?? array() ) );
+		$given6 = array_key_exists( 'nameservers6', $input ) ? ( is_array( $input['nameservers6'] ) ? implode( ',', array_map( 'strval', $input['nameservers6'] ) ) : (string) $input['nameservers6'] ) : implode( ',', (array) ( $clean['nameservers6'] ?? array() ) );
 
 		foreach ( preg_split( '/[\s,]+/', $given6, -1, PREG_SPLIT_NO_EMPTY ) as $ns ) {
 			if ( ! \BeltoftServices\Proxmox\Network\Ipv6::is_address( $ns ) ) {

@@ -213,6 +213,8 @@ final class ThankYou {
 			'disk'   => __( 'Open your disk', 'beltoft-services' ),
 			'snapshot' => __( 'Open your server', 'beltoft-services' ),
 			'applic' => __( 'Open your server', 'beltoft-services' ),
+			'managed' => __( 'Open your server', 'beltoft-services' ),
+			'ipv4'   => __( 'Open your server', 'beltoft-services' ),
 			'domain' => __( 'Open your domain', 'beltoft-services' ),
 			'dns'    => __( 'Open your DNS hosting', 'beltoft-services' ),
 			'hosting' => __( 'Open your hosting', 'beltoft-services' ),

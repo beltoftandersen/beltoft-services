@@ -399,13 +399,13 @@ final class DbAccess {
 			);
 		}
 
-		$wanted = DbIp::plan_wants( (array) $r->get( 'plan' ) );
+		$ipv4   = \BeltoftServices\Proxmox\Ipv4\Ipv4Panels::database( $r );
 
 		return array(
 			'address'   => $address,
 			'address6'  => '' === $address || ! Ipv6::databases() ? '' : (string) $r->get( 'ip6' ),
-			'adding'    => 'add' === DbIp::action( $r ) || ( $wanted && '' === $address ),
-			'removing'  => 'remove' === DbIp::action( $r ),
+			'adding'    => 'add' === DbIp::action( $r ) || $ipv4['adding'],
+			'removing'  => $ipv4['removing'],
 			'entries'   => $entries,
 			'world'     => self::world( $r ),
 			'state'     => (string) $r->get( self::STATE ),
@@ -413,10 +413,10 @@ final class DbAccess {
 			'max'       => self::MAX_ENTRIES,
 			'my_ip'     => self::my_ip(),
 			'confirm'   => self::CONFIRM_WORLD,
-			'add_url'   => '' === $address && ! $wanted ? DbIp::switch_url( $r, true ) : '',
-			'add_price' => '' === $address && ! $wanted ? \BeltoftServices\Currency::with_resource( $r, static fn() => DbIp::price_label( $r, true ), '' ) : '',
-			'sold_out'  => '' === $address && ! $wanted && 0 === IpPool::available_for_db(),
-			'remove_url' => '' !== $address && $wanted ? DbIp::switch_url( $r, false ) : '',
+			'add_url'   => $ipv4['add_url'],
+			'add_price' => $ipv4['add_price'],
+			'sold_out'  => $ipv4['sold_out'],
+			'remove_url' => $ipv4['remove_url'],
 		);
 	}
 

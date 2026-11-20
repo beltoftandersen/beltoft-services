@@ -274,6 +274,12 @@ final class LicenceServiceColumn {
 				/* translators: 1: size in GB, 2: server name. */
 				$out[] = $size > 0 ? ( '' !== $on ? sprintf( __( 'Extra disk %1$d GB on %2$s', 'beltoft-services' ), $size, $on ) : sprintf( __( 'Extra disk %d GB', 'beltoft-services' ), $size ) ) : '';
 				break;
+			case 'ipv4':
+				$address = $meta( 'ipv4_address' );
+				$on      = self::server_name( (int) $r->get( 'server_license' ) );
+				/* translators: 1: IPv4 address, 2: server name. */
+				$out[]   = '' !== $address ? ( '' !== $on ? sprintf( __( 'IPv4 address %1$s on %2$s', 'beltoft-services' ), $address, $on ) : sprintf( __( 'IPv4 address %s', 'beltoft-services' ), $address ) ) : '';
+				break;
 			case 'storage':
 				$out[] = $meta( 'storage_name' );
 				break;

@@ -209,7 +209,6 @@ final class Pricing {
 	private static function database_options( int $plan_id ): array {
 		$bare = wc_get_product( $plan_id );
 		$disk = $bare instanceof \WC_Product_Variation ? (int) ( Product::plan( $bare->get_parent_id(), $plan_id )['disk_gb'] ?? 0 ) : 0;
-		$ip   = $bare instanceof \WC_Product_Variation ? Backups::sibling_by( $bare, 'public_ip', true ) : null;
 		$base = self::database_parts( $plan_id, false, 0 );
 		$out  = array(
 			'public_ipv4'     => null,
@@ -222,14 +221,6 @@ final class Pricing {
 			),
 			'max_data_disk_gb' => DbDisk::max_gb(),
 		);
-
-		if ( $ip && is_array( $base ) ) {
-			$with = self::database_parts( $plan_id, true, 0 );
-
-			if ( is_array( $with ) && $with['ip'] > 0 ) {
-				$out['public_ipv4'] = self::adds( (float) $with['ip'] );
-			}
-		}
 
 		foreach ( $bare instanceof \WC_Product_Variation ? array_keys( DbDisk::ladder( $bare ) ) : array() as $gb ) {
 			if ( $gb < 1 ) {
@@ -244,6 +235,14 @@ final class Pricing {
 		}
 
 		return $out;
+	}
+
+	/**
+	 * Why a public IPv4 address cannot be put in an order made here: it is an add-on with its own subscription, bought from the
+	 * server or database page in the dashboard.
+	 */
+	public static function ipv4_text(): string {
+		return __( 'An IPv4 address is an add-on with its own subscription. Add it from the server or the database in the dashboard, once the service is ready.', 'beltoft-services' );
 	}
 
 	/**
@@ -262,11 +261,7 @@ final class Pricing {
 		}
 
 		if ( $ip ) {
-			$target = Backups::sibling_by( $target, 'public_ip', true );
-
-			if ( null === $target ) {
-				return __( 'This plan has no public IPv4 address option.', 'beltoft-services' );
-			}
+			return self::ipv4_text();
 		}
 
 		if ( $gb > 0 ) {
@@ -321,8 +316,12 @@ final class Pricing {
 		$parts   = null;
 
 		if ( $server ) {
-			if ( $ip || $gb > 0 ) {
-				return $fail( __( 'A public IPv4 address and extra storage are for databases. A server plan can have daily backups and an extra disk (extra_disk_gb).', 'beltoft-services' ) );
+			if ( $ip ) {
+				return $fail( self::ipv4_text() );
+			}
+
+			if ( $gb > 0 ) {
+				return $fail( __( 'Extra storage is for databases. A server plan can have daily backups and an extra disk (extra_disk_gb).', 'beltoft-services' ) );
 			}
 
 			$disk = null;

@@ -152,7 +152,7 @@ class ProxmoxDriver implements Driver, StopsOnDelete, NeedsBilling, InternalActi
 			'public_ip' => array(
 				'number',
 				__( 'Public IPv4', 'beltoft-services' ),
-				__( '1 (the default) gives the server a public IPv4 address from the pool. 0 makes a server with IPv6 only (VPS Basic). To sell the address as an add-on, make a variation pair that differs only in this field and in one attribute.', 'beltoft-services' ),
+				__( '1 (the default) gives the server a public IPv4 address from the pool. 0 makes a server with IPv6 only (VPS Basic); the IPv4 address add-on can give it an address later.', 'beltoft-services' ),
 				1,
 				true,
 			),

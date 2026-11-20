@@ -9,19 +9,16 @@ namespace BeltoftServices\Mcp;
 
 use BeltoftServices\Account\DbPicker;
 use BeltoftServices\Account\ServerPicker;
-use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Db\DbDisk;
 use BeltoftServices\Proxmox\Db\DbDiskField;
-use BeltoftServices\Proxmox\Db\DbIpField;
 use BeltoftServices\Proxmox\Db\DbTermsField;
-use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Usage\Rates;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * The counterpart of order_server, and it uses the same machinery: the rules and the order are those of the dashboard's
- * database page (DbPicker::process() puts the plan in the cart, DbIpField::swap() and DbDiskField::swap() make the choices
+ * database page (DbPicker::process() puts the plan in the cart, DbDiskField::swap() makes the choice
  * the checkout's own boxes make) and WooCommerce's own checkout inside the Sandbox, through Purchase::execute(). A database
  * is sold pay as you go through Claude: the order is a pay as you go variation at 0, never a fixed monthly one. A customer
  * without a usage account gets a link and nothing is ordered.
@@ -112,12 +109,11 @@ final class PurchaseDb {
 			return $quote;
 		}
 
-		// The choices must be ones that can be bought now: a free address (room on a node is not asked).
-		$bare = wc_get_product( (int) $plan['variation_id'] );
-		$with = $bare instanceof \WC_Product_Variation && $ip ? Backups::sibling_by( $bare, 'public_ip', true ) : $bare;
+		// The choices must be ones that can be bought now. A public IPv4 address is an add-on of its own, bought in the dashboard.
+		$with = wc_get_product( (int) $plan['variation_id'] );
 
-		if ( $ip && ( ! $with || IpPool::available_for_db() < 1 || ! $with->is_purchasable() || ! $with->is_in_stock() ) ) {
-			return $fail( __( 'No public IPv4 address is free right now. Order without it, or try again later.', 'beltoft-services' ) );
+		if ( $ip ) {
+			return $fail( Pricing::ipv4_text() );
 		}
 
 		if ( $gb > 0 && $with instanceof \WC_Product_Variation ) {
@@ -143,10 +139,6 @@ final class PurchaseDb {
 
 			if ( null !== $added ) {
 				return $added;
-			}
-
-			if ( $ip && ! DbIpField::swap( true )['ok'] ) {
-				return __( 'The public IPv4 address could not be added. Order without it, or try again later.', 'beltoft-services' );
 			}
 
 			if ( $gb > 0 && ! DbDiskField::swap( $gb )['ok'] ) {

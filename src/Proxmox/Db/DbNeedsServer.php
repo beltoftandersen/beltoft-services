@@ -65,8 +65,8 @@ final class DbNeedsServer {
 	 */
 	public static function message( bool $html ): string {
 		if ( self::addon_offered() ) {
-			$first = __( 'A database is reachable over a private network from your servers with us. Without a server with us, you need the public IP address add-on to reach the database from elsewhere.', 'beltoft-services' );
-			$then  = __( 'Choose the plan with a public IP address.', 'beltoft-services' );
+			$first = __( 'A database is reachable over a private network from your servers with us. Without a server with us, you need the IPv4 address add-on to reach the database from elsewhere.', 'beltoft-services' );
+			$then  = __( 'Add an IPv4 address to the database in this order.', 'beltoft-services' );
 			$link  = __( 'Contact us if you have a question.', 'beltoft-services' );
 		} else {
 			// The shop sells no public IP plan for this database (yet): the add-on is not promised.
@@ -83,39 +83,10 @@ final class DbNeedsServer {
 	}
 
 	/**
-	 * Does the shop sell a database plan with a public IP address (a published variation whose plan has public_ip)?
+	 * Does the shop sell the IPv4 address add-on (a published product with the add-on's driver)?
 	 */
 	private static function addon_offered(): bool {
-		$ids = get_posts(
-			array(
-				'post_type'   => 'product_variation',
-				'post_status' => 'publish',
-				'fields'      => 'ids',
-				'numberposts' => 20,
-				'meta_query'  => array( array( 'key' => Product::META_PLAN . 'public_ip', 'value' => '1' ) ), // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- a few variations, once per page.
-			)
-		);
-
-		foreach ( $ids as $id ) {
-			$parent = (int) wp_get_post_parent_id( $id );
-
-			if ( $parent > 0 && 'publish' === get_post_status( $parent ) && null !== self::database_cluster_raw( $parent ) ) {
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	/**
-	 * Is this a database product (any plan)?
-	 *
-	 * @param int $product_id Product id.
-	 */
-	private static function database_cluster_raw( int $product_id ): ?string {
-		$driver = Product::driver_for( $product_id );
-
-		return $driver && DbDriver::ID === $driver->id() ? '' : null;
+		return null !== \BeltoftServices\Proxmox\Ipv4\Ipv4Cart::product();
 	}
 
 	/**
@@ -134,7 +105,7 @@ final class DbNeedsServer {
 		$plan = Product::plan( $product_id, $variation_id > 0 ? $variation_id : null );
 
 		// A database with a public IP address is reached from anywhere: it needs no server with us, so no notice.
-		if ( DbIp::plan_wants( $plan ) ) {
+		if ( DbIp::plan_wants( $plan ) || \BeltoftServices\Proxmox\Ipv4\Ipv4Cart::in_cart( 'cart_server' ) > 0 ) {
 			return null;
 		}
 

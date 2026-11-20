@@ -1,16 +1,14 @@
 <?php
 /**
- * The public IPv4 add-on of a managed database: a variation of the plan, applied to the VM as net0.
+ * The public IPv4 address of a managed database, applied to the VM as net0.
  *
  * @package BeltoftServices
  */
 
 namespace BeltoftServices\Proxmox\Db;
 
-use BeltoftServices\Billing\SwitchGuard;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Network\Firewall;
 use BeltoftServices\Proxmox\Network\IpHistory;
 use BeltoftServices\Proxmox\Network\IpPool;
@@ -26,8 +24,9 @@ use BeltoftServices\Settings;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The add-on is a pair of variations that differ in the plan field `public_ip` (0 or 1), like Backups. Switching the
- * subscription changes the plan, and DbDriver::update_plan hands the change to this class, which makes the VM match:
+ * The address is the IPv4 add-on (Ipv4\Ipv4Driver): a subscription of its own linked to the database. The add-on takes the
+ * address from the pool and queues the action `db_ip_sync` on the database, which runs this class; `wanted()` reads the
+ * add-on (and, for a database built before the add-on, the plan field `public_ip`) and makes the VM match:
  *
  * - add: take an address from the pool (IpPool::hold), shut the VM down, write net0 and ipconfig0 and read them back,
  *   start it, tell the guest to listen on the new address and to put it in its certificate (the `listen` job), apply an
@@ -47,6 +46,9 @@ final class DbIp {
 	/** Meta: the operation in progress (action, phase, flags). */
 	public const OP = 'db_ip_op';
 
+	/** The plugin action the IPv4 add-on queues on the database to make its VM match the add-on. */
+	public const SYNC_ACTION = 'db_ip_sync';
+
 	/** Meta: a restore put the backup's guest layers back; the listen addresses and the allow-list are sent again. */
 	public const RESYNC = 'db_resync';
 
@@ -61,12 +63,22 @@ final class DbIp {
 	}
 
 	/**
-	 * Does the plan have the public IP add-on?
+	 * Does the plan have the public IP (a database built before the IPv4 add-on: plan field `public_ip`)? No product sells it
+	 * any more; a database that has it keeps its address.
 	 *
 	 * @param array<string, mixed> $plan Plan.
 	 */
 	public static function plan_wants( array $plan ): bool {
 		return (int) ( $plan['public_ip'] ?? 0 ) > 0;
+	}
+
+	/**
+	 * Should the database have a public IPv4 address: an IPv4 add-on holds a place for it, or its old plan has one.
+	 *
+	 * @param Resource $r Database.
+	 */
+	public static function wants( Resource $r ): bool {
+		return self::plan_wants( (array) $r->get( 'plan' ) ) || \BeltoftServices\Proxmox\Ipv4\Ipv4Meta::db_wants( $r );
 	}
 
 	/**
@@ -103,7 +115,7 @@ final class DbIp {
 
 		$row = IpPool::for_resource( $r->id() );
 
-		if ( self::plan_wants( (array) $r->get( 'plan' ) ) ) {
+		if ( self::wants( $r ) ) {
 			$change = null === $row || 'assigned' !== $row['state'] ? 'add' : '';
 		} else {
 			$change = null !== $row ? 'remove' : '';
@@ -203,75 +215,6 @@ final class DbIp {
 
 		return Ipv6::strip( $have_ip ) === Ipv6::strip( $want['ipconfig0'] ) && $ip6_ok
 			&& ( $have['bridge'] ?? '' ) === ( $expect['bridge'] ?? '' ) && ( $have['tag'] ?? '' ) === ( $expect['tag'] ?? '' ) && '1' === ( $have['firewall'] ?? '' );
-	}
-
-	// -- The shop side --------------------------------------------------------------------------------
-
-	/**
-	 * The refusal of a switch to a variation with the add-on while no address can be given (an existing customer's
-	 * switch is let through by Stock, so the pool is checked here). Empty when the switch may go on.
-	 *
-	 * @param int                  $subscription_id Subscription id.
-	 * @param int                  $product_id      Target product.
-	 * @param array<string, mixed> $target          Target plan.
-	 * @param mixed                $item            The line item switched.
-	 */
-	public static function switch_error( int $subscription_id, int $product_id, array $target, $item ): string {
-		if ( ! self::plan_wants( $target ) ) {
-			return '';
-		}
-
-		foreach ( SwitchGuard::resources( $subscription_id, $item, DbDriver::ID, $product_id ) as $resource ) {
-			if ( null === IpPool::for_resource( $resource->id() ) && 0 === IpPool::available_for_db() ) {
-				return __( 'No public IP address is available right now. Please try again later.', 'beltoft-services' );
-			}
-
-			// The new address reaches the guest through its agent: a stopped database cannot take it (the add would wait out its budget and fail after payment).
-			if ( DbPower::stopped( $resource ) ) {
-				return __( 'Start the database before you add the public IP address.', 'beltoft-services' );
-			}
-		}
-
-		return '';
-	}
-
-	/**
-	 * The link that switches the subscription to the variation with or without the public IP (the same WooCommerce
-	 * Subscriptions switch as for backups). Empty when there is none.
-	 *
-	 * @param Resource $r    Resource.
-	 * @param bool     $with Whether the target has the public IP.
-	 */
-	public static function switch_url( Resource $r, bool $with ): string {
-		$sibling = self::sibling( $r, $with );
-
-		return null === $sibling ? '' : Backups::switch_to( $r, $sibling );
-	}
-
-	/**
-	 * "+€4.00 / month" of the variation with the public IP, or its removal. Empty when there is none.
-	 *
-	 * @param Resource $r    Resource.
-	 * @param bool     $with Whether the target has the public IP.
-	 */
-	public static function price_label( Resource $r, bool $with ): string {
-		$variation = wc_get_product( (int) ( $r->license()['variation_id'] ?? 0 ) );
-		$sibling   = self::sibling( $r, $with );
-
-		return $variation instanceof \WC_Product_Variation && null !== $sibling ? Backups::price_difference( $variation, $sibling ) : '';
-	}
-
-	/**
-	 * The other variation of the pair.
-	 *
-	 * @param Resource $r    Resource.
-	 * @param bool     $with Whether the sibling has the public IP.
-	 */
-	public static function sibling( Resource $r, bool $with ): ?\WC_Product_Variation {
-		$id        = (int) ( $r->license()['variation_id'] ?? 0 );
-		$variation = $id > 0 && function_exists( 'wc_get_product' ) ? wc_get_product( $id ) : null;
-
-		return $variation instanceof \WC_Product_Variation ? Backups::sibling_by( $variation, 'public_ip', $with ) : null;
 	}
 
 	// -- The operation ---------------------------------------------------------------------------------

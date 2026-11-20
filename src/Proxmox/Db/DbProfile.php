@@ -41,12 +41,12 @@ final class DbProfile implements BuildProfile {
 	}
 
 	public function uses_public_ip(): bool {
-		return DbIp::plan_wants( (array) $this->r->get( 'plan' ) );
+		return DbIp::wants( $this->r );
 	}
 
 	/**
 	 * The customer has paid for the address: it is taken even when only the ones kept for servers are left.
-	 * (The shop does not sell the add-on in that case, see IpPool::available_for_db().)
+	 * (The shop does not sell the add-on in that case, see IpPool::available_for_addon().)
 	 */
 	public function hold_address( int $resource_id ): ?array {
 		return $this->uses_public_ip() ? IpPool::hold( $resource_id ) : null;

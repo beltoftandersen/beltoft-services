@@ -17,7 +17,6 @@ use BeltoftServices\Proxmox\Db\DbDisk;
 use BeltoftServices\Proxmox\Db\DbDiskField;
 use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\Proxmox\Db\DbIp;
-use BeltoftServices\Proxmox\Db\DbIpField;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
@@ -460,7 +459,7 @@ final class Breakdown {
 	 * "Billed by the hour, like the database." under the add-on fields of a pay-as-you-go line at checkout.
 	 */
 	public static function addon_note(): void {
-		$database = DbIpField::cart_database() ?? DbDiskField::cart_database();
+		$database = DbDiskField::cart_database();
 		$server   = null === $database ? BackupField::cart_server() : null;
 		$usage    = $database ? $database['variation'] : ( $server ? $server['variation'] : null );
 

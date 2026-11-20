@@ -432,6 +432,16 @@ final class IpPool {
 	}
 
 	/**
+	 * How many addresses are free right now: read from the table, never from the cache or into it.
+	 */
+	public static function free_now(): int {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- fresh on purpose.
+		return (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM %i WHERE state = 'free'", Schema::tables()['ips'] ) );
+	}
+
+	/**
 	 * Addresses kept for new dedicated servers (setting `ip_reserve_for_vps`, default 1): an IPv4 add-on is not sold
 	 * while no more than this many are free, so the last address always stays available to a new server.
 	 */
@@ -453,7 +463,7 @@ final class IpPool {
 	private static function changed(): void {
 		delete_transient( self::FREE_TRANSIENT );
 		Stock::sync();
-		\BeltoftServices\Proxmox\Ipv4\Ipv4Alerts::pool_changed( self::free_count() );
+		\BeltoftServices\Proxmox\Ipv4\Ipv4Alerts::pool_changed();
 	}
 
 	/**

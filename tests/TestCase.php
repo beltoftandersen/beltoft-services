@@ -54,6 +54,8 @@ abstract class TestCase extends \WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		// The IPv4 pool mails (running low, empty) are the subject of their own test; elsewhere an emptied pool must not add a mail.
+		add_filter( 'beltoft_services_ipv4_alerts', '__return_false' );
 		// The hosting usage memo outlives a test; the tables and options behind it are reset around each one.
 		\BeltoftServices\Hosting\HostingCapacity::forget();
 		// The per-request read memo is a static: a test that opened an account page or switched it on must not leave it on.

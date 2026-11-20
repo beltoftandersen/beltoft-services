@@ -186,7 +186,7 @@ $beltoft_services_db_wait = array(
 	<?php if ( 'ready' === $view['kind'] && ( $beltoft_services_all || 'access' === $active ) ) : ?>
 		<?php $beltoft_services_access = $view['access']; ?>
 		<div class="beltoft-services-vm__more beltoft-services-db__access" data-db-access data-confirm-remove="<?php esc_attr_e( 'Remove this address from the list?', 'beltoft-services' ); ?>">
-			<h4><?php esc_html_e( 'Public IP address', 'beltoft-services' ); ?></h4>
+			<h4><?php esc_html_e( 'IPv4 address', 'beltoft-services' ); ?></h4>
 			<?php if ( '' !== $beltoft_services_access['address'] ) : ?>
 				<p><?php esc_html_e( 'Address:', 'beltoft-services' ); ?> <code><?php echo esc_html( (string) $beltoft_services_access['address'] ); ?></code> <?php esc_html_e( 'Port:', 'beltoft-services' ); ?> <code><?php echo esc_html( (string) $view['port'] ); ?></code></p>
 				<?php if ( '' !== (string) ( $beltoft_services_access['address6'] ?? '' ) ) : ?>
@@ -196,16 +196,16 @@ $beltoft_services_db_wait = array(
 					<p><?php esc_html_e( 'The public IP address is being removed. Your database restarts once.', 'beltoft-services' ); ?></p>
 				<?php elseif ( '' !== $beltoft_services_access['remove_url'] ) : ?>
 					<p class="description"><?php esc_html_e( 'Applications that connect through this address will stop working when it is removed. Your database restarts once, which takes about a minute.', 'beltoft-services' ); ?></p>
-					<p><a class="button woocommerce-button" href="<?php echo esc_url( (string) $beltoft_services_access['remove_url'] ); ?>"><?php esc_html_e( 'Remove the public IP address', 'beltoft-services' ); ?></a></p>
+					<p><a class="button woocommerce-button" href="<?php echo esc_url( (string) $beltoft_services_access['remove_url'] ); ?>"><?php esc_html_e( 'Remove the IPv4 address', 'beltoft-services' ); ?></a></p>
 				<?php endif; ?>
 			<?php elseif ( $beltoft_services_access['adding'] ) : ?>
 				<p><?php esc_html_e( 'Your public IP address is being added. Your database restarts once, which takes about a minute. The address appears here when it is ready. You can leave this page.', 'beltoft-services' ); ?></p>
 			<?php elseif ( $beltoft_services_access['sold_out'] ) : ?>
-				<p><?php esc_html_e( 'No public IP address is available right now. Please try again later.', 'beltoft-services' ); ?></p>
+				<p><?php esc_html_e( 'No IPv4 address is free right now.', 'beltoft-services' ); ?></p>
 			<?php elseif ( '' !== $beltoft_services_access['add_url'] ) : ?>
 				<p><?php esc_html_e( 'Your database is reachable from your servers on the private network. A public IP address makes it reachable from elsewhere too, for the addresses you allow.', 'beltoft-services' ); ?></p>
 				<p class="description"><?php echo esc_html( '' !== $beltoft_services_access['add_price'] ? sprintf( /* translators: %s: the price per period, such as +€4.00 / month */ __( 'Price: %s. Your database restarts once, which takes about a minute.', 'beltoft-services' ), $beltoft_services_access['add_price'] ) : __( 'Your database restarts once, which takes about a minute.', 'beltoft-services' ) ); ?></p>
-				<p><a class="button woocommerce-button" href="<?php echo esc_url( (string) $beltoft_services_access['add_url'] ); ?>"><?php esc_html_e( 'Add a public IP address', 'beltoft-services' ); ?></a></p>
+				<p><a class="button woocommerce-button" href="<?php echo esc_url( (string) $beltoft_services_access['add_url'] ); ?>"><?php esc_html_e( 'Add an IPv4 address', 'beltoft-services' ); ?></a></p>
 			<?php else : ?>
 				<p><?php esc_html_e( 'This database has no public IP address. It is reachable from your servers on the private network.', 'beltoft-services' ); ?></p>
 			<?php endif; ?>

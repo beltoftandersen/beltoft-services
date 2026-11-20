@@ -192,7 +192,7 @@ final class DbDisk {
 
 	/**
 	 * The refusal of a switch of a database subscription to a variation with less data disk, or with extra storage that
-	 * the settings do not allow or that does not fit on the node now. Then the public IP checks. Empty when the switch
+	 * the settings do not allow or that does not fit on the node now. Empty when the switch
 	 * may go on.
 	 *
 	 * @param int                  $subscription_id Subscription id.
@@ -214,7 +214,7 @@ final class DbDisk {
 			}
 		}
 
-		return DbIp::switch_error( $subscription_id, $product_id, $target, $item );
+		return '';
 	}
 
 	/**

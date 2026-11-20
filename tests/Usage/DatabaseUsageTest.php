@@ -13,7 +13,6 @@ use BeltoftServices\Account\ServerPicker;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Db\DbDiskField;
-use BeltoftServices\Proxmox\Db\DbIpField;
 use BeltoftServices\Resource;
 use BeltoftServices\Usage\BillingField;
 use BeltoftServices\Usage\Catalog;
@@ -231,14 +230,10 @@ class DatabaseUsageTest extends UsageTestCase {
 		BillingField::enforce();
 		$this->assertSame( $v['u-1-0']->get_id(), $this->in_cart(), 'Monthly with the public IP becomes its pay as you go twin.' );
 
-		// The public IP off and extra storage on keep the billing model (storage needs room on a node).
+		// Extra storage on keeps the billing model (storage needs room on a node).
 		$this->assertTrue( \BeltoftServices\Proxmox\Pve\DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
 		\BeltoftServices\Proxmox\Vm\Stock::sync( 'lab' );
-		$this->assertTrue( DbIpField::swap( false )['ok'] );
-		$this->assertSame( $v['u-0-0']->get_id(), $this->in_cart() );
 		$this->assertTrue( DbDiskField::swap( 50 )['ok'] );
-		$this->assertSame( $v['u-0-50']->get_id(), $this->in_cart() );
-		$this->assertTrue( DbIpField::swap( true )['ok'] );
 		$this->assertSame( $v['u-1-50']->get_id(), $this->in_cart() );
 
 		WC()->cart->empty_cart();
