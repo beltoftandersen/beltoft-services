@@ -13,9 +13,9 @@
 
 	var root = document.querySelector( '[data-bs-handoff]' );
 	var next = root ? root.getAttribute( 'data-next' ) : '';
-	var MIN = 600;
-	var EVENT_TIMEOUT = 2000;
-	var MAX = 2200;
+	var MIN = 1500;
+	var EVENT_TIMEOUT = 3800;
+	var MAX = 4000;
 	var started = Date.now();
 	var left = false;
 	var asked = false;
