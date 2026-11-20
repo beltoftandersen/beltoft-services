@@ -345,7 +345,7 @@ final class PaidAppUsageTest extends PaidAppCase {
 		update_post_meta( $this->usage['basic']->get_id(), Rates::META_MONTHLY . '_DKK', '30' );
 		$this->assertSame( $why, \BeltoftServices\Apps\PleskLicence::spend_problem( $licence, 'basic' ), '33 DKK is 4.34 euro: under.' );
 
-		update_post_meta( $monthly->get_id(), '_test_price_DKK', '' );
+		update_post_meta( $this->usage['basic']->get_id(), Rates::META_MONTHLY . '_DKK', '' );
 		$this->assertSame( $why, \BeltoftServices\Apps\PleskLicence::spend_problem( $licence, 'basic' ), 'No DKK price: no cap, refused.' );
 		remove_filter( 'pre_wp_mail', '__return_true' );
 	}

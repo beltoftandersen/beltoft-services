@@ -27,10 +27,6 @@ final class PaygPanel {
 	 * Registers the hooks.
 	 */
 	public static function register(): void {
-		// The premium field of Usage\CoreHooks is replaced by this block's own.
-		remove_action( 'beltoft_services_product_panel_after_reminder', array( \BeltoftServices\Usage\CoreHooks::class, 'premium_field' ), 10 );
-		remove_action( 'beltoft_services_product_save', array( \BeltoftServices\Usage\CoreHooks::class, 'save_premium' ), 30 );
-
 		add_action( 'beltoft_services_product_panel_after_reminder', array( __CLASS__, 'block' ), 10, 2 );
 		add_action( 'beltoft_services_product_save', array( __CLASS__, 'save' ), 30, 2 );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'assets' ) );
