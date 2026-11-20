@@ -72,13 +72,13 @@ class CacheablePriceTest extends UsageTestCase {
 
 	public function test_a_usage_tag_gets_the_figure_of_each_currency_and_nothing_where_there_is_none(): void {
 		$v  = $this->usage_product();
-		$id = $v['m-None']->get_id();
+		$id = $v['u-None']->get_id();
 		$this->every_currency();
 
 		$out = apply_filters( 'bricks/dynamic_data/render_content', '{beltoft_usage_cap:' . $id . '}', null, 'text' );
 		$this->assertSame( 'EUR:€16.50 | DKK:-', $out, 'No DKK price: no variant, and never the euro figure relabelled.' );
 
-		$this->fake_price( $id, 'DKK', '120' );
+		$this->fake_price( $v['m-None']->get_id(), 'DKK', '120' );
 		$out = apply_filters( 'bricks/dynamic_data/render_content', '{beltoft_usage_cap:' . $id . '}', null, 'text' );
 		$this->assertStringStartsWith( 'EUR:€16.50 | DKK:', $out );
 		$this->assertStringContainsString( '132', $out, 'The DKK plan (120 plus the 10 percent premium).' );
@@ -119,7 +119,7 @@ class CacheablePriceTest extends UsageTestCase {
 
 	public function test_with_no_listener_and_one_currency_every_converted_output_is_what_it_was(): void {
 		$v  = $this->usage_product();
-		$id = $v['m-None']->get_id();
+		$id = $v['u-None']->get_id();
 
 		$this->assertSame( '€16.50', Catalog::value( 'beltoft_usage_cap', $id ) );
 		$this->assertSame( '€16.50', apply_filters( 'bricks/dynamic_data/render_content', '{beltoft_usage_cap:' . $id . '}', null, 'text' ) );

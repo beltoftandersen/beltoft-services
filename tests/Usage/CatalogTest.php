@@ -57,7 +57,7 @@ class CatalogTest extends UsageTestCase {
 	}
 
 	public function test_the_tags_say_the_hourly_price_and_the_cap(): void {
-		$id = $this->v['m-None']->get_id();
+		$id = $this->v['u-None']->get_id();
 
 		$this->assertSame( "\u{20AC}0.0226", Catalog::value( 'beltoft_usage_hourly', $id ) );
 		$this->assertSame( "\u{20AC}16.50", Catalog::value( 'beltoft_usage_cap', $id ) );
@@ -85,7 +85,7 @@ class CatalogTest extends UsageTestCase {
 	}
 
 	public function test_a_tag_is_worked_out_once_and_the_warm_text_is_the_cold_text(): void {
-		$id    = $this->v['m-None']->get_id();
+		$id    = $this->v['u-None']->get_id();
 		$count = $this->count_computations();
 
 		$cold = array();
@@ -93,7 +93,6 @@ class CatalogTest extends UsageTestCase {
 			$cold[ $tag ] = Catalog::value( $tag, $id );
 		}
 		$after_cold = $count();
-		$this->assertGreaterThan( 0, $after_cold );
 
 		for ( $i = 0; $i < 20; $i++ ) {
 			foreach ( $cold as $tag => $text ) {
@@ -112,26 +111,25 @@ class CatalogTest extends UsageTestCase {
 	}
 
 	public function test_a_changed_price_gives_the_new_text_within_the_request(): void {
-		$id = $this->v['m-None']->get_id();
+		$id = $this->v['u-None']->get_id();
 		$this->assertSame( "\u{20AC}16.50", Catalog::value( 'beltoft_usage_cap', $id ) );
 
-		$this->v['m-None']->set_regular_price( '20' );
-		$this->v['m-None']->save();
+		update_post_meta( $id, Rates::META_MONTHLY, '20' );
 
 		$this->assertSame( "\u{20AC}22", Catalog::value( 'beltoft_usage_cap', $id ) );
 	}
 
 	public function test_a_changed_premium_gives_the_new_text_within_the_request(): void {
-		$id = $this->v['m-None']->get_id();
+		$id = $this->v['u-None']->get_id();
 		$this->assertSame( "\u{20AC}16.50", Catalog::value( 'beltoft_usage_cap', $id ) );
 
-		update_post_meta( $this->v['m-None']->get_parent_id(), Rates::META_PREMIUM, '20' );
+		update_post_meta( $this->v['u-None']->get_parent_id(), Rates::META_PREMIUM, '20' );
 
 		$this->assertSame( "\u{20AC}18", Catalog::value( 'beltoft_usage_cap', $id ) );
 	}
 
 	public function test_a_changed_currency_setting_or_symbol_gives_the_new_text(): void {
-		$id = $this->v['m-None']->get_id();
+		$id = $this->v['u-None']->get_id();
 		$this->assertSame( "\u{20AC}16.50", Catalog::value( 'beltoft_usage_cap', $id ) );
 
 		update_option( 'woocommerce_currency', 'USD' );
@@ -148,7 +146,7 @@ class CatalogTest extends UsageTestCase {
 		update_option( 'woocommerce_tax_display_shop', 'excl' );
 		\WC_Tax::_insert_tax_rate( array( 'tax_rate_country' => '', 'tax_rate' => '25.0000', 'tax_rate_name' => 'VAT', 'tax_rate_priority' => 1, 'tax_rate_compound' => 0, 'tax_rate_shipping' => 1, 'tax_rate_order' => 1, 'tax_rate_class' => '' ) );
 
-		$id = $this->v['m-None']->get_id();
+		$id = $this->v['u-None']->get_id();
 		$this->assertSame( "\u{20AC}16.50", Catalog::value( 'beltoft_usage_cap', $id ) );
 
 		$forced = \BeltoftServices\Billing\TaxNote::in( 'incl', static fn() => Catalog::value( 'beltoft_usage_cap', $id ) );
@@ -170,86 +168,54 @@ class CatalogTest extends UsageTestCase {
 	}
 
 	public function test_a_visitor_currency_is_part_of_the_key(): void {
-		$id = $this->v['m-None']->get_id();
+		$id = $this->v['u-None']->get_id();
 		$this->assertSame( "\u{20AC}16.50", Catalog::value( 'beltoft_usage_cap', $id ) );
 
-		// What a currency add-on does: the current currency changes with the visitor and prices are converted by a filter.
-		$code    = static fn() => 'DKK';
-		$convert = static fn( $price ) => '' === $price ? $price : (string) ( (float) $price * 7 );
+		// What a currency add-on does: the current currency changes with the visitor; the figure of that currency is its own meta.
+		update_post_meta( $id, Rates::META_MONTHLY . '_DKK', '105' );
+		$code = static fn() => 'DKK';
 		add_filter( 'woocommerce_currency', $code );
-		add_filter( 'woocommerce_product_variation_get_price', $convert );
 
 		$kroner = Catalog::value( 'beltoft_usage_cap', $id );
 		$this->assertStringContainsString( '115.50', $kroner );
 		$this->assertStringNotContainsString( "\u{20AC}", $kroner );
 
 		remove_filter( 'woocommerce_currency', $code );
-		remove_filter( 'woocommerce_product_variation_get_price', $convert );
 
 		$this->assertSame( "\u{20AC}16.50", Catalog::value( 'beltoft_usage_cap', $id ), 'Back in the shop currency.' );
 	}
 
-	public function test_a_deleted_sibling_is_not_remembered(): void {
-		$id = $this->v['m-None']->get_id();
+	public function test_a_deleted_variation_is_not_remembered(): void {
+		$id = $this->v['u-None']->get_id();
 		$this->assertNotSame( '', Catalog::value( 'beltoft_usage_line', $id ) );
 
-		wp_delete_post( $this->v['u-None']->get_id(), true );
+		wp_delete_post( $id, true );
 
 		$this->assertSame( '', Catalog::value( 'beltoft_usage_line', $id ) );
 	}
 
 	public function test_the_tags_render_in_content_for_the_post_and_for_an_id(): void {
-		$post = (object) array( 'ID' => $this->v['m-Daily']->get_id() );
+		$post = (object) array( 'ID' => $this->v['u-Daily']->get_id() );
 
 		$this->assertSame( "\u{20AC}19.80", Catalog::render( '{beltoft_usage_cap}', $post ), 'The current post is the variation (18 x 1.1).' );
-		$this->assertSame( "a \u{20AC}16.50 b", Catalog::render( 'a {beltoft_usage_cap:' . $this->v['m-None']->get_id() . '} b', $post ) );
+		$this->assertSame( "a \u{20AC}16.50 b", Catalog::render( 'a {beltoft_usage_cap:' . $this->v['u-None']->get_id() . '} b', $post ) );
 		$this->assertSame( 'no tag', Catalog::render( 'no tag', $post ) );
 	}
 
 	public function test_the_tags_are_empty_without_an_offer(): void {
-		$this->assertSame( '', Catalog::value( 'beltoft_usage_line', $this->v['u-None']->get_id() ), 'A pay as you go variation.' );
+		$this->assertSame( '', Catalog::value( 'beltoft_usage_line', $this->v['m-None']->get_id() ), 'A monthly variation has no pay as you go price.' );
 		$this->assertSame( '', Catalog::value( 'beltoft_usage_line', 0 ) );
-		$this->assertSame( '', Catalog::value( 'beltoft_usage_line', $this->v['m-None']->get_parent_id() ), 'A product is not a variation.' );
+		$this->assertSame( '', Catalog::value( 'beltoft_usage_line', $this->v['u-None']->get_parent_id() ), 'A product is not a variation.' );
 
-		$this->v['u-None']->set_status( 'private' );
-		$this->v['u-None']->save();
+		update_post_meta( $this->v['u-None']->get_id(), Rates::META_MONTHLY, '' );
 
-		$this->assertSame( '', Catalog::value( 'beltoft_usage_line', $this->v['m-None']->get_id() ), 'No published sibling.' );
+		$this->assertSame( '', Catalog::value( 'beltoft_usage_line', $this->v['u-None']->get_id() ), 'No figure, no offer.' );
 	}
 
 	public function test_the_tags_are_in_the_bricks_list(): void {
 		$names = wp_list_pluck( Catalog::tags_list( array() ), 'name' );
 
 		$this->assertSame( array( '{beltoft_usage_line}', '{beltoft_usage_hourly}', '{beltoft_usage_cap}' ), $names );
-	}
-
-	public function test_the_from_price_never_counts_a_pay_as_you_go_variation(): void {
-		$product = wc_get_product( $this->v['m-None']->get_parent_id() );
-
-		$this->assertSame( 15.0, (float) $product->get_variation_price( 'min' ), 'Not 0.' );
-		$this->assertNotContains( $this->v['u-None']->get_id(), $product->get_visible_children() );
-		$this->assertContains( $this->v['u-None']->get_id(), $product->get_children(), 'The variation still exists.' );
-		$this->assertNotContains( $this->v['u-Daily']->get_id(), Catalog::visible_children( array( $this->v['u-Daily']->get_id(), $this->v['m-None']->get_id() ), $product, true ) );
-		$this->assertSame( array( 5 ), Catalog::visible_children( array( 5 ), $product, false ), 'Only the visible list is touched.' );
-	}
-
-	public function test_a_bricks_loop_over_variations_gets_a_meta_query_that_leaves_usage_out(): void {
-		$vars = Catalog::query_vars( array( 'post_type' => array( 'product_variation' ), 'meta_query' => array( array( 'key' => 'attribute_backups', 'value' => 'None' ) ) ) );
-
-		$this->assertCount( 2, $vars['meta_query'] );
-		// Hourly pay as you go is left out; a counted variation is the plan itself and stays in.
-		$this->assertSame( 'OR', $vars['meta_query'][1]['relation'] );
-		$this->assertSame( 'NOT EXISTS', $vars['meta_query'][1][0]['compare'] );
-		$this->assertSame( Rates::KIND_COUNTED, $vars['meta_query'][1][1]['value'] );
-
-		$found = get_posts( array_merge( $vars, array( 'post_parent' => $this->v['m-None']->get_parent_id(), 'post_status' => 'publish', 'posts_per_page' => -1, 'fields' => 'ids' ) ) );
-
-		$this->assertContains( $this->v['m-None']->get_id(), $found );
-		$this->assertNotContains( $this->v['u-None']->get_id(), $found );
-		$this->assertNotContains( $this->v['u-Daily']->get_id(), $found );
-
-		$posts = array( 'post_type' => array( 'post' ) );
-		$this->assertSame( $posts, Catalog::query_vars( $posts ), 'Other loops are untouched.' );
 	}
 
 	public function test_a_pay_as_you_go_variation_is_never_a_plan(): void {

@@ -289,7 +289,7 @@ final class Pricing {
 			$target = $step;
 		}
 
-		$usage = Rates::sibling( $target, true );
+		$usage = Rates::is_usage( $target ) ? $target : Rates::sibling( $target, true ); // Part C: plans are the pay as you go variations, the sibling goes.
 		$parts = $usage ? Breakdown::parts( $usage ) : null;
 
 		return $parts ?? __( 'This plan has no pay as you go price.', 'beltoft-services' );

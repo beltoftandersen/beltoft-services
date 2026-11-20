@@ -69,7 +69,7 @@ class PriceDisplayTest extends UsageTestCase {
 
 	public function test_the_usage_tags_are_unchanged_with_the_display_excluding_tax(): void {
 		$v  = $this->usage_product();
-		$id = $v['m-None']->get_id();
+		$id = $v['u-None']->get_id();
 
 		$this->assertSame( '€0.0226', Catalog::value( 'beltoft_usage_hourly', $id ) );
 		$this->assertSame( '€16.50', Catalog::value( 'beltoft_usage_cap', $id ) );
@@ -79,7 +79,7 @@ class PriceDisplayTest extends UsageTestCase {
 
 	public function test_the_usage_tags_follow_a_display_including_tax(): void {
 		$v  = $this->usage_product();
-		$id = $v['m-None']->get_id();
+		$id = $v['u-None']->get_id();
 		$this->display( 'incl' );
 
 		$this->assertSame( '€0.0283', Catalog::value( 'beltoft_usage_hourly', $id ) );
@@ -89,7 +89,7 @@ class PriceDisplayTest extends UsageTestCase {
 
 	public function test_a_listener_builds_both_figures_for_a_usage_tag_and_nothing_is_cached(): void {
 		$v  = $this->usage_product();
-		$id = $v['m-None']->get_id();
+		$id = $v['u-None']->get_id();
 		$this->both();
 
 		$this->assertSame( '€16.50 | €20.63', apply_filters( 'bricks/dynamic_data/render_content', '{beltoft_usage_cap:' . $id . '}', null, 'text' ) );
@@ -108,7 +108,7 @@ class PriceDisplayTest extends UsageTestCase {
 		add_filter( 'beltoft_services_price_html', $f );
 		$this->added[] = array( 'beltoft_services_price_html', $f, 10 );
 
-		$this->assertSame( '', apply_filters( 'bricks/frontend/render_data', '{beltoft_usage_cap:' . $v['u-None']->get_id() . '}', null ) );
+		$this->assertSame( '', apply_filters( 'bricks/frontend/render_data', '{beltoft_usage_cap:' . $v['m-None']->get_id() . '}', null ) );
 		$this->assertSame( 0, $calls );
 	}
 

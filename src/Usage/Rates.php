@@ -15,17 +15,26 @@ use BeltoftServices\Resource;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * A pay-as-you-go variation carries the meta `_beltoft_services_billing` = usage and a price of 0 at
- * checkout; it is the sibling of a monthly variation (the same parent, the same plan, the same attributes
- * except "Billing"). The hourly rate is that monthly variation's price (excluding tax) x (1 + premium) / 730,
- * the cap per resource, item and month is the monthly price x (1 + premium). The premium is a product
- * setting (`_beltoft_services_usage_premium`, percent, 10 when empty).
+ * A pay-as-you-go product carries the meta `_beltoft_services_billing` = usage (or counted) on the PARENT, and its variations
+ * a price of 0 at checkout. The monthly price a variation's rate is taken from is typed on the variation
+ * (`_beltoft_services_usage_monthly`, `_beltoft_services_usage_monthly_<CODE>` for another currency). The hourly rate is that
+ * price (excluding tax) x (1 + premium) / 730, the cap per resource, item and month is the monthly price x (1 + premium). The
+ * premium is a product setting (`_beltoft_services_usage_premium`, percent, 10 when empty).
+ *
+ * A variation of a flagged product can be a monthly subscription (a live one from before the product became pay as you go): its
+ * own meta `_beltoft_services_billing` = `monthly` says so, and it is never pay as you go. A variation's own `usage`/`counted`
+ * (the way it was flagged before) is still honoured.
  */
 final class Rates {
 
 	public const META_BILLING = '_beltoft_services_billing';
 	public const META_PREMIUM = '_beltoft_services_usage_premium';
 	public const META_MONTHLY = '_beltoft_services_usage_monthly';
+
+	/**
+	 * Value of META_BILLING on a variation: a monthly subscription under a pay as you go product. It is never metered or billed by the hour.
+	 */
+	public const KIND_MONTHLY = 'monthly';
 
 	/**
 	 * Billing kinds, the value of META_BILLING: hourly (`usage`, the monthly price spread over hours) and counted
@@ -57,14 +66,41 @@ final class Rates {
 	public const HOURS = 730;
 
 	/**
+	 * The billing kind of a product or variation: `usage`, `counted`, or '' (monthly or not a pay as you go product). A variation says
+	 * `monthly` itself to stay monthly under a pay as you go product, else it follows its own flag, else its parent's.
+	 *
+	 * @param \WC_Product|int|false $product Product or id.
+	 */
+	public static function kind( $product ): string {
+		$id = $product instanceof \WC_Product ? $product->get_id() : (int) $product;
+
+		if ( $id < 1 ) {
+			return '';
+		}
+
+		$kinds = array( self::KIND_HOURLY, self::KIND_COUNTED );
+		$own   = (string) get_post_meta( $id, self::META_BILLING, true );
+
+		if ( self::KIND_MONTHLY === $own ) {
+			return '';
+		}
+
+		if ( in_array( $own, $kinds, true ) ) {
+			return $own;
+		}
+
+		$parent = (string) get_post_meta( Product::parent_id( $id ), self::META_BILLING, true );
+
+		return in_array( $parent, $kinds, true ) ? $parent : '';
+	}
+
+	/**
 	 * Is this variation (or product) sold pay as you go?
 	 *
 	 * @param \WC_Product|int|false $product Product or id.
 	 */
 	public static function is_usage( $product ): bool {
-		$product = $product instanceof \WC_Product ? $product : wc_get_product( (int) $product );
-
-		return $product instanceof \WC_Product && in_array( (string) $product->get_meta( self::META_BILLING ), array( self::KIND_HOURLY, self::KIND_COUNTED ), true );
+		return '' !== self::kind( $product );
 	}
 
 	/**
@@ -73,9 +109,7 @@ final class Rates {
 	 * @param \WC_Product|int|false $product Product or id.
 	 */
 	public static function is_counted( $product ): bool {
-		$product = $product instanceof \WC_Product ? $product : wc_get_product( (int) $product );
-
-		return $product instanceof \WC_Product && self::KIND_COUNTED === (string) $product->get_meta( self::META_BILLING );
+		return self::KIND_COUNTED === self::kind( $product );
 	}
 
 	/**
@@ -334,20 +368,20 @@ final class Rates {
 	}
 
 	/**
-	 * "Or €0.0226/hour, max €16.50/month, pay as you go" for a monthly variation, or '' when there is no offer.
+	 * "Or €0.0226/hour, max €16.50/month, pay as you go" for a pay as you go variation, or '' when it has no price.
 	 * The slash is followed by a word joiner, so a line never breaks inside "€0.0226/hour".
 	 *
-	 * @param \WC_Product_Variation $monthly Monthly variation.
+	 * @param \WC_Product_Variation $usage Pay as you go variation.
 	 */
-	public static function line( \WC_Product_Variation $monthly ): string {
-		$rates = self::for_plan( $monthly );
+	public static function line( \WC_Product_Variation $usage ): string {
+		$rates = self::for_usage( $usage );
 
 		if ( null === $rates ) {
 			return '';
 		}
 
 		/* translators: 1: hourly price such as €0.0226, 2: monthly cap such as €16.50 */
-		return str_replace( '/', "/\u{2060}", sprintf( __( 'Or %1$s/hour, max %2$s/month, pay as you go', 'beltoft-services' ), self::money( $rates['hourly'], 4, '', $monthly ), self::cap_money( $rates['cap'], $monthly ) ) );
+		return str_replace( '/', "/\u{2060}", sprintf( __( 'Or %1$s/hour, max %2$s/month, pay as you go', 'beltoft-services' ), self::money( $rates['hourly'], 4, '', $usage ), self::cap_money( $rates['cap'], $usage ) ) );
 	}
 
 	/**
@@ -520,27 +554,21 @@ final class Rates {
 	}
 
 	/**
-	 * The monthly price (excluding tax) a pay-as-you-go variation is priced from: its monthly sibling's
-	 * price, or else the variation's own meta `_beltoft_services_usage_monthly` (a number in the shop's currency, so only
-	 * while the current currency is the shop's). Null when neither exists.
+	 * The monthly price (excluding tax) a pay-as-you-go variation is priced from: its own meta `_beltoft_services_usage_monthly` in the
+	 * shop's currency, this name plus an underscore and the code in another. A missing figure is no price (null), never a relabelled
+	 * figure of another currency. A variation that is not pay as you go has none.
 	 *
 	 * @param \WC_Product_Variation $v Pay-as-you-go variation.
 	 */
 	public static function monthly( \WC_Product_Variation $v ): ?float {
-		$sibling = self::sibling( $v, false );
-
-		if ( $sibling && '' !== (string) $sibling->get_price() ) {
-			return (float) wc_get_price_excluding_tax( $sibling );
-		}
-
-		// The meta is a figure in the shop's currency: in another currency a missing price is no price, never a relabelled figure.
-		if ( Currency::current() !== Currency::base() ) {
+		if ( ! self::is_usage( $v ) ) {
 			return null;
 		}
 
-		$meta = (string) $v->get_meta( self::META_MONTHLY );
+		$code = Currency::current();
+		$meta = (string) $v->get_meta( Currency::base() === $code ? self::META_MONTHLY : self::META_MONTHLY . '_' . $code );
 
-		return is_numeric( $meta ) ? (float) $meta : null;
+		return is_numeric( $meta ) && (float) $meta > 0 ? (float) $meta : null;
 	}
 
 	/**

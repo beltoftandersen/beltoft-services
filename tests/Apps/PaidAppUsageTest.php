@@ -334,8 +334,7 @@ final class PaidAppUsageTest extends PaidAppCase {
 		$licence = Resource::find( $p['licence']->id() );
 		$this->fake_currency_up( 'EUR' );
 		$this->fake_runner();
-		$monthly = Rates::sibling( $this->usage['basic'], false );
-		update_post_meta( $monthly->get_id(), '_test_price_DKK', '40' );
+		update_post_meta( $this->usage['basic']->get_id(), Rates::META_MONTHLY . '_DKK', '40' );
 		$why = 'The pay as you go cap of this Plesk tier is below the Openprovider cost.';
 
 		$this->assertSame( $why, \BeltoftServices\Apps\PleskLicence::spend_problem( $licence, 'basic' ), 'No guard rate for DKK: refused, never 1 to 1.' );
@@ -343,7 +342,7 @@ final class PaidAppUsageTest extends PaidAppCase {
 		$this->settings( array( 'currency_guard_rates' => 'DKK=7.60' ) );
 		$this->assertNull( \BeltoftServices\Apps\PleskLicence::spend_problem( $licence, 'basic' ), '40 x 1.1 = 44 DKK is 5.79 euro at 7.60, over the cost 5.' );
 
-		update_post_meta( $monthly->get_id(), '_test_price_DKK', '30' );
+		update_post_meta( $this->usage['basic']->get_id(), Rates::META_MONTHLY . '_DKK', '30' );
 		$this->assertSame( $why, \BeltoftServices\Apps\PleskLicence::spend_problem( $licence, 'basic' ), '33 DKK is 4.34 euro: under.' );
 
 		update_post_meta( $monthly->get_id(), '_test_price_DKK', '' );

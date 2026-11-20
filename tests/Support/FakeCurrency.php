@@ -69,6 +69,7 @@ trait FakeCurrency {
 	 */
 	protected function fake_price( int $product_id, string $code, string $price ): void {
 		update_post_meta( $product_id, '_test_price_' . $code, $price );
+		TwinMonthly::refresh( (int) wp_get_post_parent_id( $product_id ) );
 	}
 
 	/**

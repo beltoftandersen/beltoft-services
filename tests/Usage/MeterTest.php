@@ -41,15 +41,13 @@ class MeterTest extends UsageTestCase {
 		$this->assertSame( 25.0, Rates::premium( $w['u-None']->get_id() ) );
 	}
 
-	public function test_a_usage_variation_is_priced_from_its_monthly_sibling(): void {
+	public function test_a_usage_variation_is_priced_from_its_own_monthly_figure(): void {
 		$v = $this->usage_product();
 
 		$this->assertTrue( Rates::is_usage( $v['u-None'] ) );
 		$this->assertFalse( Rates::is_usage( $v['m-None'] ) );
-		$this->assertSame( $v['m-None']->get_id(), Rates::sibling( $v['u-None'], false )->get_id() );
-		$this->assertSame( $v['u-Daily']->get_id(), Rates::sibling( $v['m-Daily'], true )->get_id() );
-		$this->assertSame( 15.0, Rates::monthly( $v['u-None'] ) );
-		$this->assertSame( 18.0, Rates::monthly( $v['u-Daily'] ) );
+		$this->assertSame( 15.0, Rates::monthly( wc_get_product( $v['u-None']->get_id() ) ) );
+		$this->assertSame( 18.0, Rates::monthly( wc_get_product( $v['u-Daily']->get_id() ) ) );
 	}
 
 	public function test_the_meter_writes_one_row_per_full_hour_and_runs_again_without_duplicates(): void {

@@ -130,17 +130,16 @@ final class Breakdown {
 	public static function parts( \WC_Product_Variation $usage ): ?array {
 		$kind  = self::kind( $usage );
 		$rates = Rates::for_usage( $usage );
-		$full  = Rates::sibling( $usage, false );
 
-		if ( '' === $kind || null === $rates || ! $full ) {
+		if ( '' === $kind || null === $rates ) {
 			return null;
 		}
 
 		$premium = Rates::premium( $usage->get_parent_id() );
-		$price   = static fn( \WC_Product_Variation $v ): float => (float) wc_get_price_excluding_tax( $v );
+		$price   = static fn( \WC_Product_Variation $v ): float => (float) Rates::monthly( $v );
 
 		// The driver works out the plan and its add-ons of its own line.
-		$own     = ( self::declared( $kind )['parts'] )( $usage, $full, $price );
+		$own     = ( self::declared( $kind )['parts'] )( $usage, $price );
 		$base    = (float) $own['base'];
 		$ip      = (float) $own['ip'];
 		$storage = (float) $own['storage'];

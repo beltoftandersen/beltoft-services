@@ -314,16 +314,16 @@ class DbDriver extends ProxmoxDriver {
 		return array(
 			'single_line' => true,
 			'data_disk'   => true,
-			'parts'       => static function ( \WC_Product_Variation $usage, \WC_Product_Variation $full, callable $price ): array {
-				$bare    = DbDisk::ladder( $full )[0] ?? $full;
+			'parts'       => static function ( \WC_Product_Variation $usage, callable $price ): array {
+				$bare    = DbDisk::ladder( $usage )[0] ?? $usage;
 				$no_ip   = DbIp::plan_wants( Product::plan( $usage->get_parent_id(), $bare->get_id() ) ) ? \BeltoftServices\Proxmox\Backup\Backups::sibling_by( $bare, 'public_ip', false ) : null;
 
 				return array(
 					'base'    => $no_ip ? $price( $no_ip ) : $price( $bare ),
 					'ip'      => $no_ip ? $price( $bare ) - $price( $no_ip ) : 0.0,
-					'storage' => $price( $full ) - $price( $bare ),
+					'storage' => $price( $usage ) - $price( $bare ),
 					'backups' => 0.0,
-					'gb'      => DbDisk::extra( Product::plan( $usage->get_parent_id(), $full->get_id() ) ),
+					'gb'      => DbDisk::extra( Product::plan( $usage->get_parent_id(), $usage->get_id() ) ),
 				);
 			},
 		);

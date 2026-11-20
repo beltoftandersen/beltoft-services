@@ -106,7 +106,7 @@ class PriceDisplayInclTest extends UsageTestCase {
 	}
 
 	public function test_a_vat_exempt_customer_sees_the_excluding_figure_and_words(): void {
-		$p = $this->usage_product()['m-None'];
+		$p = $this->usage_product()['u-None'];
 		WC()->customer = WC()->customer ?: new \WC_Customer( 0, true );
 		WC()->customer->set_is_vat_exempt( true );
 
@@ -257,7 +257,7 @@ class PriceDisplayInclTest extends UsageTestCase {
 	}
 
 	public function test_a_usage_tag_in_text_is_filtered_and_kses_clean_and_elsewhere_it_is_plain(): void {
-		$id = $this->usage_product()['m-None']->get_id();
+		$id = $this->usage_product()['u-None']->get_id();
 		$f  = static fn( $html ) => $html . '<script>alert(1)</script><b onclick="x()">ok</b>';
 		add_filter( 'beltoft_services_price_html', $f );
 		$this->added[] = array( 'beltoft_services_price_html', $f, 10 );

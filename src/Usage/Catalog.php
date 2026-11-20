@@ -14,13 +14,7 @@ use BeltoftServices\Currency;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * A pay-as-you-go variation has a price of 0 (the customer pays by the hour), so it must never be taken for a plan:
- *
- * - WooCommerce's visible children of a variable product (the source of "From" prices and the synced price) leave
- *   the pay-as-you-go variations out;
- * - a Bricks query loop over product variations leaves them out (a meta query: no `_beltoft_services_billing`).
- *
- * Bricks dynamic data tags give the offer next to a monthly variation (the current post in a loop, or `:ID`):
+ * Bricks dynamic data tags give the pay as you go prices of a variation (the current post in a loop, or `:ID`):
  *
  *   {beltoft_usage_line}    "Or €0.0226/hour, max €16.50/month, pay as you go", empty when there is no offer
  *   {beltoft_usage_hourly}  "€0.0226"
@@ -28,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
  *
  * The figures are in the shop's tax display for the visitor's currency (including tax when the shop shows prices that way).
  *
- * The tags are empty for a variation without a pay-as-you-go sibling, so a text element can hide itself with the
+ * The tags are empty for a variation without a pay as you go price, so a text element can hide itself with the
  * condition "dynamic data is not empty".
  */
 final class Catalog {
@@ -46,8 +40,6 @@ final class Catalog {
 	 * Hooks.
 	 */
 	public static function register(): void {
-		add_filter( 'woocommerce_get_children', array( __CLASS__, 'visible_children' ), 20, 3 );
-		add_filter( 'bricks/posts/query_vars', array( __CLASS__, 'query_vars' ), 20 );
 		add_filter( 'bricks/dynamic_tags_list', array( __CLASS__, 'tags_list' ) );
 		add_filter( 'bricks/dynamic_data/render_content', array( __CLASS__, 'render' ), 20, 3 );
 		// render_data passes the area of the content, not its context: plain there, as only a text element may take markup.
@@ -112,55 +104,6 @@ final class Catalog {
 				get_woocommerce_price_format(),
 			)
 		);
-	}
-
-	/**
-	 * The visible children (the ones prices are read from) without pay-as-you-go variations.
-	 *
-	 * @param mixed $children Child ids.
-	 * @param mixed $product  Product.
-	 * @param mixed $visible  Whether this is the visible list.
-	 * @return mixed
-	 */
-	public static function visible_children( $children, $product = null, $visible = false ) {
-		if ( ! $visible || ! is_array( $children ) ) {
-			return $children;
-		}
-
-		return array_values(
-			array_filter(
-				$children,
-				static fn( $id ) => Rates::KIND_HOURLY !== (string) get_post_meta( (int) $id, Rates::META_BILLING, true )
-			)
-		);
-	}
-
-	/**
-	 * A Bricks loop over product variations never lists a pay-as-you-go variation.
-	 *
-	 * @param mixed $vars Query vars.
-	 * @return mixed
-	 */
-	public static function query_vars( $vars ) {
-		if ( ! is_array( $vars ) || ! in_array( 'product_variation', (array) ( $vars['post_type'] ?? array() ), true ) ) {
-			return $vars;
-		}
-
-		$vars['meta_query']   = isset( $vars['meta_query'] ) && is_array( $vars['meta_query'] ) ? $vars['meta_query'] : array(); // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- a small catalogue.
-		// Only an hourly variation is hidden: a counted one is the plan the customer buys.
-		$vars['meta_query'][] = array(
-			'relation' => 'OR',
-			array(
-				'key'     => Rates::META_BILLING,
-				'compare' => 'NOT EXISTS',
-			),
-			array(
-				'key'     => Rates::META_BILLING,
-				'value'   => Rates::KIND_COUNTED,
-			),
-		);
-
-		return $vars;
 	}
 
 	/**
@@ -275,7 +218,7 @@ final class Catalog {
 			return '';
 		}
 
-		$rates = Rates::for_plan( $v, false ); // A sold-out plan keeps its price on the page.
+		$rates = Rates::for_usage( $v ); // A sold-out plan keeps its price on the page.
 
 		if ( null === $rates ) {
 			return '';

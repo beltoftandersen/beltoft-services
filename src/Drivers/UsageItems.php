@@ -52,7 +52,7 @@ interface UsageItems {
 
 	/**
 	 * What this driver adds to the cart breakdown of a pay as you go line, or null for nothing. Keys: `parts` (callable(
-	 * \WC_Product_Variation $usage, \WC_Product_Variation $full, callable $price ): array{base, ip, storage, backups, gb}, the monthly
+	 * \WC_Product_Variation $usage, callable $price ): array{base, ip, storage, backups, gb}, the monthly
 	 * amounts of a line this driver sells: it makes the driver a line of the breakdown), `single_line` (the plan and its add-ons are one
 	 * ledger item), `data_disk` (the disk is worded as a data disk), and `extra` (an add-on that has a row of its own in the quote of a
 	 * new service: key, label, sized, size_key).

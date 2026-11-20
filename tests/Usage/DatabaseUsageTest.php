@@ -200,12 +200,9 @@ class DatabaseUsageTest extends UsageTestCase {
 		$this->assertTrue( \BeltoftServices\Proxmox\Pve\DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
 		\BeltoftServices\Proxmox\Vm\Stock::sync( 'lab' );
 
-		$this->assertSame( Rates::money( 25 / 730, 4 ), Catalog::value( 'beltoft_usage_hourly', $v['m-0-0']->get_id() ) );
-		$this->assertSame( Rates::cap_money( 25.0 ), Catalog::value( 'beltoft_usage_cap', $v['m-0-0']->get_id() ) );
-		$this->assertSame( Rates::cap_money( 38.0 ), Catalog::value( 'beltoft_usage_cap', $v['m-1-50']->get_id() ) );
-		$this->assertSame( '', Catalog::value( 'beltoft_usage_cap', $v['u-0-0']->get_id() ), 'A pay as you go variation is not a plan.' );
-		$ids = Catalog::visible_children( wc_get_product( $v['m-0-0']->get_parent_id() )->get_children(), null, true );
-		$this->assertCount( 4, $ids );
+		$this->assertSame( Rates::money( 25 / 730, 4 ), Catalog::value( 'beltoft_usage_hourly', $v['u-0-0']->get_id() ) );
+		$this->assertSame( Rates::cap_money( 25.0 ), Catalog::value( 'beltoft_usage_cap', $v['u-0-0']->get_id() ) );
+		$this->assertSame( Rates::cap_money( 38.0 ), Catalog::value( 'beltoft_usage_cap', $v['u-1-50']->get_id() ) );
 	}
 
 	public function test_a_sold_out_plan_keeps_its_price_on_the_page(): void {
@@ -214,8 +211,8 @@ class DatabaseUsageTest extends UsageTestCase {
 		$u->set_stock_status( 'outofstock' );
 		$u->save();
 
-		$this->assertSame( Rates::cap_money( 25.0 ), Catalog::value( 'beltoft_usage_cap', $v['m-0-0']->get_id() ) );
-		$this->assertSame( 25.0, Rates::for_plan( $v['m-0-0'], false )['cap'] );
+		$this->assertSame( Rates::cap_money( 25.0 ), Catalog::value( 'beltoft_usage_cap', $v['u-0-0']->get_id() ) );
+		$this->assertSame( 25.0, Rates::for_usage( wc_get_product( $v['u-0-0']->get_id() ) )['cap'] );
 	}
 
 	// -- Checkout -----------------------------------------------------------------------------------

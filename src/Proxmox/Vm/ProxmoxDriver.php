@@ -436,14 +436,14 @@ class ProxmoxDriver implements Driver, StopsOnDelete, NeedsBilling, InternalActi
 		return array(
 			'single_line' => false,
 			'data_disk'   => false,
-			'parts'       => static function ( \WC_Product_Variation $usage, \WC_Product_Variation $full, callable $price ): array {
-				$base    = $price( $full );
+			'parts'       => static function ( \WC_Product_Variation $usage, callable $price ): array {
+				$base    = $price( $usage );
 				$backups = 0.0;
 
-				if ( (int) ( Product::plan( $usage->get_parent_id(), $full->get_id() )['backup_days'] ?? 0 ) > 0 ) {
-					$without = Backups::sibling( $full, false );
-					$backups = $without ? $price( $full ) - $price( $without ) : 0.0;
-					$base    = $without ? $price( $without ) : $price( $full );
+				if ( (int) ( Product::plan( $usage->get_parent_id(), $usage->get_id() )['backup_days'] ?? 0 ) > 0 ) {
+					$without = Backups::sibling( $usage, false );
+					$backups = $without ? $price( $usage ) - $price( $without ) : 0.0;
+					$base    = $without ? $price( $without ) : $price( $usage );
 				}
 
 				return array( 'base' => $base, 'ip' => 0.0, 'storage' => 0.0, 'backups' => $backups, 'gb' => 0 );
