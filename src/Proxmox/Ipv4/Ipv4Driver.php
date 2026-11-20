@@ -216,7 +216,7 @@ final class Ipv4Driver implements Driver {
 			return $address === (string) $fresh->get( 'ip' ) && null !== $row && 'assigned' === $row['state'] && '' === Ipv4Server::working( $fresh );
 		}
 
-		return null !== $row && 'assigned' === $row['state'] && (int) $fresh->get( Ipv4Server::SYNCED ) >= (int) $r->get( self::QUEUED );
+		return null !== $row && 'assigned' === $row['state'] && (float) $fresh->get( Ipv4Server::SYNCED ) >= (float) $r->get( self::QUEUED );
 	}
 
 	/**
@@ -228,10 +228,10 @@ final class Ipv4Driver implements Driver {
 	 */
 	private function queue( Resource $r, Resource $parent, bool $add ): StepResult {
 		$key   = $add ? self::QUEUED : self::REMOVE_ASKED;
-		$asked = (int) $r->get( $key );
+		$asked = (float) $r->get( $key );
 
-		if ( 0 === $asked || time() - $asked > self::BUDGET / 2 ) {
-			if ( ! $r->set( array( $key => time() ) ) ) {
+		if ( $asked <= 0 || microtime( true ) - $asked > self::BUDGET / 2 ) {
+			if ( ! $r->set( array( $key => microtime( true ) ) ) ) {
 				return StepResult::retry( 5, 'The change could not be stored.' );
 			}
 
@@ -300,6 +300,12 @@ final class Ipv4Driver implements Driver {
 			return StepResult::retry( 5, 'The change could not be stored.' );
 		}
 
+		// A failed parent that may still have a machine keeps the address held (the pool screen releases it by hand, as for any
+		// failed resource); a deleted one is gone.
+		if ( '' !== $address && null !== $parent && 'failed' === $parent->get( 'state' ) && null !== VmRecords::for_resource( $parent->id() ) ) {
+			return StepResult::wait( 300, 'The server or database failed: the IPv4 address stays held until it is deleted.', time() + 7 * DAY_IN_SECONDS );
+		}
+
 		if ( '' === $address || null === $parent || in_array( $parent->get( 'state' ), array( 'failed', 'deleted', 'deleting' ), true ) ) {
 			// Nothing was taken, or the parent is gone (a deleted parent gave back a main address with itself): the extra row goes back.
 			IpPool::release( $r->id() );
@@ -327,9 +333,9 @@ final class Ipv4Driver implements Driver {
 		}
 
 		// Extra: the firewall must stop allowing it before it goes back: a run of the parent's sync that started after the request.
-		$asked = (int) $r->get( self::REMOVE_ASKED );
+		$asked = (float) $r->get( self::REMOVE_ASKED );
 
-		if ( $asked > 0 && (int) $fresh->get( Ipv4Server::SYNCED ) >= $asked && '' === Ipv4Server::working( $fresh ) ) {
+		if ( $asked > 0 && (float) $fresh->get( Ipv4Server::SYNCED ) >= $asked && '' === Ipv4Server::working( $fresh ) ) {
 			IpPool::release( $r->id() );
 
 			return StepResult::done();

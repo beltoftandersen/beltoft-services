@@ -167,7 +167,8 @@ final class Ipv4Meta {
 	 */
 	public static function limit( Resource $parent ): int {
 		if ( self::is_db( $parent ) ) {
-			return 1;
+			// A database built with the old plan field `public_ip` already has its one address.
+			return \BeltoftServices\Proxmox\Db\DbIp::plan_wants( (array) $parent->get( 'plan' ) ) ? 0 : 1;
 		}
 
 		return max( 1, (int) apply_filters( 'beltoft_services_ipv4_max_per_server', 16, $parent ) );

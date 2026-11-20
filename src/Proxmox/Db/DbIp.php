@@ -144,7 +144,8 @@ final class DbIp {
 
 		if ( null !== $row && 'assigned' === $row['state'] ) {
 			$record = VmRecords::for_resource( $r->id() );
-			$want   = self::public_params( $cluster, $row, (string) ( $config['net0'] ?? '' ), null === $record ? 0 : (int) $record['vmid'] );
+			// IPv6 only when the database has it (meta `ip6`): a repair never gives one that was not given.
+			$want   = self::public_params( $cluster, $row, (string) ( $config['net0'] ?? '' ), null === $record || '' === (string) $r->get( 'ip6' ) ? 0 : (int) $record['vmid'] );
 
 			return self::matches( $config, $want ) ? null : $want;
 		}

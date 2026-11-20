@@ -14,6 +14,8 @@ use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Addon\Addon;
 use BeltoftServices\Proxmox\Ipv4\Ipv4Driver;
 use BeltoftServices\Proxmox\Ipv4\Ipv4Meta;
+use BeltoftServices\Proxmox\Ipv4\Ipv4Server;
+use BeltoftServices\Proxmox\Network\Ipv6;
 use BeltoftServices\Proxmox\Network\FirewallRules;
 use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Vm\Profiles;
@@ -193,10 +195,70 @@ class Ipv4ServerTest extends FirewallTestCase {
 
 		// A run that gets there anyway keeps the address.
 		$before = $this->config()['ipconfig0'];
-		Jobs::queue_act( $server->id(), \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_REMOVE );
+		Jobs::queue_act( $server->id(), Ipv4Server::MAIN_REMOVE );
 		$this->run_jobs();
 		$this->assertSame( $before, $this->config()['ipconfig0'] );
 		$this->assertSame( (string) $addon->get( Ipv4Meta::ADDRESS ), (string) Resource::find( $server->id() )->get( 'ip' ) );
+	}
+
+	public function test_a_sync_that_started_in_the_same_second_as_the_removal_request_does_not_count(): void {
+		$server = $this->server( 1 );
+		$addon  = $this->addon( $server );
+		$addr   = (string) $addon->get( Ipv4Meta::ADDRESS );
+
+		Registry::get( Ipv4Driver::ID )->delete( Resource::find( $addon->id() ) );
+		$asked = (float) Resource::find( $addon->id() )->get( 'ipv4_remove_asked' );
+		$this->assertGreaterThan( 0, $asked );
+
+		// A run that began earlier in that same second.
+		Resource::find( $server->id() )->set( array( Ipv4Server::SYNCED => (float) floor( $asked ), Ipv4Server::OP => null ) );
+		$result = Registry::get( Ipv4Driver::ID )->delete( Resource::find( $addon->id() ) );
+
+		$this->assertFalse( $result->is_done() );
+		$this->assertSame( $addon->id(), IpPool::find( $addr )['resource_id'], 'The address is still held: the firewall was not changed by a later run.' );
+	}
+
+	public function test_an_extra_address_of_a_failed_server_stays_held_until_the_server_is_deleted(): void {
+		$server = $this->server( 1 );
+		$addon  = $this->addon( $server );
+		$addr   = (string) $addon->get( Ipv4Meta::ADDRESS );
+		$server = Resource::find( $server->id() );
+		$server->set( array( 'state' => 'failed' ) );
+
+		$result = Registry::get( Ipv4Driver::ID )->delete( Resource::find( $addon->id() ) );
+		$this->assertFalse( $result->is_done() );
+		$this->assertSame( $addon->id(), IpPool::find( $addr )['resource_id'] );
+
+		$server->set( array( 'state' => 'deleted' ) );
+		$this->assertTrue( Registry::get( Ipv4Driver::ID )->delete( Resource::find( $addon->id() ) )->is_done() );
+		$this->assertNull( IpPool::find( $addr )['resource_id'] );
+	}
+
+	public function test_a_database_with_the_old_public_ip_plan_has_no_room_for_an_addon_address(): void {
+		foreach ( array( 1 => false, 0 => true ) as $public => $room ) {
+			$product = $this->service_product( 'proxmox-db', array( 'cluster' => 'lab', 'template' => 9100, 'major' => '18', 'cores' => 1, 'memory_mb' => 2048, 'disk_gb' => 20, 'public_ip' => $public ), array( 'slug' => 'db-' . wp_generate_password( 5, false ) ) );
+			$db      = Resource::create( $this->service_license( $product, array( 'fire' => false ) ), Registry::get( 'proxmox-db' ), Product::plan( $product->get_id() ), array() );
+			$this->assertInstanceOf( Resource::class, $db );
+			$this->assertSame( $room, Ipv4Meta::room( $db ) );
+			$this->assertSame( $room, \BeltoftServices\Proxmox\Ipv4\Ipv4Cart::room( $db ) );
+		}
+	}
+
+	public function test_a_sync_does_not_replace_a_main_address_change_in_progress(): void {
+		$basic = $this->server( 0 );
+		$addon = $this->addon( $basic );
+		$this->assertSame( 'ready', $addon->get( 'state' ) );
+		$main = (string) $addon->get( Ipv4Meta::ADDRESS );
+
+		// The main change was cut after the firewall phase; a sync of an extra address comes first.
+		$this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'ipconfig0' => Ipv6::strip( '' ) ) );
+		Resource::find( $basic->id() )->set( array( Ipv4Server::OP => array( 'action' => Ipv4Server::MAIN_ADD, 'phase' => 'config', 'started' => microtime( true ) ) ) );
+		$this->assertStringNotContainsString( 'ip=', $this->config()['ipconfig0'] ?? '' );
+
+		Jobs::act( $basic->id(), Ipv4Server::SYNC, array() );
+
+		$this->assertStringStartsWith( 'ip=' . $main, $this->config()['ipconfig0'], 'The main change was finished, not replaced.' );
+		$this->assertNull( Resource::find( $basic->id() )->get( Ipv4Server::OP ) );
 	}
 
 	public function test_a_second_address_on_a_basic_server_is_an_extra_one(): void {
