@@ -560,6 +560,9 @@ final class Servers {
 
 		if ( false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
 			$parts[] = $ip;
+		} elseif ( '' !== \BeltoftServices\Proxmox\Vm\Panels::ip6( $resource ) ) {
+			// A server with IPv6 only is known by its IPv6 address.
+			$parts[] = \BeltoftServices\Proxmox\Vm\Panels::ip6( $resource );
 		}
 
 		if ( '' !== $kind && $kind !== $title ) {

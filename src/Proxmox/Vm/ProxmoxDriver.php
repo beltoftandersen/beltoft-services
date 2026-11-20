@@ -234,18 +234,6 @@ class ProxmoxDriver implements Driver, StopsOnDelete, NeedsBilling, InternalActi
 	 * @param Resource $r Resource.
 	 */
 	public function update_plan( Resource $r ): StepResult {
-		// A change of the public IPv4 add-on (VPS Basic) is made first, to the network settings; the rest of the plan change follows.
-		if ( '' !== VpsIp::wanted( $r ) ) {
-			$change = new VpsIp( $r );
-			$ip     = $change->signal( $change->run() );
-
-			if ( ! $ip->is_done() ) {
-				return $ip;
-			}
-
-			$r = Resource::find( $r->id() ) ?? $r;
-		}
-
 		$op = new Operations( $r );
 
 		return $op->signal( $op->update_plan() );

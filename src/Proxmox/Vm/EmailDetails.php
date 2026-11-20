@@ -221,14 +221,20 @@ final class EmailDetails {
 		$chosen = (int) $r->get( OsField::META );
 		$chosen = $chosen > 0 ? $chosen : (int) ( $plan['template'] ?? 0 );
 
-		if ( false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
-			$details[ __( 'IP address', 'beltoft-services' ) ] = $ip;
+		$has4 = false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 );
+		$ip6  = Panels::ip6( $r );
 
-			if ( '' !== Panels::ip6( $r ) ) {
-				$details[ __( 'IPv6 address', 'beltoft-services' ) ] = Panels::ip6( $r );
+		// A server with IPv6 only (no IPv4 address) is logged in to through its IPv6 address.
+		if ( $has4 || '' !== $ip6 ) {
+			if ( $has4 ) {
+				$details[ __( 'IP address', 'beltoft-services' ) ] = $ip;
 			}
 
-			$details[ __( 'Log in', 'beltoft-services' ) ]     = 'ssh ' . Provision::LOGIN_USER . '@' . $ip;
+			if ( '' !== $ip6 ) {
+				$details[ __( 'IPv6 address', 'beltoft-services' ) ] = $ip6;
+			}
+
+			$details[ __( 'Log in', 'beltoft-services' ) ] = 'ssh ' . Provision::LOGIN_USER . '@' . ( $has4 ? $ip : $ip6 );
 		}
 
 		if ( isset( $list[ $chosen ] ) ) {

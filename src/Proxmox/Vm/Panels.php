@@ -16,7 +16,6 @@ use BeltoftServices\Proxmox\Network\Firewall;
 use BeltoftServices\Proxmox\Network\FirewallRules;
 use BeltoftServices\Proxmox\Network\Ipv6;
 use BeltoftServices\Proxmox\Network\Monitor;
-use BeltoftServices\Proxmox\Network\PublicIp;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\Ownership;
 use BeltoftServices\Proxmox\Snapshot\PanelData;
@@ -246,32 +245,36 @@ final class Panels {
 	}
 
 	/**
-	 * What the IPv4 add-on block shows (VPS Basic: the address is a paid add-on), from stored data only, or null when the
-	 * server has no such add-on to offer or remove (a server with IPv4 included has no pair of variations).
+	 * THE HOOK POINT for "add an IPv4 address" on a server with IPv6 only. Nothing sells an address yet: the filter
+	 * `beltoft_services_server_ipv4` is the one place the future shared "extra IPv4" model plugs in. It gets null and the
+	 * server, and returns null (no block) or an array with `add_url` (where the customer buys one), `add_price` (the price
+	 * text, such as "+19 kr. / month") and optionally `busy` (a change is in progress). Only a ready server with no IPv4
+	 * and an IPv6 address is asked.
 	 *
 	 * @param Resource $r Resource.
-	 * @return array{has: bool, busy: bool, add_url: string, add_price: string, remove_url: string}|null
+	 * @return array{busy: bool, add_url: string, add_price: string}|null
 	 */
 	public static function ipv4_panel( Resource $r ): ?array {
-		if ( true === $r->get( 'linked' ) ) {
+		if ( true === $r->get( 'linked' ) || '' !== (string) $r->get( 'ip' ) || '' === self::ip6( $r ) ) {
 			return null;
 		}
 
-		$has  = '' !== (string) $r->get( 'ip' );
-		$busy = ! VpsIp::idle( $r );
-		$add  = $has || $busy || '' === self::ip6( $r ) ? '' : PublicIp::switch_url( $r, true );
-		$drop = $has && ! $busy && '' !== self::ip6( $r ) ? PublicIp::switch_url( $r, false ) : '';
+		/**
+		 * Filters the "add an IPv4 address" block of a server with IPv6 only.
+		 *
+		 * @param array|null $panel Null (none) or array( add_url, add_price, busy ).
+		 * @param Resource   $r     The server.
+		 */
+		$panel = apply_filters( 'beltoft_services_server_ipv4', null, $r );
 
-		if ( '' === $add && '' === $drop && ! $busy ) {
+		if ( ! is_array( $panel ) || ( '' === (string) ( $panel['add_url'] ?? '' ) && empty( $panel['busy'] ) ) ) {
 			return null;
 		}
 
 		return array(
-			'has'        => $has,
-			'busy'       => $busy,
-			'add_url'    => $add,
-			'add_price'  => '' === $add ? '' : (string) \BeltoftServices\Currency::with_resource( $r, static fn() => PublicIp::price_label( $r, true ), '' ),
-			'remove_url' => $drop,
+			'busy'      => ! empty( $panel['busy'] ),
+			'add_url'   => (string) ( $panel['add_url'] ?? '' ),
+			'add_price' => (string) ( $panel['add_price'] ?? '' ),
 		);
 	}
 

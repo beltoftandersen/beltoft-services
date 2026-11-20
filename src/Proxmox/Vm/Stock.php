@@ -16,7 +16,6 @@ use BeltoftServices\Apps\AppLicenceDriver;
 use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\Proxmox\Disk\DiskDriver;
 use BeltoftServices\Proxmox\Network\IpPool;
-use BeltoftServices\Proxmox\Network\PublicIp;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
 
@@ -230,7 +229,7 @@ final class Stock {
 		}
 
 		// A server with no IPv4 address (VPS Basic without the add-on) needs the cluster's IPv6 and IPv6 name servers instead of a pool address.
-		if ( $driver && ProxmoxDriver::ID === $driver->id() && ! PublicIp::wants( $plan, 1 ) ) {
+		if ( $driver && ProxmoxDriver::ID === $driver->id() && ! VpsProfile::plan_has_ipv4( $plan ) ) {
 			$cluster = Clusters::all()[ (string) ( $plan['cluster'] ?? '' ) ];
 
 			return '' !== (string) ( $cluster['ipv6_prefix'] ?? '' ) && array() !== (array) ( $cluster['nameservers6'] ?? array() );

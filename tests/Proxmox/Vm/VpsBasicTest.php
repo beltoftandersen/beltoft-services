@@ -13,12 +13,11 @@ use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Network\FirewallRules;
 use BeltoftServices\Proxmox\Network\IpPool;
-use BeltoftServices\Proxmox\Network\PublicIp;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Vm\Profiles;
+use BeltoftServices\Proxmox\Vm\Panels;
 use BeltoftServices\Proxmox\Vm\Stock;
-use BeltoftServices\Proxmox\Vm\VmRecords;
-use BeltoftServices\Proxmox\Vm\VpsIp;
+use BeltoftServices\Proxmox\Vm\VpsProfile;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\Proxmox\Network\FirewallTestCase;
 
@@ -78,9 +77,8 @@ class VpsBasicTest extends FirewallTestCase {
 		$product = $this->service_product( 'proxmox', array( 'cluster' => 'lab', 'template' => 9000, 'cores' => 1, 'memory_mb' => 1024, 'disk_gb' => 10 ), array( 'max' => 3, 'slug' => 'vm-x' ) );
 
 		$this->assertSame( 1, Product::plan( $product->get_id() )['public_ip'] );
-		$this->assertTrue( PublicIp::wants( array(), 1 ) );
-		$this->assertFalse( PublicIp::wants( array(), 0 ) );
-		$this->assertFalse( PublicIp::wants( array( 'public_ip' => 0 ), 1 ) );
+		$this->assertTrue( VpsProfile::plan_has_ipv4( array() ) );
+		$this->assertFalse( VpsProfile::plan_has_ipv4( array( 'public_ip' => 0 ) ) );
 	}
 
 	public function test_a_basic_server_is_built_with_ipv6_only(): void {
@@ -150,100 +148,6 @@ class VpsBasicTest extends FirewallTestCase {
 		$this->assertSame( array( self::ADDRESS ), $this->set() );
 	}
 
-	public function test_the_ipv4_add_on_adds_an_address_with_one_restart(): void {
-		$this->ipv6_on();
-		$r = $this->manage( $this->basic( 0 ) );
-		$this->assertTrue( VpsIp::idle( $r ) );
-		$this->assertSame( '', VpsIp::wanted( $r ) );
-
-		$plan = (array) $r->get( 'plan' );
-		$r->set( array( 'plan' => array_merge( $plan, array( 'public_ip' => 1 ) ) ) );
-		$r = Resource::find( $r->id() );
-		$this->assertSame( 'add', VpsIp::wanted( $r ) );
-
-		$mark = count( $this->fake->calls() );
-		$done = Registry::get( 'proxmox' )->update_plan( $r );
-		$this->assertTrue( $done->is_done(), $done->error() );
-
-		$fresh = Resource::find( $r->id() );
-		$ip    = IpPool::for_resource( $r->id() );
-		$this->assertNotNull( $ip );
-		$this->assertSame( 'assigned', $ip['state'] );
-		$this->assertSame( $ip['address'], $fresh->get( 'ip' ) );
-		$this->assertSame( 'ip=' . $ip['address'] . '/24,gw=192.0.2.1,ip6=' . self::ADDRESS . '/64,gw6=2001:db8:430c:1::1', $this->config()['ipconfig0'] );
-		$this->assertNull( $fresh->get( VpsIp::OP ) );
-		$this->assertSame( $ip['id'], VmRecords::for_resource( $r->id() )['ip_id'] );
-
-		$reboots = array_filter( array_slice( $this->fake->calls(), $mark ), static fn( $c ) => 'POST' === $c['method'] && '/status/reboot' === substr( $c['path'], -14 ) );
-		$this->assertCount( 1, $reboots, 'One restart.' );
-
-		$expected = array( $ip['address'], self::ADDRESS );
-		sort( $expected );
-		$this->assertSame( $expected, $this->set() );
-
-		$again = Registry::get( 'proxmox' )->update_plan( $fresh );
-		$this->assertTrue( $again->is_done() );
-		$this->assertCount( 1, array_filter( array_slice( $this->fake->calls(), $mark ), static fn( $c ) => 'POST' === $c['method'] && '/status/reboot' === substr( $c['path'], -14 ) ), 'A second run changes nothing.' );
-	}
-
-	public function test_the_ipv4_add_on_is_taken_away_and_the_address_goes_back_to_the_pool(): void {
-		$this->ipv6_on();
-		$r    = $this->manage( $this->basic( 1 ) );
-		$ip4  = (string) $r->get( 'ip' );
-		$this->assertContains( $ip4, $this->set() );
-		$free = IpPool::free_count();
-		$this->assertNotSame( '', $ip4 );
-
-		$r->set( array( 'plan' => array_merge( (array) $r->get( 'plan' ), array( 'public_ip' => 0 ) ) ) );
-		$r = Resource::find( $r->id() );
-		$this->assertSame( 'remove', VpsIp::wanted( $r ) );
-
-		$done = Registry::get( 'proxmox' )->update_plan( $r );
-		$this->assertTrue( $done->is_done(), $done->error() );
-
-		$fresh = Resource::find( $r->id() );
-		$this->assertSame( 'ip6=' . self::ADDRESS . '/64,gw6=2001:db8:430c:1::1', $this->config()['ipconfig0'] );
-		$this->assertEmpty( $fresh->get( 'ip' ) );
-		$this->assertNull( IpPool::for_resource( $r->id() ) );
-		$this->assertSame( $free + 1, IpPool::free_count() );
-		$this->assertNull( VmRecords::for_resource( $r->id() )['ip_id'] );
-		$this->assertSame( array( 'ipfilter-net0' => self::ADDRESS ), \BeltoftServices\Proxmox\Network\Firewall::expected_ipsets( $fresh, false ) );
-		$this->assertSame( array( self::ADDRESS ), $this->set(), 'The old address is out of the filter.' );
-	}
-
-	public function test_a_server_without_ipv6_never_loses_its_only_address(): void {
-		$this->save_cluster();
-		$r = $this->basic( 1 );
-		$this->assertSame( '', (string) $r->get( 'ip6' ) );
-
-		$r->set( array( 'plan' => array_merge( (array) $r->get( 'plan' ), array( 'public_ip' => 0 ) ) ) );
-		$this->assertSame( '', VpsIp::wanted( Resource::find( $r->id() ) ) );
-	}
-
-	public function test_an_adopted_server_is_never_changed(): void {
-		$this->ipv6_on();
-		$r = $this->basic( 0 );
-		$r->set( array( 'linked' => true, 'plan' => array_merge( (array) $r->get( 'plan' ), array( 'public_ip' => 1 ) ) ) );
-
-		$this->assertSame( '', VpsIp::wanted( Resource::find( $r->id() ) ) );
-	}
-
-	public function test_no_address_free_gives_up_without_touching_the_server(): void {
-		$this->ipv6_on();
-		$r = $this->basic( 0 );
-
-		foreach ( range( 10, 24 ) as $last ) {
-			IpPool::block( '192.0.2.' . $last );
-		}
-
-		$r->set( array( 'plan' => array_merge( (array) $r->get( 'plan' ), array( 'public_ip' => 1 ) ) ) );
-		$done = Registry::get( 'proxmox' )->update_plan( Resource::find( $r->id() ) );
-
-		$this->assertTrue( $done->is_failed() );
-		$this->assertSame( 'ip6=' . self::ADDRESS . '/64,gw6=2001:db8:430c:1::1', $this->config()['ipconfig0'] );
-		$this->assertNull( Resource::find( $r->id() )->get( VpsIp::OP ) );
-	}
-
 	public function test_a_restore_that_brings_back_an_old_ipv4_is_repaired_to_ipv6_only(): void {
 		$this->ipv6_on();
 		$r = $this->basic( 0 );
@@ -256,13 +160,6 @@ class VpsBasicTest extends FirewallTestCase {
 		$this->assertSame( 'same', $op->reconcile_ipv6() );
 	}
 
-	public function test_the_switch_check_refuses_a_removal_that_leaves_no_address(): void {
-		$this->save_cluster();
-		$r = $this->basic( 1 );
-		$this->assertSame( '', VpsIp::switch_error( 0, 0, array( 'public_ip' => 1 ), null ), 'No resources for this subscription: nothing to refuse.' );
-		unset( $r );
-	}
-
 	public function test_a_cluster_keeps_ipv6_name_servers(): void {
 		$this->ipv6_on();
 		$this->assertSame( array( self::DNS6 ), Clusters::get( 'lab' )['nameservers6'] );
@@ -273,4 +170,18 @@ class VpsBasicTest extends FirewallTestCase {
 		$bad = Clusters::save( 'lab', array_merge( Clusters::get( 'lab' ), array( 'token_secret' => self::SECRET, 'nodes' => 'node-a', 'templates' => '9000 = Ubuntu 26.04', 'nameservers' => '192.0.2.53', 'nameservers6' => '192.0.2.5' ) ) );
 		$this->assertTrue( is_wp_error( $bad ) || false === $bad );
 	}
+
+	public function test_the_ipv4_hook_is_empty_until_something_plugs_in(): void {
+		$this->ipv6_on();
+		$r = $this->basic( 0 );
+		$this->assertNull( Panels::ipv4_panel( $r ) );
+
+		add_filter( 'beltoft_services_server_ipv4', static fn() => array( 'add_url' => 'https://example.test/add', 'add_price' => '+19 kr. / month' ) );
+		$this->assertSame( 'https://example.test/add', Panels::ipv4_panel( $r )['add_url'] );
+
+		$with4 = $this->basic( 1 );
+		$this->assertNull( Panels::ipv4_panel( $with4 ), 'A server that has IPv4 is never asked.' );
+		remove_all_filters( 'beltoft_services_server_ipv4' );
+	}
+
 }

@@ -9,7 +9,6 @@ namespace BeltoftServices\Proxmox\Vm;
 
 use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Network\Ipv6;
-use BeltoftServices\Proxmox\Network\PublicIp;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Resource;
 
@@ -44,11 +43,20 @@ final class VpsProfile implements BuildProfile {
 	}
 
 	/**
+	 * Does a plan give the server a public IPv4 address? Yes unless the plan field `public_ip` is 0 (VPS Basic: IPv6 only). A plan stored before the field existed has no value and means yes.
+	 *
+	 * @param array<string, mixed> $plan Plan.
+	 */
+	public static function plan_has_ipv4( array $plan ): bool {
+		return (int) ( $plan['public_ip'] ?? 1 ) > 0;
+	}
+
+	/**
 	 * Does the server have a public IPv4 address? Always, unless its plan says `public_ip` 0 (VPS Basic without the add-on).
 	 * A plan stored before the field existed has no value and means yes. A profile made without a resource (a filter, a test) says yes.
 	 */
 	public function uses_public_ip(): bool {
-		return null === $this->r || PublicIp::wants( (array) $this->r->get( 'plan' ), 1 );
+		return null === $this->r || self::plan_has_ipv4( (array) $this->r->get( 'plan' ) );
 	}
 
 	public function hold_address( int $resource_id ): ?array {
