@@ -156,6 +156,7 @@ final class Plugin {
 		Domains\DnsReleaseJob::register();
 		Domains\DnsCancel::register();
 		ThankYou::register();
+		OrderHandoff::register();
 		Domains\DnsClaimRoutes::register();
 		Domains\DnsClaimPanel::register();
 		Domains\Panels::register();

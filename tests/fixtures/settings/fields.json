@@ -92,6 +92,14 @@
         "label": "Group the billing pages",
         "desc": "My Account shows one Billing item instead of Orders, Subscriptions, Payment methods and Addresses, and those pages get a tab bar. Their addresses stay the same."
     },
+    "order_handoff": {
+        "tab": "general",
+        "section": "account",
+        "type": "checkbox",
+        "default": 0,
+        "label": "Hand-off screen after payment",
+        "desc": "After a paid order the order received page shows a short \"Setting up your order\" screen and then takes the customer to My Account, where the services of the order show their progress. Orders that are not paid yet, orders without services and visitors who are not logged in keep the normal page. Turn it off to get the normal page back at once."
+    },
     "welcome_servers_url": {
         "tab": "general",
         "section": "account",
