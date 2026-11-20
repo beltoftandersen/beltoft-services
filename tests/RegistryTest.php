@@ -17,16 +17,16 @@ use BeltoftServices\Http\HttpDriver;
 class RegistryTest extends TestCase {
 
 	public function test_registry_uses_the_filter(): void {
-		$this->assertSame( array( 'http', 'proxmox', 'proxmox-db', 'proxmox-disk', 'proxmox-snapshots', 'proxmox-app', 'domain', 'dns', 'mail', 'ssl', 'licence-key', 'hosting', 'storage', 'manual-server' ), array_keys( Registry::all() ) );
+		$this->assertSame( array( 'http', 'proxmox', 'proxmox-db', 'proxmox-disk', 'proxmox-snapshots', 'proxmox-ipv4', 'proxmox-managed', 'proxmox-app', 'domain', 'dns', 'mail', 'ssl', 'licence-key', 'hosting', 'storage', 'manual-server', 'support-priority' ), array_keys( Registry::all() ) );
 		$this->assertInstanceOf( HttpDriver::class, Registry::get( 'http' ) );
 		$this->assertSame( 'vm', Registry::get( 'proxmox' )->kind() );
 		$this->assertSame( 'disk', Registry::get( 'proxmox-disk' )->kind() );
 
 		$fake = $this->fake_driver();
 
-		$this->assertSame( array( 'http', 'proxmox', 'proxmox-db', 'proxmox-disk', 'proxmox-snapshots', 'proxmox-app', 'domain', 'dns', 'mail', 'ssl', 'licence-key', 'hosting', 'storage', 'manual-server', 'fake' ), array_keys( Registry::all() ) );
+		$this->assertSame( array( 'http', 'proxmox', 'proxmox-db', 'proxmox-disk', 'proxmox-snapshots', 'proxmox-ipv4', 'proxmox-managed', 'proxmox-app', 'domain', 'dns', 'mail', 'ssl', 'licence-key', 'hosting', 'storage', 'manual-server', 'support-priority', 'fake' ), array_keys( Registry::all() ) );
 		$this->assertSame( $fake, Registry::get( 'fake' ) );
-		$this->assertSame( array( 'http', 'vm', 'db', 'disk', 'snapshot', 'applic', 'domain', 'dns', 'mail', 'ssl', 'lickey', 'hosting', 'storage', 'dedicated', 'fake' ), Registry::kinds() );
+		$this->assertSame( array( 'http', 'vm', 'db', 'disk', 'snapshot', 'ipv4', 'managed', 'applic', 'domain', 'dns', 'mail', 'ssl', 'lickey', 'hosting', 'storage', 'dedicated', 'support', 'fake' ), Registry::kinds() );
 	}
 
 	/**
@@ -40,6 +40,8 @@ class RegistryTest extends TestCase {
 			'proxmox-db'        => \BeltoftServices\Proxmox\Db\DbDriver::class,
 			'proxmox-disk'      => \BeltoftServices\Proxmox\Disk\DiskDriver::class,
 			'proxmox-snapshots' => \BeltoftServices\Proxmox\Snapshot\SnapshotDriver::class,
+			'proxmox-ipv4'      => \BeltoftServices\Proxmox\Ipv4\Ipv4Driver::class,
+			'proxmox-managed'   => \BeltoftServices\Proxmox\Managed\ManagedDriver::class,
 			'proxmox-app'       => \BeltoftServices\Apps\AppLicenceDriver::class,
 			'domain'            => \BeltoftServices\Domains\DomainDriver::class,
 			'dns'               => \BeltoftServices\Domains\DnsDriver::class,
@@ -49,6 +51,7 @@ class RegistryTest extends TestCase {
 			'hosting'           => \BeltoftServices\Hosting\HostingDriver::class,
 			'storage'           => \BeltoftServices\Storage\StorageDriver::class,
 			'manual-server'     => \BeltoftServices\ManualServer\ManualServerDriver::class,
+			'support-priority'  => \BeltoftServices\Support\PriorityDriver::class,
 		);
 
 		$actual = array();
