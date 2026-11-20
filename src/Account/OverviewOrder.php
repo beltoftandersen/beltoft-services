@@ -62,12 +62,14 @@ final class OverviewOrder {
 	}
 
 	/**
-	 * Where the order stands: running (something is still being set up or waits), ready, mixed (some ready, some failed) or failed.
+	 * Where the order stands: running (something is still being set up), waiting (everything that can be set up is, one step waits
+	 * for the customer or a service is paused), ready, mixed (some ready, some failed) or failed.
 	 *
 	 * @param array<int, array<string, mixed>> $rows Rows of ThankYou::row().
 	 */
 	public static function state( array $rows ): string {
-		$ready  = 0;
+		$ready   = 0;
+		$waiting = 0;
 
 		// The services are made right after payment; until the first one exists the order is still being set up.
 		if ( ! $rows ) {
@@ -83,6 +85,8 @@ final class OverviewOrder {
 
 			if ( 'failed' === ( $row['group'] ?? '' ) ) {
 				++$failed;
+			} elseif ( self::waits( $row ) ) {
+				++$waiting;
 			} elseif ( ! empty( $row['ready'] ) ) {
 				++$ready;
 			} else {
@@ -91,20 +95,34 @@ final class OverviewOrder {
 		}
 
 		if ( 0 === $failed ) {
-			return 'ready';
+			return $waiting > 0 ? 'waiting' : 'ready';
 		}
 
-		return $ready > 0 ? 'mixed' : 'failed';
+		return $ready + $waiting > 0 ? 'mixed' : 'failed';
+	}
+
+	/**
+	 * Does the service wait on the customer or stand still on purpose (a step the customer does, a paused or removed service)?
+	 * It is not being set up, so the order does not keep running for it.
+	 *
+	 * @param array<string, mixed> $row Row of ThankYou::row().
+	 */
+	public static function waits( array $row ): bool {
+		return ! empty( $row['waits'] ) || in_array( (string) ( $row['group'] ?? '' ), array( 'paused', 'removed' ), true );
 	}
 
 	/**
 	 * The closing line of a finished order, or ''.
 	 *
-	 * @param string $state State.
+	 * @param string $state  State.
 	 * @param int    $failed Failed services.
+	 * @param string $step   For the waiting state: the step that waits on the customer, in lower case ('' when a service is paused).
 	 */
-	public static function closing( string $state, int $failed ): string {
+	public static function closing( string $state, int $failed, string $step = '' ): string {
 		switch ( $state ) {
+			case 'waiting':
+				/* translators: %s: what the customer does, such as "point your domain here". */
+				return '' !== $step ? sprintf( __( 'Your order is set up. One step waits for you: %s.', 'beltoft-services' ), $step ) : __( 'Your order is set up. One service is paused.', 'beltoft-services' );
 			case 'ready':
 				return __( 'Everything in your order is ready', 'beltoft-services' );
 			case 'mixed':
@@ -143,8 +161,13 @@ final class OverviewOrder {
 		if ( $forced > 0 ) {
 			$order = wc_get_order( $forced );
 
-			if ( $order instanceof \WC_Order && (int) $order->get_customer_id() === $user && $order->has_status( array( 'processing', 'completed', 'on-hold' ) ) ) {
+			// Only a paid order that has services, or whose services are just being made, is followed: a deleted, on-hold or
+			// cancelled order, or one that never got a service, shows nothing (the page would wait for services that never come).
+			if ( $order instanceof \WC_Order && (int) $order->get_customer_id() === $user && $order->has_status( array( 'processing', 'completed' ) ) && self::has_services( $order ) ) {
 				$orders[ $forced ] = $order;
+			} else {
+				// Not followed: it must not come back through the recent orders as if the address named it.
+				$forced = 0;
 			}
 		}
 
@@ -152,7 +175,7 @@ final class OverviewOrder {
 			array(
 				'customer_id'  => $user,
 				'status'       => array( 'processing', 'completed' ),
-				'limit'        => 10,
+				'limit'        => 30,
 				'orderby'      => 'date',
 				'order'        => 'DESC',
 				'date_created' => '>' . ( time() - self::RECENT_DAYS * DAY_IN_SECONDS ),
@@ -160,7 +183,9 @@ final class OverviewOrder {
 		);
 
 		foreach ( $recent as $order ) {
-			if ( $order instanceof \WC_Order && ! isset( $orders[ $order->get_id() ] ) && count( $orders ) < self::LIMIT ) {
+			// No cap here: the orders that do not belong in the section (add-ons, renewals, seen ones) are skipped below, and the
+			// loop stops after LIMIT orders that do. A cap before the filter would hide an older order still being set up.
+			if ( $order instanceof \WC_Order && ! isset( $orders[ $order->get_id() ] ) ) {
 				$orders[ $order->get_id() ] = $order;
 			}
 		}
@@ -191,6 +216,14 @@ final class OverviewOrder {
 			$blocks = (string) ob_get_clean();
 
 			$failed = count( array_filter( $rows, static fn( $row ) => 'failed' === $row['group'] ) );
+			$step   = '';
+
+			foreach ( $rows as $row ) {
+				if ( ! empty( $row['waits'] ) ) {
+					$step = (string) $row['waits'];
+					break;
+				}
+			}
 
 			self::$built[ $id ] = array(
 				'id'       => $id,
@@ -199,7 +232,8 @@ final class OverviewOrder {
 				'rows'     => $rows,
 				'state'    => $state,
 				'failed'   => $failed,
-				'closing'  => self::closing( $state, $failed ),
+				'step'     => $step,
+				'closing'  => self::closing( $state, $failed, $step ),
 				'blocks'   => $blocks,
 				'poll_url' => rest_url( Plugin::REST_NAMESPACE . '/my/orders/' . $id . '/progress' ),
 				'nonce'    => wp_create_nonce( 'wp_rest' ),
@@ -215,6 +249,22 @@ final class OverviewOrder {
 		}
 
 		return self::$built;
+	}
+
+	/**
+	 * Does the order have services, or is it a paid order with service lines whose services are still being made (paid within the
+	 * last hour)? An older order with service lines and no service has had them deleted or never got them.
+	 *
+	 * @param \WC_Order $order Order.
+	 */
+	private static function has_services( \WC_Order $order ): bool {
+		if ( ThankYou::resources( $order ) ) {
+			return true;
+		}
+
+		$paid = $order->get_date_paid() ?: $order->get_date_created();
+
+		return \BeltoftServices\OrderHandoff::has_service_lines( $order ) && $paid && $paid->getTimestamp() > time() - HOUR_IN_SECONDS;
 	}
 
 	/**

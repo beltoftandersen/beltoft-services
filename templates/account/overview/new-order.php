@@ -28,7 +28,9 @@ foreach ( $views as $beltoft_view ) :
 		data-text-ready="<?php echo esc_attr( BeltoftServices\Account\OverviewOrder::closing( 'ready', 0 ) ); ?>"
 		data-text-mixed-one="<?php echo esc_attr( BeltoftServices\Account\OverviewOrder::closing( 'mixed', 1 ) ); ?>"
 		data-text-mixed-many="<?php echo esc_attr( BeltoftServices\Account\OverviewOrder::closing( 'mixed', 2 ) ); ?>"
-		data-text-failed="<?php echo esc_attr( BeltoftServices\Account\OverviewOrder::closing( 'failed', 1 ) ); ?>">
+		data-text-failed="<?php echo esc_attr( BeltoftServices\Account\OverviewOrder::closing( 'failed', 1 ) ); ?>"
+		data-text-waiting-step="<?php echo esc_attr( BeltoftServices\Account\OverviewOrder::closing( 'waiting', 0, '%s' ) ); ?>"
+		data-text-waiting-paused="<?php echo esc_attr( BeltoftServices\Account\OverviewOrder::closing( 'waiting', 0 ) ); ?>">
 		<p class="bs-order__closing-text" data-order-closing-text><?php echo esc_html( (string) $beltoft_view['closing'] ); ?></p>
 		<ul class="bs-order__closing-list" data-order-closing-list>
 			<?php foreach ( $beltoft_done ? $beltoft_view['rows'] : array() as $beltoft_row ) : ?>
@@ -43,6 +45,7 @@ foreach ( $views as $beltoft_view ) :
 	<div class="beltoft-next__block beltoft-next__services" data-beltoft-services-order data-bs-flow data-progress-url="<?php echo esc_url( $beltoft_view['poll_url'] ); ?>" data-nonce="<?php echo esc_attr( $beltoft_view['nonce'] ); ?>" data-bar-text="<?php esc_attr_e( 'Setting up your order', 'beltoft-services' ); ?>" data-order="<?php echo esc_attr( (string) $beltoft_view['id'] ); ?>" data-known="<?php echo esc_attr( (string) count( $beltoft_view['rows'] ) ); ?>">
 		<?php if ( ! $beltoft_view['rows'] ) : ?>
 			<div class="bs-loader is-busy bs-order__waiting" role="status"><span class="bs-loader__text"><?php esc_html_e( 'Setting up your order', 'beltoft-services' ); ?></span><span class="bs-loader__bar"><i></i></span></div>
+			<p class="bs-order__gaveup" data-order-gaveup hidden><?php esc_html_e( 'Your services are not showing yet. Open the order to follow it.', 'beltoft-services' ); ?> <a href="<?php echo esc_url( $beltoft_view['view_url'] ); ?>"><?php esc_html_e( 'See the order', 'beltoft-services' ); ?></a></p>
 		<?php endif; ?>
 		<ul class="beltoft-service-list bs-flow-list">
 			<?php foreach ( $beltoft_view['rows'] as $beltoft_row ) : ?>

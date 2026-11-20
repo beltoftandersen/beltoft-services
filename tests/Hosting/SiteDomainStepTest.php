@@ -180,6 +180,11 @@ final class SiteDomainStepTest extends HostingCase {
 		$site = \BeltoftServices\Hosting\Sites::for_resource( $host->id() )[0] ?? null;
 		SiteDomains::add( $host->id(), (int) ( $site['id'] ?? 1 ), 'mine.example', 'external' );
 
+		$own = $this->row( $host );
+		$this->assertSame( 'point your domain here', $own['waits'], 'The row says what waits on the customer.' );
+		$this->assertFalse( $own['progress']['active'], 'A step the customer does is not polled.' );
+		$this->assertSame( 'waiting', \BeltoftServices\Account\OverviewOrder::state( array( $own ) ) );
+
 		$last = $this->last( $this->row( $host ) );
 		$this->assertSame( SiteDomainStep::POINT, $last['key'] );
 		$this->assertSame( 'Point your domain here', $last['label'] );
@@ -187,6 +192,7 @@ final class SiteDomainStepTest extends HostingCase {
 
 		SiteDomains::set_state( 'mine.example', 'active' );
 		$this->assertSame( 'done', $this->last( $this->row( $host ) )['status'] );
+		$this->assertArrayNotHasKey( 'waits', $this->row( $host ) );
 	}
 
 	public function test_an_account_without_a_domain_step_is_left_alone(): void {

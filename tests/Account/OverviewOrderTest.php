@@ -119,7 +119,7 @@ final class OverviewOrderTest extends TestCase {
 
 	public function test_the_owner_route_is_rate_limited(): void {
 		$order = $this->order( array( 'ready' ) );
-		add_filter( 'beltoft_services_order_progress_rate_limit', static fn() => 2 );
+		add_filter( 'beltoft_services_my_order_progress_rate_limit', static fn() => 2 );
 
 		$codes = array();
 
@@ -128,6 +128,18 @@ final class OverviewOrderTest extends TestCase {
 		}
 
 		$this->assertContains( 429, $codes );
+	}
+
+	public function test_the_owner_route_has_its_own_bucket_by_user_and_does_not_use_up_the_address_bucket(): void {
+		$order = $this->order( array( 'ready' ) );
+
+		for ( $i = 0; $i < 60; $i++ ) {
+			$this->assertSame( 200, $this->route( 'my/orders/' . $order->get_id() . '/progress' )->get_status(), 'Request ' . $i );
+		}
+
+		$request = new \WP_REST_Request( 'GET', '/beltoft-services/v1/orders/' . $order->get_id() . '/progress' );
+		$request->set_query_params( array( 'key' => $order->get_order_key() ) );
+		$this->assertSame( 200, rest_get_server()->dispatch( $request )->get_status(), 'The order received route still has its 40 a minute.' );
 	}
 
 	// -- Which orders show ---------------------------------------------------------------------
@@ -197,6 +209,49 @@ final class OverviewOrderTest extends TestCase {
 		$this->assertSame( 'failed', OverviewOrder::state( array( $failed ) ) );
 	}
 
+	public function test_a_paused_service_or_a_step_waiting_on_the_customer_is_waiting_not_running(): void {
+		$ready  = array( 'group' => 'ready', 'ready' => true, 'progress' => array( 'active' => false ) );
+		$paused = array( 'group' => 'paused', 'ready' => false, 'progress' => array( 'active' => false ) );
+		$point  = array( 'group' => 'ready', 'ready' => true, 'waits' => 'point your domain here', 'progress' => array( 'active' => false ) );
+		$failed = array( 'group' => 'failed', 'ready' => false, 'progress' => array( 'active' => false ) );
+
+		$this->assertSame( 'waiting', OverviewOrder::state( array( $ready, $paused ) ) );
+		$this->assertSame( 'waiting', OverviewOrder::state( array( $ready, $point ) ) );
+		$this->assertSame( 'mixed', OverviewOrder::state( array( $paused, $failed ) ) );
+		$this->assertSame( 'Your order is set up. One step waits for you: point your domain here.', OverviewOrder::closing( 'waiting', 0, 'point your domain here' ) );
+		$this->assertSame( 'Your order is set up. One service is paused.', OverviewOrder::closing( 'waiting', 0 ) );
+	}
+
+	public function test_a_paused_order_ends_with_its_own_closing_line(): void {
+		$order = $this->order( array( 'ready', 'paused' ) );
+
+		// A paused service that nobody asked to resume (desired stays paused) stands still.
+		foreach ( \BeltoftLicenses\Licenses::where( 'order_id', $order->get_id() ) as $license ) {
+			Resource::for_license( (int) $license['id'] )->set( array( 'desired' => Resource::for_license( (int) $license['id'] )->get( 'state' ) ) );
+		}
+
+		$html = $this->section();
+
+		$this->assertStringContainsString( 'Your order is set up. One service is paused.', $html );
+		$this->assertStringNotContainsString( 'data-order-closing hidden', $html );
+		$this->assertStringContainsString( 'is-waiting', $html );
+	}
+
+	public function test_three_newer_orders_that_do_not_belong_do_not_hide_an_older_order_still_being_set_up(): void {
+		$running = $this->order( array( 'provisioning' ) );
+		$running->set_date_created( time() - 3 * DAY_IN_SECONDS );
+		$running->save();
+
+		for ( $i = 0; $i < 3; $i++ ) {
+			$other = wc_create_order( array( 'customer_id' => $this->user ) );
+			$other->set_status( 'processing' );
+			$other->set_date_created( time() - $i * HOUR_IN_SECONDS );
+			$other->save();
+		}
+
+		$this->assertArrayHasKey( $running->get_id(), OverviewOrder::views() );
+	}
+
 	public function test_the_route_marks_a_finished_order_seen_but_not_a_running_one(): void {
 		$running = $this->order( array( 'provisioning' ) );
 		$this->route( 'my/orders/' . $running->get_id() . '/progress' );
@@ -207,10 +262,19 @@ final class OverviewOrderTest extends TestCase {
 		$this->assertArrayHasKey( $done->get_id(), (array) get_user_meta( $this->user, OverviewOrder::SEEN, true ) );
 	}
 
-	public function test_an_order_without_services_yet_shows_the_setting_up_line_for_the_address_order(): void {
-		$order = wc_create_order( array( 'customer_id' => $this->user ) );
-		$order->set_status( 'processing' );
+	private function order_with_service_line( string $status = 'processing', int $age = 0 ): \WC_Order {
+		$order   = wc_create_order( array( 'customer_id' => $this->user, 'status' => $status ) );
+		$product = $this->service_product( 'fake', array(), array( 'slug' => 'oo-' . wp_generate_password( 6, false ) ) );
+		$order->add_product( wc_get_product( $product->get_id() ), 1 );
+		$order->set_date_created( time() - $age );
+		$order->set_date_paid( time() - $age );
 		$order->save();
+
+		return wc_get_order( $order->get_id() );
+	}
+
+	public function test_an_order_without_services_yet_shows_the_setting_up_line_for_the_address_order(): void {
+		$order         = $this->order_with_service_line();
 		$_GET['order'] = (string) $order->get_id();
 
 		$html = $this->section();
@@ -218,6 +282,20 @@ final class OverviewOrderTest extends TestCase {
 		$this->assertStringContainsString( 'bs-order__waiting', $html );
 		$this->assertStringContainsString( 'Setting up your order', $html );
 		$this->assertStringNotContainsString( 'data-service="', $html );
+	}
+
+	public function test_the_address_order_shows_nothing_when_it_never_gets_services(): void {
+		foreach ( array( $this->order_with_service_line( 'on-hold' ), $this->order_with_service_line( 'cancelled' ), $this->order_with_service_line( 'processing', 2 * DAY_IN_SECONDS ) ) as $order ) {
+			$_GET['order'] = (string) $order->get_id();
+
+			$this->assertSame( '', $this->section(), $order->get_status() );
+		}
+
+		$bare = wc_create_order( array( 'customer_id' => $this->user ) );
+		$bare->set_status( 'processing' );
+		$bare->save();
+		$_GET['order'] = (string) $bare->get_id();
+		$this->assertSame( '', $this->section(), 'No service lines.' );
 	}
 
 	public function test_the_attention_list_does_not_repeat_the_services_of_the_section(): void {

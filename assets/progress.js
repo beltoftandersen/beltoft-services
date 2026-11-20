@@ -123,6 +123,7 @@
 
 	function mount( element, options ) {
 		var source = options.source || fetchSource( element.getAttribute( 'data-progress-url' ) );
+		// A number, or a function that says the time to the next look (a poller that backs off when the server says wait).
 		var interval = options.interval || 5000;
 		var wasActive = 'queued' === element.getAttribute( 'data-phase' ) || 'running' === element.getAttribute( 'data-phase' );
 
@@ -153,7 +154,7 @@
 						again();
 					}
 				} );
-			}, interval );
+			}, 'function' === typeof interval ? interval() : interval );
 		}
 
 		again();

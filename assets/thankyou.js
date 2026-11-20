@@ -16,6 +16,9 @@
 		return;
 	}
 
+	// How long a page without services waits for them (ms).
+	var WAIT_LIMIT = 180000;
+
 	function countSteps( rows ) {
 		var out = { done: 0, all: 0 };
 
@@ -51,9 +54,15 @@
 		return Math.round( 100 * counted.done / counted.all );
 	}
 
-	// running, ready, mixed or failed: the same rule as OverviewOrder::state().
+	// A service that waits on the customer (a step they do) or stands still on purpose: not being set up, so nothing is polled for it.
+	function waits( row ) {
+		return !! row.waits || 'paused' === row.group || 'removed' === row.group;
+	}
+
+	// running, waiting, ready, mixed or failed: the same rule as OverviewOrder::state().
 	function stateOf( rows ) {
 		var ready = 0;
+		var waiting = 0;
 		var failed = 0;
 		var i;
 
@@ -68,6 +77,8 @@
 
 			if ( 'failed' === rows[ i ].group ) {
 				failed += 1;
+			} else if ( waits( rows[ i ] ) ) {
+				waiting += 1;
 			} else if ( rows[ i ].ready ) {
 				ready += 1;
 			} else {
@@ -76,10 +87,10 @@
 		}
 
 		if ( ! failed ) {
-			return 'ready';
+			return waiting ? 'waiting' : 'ready';
 		}
 
-		return ready ? 'mixed' : 'failed';
+		return ready + waiting ? 'mixed' : 'failed';
 	}
 
 	function setupRoot( root ) {
@@ -92,6 +103,8 @@
 		var shared = null;
 		var sharedAt = 0;
 		var handle = null;
+		var slow = 1;
+		var started = Date.now();
 
 		if ( ! url ) {
 			return;
@@ -108,7 +121,8 @@
 
 				window.sessionStorage.setItem( key, String( Date.now() ) );
 			} catch ( error ) {
-				return;
+				// Storage is blocked: the page is drawn with the new services at once, so one reload still ends the wait (rows.length > known
+				// is false after it).
 			}
 
 			window.location.reload();
@@ -132,9 +146,27 @@
 
 				window.beltoftStatus.progress( handle, counted.all ? counted.done / counted.all : 0.06 );
 			} else if ( handle ) {
-				window.beltoftStatus.done( handle, text ? text.textContent : '' );
+				// closing() has filled the text before this runs. Some of the order failed: the bar says so, it is not "done".
+				if ( 'failed' === stateOf( rows ) || 'mixed' === stateOf( rows ) ) {
+					window.beltoftStatus.fail( handle, text ? text.textContent : '' );
+				} else {
+					window.beltoftStatus.done( handle, text ? text.textContent : '' );
+				}
+
 				handle = null;
 			}
+		}
+
+		function waitingText( box, rows ) {
+			var step = '';
+
+			rows.forEach( function ( row ) {
+				if ( ! step && row.waits ) {
+					step = row.waits;
+				}
+			} );
+
+			return step ? ( box.getAttribute( 'data-text-waiting-step' ) || '' ).replace( '%s', step ) : box.getAttribute( 'data-text-waiting-paused' );
 		}
 
 		function closing( rows ) {
@@ -159,6 +191,8 @@
 
 			if ( 'ready' === state ) {
 				text.textContent = box.getAttribute( 'data-text-ready' );
+			} else if ( 'waiting' === state ) {
+				text.textContent = waitingText( box, rows );
 			} else if ( 'mixed' === state ) {
 				text.textContent = box.getAttribute( failed > 1 ? 'data-text-mixed-many' : 'data-text-mixed-one' ).replace( '2', String( failed ) );
 			} else {
@@ -189,7 +223,7 @@
 
 			box.hidden = false;
 			section.setAttribute( 'data-state', state );
-			section.className = section.className.replace( /\bis-(running|ready|mixed|failed)\b/, 'is-' + state );
+			section.className = section.className.replace( /\bis-(running|waiting|ready|mixed|failed)\b/, 'is-' + state );
 		}
 
 		function seen( rows ) {
@@ -197,8 +231,9 @@
 				reloadOnce();
 			}
 
-			bar( rows );
+			// The closing line first: the bar's last message is read from it.
 			closing( rows );
+			bar( rows );
 		}
 
 		function load() {
@@ -211,6 +246,9 @@
 			sharedAt = Date.now();
 			shared = window.fetch( url, { credentials: 'same-origin', headers: headers } ).then( function ( response ) {
 				var fresh = response.headers.get( 'X-WP-Nonce' );
+
+				// Too many requests: look half as often (up to 8 times as long) until the server answers again.
+				slow = 429 === response.status ? Math.min( slow * 2, 8 ) : 1;
 
 				if ( fresh ) {
 					nonce = fresh;
@@ -259,12 +297,37 @@
 			}
 		}
 
-		// Nothing to follow yet: ask until the services exist, then the page reloads.
+		// The services did not show up in time (deleted, never made): the page stops asking and points to the order.
+		function giveUp() {
+			var line = root.querySelector( '[data-order-gaveup]' );
+			var wait = root.querySelector( '.bs-order__waiting' );
+
+			if ( wait ) {
+				wait.hidden = true;
+			}
+
+			if ( line ) {
+				line.hidden = false;
+			}
+
+			if ( handle && window.beltoftStatus ) {
+				window.beltoftStatus.done( handle, '' );
+				handle = null;
+			}
+		}
+
+		// Nothing to follow yet: ask until the services exist (then the page reloads), for three minutes at most.
 		if ( ! root.querySelector( '[data-service]' ) ) {
 			( function again() {
+				if ( Date.now() - started > WAIT_LIMIT ) {
+					giveUp();
+
+					return;
+				}
+
 				window.setTimeout( function () {
 					load().then( again );
-				}, 4000 );
+				}, 4000 * slow );
 			}() );
 
 			return;
@@ -281,7 +344,9 @@
 			}
 
 			window.BeltoftServicesProgress.mount( block, {
-				interval: 5000,
+				interval: function () {
+					return 5000 * slow;
+				},
 				source: function () {
 					return load().then( function ( body ) {
 						var rows = body && body.services ? body.services : [];

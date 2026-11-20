@@ -80,8 +80,14 @@ final class SiteDomainStep {
 
 		$row['progress']['steps'] = $steps;
 
+		// The customer's own step (point the domain here) is not being set up by us: the row says what waits and the order stops running.
+		if ( $ready && self::POINT === $step['key'] && 'current' === $step['status'] ) {
+			$row['waits'] = mb_strtolower( $step['label'] );
+			$row['progress']['active'] = false;
+		}
+
 		// A step that waits on the domain keeps the line running (and polled) until the domain has joined or the wait has ended.
-		if ( $ready && 'current' === $step['status'] ) {
+		if ( $ready && 'current' === $step['status'] && self::CONNECT === $step['key'] ) {
 			$row['progress']['phase']  = 'running';
 			$row['progress']['active'] = true;
 			$row['progress']['text']   = __( 'Waiting for the domain.', 'beltoft-services' );

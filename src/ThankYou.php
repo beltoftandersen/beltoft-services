@@ -37,6 +37,11 @@ final class ThankYou {
 	public const RATE_LIMIT = 40;
 
 	/**
+	 * Requests per signed-in customer and minute to the owner route.
+	 */
+	public const OWNER_RATE_LIMIT = 120;
+
+	/**
 	 * Orders already printed in this request.
 	 *
 	 * @var array<int, bool>
@@ -105,7 +110,9 @@ final class ThankYou {
 	 * @return \WP_REST_Response
 	 */
 	public static function my_progress( \WP_REST_Request $request ): \WP_REST_Response {
-		if ( self::limited() ) {
+		// The signed-in customer has a bucket of their own, by user id (the order received route's address bucket is not eaten by
+		// three sections polling at once); a visitor who is not signed in falls back to the address bucket and is refused below.
+		if ( is_user_logged_in() ? self::limited_owner() : self::limited() ) {
 			return self::reply( array( 'code' => 'beltoft_services_rate_limited', 'message' => __( 'Too many requests. Please wait a minute and try again.', 'beltoft-services' ) ), 429 );
 		}
 
@@ -116,6 +123,21 @@ final class ThankYou {
 		}
 
 		return self::services_reply( $order );
+	}
+
+	/**
+	 * Is the signed-in customer over the rate limit of the owner progress route? Counted per user id.
+	 */
+	private static function limited_owner(): bool {
+		/**
+		 * Requests per signed-in customer and minute to the owner order progress route (0 turns it off). The overview polls with one
+		 * request per section every 5 seconds, so 120 covers a few sections open in several tabs.
+		 *
+		 * @param int $max Requests, 120 by default.
+		 */
+		$max = (int) apply_filters( 'beltoft_services_my_order_progress_rate_limit', self::OWNER_RATE_LIMIT );
+
+		return RateLimit::exceeded( get_current_user_id(), 'beltoft-services:my-order-progress', $max, MINUTE_IN_SECONDS );
 	}
 
 	/**
