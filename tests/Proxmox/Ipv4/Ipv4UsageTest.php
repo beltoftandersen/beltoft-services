@@ -190,4 +190,15 @@ class Ipv4UsageTest extends Ipv4TestCase {
 
 		$this->assertNotNull( CustomerDelete::blocker( Resource::find( $addon->id() ) ) );
 	}
+
+	public function test_the_main_address_of_a_server_without_ipv6_cannot_be_removed(): void {
+		$server = $this->parent( true );
+		$addon  = $this->address( $server, true );
+		$addon->set( array( Ipv4Meta::ROLE => 'main' ) );
+		$server->set( array( 'ip6' => '' ) );
+
+		$this->assertNotNull( CustomerDelete::blocker( Resource::find( $addon->id() ) ) );
+		$view = Ipv4Panels::view( Resource::find( $server->id() ) );
+		$this->assertSame( 0, end( $view['addresses'] )['delete_id'] );
+	}
 }
