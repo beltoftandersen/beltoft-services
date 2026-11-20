@@ -503,7 +503,7 @@ final class AppField {
 		}
 
 		foreach ( AppLicence::tiers( $id ) as $key => $tier ) {
-			// Both prices are printed: the script shows the one that fits the billing choice. The licence is a whole month in advance either way; on a pay-as-you-go server the price says so.
+			// Both prices are printed, the one that does not fit the cart's server is hidden. The licence is a whole month in advance either way; on a pay-as-you-go server the price says so.
 			echo '<label class="beltoft-services-app__domain-choice"><input type="radio" class="input-radio" name="' . esc_attr( self::POST_TIER ) . '" value="' . esc_attr( (string) $key ) . '" data-app-tier' . checked( $shown && $selected === (string) $key, true, false ) . ( $shown ? '' : ' disabled' ) . '> <span>' . esc_html( $tier['label'] ) . '</span>';
 			echo '<span class="description" data-price-monthly' . ( $usage ? ' hidden' : '' ) . '>' . esc_html( AppLicence::price_text( $tier, false ) ) . '</span>';
 			echo '<span class="description" data-price-usage' . ( $usage ? '' : ' hidden' ) . '>' . esc_html( AppLicence::price_text( $tier, true ) ) . '</span></label>';

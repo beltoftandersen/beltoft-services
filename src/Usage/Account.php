@@ -121,14 +121,6 @@ final class Account {
 					'label'   => __( 'Order meta key with the customer\'s language', 'beltoft-services' ),
 					'desc'    => __( 'The meta key a language plugin saves the order\'s language in. The usage invoice lines are then written in that language (an installed WordPress language, matched by code such as da or da_DK). Empty: the site\'s language.', 'beltoft-services' ),
 				),
-				'offer_monthly' => array(
-					'tab'     => 'general',
-					'section' => 'usage',
-					'type'    => 'checkbox',
-					'default' => 0,
-					'label'   => __( 'Show the Monthly option for servers and databases', 'beltoft-services' ),
-					'desc'    => __( 'Off: customers only see pay as you go, and a new server or database added to the cart as a monthly plan is changed to its pay as you go plan when it has one. Email plans, plugin licences, renewals, plan changes of existing subscriptions and orders made in the admin are not touched.', 'beltoft-services' ),
-				),
 				'usage_new_limit' => array(
 					'tab'     => 'general',
 					'section' => 'usage',

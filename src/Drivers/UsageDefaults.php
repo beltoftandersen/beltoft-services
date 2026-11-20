@@ -21,13 +21,6 @@ trait UsageDefaults {
 	}
 
 	/**
-	 * No Billing choice.
-	 */
-	public function usage_billing_choice(): bool {
-		return false;
-	}
-
-	/**
 	 * Nothing in the cart breakdown.
 	 *
 	 * @return array<string, mixed>|null

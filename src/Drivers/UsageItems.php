@@ -14,8 +14,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * The usage engine (src/Usage) never names a product. A driver that can be sold pay as you go implements this and the engine asks
  * it: which hourly items its resource is billed for (the ledger item names, quantities, units and rates), the words of those items
- * on an invoice, whether it is a service of its own or an add-on of one, how it is called on an invoice, and whether its products
- * offer the Billing choice at checkout. `UsageDefaults` gives the defaults of a plain service.
+ * on an invoice, whether it is a service of its own or an add-on of one, and how it is called on an invoice. `UsageDefaults` gives the defaults of a plain service.
  */
 interface UsageItems {
 
@@ -44,11 +43,6 @@ interface UsageItems {
 	 * Is a resource of this driver an add-on that belongs to another service (an extra disk, an address, a licence), not a service of its own?
 	 */
 	public function usage_is_addon(): bool;
-
-	/**
-	 * Do the products of this driver offer the Billing choice (monthly or pay as you go) at checkout?
-	 */
-	public function usage_billing_choice(): bool;
 
 	/**
 	 * What this driver adds to the cart breakdown of a pay as you go line, or null for nothing. Keys: `parts` (callable(

@@ -229,13 +229,6 @@ final class ManualServerDriver implements Driver, StopsOnDelete, NeedsBilling, \
 
 	/**
 	 * {@inheritDoc}
-	 */
-	public function usage_billing_choice(): bool {
-		return true;
-	}
-
-	/**
-	 * {@inheritDoc}
 	 *
 	 * A dedicated server has a fixed name of its own (dedicated-<8 characters>), not a vm- one.
 	 *

@@ -38,7 +38,6 @@ final class Ipv4Field {
 		add_action( 'wc_ajax_' . self::AJAX, array( __CLASS__, 'ajax' ) );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
 		add_action( 'woocommerce_cart_item_removed', array( __CLASS__, 'clean_orphan' ) );
-		add_action( 'beltoft_services_billing_swapped', array( __CLASS__, 'rematch' ), 30 );
 	}
 
 	/**
@@ -230,25 +229,6 @@ final class Ipv4Field {
 		}
 
 		return array( 'ok' => true, 'count' => self::chosen() );
-	}
-
-	/**
-	 * After the billing of the cart's server was swapped (BillingField), the address lines follow: each goes back as its twin of the
-	 * other billing, or leaves the cart when there is none (as DiskField::rematch() does).
-	 */
-	public static function rematch(): void {
-		$count = self::chosen();
-		$usage = Ipv4Cart::cart_parent_usage();
-
-		foreach ( $count > 0 && WC()->cart ? WC()->cart->get_cart() : array() as $key => $item ) {
-			if ( 'cart_server' === ( $item['beltoft_services_ipv4_for'] ?? null ) && Rates::is_usage( (int) ( $item['variation_id'] ?? 0 ) ) !== $usage ) {
-				WC()->cart->remove_cart_item( (string) $key );
-			}
-		}
-
-		if ( $count > 0 && self::chosen() < $count ) {
-			self::choose( $count );
-		}
 	}
 
 	/**

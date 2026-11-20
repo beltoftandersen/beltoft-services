@@ -336,38 +336,6 @@ final class Rates {
 	}
 
 	/**
-	 * The pay-as-you-go offer next to a monthly plan: the usage sibling that can be bought, and what it costs
-	 * (hourly and the monthly cap, excluding tax). Null for a pay-as-you-go variation, a plan with no usage
-	 * sibling, one that cannot be bought, or a monthly price of 0.
-	 *
-	 * @param \WC_Product_Variation $monthly Monthly variation.
-	 * @param bool                  $buyable Whether the usage sibling must be purchasable (false: for showing prices, a sold-out plan keeps its price).
-	 * @return array{variation_id: int, monthly: float, hourly: float, cap: float, premium: float}|null
-	 */
-	public static function for_plan( \WC_Product_Variation $monthly, bool $buyable = true ): ?array {
-		if ( self::is_usage( $monthly ) ) {
-			return null;
-		}
-
-		$usage = self::sibling( $monthly, true );
-		$price = (float) wc_get_price_excluding_tax( $monthly );
-
-		if ( ! $usage || ( $buyable && ! $usage->is_purchasable() ) || $price <= 0 ) {
-			return null;
-		}
-
-		$premium = self::premium( $monthly->get_parent_id() );
-
-		return array(
-			'variation_id' => $usage->get_id(),
-			'monthly'      => $price,
-			'hourly'       => self::hourly( $price, $premium ),
-			'cap'          => self::cap( $price, $premium ),
-			'premium'      => $premium,
-		);
-	}
-
-	/**
 	 * "Or €0.0226/hour, max €16.50/month, pay as you go" for a pay as you go variation, or '' when it has no price.
 	 * The slash is followed by a word joiner, so a line never breaks inside "€0.0226/hour".
 	 *
@@ -446,13 +414,6 @@ final class Rates {
 	}
 
 	/**
-	 * Is the Monthly option shown to customers (setting)? Off, new servers are sold pay as you go only.
-	 */
-	public static function monthly_offered(): bool {
-		return (bool) \BeltoftServices\Settings::get( 'offer_monthly' );
-	}
-
-	/**
 	 * "€0.0829 per hour".
 	 *
 	 * @param float            $hourly Price per hour.
@@ -475,7 +436,7 @@ final class Rates {
 	}
 
 	/**
-	 * The two billing tiles' first line for pay as you go: "€0.0829 per hour, max €55.00 per month".
+	 * The first line of a pay as you go price: "€0.0829 per hour, max €55.00 per month".
 	 *
 	 * @param float            $hourly Price per hour.
 	 * @param float            $cap    Monthly cap.
@@ -484,73 +445,6 @@ final class Rates {
 	public static function tile_terms( float $hourly, float $cap, ?\WC_Product $tax = null ): string {
 		/* translators: 1: "€0.0829 per hour", 2: "max €55.00 per month" */
 		return sprintf( __( '%1$s, %2$s', 'beltoft-services' ), self::per_hour( $hourly, $tax ), self::max_per_month( $cap, $tax ) );
-	}
-
-	/**
-	 * The monthly tile's line: "€55.00 per month, paid in advance".
-	 *
-	 * @param float            $monthly Monthly price.
-	 * @param \WC_Product|null $tax     Product for the tax display, null for the amount as given.
-	 */
-	public static function tile_monthly( float $monthly, ?\WC_Product $tax = null ): string {
-		/* translators: %s: monthly price such as €55.00 */
-		return sprintf( __( '%s per month, paid in advance', 'beltoft-services' ), TaxNote::text( $monthly, 2, $tax ) );
-	}
-
-	/**
-	 * The name of the Billing attribute key of a variation, or null.
-	 *
-	 * @param array<string, mixed> $attributes Variation attributes.
-	 */
-	public static function billing_key( array $attributes ): ?string {
-		foreach ( array_keys( $attributes ) as $key ) {
-			if ( 1 === preg_match( '/^(attribute_)?(pa_)?billing$/D', (string) $key ) ) {
-				return (string) $key;
-			}
-		}
-
-		return null;
-	}
-
-	/**
-	 * The other billing model of the same plan: the variation of the same parent that differs only in the
-	 * Billing attribute (as Backups::sibling() finds the other backups state) and has the same plan.
-	 *
-	 * @param \WC_Product_Variation $v     Variation.
-	 * @param bool                  $usage Whether the sibling is pay as you go.
-	 */
-	public static function sibling( \WC_Product_Variation $v, bool $usage ): ?\WC_Product_Variation {
-		$parent = wc_get_product( $v->get_parent_id() );
-
-		if ( ! $parent instanceof \WC_Product_Variable || self::is_usage( $v ) === $usage ) {
-			return null;
-		}
-
-		$mine = $v->get_attributes();
-		$own  = Product::plan( $parent->get_id(), $v->get_id() );
-
-		foreach ( $parent->get_children() as $id ) {
-			$other = wc_get_product( $id );
-
-			if ( ! $other instanceof \WC_Product_Variation || $other->get_id() === $v->get_id() || 'publish' !== $other->get_status() || self::is_usage( $other ) !== $usage ) {
-				continue;
-			}
-
-			$theirs = $other->get_attributes();
-			$billing = self::billing_key( $mine ) ?? self::billing_key( $theirs );
-
-			foreach ( array_unique( array_merge( array_keys( $mine ), array_keys( $theirs ) ) ) as $key ) {
-				if ( $key !== $billing && (string) ( $mine[ $key ] ?? '' ) !== (string) ( $theirs[ $key ] ?? '' ) ) {
-					continue 2;
-				}
-			}
-
-			if ( Product::plan( $parent->get_id(), $other->get_id() ) === $own ) {
-				return $other;
-			}
-		}
-
-		return null;
 	}
 
 	/**

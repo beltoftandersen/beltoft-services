@@ -71,7 +71,7 @@ final class Ipv4Cart {
 	}
 
 	/**
-	 * The published, purchasable IPv4 address of one billing: the monthly subscription, or its pay as you go twin, or null.
+	 * The published, purchasable IPv4 address of one billing: the monthly subscription, or the pay as you go variation of its product, or null.
 	 *
 	 * @param bool $usage Pay as you go.
 	 */

@@ -292,7 +292,6 @@ final class Plugin {
 		Usage\Trusted::register();
 		Usage\Summary::register();
 		Usage\Breakdown::register();
-		Usage\BillingField::register();
 		Usage\Catalog::register();
 		Domains\PriceTags::register();
 		Usage\Renewal::register();

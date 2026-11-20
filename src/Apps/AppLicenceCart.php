@@ -17,10 +17,7 @@ defined( 'ABSPATH' ) || exit;
  * nowhere else. A renewal, a resubscribe and a WooCommerce Subscriptions switch of a tier line pass (the line
  * was bought before). The app field's script keeps the line in step with the chosen tier (AJAX).
  *
- * Billing follows the server. A pay-as-you-go server gets the tier's usage sibling (price 0 at checkout, billed by
- * the hour from the usage ledger, see Rates::items) and never the monthly variation: a tier with no usage sibling is
- * not offered there, so a pay-as-you-go customer never gets a fixed monthly subscription they did not see. When the
- * billing choice of the cart's server changes, rematch() puts the matching variation in the cart.
+ * The licence is a monthly subscription of its own whatever the billing of the server (a whole month in advance).
  *
  * A reinstall of an existing server to a paid app uses the same line, linked to that server's license id instead of
  * `cart_server` (AppReinstallPaid: URL, nonce and the pending reinstall request it needs).
@@ -41,8 +38,6 @@ final class AppLicenceCart {
 		add_action( 'woocommerce_check_cart_items', array( __CLASS__, 'normalise' ), 1 );
 		add_action( 'woocommerce_cart_item_removed', array( __CLASS__, 'clean_orphan' ) );
 		add_action( 'wc_ajax_' . self::AJAX, array( __CLASS__, 'ajax' ) );
-		// A paid app's tier follows the billing choice of the cart's server: its usage sibling for pay as you go, else the monthly one.
-		add_action( 'beltoft_services_billing_swapped', array( __CLASS__, 'rematch' ), 10 );
 	}
 
 	/**
@@ -152,43 +147,6 @@ final class AppLicenceCart {
 		$server = DiskField::cart_server();
 
 		return null !== $server && \BeltoftServices\Usage\Rates::is_usage( (int) ( $server['item']['variation_id'] ?? 0 ) );
-	}
-
-	/**
-	 * After the billing choice of the cart's server changed: the tier line gets the variation that matches (monthly, or
-	 * its usage sibling), or leaves the cart when the tier has none for that billing (the app field then asks again).
-	 *
-	 * @return bool Whether the cart is in step (no line, or a matching one).
-	 */
-	public static function rematch(): bool {
-		$line = self::line();
-
-		if ( ! $line ) {
-			return true;
-		}
-
-		$item = $line['item'];
-		$app  = AppLicence::app_of( (int) ( $item['variation_id'] ?? 0 ) );
-		$plan = Product::plan( (int) ( $item['product_id'] ?? 0 ), (int) ( $item['variation_id'] ?? 0 ) );
-
-		if ( null === $app ) {
-			return true;
-		}
-
-		$wanted    = AppLicence::tier( $app, (string) ( $plan['tier'] ?? '' ) );
-		$variation = null === $wanted ? null : AppLicence::line_variation( $wanted, self::server_usage() );
-
-		if ( null !== $variation && (int) ( $item['variation_id'] ?? 0 ) === $variation->get_id() ) {
-			return true;
-		}
-
-		if ( null === $variation ) {
-			WC()->cart->remove_cart_item( $line['key'] );
-
-			return false;
-		}
-
-		return self::choose( $app, (string) $wanted['key'] );
 	}
 
 	/**

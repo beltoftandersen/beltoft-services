@@ -359,13 +359,6 @@ class ProxmoxDriver implements Driver, StopsOnDelete, NeedsBilling, InternalActi
 
 	/**
 	 * {@inheritDoc}
-	 */
-	public function usage_billing_choice(): bool {
-		return true;
-	}
-
-	/**
-	 * {@inheritDoc}
 	 *
 	 * @return array<string, mixed>|null
 	 */
