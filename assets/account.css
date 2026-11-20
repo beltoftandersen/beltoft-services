@@ -1421,3 +1421,46 @@ div.beltoft-services-domain__dnssec, div.beltoft-services-domain__whois { margin
 @media (max-width: 600px) {
 	.bs-handoff { margin: var(--bs-space-5) var(--bs-space-4); padding: var(--bs-space-4); }
 }
+
+/* ==== The order section of the overview and its process lines (templates/account/overview/new-order.php, assets/thankyou.js) ==== */
+.bs-order { box-sizing: border-box; display: grid; gap: var(--bs-space-4); margin: 0 0 var(--bs-space-5); padding: var(--bs-space-5); border-radius: var(--bs-radius); background: var(--bs-warm); color: var(--bs-ink); }
+.bs-order__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--bs-space-1) var(--bs-space-4); }
+.bs-order__title { margin: 0; font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); }
+.bs-order__closing[hidden], .bs-order [hidden] { display: none; }
+.bs-order__closing { display: grid; gap: var(--bs-space-2); padding: var(--bs-space-3) var(--bs-space-4); border-radius: var(--bs-radius); background: var(--bs-surface); }
+.bs-order.is-ready .bs-order__closing-text { color: var(--bs-status-ok); }
+.bs-order.is-mixed .bs-order__closing-text, .bs-order.is-failed .bs-order__closing-text { color: var(--bs-status-fail); }
+.bs-order__closing-text { margin: 0; font-weight: var(--bs-fw-strong); }
+.bs-order__closing-list { display: flex; flex-wrap: wrap; gap: var(--bs-space-2); margin: 0; padding: 0; list-style: none; }
+div.bs-order .bs-order__closing-list a, div.bs-order .bs-order__closing-list a:visited { display: inline-flex; align-items: center; min-height: var(--bs-btn-h); padding: 0 var(--bs-space-4); border-radius: var(--bs-radius); background: var(--bs-dark); color: var(--bs-on-dark); font-weight: var(--bs-fw-medium); text-decoration: none; }
+div.bs-order .bs-order__closing-list a:hover, div.bs-order .bs-order__closing-list a:focus-visible { background: var(--bs-status-ok); }
+.bs-order .beltoft-service-list { gap: var(--bs-space-4); }
+.bs-order__waiting { min-height: 24px; padding-bottom: var(--bs-space-2); }
+.bs-order__waiting .bs-loader__bar { bottom: 0; }
+.bs-flow { display: grid; gap: var(--bs-space-2); padding: var(--bs-space-4); border-radius: var(--bs-radius); background: var(--bs-surface); }
+.bs-flow .beltoft-service__state { color: var(--bs-muted); font-size: var(--bs-fs-small); }
+.bs-flow.is-ready .beltoft-service__state { color: var(--bs-status-ok); font-weight: var(--bs-fw-medium); }
+.bs-flow.is-failed .beltoft-service__state, .bs-flow.is-failed .beltoft-service__message { color: var(--bs-status-fail); }
+.bs-flow__track { position: relative; height: 4px; overflow: hidden; border-radius: 2px; background: var(--bs-line); }
+.bs-flow__track i { display: block; height: 100%; border-radius: inherit; background: var(--bs-status-ok); transition: width .4s ease; }
+.bs-flow.is-getting-ready .bs-flow__track[aria-valuenow="0"]::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; border-radius: inherit; background: var(--bs-status-ok); animation: bs-loader-run 1.3s ease-in-out infinite; }
+.bs-flow.is-failed .bs-flow__track i { background: var(--bs-status-fail); }
+.bs-flow .beltoft-services-progress.is-idle { display: block; }
+.bs-flow .beltoft-services-progress.is-idle:not(:has(li)) { display: none; }
+.bs-flow .beltoft-services-progress__steps li { transition: color .3s ease; padding-left: 28px; }
+.bs-flow .beltoft-services-progress__steps li::before { width: 16px; height: 16px; top: 2px; box-sizing: border-box; transition: background-color .3s ease; }
+.bs-flow .beltoft-services-progress__steps li.is-done::after { content: ""; position: absolute; left: 5px; top: 5px; width: 4px; height: 8px; border: solid var(--bs-on-dark); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.bs-flow .beltoft-services-progress__steps li.is-failed::after { content: "\00d7"; position: absolute; left: 0; top: 2px; width: 16px; color: var(--bs-on-dark); font-size: 14px; line-height: 16px; text-align: center; }
+.bs-flow .beltoft-services-progress__steps li.is-skipped { color: var(--bs-muted); }
+.bs-flow .beltoft-services-progress__steps li.is-skipped::before { background: var(--bs-line); }
+.bs-flow .beltoft-service__open a { display: inline-flex; align-items: center; min-height: var(--bs-btn-h); padding: 0 var(--bs-space-4); border-radius: var(--bs-radius); background: var(--bs-dark); color: var(--bs-on-dark); font-weight: var(--bs-fw-medium); text-decoration: none; }
+.bs-flow .beltoft-service__open a:hover, .bs-flow .beltoft-service__open a:focus-visible { background: var(--bs-status-ok); }
+@media (max-width: 600px) {
+	.bs-order { padding: var(--bs-space-4); }
+	.bs-flow { padding: var(--bs-space-3); }
+	.bs-order__closing-list a { flex: 1 1 100%; justify-content: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.bs-flow__track i, .bs-flow .beltoft-services-progress__steps li, .bs-flow .beltoft-services-progress__steps li::before { transition: none; }
+	.bs-flow.is-getting-ready .bs-flow__track[aria-valuenow="0"]::after { width: 100%; animation: none; opacity: .4; }
+}
