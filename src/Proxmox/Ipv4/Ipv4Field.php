@@ -38,6 +38,7 @@ final class Ipv4Field {
 		add_action( 'wc_ajax_' . self::AJAX, array( __CLASS__, 'ajax' ) );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
 		add_action( 'woocommerce_cart_item_removed', array( __CLASS__, 'clean_orphan' ) );
+		add_action( 'beltoft_services_billing_swapped', array( __CLASS__, 'rematch' ), 30 );
 	}
 
 	/**

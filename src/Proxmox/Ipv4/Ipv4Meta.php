@@ -389,6 +389,11 @@ final class Ipv4Meta {
 			return __( 'Remove the extra IPv4 addresses first. The first address is the main address of the server.', 'beltoft-services' );
 		}
 
+		// The same rule as the monthly address (user_has_cap): a server without IPv6 would be left with no address at all.
+		if ( null !== $parent && 'main' === $addon->get( self::ROLE ) && ! self::main_removable( $parent ) ) {
+			return __( 'This is the only address of the server. It cannot be removed.', 'beltoft-services' );
+		}
+
 		if ( null !== $parent && '' !== Ipv4Server::working( $parent ) ) {
 			return __( 'An IPv4 address is being changed. Please try again when it is done.', 'beltoft-services' );
 		}

@@ -190,4 +190,70 @@ class Ipv4UsageTest extends Ipv4TestCase {
 
 		$this->assertNotNull( CustomerDelete::blocker( Resource::find( $addon->id() ) ) );
 	}
+
+	public function test_the_main_address_of_a_server_without_ipv6_cannot_be_removed(): void {
+		$server = $this->parent( true );
+		$addon  = $this->address( $server, true );
+		$addon->set( array( Ipv4Meta::ROLE => 'main' ) );
+		$server->set( array( 'ip6' => '' ) );
+
+		$this->assertNotNull( CustomerDelete::blocker( Resource::find( $addon->id() ) ) );
+		$view = Ipv4Panels::view( Resource::find( $server->id() ) );
+		$this->assertSame( 0, end( $view['addresses'] )['delete_id'] );
+	}
+
+	public function test_the_wait_for_a_failed_parent_ends(): void {
+		$server = $this->parent( true );
+		$addon  = $this->address( $server, true );
+		$parent = Resource::find( $server->id() );
+		$parent->set( array( 'state' => 'failed' ) );
+		$driver = Registry::get( Ipv4Driver::ID );
+
+		$first = $driver->delete( Resource::find( $addon->id() ) );
+		$this->assertSame( 'wait', $first->wait_until() > time() ? 'wait' : 'no' );
+		$until = (int) Resource::find( $addon->id() )->get( 'parent_failed_until' );
+		$this->assertGreaterThan( time(), $until );
+
+		$driver->delete( Resource::find( $addon->id() ) );
+		$this->assertSame( $until, (int) Resource::find( $addon->id() )->get( 'parent_failed_until' ), 'The deadline is stored once.' );
+
+		Resource::find( $addon->id() )->set( array( 'parent_failed_until' => time() - 1 ) );
+		$last = $driver->delete( Resource::find( $addon->id() ) );
+		$this->assertFalse( $last->is_retry() );
+		$this->assertFalse( $last->is_done() );
+		$this->assertStringContainsString( 'seven days', $last->error() );
+	}
+
+	public function test_the_invoice_names_the_server_of_the_address(): void {
+		$server = $this->parent( true );
+		$server->set( array( 'server_name' => 'web1' ) );
+		$addon = $this->address( $server, true );
+		$this->assertSame( 'web1', Renewal::label( $addon->id() ), 'Through Renewal with a real resource.' );
+		$this->assertSame( 'IPv4 address for web1', Renewal::line_subject( 'ipv4', Renewal::label( $addon->id() ) ) );
+		$this->assertSame( Renewal::reference( $server->id() ), Renewal::reference( $addon->id() ) );
+		$this->assertNotSame( '#' . $addon->id(), Renewal::reference( $addon->id() ) );
+	}
+
+	public function test_the_mcp_removes_a_pay_as_you_go_address_like_the_dashboard(): void {
+		$server = $this->parent( true );
+		$addon  = $this->address( $server, true );
+		$user   = (int) $addon->license()['user_id'];
+
+		$sum = \BeltoftServices\Mcp\BillingActions::summary( 'remove_addon', array( 'id' => $addon->id() ), $user );
+		$this->assertIsArray( $sum, is_wp_error( $sum ) ? $sum->get_error_message() : '' );
+		$this->assertStringContainsString( 'IPv4 address', $sum['text'] );
+		$this->assertStringContainsString( 'billed by the hour', $sum['text'] );
+
+		$gone = \BeltoftServices\Mcp\DeleteService::summary( 'delete_server', array( 'id' => $addon->id() ), $user );
+		$this->assertWPError( $gone );
+		$this->assertStringContainsString( 'remove_addon', $gone->get_error_message() );
+
+		$done = \BeltoftServices\Mcp\BillingActions::run( 'remove_addon', array( 'id' => $addon->id() ), $user );
+		$this->assertIsArray( $done, is_wp_error( $done ) ? $done->get_error_message() : '' );
+		$this->assertTrue( $done['deleting'] );
+		$this->assertStringContainsString( 'IPv4 address', $done['message'] );
+		$this->settle( $addon );
+		$this->assertSame( 'deleted', Resource::find( $addon->id() )->get( 'state' ) );
+		$this->assertSame( 'ready', Resource::find( $server->id() )->get( 'state' ), 'The server was not touched.' );
+	}
 }

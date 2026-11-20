@@ -82,21 +82,81 @@ final class Items {
 	}
 
 	/**
+	 * What the lookups share per request: the drivers, the words of every hourly item and the delete descriptions. Built once, and
+	 * again when the registered drivers change (the filter `beltoft_services_drivers` got or lost a callback) or the language does.
+	 *
+	 * @var array{sig: string, drivers: array<string, UsageItems>, words: array<string, array<string, mixed>>, delete: array<string, array<string, mixed>>}|null
+	 */
+	private static ?array $memo = null;
+
+	/**
+	 * Forgets what the lookups built (a test that changes drivers or words inside one request).
+	 */
+	public static function reset(): void {
+		self::$memo = null;
+	}
+
+	/**
+	 * What would make the memo stale: the language and the callbacks of the drivers filter.
+	 */
+	private static function signature(): string {
+		global $wp_filter;
+
+		$hook = $wp_filter['beltoft_services_drivers'] ?? null;
+		$keys = array();
+
+		foreach ( $hook instanceof \WP_Hook ? $hook->callbacks : array() as $priority => $callbacks ) {
+			$keys[ $priority ] = array_keys( $callbacks );
+		}
+
+		return get_locale() . '|' . md5( (string) wp_json_encode( $keys ) );
+	}
+
+	/**
+	 * The memo, built when missing or stale.
+	 *
+	 * @return array{sig: string, drivers: array<string, UsageItems>, words: array<string, array<string, mixed>>, delete: array<string, array<string, mixed>>}
+	 */
+	private static function memo(): array {
+		$sig = self::signature();
+
+		if ( null !== self::$memo && self::$memo['sig'] === $sig ) {
+			return self::$memo;
+		}
+
+		$memo = array( 'sig' => $sig, 'drivers' => array(), 'words' => array(), 'delete' => array() );
+
+		foreach ( Registry::all() as $id => $driver ) {
+			if ( $driver instanceof UsageItems ) {
+				$memo['drivers'][ (string) $id ] = $driver;
+			}
+		}
+
+		foreach ( $memo['drivers'] as $driver ) {
+			foreach ( $driver->usage_words() as $item => $words ) {
+				$memo['words'][ (string) $item ] ??= $words;
+			}
+
+			$spec = $driver->usage_delete();
+
+			if ( null !== $spec ) {
+				$memo['delete'][ (string) $spec['kind'] ] ??= $spec;
+			}
+		}
+
+		self::$memo = $memo;
+
+		return $memo;
+	}
+
+	/**
 	 * The drivers the usage engine bills: every registered driver that implements UsageItems. The one registration point: a new pay as
 	 * you go product needs a pay as you go variation (meta `_beltoft_services_billing`) and a driver that implements UsageItems.
 	 *
 	 * @return array<string, UsageItems> Driver id => driver.
 	 */
 	public static function drivers(): array {
-		$out = array();
-
-		foreach ( Registry::all() as $id => $driver ) {
-			if ( $driver instanceof UsageItems ) {
-				$out[ (string) $id ] = $driver;
-			}
-		}
-
-		return $out;
+		return self::memo()['drivers'];
 	}
 
 	/**
@@ -117,15 +177,7 @@ final class Items {
 	 * @return array<string, mixed>
 	 */
 	public static function hourly( string $item ): array {
-		foreach ( self::drivers() as $driver ) {
-			$words = $driver->usage_words();
-
-			if ( isset( $words[ $item ] ) ) {
-				return $words[ $item ];
-			}
-		}
-
-		return array();
+		return self::memo()['words'][ $item ] ?? array();
 	}
 
 	/**
@@ -157,15 +209,7 @@ final class Items {
 	 * @return array<string, mixed>|null
 	 */
 	public static function delete_for( string $kind ): ?array {
-		foreach ( self::drivers() as $driver ) {
-			$spec = $driver->usage_delete();
-
-			if ( null !== $spec && $kind === $spec['kind'] ) {
-				return $spec;
-			}
-		}
-
-		return null;
+		return self::memo()['delete'][ $kind ] ?? null;
 	}
 
 	/**

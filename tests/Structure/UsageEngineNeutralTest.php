@@ -64,4 +64,57 @@ class UsageEngineNeutralTest extends TestCase {
 
 		$this->assertSame( array(), $bad, 'A driver class of a feature is named in src/Usage: ask the driver through Drivers\UsageItems instead.' );
 	}
+
+	/**
+	 * Feature classes the engine still imports (a file and the class), the debts of the cart and ledger code. The list only shrinks:
+	 * a new import of a feature class in src/Usage fails the test, a fixed one must be removed from here.
+	 */
+	private const FEATURE_IMPORTS = array(
+		'src/Usage/Breakdown.php'       => array( 'Proxmox\\Backup\\BackupField', 'Proxmox\\Db\\DbDiskField' ),
+		'src/Usage/BillingField.php'    => array( 'Proxmox\\Backup\\BackupField', 'Proxmox\\Backup\\Backups', 'Proxmox\\Backup\\CartSwap', 'Proxmox\\Disk\\DiskField', 'Proxmox\\Vm\\OsField' ),
+		'src/Usage/Counted/Intro.php'   => array( 'Proxmox\\Vm\\Schema' ),
+		'src/Usage/Counted/Store.php'   => array( 'Proxmox\\Vm\\Schema' ),
+		'src/Usage/Estimate.php'        => array( 'Proxmox\\Db\\DbAccess' ),
+		'src/Usage/Ledger.php'          => array( 'Proxmox\\Vm\\Schema' ),
+	);
+
+	public function test_the_engine_imports_no_new_feature_class(): void {
+		$root  = dirname( __DIR__, 2 );
+		$found = array();
+		$it    = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $root . '/src/Usage', \FilesystemIterator::SKIP_DOTS ) );
+
+		foreach ( $it as $file ) {
+			if ( 'php' !== $file->getExtension() ) {
+				continue;
+			}
+
+			$rel = substr( $file->getPathname(), strlen( $root ) + 1 );
+
+			// Code only: comments and strings are not imports.
+			$code = '';
+
+			foreach ( token_get_all( (string) file_get_contents( $file->getPathname() ) ) as $token ) {
+				if ( is_array( $token ) && in_array( $token[0], array( T_COMMENT, T_DOC_COMMENT, T_CONSTANT_ENCAPSED_STRING ), true ) ) {
+					continue;
+				}
+
+				$code .= is_array( $token ) ? $token[1] : $token;
+			}
+
+			if ( preg_match_all( '/(?:BeltoftServices\\\\)((?:Proxmox|Apps|ManualServer|Hosting|Domains|Mail|Ssl|Storage|Licences|Support)(?:\\\\\w+)+)/', $code, $m ) ) {
+				$found[ $rel ] = array_values( array_unique( $m[1] ) );
+				sort( $found[ $rel ] );
+			}
+		}
+
+		ksort( $found );
+		$expected = self::FEATURE_IMPORTS;
+		ksort( $expected );
+
+		foreach ( $expected as &$list ) {
+			sort( $list );
+		}
+
+		$this->assertSame( $expected, $found, 'src/Usage names a class of a feature: the feature hooks the engine instead (do_action / a driver method).' );
+	}
 }

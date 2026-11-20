@@ -402,7 +402,7 @@ final class Definitions {
 				self::obj( array( 'id' => $id ), array( 'id' ), true )
 			),
 			'remove_addon'     => self::full(
-				'Removes an add-on the customer pays for separately: an extra disk, snapshot slots or an app licence. Give the id of the add-on from list_services. Removing backups or a public IP address is a plan change in the dashboard.',
+				'Removes an add-on the customer pays for separately: an extra disk, snapshot slots, an app licence, or a pay as you go public IPv4 address. Give the id of the add-on from list_services. Removing backups is a plan change in the dashboard.',
 				self::obj( array( 'id' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'The id of the add-on, from list_services (type disk, snapshot or applic).' ) ), array( 'id' ), true )
 			),
 			'set_default_payment_method' => self::full(

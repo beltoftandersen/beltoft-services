@@ -46,6 +46,10 @@ final class DeleteService {
 			return new \WP_Error( 'beltoft_services_tool', __( 'This is an extra disk. Remove it with remove_addon.', 'beltoft-services' ) );
 		}
 
+		if ( 'ipv4' === $kind ) {
+			return new \WP_Error( 'beltoft_services_tool', __( 'This is an IPv4 address. Remove it with remove_addon.', 'beltoft-services' ) );
+		}
+
 		// A dedicated server is cancelled in the dashboard only (a typed confirmation, and the data is gone at once).
 		if ( 'dedicated' === $kind ) {
 			return new \WP_Error( 'beltoft_services_tool', __( 'A dedicated server is cancelled in the dashboard, with a typed confirmation.', 'beltoft-services' ) );

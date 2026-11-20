@@ -297,11 +297,12 @@ final class BillingField {
 				return false;
 			}
 		);
-		// A paid app's tier follows the billing choice: its usage sibling for pay as you go, else the monthly one.
 		if ( $added ) {
-			\BeltoftServices\Apps\AppLicenceCart::rematch();
-			DiskField::rematch();
-			\BeltoftServices\Proxmox\Ipv4\Ipv4Field::rematch();
+			/**
+			 * The billing of the cart's server was swapped: every add-on line of the cart follows (a paid app's tier, the extra disk,
+			 * the IPv4 address lines), each feature hooks this. Order: app licence 10, disk 20, IPv4 30.
+			 */
+			do_action( 'beltoft_services_billing_swapped' );
 		}
 
 		$cart->calculate_totals();

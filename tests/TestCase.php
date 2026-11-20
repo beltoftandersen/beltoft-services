@@ -61,6 +61,8 @@ abstract class TestCase extends \WP_UnitTestCase {
 		// The per-request read memo is a static: a test that opened an account page or switched it on must not leave it on.
 		\BeltoftServices\Resource::memo_end();
 		\BeltoftServices\Usage\Catalog::forget();
+		\BeltoftServices\Usage\Items::reset();
+		\BeltoftServices\Proxmox\Addon\AddonCart::reset_products();
 		// The licenses activation table is outside WordPress' per-test rollback. A domain resource
 		// from an earlier test would be picked up by the daily sync during unrelated alert tests.
 		global $wpdb;

@@ -220,6 +220,17 @@ class ManualServerTest extends ManualServerTestCase {
 		$this->assertSame( 'provisioning', Resource::find( $r->id() )->get( 'state' ) );
 	}
 
+	public function test_a_busy_server_says_server_not_database(): void {
+		$v = $this->server_product();
+		$r = $this->ready_server( $v['u'], $this->new_user() );
+		$r->queue_desire( 'paused', 'Usage account on hold' );
+
+		$why = CustomerDelete::blocker( Resource::find( $r->id() ) );
+		$this->assertNotNull( $why );
+		$this->assertStringContainsString( 'this server', $why );
+		$this->assertStringNotContainsString( 'database', $why );
+	}
+
 	public function test_an_admin_cancel_tells_staff_and_closes_the_server(): void {
 		$v = $this->server_product();
 		$r = $this->ready_server( $v['u'], $this->new_user() );

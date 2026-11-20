@@ -22,6 +22,10 @@ final class AddonCart {
 	 */
 	public static function register_cart_hooks( string $class, Addon $a ): void {
 		self::register_pending_lines();
+		// The product found for an add-on kind is kept for the request: a saved or deleted product starts the lookup again.
+		add_action( 'woocommerce_after_product_object_save', array( __CLASS__, 'reset_products' ) );
+		add_action( 'woocommerce_after_product_variation_object_save', array( __CLASS__, 'reset_products' ) );
+		add_action( 'deleted_post', array( __CLASS__, 'reset_products' ) );
 		add_filter( 'woocommerce_add_to_cart_validation', array( $class, 'validate' ), 20, 6 );
 		add_filter( 'woocommerce_add_cart_item_data', array( $class, 'item_data' ), 20, 2 );
 		self::register_line_hooks( $a );
@@ -66,7 +70,19 @@ final class AddonCart {
 	public static function pending_can_put_back( $allowed, $item = array() ) {
 		$a = self::pending_kind( $item );
 
-		return $a ? self::cart_has_parent( $a ) : $allowed;
+		if ( ! $a ) {
+			return $allowed;
+		}
+
+		/**
+		 * Does a kept add-on line still fit its new server or database: the billing twin of the parent and the limit of addresses.
+		 * A kind that has such rules answers false; the default is true.
+		 *
+		 * @param bool                 $fits True.
+		 * @param array<string, mixed> $item The kept cart line.
+		 * @param Addon                $a    Add-on kind.
+		 */
+		return self::cart_has_parent( $a ) && (bool) apply_filters( 'beltoft_services_addon_line_fits', true, $item, $a );
 	}
 
 	/**
@@ -187,6 +203,34 @@ final class AddonCart {
 		if ( ! class_exists( '\\WC_Subscriptions_Product' ) ) {
 			return null;
 		}
+
+		// Looked up once per request: the cart hooks ask for it on every line and every removal. A saved product starts it again (register_cart_hooks).
+		$key = $driver_id . '|' . ( null === $usage ? 'any' : ( $usage ? 'usage' : 'monthly' ) );
+
+		if ( ! array_key_exists( $key, self::$products ) ) {
+			self::$products[ $key ] = self::find_single_product( $driver_id, $usage );
+		}
+
+		return self::$products[ $key ];
+	}
+
+	/** @var array<string, \WC_Product|null> */
+	private static array $products = array();
+
+	/**
+	 * Forgets the products found (a product was saved or deleted, or a test changed the catalogue).
+	 */
+	public static function reset_products(): void {
+		self::$products = array();
+	}
+
+	/**
+	 * The lookup behind single_product().
+	 *
+	 * @param string    $driver_id Driver id of the add-on.
+	 * @param bool|null $usage     See single_product().
+	 */
+	private static function find_single_product( string $driver_id, ?bool $usage ): ?\WC_Product {
 
 		$ids = get_posts( array( 'post_type' => 'product', 'post_status' => 'publish', 'fields' => 'ids', 'posts_per_page' => 5, 'meta_key' => Product::META_DRIVER, 'meta_value' => $driver_id ) ); // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key,WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- One product.
 
