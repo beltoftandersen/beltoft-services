@@ -247,7 +247,18 @@ final class Servers {
 				static function ( $view ) use ( $servers ): bool {
 					$parent = self::parent_of( $view );
 
-					return null === $parent || 0 === $parent['license_id'] || ! isset( $servers[ $parent['license_id'] ] );
+					if ( null === $parent || 0 === $parent['license_id'] ) {
+						return true;
+					}
+
+					if ( isset( $servers[ $parent['license_id'] ] ) ) {
+						return false;
+					}
+
+					// The IPv4 address of a database is shown on the database's own page, not as a row of this list.
+					$db = \BeltoftServices\Proxmox\Ipv4\Ipv4Driver::ID === (string) $parent['resource']->get( 'driver' ) ? Resource::for_license( $parent['license_id'] ) : null;
+
+					return ! ( $db && \BeltoftServices\Proxmox\Db\DbDriver::ID === (string) $db->get( 'driver' ) );
 				}
 			)
 		);
@@ -290,13 +301,13 @@ final class Servers {
 
 		$driver = (string) $resource->get( 'driver' );
 
-		if ( DiskDriver::ID !== $driver && SnapshotDriver::ID !== $driver && \BeltoftServices\Apps\AppLicenceDriver::ID !== $driver && \BeltoftServices\Proxmox\Managed\ManagedDriver::ID !== $driver ) {
+		if ( DiskDriver::ID !== $driver && SnapshotDriver::ID !== $driver && \BeltoftServices\Apps\AppLicenceDriver::ID !== $driver && \BeltoftServices\Proxmox\Managed\ManagedDriver::ID !== $driver && \BeltoftServices\Proxmox\Ipv4\Ipv4Driver::ID !== $driver ) {
 			return null;
 		}
 
 		return array(
 			'license_id' => max( 0, (int) $resource->get( 'server_license' ) ),
-			'tab'        => DiskDriver::ID === $driver ? 'disks' : ( SnapshotDriver::ID === $driver ? 'snapshots' : ( \BeltoftServices\Proxmox\Managed\ManagedDriver::ID === $driver ? '' : \BeltoftServices\Apps\AppTab::SLUG ) ),
+			'tab'        => DiskDriver::ID === $driver ? 'disks' : ( SnapshotDriver::ID === $driver ? 'snapshots' : ( \BeltoftServices\Proxmox\Managed\ManagedDriver::ID === $driver || \BeltoftServices\Proxmox\Ipv4\Ipv4Driver::ID === $driver ? '' : \BeltoftServices\Apps\AppTab::SLUG ) ),
 			'resource'   => $resource,
 		);
 	}

@@ -303,4 +303,42 @@ class Ipv4ServerTest extends FirewallTestCase {
 		$this->assertSame( 0, IpPool::available_for_addon(), 'The last address is kept for a new dedicated server.' );
 		$this->assertFalse( \BeltoftServices\Proxmox\Ipv4\Ipv4Cart::in_stock() );
 	}
+
+	public function test_traffic_from_an_extra_address_is_the_servers_traffic(): void {
+		$server = $this->server( 1 );
+		$addon  = $this->addon( $server );
+		$method = new \ReflectionMethod( \BeltoftServices\Proxmox\Network\Flows::class, 'resource_of' );
+		$method->setAccessible( true );
+
+		$this->assertSame( $server->id(), $method->invoke( null, (string) $addon->get( Ipv4Meta::ADDRESS ) )->id() );
+		$this->assertSame( $server->id(), $method->invoke( null, (string) $server->get( 'ip' ) )->id() );
+	}
+
+	public function test_an_app_on_a_server_with_ipv6_only_is_opened_by_its_ipv6_address(): void {
+		$basic = $this->server( 0 );
+		$app   = array( 'open' => array( 'port' => 8080 ) );
+
+		$this->assertSame( 'http://[' . $basic->get( 'ip6' ) . ']:8080/', \BeltoftServices\Apps\AppTab::url( $basic, $app ) );
+	}
+
+	public function test_the_dashboard_block_lists_the_addresses_sold_out_and_the_setup_lines(): void {
+		$server = $this->server( 1 );
+		$this->assertNull( \BeltoftServices\Proxmox\Ipv4\Ipv4Panels::view( $server ), 'No product and no address: no block.' );
+
+		$addon = $this->addon( $server );
+		$view  = \BeltoftServices\Proxmox\Ipv4\Ipv4Panels::view( Resource::find( $server->id() ) );
+
+		$this->assertSame( (string) $addon->get( Ipv4Meta::ADDRESS ), $view['addresses'][0]['address'] );
+		$this->assertSame( 'extra', $view['addresses'][0]['role'] );
+		$this->assertTrue( $view['addresses'][0]['live'] );
+		$this->assertFalse( $view['first_restarts'] );
+		$this->assertArrayHasKey( 'netplan', $view['setup'] );
+		$this->assertStringContainsString( $addon->get( Ipv4Meta::ADDRESS ) . '/32', $view['setup']['netplan'] );
+		$this->assertStringContainsString( 'ip addr add ' . $addon->get( Ipv4Meta::ADDRESS ) . '/32', $view['setup']['ifupdown'] );
+		$this->assertStringContainsString( '+ipv4.addresses ' . $addon->get( Ipv4Meta::ADDRESS ) . '/32', $view['setup']['networkmanager'] );
+		$this->assertStringNotContainsString( "\u{2014}", wp_json_encode( $view ) );
+
+		$basic = Resource::find( $this->server( 0 )->id() );
+		$this->assertTrue( Ipv4Meta::next_role( $basic, $addon ) === 'main' );
+	}
 }

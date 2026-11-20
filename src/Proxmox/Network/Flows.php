@@ -251,6 +251,11 @@ final class Flows {
 
 		$r = Resource::find( (int) $row['resource_id'] );
 
+		// An extra IPv4 address is held by its add-on: the traffic is the server's.
+		if ( $r && \BeltoftServices\Proxmox\Ipv4\Ipv4Driver::ID === $r->get( 'driver' ) ) {
+			$r = \BeltoftServices\Proxmox\Ipv4\Ipv4Meta::parent_of( $r );
+		}
+
 		if ( ! $r || ProxmoxDriver::ID !== $r->get( 'driver' ) || 'ready' !== $r->get( 'state' ) || true === $r->get( 'linked' ) ) {
 			return null;
 		}

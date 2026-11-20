@@ -146,7 +146,9 @@ final class AppTab {
 		$open   = (array) ( $app['open'] ?? array() );
 		$domain = (string) $r->get( 'app_domain' );
 		$ip     = (string) $r->get( 'ip' );
-		$host   = '' !== $domain ? $domain : ( false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ? $ip : '' );
+		$ip6    = \BeltoftServices\Proxmox\Vm\Panels::ip6( $r );
+		// A server with IPv6 only is opened by its IPv6 address, which a URL writes in brackets.
+		$host   = '' !== $domain ? $domain : ( false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ? $ip : ( '' !== $ip6 ? '[' . $ip6 . ']' : '' ) );
 
 		if ( '' === $host || ( ! isset( $open['path'] ) && ! isset( $open['port'] ) ) ) {
 			return '';
