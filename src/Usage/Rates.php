@@ -607,6 +607,8 @@ final class Rates {
 			}
 		} elseif ( SnapshotDriver::ID === $driver ) {
 			$out[] = array( 'item' => 'snapshots', 'quantity' => 1.0, 'unit' => 'pack', 'rate' => self::hourly( $monthly, $premium ) );
+		} elseif ( \BeltoftServices\Proxmox\Ipv4\Ipv4Driver::ID === $driver ) {
+			$out[] = array( 'item' => 'ipv4', 'quantity' => 1.0, 'unit' => 'hour', 'rate' => self::hourly( $monthly, $premium ) );
 		} elseif ( \BeltoftServices\Proxmox\Managed\ManagedDriver::ID === $driver ) {
 			$out[] = array( 'item' => 'managed', 'quantity' => 1.0, 'unit' => 'hour', 'rate' => self::hourly( $monthly, $premium ) );
 		} elseif ( AppLicenceDriver::ID === $driver ) {

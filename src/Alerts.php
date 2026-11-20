@@ -53,7 +53,8 @@ final class Alerts {
 	 *
 	 * Options: prefix (bool, default true) starts the subject with "[site name] "; newline (bool, default true) ends
 	 * the body with a newline; fallback (bool, default false) uses the WordPress admin address when the alert
-	 * address is not valid; ttl (int, default one day) is how long a dedupe key holds.
+	 * address is not valid; ttl (int, default one day) is how long a dedupe key holds; to (string) sends to this address
+	 * instead of the alert address, when it is a valid one.
 	 *
 	 * @param string               $subject    Subject, after the site name.
 	 * @param array<int, string>   $lines      Body lines.
@@ -73,7 +74,7 @@ final class Alerts {
 			$options
 		);
 
-		$to = self::address( (bool) $options['fallback'] );
+		$to = isset( $options['to'] ) && is_email( (string) $options['to'] ) ? (string) $options['to'] : self::address( (bool) $options['fallback'] );
 
 		if ( '' === $to ) {
 			if ( $resource ) {

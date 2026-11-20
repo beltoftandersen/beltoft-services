@@ -3,6 +3,7 @@
 
 namespace BeltoftServices\Proxmox\Addon;
 
+use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\SwitchLink;
 
@@ -108,7 +109,7 @@ final class AddonCart {
 		$requested_link = isset( $_REQUEST[ $a->cart_for() ] ) && is_scalar( $_REQUEST[ $a->cart_for() ] ) ? sanitize_text_field( wp_unslash( $_REQUEST[ $a->cart_for() ] ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- verified below.
 		$link           = $data[ $a->cart_for() ] ?? $requested_link;
 		if ( $a->accepts_cart_server && 'cart_server' === $link ) {
-			return DiskField::cart_server() ? 'cart_server' : null;
+			return self::cart_has_parent( $a ) ? 'cart_server' : null;
 		}
 		if ( ! is_scalar( $link ) || ! ctype_digit( (string) $link ) ) {
 			return null;
@@ -122,5 +123,44 @@ final class AddonCart {
 		}
 
 		return $owned( $id ) ? $id : null;
+	}
+
+	/**
+	 * Is there a new server in the cart for a line of this kind to be bought with: the one server of the cart, or for a kind that
+	 * also belongs to a database (the IPv4 address) the one new database?
+	 *
+	 * @param Addon $a Add-on kind.
+	 */
+	public static function cart_has_parent( Addon $a ): bool {
+		return null !== DiskField::cart_server() || ( in_array( \BeltoftServices\Proxmox\Db\DbDriver::ID, $a->also_parents, true ) && null !== \BeltoftServices\Proxmox\Db\DbIpField::new_database() );
+	}
+
+	/**
+	 * The published, purchasable subscription (a variation or a simple product) of an add-on kind that is one product, or null.
+	 *
+	 * @param string $driver_id Driver id of the add-on.
+	 */
+	public static function single_product( string $driver_id ): ?\WC_Product {
+		if ( ! class_exists( '\\WC_Subscriptions_Product' ) ) {
+			return null;
+		}
+
+		$ids = get_posts( array( 'post_type' => 'product', 'post_status' => 'publish', 'fields' => 'ids', 'posts_per_page' => 5, 'meta_key' => Product::META_DRIVER, 'meta_value' => $driver_id ) ); // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key,WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- One product.
+
+		foreach ( $ids as $id ) {
+			$product = wc_get_product( $id );
+
+			if ( $product instanceof \WC_Product_Variable ) {
+				foreach ( $product->get_available_variations( 'objects' ) as $variation ) {
+					if ( \WC_Subscriptions_Product::is_subscription( $variation ) && $variation->is_purchasable() ) {
+						return $variation;
+					}
+				}
+			} elseif ( $product && \WC_Subscriptions_Product::is_subscription( $product ) && $product->is_purchasable() ) {
+				return $product;
+			}
+		}
+
+		return null;
 	}
 }

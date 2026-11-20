@@ -115,7 +115,17 @@ final class EmailDetails {
 			return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Databases::class )->url( $license );
 		}
 
-		if ( DiskDriver::ID === $driver || SnapshotDriver::ID === $driver || AppLicenceDriver::ID === $driver || \BeltoftServices\Proxmox\Managed\ManagedDriver::ID === $driver ) {
+		if ( \BeltoftServices\Proxmox\Ipv4\Ipv4Driver::ID === $driver ) {
+			// The page of the server or the database the address is for.
+			$parent = \BeltoftServices\Proxmox\Ipv4\Ipv4Meta::parent_of( $r );
+
+			if ( $parent && DbDriver::ID === (string) $parent->get( 'driver' ) && ! $gone ) {
+				return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Databases::class )->url( (array) $parent->license() );
+			}
+
+			$server = $parent;
+			$tab    = '';
+		} elseif ( DiskDriver::ID === $driver || SnapshotDriver::ID === $driver || AppLicenceDriver::ID === $driver || \BeltoftServices\Proxmox\Managed\ManagedDriver::ID === $driver ) {
 			$server = Resource::for_license( (int) $r->get( 'server_license' ) );
 			$tab    = DiskDriver::ID === $driver ? 'disks' : ( SnapshotDriver::ID === $driver ? 'snapshots' : ( \BeltoftServices\Proxmox\Managed\ManagedDriver::ID === $driver ? '' : 'app' ) );
 		} elseif ( ProxmoxDriver::ID === $driver && ! $gone ) {
@@ -205,6 +215,19 @@ final class EmailDetails {
 			}
 			/* translators: %d: days a snapshot is kept */
 			$details[ __( 'Kept', 'beltoft-services' ) ] = sprintf( _n( 'Snapshots are kept %d day.', 'Snapshots are kept %d days.', $days, 'beltoft-services' ), $days );
+			return $details;
+		}
+		if ( \BeltoftServices\Proxmox\Ipv4\Ipv4Driver::ID === $r->get( 'driver' ) ) {
+			$parent = \BeltoftServices\Proxmox\Ipv4\Ipv4Meta::parent_of( $r );
+
+			if ( '' !== (string) $r->get( \BeltoftServices\Proxmox\Ipv4\Ipv4Meta::ADDRESS ) ) {
+				$details[ __( 'IPv4 address', 'beltoft-services' ) ] = (string) $r->get( \BeltoftServices\Proxmox\Ipv4\Ipv4Meta::ADDRESS );
+			}
+
+			if ( $parent && ProxmoxDriver::ID === (string) $parent->get( 'driver' ) ) {
+				$details[ __( 'Server', 'beltoft-services' ) ] = self::server_name( $parent );
+			}
+
 			return $details;
 		}
 		if ( \BeltoftServices\Proxmox\Managed\ManagedDriver::ID === $r->get( 'driver' ) ) {

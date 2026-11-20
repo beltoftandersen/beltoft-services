@@ -27,27 +27,7 @@ final class ManagedCart {
 
 	/** The published, purchasable subscription (a variation or a simple product) of the managed service, or null. */
 	public static function product(): ?\WC_Product {
-		if ( ! class_exists( '\\WC_Subscriptions_Product' ) ) {
-			return null;
-		}
-
-		$ids = get_posts( array( 'post_type' => 'product', 'post_status' => 'publish', 'fields' => 'ids', 'posts_per_page' => 5, 'meta_key' => Product::META_DRIVER, 'meta_value' => ManagedDriver::ID ) ); // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key,WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- One product.
-
-		foreach ( $ids as $id ) {
-			$product = wc_get_product( $id );
-
-			if ( $product instanceof \WC_Product_Variable ) {
-				foreach ( $product->get_available_variations( 'objects' ) as $variation ) {
-					if ( \WC_Subscriptions_Product::is_subscription( $variation ) && $variation->is_purchasable() ) {
-						return $variation;
-					}
-				}
-			} elseif ( $product && \WC_Subscriptions_Product::is_subscription( $product ) && $product->is_purchasable() ) {
-				return $product;
-			}
-		}
-
-		return null;
+		return AddonCart::single_product( ManagedDriver::ID );
 	}
 
 	/** May this server take the service: a ready, active server. */

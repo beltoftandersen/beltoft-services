@@ -72,7 +72,7 @@ final class AddonLink {
 		if ( is_numeric( $link ) && (int) $link > 0 ) {
 			$server = Licenses::find( (int) $link );
 
-			if ( $server && (int) $server['user_id'] === (int) $license['user_id'] && self::is_server( $server ) && ( ! $a->server_must_be_live || self::is_live_server( (int) $link ) ) ) {
+			if ( $server && (int) $server['user_id'] === (int) $license['user_id'] && self::is_parent( $a, $server ) && ( ! $a->server_must_be_live || self::is_live_server( (int) $link ) ) ) {
 				$meta['server_license'] = (int) $link;
 			}
 		} elseif ( 'cart_server' === $link && $a->accepts_cart_server ) {
@@ -124,6 +124,13 @@ final class AddonLink {
 		}
 
 		return $out;
+	}
+
+	/** Whether a license is a resource this kind can belong to: a server, or for the IPv4 add-on a database too. */
+	public static function is_parent( Addon $a, array $license ): bool {
+		$driver = Product::driver_for( (int) ( $license['product_id'] ?? 0 ) );
+
+		return $driver && in_array( $driver->id(), $a->parent_drivers(), true );
 	}
 
 	/** Whether a license is a Proxmox server (its product's driver). */

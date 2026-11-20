@@ -150,9 +150,12 @@ trait FirewallIpfilter {
 
 			$sets['ipfilter-net0'] = $ip;
 
+			// The extra IPv4 addresses the server has bought (the IPv4 add-on) go in the same set: the guest may send from them.
+			$extra = \BeltoftServices\Proxmox\Ipv4\Ipv4Meta::extra_addresses( $r );
+
 			// The IPv6 address goes in the same set: with ipfilter on, the guest may send from its own addresses only, so the set must never lack the IPv6 one once the guest has it.
-			if ( '' !== $ip6 ) {
-				$sets['ipfilter-net0'] = array( $ip, $ip6 );
+			if ( '' !== $ip6 || array() !== $extra ) {
+				$sets['ipfilter-net0'] = array_merge( array( $ip ), $extra, '' === $ip6 ? array() : array( $ip6 ) );
 			}
 		} elseif ( '' !== $ip6 ) {
 			// An IPv6 only server (VPS Basic without the IPv4 add-on): its public NIC is filtered on the IPv6 address alone.

@@ -283,7 +283,7 @@ class ProxmoxDriver implements Driver, StopsOnDelete, NeedsBilling, InternalActi
 	 * {@inheritDoc}
 	 */
 	public function internal_actions(): array {
-		return array_merge( Snapshots::INTERNAL, Firewall::INTERNAL );
+		return array_merge( Snapshots::INTERNAL, Firewall::INTERNAL, \BeltoftServices\Proxmox\Ipv4\Ipv4Server::ACTIONS );
 	}
 
 	/**

@@ -218,6 +218,11 @@ final class Stock {
 			return (int) ( Product::plan( $product->get_id() )['disk_gb'] ?? 0 ) >= 1; // No size, no disk to make.
 		}
 
+		// An IPv4 address is sold while one is free beyond the ones kept for new dedicated servers.
+		if ( $driver && \BeltoftServices\Proxmox\Ipv4\Ipv4Driver::ID === $driver->id() ) {
+			return IpPool::available_for_addon() > 0;
+		}
+
 		$plan = Product::plan( $product->get_id() );
 
 		if ( $driver && in_array( $driver->id(), array( ProxmoxDriver::ID, DbDriver::ID ), true ) && ! isset( Clusters::all()[ (string) ( $plan['cluster'] ?? '' ) ] ) ) {
@@ -225,7 +230,7 @@ final class Stock {
 		}
 
 		if ( $driver && DbDriver::ID === $driver->id() ) {
-			return ! ( (int) ( $plan['public_ip'] ?? 0 ) > 0 && 0 === IpPool::available_for_db() );
+			return ! ( (int) ( $plan['public_ip'] ?? 0 ) > 0 && 0 === IpPool::available_for_addon() );
 		}
 
 		// A server with no IPv4 address (VPS Basic without the add-on) needs the cluster's IPv6 and IPv6 name servers instead of a pool address.

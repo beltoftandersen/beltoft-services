@@ -59,6 +59,7 @@ final class ProxmoxSettings {
 		'snapshot_max_slots' => array( 1, 50 ),
 		'snapshot_reserve_gb' => array( 0, 10000 ),
 		'ip_reserve_for_vps' => array( 0, 100 ),
+		'ipv4_low_mark'    => array( 0, 1000 ),
 		'db_disk_max_gb'   => array( 1, 65536 ),
 		'db_disk_step_gb'  => array( 1, 1000 ),
 	);
@@ -243,7 +244,20 @@ final class ProxmoxSettings {
 			'default' => 1,
 			'min'     => self::RANGES['ip_reserve_for_vps'][0],
 			'label'   => __( 'Public IP addresses kept for servers', 'beltoft-services' ),
-			'desc'    => __( 'A database with a public IP address is sold out while no more than this many addresses are free, so the last address always stays available to a new server. 0 lets databases take the last one.', 'beltoft-services' ),
+			'desc'    => __( 'An IPv4 address add-on is sold out while no more than this many addresses are free, so the last address always stays available to a new dedicated server. 0 lets the add-on take the last one.', 'beltoft-services' ),
+		);
+		$fields['ipv4_alert_email'] = $base + array(
+			'type'    => 'email',
+			'default' => (string) get_option( 'admin_email' ),
+			'label'   => __( 'Send low IPv4 pool mails to', 'beltoft-services' ),
+			'desc'    => __( 'The address that is told when the free IPv4 addresses run low, are all used, or a customer met "no address is free". Empty: the failure alert address. Adding addresses is done by hand: buy them, add them on the IP pool screen and run the host script for the new range.', 'beltoft-services' ),
+		);
+		$fields['ipv4_low_mark'] = $base + array(
+			'type'    => 'number',
+			'default' => 2,
+			'min'     => self::RANGES['ipv4_low_mark'][0],
+			'label'   => __( 'Warn when this many IPv4 addresses are free', 'beltoft-services' ),
+			'desc'    => __( 'A mail is sent when the free addresses fall to this number, and another when none is left. At most one mail a day for each reason.', 'beltoft-services' ),
 		);
 		$fields['db_disk_max_gb'] = $base + array(
 			'type'    => 'number',

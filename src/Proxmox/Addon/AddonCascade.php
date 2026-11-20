@@ -3,7 +3,6 @@
 
 namespace BeltoftServices\Proxmox\Addon;
 
-use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -25,11 +24,15 @@ final class AddonCascade {
 	public static function state_changed( $resource, $old, $new ): void {
 		unset( $old );
 
-		if ( ! $resource instanceof Resource || 'deleted' !== $new || ProxmoxDriver::ID !== $resource->get( 'driver' ) ) {
+		if ( ! $resource instanceof Resource || 'deleted' !== $new ) {
 			return;
 		}
 
 		foreach ( Addon::all() as $a ) {
+			if ( ! in_array( (string) $resource->get( 'driver' ), $a->parent_drivers(), true ) ) {
+				continue;
+			}
+
 			foreach ( AddonLink::for_server( $a, $resource ) as $addon ) {
 				if ( $a->skips_deleted && 'deleted' === $addon->get( 'state' ) ) {
 					continue;

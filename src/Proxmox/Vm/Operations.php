@@ -677,7 +677,7 @@ final class Operations {
 	 * Is this a server with IPv6 only: no IPv4 address in its plan (VPS Basic without the add-on)?
 	 */
 	private function ipv6_only(): bool {
-		return ! VpsProfile::plan_has_ipv4( (array) $this->r->get( 'plan' ) );
+		return ! ( new VpsProfile( $this->r ) )->uses_public_ip();
 	}
 
 	/**

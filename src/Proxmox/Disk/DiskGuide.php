@@ -175,7 +175,7 @@ final class DiskGuide {
 		$target = $r;
 		$driver = (string) $r->get( 'driver' );
 
-		if ( DiskDriver::ID === $driver || SnapshotDriver::ID === $driver || AppLicenceDriver::ID === $driver || \BeltoftServices\Proxmox\Managed\ManagedDriver::ID === $driver ) {
+		if ( DiskDriver::ID === $driver || SnapshotDriver::ID === $driver || AppLicenceDriver::ID === $driver || \BeltoftServices\Proxmox\Managed\ManagedDriver::ID === $driver || \BeltoftServices\Proxmox\Ipv4\Ipv4Driver::ID === $driver ) {
 			$server = Resource::for_license( (int) $r->get( 'server_license' ) );
 			$target = $server ? $server : $r;
 		}

@@ -204,6 +204,9 @@ final class CoreHooks {
 		if ( ! isset( $drivers[ 'proxmox-snapshots' ] ) ) {
 			$drivers[ 'proxmox-snapshots' ] = new SnapshotDriver();
 		}
+		if ( ! isset( $drivers[ \BeltoftServices\Proxmox\Ipv4\Ipv4Driver::ID ] ) ) {
+			$drivers[ \BeltoftServices\Proxmox\Ipv4\Ipv4Driver::ID ] = new \BeltoftServices\Proxmox\Ipv4\Ipv4Driver();
+		}
 		if ( ! isset( $drivers[ \BeltoftServices\Proxmox\Managed\ManagedDriver::ID ] ) ) {
 			$drivers[ \BeltoftServices\Proxmox\Managed\ManagedDriver::ID ] = new \BeltoftServices\Proxmox\Managed\ManagedDriver();
 		}

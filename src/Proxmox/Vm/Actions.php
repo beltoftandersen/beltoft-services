@@ -515,7 +515,7 @@ final class Actions {
 	 */
 	public function run( string $action, array $args ): StepResult {
 		$internal = in_array( $action, Snapshots::INTERNAL, true );
-		$plugin   = $internal || in_array( $action, Firewall::INTERNAL, true );
+		$plugin   = $internal || in_array( $action, Firewall::INTERNAL, true ) || \BeltoftServices\Proxmox\Ipv4\Ipv4Server::is_action( $action );
 
 		if ( ! $plugin && ! isset( self::FLOORS[ $action ] ) ) {
 			return StepResult::fail( 'This action is not available' );
@@ -590,6 +590,10 @@ final class Actions {
 				return ( new BackupDelete( $this->r, $this ) )->delete( $record, $v, (string) $args['volid'] );
 			case ServerName::ACTION:
 				return ( new AccessActions( $this->r, $this ) )->rename( $record, $v, (string) $args['name'] );
+			case \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_ADD:
+			case \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_REMOVE:
+			case \BeltoftServices\Proxmox\Ipv4\Ipv4Server::SYNC:
+				return ( new \BeltoftServices\Proxmox\Ipv4\Ipv4Server( $this->r, $this ) )->run( $action, $record, $v );
 			default:
 				return ( new Reinstall( $this->r, $this ) )->reinstall( $record, $args );
 		}

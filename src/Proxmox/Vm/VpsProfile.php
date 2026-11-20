@@ -52,11 +52,12 @@ final class VpsProfile implements BuildProfile {
 	}
 
 	/**
-	 * Does the server have a public IPv4 address? Always, unless its plan says `public_ip` 0 (VPS Basic without the add-on).
+	 * Does the server have a public IPv4 address? Always, unless its plan says `public_ip` 0 (VPS Basic) and the IPv4 add-on has not given it one.
 	 * A plan stored before the field existed has no value and means yes. A profile made without a resource (a filter, a test) says yes.
 	 */
 	public function uses_public_ip(): bool {
-		return null === $this->r || self::plan_has_ipv4( (array) $this->r->get( 'plan' ) );
+		// A plan without IPv4 (VPS Basic) still has one once the IPv4 add-on gave it a main address (meta `ip`).
+		return null === $this->r || self::plan_has_ipv4( (array) $this->r->get( 'plan' ) ) || false !== filter_var( (string) $this->r->get( 'ip' ), FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 );
 	}
 
 	public function hold_address( int $resource_id ): ?array {

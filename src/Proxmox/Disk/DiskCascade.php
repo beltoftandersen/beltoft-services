@@ -105,7 +105,7 @@ final class DiskCascade {
 		}
 		foreach ( Licenses::where( 'subscription_id', (int) $subscription->get_id() ) as $license ) {
 			$server = Resource::for_license( (int) $license['id'] );
-			if ( $server && ProxmoxDriver::ID === $server->get( 'driver' ) ) {
+			if ( $server && in_array( (string) $server->get( 'driver' ), array( ProxmoxDriver::ID, \BeltoftServices\Proxmox\Db\DbDriver::ID ), true ) ) {
 				self::end_disks( $subscription, $server, $status );
 			}
 		}
@@ -125,7 +125,7 @@ final class DiskCascade {
 		$server_sub_id = (int) $subscription->get_id();
 		foreach ( Licenses::where( 'subscription_id', $server_sub_id ) as $license ) {
 			$server = Resource::for_license( (int) $license['id'] );
-			if ( ! $server || ProxmoxDriver::ID !== $server->get( 'driver' ) ) {
+			if ( ! $server || ! in_array( (string) $server->get( 'driver' ), array( ProxmoxDriver::ID, \BeltoftServices\Proxmox\Db\DbDriver::ID ), true ) ) {
 				continue;
 			}
 			$seen = array();
@@ -211,6 +211,11 @@ final class DiskCascade {
 		if ( SnapshotDriver::ID === $driver ) {
 			/* translators: %d: add-on subscription number. */
 			return sprintf( $again ? __( 'Snapshot slots subscription #%d is active again with this server.', 'beltoft-services' ) : __( 'Snapshot slots subscription #%d ends with this server.', 'beltoft-services' ), $id );
+		}
+
+		if ( \BeltoftServices\Proxmox\Ipv4\Ipv4Driver::ID === $driver ) {
+			/* translators: %d: add-on subscription number. */
+			return sprintf( $again ? __( 'IPv4 address subscription #%d is active again with its server or database.', 'beltoft-services' ) : __( 'IPv4 address subscription #%d ends with its server or database.', 'beltoft-services' ), $id );
 		}
 
 		if ( \BeltoftServices\Proxmox\Managed\ManagedDriver::ID === $driver ) {

@@ -432,17 +432,17 @@ final class IpPool {
 	}
 
 	/**
-	 * Addresses kept for new servers (setting `ip_reserve_for_vps`, default 1): a database with a public IP is not
-	 * sold while no more than this many are free, so the last address always stays available to a server.
+	 * Addresses kept for new dedicated servers (setting `ip_reserve_for_vps`, default 1): an IPv4 add-on is not sold
+	 * while no more than this many are free, so the last address always stays available to a new server.
 	 */
 	public static function reserve_for_vps(): int {
 		return max( 0, (int) \BeltoftServices\Settings::get( 'ip_reserve_for_vps' ) );
 	}
 
 	/**
-	 * How many addresses a database may still take: the free ones minus the reserve for servers.
+	 * How many IPv4 add-ons can still be sold: the free addresses minus the reserve for new dedicated servers.
 	 */
-	public static function available_for_db(): int {
+	public static function available_for_addon(): int {
 		return max( 0, self::free_count() - self::reserve_for_vps() );
 	}
 
@@ -453,6 +453,7 @@ final class IpPool {
 	private static function changed(): void {
 		delete_transient( self::FREE_TRANSIENT );
 		Stock::sync();
+		\BeltoftServices\Proxmox\Ipv4\Ipv4Alerts::pool_changed( self::free_count() );
 	}
 
 	/**
