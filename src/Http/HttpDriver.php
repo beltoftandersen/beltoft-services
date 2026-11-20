@@ -8,6 +8,7 @@
 namespace BeltoftServices\Http;
 
 use BeltoftServices\Api\Routes;
+use BeltoftServices\Drivers\CountsUsage;
 use BeltoftServices\Drivers\Driver;
 use BeltoftServices\Drivers\Opens;
 use BeltoftServices\Drivers\StepResult;
@@ -34,7 +35,7 @@ defined( 'ABSPATH' ) || exit;
  * errors are retried (a Retry-After of up to a day is accepted; the Reconciler never waits less
  * than its backoff step nor more than 14400 seconds); anything else fails. Redirects are not followed.
  */
-final class HttpDriver implements Driver, Opens {
+final class HttpDriver implements Driver, Opens, CountsUsage {
 
 	/**
 	 * Error when a provision answer carries no remote id.
