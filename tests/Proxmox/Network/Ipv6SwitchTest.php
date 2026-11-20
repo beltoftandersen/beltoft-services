@@ -142,6 +142,18 @@ class Ipv6SwitchTest extends BackupTestCase {
 		$this->assertArrayNotHasKey( Ipv6Switch::ADD, Actions::offered( $fresh ) );
 	}
 
+	public function test_a_reboot_task_that_fails_still_ends_the_operation(): void {
+		$r = $this->plain_vm();
+		$this->fake->next_task( array( 'exitstatus' => 'command timed out - aborting', 'effect' => false ) );
+
+		$this->act( $r, Ipv6Switch::ADD );
+
+		$fresh = Resource::find( $r->id() );
+		$this->assertNull( $fresh->get( Ipv6Switch::OP ), 'The operation marker is cleared, so the customer has the button back.' );
+		$this->assertStringContainsString( 'did not restart', (string) $this->last( $r )['text'] );
+		$this->assertArrayHasKey( Ipv6Switch::REMOVE, Actions::offered( $fresh ) );
+	}
+
 	public function test_a_stopped_server_is_not_started_and_takes_the_address_at_its_next_start(): void {
 		$r = $this->plain_vm();
 		$this->fake->request( 'POST', '/nodes/node-a/qemu/5000/status/stop' );
