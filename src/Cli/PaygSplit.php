@@ -154,7 +154,6 @@ final class PaygSplit {
 				'nopaging'         => true,
 				'orderby'          => 'ID',
 				'order'            => 'ASC',
-				'suppress_filters' => true,
 			)
 		);
 		$out = array();
@@ -178,7 +177,6 @@ final class PaygSplit {
 					'nopaging'         => true,
 					'orderby'          => 'ID',
 					'order'            => 'ASC',
-					'suppress_filters' => true,
 				)
 			);
 
