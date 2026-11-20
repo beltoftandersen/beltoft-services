@@ -66,7 +66,19 @@ final class AddonCart {
 	public static function pending_can_put_back( $allowed, $item = array() ) {
 		$a = self::pending_kind( $item );
 
-		return $a ? self::cart_has_parent( $a ) : $allowed;
+		if ( ! $a ) {
+			return $allowed;
+		}
+
+		/**
+		 * Does a kept add-on line still fit its new server or database: the billing twin of the parent and the limit of addresses.
+		 * A kind that has such rules answers false; the default is true.
+		 *
+		 * @param bool                 $fits True.
+		 * @param array<string, mixed> $item The kept cart line.
+		 * @param Addon                $a    Add-on kind.
+		 */
+		return self::cart_has_parent( $a ) && (bool) apply_filters( 'beltoft_services_addon_line_fits', true, $item, $a );
 	}
 
 	/**

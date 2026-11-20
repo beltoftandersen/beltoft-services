@@ -40,6 +40,34 @@ final class Ipv4Cart {
 	 */
 	public static function register(): void {
 		AddonCart::register_cart_hooks( __CLASS__, self::addon() );
+		add_filter( 'beltoft_services_addon_line_fits', array( __CLASS__, 'line_fits' ), 10, 3 );
+	}
+
+	/**
+	 * Filter beltoft_services_addon_line_fits: a kept address line of the new server or database comes back only when its billing
+	 * is the one of that parent (a stale write may carry a line of the other billing) and the parent can take one more.
+	 *
+	 * @param mixed $fits True so far.
+	 * @param mixed $item The kept cart line.
+	 * @param mixed $a    Add-on kind.
+	 */
+	public static function line_fits( $fits, $item = array(), $a = null ) {
+		if ( ! $a instanceof Addon || Ipv4Driver::ID !== $a->driver_id || ! is_array( $item ) ) {
+			return $fits;
+		}
+
+		$target = Ipv4Field::target();
+
+		return null !== $target && self::line_billing_ok( $item ) && self::in_cart( 'cart_server' ) < (int) $target['max'];
+	}
+
+	/**
+	 * Is the billing of a cart_server line the billing of the new server or database of the cart?
+	 *
+	 * @param array<string, mixed> $item Cart line.
+	 */
+	private static function line_billing_ok( array $item ): bool {
+		return Rates::is_usage( (int) ( $item['variation_id'] ?? 0 ) ) === self::cart_parent_usage();
 	}
 
 	/**
@@ -290,7 +318,9 @@ final class Ipv4Cart {
 			if ( 'cart_server' === $link ) {
 				$target = Ipv4Field::target();
 
-				if ( null === $target ) {
+				if ( null !== $target && ! self::line_billing_ok( $item ) ) {
+					$errors->add( 'ipv4_billing', __( 'This IPv4 address is not sold with the billing of this server or database. Add it from the page of the service.', 'beltoft-services' ) );
+				} elseif ( null === $target ) {
 					$errors->add( 'ipv4_parent_unavailable', Ipv4Field::both() ? self::both_text() : __( 'The server or database for the IPv4 address is no longer available.', 'beltoft-services' ) );
 				} elseif ( ++$new > (int) $target['max'] ) {
 					$errors->add( 'ipv4_limit', __( 'This server or database cannot take another IPv4 address.', 'beltoft-services' ) );
