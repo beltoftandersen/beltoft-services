@@ -16,6 +16,7 @@ use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Disk\DiskCart;
 use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Proxmox\Disk\DiskPanels;
+use BeltoftServices\Proxmox\Disk\UsageDisk;
 use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\Mcp\CallsTools;
@@ -26,7 +27,6 @@ use BeltoftServices\Usage\Ledger;
 use BeltoftServices\Usage\Meter;
 use BeltoftServices\Usage\Rates;
 use BeltoftServices\Usage\Renewal;
-use BeltoftServices\Usage\UsageDisk;
 
 require_once __DIR__ . '/UsageTestCase.php';
 require_once dirname( __DIR__ ) . '/Mcp/CallsTools.php';
