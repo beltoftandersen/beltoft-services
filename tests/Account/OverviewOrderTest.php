@@ -357,4 +357,36 @@ final class OverviewOrderTest extends TestCase {
 		$foreign->set( array( 'server_license' => (int) $server_license['id'] ) );
 		$this->assertNull( \BeltoftServices\Account\OrderTarget::license_for( $other ) );
 	}
+
+	public function test_an_add_on_order_without_services_yet_still_returns_to_its_server_from_its_line_meta(): void {
+		$this->settings( array( OrderHandoff::SETTING => 1 ) );
+		$server_product = $this->service_product( 'fake', array(), array( 'slug' => 'oo-' . wp_generate_password( 6, false ) ) );
+		$server_license = $this->service_license( $server_product, array( 'fire' => false, 'user_id' => $this->user ) );
+		Resource::create( $server_license, Registry::get( 'fake' ), array(), array( 'state' => 'ready' ) );
+
+		$order   = wc_create_order( array( 'customer_id' => $this->user, 'status' => 'processing' ) );
+		$product = $this->service_product( 'fake', array(), array( 'slug' => 'oo-' . wp_generate_password( 6, false ) ) );
+		$item    = new \WC_Order_Item_Product();
+		$item->set_product_id( $product->get_id() );
+		$item->add_meta_data( \BeltoftServices\Proxmox\Addon\Addon::all()[0]->item_server(), (int) $server_license['id'], true );
+		$order->add_item( $item );
+		$order->save();
+		$order = wc_get_order( $order->get_id() );
+
+		$this->assertSame( array(), \BeltoftServices\ThankYou::resources( $order ), 'The add-on service is not made yet.' );
+		$this->assertSame( (int) $server_license['id'], (int) \BeltoftServices\Account\OrderTarget::license_for( $order )['id'] );
+
+		$url = OrderHandoff::target( $order );
+		$this->assertNotSame( '', $url );
+		$this->assertStringNotContainsString( 'order=', $url, 'To the server page, not the overview.' );
+
+		// Another customer's server is not a target: the new order goes to the overview.
+		wp_set_current_user( self::factory()->user->create() );
+		$foreign = wc_create_order( array( 'customer_id' => get_current_user_id(), 'status' => 'processing' ) );
+		$line    = clone $item;
+		$line->set_id( 0 );
+		$foreign->add_item( $line );
+		$foreign->save();
+		$this->assertNull( \BeltoftServices\Account\OrderTarget::license_for( wc_get_order( $foreign->get_id() ) ) );
+	}
 }

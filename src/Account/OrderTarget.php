@@ -9,6 +9,8 @@ namespace BeltoftServices\Account;
 
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Hosting\Addons;
+use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Addon\Addon;
 use BeltoftServices\Resource;
 use BeltoftServices\ThankYou;
 
@@ -73,6 +75,13 @@ final class OrderTarget {
 			return null;
 		}
 
+		// An add-on line names its server in its own line meta (set at add to cart), so the page is known before the add-on's service exists.
+		$by_line = self::server_from_lines( $order );
+
+		if ( null !== $by_line ) {
+			return $by_line ?: null;
+		}
+
 		$resources = ThankYou::resources( $order );
 
 		if ( ! $resources ) {
@@ -94,5 +103,55 @@ final class OrderTarget {
 		$server = Licenses::find( $parent );
 
 		return $server && (int) $server['user_id'] === (int) $order->get_customer_id() ? $server : null;
+	}
+
+	/**
+	 * The server the add-on lines of the order are for, read from the lines' own meta: the licence row of that server, false when the
+	 * lines point to no single server of the customer (a mix, or another customer's), null when no line is an add-on line.
+	 *
+	 * @param \WC_Order $order Order.
+	 * @return array<string, mixed>|false|null
+	 */
+	private static function server_from_lines( \WC_Order $order ) {
+		$parent = 0;
+		$linked = 0;
+		$other  = 0;
+
+		foreach ( $order->get_items() as $item ) {
+			if ( ! $item instanceof \WC_Order_Item_Product || ! Product::is_service( (int) ( $item->get_variation_id() ?: $item->get_product_id() ) ) ) {
+				continue;
+			}
+
+			$link = 0;
+
+			foreach ( Addon::all() as $addon ) {
+				$value = $item->get_meta( $addon->item_server(), true );
+
+				if ( is_numeric( $value ) && (int) $value > 0 ) {
+					$link = (int) $value;
+					break;
+				}
+			}
+
+			if ( $link < 1 ) {
+				++$other;
+				continue;
+			}
+
+			if ( $parent > 0 && $parent !== $link ) {
+				return false;
+			}
+
+			$parent = $link;
+			++$linked;
+		}
+
+		if ( 0 === $linked ) {
+			return null;
+		}
+
+		$server = 0 === $other ? Licenses::find( $parent ) : null;
+
+		return $server && (int) $server['user_id'] === (int) $order->get_customer_id() ? $server : false;
 	}
 }
