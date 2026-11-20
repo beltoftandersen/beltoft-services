@@ -73,6 +73,12 @@ final class Switches {
 				return $message;
 			}
 
+			$ip_error = VpsIp::switch_error( (int) $subscription->get_id(), (int) $product_id, $target, $item );
+
+			if ( '' !== $ip_error ) {
+				return $ip_error;
+			}
+
 			$have = array(
 				'disk_gb'   => 0,
 				'cores'     => 0,

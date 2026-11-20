@@ -649,11 +649,16 @@ final class Operations {
 		$have = (string) ( $v['config']['ipconfig0'] ?? '' );
 		$vmid = (int) $record['vmid'];
 
-		if ( ! $this->has_ipv6() || true === $this->r->get( 'linked' ) || null === Ipv6::address( $this->cluster, $vmid ) || ! self::has_public_ipv4( $have ) || Ipv6::has_ipconfig( $have, $this->cluster, $vmid ) ) {
+		$only = $this->ipv6_only();
+
+		// An IPv6 only server (VPS Basic without the add-on) must have no IPv4 part at all: a restored backup may carry one the pool no longer holds for it.
+		$settled = $only ? Ipv6::strip( $have ) === '' : self::has_public_ipv4( $have );
+
+		if ( ! $this->has_ipv6() || true === $this->r->get( 'linked' ) || null === Ipv6::address( $this->cluster, $vmid ) || ( ! $only && ! $settled ) || ( $only && $settled && Ipv6::has_ipconfig( $have, $this->cluster, $vmid ) ) || ( ! $only && Ipv6::has_ipconfig( $have, $this->cluster, $vmid ) ) ) {
 			return $v;
 		}
 
-		$params = array( 'ipconfig0' => Ipv6::with_ipconfig( $have, $this->cluster, $vmid ) );
+		$params = array( 'ipconfig0' => $only ? Ipv6::ipconfig( $this->cluster, $vmid ) : Ipv6::with_ipconfig( $have, $this->cluster, $vmid ) );
 
 		if ( ! empty( $v['config']['digest'] ) ) {
 			$params['digest'] = (string) $v['config']['digest'];
@@ -666,6 +671,13 @@ final class Operations {
 		}
 
 		return $this->verified( $record, 'update' );
+	}
+
+	/**
+	 * Is this a server with IPv6 only: no IPv4 address in its plan (VPS Basic without the add-on)?
+	 */
+	private function ipv6_only(): bool {
+		return ! \BeltoftServices\Proxmox\Network\PublicIp::wants( (array) $this->r->get( 'plan' ), 1 );
 	}
 
 	/**
@@ -709,11 +721,13 @@ final class Operations {
 
 		$vmid = (int) $record['vmid'];
 
-		if ( true === $this->r->get( 'linked' ) || null === Ipv6::address( $this->cluster, $vmid ) || ! self::has_public_ipv4( (string) ( $v['config']['ipconfig0'] ?? '' ) ) ) {
+		$have_cfg = (string) ( $v['config']['ipconfig0'] ?? '' );
+
+		if ( true === $this->r->get( 'linked' ) || null === Ipv6::address( $this->cluster, $vmid ) || ( ! $this->ipv6_only() && ! self::has_public_ipv4( $have_cfg ) ) ) {
 			return 'skipped';
 		}
 
-		$changed = ! Ipv6::has_ipconfig( (string) ( $v['config']['ipconfig0'] ?? '' ), $this->cluster, $vmid );
+		$changed = ! Ipv6::has_ipconfig( $have_cfg, $this->cluster, $vmid ) || ( $this->ipv6_only() && '' !== Ipv6::strip( $have_cfg ) );
 		$after   = $this->sync_ipv6( $record, $v );
 
 		if ( $after instanceof StepResult ) {

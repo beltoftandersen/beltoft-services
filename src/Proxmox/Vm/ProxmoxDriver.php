@@ -149,6 +149,13 @@ class ProxmoxDriver implements Driver, StopsOnDelete, NeedsBilling, InternalActi
 				0,
 				true,
 			),
+			'public_ip' => array(
+				'number',
+				__( 'Public IPv4', 'beltoft-services' ),
+				__( '1 (the default) gives the server a public IPv4 address from the pool. 0 makes a server with IPv6 only (VPS Basic). To sell the address as an add-on, make a variation pair that differs only in this field and in one attribute.', 'beltoft-services' ),
+				1,
+				true,
+			),
 			'backup_days' => array(
 				'number',
 				__( 'Backup days', 'beltoft-services' ),
@@ -227,6 +234,18 @@ class ProxmoxDriver implements Driver, StopsOnDelete, NeedsBilling, InternalActi
 	 * @param Resource $r Resource.
 	 */
 	public function update_plan( Resource $r ): StepResult {
+		// A change of the public IPv4 add-on (VPS Basic) is made first, to the network settings; the rest of the plan change follows.
+		if ( '' !== VpsIp::wanted( $r ) ) {
+			$change = new VpsIp( $r );
+			$ip     = $change->signal( $change->run() );
+
+			if ( ! $ip->is_done() ) {
+				return $ip;
+			}
+
+			$r = Resource::find( $r->id() ) ?? $r;
+		}
+
 		$op = new Operations( $r );
 
 		return $op->signal( $op->update_plan() );

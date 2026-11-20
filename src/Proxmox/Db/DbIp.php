@@ -10,12 +10,12 @@ namespace BeltoftServices\Proxmox\Db;
 use BeltoftServices\Billing\SwitchGuard;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
-use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Network\Firewall;
 use BeltoftServices\Proxmox\Network\IpHistory;
 use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Network\Ipv6;
 use BeltoftServices\Proxmox\Network\NetConfig;
+use BeltoftServices\Proxmox\Network\PublicIp;
 use BeltoftServices\Proxmox\Pve\Prepares;
 use BeltoftServices\Proxmox\Pve\Steps;
 use BeltoftServices\Proxmox\Vm\Operations;
@@ -66,7 +66,7 @@ final class DbIp {
 	 * @param array<string, mixed> $plan Plan.
 	 */
 	public static function plan_wants( array $plan ): bool {
-		return (int) ( $plan['public_ip'] ?? 0 ) > 0;
+		return PublicIp::wants( $plan, 0 );
 	}
 
 	/**
@@ -221,11 +221,13 @@ final class DbIp {
 			return '';
 		}
 
-		foreach ( SwitchGuard::resources( $subscription_id, $item, DbDriver::ID, $product_id ) as $resource ) {
-			if ( null === IpPool::for_resource( $resource->id() ) && 0 === IpPool::available_for_db() ) {
-				return __( 'No public IP address is available right now. Please try again later.', 'beltoft-services' );
-			}
+		$pool = PublicIp::pool_error( $subscription_id, $product_id, DbDriver::ID, $item );
 
+		if ( '' !== $pool ) {
+			return $pool;
+		}
+
+		foreach ( SwitchGuard::resources( $subscription_id, $item, DbDriver::ID, $product_id ) as $resource ) {
 			// The new address reaches the guest through its agent: a stopped database cannot take it (the add would wait out its budget and fail after payment).
 			if ( DbPower::stopped( $resource ) ) {
 				return __( 'Start the database before you add the public IP address.', 'beltoft-services' );
@@ -243,9 +245,7 @@ final class DbIp {
 	 * @param bool     $with Whether the target has the public IP.
 	 */
 	public static function switch_url( Resource $r, bool $with ): string {
-		$sibling = self::sibling( $r, $with );
-
-		return null === $sibling ? '' : Backups::switch_to( $r, $sibling );
+		return PublicIp::switch_url( $r, $with );
 	}
 
 	/**
@@ -255,10 +255,7 @@ final class DbIp {
 	 * @param bool     $with Whether the target has the public IP.
 	 */
 	public static function price_label( Resource $r, bool $with ): string {
-		$variation = wc_get_product( (int) ( $r->license()['variation_id'] ?? 0 ) );
-		$sibling   = self::sibling( $r, $with );
-
-		return $variation instanceof \WC_Product_Variation && null !== $sibling ? Backups::price_difference( $variation, $sibling ) : '';
+		return PublicIp::price_label( $r, $with );
 	}
 
 	/**
@@ -268,10 +265,7 @@ final class DbIp {
 	 * @param bool     $with Whether the sibling has the public IP.
 	 */
 	public static function sibling( Resource $r, bool $with ): ?\WC_Product_Variation {
-		$id        = (int) ( $r->license()['variation_id'] ?? 0 );
-		$variation = $id > 0 && function_exists( 'wc_get_product' ) ? wc_get_product( $id ) : null;
-
-		return $variation instanceof \WC_Product_Variation ? Backups::sibling_by( $variation, 'public_ip', $with ) : null;
+		return PublicIp::sibling( $r, $with );
 	}
 
 	// -- The operation ---------------------------------------------------------------------------------

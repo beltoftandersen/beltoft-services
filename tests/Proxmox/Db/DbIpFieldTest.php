@@ -79,7 +79,7 @@ class DbIpFieldTest extends BackupTestCase {
 				$v->set_attributes( array( 'plan' => $name, 'public-ip' => $with ) );
 				$v->set_regular_price( (string) ( $price + ( 'Yes' === $with ? 5 : 0 ) ) );
 				$v->set_status( 'publish' );
-				$v->update_meta_data( Product::META_PLAN . 'public_ip', 'Yes' === $with ? '1' : '0' );
+				$v->update_meta_data( Product::META_PLAN . 'public_ip', 'Yes' === $with || 'proxmox-db' !== $driver ? '1' : '0' ); // A server plan without the address is a VPS Basic plan: it needs IPv6 on the cluster to be in stock.
 				$v->save();
 				$out[ $name . '-' . $with ] = $v;
 			}

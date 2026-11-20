@@ -79,7 +79,7 @@ class DbDiskFieldTest extends BackupTestCase {
 				$v->set_attributes( array( 'extra-storage' => $set[0], 'public-ip' => $with ? 'Yes' : 'No' ) );
 				$v->set_regular_price( (string) ( $set[1] + ( $with ? 5 : 0 ) ) );
 				$v->set_status( 'publish' );
-				$v->update_meta_data( Product::META_PLAN . 'public_ip', (string) $with );
+				$v->update_meta_data( Product::META_PLAN . 'public_ip', 'proxmox-db' !== $driver ? '1' : (string) $with ); // A server plan without the address would need IPv6 on the cluster to be in stock.
 				$v->update_meta_data( Product::META_PLAN . 'extra_disk_gb', (string) $extra );
 				$v->save();
 				$out[ 'e' . $extra . '-' . $with ] = $v;

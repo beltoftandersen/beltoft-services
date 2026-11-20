@@ -16,6 +16,7 @@ use BeltoftServices\Proxmox\Network\Firewall;
 use BeltoftServices\Proxmox\Network\FirewallRules;
 use BeltoftServices\Proxmox\Network\Ipv6;
 use BeltoftServices\Proxmox\Network\Monitor;
+use BeltoftServices\Proxmox\Network\PublicIp;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\Ownership;
 use BeltoftServices\Proxmox\Snapshot\PanelData;
@@ -75,6 +76,7 @@ final class Panels {
 		$power   = null === $status ? '' : (string) $status['power'];
 		$busy    = (bool) \BeltoftServices\Progress::build( $resource )['active'];
 		$ip      = (string) $resource->get( 'ip' );
+		$ip      = false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ? $ip : self::ip6( $resource );
 		$title   = is_array( $view ) && isset( $view['product'] ) ? (string) $view['product'] : \BeltoftLicenses\Account\View::product_name( $license );
 		$product = \BeltoftLicenses\Account\View::product_name( $license );
 		$offered = $resource->accepts_actions() && 'ready' === $state ? Actions::offered( $resource ) : array();
@@ -93,7 +95,7 @@ final class Panels {
 			'resource_id' => $resource->id(),
 			'can_rename' => $resource->accepts_actions() && true !== $resource->get( 'linked' ),
 			'server_name' => ServerName::of( $resource ),
-			'ip'         => false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ? $ip : '',
+			'ip'         => $ip,
 			'ssh_user'   => Provision::LOGIN_USER,
 			'actions'    => array_intersect_key( $offered, array_flip( array( 'start', 'reboot', 'shutdown' ) ) ),
 			'billing_note' => 'server' === \BeltoftServices\Usage\CustomerDelete::kind( $resource ) ? \BeltoftServices\Usage\CustomerDelete::billing_note( 'server' ) : '',
@@ -244,6 +246,36 @@ final class Panels {
 	}
 
 	/**
+	 * What the IPv4 add-on block shows (VPS Basic: the address is a paid add-on), from stored data only, or null when the
+	 * server has no such add-on to offer or remove (a server with IPv4 included has no pair of variations).
+	 *
+	 * @param Resource $r Resource.
+	 * @return array{has: bool, busy: bool, add_url: string, add_price: string, remove_url: string}|null
+	 */
+	public static function ipv4_panel( Resource $r ): ?array {
+		if ( true === $r->get( 'linked' ) ) {
+			return null;
+		}
+
+		$has  = '' !== (string) $r->get( 'ip' );
+		$busy = ! VpsIp::idle( $r );
+		$add  = $has || $busy || '' === self::ip6( $r ) ? '' : PublicIp::switch_url( $r, true );
+		$drop = $has && ! $busy && '' !== self::ip6( $r ) ? PublicIp::switch_url( $r, false ) : '';
+
+		if ( '' === $add && '' === $drop && ! $busy ) {
+			return null;
+		}
+
+		return array(
+			'has'        => $has,
+			'busy'       => $busy,
+			'add_url'    => $add,
+			'add_price'  => '' === $add ? '' : (string) \BeltoftServices\Currency::with_resource( $r, static fn() => PublicIp::price_label( $r, true ), '' ),
+			'remove_url' => $drop,
+		);
+	}
+
+	/**
 	 * The account panel.
 	 *
 	 * @param Resource $r Resource.
@@ -266,6 +298,7 @@ final class Panels {
 			'can_reset'  => null !== $page && $r->accepts_actions() && array_key_exists( 'reset_password', Actions::offered( $r ) ),
 			'ip'         => false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ? $ip : '',
 			'ip6'        => self::ip6( $r ),
+			'ipv4'       => self::ipv4_panel( $r ),
 			'plan'       => array(
 				'cores'     => (int) ( $plan['cores'] ?? 0 ),
 				'memory_mb' => (int) ( $plan['memory_mb'] ?? 0 ),

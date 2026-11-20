@@ -1178,6 +1178,11 @@ final class Provision {
 			return StepResult::fail( 'configure: the VM record or the address is missing' );
 		}
 
+		// A server with no IPv4 address needs the cluster's IPv6 and IPv6 name servers: without them it would have no way to the network.
+		if ( $this->profile instanceof VpsProfile && '' !== $this->profile->address_error( $this->cluster, (int) $record['vmid'] ) ) {
+			return StepResult::fail( $this->profile->address_error( $this->cluster, (int) $record['vmid'] ) );
+		}
+
 		// A gateway the pool row brings must be on the address's own network; the cluster's is the routed default.
 		if ( null !== $ip && null !== $ip['gateway'] && '' !== $ip['gateway'] && ! NetConfig::gateway_on_network( $ip['address'], $ip['gateway'], (int) $this->cluster['prefix'] ) ) {
 			return StepResult::fail( sprintf( 'configure: the gateway %1$s of address %2$s is outside %2$s/%3$d; nothing was written to the VM', $ip['gateway'], $ip['address'], (int) $this->cluster['prefix'] ) );
@@ -1314,8 +1319,11 @@ final class Provision {
 				'digest'    => (string) ( $v['config']['digest'] ?? '' ),
 			) + $this->profile->network_params( $this->cluster, $ip, $this->net0( (string) ( $v['config']['net0'] ?? '' ) ) );
 
-			if ( array() !== (array) $this->cluster['nameservers'] ) {
-				$params['nameserver'] = implode( ' ', (array) $this->cluster['nameservers'] );
+			// A server with no IPv4 address cannot reach an IPv4 resolver: it gets the cluster's IPv6 ones.
+			$resolvers = null === $ip && $this->profile instanceof VpsProfile && ! $this->profile->uses_public_ip() ? (array) ( $this->cluster['nameservers6'] ?? array() ) : (array) $this->cluster['nameservers'];
+
+			if ( array() !== $resolvers ) {
+				$params['nameserver'] = implode( ' ', $resolvers );
 			}
 
 			$cicustom = $this->profile->cicustom( $this->cluster );

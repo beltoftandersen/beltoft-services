@@ -137,7 +137,11 @@ trait FirewallIpfilter {
 	public static function expected_ipsets( Resource $r, bool $private_nic ): ?array {
 		$sets = array();
 
-		if ( Profiles::for_resource( $r )->uses_public_ip() ) {
+		$wants4 = Profiles::for_resource( $r )->uses_public_ip();
+		$ip6    = (string) $r->get( 'ip6' );
+		$ip6    = Ipv6::is_address( $ip6 ) ? (string) Ipv6::normalise( $ip6 ) : '';
+
+		if ( $wants4 ) {
 			$ip = (string) $r->get( 'ip' );
 
 			if ( false === filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
@@ -145,12 +149,14 @@ trait FirewallIpfilter {
 			}
 
 			$sets['ipfilter-net0'] = $ip;
-			$ip6                   = (string) $r->get( 'ip6' );
 
 			// The IPv6 address goes in the same set: with ipfilter on, the guest may send from its own addresses only, so the set must never lack the IPv6 one once the guest has it.
-			if ( Ipv6::is_address( $ip6 ) ) {
-				$sets['ipfilter-net0'] = array( $ip, (string) Ipv6::normalise( $ip6 ) );
+			if ( '' !== $ip6 ) {
+				$sets['ipfilter-net0'] = array( $ip, $ip6 );
 			}
+		} elseif ( '' !== $ip6 ) {
+			// An IPv6 only server (VPS Basic without the IPv4 add-on): its public NIC is filtered on the IPv6 address alone.
+			$sets['ipfilter-net0'] = $ip6;
 		}
 
 		if ( $private_nic ) {

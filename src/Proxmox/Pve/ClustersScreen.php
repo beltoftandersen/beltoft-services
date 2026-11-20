@@ -334,6 +334,7 @@ final class ClustersScreen {
 		self::row( 'ipv6_prefix', __( 'IPv6 prefix', 'beltoft-services' ), (string) $c['ipv6_prefix'], __( 'Optional. A /64 routed to this cluster, such as 2001:db8:1:2::/64. Each server gets one address in it, made from its VMID. Empty: IPv6 is off. Needs the firewall and the IP filter below.', 'beltoft-services' ) );
 		self::row( 'ipv6_gateway', __( 'IPv6 gateway', 'beltoft-services' ), (string) $c['ipv6_gateway'], __( 'Optional. The host address on the bridge, inside the prefix (such as 2001:db8:1:2::1). Empty: the first address of the prefix.', 'beltoft-services' ) );
 		self::row( 'nameservers', __( 'Name servers', 'beltoft-services' ), implode( ', ', (array) $c['nameservers'] ), __( 'IPv4 addresses, separated by commas.', 'beltoft-services' ) );
+		self::row( 'nameservers6', __( 'IPv6 name servers', 'beltoft-services' ), implode( ', ', (array) $c['nameservers6'] ), __( 'Optional. IPv6 addresses, separated by commas. Servers with no IPv4 address (VPS Basic) use these; without them such servers are not sold.', 'beltoft-services' ) );
 		self::row( 'prefix', __( 'Network prefix', 'beltoft-services' ), (string) $c['prefix'], __( 'Bits in the netmask, 1 to 32.', 'beltoft-services' ) );
 		self::row( 'vmid_min', __( 'First customer VMID', 'beltoft-services' ), (string) $c['vmid_min'], __( 'At least 100. Machines in this range are the only ones this site will change.', 'beltoft-services' ) );
 		self::row( 'vmid_max', __( 'Last customer VMID', 'beltoft-services' ), (string) $c['vmid_max'] );

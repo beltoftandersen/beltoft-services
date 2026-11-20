@@ -9,6 +9,8 @@ namespace BeltoftServices\Proxmox\Vm;
 
 use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Network\Ipv6;
+use BeltoftServices\Proxmox\Network\PublicIp;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -18,7 +20,9 @@ defined( 'ABSPATH' ) || exit;
  */
 final class VpsProfile implements BuildProfile {
 
-	use PostBuildMeta;
+	use PostBuildMeta {
+		post_build_meta as private base_meta;
+	}
 
 	/**
 	 * The resource being built, when there is one: its VMID gives the IPv6 address. A profile made without one (a filter, a
@@ -33,15 +37,41 @@ final class VpsProfile implements BuildProfile {
 	}
 
 	public function steps(): array {
-		return array( 'wipe', 'ip', 'vmid', 'clone', 'configure', 'start', 'ready' );
+		$steps = array( 'wipe', 'ip', 'vmid', 'clone', 'configure', 'start', 'ready' );
+
+		// A server with no IPv4 address (VPS Basic without the add-on) has nothing to hold.
+		return $this->uses_public_ip() ? $steps : array_values( array_diff( $steps, array( 'ip' ) ) );
 	}
 
+	/**
+	 * Does the server have a public IPv4 address? Always, unless its plan says `public_ip` 0 (VPS Basic without the add-on).
+	 * A plan stored before the field existed has no value and means yes. A profile made without a resource (a filter, a test) says yes.
+	 */
 	public function uses_public_ip(): bool {
-		return true;
+		return null === $this->r || PublicIp::wants( (array) $this->r->get( 'plan' ), 1 );
 	}
 
 	public function hold_address( int $resource_id ): ?array {
-		return IpPool::hold( $resource_id );
+		return $this->uses_public_ip() ? IpPool::hold( $resource_id ) : null;
+	}
+
+	/**
+	 * Why a server with no IPv4 address cannot be built on this cluster: it needs the cluster's IPv6 (its only address) and
+	 * IPv6 name servers. Empty when the server has an IPv4 address or the cluster can serve it.
+	 *
+	 * @param array<string, mixed> $cluster Cluster settings.
+	 * @param int                  $vmid    VMID.
+	 */
+	public function address_error( array $cluster, int $vmid ): string {
+		if ( $this->uses_public_ip() ) {
+			return '';
+		}
+
+		if ( '' === Ipv6::ipconfig( $cluster, $vmid ) ) {
+			return 'configure: this server has no IPv4 address and the cluster has no IPv6, so it would have no address';
+		}
+
+		return array() === (array) ( $cluster['nameservers6'] ?? array() ) ? 'configure: this server has no IPv4 address and the cluster has no IPv6 name servers' : '';
 	}
 
 	public function network_params( array $cluster, ?array $ip, string $net0 ): array {
@@ -54,10 +84,31 @@ final class VpsProfile implements BuildProfile {
 			$ip6 = Ipv6::ipconfig( $cluster, (int) $record['vmid'] );
 		}
 
+		// No pool address (IPv6 only): ipconfig0 holds the IPv6 part alone.
+		$ip4 = null === $ip ? '' : 'ip=' . ( $ip['address'] ?? '' ) . '/' . (int) $cluster['prefix'] . ',gw=' . $gw;
+
 		return array(
-			'ipconfig0' => 'ip=' . ( $ip['address'] ?? '' ) . '/' . (int) $cluster['prefix'] . ',gw=' . $gw . ( '' === $ip6 ? '' : ',' . $ip6 ),
+			'ipconfig0' => $ip4 . ( '' === $ip4 || '' === $ip6 ? '' : ',' ) . $ip6,
 			'net0'      => $net0,
 		);
+	}
+
+	/**
+	 * The meta of a built server. The IPv6 address is recorded whether or not the server has an IPv4 one.
+	 *
+	 * @param array<string, mixed>      $record VM record.
+	 * @param array<string, mixed>|null $ip     The held pool row (null: none).
+	 * @return array<string, mixed>
+	 */
+	public function post_build_meta( array $record, ?array $ip ): array {
+		$meta = $this->base_meta( $record, $ip );
+
+		if ( null === $ip && ! $this->uses_public_ip() ) {
+			$cluster     = Clusters::get( (string) $record['cluster'] );
+			$meta['ip6'] = null === $cluster ? null : Ipv6::address( $cluster, (int) $record['vmid'] );
+		}
+
+		return $meta;
 	}
 
 	public function cicustom( array $cluster ): ?string {

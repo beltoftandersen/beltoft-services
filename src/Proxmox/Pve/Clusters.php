@@ -76,6 +76,8 @@ final class Clusters {
 			// IPv6 (empty prefix = off): the /64 of the cluster and the address the guests use as gateway (empty: the first address of the /64).
 			'ipv6_prefix'       => '',
 			'ipv6_gateway'      => '',
+			// Name servers (IPv6 addresses) for servers that have no IPv4 address: an IPv6-only server cannot reach an IPv4 resolver.
+			'nameservers6'      => array(),
 		);
 	}
 
@@ -521,6 +523,20 @@ final class Clusters {
 		}
 
 		$clean['nameservers'] = $nameservers;
+
+		$nameservers6 = array();
+
+		$given6 = array_key_exists( 'nameservers6', $input ) ? (string) $input['nameservers6'] : implode( ',', (array) ( $clean['nameservers6'] ?? array() ) );
+
+		foreach ( preg_split( '/[\s,]+/', $given6, -1, PREG_SPLIT_NO_EMPTY ) as $ns ) {
+			if ( ! \BeltoftServices\Proxmox\Network\Ipv6::is_address( $ns ) ) {
+				return self::error( 'nameservers6', __( 'IPv6 name servers are IPv6 addresses, separated by commas.', 'beltoft-services' ) );
+			}
+
+			$nameservers6[] = (string) \BeltoftServices\Proxmox\Network\Ipv6::normalise( $ns );
+		}
+
+		$clean['nameservers6'] = array_values( array_unique( $nameservers6 ) );
 
 		$prefix = trim( (string) ( $input['prefix'] ?? '' ) );
 		$prefix = '' === $prefix ? '32' : $prefix;
