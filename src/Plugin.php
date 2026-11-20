@@ -282,6 +282,8 @@ final class Plugin {
 		Emails\Emails::register();
 		Proxmox\Disk\UsageDisk::register();
 		Usage\CoreHooks::register();
+		// After CoreHooks: the editor block replaces its premium field.
+		Usage\Admin\PaygPanel::register();
 		Usage\Meter::register();
 		Usage\Counted\Views::register();
 		Usage\Threshold::register();

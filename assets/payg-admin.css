@@ -1,0 +1,19 @@
+/* The Pay as you go block of the product editor. */
+.bs-payg-heading { border-top: 1px solid #c3c4c7; border-bottom: 1px solid #c3c4c7; margin: 1.2em 0 1em; padding: 10px 12px; font-size: 14px; }
+.bs-payg .bs-payg-none, .bs-payg .bs-payg-driver-note { margin: 0 12px 12px; padding: 0; }
+.bs-payg-driver-note { color: #996800; }
+.bs-payg-wrap { margin: 0 12px 8px; }
+.bs-payg-scroll { overflow-x: auto; }
+.bs-payg-preview th, .bs-payg-preview td { white-space: nowrap; }
+.bs-payg-preview .bs-payg-code { text-align: center; border-left: 1px solid #dcdcde; }
+.bs-payg-scroll-cue { display: none; }
+@media ( max-width: 1000px ) { .bs-payg-scroll-cue { display: block; } }
+.bs-payg-running { margin: 8px 12px; padding: 6px 10px; background: #fcf9e8; border-left: 4px solid #dba617; }
+.bs-payg-problems { margin: 8px 12px; }
+.bs-payg-problem-list, .bs-payg-checks { margin: 0 0 8px; }
+.bs-payg-problem-list li, .bs-payg-checks li { border-left: 4px solid #646970; padding-left: 8px; margin: 4px 0; }
+.bs-payg-js-error { color: #d63638; font-weight: 600; clear: both; }
+.bs-payg-premium-msg span { color: #d63638; }
+.bs-payg .description, .bs-payg-help { color: #646970; }
+.bs-payg-live { color: #646970; margin-left: 8px; }
+.bs-payg-rate input { width: 9em; }

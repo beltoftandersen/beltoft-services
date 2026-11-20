@@ -53,16 +53,21 @@ class CoreHooksTest extends TestCase {
 	public function test_the_premium_field_renders_with_a_driver_only(): void {
 		$this->fake_driver();
 
+		// A new product has no driver; a driver that cannot be billed by use has no pay as you go block; one that can has it.
 		$this->assertStringNotContainsString( 'id="' . Rates::META_PREMIUM . '"', $this->panel_html( new \WC_Product_Simple() ) );
-		$this->assertStringContainsString( 'id="' . Rates::META_PREMIUM . '"', $this->panel_html( wc_get_product( $this->service_product()->get_id() ) ) );
+		$this->assertStringNotContainsString( 'id="' . Rates::META_PREMIUM . '"', $this->panel_html( wc_get_product( $this->service_product()->get_id() ) ) );
+		$this->assertStringContainsString( 'id="' . Rates::META_PREMIUM . '"', $this->panel_html( wc_get_product( $this->service_product( 'proxmox' )->get_id() ) ) );
 	}
 
-	public function test_a_posted_premium_is_saved_clean(): void {
+	public function test_a_posted_premium_is_saved_clean_and_a_bad_one_refused(): void {
 		$with_driver = array( Product::META_DRIVER => 'fake' );
 
 		$this->assertSame( '12.5', $this->saved( $with_driver, '12.5' ) );
-		$this->assertSame( '0', $this->saved( $with_driver, '-3' ) );
-		$this->assertSame( '', $this->saved( $with_driver, 'abc' ) );
+		$this->assertSame( '0', $this->saved( $with_driver, '0' ) );
+		$this->assertSame( '', $this->saved( $with_driver, '' ) );
+		// A value that is not a number of 0 or more is refused: the saved premium stays.
+		$this->assertSame( 'untouched', $this->saved( $with_driver, '-3' ) );
+		$this->assertSame( 'untouched', $this->saved( $with_driver, 'abc' ) );
 	}
 
 	public function test_nothing_is_saved_when_no_driver_is_posted(): void {
