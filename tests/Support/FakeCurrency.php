@@ -69,7 +69,17 @@ trait FakeCurrency {
 	 */
 	protected function fake_price( int $product_id, string $code, string $price ): void {
 		update_post_meta( $product_id, '_test_price_' . $code, $price );
-		TwinMonthly::refresh( (int) wp_get_post_parent_id( $product_id ) );
+	}
+
+	/**
+	 * Types the monthly figure of a pay as you go variation in a currency, the way the product editor does.
+	 *
+	 * @param int    $variation_id Pay as you go variation id.
+	 * @param string $code         Currency code.
+	 * @param string $price        Monthly figure excluding tax.
+	 */
+	protected function fake_monthly( int $variation_id, string $code, string $price ): void {
+		update_post_meta( $variation_id, \BeltoftServices\Usage\Rates::META_MONTHLY . '_' . $code, $price );
 	}
 
 	/**

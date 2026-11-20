@@ -12,7 +12,6 @@ use BeltoftServices\Apps\AppLicenceCart;
 use BeltoftServices\Apps\AppReinstallPaid;
 use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Resource;
-use BeltoftServices\Usage\BillingField;
 use BeltoftServices\Usage\Estimate;
 use BeltoftServices\Usage\Ledger;
 use BeltoftServices\Usage\Meter;
@@ -36,7 +35,6 @@ final class PaidAppUsageTest extends PaidAppCase {
 
 	public function set_up(): void {
 		parent::set_up();
-		$this->settings( array( 'offer_monthly' => 1 ) );
 		global $wpdb;
 		$wpdb->query( 'DELETE FROM ' . Ledger::table() ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test fixture reset.
 		AppReinstallPaid::register();
@@ -261,6 +259,7 @@ final class PaidAppUsageTest extends PaidAppCase {
 
 			if ( 'u' === $short ) {
 				$v->update_meta_data( Rates::META_BILLING, 'usage' );
+				$v->update_meta_data( Rates::META_MONTHLY, '10' );
 			}
 
 			$v->save();
@@ -285,17 +284,14 @@ final class PaidAppUsageTest extends PaidAppCase {
 
 	public function test_the_tier_line_is_the_monthly_one_whatever_the_servers_billing(): void {
 		$server = $this->server_variations();
-		$this->put_server_in_cart( $server['m'] );
-		$this->assertFalse( AppLicenceCart::server_usage() );
-		$this->assertTrue( AppLicenceCart::choose( 'docker', 'pro' ) );
-		$this->assertSame( $this->tiers['pro']->get_id(), $this->tier_line_variation() );
 
-		$this->assertTrue( BillingField::swap( true )['ok'] );
-		$this->assertTrue( AppLicenceCart::server_usage() );
-		$this->assertSame( $this->tiers['pro']->get_id(), $this->tier_line_variation(), 'The server went pay as you go: the licence stays a month in advance.' );
-
-		$this->assertTrue( BillingField::swap( false )['ok'] );
-		$this->assertSame( $this->tiers['pro']->get_id(), $this->tier_line_variation() );
+		foreach ( array( 'm' => false, 'u' => true ) as $key => $usage ) {
+			WC()->cart->empty_cart();
+			$this->put_server_in_cart( $server[ $key ] );
+			$this->assertSame( $usage, AppLicenceCart::server_usage() );
+			$this->assertTrue( AppLicenceCart::choose( 'docker', 'pro' ) );
+			$this->assertSame( $this->tiers['pro']->get_id(), $this->tier_line_variation(), 'The licence stays a month in advance, also on a pay as you go server.' );
+		}
 	}
 
 	public function test_a_usage_server_in_the_cart_gets_the_monthly_tier_and_it_costs_the_month_at_checkout(): void {
@@ -313,9 +309,6 @@ final class PaidAppUsageTest extends PaidAppCase {
 		$this->put_server_in_cart( $server['u'] );
 		$this->assertTrue( AppLicenceCart::choose( 'docker', 'pro' ) );
 		$this->assertSame( $this->tiers['pro']->get_id(), $this->tier_line_variation() );
-		$this->assertTrue( BillingField::swap( false )['ok'] );
-		$this->assertTrue( BillingField::swap( true )['ok'] );
-		$this->assertSame( $this->tiers['pro']->get_id(), $this->tier_line_variation(), 'The line stays through a billing change.' );
 	}
 
 	/** The cap of a pay as you go Plesk tier in the usage account's currency is compared with its euro cost at the guard rate. */

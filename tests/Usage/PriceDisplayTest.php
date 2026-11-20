@@ -99,7 +99,7 @@ class PriceDisplayTest extends UsageTestCase {
 	}
 
 	public function test_a_tag_with_no_offer_stays_empty_and_calls_no_listener(): void {
-		$v     = $this->usage_product();
+		$v     = $this->monthly_vps();
 		$calls = 0;
 		$f     = static function ( $html ) use ( &$calls ) {
 			++$calls;
@@ -113,35 +113,23 @@ class PriceDisplayTest extends UsageTestCase {
 	}
 
 	public function test_the_rate_sentences_are_unchanged_without_a_product_and_follow_the_display_with_one(): void {
-		$v = $this->usage_product();
+		$v = $this->monthly_vps();
 		$p = $v['m-None'];
 
 		$this->assertSame( '€0.0226 per hour, max €16.50 per month excluding VAT', Rates::terms( 0.02260274, 16.5 ) );
 		$this->assertSame( '€0.0226 per hour, max €16.50 per month excluding VAT', Rates::terms( 0.02260274, 16.5, $p ) );
-		$this->assertSame( '€15.00 per month, paid in advance', Rates::tile_monthly( 15.0, $p ) );
 		$this->assertSame( '+€5 per month', Rates::plus_per_month( 5.0, $p ) );
 
 		$this->display( 'incl' );
 
 		$this->assertSame( '€0.0226 per hour, max €16.50 per month excluding VAT', Rates::terms( 0.02260274, 16.5 ), 'API and MCP answers stay excluding tax.' );
 		$this->assertSame( '€0.0283 per hour, max €20.63 per month including VAT', Rates::terms( 0.02260274, 16.5, $p ) );
-		$this->assertSame( '€18.75 per month, paid in advance', Rates::tile_monthly( 15.0, $p ) );
 		$this->assertSame( '+€6.25 per month', Rates::plus_per_month( 5.0, $p ) );
 		$this->assertSame( '€0.0226', Rates::money( 0.02260274, 4 ), 'An invoice figure is the amount as given.' );
 	}
 
-	public function test_a_non_taxable_product_is_shown_as_it_is_in_the_including_display(): void {
-		$v = $this->usage_product();
-		$parent = wc_get_product( $v['m-None']->get_parent_id() );
-		$parent->set_tax_status( 'none' );
-		$parent->save();
-		$this->display( 'incl' );
-
-		$this->assertSame( '€15.00 per month, paid in advance', Rates::tile_monthly( 15.0, wc_get_product( $v['m-None']->get_id() ) ) );
-	}
-
 	public function test_the_picker_text_is_unchanged_excluding_and_including_when_the_display_says_so(): void {
-		$v = $this->usage_product();
+		$v = $this->monthly_vps();
 		$p = $v['m-None'];
 
 		$this->assertSame( '€10.00 per month excluding VAT', ServerPicker::price_text( 10.0, 'month' ) );
@@ -157,7 +145,7 @@ class PriceDisplayTest extends UsageTestCase {
 	}
 
 	public function test_the_plan_price_html_is_wc_price_excluding_and_switchable(): void {
-		$v = $this->usage_product();
+		$v = $this->monthly_vps();
 		$p = $v['m-None'];
 
 		$this->assertSame( wc_price( 15 ), TaxNote::html( 15.0, 'server-picker', array( 'product' => $p ) ) );
@@ -170,7 +158,7 @@ class PriceDisplayTest extends UsageTestCase {
 	}
 
 	public function test_the_breakdown_rows_follow_the_cart_display_only_with_a_product(): void {
-		$v    = $this->usage_product();
+		$v    = $this->monthly_vps();
 		$p    = $v['m-None'];
 		$part = array( 'plan' => 45.0, 'ip' => 0, 'storage' => 0, 'backups' => 3.0 );
 
@@ -184,7 +172,7 @@ class PriceDisplayTest extends UsageTestCase {
 	}
 
 	public function test_a_backups_price_difference_is_plain_text_in_the_display(): void {
-		$v = $this->usage_product();
+		$v = $this->monthly_vps();
 
 		$this->assertSame( '+€3.00', Backups::price_difference( $v['m-None'], $v['m-Daily'] ) );
 		$this->display( 'incl' );
@@ -262,7 +250,7 @@ class PriceDisplayTest extends UsageTestCase {
 	}
 
 	public function test_the_db_picker_summary_and_the_cart_rate_follow_the_display(): void {
-		$v    = $this->usage_product();
+		$v = $this->usage_product() + $this->monthly_vps();
 		$plan = array( 'name' => 'Small', 'price' => 25.0, 'period' => 'month', 'variation_id' => $v['m-None']->get_id() );
 		$call = new \ReflectionMethod( \BeltoftServices\Account\DbPicker::class, 'summary' );
 		$call->setAccessible( true );

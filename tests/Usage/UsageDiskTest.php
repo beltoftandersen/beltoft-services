@@ -69,7 +69,7 @@ final class UsageDiskTest extends UsageTestCase {
 
 		$this->user    = $this->new_user();
 		$this->account = $this->usage_account( $this->user );
-		$this->settings( array( 'offer_monthly' => 0, 'usage_new_limit' => 0, 'disk_max_extra' => 3, 'disk_reserve_gb' => 0, 'mcp_enabled' => 1 ) );
+		$this->settings( array( 'usage_new_limit' => 0, 'disk_max_extra' => 3, 'disk_reserve_gb' => 0, 'mcp_enabled' => 1 ) );
 		$this->v = $this->usage_product();
 		$this->capacity( 4000 );
 		$this->disk = $this->disk_product();
@@ -192,8 +192,8 @@ final class UsageDiskTest extends UsageTestCase {
 
 	private function usage_server_cart(): void {
 		WC()->cart->empty_cart();
-		$plan    = Offers::find( $this->v['m-None']->get_id() );
-		$checked = \BeltoftServices\Account\ServerPicker::check( array( 'plan' => (string) $plan['variation_id'], 'backups' => '', 'billing' => 'usage', 'os' => '9000', 'app' => '', 'version' => '', 'tier' => '', 'domain_on' => '', 'own_on' => '', 'own' => '', 'zone' => '', 'sub' => '', 'name' => 'web1', 'ssh_key' => '' ), $this->user );
+		$plan    = Offers::find( $this->v['u-None']->get_id() );
+		$checked = \BeltoftServices\Account\ServerPicker::check( array( 'plan' => (string) $plan['variation_id'], 'backups' => '', 'os' => '9000', 'app' => '', 'version' => '', 'tier' => '', 'domain_on' => '', 'own_on' => '', 'own' => '', 'zone' => '', 'sub' => '', 'name' => 'web1', 'ssh_key' => '' ), $this->user );
 		$this->assertSame( array(), $checked['errors'] );
 		$this->assertNull( \BeltoftServices\Account\ServerPicker::add_to_cart( $checked ) );
 	}
@@ -221,21 +221,6 @@ final class UsageDiskTest extends UsageTestCase {
 		$this->assertNotEmpty( wc_get_notices( 'error' ) );
 	}
 
-	public function test_switching_the_servers_billing_moves_the_disk_to_its_twin(): void {
-		$this->settings( array( 'offer_monthly' => 1 ) );
-		Offers::reset();
-		$this->usage_server_cart();
-		$this->assertTrue( DiskField::choose( $this->disk['u-50']->get_id() ) );
-		$this->assertTrue( \BeltoftServices\Usage\BillingField::swap( false )['ok'] );
-		$this->assertFalse( DiskField::cart_server_usage() );
-		$ids = array_map( static fn( $i ) => (int) $i['variation_id'], WC()->cart->get_cart() );
-		$this->assertContains( $this->disk['m-50']->get_id(), $ids, 'The monthly twin follows a monthly server.' );
-		$this->assertNotContains( $this->disk['u-50']->get_id(), $ids );
-		$this->assertTrue( \BeltoftServices\Usage\BillingField::swap( true )['ok'] );
-		$ids = array_map( static fn( $i ) => (int) $i['variation_id'], WC()->cart->get_cart() );
-		$this->assertContains( $this->disk['u-50']->get_id(), $ids );
-	}
-
 	public function test_adding_a_disk_to_an_existing_usage_server_needs_the_pay_as_you_go_size(): void {
 		$server  = $this->server();
 		$license = $server->license();
@@ -251,7 +236,7 @@ final class UsageDiskTest extends UsageTestCase {
 		$this->assertFalse( DiskCart::validate( true, $monthly->get_parent_id(), 1, $monthly->get_id(), array(), array() ), 'A pay as you go server gets no monthly subscription disk.' );
 
 		// The cart takes it, free of payment: the total is 0 and the usage account line is added when the customer has none.
-		$added = WC()->cart->add_to_cart( $usage->get_parent_id(), 1, $usage->get_id(), array( 'attribute_size' => '50 GB', 'attribute_billing' => 'Pay as you go' ) );
+		$added = WC()->cart->add_to_cart( $usage->get_parent_id(), 1, $usage->get_id(), array( 'attribute_size' => '50 GB',  ) );
 		$this->assertNotFalse( $added );
 		WC()->cart->calculate_totals();
 		$this->assertEquals( 0, WC()->cart->get_total( 'edit' ) );

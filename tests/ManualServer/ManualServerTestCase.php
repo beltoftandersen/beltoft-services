@@ -26,7 +26,7 @@ abstract class ManualServerTestCase extends UsageTestCase {
 	public function set_up(): void {
 		parent::set_up();
 
-		$this->settings( array( 'offer_monthly' => 0, 'usage_new_limit' => 2 ) );
+		$this->settings( array( 'usage_new_limit' => 2 ) );
 		$this->staff_mails = array();
 		add_filter( 'pre_wp_mail', array( $this, 'catch_mail' ), 10, 2 );
 		add_filter(
@@ -130,6 +130,7 @@ abstract class ManualServerTestCase extends UsageTestCase {
 
 			if ( 'u' === $short ) {
 				$v->update_meta_data( Rates::META_BILLING, 'usage' );
+				$v->update_meta_data( Rates::META_MONTHLY, '119' );
 			}
 
 			$v->save();

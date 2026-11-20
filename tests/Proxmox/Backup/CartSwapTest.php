@@ -37,7 +37,7 @@ final class CartSwapTest extends UsageTestCase {
 	public function set_up(): void {
 		parent::set_up();
 
-		$this->settings( array( 'offer_monthly' => 1, 'usage_new_limit' => 0, 'disk_max_extra' => 3, 'disk_reserve_gb' => 0 ) );
+		$this->settings( array( 'usage_new_limit' => 0, 'disk_max_extra' => 3, 'disk_reserve_gb' => 0 ) );
 		$this->v = $this->usage_product();
 		$this->capacity( 4000 );
 		$this->disk = $this->disk_product();
@@ -100,21 +100,6 @@ final class CartSwapTest extends UsageTestCase {
 		$this->assertTrue( CartSwap::apply( true, $this->disk['u-50']->get_id() )['ok'] );
 
 		$this->assertSame( array( 'server' => $this->v['u-Daily']->get_id(), 'disk' => $this->disk['u-50']->get_id(), 'lines' => 2 ), $this->seen(), 'A resent disk is not added twice or dropped.' );
-	}
-
-	public function test_the_billing_stays_right_when_the_add_ons_swap_after_a_billing_swap(): void {
-		$this->cart_with( $this->v['m-None'] );
-		$this->assertTrue( CartSwap::apply( true, $this->disk['m-50']->get_id() )['ok'] );
-		$this->assertSame( array( 'server' => $this->v['m-Daily']->get_id(), 'disk' => $this->disk['m-50']->get_id(), 'lines' => 2 ), $this->seen() );
-
-		$this->assertTrue( \BeltoftServices\Usage\BillingField::swap( true )['ok'] );
-		WC()->session->save_data();
-		$this->assertSame( array( 'server' => $this->v['u-Daily']->get_id(), 'disk' => $this->disk['u-50']->get_id(), 'lines' => $this->seen()['lines'] ), $this->seen() );
-
-		$this->assertTrue( CartSwap::apply( false, $this->disk['u-100']->get_id() )['ok'] );
-		$seen = $this->seen();
-		$this->assertSame( $this->v['u-None']->get_id(), $seen['server'], 'Still pay as you go.' );
-		$this->assertSame( $this->disk['u-100']->get_id(), $seen['disk'] );
 	}
 
 	public function test_an_invalid_combination_is_refused_and_changes_nothing(): void {

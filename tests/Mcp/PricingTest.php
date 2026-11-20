@@ -57,7 +57,7 @@ final class PricingTest extends UsageTestCase {
 		$this->save_cluster( array( 'templates' => "9000 = Debian 12", 'default_template' => '9000' ) );
 		$this->server = $this->usage_product( '0' );
 		$this->db     = $this->database_product();
-		$this->settings( array( 'offer_monthly' => 0, 'usage_new_limit' => 0, 'db_disk_max_gb' => 1000, 'db_disk_step_gb' => 10, 'gift_credit' => 1 ) );
+		$this->settings( array( 'usage_new_limit' => 0, 'db_disk_max_gb' => 1000, 'db_disk_step_gb' => 10, 'gift_credit' => 1 ) );
 		$this->mcp_set_up();
 		add_filter( 'beltoft_services_mcp_rate_limit', '__return_zero' );
 		update_option( 'woocommerce_currency', 'EUR' );
@@ -87,7 +87,7 @@ final class PricingTest extends UsageTestCase {
 		$out  = $this->call( 'catalog', array( 'kind' => 'database_plans' ) );
 		$plan = $out['plans'][0];
 
-		$this->assertSame( (int) $this->db['m-0-0']->get_id(), $plan['variation_id'] );
+		$this->assertSame( (int) $this->db['u-0-0']->get_id(), $plan['variation_id'] );
 		$this->assertEquals( 45.0, $plan['price']['max_per_month'] );
 		$this->assertEqualsWithDelta( 45 / 730, $plan['price']['hourly'], 0.0001 );
 		$this->assertTrue( $plan['price']['excl_vat'] );
@@ -110,16 +110,14 @@ final class PricingTest extends UsageTestCase {
 		$this->assertStringContainsString( 'order_database', $out['note'] );
 	}
 
-	public function test_monthly_is_listed_only_when_the_site_offers_it(): void {
-		$this->settings( array( 'offer_monthly' => 1 ) );
-		$plan = $this->call( 'catalog', array( 'kind' => 'database_plans' ) )['plans'][0];
-		$this->assertEquals( 45.0, $plan['monthly']['price'] );
+	public function test_a_plan_of_a_monthly_product_is_not_listed(): void {
+		$plans = $this->call( 'catalog', array( 'kind' => 'database_plans' ) )['plans'];
 
-		$this->settings( array( 'offer_monthly' => 0 ) );
-		$this->assertArrayNotHasKey( 'monthly', $this->call( 'catalog', array( 'kind' => 'database_plans' ) )['plans'][0] );
+		$this->assertArrayNotHasKey( 'monthly', $plans[0] );
+		$this->assertSame( array( (int) $this->db['u-0-0']->get_id() ), array_column( $plans, 'variation_id' ), 'Only the pay as you go plan is listed.' );
 	}
 
-	public function test_a_plan_without_a_pay_as_you_go_price_is_not_listed_when_monthly_is_hidden(): void {
+	public function test_no_pay_as_you_go_plan_means_no_plan_in_the_catalog(): void {
 		$this->db['u-0-0']->set_status( 'private' );
 		$this->db['u-0-0']->save();
 		$this->server['u-None']->set_status( 'private' );
@@ -148,7 +146,7 @@ final class PricingTest extends UsageTestCase {
 	}
 
 	public function test_the_quote_of_a_database_with_50_gb_is_the_checkouts_breakdown(): void {
-		$quote = $this->call( 'price_quote', array( 'plan' => $this->db['m-0-0']->get_id(), 'extra_storage_gb' => 50 ) );
+		$quote = $this->call( 'price_quote', array( 'plan' => $this->db['u-0-0']->get_id(), 'extra_storage_gb' => 50 ) );
 		$parts = Breakdown::parts( $this->db['u-50-0'] );
 
 		$this->assertEquals( 49.0, $quote['max_per_month'] );
@@ -162,7 +160,7 @@ final class PricingTest extends UsageTestCase {
 	}
 
 	public function test_a_public_ipv4_is_not_part_of_a_quote(): void {
-		$out = $this->tool( 'price_quote', array( 'plan' => $this->db['m-0-0']->get_id(), 'public_ipv4' => true ), $this->read() );
+		$out = $this->tool( 'price_quote', array( 'plan' => $this->db['u-0-0']->get_id(), 'public_ipv4' => true ), $this->read() );
 
 		$this->assertTrue( $out['isError'] );
 		$this->assertStringContainsString( 'add-on with its own subscription', wp_json_encode( $out ) );
@@ -175,22 +173,22 @@ final class PricingTest extends UsageTestCase {
 			\BeltoftServices\Proxmox\Network\IpPool::add( '198.51.100.' . $i );
 		}
 
-		$quote = $this->call( 'price_quote', array( 'plan' => $this->db['m-0-0']->get_id(), 'public_ipv4' => true ) );
+		$quote = $this->call( 'price_quote', array( 'plan' => $this->db['u-0-0']->get_id(), 'public_ipv4' => true ) );
 
 		$this->assertEquals( 47.04, $quote['max_per_month'], 'The plan plus the address at its cap (the monthly price).' );
 		$this->assertEquals( array( 45.0, 2.04 ), array_column( $quote['lines'], 'per_month' ) );
 		$this->assertSame( 'Public IPv4 address', $quote['lines'][1]['label'] );
 
 		// A server has no address in a quote or an order here: it is added in the dashboard.
-		$this->assertTrue( $this->tool( 'price_quote', array( 'plan' => (int) $this->server['m-None']->get_id(), 'public_ipv4' => true ), $this->read() )['isError'] );
+		$this->assertTrue( $this->tool( 'price_quote', array( 'plan' => (int) $this->server['u-None']->get_id(), 'public_ipv4' => true ), $this->read() )['isError'] );
 	}
 
 	public function test_the_quote_of_a_plan_alone_and_of_a_server_with_backups(): void {
-		$alone = $this->call( 'price_quote', array( 'plan' => $this->db['m-0-0']->get_id() ) );
+		$alone = $this->call( 'price_quote', array( 'plan' => $this->db['u-0-0']->get_id() ) );
 		$this->assertEquals( 45.0, $alone['max_per_month'] );
 		$this->assertCount( 1, $alone['lines'] );
 
-		$server = $this->call( 'price_quote', array( 'plan' => $this->server['m-None']->get_id(), 'backups' => true ) );
+		$server = $this->call( 'price_quote', array( 'plan' => $this->server['u-None']->get_id(), 'backups' => true ) );
 		$this->assertEquals( 18.0, $server['max_per_month'] );
 		$this->assertEquals( array( 15.0, 3.0 ), array_column( $server['lines'], 'per_month' ) );
 		$this->assertEquals( Breakdown::parts( $this->server['u-Daily'] )['max'], $server['max_per_month'] );
@@ -198,11 +196,11 @@ final class PricingTest extends UsageTestCase {
 	}
 
 	public function test_the_quote_refuses_what_is_not_offered(): void {
-		$plan = (int) $this->db['m-0-0']->get_id();
+		$plan = (int) $this->db['u-0-0']->get_id();
 
 		$this->assertTrue( $this->tool( 'price_quote', array( 'plan' => $plan, 'extra_storage_gb' => 7 ), $this->read() )['isError'] );
 		$this->assertTrue( $this->tool( 'price_quote', array( 'plan' => 999999 ), $this->read() )['isError'] );
-		$this->assertTrue( $this->tool( 'price_quote', array( 'plan' => (int) $this->server['m-None']->get_id(), 'public_ipv4' => true ), $this->read() )['isError'] );
+		$this->assertTrue( $this->tool( 'price_quote', array( 'plan' => (int) $this->server['u-None']->get_id(), 'public_ipv4' => true ), $this->read() )['isError'] );
 		$this->assertTrue( $this->tool( 'price_quote', array( 'plan' => $plan, 'backups' => true ), $this->read() )['isError'] );
 	}
 

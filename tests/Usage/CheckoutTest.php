@@ -30,7 +30,7 @@ class CheckoutTest extends UsageTestCase {
 	}
 
 	private function add( \WC_Product_Variation $v ): string {
-		$key = WC()->cart->add_to_cart( $v->get_parent_id(), 1, $v->get_id(), array( 'attribute_billing' => $v->get_attributes()['billing'], 'attribute_backups' => $v->get_attributes()['backups'] ) );
+		$key = WC()->cart->add_to_cart( $v->get_parent_id(), 1, $v->get_id(), array( 'attribute_backups' => $v->get_attributes()['backups'] ) );
 		$this->assertNotFalse( $key, 'The variation is in the cart.' );
 		WC()->cart->calculate_totals();
 
@@ -78,6 +78,7 @@ class CheckoutTest extends UsageTestCase {
 			$v->update_meta_data( '_subscription_period_interval', '1' );
 			if ( '0' === $price ) {
 				$v->update_meta_data( Rates::META_BILLING, 'usage' );
+				$v->update_meta_data( Rates::META_MONTHLY, '15' );
 			}
 			$v->save();
 			$made[ $value ] = wc_get_product( $v->get_id() );
@@ -110,7 +111,7 @@ class CheckoutTest extends UsageTestCase {
 	}
 
 	public function test_a_monthly_server_does_not_get_an_account_line(): void {
-		$v = $this->usage_product();
+		$v = $this->monthly_vps();
 		wp_set_current_user( $this->new_user() );
 		$this->add( $v['m-None'] );
 
@@ -232,7 +233,7 @@ class CheckoutTest extends UsageTestCase {
 	}
 
 	public function test_a_monthly_license_is_not_touched(): void {
-		$v    = $this->usage_product();
+		$v    = $this->monthly_vps();
 		$user = $this->new_user();
 		$this->usage_account( $user );
 

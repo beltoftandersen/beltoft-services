@@ -171,22 +171,20 @@ class OwnProductRatesTest extends UsageTestCase {
 	/**
 	 * The figure the old twin model gave: the twin's price excluding tax in the current currency.
 	 */
-	private function old_figure( \WC_Product_Variation $usage ): ?float {
-		$twin = Rates::sibling( $usage, false );
-
+	private function old_figure( ?\WC_Product_Variation $twin ): ?float {
 		return $twin && '' !== (string) $twin->get_price() ? (float) wc_get_price_excluding_tax( $twin ) : null;
 	}
 
 	public function test_no_bill_changes_the_own_figure_equals_the_old_twin_price(): void {
 		$this->vat( true );
 		update_option( 'woocommerce_tax_display_shop', 'incl' );
-		$v = $this->usage_product();
+		$v = $this->usage_product() + $this->monthly_vps();
 		$v['m-None']->set_sale_price( '12' );
 		$v['m-None']->save();
 		\WC_Product_Variable::sync( $v['m-None']->get_parent_id() );
 
 		foreach ( array( 'u-None', 'u-Daily' ) as $key ) {
-			$before = $this->old_figure( wc_get_product( $v[ $key ]->get_id() ) );
+			$before = $this->old_figure( wc_get_product( $v[ 'u-None' === $key ? 'm-None' : 'm-Daily' ]->get_id() ) );
 			// What the migration copies.
 			update_post_meta( $v[ $key ]->get_id(), Rates::META_MONTHLY, (string) $before );
 			$u = wc_get_product( $v[ $key ]->get_id() );
@@ -207,11 +205,11 @@ class OwnProductRatesTest extends UsageTestCase {
 		update_option( 'woocommerce_currency', 'EUR' );
 		$this->fake_currency_up( 'EUR' );
 		$this->fake_runner();
-		$v = $this->usage_product();
-		$this->fake_price( $v['m-None']->get_id(), 'DKK', '112.5' );
+		$v = $this->usage_product() + $this->monthly_vps();
+		$this->fake_price( $v['m-None']->get_id(), 'DKK', '112.5' ); // The old twin's price in DKK.
 
 		$u = wc_get_product( $v['u-None']->get_id() );
-		list( $ok, $before ) = Currency::with( 'DKK', fn() => $this->old_figure( $u ) );
+		list( $ok, $before ) = Currency::with( 'DKK', fn() => $this->old_figure( wc_get_product( $v['m-None']->get_id() ) ) );
 		$this->assertTrue( $ok );
 		$this->assertSame( 112.5, $before );
 

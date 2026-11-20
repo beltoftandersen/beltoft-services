@@ -207,7 +207,7 @@ final class DeletedServicesTest extends UsageTestCase {
 	}
 
 	public function test_an_expired_monthly_server_is_still_listed(): void {
-		$v    = $this->usage_product();
+		$v    = $this->monthly_vps();
 		$user = $this->new_user();
 		$r    = $this->usage_vm( $v['m-None'], $user, 5 );
 		$r->set( array( 'server_name' => 'monthly-vps' ) );

@@ -120,5 +120,4 @@ require __DIR__ . '/Support/FakeDriver.php';
 require __DIR__ . '/Support/DnsPackets.php';
 require __DIR__ . '/Support/CannedChannel.php';
 require __DIR__ . '/Support/FakeCurrency.php';
-require __DIR__ . '/Support/TwinMonthly.php';
 require __DIR__ . '/TestCase.php';

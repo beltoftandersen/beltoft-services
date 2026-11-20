@@ -100,7 +100,7 @@ class CurrencyMeterTest extends UsageTestCase {
 		$user = $this->new_user();
 		$this->fake_currency_up( 'EUR' );
 		$this->fake_runner();
-		$this->fake_price( $v['m-None']->get_id(), 'DKK', '30' );
+		$this->fake_monthly( $v['u-None']->get_id(), 'DKK', '30' );
 		list( , $r ) = $this->dkk_server( $v, $user );
 
 		Meter::run( time() );
@@ -135,8 +135,6 @@ class CurrencyMeterTest extends UsageTestCase {
 		$user = $this->new_user();
 		$v['u-None']->update_meta_data( Rates::META_MONTHLY, '20' );
 		$v['u-None']->save();
-		$v['m-None']->set_regular_price( '' );
-		$v['m-None']->save();
 		\WC_Product_Variable::sync( $v['u-None']->get_parent_id() );
 		$r = $this->usage_vm( $v['u-None'], $user, 5 );
 
@@ -150,7 +148,7 @@ class CurrencyMeterTest extends UsageTestCase {
 		$user = $this->new_user();
 		$this->fake_currency_up( 'EUR' );
 		$this->fake_runner( false );
-		$this->fake_price( $v['m-None']->get_id(), 'DKK', '30' );
+		$this->fake_monthly( $v['u-None']->get_id(), 'DKK', '30' );
 		list( , $r ) = $this->dkk_server( $v, $user );
 
 		$this->assertSame( 0, Meter::run( time() ) );
@@ -238,7 +236,7 @@ class CurrencyMeterTest extends UsageTestCase {
 		$this->assertSame( array(), $this->rows( $r->id() ) );
 		$this->assertNotNull( \BeltoftServices\Resource::find( $r->id() )->get( Meter::UNMETERED_SINCE ), 'The first unmetered hour is kept.' );
 
-		$this->fake_price( $v['m-None']->get_id(), 'DKK', '30' );
+		$this->fake_monthly( $v['u-None']->get_id(), 'DKK', '30' );
 		Meter::run( time() );
 		$rows = $this->rows( $r->id() );
 
@@ -252,7 +250,7 @@ class CurrencyMeterTest extends UsageTestCase {
 		$user = $this->new_user();
 		$this->fake_currency_up( 'EUR' );
 		$this->fake_runner( false );
-		$this->fake_price( $v['m-None']->get_id(), 'DKK', '30' );
+		$this->fake_monthly( $v['u-None']->get_id(), 'DKK', '30' );
 		list( , $r ) = $this->dkk_server( $v, $user );
 		$this->activated_ago( $r->id(), 80 );
 
@@ -262,7 +260,7 @@ class CurrencyMeterTest extends UsageTestCase {
 		$this->fake_currency_down();
 		$this->fake_currency_up( 'EUR' );
 		$this->fake_runner();
-		$this->fake_price( $v['m-None']->get_id(), 'DKK', '30' );
+		$this->fake_monthly( $v['u-None']->get_id(), 'DKK', '30' );
 		Meter::run( time() );
 
 		$this->assertGreaterThanOrEqual( 79, count( $this->rows( $r->id() ) ) );
@@ -273,7 +271,7 @@ class CurrencyMeterTest extends UsageTestCase {
 		$user = $this->new_user();
 		$this->fake_currency_up( 'EUR' );
 		$this->fake_runner();
-		$this->fake_price( $v['m-None']->get_id(), 'DKK', '30' );
+		$this->fake_monthly( $v['u-None']->get_id(), 'DKK', '30' );
 		list( , $r ) = $this->dkk_server( $v, $user );
 		$this->activated_ago( $r->id(), 1300 );
 		\BeltoftServices\Resource::find( $r->id() )->set( array( Meter::UNMETERED_SINCE => time() - 1300 * HOUR_IN_SECONDS ) );
@@ -348,7 +346,7 @@ class CurrencyMeterTest extends UsageTestCase {
 		$closed = time() - 200 * HOUR_IN_SECONDS;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture.
 		$wpdb->update( \BeltoftLicenses\Install::tables()['activations'], array( 'deactivated_at' => gmdate( 'Y-m-d H:i:s', $closed ) ), array( 'id' => $r->id() ) );
-		$this->fake_price( $v['m-None']->get_id(), 'DKK', '30' );
+		$this->fake_monthly( $v['u-None']->get_id(), 'DKK', '30' );
 
 		Meter::run( time() );
 		$rows = $this->rows( $r->id() );
@@ -371,7 +369,7 @@ class CurrencyMeterTest extends UsageTestCase {
 		list( , $r ) = $this->dkk_server( $v, $user );
 		$this->activated_ago( $r->id(), 80 );
 		Meter::run( time() );
-		$this->fake_price( $v['m-None']->get_id(), 'DKK', '30' );
+		$this->fake_monthly( $v['u-None']->get_id(), 'DKK', '30' );
 
 		$break = static function ( $query ) {
 			return false !== stripos( $query, 'INSERT IGNORE INTO' ) && false !== stripos( $query, 'bs_usage' ) ? 'SELECT * FROM zz_no_such_table' : $query;

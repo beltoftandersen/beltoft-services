@@ -64,7 +64,7 @@ final class PurchaseTest extends UsageTestCase {
 		$this->account = $this->usage_account( $this->user );
 		$this->save_cluster( array( 'templates' => "9000 = Debian 12\n9001 = Ubuntu 24.04", 'default_template' => '9000' ) );
 		$this->v = $this->usage_product();
-		$this->settings( array( 'offer_monthly' => 0, 'usage_new_limit' => 0 ) );
+		$this->settings( array( 'usage_new_limit' => 0 ) );
 		$this->mcp_set_up();
 		add_filter( 'beltoft_services_mcp_rate_limit', '__return_zero' );
 		update_option( 'woocommerce_currency', 'EUR' );
@@ -107,7 +107,7 @@ final class PurchaseTest extends UsageTestCase {
 	}
 
 	private function plan_id(): int {
-		return (int) $this->v['m-None']->get_id();
+		return (int) $this->v['u-None']->get_id();
 	}
 
 	/**
@@ -309,7 +309,6 @@ final class PurchaseTest extends UsageTestCase {
 					array(
 						ServerPicker::FIELD   => wp_create_nonce( ServerPicker::NONCE ),
 						ServerPicker::PLAN    => (string) $this->plan_id(),
-						ServerPicker::BILLING => 'usage',
 						OsField::POST_KEY     => '9001',
 						ServerName::POST_KEY  => 'web-one',
 						SshKeyField::POST_KEY => self::KEY,
@@ -459,10 +458,9 @@ final class PurchaseTest extends UsageTestCase {
 		$sum  = $this->json( $this->tool( 'order_server', $this->args( array( 'plan' => $name ) ), $this->oauth( $this->user, Tokens::FULL ) ) );
 		$this->assertTrue( $sum['requires_confirmation'] );
 
-		$this->v['u-None']->set_status( 'private' );
-		$this->v['u-None']->save();
+		$monthly = $this->monthly_vps()['m-None'];
 		Offers::reset();
-		$this->assertStringContainsString( 'not sold pay as you go', $this->refused( $this->args() ) );
+		$this->assertStringContainsString( 'not sold pay as you go', $this->refused( $this->args( array( 'plan' => (string) $monthly->get_id() ) ) ) );
 	}
 
 	public function test_stock_and_the_sites_rule_stop_an_order(): void {
@@ -470,8 +468,8 @@ final class PurchaseTest extends UsageTestCase {
 		$this->assertStringContainsString( 'cannot be ordered right now', $this->refused( $this->args() ) );
 		remove_all_filters( 'beltoft_services_picker_can_buy' );
 
-		$this->v['m-None']->set_stock_status( 'outofstock' );
-		$this->v['m-None']->save();
+		$this->v['u-None']->set_stock_status( 'outofstock' );
+		$this->v['u-None']->save();
 		Offers::reset();
 		$this->assertStringContainsString( 'out of stock', $this->refused( $this->args() ) );
 	}
@@ -602,8 +600,7 @@ final class PurchaseTest extends UsageTestCase {
 		$token   = $this->oauth( $this->user, Tokens::FULL );
 		$summary = $this->json( $this->tool( 'order_server', $this->args(), $token ) );
 
-		$this->v['m-None']->set_regular_price( '20' );
-		$this->v['m-None']->save();
+		update_post_meta( $this->v['u-None']->get_id(), \BeltoftServices\Usage\Rates::META_MONTHLY, '20' );
 		Offers::reset();
 
 		$res = $this->tool( 'order_server', $this->args() + array( 'confirm' => $summary['confirm'] ), $token );

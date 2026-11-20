@@ -102,6 +102,7 @@ trait PaidAppFixtures {
 			$v->set_regular_price( '0' );
 			$v->set_status( 'publish' );
 			$v->update_meta_data( \BeltoftServices\Usage\Rates::META_BILLING, 'usage' );
+			$v->update_meta_data( \BeltoftServices\Usage\Rates::META_MONTHLY, (string) $monthly->get_price() );
 			$v->update_meta_data( Product::META_PLAN . 'tier', $key );
 			$v->save();
 			$out[ $key ] = wc_get_product( $v->get_id() );

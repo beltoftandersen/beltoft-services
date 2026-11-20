@@ -66,7 +66,7 @@ class BreakdownShownTest extends UsageTestCase {
 	 * @param float[]              $lines Invoice lines excluding tax.
 	 */
 	public function test_the_maximum_shown_is_the_maximum_charged_and_the_rows_add_up_to_it( array $parts, array $lines ): void {
-		$v = $this->usage_product()['m-None'];
+		$v = $this->usage_product()['u-None'];
 		$parts['driver'] = 'db' === $parts['driver'] ? \BeltoftServices\Proxmox\Db\DbDriver::ID : $parts['driver'];
 
 		foreach ( array( false, true ) as $subtotal ) {
@@ -80,7 +80,7 @@ class BreakdownShownTest extends UsageTestCase {
 	}
 
 	public function test_the_database_of_the_review_is_68_75(): void {
-		$v     = $this->usage_product()['m-None'];
+		$v     = $this->usage_product()['u-None'];
 		$parts = array( 'driver' => \BeltoftServices\Proxmox\Db\DbDriver::ID, 'plan' => 45.0, 'ip' => 5.0, 'storage' => 5.0, 'storage_gb' => 10, 'backups' => 0.0, 'max' => 55.0, 'hourly' => 0.1 );
 
 		$shown = TaxNote::in_cart( static fn() => Breakdown::shown( $parts, $v ) );
@@ -91,7 +91,7 @@ class BreakdownShownTest extends UsageTestCase {
 
 	public function test_nothing_is_worked_out_in_the_excluding_display(): void {
 		update_option( 'woocommerce_tax_display_cart', 'excl' );
-		$v = $this->usage_product()['m-None'];
+		$v = $this->usage_product()['u-None'];
 
 		$this->assertNull( TaxNote::in_cart( static fn() => Breakdown::shown( array( 'plan' => 45.0, 'max' => 45.0 ), $v ) ) );
 	}

@@ -62,6 +62,7 @@ trait DatabaseFixture {
 
 					if ( 'u' === $short ) {
 						$v->update_meta_data( Rates::META_BILLING, 'usage' );
+						$v->update_meta_data( Rates::META_MONTHLY, (string) ( $set[1] + ( $with ? 5 : 0 ) ) );
 					}
 
 					$v->save();

@@ -14,7 +14,6 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Db\DbDiskField;
 use BeltoftServices\Resource;
-use BeltoftServices\Usage\BillingField;
 use BeltoftServices\Usage\Catalog;
 use BeltoftServices\Usage\Ledger;
 use BeltoftServices\Usage\Meter;
@@ -81,6 +80,7 @@ class DatabaseUsageTest extends UsageTestCase {
 
 					if ( 'u' === $short ) {
 						$v->update_meta_data( Rates::META_BILLING, 'usage' );
+						$v->update_meta_data( Rates::META_MONTHLY, (string) ( 25 + 5 * $ip + ( $gb ? 8 : 0 ) ) );
 					}
 
 					$v->save();
@@ -217,17 +217,16 @@ class DatabaseUsageTest extends UsageTestCase {
 
 	// -- Checkout -----------------------------------------------------------------------------------
 
-	public function test_monthly_not_offered_a_database_in_the_cart_becomes_pay_as_you_go_and_keeps_its_add_ons(): void {
-		$this->settings( array( 'admin_email' => self::MAIL, 'offer_monthly' => 0 ) );
+	public function test_extra_storage_on_a_pay_as_you_go_database_keeps_the_pay_as_you_go_plan(): void {
+		$this->settings( array( 'admin_email' => self::MAIL ) );
 		wp_set_current_user( $this->new_user() );
 		WC()->cart->empty_cart();
 		$v = $this->db_product();
 
-		$this->add( $v['m-1-0'] );
-		BillingField::enforce();
-		$this->assertSame( $v['u-1-0']->get_id(), $this->in_cart(), 'Monthly with the public IP becomes its pay as you go twin.' );
+		$this->add( $v['u-1-0'] );
+		$this->assertSame( $v['u-1-0']->get_id(), $this->in_cart() );
 
-		// Extra storage on keeps the billing model (storage needs room on a node).
+		// Extra storage keeps the pay as you go plan (storage needs room on a node).
 		$this->assertTrue( \BeltoftServices\Proxmox\Pve\DiskCapacity::refresh( 'lab', 'node-a', 'disk-store', $this->fake ) );
 		\BeltoftServices\Proxmox\Vm\Stock::sync( 'lab' );
 		$this->assertTrue( DbDiskField::swap( 50 )['ok'] );
@@ -253,16 +252,16 @@ class DatabaseUsageTest extends UsageTestCase {
 		return (string) ob_get_clean();
 	}
 
-	public function test_monthly_not_offered_the_plan_cards_show_the_cap_then_the_hourly_rate(): void {
-		$this->settings( array( 'admin_email' => self::MAIL, 'offer_monthly' => 0 ) );
+	public function test_the_plan_cards_show_the_cap_then_the_hourly_rate(): void {
+		$this->settings( array( 'admin_email' => self::MAIL ) );
 		wp_set_current_user( $this->new_user() );
 		$v = $this->db_product();
+		$this->off_sale( $v );
 		add_filter( 'beltoft_services_db_picker_products', fn() => array( $v['m-0-0']->get_parent_id() ) );
 
 		$html = $this->picker_page();
 
-		$this->assertStringContainsString( 'data-picker-payg-only', $html );
-		$this->assertStringContainsString( '<span class="beltoft-services-plan__name">Small</span>', $html, 'The public IP answer is not part of the plan name.' );
+		$this->assertStringContainsString( '<span class="beltoft-services-plan__name">Small, Pay as you go</span>', $html, 'The public IP answer is not part of the plan name.' );
 		$this->assertStringContainsString( '<b>' . Rates::cap_money( 25.0 ) . '</b> <span>max per month, excl. VAT</span>', $html );
 		$this->assertStringContainsString( 'beltoft-services-plan__hourly">' . Rates::per_hour( 25 / 730 ), str_replace( "\n", '', $html ) );
 		$this->assertStringContainsString( 'data-card-cap="' . Rates::cap_money( 25.0 ) . '"', $html );
@@ -274,29 +273,45 @@ class DatabaseUsageTest extends UsageTestCase {
 		unset( $GLOBALS['wp']->query_vars['databases'] );
 	}
 
-	public function test_monthly_offered_the_cards_keep_the_monthly_price(): void {
+	public function test_a_plan_of_a_monthly_product_keeps_the_monthly_price_on_its_card(): void {
 		wp_set_current_user( $this->new_user() );
 		$v = $this->db_product();
+		$this->off_sale( $v, 'u' );
 		add_filter( 'beltoft_services_db_picker_products', fn() => array( $v['m-0-0']->get_parent_id() ) );
 
 		$html = $this->picker_page();
 
-		$this->assertStringNotContainsString( 'data-picker-payg-only', $html );
-		$this->assertStringContainsString( 'per month excluding VAT', $html );
+		$this->assertStringContainsString( '25.00</span></b> <span>excluding VAT</span>', $html );
+		$this->assertStringNotContainsString( 'max per month', $html );
 
 		remove_all_filters( 'beltoft_services_db_picker_products' );
 		unset( $GLOBALS['wp']->query_vars['databases'] );
 	}
 
-	public function test_a_post_without_monthly_puts_the_pay_as_you_go_variation_in_the_cart(): void {
-		$this->settings( array( 'admin_email' => self::MAIL, 'offer_monthly' => 0 ) );
+	/**
+	 * Takes the variations of one billing (m or u) off sale: after the move of a live product its monthly variations are private.
+	 *
+	 * @param array<string, \WC_Product_Variation> $v    Variations.
+	 * @param string                                $kind 'm' (default) or 'u'.
+	 */
+	private function off_sale( array $v, string $kind = 'm' ): void {
+		foreach ( $v as $key => $variation ) {
+			if ( 0 === strpos( $key, $kind . '-' ) ) {
+				$variation->set_status( 'private' );
+				$variation->save();
+			}
+		}
+	}
+
+	public function test_a_post_puts_the_pay_as_you_go_variation_in_the_cart(): void {
+		$this->settings( array( 'admin_email' => self::MAIL ) );
 		$user = $this->new_user();
 		wp_set_current_user( $user );
 		WC()->cart->empty_cart();
 		$v = $this->db_product();
 		add_filter( 'beltoft_services_db_picker_products', fn() => array( $v['m-0-0']->get_parent_id() ) );
 
-		$result = DbPicker::process( array( DbPicker::FIELD => wp_create_nonce( DbPicker::NONCE ), ServerPicker::PLAN => (string) $v['m-0-0']->get_id() ), $user );
+		$result = DbPicker::process( array( DbPicker::FIELD => wp_create_nonce( DbPicker::NONCE ), ServerPicker::PLAN => (string) $v['u-0-0']->get_id() ), $user );
 
 		$this->assertSame( array(), $result['errors'] );
 		$this->assertSame( $v['u-0-0']->get_id(), $this->in_cart() );

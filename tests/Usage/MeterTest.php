@@ -42,7 +42,7 @@ class MeterTest extends UsageTestCase {
 	}
 
 	public function test_a_usage_variation_is_priced_from_its_own_monthly_figure(): void {
-		$v = $this->usage_product();
+		$v = $this->usage_product() + $this->monthly_vps();
 
 		$this->assertTrue( Rates::is_usage( $v['u-None'] ) );
 		$this->assertFalse( Rates::is_usage( $v['m-None'] ) );
@@ -124,7 +124,7 @@ class MeterTest extends UsageTestCase {
 	}
 
 	public function test_a_server_without_backups_has_no_backups_item_and_a_monthly_license_is_not_metered(): void {
-		$v    = $this->usage_product();
+		$v = $this->usage_product() + $this->monthly_vps();
 		$user = $this->new_user();
 		$r    = $this->usage_vm( $v['u-None'], $user, 3 );
 		$this->assertSame( array( 'server' ), array_column( Rates::items( $r ), 'item' ) );

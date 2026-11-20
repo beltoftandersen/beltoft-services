@@ -15,7 +15,7 @@ require_once dirname( __DIR__ ) . '/Usage/UsageTestCase.php';
 final class LineOptionsTest extends UsageTestCase {
 
 	public function test_a_line_keeps_the_product_name_and_its_main_choice(): void {
-		$v      = $this->usage_product();
+		$v      = $this->monthly_vps();
 		$order  = wc_create_order();
 		$item   = new \WC_Order_Item_Product();
 		$item->set_product( $v['m-Daily'] );

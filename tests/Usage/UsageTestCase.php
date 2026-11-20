@@ -39,7 +39,7 @@ abstract class UsageTestCase extends BackupTestCase {
 	public function set_up(): void {
 		parent::set_up();
 
-		$this->settings( array( 'admin_email' => self::MAIL, 'offer_monthly' => 1, 'usage_minimum' => 0 ) );
+		$this->settings( array( 'admin_email' => self::MAIL, 'usage_minimum' => 0 ) );
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test fixture reset.
 		$wpdb->query( 'DELETE FROM ' . \BeltoftServices\Usage\Ledger::table() );
@@ -104,22 +104,36 @@ abstract class UsageTestCase extends BackupTestCase {
 	}
 
 	/**
-	 * A VPS with a Billing attribute (Monthly, Pay as you go) and a Backups attribute (None, Daily).
-	 * Monthly: 15 without and 18 with backups. Pay as you go: price 0, meta billing = usage.
+	 * A pay as you go VPS product: the parent says usage, its two plans (None, Daily backups) have price 0 and the monthly figure
+	 * 15 and 18 typed on the variation, as the product editor writes it. No Billing attribute.
 	 *
 	 * @param string $premium Premium percent on the product ('' for the default).
-	 * @return array<string, \WC_Product_Variation> Keys: m-None, m-Daily, u-None, u-Daily.
+	 * @return array<string, \WC_Product_Variation> Keys: u-None, u-Daily.
 	 */
 	protected function usage_product( string $premium = '' ): array {
+		return $this->vps_product( true, $premium );
+	}
+
+	/**
+	 * A monthly VPS product of the same driver: no flag, price 15 without and 18 with backups. Keys: m-None, m-Daily.
+	 *
+	 * @return array<string, \WC_Product_Variation>
+	 */
+	protected function monthly_vps(): array {
+		return $this->vps_product( false, '' );
+	}
+
+	/**
+	 * Builds the product of usage_product() or monthly_vps().
+	 *
+	 * @param bool   $payg    Pay as you go.
+	 * @param string $premium Premium percent ('' for the default).
+	 * @return array<string, \WC_Product_Variation>
+	 */
+	private function vps_product( bool $payg, string $premium ): array {
 		$product = new \WC_Product_Variable();
 		$product->set_name( 'VPS ' . wp_generate_password( 5, false ) );
 		$product->set_status( 'publish' );
-
-		$billing = new \WC_Product_Attribute();
-		$billing->set_name( 'Billing' );
-		$billing->set_options( array( 'Monthly', 'Pay as you go' ) );
-		$billing->set_visible( true );
-		$billing->set_variation( true );
 
 		$backups = new \WC_Product_Attribute();
 		$backups->set_name( 'Backups' );
@@ -127,10 +141,14 @@ abstract class UsageTestCase extends BackupTestCase {
 		$backups->set_visible( true );
 		$backups->set_variation( true );
 
-		$product->set_attributes( array( $billing, $backups ) );
+		$product->set_attributes( array( $backups ) );
 		$product->update_meta_data( Product::META_DRIVER, 'proxmox' );
 		$product->update_meta_data( \BeltoftLicenses\Software::META_LICENSED, 'yes' );
 		$product->update_meta_data( \BeltoftLicenses\Software::META_SLUG, 'vps-' . wp_generate_password( 5, false ) );
+
+		if ( $payg ) {
+			$product->update_meta_data( Rates::META_BILLING, Rates::KIND_HOURLY );
+		}
 
 		if ( '' !== $premium ) {
 			$product->update_meta_data( Rates::META_PREMIUM, $premium );
@@ -145,22 +163,20 @@ abstract class UsageTestCase extends BackupTestCase {
 
 		$out = array();
 
-		foreach ( array( 'm' => 'Monthly', 'u' => 'Pay as you go' ) as $short => $billing_value ) {
-			foreach ( array( 'None' => '15', 'Daily' => '18' ) as $b => $price ) {
-				$v = new \WC_Product_Variation();
-				$v->set_parent_id( $product->get_id() );
-				$v->set_attributes( array( 'billing' => $billing_value, 'backups' => $b ) );
-				$v->set_regular_price( 'm' === $short ? $price : '0' );
-				$v->set_status( 'publish' );
-				$v->update_meta_data( Product::META_PLAN . 'backup_days', 'Daily' === $b ? '7' : '0' );
+		foreach ( array( 'None' => '15', 'Daily' => '18' ) as $b => $price ) {
+			$v = new \WC_Product_Variation();
+			$v->set_parent_id( $product->get_id() );
+			$v->set_attributes( array( 'backups' => $b ) );
+			$v->set_regular_price( $payg ? '0' : $price );
+			$v->set_status( 'publish' );
+			$v->update_meta_data( Product::META_PLAN . 'backup_days', 'Daily' === $b ? '7' : '0' );
 
-				if ( 'u' === $short ) {
-					$v->update_meta_data( Rates::META_BILLING, 'usage' );
-				}
-
-				$v->save();
-				$out[ $short . '-' . $b ] = $v;
+			if ( $payg ) {
+				$v->update_meta_data( Rates::META_MONTHLY, $price );
 			}
+
+			$v->save();
+			$out[ ( $payg ? 'u-' : 'm-' ) . $b ] = $v;
 		}
 
 		\WC_Product_Variable::sync( $product->get_id() );

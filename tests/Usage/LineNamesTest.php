@@ -32,21 +32,26 @@ class LineNamesTest extends UsageTestCase {
 	}
 
 	public function test_a_monthly_line_with_backups_reads_plan_and_backups(): void {
-		$v    = $this->usage_product();
+		$v    = $this->monthly_vps();
 		$name = wc_get_product( $v['m-Daily']->get_parent_id() )->get_name();
 		$item = $this->line( $v['m-Daily'] );
 
-		$this->assertSame( $name . ', billed monthly, daily backups', LineNames::label( $v['m-Daily'] ) );
-		$this->assertSame( $name . ', billed monthly, daily backups', apply_filters( 'woocommerce_order_item_name', $item->get_name(), $item, false ) );
+		$this->assertSame( $name . ', daily backups', LineNames::label( $v['m-Daily'] ) );
+		$this->assertSame( $name . ', daily backups', apply_filters( 'woocommerce_order_item_name', $item->get_name(), $item, false ) );
 		$this->assertStringNotContainsString( ' - ', LineNames::label( $v['m-Daily'] ) );
 	}
 
 	public function test_none_backups_are_not_mentioned_and_usage_says_pay_as_you_go(): void {
-		$v    = $this->usage_product();
+		$v = $this->usage_product() + $this->monthly_vps();
 		$name = wc_get_product( $v['u-None']->get_parent_id() )->get_name();
 
-		$this->assertSame( $name . ', billed monthly', LineNames::label( $v['m-None'] ) );
-		$this->assertSame( $name . ', pay as you go', LineNames::label( $v['u-None'] ) );
+		$this->assertSame( wc_get_product( $v['m-None']->get_parent_id() )->get_name(), LineNames::label( $v['m-None'] ) );
+		$this->assertSame( $name, LineNames::label( $v['u-None'] ) );
+
+		// A variation of a product made before the move still has its Billing attribute: its name says so.
+		$old = new \WC_Product_Variation( $v['u-None']->get_id() );
+		$old->set_attributes( array( 'billing' => 'Pay as you go', 'backups' => 'None' ) );
+		$this->assertSame( $name . ', pay as you go', LineNames::label( $old ) );
 	}
 
 	public function test_a_linked_name_keeps_its_link(): void {
@@ -55,7 +60,7 @@ class LineNamesTest extends UsageTestCase {
 		$out  = apply_filters( 'woocommerce_order_item_name', '<a href="https://example.com/p">Old - name</a>', $item, true );
 
 		$this->assertStringStartsWith( '<a href="https://example.com/p">', $out );
-		$this->assertStringContainsString( 'pay as you go</a>', $out );
+		$this->assertStringContainsString( wc_get_product( $v['u-None']->get_parent_id() )->get_name() . '</a>', $out );
 	}
 
 	public function test_the_meta_list_leaves_out_what_the_name_says_and_adds_the_usage_note(): void {
@@ -120,7 +125,7 @@ class LineNamesTest extends UsageTestCase {
 		$cart = WC()->cart->get_cart()[ $key ];
 
 		// The summary and cart show the breakdown (Breakdown); the name itself is still built the same way.
-		$this->assertStringContainsString( 'pay as you go', \BeltoftServices\LineNames::label( $cart['data'] ) );
+		$this->assertSame( wc_get_product( $v['u-None']->get_parent_id() )->get_name(), \BeltoftServices\LineNames::label( $cart['data'] ) );
 
 		$rows = wp_list_pluck( apply_filters( 'woocommerce_get_item_data', array( array( 'key' => 'Billing', 'value' => 'Pay as you go' ), array( 'key' => 'Backups', 'value' => 'None' ) ), $cart ), 'value', 'key' );
 

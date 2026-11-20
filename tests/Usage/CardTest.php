@@ -346,7 +346,7 @@ class CardTest extends UsageTestCase {
 		$this->add_card( $user );
 		wp_set_current_user( $user );
 
-		WC()->cart->add_to_cart( $v['u-None']->get_parent_id(), 1, $v['u-None']->get_id(), array( 'attribute_billing' => 'Pay as you go', 'attribute_backups' => 'None' ) );
+		WC()->cart->add_to_cart( $v['u-None']->get_parent_id(), 1, $v['u-None']->get_id(), array( 'attribute_backups' => 'None' ) );
 		WC()->cart->calculate_totals();
 
 		$this->assertFalse( WC()->cart->needs_payment(), 'The card account makes it a 0 order.' );

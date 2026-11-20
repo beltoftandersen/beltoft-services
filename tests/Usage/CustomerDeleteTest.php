@@ -183,7 +183,7 @@ final class CustomerDeleteTest extends UsageTestCase {
 	}
 
 	public function test_a_monthly_service_is_not_offered_and_not_deleted(): void {
-		$v    = $this->usage_product();
+		$v    = $this->monthly_vps();
 		$user = $this->new_user();
 		$row  = $this->service_license( wc_get_product( $v['m-None']->get_parent_id() ), array( 'variation_id' => $v['m-None']->get_id(), 'user_id' => $user, 'email' => self::MAIL, 'source' => 'order', 'fire' => false ) );
 		$r    = Resource::create( $row, Registry::get( 'proxmox' ), array(), array( 'state' => 'ready', 'desired' => 'ready' ) );

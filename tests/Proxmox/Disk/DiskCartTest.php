@@ -128,7 +128,7 @@ class DiskCartTest extends BackupTestCase {
 		$variation = $this->variation();
 		$this->assertNotFalse( WC()->cart->add_to_cart( $server['a-None']->get_parent_id(), 1, $server['a-None']->get_id(), array( 'attribute_tier' => 'a', 'attribute_backups' => 'None' ) ) );
 		$this->assertNotNull( DiskField::cart_server() );
-		$this->assertArrayHasKey( $variation->get_id(), DiskField::sizes() );
+		$this->assertArrayHasKey( $variation->get_id(), DiskField::sizes_for( false ) );
 		$this->assertTrue( DiskField::choose( $variation->get_id() ) );
 		$this->assertCount( 2, WC()->cart->get_cart() );
 		$this->assertTrue( DiskField::choose( $variation->get_id() ) );

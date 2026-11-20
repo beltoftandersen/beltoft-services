@@ -73,6 +73,7 @@ trait ServerDiskFixture {
 
 				if ( 'u' === $short ) {
 					$v->update_meta_data( Rates::META_BILLING, 'usage' );
+				$v->update_meta_data( Rates::META_MONTHLY, (string) $price );
 				}
 
 				$v->save();

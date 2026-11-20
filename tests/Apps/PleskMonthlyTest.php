@@ -30,7 +30,6 @@ final class PleskMonthlyTest extends PaidAppCase {
 
 	public function set_up(): void {
 		parent::set_up();
-		$this->settings( array( 'offer_monthly' => 1 ) );
 		// wcs_create_renewal_order() commits the test transaction: a customer and a server record it left would block this run.
 		global $wpdb;
 		$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->users} WHERE user_email = %s", 'christian.beltoft@gmail.com' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- test fixture reset.
@@ -94,6 +93,7 @@ final class PleskMonthlyTest extends PaidAppCase {
 
 			if ( 'u' === $short ) {
 				$v->update_meta_data( Rates::META_BILLING, 'usage' );
+				$v->update_meta_data( Rates::META_MONTHLY, '10' );
 			}
 
 			$v->save();
@@ -154,17 +154,6 @@ final class PleskMonthlyTest extends PaidAppCase {
 
 		$this->assertArrayHasKey( $account, $keys, 'A new customer still gets the usage account line.' );
 		$this->assertNotSame( $keys[ $account ], $keys[ $this->tiers['webadmin']->get_parent_id() ], 'The licence is a subscription of its own, not a line of the usage account.' );
-	}
-
-	public function test_the_tier_line_stays_the_monthly_one_when_the_billing_choice_changes(): void {
-		$server = $this->server_variations();
-		$this->put_server_in_cart( $server['m'] );
-		$this->assertTrue( AppLicenceCart::choose( 'docker', 'webpro' ) );
-		$this->assertTrue( \BeltoftServices\Usage\BillingField::swap( true )['ok'] );
-		$this->assertTrue( AppLicenceCart::server_usage() );
-		$line = AppLicenceCart::line();
-		$this->assertNotNull( $line );
-		$this->assertSame( $this->tiers['webpro']->get_id(), (int) $line['item']['variation_id'] );
 	}
 
 	public function test_the_form_says_per_month_in_advance_and_never_per_hour_for_the_licence(): void {

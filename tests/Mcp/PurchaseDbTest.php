@@ -62,7 +62,7 @@ final class PurchaseDbTest extends UsageTestCase {
 		$key->setAccessible( true );
 		set_transient( $key->invoke( null, 'lab', 'node-a', 'disk-store' ), array( 'total' => 5000 * 1073741824, 'avail' => 4000 * 1073741824, 'read_at' => time() ), HOUR_IN_SECONDS );
 		$this->db = $this->database_product();
-		$this->settings( array( 'offer_monthly' => 0, 'usage_new_limit' => 0, 'db_disk_max_gb' => 1000, 'db_disk_step_gb' => 10 ) );
+		$this->settings( array( 'usage_new_limit' => 0, 'db_disk_max_gb' => 1000, 'db_disk_step_gb' => 10 ) );
 		$this->mcp_set_up();
 		add_filter( 'beltoft_services_mcp_rate_limit', '__return_zero' );
 		update_option( 'woocommerce_currency', 'EUR' );
@@ -85,7 +85,7 @@ final class PurchaseDbTest extends UsageTestCase {
 	}
 
 	private function plan_id(): int {
-		return (int) $this->db['m-0-0']->get_id();
+		return (int) $this->db['u-0-0']->get_id();
 	}
 
 	/**
@@ -137,8 +137,8 @@ final class PurchaseDbTest extends UsageTestCase {
 	}
 
 	public function test_an_out_of_stock_plan_is_refused(): void {
-		$this->db['m-0-0']->set_stock_status( 'outofstock' );
-		$this->db['m-0-0']->save();
+		$this->db['u-0-0']->set_stock_status( 'outofstock' );
+		$this->db['u-0-0']->save();
 		Offers::reset();
 
 		$out = $this->tool( 'order_database', $this->args(), $this->oauth( $this->user, Tokens::FULL ) );
@@ -167,10 +167,7 @@ final class PurchaseDbTest extends UsageTestCase {
 	}
 
 	public function test_a_plan_with_no_pay_as_you_go_price_is_never_ordered_as_a_fixed_monthly_one(): void {
-		$this->db['u-0-0']->set_status( 'private' );
-		$this->db['u-0-0']->save();
-
-		$out = $this->tool( 'order_database', $this->args(), $this->oauth( $this->user, Tokens::FULL ) );
+		$out = $this->tool( 'order_database', $this->args( array( 'plan' => (string) $this->db['m-0-0']->get_id() ) ), $this->oauth( $this->user, Tokens::FULL ) );
 		$this->assertTrue( $out['isError'] );
 		$this->assertStringContainsString( 'not sold pay as you go', wp_json_encode( $out ) );
 		$this->assertSame( array(), $this->orders( $this->user ) );

@@ -71,7 +71,6 @@ class UsageEngineNeutralTest extends TestCase {
 	 */
 	private const FEATURE_IMPORTS = array(
 		'src/Usage/Breakdown.php'       => array( 'Proxmox\\Backup\\BackupField', 'Proxmox\\Db\\DbDiskField' ),
-		'src/Usage/BillingField.php'    => array( 'Proxmox\\Backup\\BackupField', 'Proxmox\\Backup\\Backups', 'Proxmox\\Backup\\CartSwap', 'Proxmox\\Disk\\DiskField', 'Proxmox\\Vm\\OsField' ),
 		'src/Usage/Counted/Intro.php'   => array( 'Proxmox\\Vm\\Schema' ),
 		'src/Usage/Counted/Store.php'   => array( 'Proxmox\\Vm\\Schema' ),
 		'src/Usage/Estimate.php'        => array( 'Proxmox\\Db\\DbAccess' ),

@@ -44,7 +44,7 @@ class CartRuleTest extends UsageTestCase {
 	}
 
 	private function add_variation( \WC_Product_Variation $v ) {
-		return $this->add_product( $v->get_parent_id(), $v->get_id(), array( 'attribute_billing' => $v->get_attributes()['billing'], 'attribute_backups' => $v->get_attributes()['backups'] ) );
+		return $this->add_product( $v->get_parent_id(), $v->get_id(), array( 'attribute_backups' => $v->get_attributes()['backups'] ) );
 	}
 
 	private function hosting(): \WC_Product {
@@ -108,7 +108,7 @@ class CartRuleTest extends UsageTestCase {
 		// A monthly (not pay as you go) variation does not trigger it either.
 		WC()->cart->empty_cart();
 		wc_clear_notices();
-		$monthly = $this->usage_product()['m-None'];
+		$monthly = $this->monthly_vps()['m-None'];
 		$this->add_variation( $monthly );
 		$this->assertSame( array(), preg_grep( '/Your cart had/', $this->notices() ) );
 	}

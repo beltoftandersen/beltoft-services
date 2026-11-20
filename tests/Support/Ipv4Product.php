@@ -45,6 +45,7 @@ trait Ipv4Product {
 
 			if ( 'u' === $short ) {
 				$v->update_meta_data( Rates::META_BILLING, 'usage' );
+				$v->update_meta_data( Rates::META_MONTHLY, '2.04' );
 			}
 
 			$v->save();

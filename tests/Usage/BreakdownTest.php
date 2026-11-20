@@ -71,6 +71,7 @@ class BreakdownTest extends UsageTestCase {
 
 					if ( 'u' === $short ) {
 						$v->update_meta_data( Rates::META_BILLING, 'usage' );
+						$v->update_meta_data( Rates::META_MONTHLY, (string) ( $set[1] + ( $with ? 5 : 0 ) ) );
 					}
 
 					$v->save();
@@ -250,7 +251,7 @@ class BreakdownTest extends UsageTestCase {
 	public function test_real_prices_and_totals_are_not_touched(): void {
 		$v = $this->usage_product( '0' );
 		wp_set_current_user( $this->new_user() );
-		$key = WC()->cart->add_to_cart( $v['u-Daily']->get_parent_id(), 1, $v['u-Daily']->get_id(), array( 'attribute_billing' => 'Pay as you go', 'attribute_backups' => 'Daily' ) );
+		$key = WC()->cart->add_to_cart( $v['u-Daily']->get_parent_id(), 1, $v['u-Daily']->get_id(), array( 'attribute_backups' => 'Daily' ) );
 		$this->assertNotFalse( $key );
 		WC()->cart->calculate_totals();
 		$item = WC()->cart->get_cart()[ $key ];
@@ -274,7 +275,7 @@ class BreakdownTest extends UsageTestCase {
 	}
 
 	public function test_the_server_label_shows_the_monthly_maximum(): void {
-		$v = $this->usage_product( '0' );
+		$v = $this->usage_product( '0' ) + $this->monthly_vps();
 
 		$this->assertSame( 'Daily backups, +€3 per month', BackupField::label( $v['u-None'], $v['u-Daily'], '+€0.0041 / hour' ) );
 		$this->assertSame( 'Daily backups (+€3.00)', BackupField::label( $v['m-None'], $v['m-Daily'], '+€3.00' ) );
@@ -283,7 +284,7 @@ class BreakdownTest extends UsageTestCase {
 	public function test_the_bricks_summary_row_becomes_the_stacked_block(): void {
 		$v = $this->usage_product( '0' );
 		wp_set_current_user( $this->new_user() );
-		$key = WC()->cart->add_to_cart( $v['u-Daily']->get_parent_id(), 1, $v['u-Daily']->get_id(), array( 'attribute_billing' => 'Pay as you go', 'attribute_backups' => 'Daily' ) );
+		$key = WC()->cart->add_to_cart( $v['u-Daily']->get_parent_id(), 1, $v['u-Daily']->get_id(), array( 'attribute_backups' => 'Daily' ) );
 		$this->assertNotFalse( $key );
 		WC()->cart->calculate_totals();
 		$name = wc_get_product( $v['u-Daily']->get_parent_id() )->get_name();
@@ -306,7 +307,7 @@ class BreakdownTest extends UsageTestCase {
 	public function test_a_row_that_is_not_ours_is_left_alone(): void {
 		$v = $this->usage_product( '0' );
 		wp_set_current_user( $this->new_user() );
-		WC()->cart->add_to_cart( $v['u-None']->get_parent_id(), 1, $v['u-None']->get_id(), array( 'attribute_billing' => 'Pay as you go', 'attribute_backups' => 'None' ) );
+		WC()->cart->add_to_cart( $v['u-None']->get_parent_id(), 1, $v['u-None']->get_id(), array( 'attribute_backups' => 'None' ) );
 		WC()->cart->calculate_totals();
 		$html = '<div id="bricks-woo-checkout-order-summary" class="x"><div class="brxe-33b40c brxe-div"><div class="brxe-d4a5aa brxe-div"><div class="brxe-f8a552 brxe-div"><div class="brxe-4b1d33 brxe-text-basic">Something else</div><div class="brxe-807587 brxe-text-basic">€1</div><small class="brxe-1b2247 brxe-text-basic">x</small><div class="brxe-sumos1 brxe-text-basic checkout-summary-os"></div></div><div class="brxe-781d12 brxe-div"><div class="brxe-57f1f8 brxe-text-basic">€1</div></div></div></div></div>';
 

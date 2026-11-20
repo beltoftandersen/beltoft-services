@@ -46,7 +46,7 @@ class ManualServerTest extends ManualServerTestCase {
 		$this->assertSame( '49.00', $plan['cost_setup'] );
 		$this->assertSame( 'manual-server', Product::driver_for( $v['u']->get_parent_id() )->id() );
 		$this->assertSame( 'dedicated', Product::driver_for( $v['u']->get_parent_id() )->kind() );
-		$this->assertSame( $v['m']->get_id(), Rates::sibling( $v['u'], false )->get_id(), 'The monthly variation is the price source.' );
+		$this->assertSame( 119.0, Rates::monthly( $v['u'] ), 'The figure the rates are taken from is typed on the variation.' );
 	}
 
 	public function test_a_new_server_waits_calls_nothing_and_mails_staff_once(): void {

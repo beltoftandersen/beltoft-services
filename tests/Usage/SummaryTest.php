@@ -8,7 +8,6 @@
 namespace BeltoftServices\Tests\Usage;
 
 use BeltoftServices\Usage\Account;
-use BeltoftServices\Usage\BillingField;
 use BeltoftServices\Usage\Summary;
 
 require_once __DIR__ . '/UsageTestCase.php';
@@ -19,7 +18,7 @@ require_once __DIR__ . '/UsageTestCase.php';
 class SummaryTest extends UsageTestCase {
 
 	private function add( \WC_Product_Variation $v ): string {
-		$key = WC()->cart->add_to_cart( $v->get_parent_id(), 1, $v->get_id(), array( 'attribute_billing' => $v->get_attributes()['billing'], 'attribute_backups' => $v->get_attributes()['backups'] ) );
+		$key = WC()->cart->add_to_cart( $v->get_parent_id(), 1, $v->get_id(), array( 'attribute_backups' => $v->get_attributes()['backups'] ) );
 		$this->assertNotFalse( $key );
 		WC()->cart->calculate_totals();
 
@@ -81,7 +80,7 @@ class SummaryTest extends UsageTestCase {
 	}
 
 	public function test_a_monthly_line_keeps_its_price(): void {
-		$v = $this->usage_product( '0' );
+		$v = $this->monthly_vps();
 		wp_set_current_user( $this->new_user() );
 		$key  = $this->add( $v['m-None'] );
 		$item = WC()->cart->get_cart()[ $key ];
@@ -120,7 +119,7 @@ class SummaryTest extends UsageTestCase {
 	}
 
 	public function test_a_cart_without_a_usage_server_is_untouched(): void {
-		$v = $this->usage_product( '0' );
+		$v = $this->monthly_vps();
 		wp_set_current_user( $this->new_user() );
 		$this->add( $v['m-None'] );
 
@@ -187,94 +186,6 @@ class SummaryTest extends UsageTestCase {
 		}
 	}
 
-	public function test_the_tiles_say_what_each_choice_means(): void {
-		$v     = $this->usage_product( '0' );
-		$tiles = BillingField::tiles( $v['m-None'] );
-
-		$this->assertStringContainsString( '15.00', $tiles['monthly'][0] );
-		$this->assertStringContainsString( 'per month, paid in advance', $tiles['monthly'][0] );
-		$this->assertStringContainsString( '18.00', $tiles['monthly'][1] );
-		$this->assertStringContainsString( '0.0205 per hour, max', $tiles['usage'][0] );
-		$this->assertStringContainsString( '18 per month', str_replace( "\u{a0}", ' ', $tiles['usage'][1] ) );
-		$this->assertSame( 'Billed monthly for the hours used', \BeltoftServices\Usage\Rates::billed_note() );
-	}
-
-	public function test_monthly_not_offered_swaps_a_new_monthly_server_to_pay_as_you_go(): void {
-		$this->settings( array( 'offer_monthly' => 0 ) );
-		$v = $this->usage_product( '0' );
-		wp_set_current_user( $this->new_user() );
-		$key = WC()->cart->add_to_cart( $v['m-None']->get_parent_id(), 1, $v['m-None']->get_id(), array( 'attribute_billing' => 'Monthly', 'attribute_backups' => 'None' ) );
-		WC()->cart->calculate_totals();
-
-		$ids = array_map( static fn( $i ) => (int) $i['variation_id'], WC()->cart->get_cart() );
-
-		$this->assertContains( $v['u-None']->get_id(), $ids );
-		$this->assertNotContains( $v['m-None']->get_id(), $ids );
-		$this->assertNotFalse( $key );
-		$this->assertSame( 1, \BeltoftServices\Usage\Cart::usage_units() );
-	}
-
-	public function test_monthly_not_offered_keeps_backups_in_the_swap(): void {
-		$this->settings( array( 'offer_monthly' => 0 ) );
-		$v = $this->usage_product( '0' );
-		wp_set_current_user( $this->new_user() );
-		WC()->cart->add_to_cart( $v['m-Daily']->get_parent_id(), 1, $v['m-Daily']->get_id(), array( 'attribute_billing' => 'Monthly', 'attribute_backups' => 'Daily' ) );
-
-		$ids = array_map( static fn( $i ) => (int) $i['variation_id'], WC()->cart->get_cart() );
-
-		$this->assertContains( $v['u-Daily']->get_id(), $ids );
-	}
-
-	public function test_monthly_offered_leaves_a_monthly_server_alone(): void {
-		$this->settings( array( 'offer_monthly' => 1 ) );
-		$v = $this->usage_product( '0' );
-		wp_set_current_user( $this->new_user() );
-		WC()->cart->add_to_cart( $v['m-None']->get_parent_id(), 1, $v['m-None']->get_id(), array( 'attribute_billing' => 'Monthly', 'attribute_backups' => 'None' ) );
-
-		$ids = array_map( static fn( $i ) => (int) $i['variation_id'], WC()->cart->get_cart() );
-
-		$this->assertContains( $v['m-None']->get_id(), $ids );
-	}
-
-	public function test_monthly_not_offered_never_swaps_a_renewal_or_switch(): void {
-		$this->settings( array( 'offer_monthly' => 0 ) );
-		$v = $this->usage_product( '0' );
-		wp_set_current_user( $this->new_user() );
-
-		foreach ( array( 'subscription_renewal', 'subscription_switch', 'subscription_resubscribe' ) as $flag ) {
-			$this->settings( array( 'offer_monthly' => 1 ) );
-			WC()->cart->empty_cart();
-			$key = WC()->cart->add_to_cart( $v['m-None']->get_parent_id(), 1, $v['m-None']->get_id(), array( 'attribute_billing' => 'Monthly', 'attribute_backups' => 'None' ) );
-			$contents                       = WC()->cart->get_cart_contents();
-			$contents[ $key ][ $flag ]      = array( 'subscription_id' => 1 );
-			WC()->cart->set_cart_contents( $contents );
-			$this->settings( array( 'offer_monthly' => 0 ) );
-			BillingField::enforce();
-			$ids = array_map( static fn( $i ) => (int) $i['variation_id'], WC()->cart->get_cart() );
-
-			$this->assertContains( $v['m-None']->get_id(), $ids, $flag );
-		}
-	}
-
-	public function test_monthly_not_offered_hides_the_checkout_box_and_leaves_admin_orders_alone(): void {
-		$this->settings( array( 'offer_monthly' => 0 ) );
-		$v = $this->usage_product( '0' );
-		wp_set_current_user( $this->new_user() );
-		$order = wc_create_order();
-		$order->add_product( $v['m-None'], 1 );
-		$order->save();
-		$items = array_values( $order->get_items() );
-
-		$this->assertSame( $v['m-None']->get_id(), (int) $items[0]->get_variation_id(), 'An order made outside the cart keeps its monthly plan.' );
-
-		$this->add( $v['u-None'] );
-		ob_start();
-		BillingField::render();
-
-		$this->assertSame( '', (string) ob_get_clean(), 'No billing box.' );
-		$this->assertFalse( \BeltoftServices\Usage\Rates::monthly_offered() );
-	}
-
 	public function test_a_whole_euro_cap_has_no_decimals_and_other_amounts_keep_two(): void {
 		$this->assertSame( "\u{20AC}15", str_replace( '$', "\u{20AC}", \BeltoftServices\Usage\Rates::cap_money( 15.0 ) ) );
 		$this->assertSame( "\u{20AC}55", str_replace( '$', "\u{20AC}", \BeltoftServices\Usage\Rates::cap_money( 55.004 ) ) );
@@ -282,37 +193,5 @@ class SummaryTest extends UsageTestCase {
 		$this->assertStringContainsString( 'max ', \BeltoftServices\Usage\Rates::max_per_month( 15.0 ) );
 		$this->assertStringContainsString( "\u{20AC}15 ", str_replace( '$', "\u{20AC}", str_replace( "\u{a0}", ' ', \BeltoftServices\Usage\Rates::max_per_month( 15.0 ) ) ) );
 		$this->assertStringContainsString( '0.0226', \BeltoftServices\Usage\Rates::money( 0.0226, 4 ) );
-	}
-
-	public function test_monthly_not_offered_never_touches_a_mail_plan_or_a_plugin_licence_in_the_cart(): void {
-		$this->settings( array( 'offer_monthly' => 0 ) );
-		$vps  = $this->usage_product( '0' );
-		$mail = $this->usage_product( '0' );
-		$mail['m-None']->get_parent_id();
-		update_post_meta( $mail['m-None']->get_parent_id(), \BeltoftServices\Product::META_DRIVER, 'http' );
-		wp_set_current_user( $this->new_user() );
-
-		$plugin = new \WC_Product_Simple();
-		$plugin->set_name( 'Plugin' );
-		$plugin->set_regular_price( '49' );
-		$plugin->save();
-
-		WC()->cart->add_to_cart( $mail['m-None']->get_parent_id(), 1, $mail['m-None']->get_id(), array( 'attribute_billing' => 'Monthly', 'attribute_backups' => 'None' ) );
-		WC()->cart->add_to_cart( $plugin->get_id() );
-		WC()->cart->add_to_cart( $vps['m-None']->get_parent_id(), 1, $vps['m-None']->get_id(), array( 'attribute_billing' => 'Monthly', 'attribute_backups' => 'None' ) );
-
-		$ids = array_map( static fn( $i ) => (int) ( $i['variation_id'] ?: $i['product_id'] ), WC()->cart->get_cart() );
-
-		$this->assertContains( $mail['m-None']->get_id(), $ids, 'The mail plan stays monthly.' );
-		$this->assertNotContains( $mail['u-None']->get_id(), $ids );
-		$this->assertContains( $plugin->get_id(), $ids, 'The plugin licence is untouched.' );
-		$this->assertContains( $vps['u-None']->get_id(), $ids, 'The server is swapped.' );
-		$this->assertNotContains( $vps['m-None']->get_id(), $ids );
-
-		foreach ( WC()->cart->get_cart() as $key => $item ) {
-			if ( (int) $item['product_id'] === $plugin->get_id() || (int) $item['variation_id'] === $mail['m-None']->get_id() ) {
-				$this->assertSame( $item['data']->get_price(), apply_filters( 'woocommerce_cart_item_price', $item['data']->get_price(), $item, $key ) );
-			}
-		}
 	}
 }

@@ -78,7 +78,7 @@ class CacheablePriceTest extends UsageTestCase {
 		$out = apply_filters( 'bricks/dynamic_data/render_content', '{beltoft_usage_cap:' . $id . '}', null, 'text' );
 		$this->assertSame( 'EUR:€16.50 | DKK:-', $out, 'No DKK price: no variant, and never the euro figure relabelled.' );
 
-		$this->fake_price( $v['m-None']->get_id(), 'DKK', '120' );
+		$this->fake_monthly( $v['u-None']->get_id(), 'DKK', '120' );
 		$out = apply_filters( 'bricks/dynamic_data/render_content', '{beltoft_usage_cap:' . $id . '}', null, 'text' );
 		$this->assertStringStartsWith( 'EUR:€16.50 | DKK:', $out );
 		$this->assertStringContainsString( '132', $out, 'The DKK plan (120 plus the 10 percent premium).' );

@@ -17,7 +17,6 @@ use BeltoftServices\Domains\Prices;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Proxmox\Vm\Panels;
-use BeltoftServices\Usage\BillingField;
 use BeltoftServices\Usage\Breakdown;
 use BeltoftServices\Usage\Catalog;
 use BeltoftServices\Usage\CoreHooks;
@@ -78,7 +77,7 @@ class PriceDisplayInclTest extends UsageTestCase {
 	}
 
 	public function test_the_picker_card_price_and_its_words_flip_together(): void {
-		$p    = $this->usage_product()['m-None'];
+		$p    = $this->monthly_vps()['m-None'];
 		$span = '<span class="beltoft-services-plan__price"><b>%s</b> <span>%s</span></span>';
 
 		$this->assertSame( sprintf( $span, wp_kses_post( wc_price( 12.5 ) ), 'per month including VAT' ), ServerPicker::price_span( 10.0, 'month', $p, 'server-picker' ) );
@@ -95,7 +94,7 @@ class PriceDisplayInclTest extends UsageTestCase {
 	}
 
 	public function test_a_product_that_is_not_taxable_shows_its_figure_and_no_vat_words(): void {
-		$v = $this->untaxed( $this->usage_product()['m-None'] );
+		$v = $this->untaxed( $this->monthly_vps()['m-None'] );
 
 		$this->assertSame( 'none', TaxNote::vat_mode( $v ) );
 		$this->assertSame( '<span class="beltoft-services-plan__price"><b>' . wp_kses_post( wc_price( 10 ) ) . '</b> <span>per month</span></span>', ServerPicker::price_span( 10.0, 'month', $v, 'server-picker' ) );
@@ -119,7 +118,7 @@ class PriceDisplayInclTest extends UsageTestCase {
 	}
 
 	public function test_pay_as_you_go_cards_and_sentences_follow_the_display_at_the_standard_class(): void {
-		$p = $this->usage_product()['m-None'];
+		$p = $this->monthly_vps()['m-None'];
 
 		$spans = ServerPicker::payg_spans( 16.5, 0.02260274, $p, 'server-picker-payg' );
 		$this->assertStringContainsString( '<b>€20.63</b> <span>max per month, incl. VAT</span>', $spans );
@@ -132,22 +131,18 @@ class PriceDisplayInclTest extends UsageTestCase {
 	}
 
 	public function test_a_usage_rate_is_shown_at_the_class_the_invoice_is_taxed_at_not_the_products(): void {
-		$p = $this->usage_product()['m-None'];
+		$p = $this->monthly_vps()['m-None'];
 		$parent = wc_get_product( $p->get_parent_id() );
 		$parent->set_tax_class( 'reduced-rate' );
 		$parent->save();
 		$p = wc_get_product( $p->get_id() );
 
 		$this->assertSame( '€20.63', Rates::cap_money( 16.5, $p ), 'The usage invoice is taxed at the standard class: 25 percent, not the product\'s 10.' );
-		$this->assertSame( '€16.50 per month, paid in advance', Rates::tile_monthly( 15.0, $p ), 'A fixed price follows the product\'s class: 10 percent.' );
 	}
 
-	public function test_monthly_labels_tiles_and_the_pay_as_you_go_terms(): void {
-		$v = $this->usage_product();
+	public function test_the_pay_as_you_go_terms(): void {
+		$v = $this->monthly_vps();
 
-		$tiles = BillingField::tiles( $v['m-None'] );
-		$this->assertSame( '€18.75 per month, paid in advance', $tiles['monthly'][0] );
-		$this->assertSame( '€0.0283 per hour, max €20.63 per month', $tiles['usage'][0] );
 		$this->assertSame( '€0.0283 per hour, max €20.63 per month including VAT', Rates::terms( 0.02260274, 16.5, $v['m-None'] ) );
 	}
 
@@ -189,7 +184,7 @@ class PriceDisplayInclTest extends UsageTestCase {
 	}
 
 	public function test_a_cart_row_that_is_a_price_difference_uses_the_cart_display(): void {
-		$v = $this->usage_product();
+		$v = $this->monthly_vps();
 		update_option( 'woocommerce_tax_display_cart', 'excl' );
 		update_option( 'woocommerce_tax_display_shop', 'incl' );
 
@@ -225,14 +220,14 @@ class PriceDisplayInclTest extends UsageTestCase {
 	}
 
 	public function test_the_database_card_and_the_disk_sizes_and_the_snapshot_price(): void {
-		$v = $this->usage_product();
+		$v = $this->usage_product() + $this->monthly_vps();
 
 		$this->assertStringContainsString( 'GB: €', DiskField::size_label( 10, $v['m-None'], false ) );
 		$this->assertStringEndsWith( 'incl. VAT', DiskField::size_label( 10, $v['m-None'], false ) );
 		$this->assertStringEndsWith( 'incl. VAT, billed by the hour', DiskField::size_label( 10, $v['u-None'], true ) );
 		$this->assertSame( '€18.75', Panels::price_text( $v['m-None'] ) );
 
-		$plan = array( 'name' => 'Small', 'price' => 20.0, 'period' => 'month', 'variation_id' => $v['m-None']->get_id(), 'in_stock' => true, 'cores' => 2, 'memory_mb' => 2048, 'disk_gb' => 20, 'backup_days' => 0, 'engine' => '', 'usage' => array( 'cap' => 16.5, 'hourly' => 0.0226, 'variation_id' => $v['u-None']->get_id() ), 'backups' => null, 'note' => '' );
+		$plan = array( 'name' => 'Small', 'price' => 20.0, 'period' => 'month', 'variation_id' => $v['m-None']->get_id(), 'in_stock' => true, 'cores' => 2, 'memory_mb' => 2048, 'disk_gb' => 20, 'backup_days' => 0, 'engine' => '', 'usage' => null, 'backups' => null, 'note' => '' );
 		$card = new \ReflectionMethod( DbPicker::class, 'card' );
 		$card->setAccessible( true );
 		ob_start();
@@ -243,7 +238,7 @@ class PriceDisplayInclTest extends UsageTestCase {
 	}
 
 	public function test_the_app_licence_price_and_the_billing_words(): void {
-		$p = $this->usage_product()['m-None'];
+		$p = $this->monthly_vps()['m-None'];
 		$p->update_meta_data( '_subscription_period', 'month' );
 		$p->update_meta_data( '_subscription_period_interval', '1' );
 		$p->save();

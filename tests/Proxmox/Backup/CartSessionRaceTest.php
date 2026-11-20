@@ -38,7 +38,7 @@ final class CartSessionRaceTest extends UsageTestCase {
 		parent::set_up();
 		$this->saved_session = WC()->session instanceof \WC_Session_Handler ? WC()->session : null;
 		add_filter( 'woocommerce_set_cookie_enabled', '__return_false' );
-		$this->settings( array( 'offer_monthly' => 1, 'usage_new_limit' => 0, 'disk_max_extra' => 3, 'disk_reserve_gb' => 0 ) );
+		$this->settings( array( 'usage_new_limit' => 0, 'disk_max_extra' => 3, 'disk_reserve_gb' => 0 ) );
 		$this->v = $this->usage_product();
 		$this->capacity( 4000 );
 		$this->disk = $this->disk_product();

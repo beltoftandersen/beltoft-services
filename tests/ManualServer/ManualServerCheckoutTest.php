@@ -43,17 +43,6 @@ class ManualServerCheckoutTest extends ManualServerTestCase {
 		$this->assertCount( 1, $lines, 'The hidden usage account line holds the card for the hourly bills.' );
 	}
 
-	public function test_monthly_is_swapped_to_pay_as_you_go_when_monthly_is_not_offered(): void {
-		$v = $this->server_product();
-		wp_set_current_user( $this->new_user() );
-
-		$this->add( $v['m'] );
-
-		$ids = array_map( static fn( $item ) => (int) $item['variation_id'], array_values( array_filter( WC()->cart->get_cart(), static fn( $item ) => ! empty( $item['variation_id'] ) ) ) );
-		$this->assertSame( array( $v['u']->get_id() ), $ids );
-		$this->assertEquals( 54, WC()->cart->get_subtotal() );
-	}
-
 	public function test_a_new_account_is_limited_like_a_vps(): void {
 		$v    = $this->server_product();
 		$user = $this->new_user();
