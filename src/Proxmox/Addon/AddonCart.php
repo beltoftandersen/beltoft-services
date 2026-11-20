@@ -21,10 +21,52 @@ final class AddonCart {
 	 * @param Addon        $a     Add-on kind.
 	 */
 	public static function register_cart_hooks( string $class, Addon $a ): void {
+		self::register_pending_lines();
 		add_filter( 'woocommerce_add_to_cart_validation', array( $class, 'validate' ), 20, 6 );
 		add_filter( 'woocommerce_add_cart_item_data', array( $class, 'item_data' ), 20, 2 );
 		self::register_line_hooks( $a );
 		add_action( 'woocommerce_after_checkout_validation', array( $class, 'checkout_validation' ), 10, 2 );
+	}
+
+	private static bool $pending_registered = false;
+
+	/**
+	 * The add-on lines bought with the new server of the cart are kept like the domain lines of the order form (Domains\PendingLines):
+	 * a checkout refresh that read the cart before the choice and writes the session after it must not take the line out.
+	 */
+	private static function register_pending_lines(): void {
+		if ( self::$pending_registered ) {
+			return;
+		}
+
+		self::$pending_registered = true;
+		add_filter( 'beltoft_services_pending_line_name', array( __CLASS__, 'pending_name' ), 10, 2 );
+		add_filter( 'beltoft_services_pending_line_can_put_back', array( __CLASS__, 'pending_can_put_back' ), 10, 2 );
+	}
+
+	/** The kind of an add-on line that goes with the new server of the cart, or null. */
+	private static function pending_kind( $item ): ?Addon {
+		foreach ( is_array( $item ) ? Addon::all() : array() as $a ) {
+			if ( $a->accepts_cart_server && 'cart_server' === ( $item[ $a->cart_for() ] ?? null ) && '' !== (string) ( $item[ $a->cart_uid() ] ?? '' ) ) {
+				return $a;
+			}
+		}
+
+		return null;
+	}
+
+	/** Filter beltoft_services_pending_line_name. */
+	public static function pending_name( $name, $item = array() ): string {
+		$a = self::pending_kind( $item );
+
+		return $a ? 'addon:' . $item[ $a->cart_uid() ] : (string) $name;
+	}
+
+	/** Filter beltoft_services_pending_line_can_put_back: an add-on line only while its new server (or database) is in the cart. */
+	public static function pending_can_put_back( $allowed, $item = array() ) {
+		$a = self::pending_kind( $item );
+
+		return $a ? self::cart_has_parent( $a ) : $allowed;
 	}
 
 	/**

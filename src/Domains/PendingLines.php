@@ -1,6 +1,6 @@
 <?php
 /**
- * The domain lines a customer has just put in the cart, kept outside the WooCommerce session.
+ * The domain lines (and the add-on lines of a new server: extra disk, IPv4 address, app licence, ...) a customer has just put in the cart, kept outside the WooCommerce session.
  *
  * The session row of a customer is written whole: a request that read it before the domain was added (the checkout refresh that runs
  * while the add waits for the registrar) writes its older copy back at shutdown, and the line is gone. The lines are therefore kept
@@ -27,6 +27,7 @@ final class PendingLines {
 		add_action( 'shutdown', array( __CLASS__, 'guard_session' ), 19 );
 		add_action( 'woocommerce_remove_cart_item', array( __CLASS__, 'line_removed' ), 10, 2 );
 		add_action( 'woocommerce_remove_cart_item_from_session', array( __CLASS__, 'line_dropped' ), 10, 2 );
+		add_action( 'woocommerce_add_to_cart', array( __CLASS__, 'line_added' ), 10, 1 );
 		add_action( 'woocommerce_cart_item_restored', array( __CLASS__, 'line_restored' ), 10, 2 );
 		add_action( 'woocommerce_cart_emptied', array( __CLASS__, 'forget_all' ) );
 		add_action( 'woocommerce_checkout_order_processed', array( __CLASS__, 'forget_all' ) );
@@ -85,11 +86,24 @@ final class PendingLines {
 		set_transient( self::option_key( $customer ), $rows, self::EXPIRY );
 	}
 
-	/** The domain of a registration or transfer line, or ''. Renewals and the like are not kept: they are not chosen on the order form. */
+	/** The name of a pending line of another feature (the add-on lines of a new server give `addon:<uid>`), or ''. */
+	private static function foreign_name( array $item ): string {
+		return (string) apply_filters( 'beltoft_services_pending_line_name', '', $item );
+	}
+
+	/** The name a pending line is kept under: the domain of a registration or transfer line, a feature's own name (filter `beltoft_services_pending_line_name`), or ''. Renewals and the like are not kept: they are not chosen on the order form. */
 	private static function name( array $item ): string {
+		$foreign = self::foreign_name( $item );
+		if ( '' !== $foreign ) { return $foreign; }
 		$line = $item['beltoft_services_domain'] ?? null;
 		if ( ! is_array( $line ) || ! in_array( $line['mode'] ?? '', array( 'register', 'transfer' ), true ) ) { return ''; }
 		return strtolower( (string) ( $line['domain'] ?? '' ) );
+	}
+
+	/** May this kept line be put back now? A feature's line by its own rule (filter `beltoft_services_pending_line_can_put_back`), a domain line by the local checks of its add. */
+	private static function can_put_back( array $item ): bool {
+		$own = apply_filters( 'beltoft_services_pending_line_can_put_back', null, $item );
+		return null !== $own ? (bool) $own : Cart::can_restore( $item );
 	}
 
 	/** The cart line as the session stores it: without the product object. */
@@ -108,6 +122,13 @@ final class PendingLines {
 		$exp = time() + self::EXPIRY;
 		$rows[ $name ] = array( 'product_id' => (int) ( $item['product_id'] ?? 0 ), 'item' => self::session_form( $item ), 'exp' => $end > 0 ? min( $exp, $end ) : $exp );
 		self::save( $customer, $rows );
+	}
+
+	/** @param string $key Cart item key of a line that was just added. */
+	public static function line_added( $key = '' ): void {
+		$cart = function_exists( 'WC' ) && WC() ? WC()->cart : null;
+		$item = $cart instanceof \WC_Cart ? ( $cart->cart_contents[ $key ] ?? null ) : null;
+		if ( is_array( $item ) && '' !== self::foreign_name( $item ) ) { self::keep( $item ); }
 	}
 
 	public static function forget( string $domain ): void {
@@ -148,7 +169,7 @@ final class PendingLines {
 		$keep = array();
 
 		foreach ( $rows as $name => $row ) {
-			if ( is_array( $row['item'] ?? null ) && Cart::can_restore( $row['item'] ) ) {
+			if ( is_array( $row['item'] ?? null ) && self::can_put_back( $row['item'] ) ) {
 				$keep[ $name ] = $row;
 			}
 		}
