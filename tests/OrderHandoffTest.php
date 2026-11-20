@@ -21,6 +21,7 @@ final class OrderHandoffTest extends TestCase {
 
 		$this->fake_driver();
 		$this->settings( array( OrderHandoff::SETTING => 1 ) );
+		OrderHandoff::reset();
 	}
 
 	public function tear_down(): void {
@@ -83,6 +84,7 @@ final class OrderHandoffTest extends TestCase {
 
 		$order = $this->order();
 		$this->settings( array( OrderHandoff::SETTING => 0 ) );
+		OrderHandoff::reset();
 
 		$this->assertFalse( OrderHandoff::applies( $order ) );
 	}
@@ -122,6 +124,7 @@ final class OrderHandoffTest extends TestCase {
 	public function test_the_filter_can_keep_the_normal_page(): void {
 		$order = $this->order();
 		add_filter( 'beltoft_services_order_handoff', '__return_false' );
+		OrderHandoff::reset();
 
 		$this->assertFalse( OrderHandoff::applies( $order ) );
 
@@ -141,6 +144,7 @@ final class OrderHandoffTest extends TestCase {
 
 		$page = static fn() => 'https://example.test/my-account/server/7/';
 		add_filter( 'beltoft_services_order_handoff_target', $page );
+		OrderHandoff::reset();
 
 		$this->assertTrue( OrderHandoff::applies( $order ) );
 		$this->assertSame( 'https://example.test/my-account/server/7/', OrderHandoff::target( $order ) );
@@ -171,6 +175,7 @@ final class OrderHandoffTest extends TestCase {
 
 		$_GET['key'] = $order->get_order_key();
 		$this->settings( array( OrderHandoff::SETTING => 0 ) );
+		OrderHandoff::reset();
 		$this->assertSame( '', do_shortcode( '[' . OrderHandoff::SHORTCODE . ']' ), 'Off: nothing.' );
 		$this->assertSame( array( 'x' ), OrderHandoff::body_class( array( 'x' ) ) );
 		$this->assertFalse( wp_script_is( 'beltoft-services-handoff', 'enqueued' ) );
@@ -189,6 +194,7 @@ final class OrderHandoffTest extends TestCase {
 		$this->assertSame( 'normal.php', OrderHandoff::swap( 'normal.php', 'checkout/thankyou.php', array( 'order' => false ) ) );
 
 		$this->settings( array( OrderHandoff::SETTING => 0 ) );
+		OrderHandoff::reset();
 		$this->assertSame( 'normal.php', OrderHandoff::swap( 'normal.php', 'checkout/thankyou.php', array( 'order' => $order ) ) );
 	}
 
@@ -256,5 +262,33 @@ final class OrderHandoffTest extends TestCase {
 
 		remove_action( $gate, $one );
 		remove_action( 'woocommerce_thankyou', $two );
+	}
+
+	public function test_the_answers_are_asked_once_per_order_and_request_and_a_status_change_forgets_them(): void {
+		$order = $this->order();
+		$calls = 0;
+		$count = static function ( $apply ) use ( &$calls ) {
+			++$calls;
+
+			return $apply;
+		};
+		add_filter( 'beltoft_services_order_handoff', $count );
+
+		$this->assertTrue( OrderHandoff::applies( $order ) );
+		$this->assertTrue( OrderHandoff::applies( $order ) );
+		$this->assertSame( OrderHandoff::target( $order ), OrderHandoff::target( $order ) );
+		$this->assertSame( 1, $calls, 'The rules ran once for the five asks.' );
+
+		do_action( 'woocommerce_order_status_changed', $order->get_id(), 'processing', 'completed', $order );
+		$this->assertTrue( OrderHandoff::applies( $order ) );
+		$this->assertSame( 2, $calls );
+
+		remove_filter( 'beltoft_services_order_handoff', $count );
+	}
+
+	public function test_the_page_needs_no_cache_headers_of_its_own_because_woocommerce_sends_them_for_the_checkout_page(): void {
+		$this->assertFalse( has_action( 'template_redirect', array( OrderHandoff::class, 'no_cache' ) ) );
+		$this->assertFalse( method_exists( OrderHandoff::class, 'no_cache' ) );
+		$this->assertNotFalse( has_filter( 'wp_headers', array( 'WC_Cache_Helper', 'prevent_caching' ) ), 'WooCommerce marks the checkout page (and its order received endpoint) uncacheable.' );
 	}
 }

@@ -46,10 +46,25 @@ final class OrderHandoff {
 	private static bool $placed = false;
 
 	/**
+	 * Answers of applies() and target() by order, for this request (the body class, the script, the shortcode and the template each
+	 * ask). Forgotten when an order's status changes, and by reset() (tests).
+	 *
+	 * @var array<string, bool|string>
+	 */
+	private static array $memo = array();
+
+	/**
 	 * Did the shortcode print the hand-off on this request (WooCommerce's normal thank-you content then stays and runs its hooks)?
 	 */
 	public static function placed(): bool {
 		return self::$placed;
+	}
+
+	/**
+	 * Forgets the answers of this request.
+	 */
+	public static function reset(): void {
+		self::$memo = array();
 	}
 
 	/**
@@ -61,7 +76,7 @@ final class OrderHandoff {
 		// A page builder draws the order received page itself and never loads checkout/thankyou.php: its template places the shortcode.
 		add_shortcode( self::SHORTCODE, array( __CLASS__, 'shortcode' ) );
 		add_filter( 'body_class', array( __CLASS__, 'body_class' ) );
-		add_action( 'template_redirect', array( __CLASS__, 'no_cache' ), 30 );
+		add_action( 'woocommerce_order_status_changed', array( __CLASS__, 'reset' ) );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ), 20 );
 	}
 
@@ -97,6 +112,21 @@ final class OrderHandoff {
 	 * @param \WC_Order $order Order.
 	 */
 	public static function applies( \WC_Order $order ): bool {
+		$key = 'applies:' . $order->get_id() . ':' . $order->get_status() . ':' . get_current_user_id() . ':' . (int) self::enabled();
+
+		if ( ! isset( self::$memo[ $key ] ) ) {
+			self::$memo[ $key ] = self::decide( $order );
+		}
+
+		return (bool) self::$memo[ $key ];
+	}
+
+	/**
+	 * The rules of applies(), asked once per order and request.
+	 *
+	 * @param \WC_Order $order Order.
+	 */
+	private static function decide( \WC_Order $order ): bool {
 		if ( ! self::enabled() || ! is_user_logged_in() ) {
 			return false;
 		}
@@ -131,6 +161,21 @@ final class OrderHandoff {
 	 * @param \WC_Order $order Order.
 	 */
 	public static function target( \WC_Order $order ): string {
+		$key = 'target:' . $order->get_id() . ':' . $order->get_status();
+
+		if ( ! isset( self::$memo[ $key ] ) ) {
+			self::$memo[ $key ] = self::find_target( $order );
+		}
+
+		return (string) self::$memo[ $key ];
+	}
+
+	/**
+	 * The place of target(), found once per order and request.
+	 *
+	 * @param \WC_Order $order Order.
+	 */
+	private static function find_target( \WC_Order $order ): string {
 		/**
 		 * The page a paid order leads to: the page of the service an add-on, a switch or a renewal payment was for. Empty
 		 * until a feature knows; the core then sends a new order with services to the overview of My Account.
@@ -244,34 +289,10 @@ final class OrderHandoff {
 	}
 
 	/**
-	 * The order of the order received page, or null.
-	 */
-	private static function current_order(): ?\WC_Order {
-		if ( ! function_exists( 'is_order_received_page' ) || ! is_order_received_page() ) {
-			return null;
-		}
-
-		$order = wc_get_order( absint( get_query_var( 'order-received' ) ) );
-
-		return $order instanceof \WC_Order ? $order : null;
-	}
-
-	/**
-	 * The hand-off page is never kept by a cache (headers go out before the template, so this is on template_redirect).
-	 */
-	public static function no_cache(): void {
-		$order = self::current_order();
-
-		if ( $order && self::applies( $order ) ) {
-			nocache_headers();
-		}
-	}
-
-	/**
 	 * The script, only on a page that prints the hand-off.
 	 */
 	public static function assets(): void {
-		$order = self::current_order();
+		$order = self::page_order();
 
 		if ( ! $order || ! self::applies( $order ) ) {
 			return;
