@@ -259,6 +259,12 @@ final class ProxmoxSettings {
 			'label'   => __( 'Database extra storage step (GB)', 'beltoft-services' ),
 			'desc'    => __( 'The extra storage of a database variation must be a multiple of this, or it is not offered and a switch to it is refused.', 'beltoft-services' ),
 		);
+		$fields['db_ipv6'] = $base + array(
+			'type'    => 'checkbox',
+			'default' => 0,
+			'label'   => __( 'IPv6 for databases', 'beltoft-services' ),
+			'desc'    => __( 'A database with a public IP address also gets an IPv6 address (on a cluster that has an IPv6 prefix), the access list takes IPv6 addresses, and customers can add or remove IPv6. Turn it on only after the database templates have the guest script that listens on IPv6 (listen6 and allow6). An older template ignores them.', 'beltoft-services' ),
+		);
 		$fields['disk_reserve_gb'] = $base + array( 'type' => 'number', 'default' => 200, 'min' => 0, 'label' => __( 'Storage kept free on each node (GB)', 'beltoft-services' ) );
 		$fields['capacity_free_memory_percent'] = $base + array(
 			'type'    => 'number',

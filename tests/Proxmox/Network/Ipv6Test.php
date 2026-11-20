@@ -109,4 +109,18 @@ class Ipv6Test extends TestCase {
 		$this->assertFalse( Ipv6::in_prefix( $this->cluster(), '2001:db8:430d:1::9' ) );
 		$this->assertFalse( Ipv6::in_prefix( $this->cluster( '' ), '2001:db8:430c:1::9' ) );
 	}
+
+	public function test_databases_have_ipv6_only_when_the_setting_or_the_filter_says_so(): void {
+		$this->assertFalse( Ipv6::databases(), 'Off by default.' );
+
+		$this->settings( array( 'db_ipv6' => 1 ) );
+		$this->assertTrue( Ipv6::databases() );
+
+		add_filter( 'beltoft_services_db_ipv6', '__return_false' );
+		$this->assertFalse( Ipv6::databases(), 'The filter has the last word.' );
+		remove_all_filters( 'beltoft_services_db_ipv6' );
+
+		$this->settings( array( 'db_ipv6' => 0 ) );
+		$this->assertFalse( Ipv6::databases() );
+	}
 }

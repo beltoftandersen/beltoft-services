@@ -44,6 +44,7 @@ final class DbCard {
 				'notapplied' => __( 'The change could not be applied. We have been told. Please try again later.', 'beltoft-services' ),
 				'noip'      => __( 'Your current address could not be read.', 'beltoft-services' ),
 				'confirmremove' => __( 'Remove this address from the list?', 'beltoft-services' ),
+				'ipv6working'   => __( 'Changing IPv6. This can take a few minutes.', 'beltoft-services' ),
 				'policyworking' => __( 'Applying the setting. This can take a minute.', 'beltoft-services' ),
 				'nobackup'  => __( 'Choose a backup.', 'beltoft-services' ),
 				'backupdeletetitle' => __( 'Delete this backup?', 'beltoft-services' ),

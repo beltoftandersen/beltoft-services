@@ -9,6 +9,8 @@ namespace BeltoftServices\Proxmox\Db;
 
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
+use BeltoftServices\Jobs;
+use BeltoftServices\Proxmox\Network\Ipv6Switch;
 use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
@@ -106,6 +108,10 @@ class DbDriver extends ProxmoxDriver {
 			return $result;
 		}
 
+		if ( Ipv6Switch::is_action( $action ) ) {
+			return $this->ipv6( $r, $action );
+		}
+
 		if ( DbActions::RESTORE === $action ) {
 			return ( new Actions( $r ) )->run( 'restore', $args );
 		}
@@ -123,6 +129,32 @@ class DbDriver extends ProxmoxDriver {
 		}
 
 		return DbActions::RESET === $action ? ( new DbActions( $r ) )->run() : StepResult::fail( 'This database action is not available.' );
+	}
+
+	/**
+	 * The IPv6 switch of a database: the server's own steps (ipconfig0, meta, ipfilter, one restart), then the guest is told
+	 * the new listen addresses and the allow list through DbIp's `sync` (the listen job with `listen6`, the access list
+	 * with `allow6`, the firewall). A repeat that finds the sync marked finishes the sync only.
+	 *
+	 * @param Resource $r      Resource.
+	 * @param string   $action ipv6_add or ipv6_remove.
+	 */
+	private function ipv6( Resource $r, string $action ): StepResult {
+		if ( true !== $r->get( DbIp::RESYNC ) ) {
+			$res = ( new Actions( $r ) )->run( $action, array() );
+
+			if ( ! $res->is_done() || $res->is_refusal() ) {
+				return $res;
+			}
+
+			// The restart is over: the guest follows, with the IPv4 and IPv6 addresses the VM has now.
+			$r->set( array( DbIp::RESYNC => true ) );
+			$r = Resource::find( $r->id() ) ?? $r;
+		}
+
+		$sync = ( new DbIp( Resource::find( $r->id() ) ?? $r ) )->run();
+
+		return $sync->is_done() ? StepResult::done( array( Jobs::TEXT => ( Ipv6Switch::ADD === $action ? __( 'IPv6 was added to the database and it restarted.', 'beltoft-services' ) : __( 'IPv6 was removed from the database and it restarted.', 'beltoft-services' ) ) ), Ipv6Switch::ADD === $action ? 'Customer added IPv6 to the database' : 'Customer removed IPv6 from the database' ) : $sync;
 	}
 
 	/**

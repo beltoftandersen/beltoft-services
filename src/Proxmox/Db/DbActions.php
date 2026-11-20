@@ -10,6 +10,7 @@ namespace BeltoftServices\Proxmox\Db;
 use BeltoftServices\Crypto;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Proxmox\Backup\Backups;
+use BeltoftServices\Proxmox\Network\Ipv6Switch;
 use BeltoftServices\Proxmox\Pve\Prepares;
 use BeltoftServices\Proxmox\Pve\Steps;
 use BeltoftServices\Proxmox\Vm\Actions;
@@ -87,6 +88,11 @@ final class DbActions {
 			$out[ DbPolicy::ACTION ] = __( 'When memory is full', 'beltoft-services' );
 		}
 
+		// The IPv6 switch of a database with a public address (only while IPv6 for databases is on).
+		if ( 'ready' === $r->get( 'db_state' ) ) {
+			$out = array_merge( $out, Ipv6Switch::offered( $r ) );
+		}
+
 		// Shut down and start are the server's own actions (Actions), with the refusals of DbPower.
 		return array_merge( $out, DbPower::offered( $r ) );
 	}
@@ -101,7 +107,7 @@ final class DbActions {
 	public static function buttons( $actions, $r ) {
 		if ( is_array( $actions ) && self::is_db( $r ) ) {
 			// The power buttons are drawn by the database page itself (a question first, its own note).
-			unset( $actions[ self::RESET ], $actions[ self::RESTORE ], $actions[ self::BACKUP_DELETE ], $actions[ DbPolicy::ACTION ], $actions['start'], $actions['shutdown'] );
+			unset( $actions[ self::RESET ], $actions[ self::RESTORE ], $actions[ self::BACKUP_DELETE ], $actions[ DbPolicy::ACTION ], $actions[ Ipv6Switch::ADD ], $actions[ Ipv6Switch::REMOVE ], $actions['start'], $actions['shutdown'] );
 		}
 
 		return $actions;
@@ -127,6 +133,10 @@ final class DbActions {
 
 		if ( self::is_db( $r ) && self::BACKUP_DELETE === $action ) {
 			return self::delete_refusal( $refusal, $r, is_array( $args ) ? $args : array() );
+		}
+
+		if ( self::is_db( $r ) && Ipv6Switch::is_action( $action ) ) {
+			return self::ipv6_refusal( $refusal, $r, (string) $action );
 		}
 
 		if ( self::is_db( $r ) && DbPolicy::ACTION === $action ) {
@@ -218,6 +228,39 @@ final class DbActions {
 		}
 
 		if ( Actions::floor_exceeded( $r, self::BACKUP_DELETE ) ) {
+			return new \WP_Error( 'beltoft_services_rate_limited', __( 'Too many requests. Please wait a while and try again.', 'beltoft-services' ), array( 'status' => 429 ) );
+		}
+
+		return $refusal;
+	}
+
+	/**
+	 * The early refusal of the IPv6 switch of a database: only a ready database that is not changing its address.
+	 *
+	 * @param mixed    $refusal Refusal so far.
+	 * @param Resource $r       Resource.
+	 * @param string   $action  ipv6_add or ipv6_remove.
+	 * @return mixed
+	 */
+	private static function ipv6_refusal( $refusal, Resource $r, string $action ) {
+		if ( null !== $refusal ) {
+			return $refusal;
+		}
+
+		// The guest has to be told the new addresses after the restart, so the database must be running.
+		$stopped = DbPower::needs_running( $r );
+
+		if ( null !== $stopped ) {
+			return $stopped;
+		}
+
+		$why = 'ready' !== $r->get( 'db_state' ) || ! DbIp::idle( $r ) ? __( 'The database is busy. Please try again when it is ready.', 'beltoft-services' ) : Actions::check( $r, $action, array() );
+
+		if ( null !== $why ) {
+			return new \WP_Error( 'beltoft_services_refused', $why, array( 'status' => 422 ) );
+		}
+
+		if ( Actions::floor_exceeded( $r, $action ) ) {
 			return new \WP_Error( 'beltoft_services_rate_limited', __( 'Too many requests. Please wait a while and try again.', 'beltoft-services' ), array( 'status' => 429 ) );
 		}
 

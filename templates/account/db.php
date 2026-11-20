@@ -192,6 +192,12 @@ $beltoft_services_db_wait = array(
 				<?php if ( '' !== (string) ( $beltoft_services_access['address6'] ?? '' ) ) : ?>
 					<p><?php esc_html_e( 'IPv6 address:', 'beltoft-services' ); ?> <code><?php echo esc_html( (string) $beltoft_services_access['address6'] ); ?></code></p>
 				<?php endif; ?>
+				<?php $beltoft_services_ipv6 = (array) ( $beltoft_services_access['ipv6'] ?? array() ); ?>
+				<?php if ( ! empty( $beltoft_services_ipv6['show'] ) && ( ! empty( $beltoft_services_ipv6['can_add'] ) || ! empty( $beltoft_services_ipv6['can_remove'] ) ) ) : ?>
+					<?php $beltoft_services_ipv6_words = \BeltoftServices\Proxmox\Network\Ipv6Switch::words( ! empty( $beltoft_services_ipv6['can_add'] ) ? 'ipv6_add' : 'ipv6_remove', true ); ?>
+					<p class="description"><?php echo esc_html( $beltoft_services_ipv6_words['text'] ); ?></p>
+					<p><button type="button" class="button woocommerce-button" data-db-ipv6="<?php echo ! empty( $beltoft_services_ipv6['can_add'] ) ? 'ipv6_add' : 'ipv6_remove'; ?>" data-title="<?php echo esc_attr( $beltoft_services_ipv6_words['title'] ); ?>" data-text="<?php echo esc_attr( $beltoft_services_ipv6_words['text'] ); ?>" data-confirm="<?php echo esc_attr( $beltoft_services_ipv6_words['confirm'] ); ?>"><?php echo esc_html( $beltoft_services_ipv6_words['confirm'] ); ?></button></p>
+				<?php endif; ?>
 				<?php if ( $beltoft_services_access['removing'] ) : ?>
 					<p><?php esc_html_e( 'The public IP address is being removed. Your database restarts once.', 'beltoft-services' ); ?></p>
 				<?php elseif ( '' !== $beltoft_services_access['remove_url'] ) : ?>

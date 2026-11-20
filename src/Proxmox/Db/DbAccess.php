@@ -417,6 +417,7 @@ final class DbAccess {
 			'add_price' => '' === $address && ! $wanted ? \BeltoftServices\Currency::with_resource( $r, static fn() => DbIp::price_label( $r, true ), '' ) : '',
 			'sold_out'  => '' === $address && ! $wanted && 0 === IpPool::available_for_db(),
 			'remove_url' => '' !== $address && $wanted ? DbIp::switch_url( $r, false ) : '',
+			'ipv6'      => \BeltoftServices\Proxmox\Network\Ipv6Switch::view( $r ),
 		);
 	}
 
