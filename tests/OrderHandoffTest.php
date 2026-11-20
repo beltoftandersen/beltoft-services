@@ -148,6 +148,26 @@ final class OrderHandoffTest extends TestCase {
 		remove_filter( 'beltoft_services_order_handoff_target', $page );
 	}
 
+	public function test_a_theme_that_draws_the_page_itself_gets_the_whole_hand_off_page(): void {
+		$order = $this->order();
+		set_query_var( 'order-received', $order->get_id() );
+		$_GET['key'] = $order->get_order_key();
+
+		$this->assertSame( $order->get_id(), OrderHandoff::page_order()->get_id() );
+		$this->assertStringEndsWith( 'templates/order/handoff-page.php', OrderHandoff::page( 'theme-index.php' ) );
+
+		$_GET['key'] = 'wc_order_wrong';
+		$this->assertNull( OrderHandoff::page_order(), 'A wrong key is not the order.' );
+		$this->assertSame( 'theme-index.php', OrderHandoff::page( 'theme-index.php' ) );
+
+		$_GET['key'] = $order->get_order_key();
+		$this->settings( array( OrderHandoff::SETTING => 0 ) );
+		$this->assertSame( 'theme-index.php', OrderHandoff::page( 'theme-index.php' ), 'Off: the theme page stays.' );
+		unset( $_GET['key'] );
+		set_query_var( 'order-received', '' );
+		$this->assertNull( OrderHandoff::page_order(), 'Any other page has no order.' );
+	}
+
 	public function test_only_the_thank_you_template_is_swapped_and_only_when_it_applies(): void {
 		$order = $this->order();
 		$mine  = BELTOFT_SERVICES_PATH . 'templates/order/handoff.php';

@@ -35,6 +35,8 @@ final class OrderHandoff {
 	public static function register(): void {
 		add_filter( 'beltoft_services_settings_fields', array( __CLASS__, 'settings_fields' ), 8 );
 		add_filter( 'wc_get_template', array( __CLASS__, 'swap' ), 10, 5 );
+		// A page builder that draws the order received page itself never loads checkout/thankyou.php: the whole page is replaced.
+		add_filter( 'template_include', array( __CLASS__, 'page' ), 99 );
 		add_action( 'template_redirect', array( __CLASS__, 'no_cache' ), 30 );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ), 20 );
 	}
@@ -145,6 +147,36 @@ final class OrderHandoff {
 		}
 
 		return false;
+	}
+
+	/**
+	 * The order of the order received request, when its key matches; null otherwise.
+	 */
+	public static function page_order(): ?\WC_Order {
+		// WooCommerce's order-received endpoint is the only place this query variable is set.
+		$order_id = function_exists( 'wc_get_order' ) ? absint( get_query_var( 'order-received' ) ) : 0;
+		$key      = isset( $_GET['key'] ) ? sanitize_text_field( wp_unslash( $_GET['key'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- the order key is the proof, as in WooCommerce.
+		$order    = $order_id > 0 ? wc_get_order( $order_id ) : null;
+
+		return $order instanceof \WC_Order && '' !== $key && hash_equals( $order->get_order_key(), $key ) ? $order : null;
+	}
+
+	/**
+	 * Filter template_include: the whole order received page becomes the hand-off page when the order gets the hand-off.
+	 *
+	 * @param mixed $template Template file.
+	 * @return mixed
+	 */
+	public static function page( $template ) {
+		$order = self::page_order();
+
+		if ( null === $order || ! self::applies( $order ) ) {
+			return $template;
+		}
+
+		$theme = locate_template( array( 'beltoft-services/order/handoff-page.php' ) );
+
+		return '' !== $theme ? $theme : BELTOFT_SERVICES_PATH . 'templates/order/handoff-page.php';
 	}
 
 	/**
