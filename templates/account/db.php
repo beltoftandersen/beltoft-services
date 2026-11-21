@@ -87,7 +87,7 @@ $beltoft_services_db_wait = array(
 				<p class="description"><?php esc_html_e( 'You can make the storage larger. It cannot be made smaller again, and the extra storage is part of your database plan until the database is deleted. Your database stays available.', 'beltoft-services' ); ?></p>
 				<ul class="beltoft-services-db__storage-options">
 					<?php foreach ( $beltoft_services_storage['options'] as $beltoft_services_option ) : ?>
-						<li><a class="button woocommerce-button" href="<?php echo esc_url( (string) $beltoft_services_option['url'] ); ?>"><?php echo esc_html( sprintf( /* translators: 1: new size in GB, 2: price difference such as +€8.00 / month */ __( 'Make larger: %1$d GB (%2$s)', 'beltoft-services' ), (int) $beltoft_services_option['total'], (string) $beltoft_services_option['price'] ) ); ?></a></li>
+						<li><a class="button woocommerce-button" href="<?php echo esc_url( (string) $beltoft_services_option['url'] ); ?>"><?php echo esc_html( sprintf( /* translators: %d: new size in GB */ __( 'Make larger: %d GB', 'beltoft-services' ), (int) $beltoft_services_option['total'] ) ); ?></a> <span class="description"><?php /* translators: %s: price such as 19 kr. / month */ echo esc_html( sprintf( __( 'Price: %s.', 'beltoft-services' ), (string) $beltoft_services_option['price'] ) ); ?></span></li>
 					<?php endforeach; ?>
 				</ul>
 			<?php elseif ( $beltoft_services_storage['full'] ) : ?>

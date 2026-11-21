@@ -117,7 +117,8 @@ class BackupsSwitchTest extends BackupTestCase {
 		$this->assertNotEmpty( $args['_wcsnonce'] );
 		$this->assertNotFalse( wp_verify_nonce( $args['_wcsnonce'], 'wcs_switch_request' ) );
 
-		$this->assertMatchesRegularExpression( '#Add daily backups \(\+[^)]*2\.00#', $html, 'The price difference is on the link.' );
+		$this->assertMatchesRegularExpression( '#Price: \+[^<]*2\.00#', $html, 'The price difference is beside the link, not on it.' );
+		$this->assertDoesNotMatchRegularExpression( '#Add daily backups \(#', $html, 'No price in the button.' );
 		$this->assertStringNotContainsString( 'Remove backups', $html );
 		$this->assertStringNotContainsString( 'data-action="restore"', $html );
 	}

@@ -62,17 +62,7 @@ defined( 'ABSPATH' ) || exit;
 		<?php if ( $ipv4['first_restarts'] ) : ?>
 			<p class="description"><?php esc_html_e( 'The first IPv4 address becomes the main address of the server. The server restarts once, which takes about a minute, and its SSH host keys are made again.', 'beltoft-services' ); ?></p>
 		<?php endif; ?>
-		<p>
-			<a class="button woocommerce-button bs-btn" href="<?php echo esc_url( $ipv4['add_url'] ); ?>">
-				<?php
-				echo esc_html(
-					'' === $ipv4['add_price']
-						? __( 'Add an IPv4 address', 'beltoft-services' )
-						/* translators: %s: price such as 19 kr. / month */
-						: sprintf( __( 'Add an IPv4 address (%s)', 'beltoft-services' ), $ipv4['add_price'] )
-				);
-				?>
-			</a>
-		</p>
+		<?php if ( '' !== $ipv4['add_price'] ) : ?><p class="description"><?php /* translators: %s: price such as 19 kr. / month */ echo esc_html( sprintf( __( 'Price: %s.', 'beltoft-services' ), $ipv4['add_price'] ) ); ?></p><?php endif; ?>
+		<p><a class="button woocommerce-button bs-btn" href="<?php echo esc_url( $ipv4['add_url'] ); ?>"><?php esc_html_e( 'Add an IPv4 address', 'beltoft-services' ); ?></a></p>
 	<?php endif; ?>
 </div>

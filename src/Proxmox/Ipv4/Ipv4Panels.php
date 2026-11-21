@@ -84,6 +84,24 @@ final class Ipv4Panels {
 			);
 		}
 
+		// A server whose plan gives it an address (or one built with it) has that main address without an add-on: it is listed first and cannot be removed here.
+		$own = (string) $parent->get( 'ip' );
+
+		if ( ! $db && false !== filter_var( $own, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) && ! in_array( $own, array_column( $entries, 'address' ), true ) ) {
+			array_unshift(
+				$rows,
+				array(
+					'address'    => $own,
+					'role'       => 'main',
+					'live'       => true,
+					'ending'     => '',
+					'remove_url' => '',
+					'delete_id'  => 0,
+					'undo_url'   => '',
+				)
+			);
+		}
+
 		$busy    = '' !== Ipv4Server::working( $parent ) || array() !== array_filter( $rows, static fn( $row ) => ! $row['live'] );
 		$add_url = Ipv4Cart::add_url( $parent );
 		$price   = '';

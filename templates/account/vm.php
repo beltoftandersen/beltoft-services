@@ -211,18 +211,8 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 				<p class="description"><?php esc_html_e( 'This server is managed: we keep it up to date, answer its alerts and check its backups. Help with your own software is billed per started 15 minutes.', 'beltoft-services' ); ?></p>
 			<?php else : ?>
 				<p class="description"><?php esc_html_e( 'We keep the server up to date, answer its alerts and check its backups. Help with your own software is billed per started 15 minutes.', 'beltoft-services' ); ?></p>
-				<p>
-					<a class="button woocommerce-button bs-btn" href="<?php echo esc_url( $managed['add_url'] ); ?>">
-						<?php
-						echo esc_html(
-							'' === $managed['add_price']
-								? __( 'Add managed server', 'beltoft-services' )
-								/* translators: %s: price such as 299 kr. / month */
-								: sprintf( __( 'Add managed server (%s)', 'beltoft-services' ), $managed['add_price'] )
-						);
-						?>
-					</a>
-				</p>
+				<?php if ( '' !== $managed['add_price'] ) : ?><p class="description"><?php /* translators: %s: price such as 19 kr. / month */ echo esc_html( sprintf( __( 'Price: %s.', 'beltoft-services' ), $managed['add_price'] ) ); ?></p><?php endif; ?>
+				<p><a class="button woocommerce-button bs-btn" href="<?php echo esc_url( $managed['add_url'] ); ?>"><?php esc_html_e( 'Add managed server', 'beltoft-services' ); ?></a></p>
 			<?php endif; ?>
 		</div>
 	<?php endif; ?>
@@ -342,11 +332,11 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 						?>
 					</div>
 				<?php endif; ?>
-				<?php if ( $beltoft_extra_disk['grow_url'] ) : ?><a href="<?php echo esc_url( $beltoft_extra_disk['grow_url'] ); ?>"><?php esc_html_e( 'Make larger', 'beltoft-services' ); ?><?php if ( $beltoft_extra_disk['grow_price'] ) : ?> (<?php echo esc_html( $beltoft_extra_disk['grow_price'] ); ?>)<?php endif; ?></a><?php endif; ?>
+				<?php if ( $beltoft_extra_disk['grow_url'] ) : ?><a href="<?php echo esc_url( $beltoft_extra_disk['grow_url'] ); ?>"><?php esc_html_e( 'Make larger', 'beltoft-services' ); ?></a><?php if ( $beltoft_extra_disk['grow_price'] ) : ?> <span class="description"><?php /* translators: %s: price such as 19 kr. / month */ echo esc_html( sprintf( __( 'Price: %s.', 'beltoft-services' ), $beltoft_extra_disk['grow_price'] ) ); ?></span><?php endif; ?><?php endif; ?>
 				<?php if ( ! empty( $beltoft_extra_disk['usage'] ) ) : ?>
 					<?php if ( '' !== $beltoft_extra_disk['usage_terms'] ) : ?><p class="description" data-disk-usage-terms><?php echo esc_html( $beltoft_extra_disk['usage_terms'] ); ?></p><?php endif; ?>
 					<?php if ( ! empty( $beltoft_extra_disk['grow_next'] ) ) : ?>
-						<button type="button" class="beltoft-services-vm__link" data-confirm-open="beltoft-vm-disk-grow-<?php echo (int) $beltoft_extra_disk['id']; ?>" data-grow-disk="<?php echo (int) $beltoft_extra_disk['id']; ?>"><?php esc_html_e( 'Make larger', 'beltoft-services' ); ?> (<?php echo esc_html( (string) $beltoft_extra_disk['grow_next']['price'] ); ?>)</button>
+						<button type="button" class="beltoft-services-vm__link" data-confirm-open="beltoft-vm-disk-grow-<?php echo (int) $beltoft_extra_disk['id']; ?>" data-grow-disk="<?php echo (int) $beltoft_extra_disk['id']; ?>"><?php esc_html_e( 'Make larger', 'beltoft-services' ); ?></button>
 						<div hidden id="beltoft-vm-disk-grow-<?php echo (int) $beltoft_extra_disk['id']; ?>" data-confirm-source data-confirm-title="<?php esc_attr_e( 'Make this extra disk larger?', 'beltoft-services' ); ?>" data-confirm-yes="<?php esc_attr_e( 'Make the disk larger', 'beltoft-services' ); ?>">
 							<p>
 								<?php
@@ -488,18 +478,8 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 		<div class="beltoft-services-vm__backups">
 			<h4><?php esc_html_e( 'Backups', 'beltoft-services' ); ?></h4>
 			<?php if ( ! $backups['enabled'] ) : ?>
-				<p>
-					<a class="button woocommerce-button bs-btn" href="<?php echo esc_url( $backups['add_url'] ); ?>">
-						<?php
-						echo esc_html(
-							'' === $backups['add_price']
-								? __( 'Add daily backups', 'beltoft-services' )
-								/* translators: %s: price difference such as +€12.00 / month */
-								: sprintf( __( 'Add daily backups (%s)', 'beltoft-services' ), $backups['add_price'] )
-						);
-						?>
-					</a>
-				</p>
+				<?php if ( '' !== $backups['add_price'] ) : ?><p class="description"><?php /* translators: %s: price such as 19 kr. / month */ echo esc_html( sprintf( __( 'Price: %s.', 'beltoft-services' ), $backups['add_price'] ) ); ?></p><?php endif; ?>
+				<p><a class="button woocommerce-button bs-btn" href="<?php echo esc_url( $backups['add_url'] ); ?>"><?php esc_html_e( 'Add daily backups', 'beltoft-services' ); ?></a></p>
 				<p class="description"><?php esc_html_e( 'A backup of the whole server is taken every night.', 'beltoft-services' ); ?></p>
 			<?php else : ?>
 				<p class="description">

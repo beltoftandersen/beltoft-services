@@ -339,9 +339,11 @@ class Ipv4ServerTest extends Ipv4TestCase {
 		$addon = $this->addon( $server );
 		$view  = \BeltoftServices\Proxmox\Ipv4\Ipv4Panels::view( Resource::find( $server->id() ) );
 
-		$this->assertSame( (string) $addon->get( Ipv4Meta::ADDRESS ), $view['addresses'][0]['address'] );
-		$this->assertSame( 'extra', $view['addresses'][0]['role'] );
-		$this->assertTrue( $view['addresses'][0]['live'] );
+		$this->assertSame( (string) Resource::find( $server->id() )->get( 'ip' ), $view['addresses'][0]['address'], 'The server\'s own address comes first.' );
+		$this->assertSame( 'main', $view['addresses'][0]['role'] );
+		$this->assertSame( (string) $addon->get( Ipv4Meta::ADDRESS ), $view['addresses'][1]['address'] );
+		$this->assertSame( 'extra', $view['addresses'][1]['role'] );
+		$this->assertTrue( $view['addresses'][1]['live'] );
 		$this->assertFalse( $view['first_restarts'] );
 		$this->assertArrayHasKey( 'netplan', $view['setup'] );
 		$this->assertStringContainsString( $addon->get( Ipv4Meta::ADDRESS ) . '/32', $view['setup']['netplan'] );
@@ -351,5 +353,19 @@ class Ipv4ServerTest extends Ipv4TestCase {
 
 		$basic = Resource::find( $this->server( 0 )->id() );
 		$this->assertTrue( Ipv4Meta::next_role( $basic, $addon ) === 'main' );
+	}
+
+	public function test_a_server_with_its_own_address_lists_it_as_main_and_no_button_carries_a_price(): void {
+		$server = $this->server( 1 );
+		$this->addon( $server );
+		$view   = \BeltoftServices\Proxmox\Ipv4\Ipv4Panels::view( Resource::find( $server->id() ) );
+		$this->assertNotNull( $view );
+		$this->assertSame( (string) $server->get( 'ip' ), $view['addresses'][0]['address'], 'The plan address is listed.' );
+		$this->assertSame( 'main', $view['addresses'][0]['role'] );
+		$this->assertSame( '', $view['addresses'][0]['remove_url'], 'It cannot be removed here.' );
+
+		foreach ( array( 'templates/account/ipv4.php', 'templates/account/vm.php', 'templates/account/db.php' ) as $file ) {
+			$this->assertDoesNotMatchRegularExpression( "#__\\( '(Add [^']*|Make larger[^']*) \\(%#", (string) file_get_contents( BELTOFT_SERVICES_PATH . $file ), $file . ': no price inside a button label.' );
+		}
 	}
 }
