@@ -1444,6 +1444,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .bs-order .bs-order__clo
    own page and the order received page), and not "you can leave this site", which is for the order received page. */
 .bs-order .bs-flow .beltoft-services-progress__steps > li:not(.is-current) { display: none; }
 .bs-order .bs-flow .beltoft-services-progress__leave { display: none; }
+.bs-order .bs-flow .beltoft-services-progress:has(.beltoft-services-progress__steps > li.is-current) .beltoft-services-progress__text { display: none; }
 /* The theme caps account paragraphs at 70ch: the head of a process line spans the line, so its state sits at the right edge. */
 body.woocommerce-account .woocommerce-MyAccount-content .bs-flow .beltoft-service__head { max-width: none; }
 .bs-order__waiting { min-height: 24px; padding-bottom: var(--bs-space-2); }
