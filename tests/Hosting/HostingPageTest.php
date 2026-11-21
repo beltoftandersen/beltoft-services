@@ -347,9 +347,6 @@ class HostingPageTest extends HostingCase {
 		$a = new HostingActions( $r );
 
 		$this->assertArrayNotHasKey( 'admin_user', $a->login_link( $slug ) === null ? array() : $this->agent->calls_of( 'site.wp_login_link' )[0]['args'] );
-		$this->assertSame( 'Signs you in as the administrator of this website. No password is needed.', HostingAccount::login_facts( '', '' ) );
-		$this->assertSame( 'Signs you in as owner. No password is needed.', HostingAccount::login_facts( 'owner', '' ) );
-		$this->assertSame( 'Signs you in as owner (a@example.org). No password is needed.', HostingAccount::login_facts( 'owner', 'a@example.org' ) );
 	}
 
 	public function test_the_password_link_is_a_one_time_address_that_is_never_stored(): void {

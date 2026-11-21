@@ -401,26 +401,6 @@ final class HostingAccount {
 	}
 
 	/**
-	 * What the page says before a click about the user the sign-in link uses.
-	 *
-	 * @param string $user  User name the install made the administrator, or ''.
-	 * @param string $email Its email, or ''.
-	 */
-	public static function login_facts( string $user, string $email ): string {
-		if ( '' === $user ) {
-			return __( 'Signs you in as the administrator of this website. No password is needed.', 'beltoft-services' );
-		}
-
-		if ( '' === $email ) {
-			/* translators: %s: WordPress user name. */
-			return sprintf( __( 'Signs you in as %s. No password is needed.', 'beltoft-services' ), $user );
-		}
-
-		/* translators: 1: WordPress user name, 2: email address. */
-		return sprintf( __( 'Signs you in as %1$s (%2$s). No password is needed.', 'beltoft-services' ), $user, $email );
-	}
-
-	/**
 	 * The size of a backup for the list: always GB with one decimal, so two backups can be compared at a glance.
 	 *
 	 * @param int $bytes Bytes the backup holds.

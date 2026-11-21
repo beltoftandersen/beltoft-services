@@ -50,9 +50,6 @@ final class SiteCron {
 	/** Arguments of a script. */
 	public const MAX_ARGS = 5;
 
-	/** What the server cron of WordPress is prefilled with: its due tasks every 5 minutes. */
-	public const WORDPRESS_SCHEDULE = '*/5 * * * *';
-
 	/** Tries of the follow-up that sends the jobs again (every 30 seconds). */
 	public const RESEND_TRIES = 20;
 

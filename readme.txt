@@ -259,7 +259,7 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 == Changelog ==
 
 = 0.55.2 =
-* Removed 45 filters that nothing used (no change in behaviour).
+* Removed 45 filters that nothing used and 13 unused functions (no change in behaviour).
 
 = 0.55.1 =
 * Filter `beltoft_services_licences_client`: licence orders may use the fake registrar while domains keep theirs (staging, where the Openprovider sandbox orders no licences). Only the fake is taken.

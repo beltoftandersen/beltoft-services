@@ -43,7 +43,6 @@ class CartFlowTest extends TestCase {
 		$this->assertSame( $all, CartFlow::has_value( $item, CartFlow::ALL ) );
 		$this->assertSame( 'subscription_renewal' === $key, CartFlow::is_renewal( $item ) );
 		$this->assertSame( 'subscription_switch' === $key, CartFlow::is_switch( $item ) );
-		$this->assertSame( 'subscription_resubscribe' === $key, CartFlow::is_resubscribe( $item ) );
 	}
 
 	public function test_a_plain_line_is_in_no_set(): void {

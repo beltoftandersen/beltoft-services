@@ -349,9 +349,6 @@ class CountedTest extends TestCase {
 		$this->remote( 5 );
 		OrderPull::pull( $r, time() );
 		$this->assertEquals( array( Store::BILLABLE => 3, Store::HELD => 2 ), $this->states( $r ) );
-
-		$this->assertSame( 2, Store::release_held( $r->id(), time() + 3600 ) );
-		$this->assertSame( array( Store::BILLABLE => 5 ), $this->states( $r ) );
 	}
 
 	// ------------------------------------------------------------ steps and billing

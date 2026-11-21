@@ -370,35 +370,6 @@ final class HostingCapacity {
 	}
 
 	/**
-	 * What the plugin counts as committed on a node, next to what the node reports itself, mailed when the real free
-	 * memory or disk is under the threshold. $host comes from the agent's health answer (member `host`, see
-	 * NodeHealth::check()); a member that is missing is not checked.
-	 *
-	 * @param string               $id   Node id.
-	 * @param array<string, mixed> $host mem_total_mb, mem_free_mb, disk_total_gb, disk_free_gb.
-	 * @return string[] Kinds a mail was sent for.
-	 */
-	public static function cross_check( string $id, array $host ): array {
-		$u = self::usage( $id );
-
-		if ( null === $u ) {
-			return array();
-		}
-
-		$sent = array();
-
-		if ( isset( $host['mem_total_mb'], $host['mem_free_mb'] ) && \BeltoftServices\Proxmox\Pve\CapacityCheck::report( 'hosting:' . $id, sprintf( /* translators: %s: node id. */ __( 'Hosting node %s', 'beltoft-services' ), $id ), 'memory', (float) $host['mem_total_mb'], (float) $host['mem_free_mb'], $u['memory_committed'], $u['memory_budget'] ) ) {
-			$sent[] = 'memory';
-		}
-
-		if ( isset( $host['disk_total_gb'], $host['disk_free_gb'] ) && \BeltoftServices\Proxmox\Pve\CapacityCheck::report( 'hosting:' . $id, sprintf( /* translators: %s: node id. */ __( 'Hosting node %s', 'beltoft-services' ), $id ), 'disk', (float) $host['disk_total_gb'] * 1024, (float) $host['disk_free_gb'] * 1024, $u['disk_committed'], $u['disk_budget'] ) ) {
-			$sent[] = 'disk';
-		}
-
-		return $sent;
-	}
-
-	/**
 	 * The word for memory or disk in a mail, translated.
 	 *
 	 * @param string $kind memory or disk.

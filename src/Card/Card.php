@@ -352,32 +352,6 @@ final class Card {
 		return self::token_details( $account );
 	}
 
-	/**
-	 * The card's fingerprint (the same physical card gives the same one), '' when it is not known. A saved token has
-	 * it on the gateway's payment method, which the Stripe plugin's client reads; the filter lets a site supply it.
-	 *
-	 * @param \WC_Subscription $account Account.
-	 */
-	public static function token_fingerprint( \WC_Subscription $account ): string {
-		$token       = self::token_for( $account );
-		$fingerprint = '';
-
-		if ( $token && class_exists( '\\WC_Stripe_Gateway' ) && str_starts_with( $token->get_gateway_id(), 'stripe_' ) ) {
-			try {
-				// The plugin's client comes from its gateway class (it has no `client` property on `stripe_wc()`).
-				$pm = \WC_Stripe_Gateway::load()->mode( $account )->paymentMethods->retrieve( $token->get_token() );
-
-				if ( ! is_wp_error( $pm ) && isset( $pm->card->fingerprint ) ) {
-					$fingerprint = (string) $pm->card->fingerprint;
-				}
-			} catch ( \Throwable $e ) {
-				unset( $e );
-			}
-		}
-
-		return trim( (string) $fingerprint );
-	}
-
 	// ------------------------------------------------------------------ the default card is the account's card.
 
 	/**

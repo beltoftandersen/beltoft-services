@@ -150,20 +150,6 @@ final class Store {
 	}
 
 	/**
-	 * Events received per UTC day over the last days (for the trailing average of the cap).
-	 *
-	 * @param int $resource_id Resource.
-	 * @param int $from        Unix time, start of the first day.
-	 * @param int $to          Unix time, end (exclusive).
-	 */
-	public static function received_between( int $resource_id, int $from, int $to ): int {
-		global $wpdb;
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
-		return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE resource_id = %d AND received_at >= %s AND received_at < %s', self::table(), $resource_id, gmdate( 'Y-m-d H:i:s', $from ), gmdate( 'Y-m-d H:i:s', $to ) ) );
-	}
-
-	/**
 	 * Billable events of a resource, per hour, for hours that ended before a time. The caller passes the start of the hour
 	 * (now minus the hold window), so every event of such an hour is old enough and no new event can arrive in it.
 	 *
@@ -206,21 +192,6 @@ final class Store {
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
 		return (int) $wpdb->query( $wpdb->prepare( 'UPDATE %i SET state = %s, billed_hour = %s WHERE resource_id = %d AND state = %s AND hour_bucket = %s', self::table(), self::BILLED, gmdate( 'Y-m-d H:i:s', $hour ), $resource_id, self::BILLABLE, gmdate( 'Y-m-d H:i:s', $hour ) ) );
-	}
-
-	/**
-	 * Releases held events to billing: they are billed in the hour they are released (never in an hour that has been written
-	 * already), and the hold window starts again.
-	 *
-	 * @param int $resource_id Resource.
-	 * @param int $now         Unix time.
-	 * @return int Rows changed.
-	 */
-	public static function release_held( int $resource_id, int $now ): int {
-		global $wpdb;
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- own table.
-		return (int) $wpdb->query( $wpdb->prepare( 'UPDATE %i SET state = %s, hour_bucket = %s WHERE resource_id = %d AND state = %s', self::table(), self::BILLABLE, gmdate( 'Y-m-d H:i:s', self::hour( $now ) ), $resource_id, self::HELD ) );
 	}
 
 	/**

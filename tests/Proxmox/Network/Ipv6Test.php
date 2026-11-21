@@ -103,11 +103,4 @@ class Ipv6Test extends TestCase {
 		$this->assertNull( Ipv6::vmid_for( '192.0.2.5' ) );
 		$this->assertNull( Ipv6::vmid_for( 'junk' ) );
 	}
-
-	public function test_in_prefix(): void {
-		$this->assertTrue( Ipv6::in_prefix( $this->cluster(), '2001:db8:430c:1:ffff::9' ) );
-		$this->assertFalse( Ipv6::in_prefix( $this->cluster(), '2001:db8:430d:1::9' ) );
-		$this->assertFalse( Ipv6::in_prefix( $this->cluster( '' ), '2001:db8:430c:1::9' ) );
-	}
-
 }

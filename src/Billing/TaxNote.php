@@ -180,16 +180,6 @@ final class TaxNote {
 	}
 
 	/**
-	 * Whether a catalogue figure of this product is shown including tax: the display in force is including and the amount belongs to a
-	 * product. Without a product the amount is shown as given (excluding tax) and the sentence around it says so.
-	 *
-	 * @param \WC_Product|null $product Product the amount belongs to.
-	 */
-	public static function incl_for( ?\WC_Product $product ): bool {
-		return 'incl' === self::vat_mode( $product );
-	}
-
-	/**
 	 * What the words next to a catalogue figure of a product say: 'incl' (display including tax, taxable product), 'excl' (display
 	 * excluding tax, or no product: as the plugin always printed it) or 'none' (display including tax and the product is not taxable: the
 	 * figure has no VAT in it and no VAT words belong next to it).

@@ -101,13 +101,4 @@ final class CartFlow {
 	public static function is_switch( array $item ): bool {
 		return isset( $item[ self::SWITCH ] );
 	}
-
-	/**
-	 * Is the line a resubscribe?
-	 *
-	 * @param array<string, mixed> $item Cart item.
-	 */
-	public static function is_resubscribe( array $item ): bool {
-		return isset( $item[ self::RESUBSCRIBE ] );
-	}
 }

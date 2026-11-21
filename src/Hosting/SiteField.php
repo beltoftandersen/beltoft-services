@@ -457,23 +457,6 @@ final class SiteField {
 	}
 
 	/**
-	 * Is the name one that was made from the website's title (a domain order), so the customer never chose it? Then it
-	 * is an internal name and the account page shows the title only.
-	 *
-	 * @param string $slug  Name of the site.
-	 * @param string $label Title of the site.
-	 */
-	public static function slug_is_made( string $slug, string $label ): bool {
-		if ( '' === $label ) {
-			return false;
-		}
-
-		$base = self::slug_base( $label );
-
-		return $slug === $base || 1 === preg_match( '/^' . preg_quote( $base, '/' ) . '-[0-9]{1,2}$/', $slug );
-	}
-
-	/**
 	 * A temporary name made from a domain, free to take: example.com becomes example-com, then example-com-2 when the
 	 * first is used. The name is only the temporary address, so the customer is not asked for it.	 *
 	 * @param string $domain Domain.

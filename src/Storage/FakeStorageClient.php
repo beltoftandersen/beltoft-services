@@ -176,23 +176,6 @@ final class FakeStorageClient implements StorageClient {
 	}
 
 	/**
-	 * A usage figure for tests: sets what a box reports as used.
-	 *
-	 * @param string $id             Box id.
-	 * @param int    $used_bytes     Data.
-	 * @param int    $snapshot_bytes Snapshots.
-	 */
-	public function set_used( string $id, int $used_bytes, int $snapshot_bytes = 0 ): void {
-		$state = self::state();
-
-		if ( isset( $state['boxes'][ $id ] ) ) {
-			$state['boxes'][ $id ]['used_bytes']     = $used_bytes;
-			$state['boxes'][ $id ]['snapshot_bytes'] = $snapshot_bytes;
-			$this->save( $state );
-		}
-	}
-
-	/**
 	 * Whether a password is the box's (a test check).
 	 *
 	 * @param string $id       Box id.

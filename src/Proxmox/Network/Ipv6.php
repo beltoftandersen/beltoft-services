@@ -169,19 +169,6 @@ final class Ipv6 {
 	}
 
 	/**
-	 * Is the address inside the /64 of the cluster?
-	 *
-	 * @param array<string, mixed> $cluster Cluster settings.
-	 * @param string               $address Address.
-	 */
-	public static function in_prefix( array $cluster, string $address ): bool {
-		$prefix = self::prefix_bytes( $cluster );
-		$packed = self::pack( $address );
-
-		return null !== $prefix && null !== $packed && substr( $packed, 0, 8 ) === $prefix;
-	}
-
-	/**
 	 * The 16 packed bytes of an IPv6 address, or null (also for IPv4 text and for anything with a zone or a prefix length).
 	 *
 	 * @param string $address Text.

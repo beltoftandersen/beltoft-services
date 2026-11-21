@@ -455,36 +455,6 @@ class CapacityTest extends HostingCase {
 		$this->assertCount( 1, $mails, 'The second account is placed over the budget and the admin is told.' );
 	}
 
-	public function test_the_cross_check_mails_on_low_real_free_memory_or_disk_and_is_quiet_otherwise(): void {
-		$mails = array();
-		add_filter(
-			'pre_wp_mail',
-			function ( $pre, $args ) use ( &$mails ) {
-				$mails[] = $args;
-
-				return true;
-			},
-			10,
-			2
-		);
-		$this->settings( array( 'capacity_free_memory_percent' => 10, 'capacity_free_disk_percent' => 10 ) );
-
-		$this->assertSame( array(), HostingCapacity::cross_check( 'n1', array( 'mem_total_mb' => 32768, 'mem_free_mb' => 8000, 'disk_total_gb' => 1000, 'disk_free_gb' => 400 ) ) );
-		$this->assertCount( 0, $mails, 'Plenty free: quiet.' );
-
-		$this->assertSame( array( 'memory' ), HostingCapacity::cross_check( 'n1', array( 'mem_total_mb' => 32768, 'mem_free_mb' => 1000, 'disk_total_gb' => 1000, 'disk_free_gb' => 400 ) ) );
-		$this->assertCount( 1, $mails );
-		$this->assertStringContainsString( 'free memory', $mails[0]['subject'] );
-		$this->assertStringContainsString( 'committed', $mails[0]['message'] );
-		$this->assertStringContainsString( 'budget', $mails[0]['message'] );
-
-		$this->assertSame( array( 'disk' ), HostingCapacity::cross_check( 'n1', array( 'mem_total_mb' => 32768, 'mem_free_mb' => 8000, 'disk_total_gb' => 1000, 'disk_free_gb' => 50 ) ) );
-		$this->assertCount( 2, $mails );
-
-		$this->assertSame( array(), HostingCapacity::cross_check( 'n1', array( 'mem_total_mb' => 32768, 'mem_free_mb' => 1000 ) ), 'Once a day per node and kind.' );
-		$this->assertSame( array(), HostingCapacity::cross_check( 'n1', array() ), 'A member that is missing is not checked.' );
-	}
-
 	public function test_the_health_job_tells_the_admin_when_a_node_is_over_its_budget(): void {
 		$mails = array();
 		add_filter(

@@ -628,15 +628,6 @@ final class Resource {
 	}
 
 	/**
-	 * The fragments that mark a resource as ended by its own state, for ids_with_meta_value( ..., $any_of ).
-	 *
-	 * @return string[]
-	 */
-	public static function ended_state_fragments(): array {
-		return array( '"state":"failed"', '"state":"deleting"', '"state":"deleted"' );
-	}
-
-	/**
 	 * The activation kind (the kind of its driver).
 	 */
 	public function kind(): string {
@@ -692,13 +683,6 @@ final class Resource {
 		if ( null !== self::$memo ) {
 			self::$memo = array();
 		}
-	}
-
-	/**
-	 * Is the memo on?
-	 */
-	public static function memo_active(): bool {
-		return null !== self::$memo;
 	}
 
 	/**
