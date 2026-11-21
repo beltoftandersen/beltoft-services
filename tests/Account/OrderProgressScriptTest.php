@@ -51,4 +51,14 @@ final class OrderProgressScriptTest extends TestCase {
 		$this->assertStringContainsString( "'function' === typeof interval ? interval() : interval", $this->script( 'progress.js' ) );
 		$this->assertMatchesRegularExpression( '/catch \( error \) \{\s*\/\/ Storage is blocked/', $js );
 	}
+
+	public function test_a_ready_service_updates_its_row_in_the_server_list_and_the_open_button_keeps_white_text(): void {
+		$js = $this->script();
+
+		$this->assertStringContainsString( "document.querySelector( '#beltoft-service-' + row.id + ' .beltoft-services-state.is-busy' )", $js );
+		$this->assertStringContainsString( "listed.className = 'beltoft-services-state is-ok';", $js );
+
+		$css = (string) file_get_contents( dirname( __DIR__, 2 ) . '/assets/account.css' );
+		$this->assertStringContainsString( 'body.woocommerce-account .woocommerce-MyAccount-content .bs-order .bs-flow .beltoft-service__open a { color: var(--bs-on-dark);', $css );
+	}
 }

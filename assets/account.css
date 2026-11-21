@@ -1457,6 +1457,9 @@ div.bs-order .bs-order__closing-list a:hover, div.bs-order .bs-order__closing-li
 .bs-flow .beltoft-services-progress__steps li.is-skipped::before { background: var(--bs-line); }
 .bs-flow .beltoft-service__open a { display: inline-flex; align-items: center; min-height: var(--bs-btn-h); padding: 0 var(--bs-space-4); border-radius: var(--bs-radius); background: var(--bs-dark); color: var(--bs-on-dark); font-weight: var(--bs-fw-medium); text-decoration: none; }
 .bs-flow .beltoft-service__open a:hover, .bs-flow .beltoft-service__open a:focus-visible { background: var(--bs-status-ok); }
+/* The theme colours every account link (.woocommerce-MyAccount-content a:not(.btn):not(.button), four classes): on the dark
+   button that gave dark text on dark. This one rule outranks it, so the button reads on any theme that does the same. */
+body.woocommerce-account .woocommerce-MyAccount-content .bs-order .bs-flow .beltoft-service__open a { color: var(--bs-on-dark); text-decoration: none; }
 @media (max-width: 600px) {
 	.bs-order { padding: var(--bs-space-4); }
 	.bs-flow { padding: var(--bs-space-3); }

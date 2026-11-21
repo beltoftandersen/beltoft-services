@@ -273,6 +273,7 @@
 			var message = item.querySelector( '[data-service-message]' );
 			var open = item.querySelector( '[data-service-open]' );
 			var track = item.querySelector( '[data-flow-track]' );
+			var listed;
 			var value;
 
 			item.className = 'beltoft-service' + ( flow ? ' bs-flow' : '' ) + ' is-' + row.group;
@@ -288,6 +289,17 @@
 
 			if ( open ) {
 				open.hidden = ! row.ready;
+			}
+
+			// The server list on the same page is drawn once, while the service was still being set up: when it is ready, its row
+			// stops saying Working (the same words as the order line).
+			if ( row.ready && ! ( row.progress && row.progress.active ) ) {
+				listed = document.querySelector( '#beltoft-service-' + row.id + ' .beltoft-services-state.is-busy' );
+
+				if ( listed ) {
+					listed.textContent = row.label;
+					listed.className = 'beltoft-services-state is-ok';
+				}
 			}
 
 			if ( track ) {
