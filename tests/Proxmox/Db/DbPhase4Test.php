@@ -1479,4 +1479,28 @@ class DbPhase4Test extends TestCase {
 		$this->assertFalse( \BeltoftServices\Proxmox\Network\Ipv6Switch::applies( $r ) );
 		$this->assertNotNull( \BeltoftServices\Proxmox\Vm\Actions::check( $r, 'ipv6_add', array() ) );
 	}
+
+	public function test_a_database_has_the_servers_network_tab_on_its_one_network(): void {
+		$r    = $this->ready_db();
+		$view = \BeltoftServices\Proxmox\Network\PrivateAttach::view( $r );
+
+		$this->assertTrue( $view['is_db'] );
+		$this->assertSame( 'attached', $view['state'], 'Built on its network: always attached.' );
+		$this->assertSame( (string) Resource::find( $r->id() )->get( 'db_address' ), $view['address'] );
+		$this->assertSame( '10.64.0.0/28', $view['cidr'] );
+		$this->assertFalse( $view['can_attach'] );
+		$this->assertFalse( $view['can_detach'] );
+
+		ob_start();
+		( static function ( array $view ): void {
+			include BELTOFT_SERVICES_PATH . 'templates/account/network.php';
+		} )( $view );
+		$html = (string) ob_get_clean();
+
+		$this->assertStringContainsString( 'The database is always on one private network', $html );
+		$this->assertStringContainsString( (string) $view['address'], $html );
+		$this->assertStringNotContainsString( 'data-net-attach', $html );
+		$this->assertStringNotContainsString( 'data-net-detach', $html );
+		$this->assertStringNotContainsString( 'qemu-guest-agent', $html );
+	}
 }

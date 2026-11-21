@@ -128,6 +128,8 @@ final class DbCard {
 				DbDisk::promised_gb( $r )
 			),
 			'storage'     => DbDisk::view( $r ),
+			// The server's Network tab, the same code (Proxmox\Network\PrivateAttach::view, templates/account/network.php).
+			'network'     => \BeltoftServices\Proxmox\Network\PrivateAttach::view( $r ),
 		);
 	}
 

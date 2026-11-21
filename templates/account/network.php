@@ -5,7 +5,8 @@
  * Variables: $view (PrivateAttach::view()): resource_id, state (empty, attaching, attached, detaching, failed),
  * address, cidr, network (name of the network this server is on), networks (id, label and full of each
  * network of the customer), can_new, next_name, name_max, others (address and name of the customer's other servers on the
- * network), notice, mac, can_attach, can_detach. assets/network-tab.js posts the actions and waits for the job.
+ * network), notice, mac, can_attach, can_detach, is_db (a database's page: it is always on this one network, no attach or
+ * detach). assets/network-tab.js posts the actions and waits for the job.
  *
  * @package BeltoftServices
  */
@@ -23,7 +24,11 @@ $beltoft_services_net_words = array(
 ?>
 <div class="beltoft-services-net" data-net data-resource="<?php echo (int) $view['resource_id']; ?>" data-net-state="<?php echo esc_attr( $beltoft_services_net_state ); ?>">
 	<h4><?php esc_html_e( 'Private network', 'beltoft-services' ); ?></h4>
-	<p class="description"><?php esc_html_e( 'A network that only your own servers share. Traffic on it never goes over the internet. It needs the guest agent (qemu-guest-agent) running in your server.', 'beltoft-services' ); ?></p>
+	<?php if ( ! empty( $view['is_db'] ) ) : ?>
+		<p class="description"><?php esc_html_e( 'A network that only your own servers share. Traffic on it never goes over the internet. The database is always on one private network: your servers on it reach the database on its private address.', 'beltoft-services' ); ?></p>
+	<?php else : ?>
+		<p class="description"><?php esc_html_e( 'A network that only your own servers share. Traffic on it never goes over the internet. It needs the guest agent (qemu-guest-agent) running in your server.', 'beltoft-services' ); ?></p>
+	<?php endif; ?>
 
 	<dl class="beltoft-services-facts">
 		<div><dt><?php esc_html_e( 'Status', 'beltoft-services' ); ?></dt><dd data-net-status><?php echo esc_html( $beltoft_services_net_words[ $beltoft_services_net_state ] ); ?></dd></div>
@@ -76,7 +81,7 @@ $beltoft_services_net_words = array(
 		</div>
 	<?php endif; ?>
 
-	<?php if ( 'attached' === $beltoft_services_net_state ) : ?>
+	<?php if ( 'attached' === $beltoft_services_net_state && empty( $view['is_db'] ) ) : ?>
 		<p class="description"><?php esc_html_e( 'To check inside the server, run this and look for the private address:', 'beltoft-services' ); ?> <code>ip -br a</code></p>
 	<?php endif; ?>
 

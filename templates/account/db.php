@@ -288,6 +288,15 @@ $beltoft_services_db_wait = array(
 		</div>
 	<?php endif; ?>
 
+	<?php if ( 'ready' === $view['kind'] && ! $beltoft_services_all && 'network' === $active ) : ?>
+		<?php
+		// The server's Network tab, the same template: a database shows its network, its private address and what else is on it.
+		( static function ( array $view ): void {
+			include BELTOFT_SERVICES_PATH . 'templates/account/network.php';
+		} )( (array) $view['network'] );
+		?>
+	<?php endif; ?>
+
 	<?php if ( in_array( $view['kind'], array( 'ready', 'restoring' ), true ) && ( $beltoft_services_all || 'backups' === $active ) ) : ?>
 		<?php $beltoft_services_backups = $view['backups']; ?>
 		<div class="beltoft-services-vm__more beltoft-services-vm__backups">

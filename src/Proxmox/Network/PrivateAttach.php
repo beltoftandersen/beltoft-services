@@ -405,6 +405,9 @@ final class PrivateAttach {
 		$state  = (string) $r->get( self::STATE );
 		$row    = PrivateNets::for_resource( $r->id() );
 		$state  = in_array( $state, array( 'attaching', 'attached', 'detaching', 'failed' ), true ) ? $state : '';
+		// A database is built on its one private network and stays on it: the same tab, without attach and detach.
+		$is_db  = \BeltoftServices\Proxmox\Db\DbActions::is_db( $r );
+		$state  = $is_db && null !== $row ? 'attached' : $state;
 		$others = array();
 		$user   = (int) ( is_array( $r->license() ) ? ( $r->license()['user_id'] ?? 0 ) : 0 );
 		$nets   = PrivateNets::nets_for_user( $user );
@@ -457,8 +460,9 @@ final class PrivateAttach {
 			'others'      => $others,
 			'notice'      => self::notice_text( $notice ),
 			'mac'         => (string) $r->get( self::MAC ),
-			'can_attach'  => 'attached' !== $state && 'detaching' !== $state && 'attaching' !== $state,
-			'can_detach'  => in_array( $state, array( 'attached', 'failed' ), true ),
+			'can_attach'  => ! $is_db && 'attached' !== $state && 'detaching' !== $state && 'attaching' !== $state,
+			'can_detach'  => ! $is_db && in_array( $state, array( 'attached', 'failed' ), true ),
+			'is_db'       => $is_db,
 		);
 	}
 
