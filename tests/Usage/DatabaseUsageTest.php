@@ -257,6 +257,13 @@ class DatabaseUsageTest extends UsageTestCase {
 		wp_set_current_user( $this->new_user() );
 		$v = $this->db_product();
 		$this->off_sale( $v );
+
+		// The shop has no "Public IP" variations any more (the IPv4 address is its own add-on): the fixture's are off sale here.
+		foreach ( array( 'u-1-0', 'u-1-50' ) as $key ) {
+			$v[ $key ]->set_status( 'private' );
+			$v[ $key ]->save();
+		}
+
 		add_filter( 'beltoft_services_db_picker_products', fn() => array( $v['m-0-0']->get_parent_id() ) );
 
 		$html = $this->picker_page();

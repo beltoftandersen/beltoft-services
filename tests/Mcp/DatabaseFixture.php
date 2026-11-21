@@ -26,7 +26,7 @@ trait DatabaseFixture {
 		$product->set_status( 'publish' );
 		$attrs = array();
 
-		foreach ( array( 'Plan' => array( 'Standard' ), 'Billing' => array( 'Monthly', 'Pay as you go' ), 'Extra storage' => array( 'None', '50 GB' ), 'Public IP' => array( 'No', 'Yes' ) ) as $name => $options ) {
+		foreach ( array( 'Plan' => array( 'Standard' ), 'Billing' => array( 'Monthly', 'Pay as you go' ), 'Extra storage' => array( 'None', '50 GB' ) ) as $name => $options ) {
 			$a = new \WC_Product_Attribute();
 			$a->set_name( $name );
 			$a->set_options( $options );
@@ -51,13 +51,13 @@ trait DatabaseFixture {
 
 		foreach ( array( 'm' => 'Monthly', 'u' => 'Pay as you go' ) as $short => $billing ) {
 			foreach ( array( 0 => array( 'None', 45 ), 50 => array( '50 GB', 49 ) ) as $extra => $set ) {
-				foreach ( array( 0, 1 ) as $with ) {
+				// A public IPv4 address is its own add-on, not a variation of the plan (as in the shop).
+				foreach ( array( 0 ) as $with ) {
 					$v = new \WC_Product_Variation();
 					$v->set_parent_id( $product->get_id() );
-					$v->set_attributes( array( 'plan' => 'Standard', 'billing' => $billing, 'extra-storage' => $set[0], 'public-ip' => $with ? 'Yes' : 'No' ) );
+					$v->set_attributes( array( 'plan' => 'Standard', 'billing' => $billing, 'extra-storage' => $set[0] ) );
 					$v->set_regular_price( 'm' === $short ? (string) ( $set[1] + ( $with ? 5 : 0 ) ) : '0' );
 					$v->set_status( 'publish' );
-					$v->update_meta_data( Product::META_PLAN . 'public_ip', (string) $with );
 					$v->update_meta_data( Product::META_PLAN . 'extra_disk_gb', (string) $extra );
 
 					if ( 'u' === $short ) {
