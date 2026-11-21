@@ -1480,16 +1480,22 @@ body.woocommerce-account .woocommerce-MyAccount-content .bs-order .bs-flow .belt
 	.bs-flow.is-getting-ready .bs-flow__track[aria-valuenow="0"]::after { width: 100%; animation: none; opacity: .4; }
 }
 
-/* The subscription list: the product name leads a row, the number is small under it; ended ones are folded. */
+/* The subscription list and the pay-as-you-go card: the Servers list's rows (.beltoft-services-servers--area), money on the right. */
 body.woocommerce-account .woocommerce-MyAccount-content .bs-subscriptions__title { margin: var(--bs-space-5) 0 var(--bs-space-3); }
-body.woocommerce-account .woocommerce-MyAccount-content .bs-sub-title { display: block; font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); }
-body.woocommerce-account .woocommerce-MyAccount-content table.bs-subs td.subscription-id::before { content: none; display: none; }
+.beltoft-services-servers--subs .beltoft-services-srv__state { justify-items: end; text-align: right; }
+.beltoft-services-srv__figure { font-size: var(--bs-fs-body); font-weight: var(--bs-fw-strong); font-variant-numeric: tabular-nums; }
+.beltoft-services-servers--subs .beltoft-services-srv__figure .woocommerce-Price-amount, .beltoft-services-servers--subs .beltoft-services-srv__sub .woocommerce-Price-amount { font-variant-numeric: tabular-nums; }
+.beltoft-services-usage__body { padding: 0 var(--bs-space-4) var(--bs-space-3); border-top: 1px solid var(--bs-warm); }
+.beltoft-services-usage--card .beltoft-services-usage__table { margin-top: var(--bs-space-3); }
+.beltoft-services-usage--card .beltoft-services-usage__note { margin: var(--bs-space-2) 0 0; color: var(--bs-muted); font-size: var(--bs-fs-small); }
+.beltoft-services-usage--card { margin: 0 0 var(--bs-space-5); }
 body.woocommerce-account .woocommerce-MyAccount-content .bs-subscriptions__ended { margin: var(--bs-space-4) 0 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .bs-subscriptions__ended > summary { cursor: pointer; padding: var(--bs-space-2) 0; color: var(--bs-muted); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); }
 body.woocommerce-account .woocommerce-MyAccount-content .bs-subscriptions__ended[open] > summary { margin-bottom: var(--bs-space-3); }
+/* A phone: name first, the price under the status column on the right, no chevron; the list's own container rule does the grid. */
 @media (max-width: 767px) {
-	body.woocommerce-account .woocommerce-MyAccount-content table.bs-subs td.subscription-id { padding-bottom: var(--bs-space-2); }
-	body.woocommerce-account .woocommerce-MyAccount-content table.bs-subs td.subscription-actions .button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; box-sizing: border-box; }
+	.beltoft-services-servers--area.beltoft-services-servers--subs :is(a, div).beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; padding-block: var(--bs-space-3); }
+	.beltoft-services-servers--subs .beltoft-services-srv__go { display: none; }
 }
 
 /* The page of one subscription: the product names as its heading, the number under it. */
@@ -1497,3 +1503,5 @@ body.woocommerce-account .woocommerce-MyAccount-content .bs-sub-head { margin: 0
 body.woocommerce-account .woocommerce-MyAccount-content .bs-sub-head__title { margin: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .bs-sub-head__id { margin: var(--bs-space-1) 0 0; color: var(--bs-muted); font-size: var(--bs-fs-small); }
 body.woocommerce-account .woocommerce-MyAccount-content .bs-sub-head .bs-note { margin: var(--bs-space-3) 0 0; }
+
+.bs-sub-head + .bs-sub-summary { margin: 0 0 var(--bs-space-5); }

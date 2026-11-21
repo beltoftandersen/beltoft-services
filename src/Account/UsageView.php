@@ -73,7 +73,11 @@ final class UsageView {
 		$estimate = Estimate::for_user( get_current_user_id() );
 		$account  = $estimate ? \BeltoftServices\Usage\Account::for_user( get_current_user_id() ) : null;
 
-		return $estimate && $account ? self::render( $estimate, $account->get_view_order_url() ) : '';
+		if ( ! $estimate || ! $account ) {
+			return '';
+		}
+
+		return self::render( $estimate, $account->get_view_order_url(), wcs_get_subscription_status_name( $account->get_status() ), SubscriptionPages::tone( $account->get_status() ) );
 	}
 
 	/**
@@ -81,8 +85,10 @@ final class UsageView {
 	 *
 	 * @param array<string, mixed> $estimate Estimate.
 	 * @param string               $view_url Address of the account's subscription ('' for the plain block).
+	 * @param string               $state    Status word of the account (the card).
+	 * @param string               $tone     Colour group of the status (the card).
 	 */
-	private static function render( array $estimate, string $view_url ): string {
+	private static function render( array $estimate, string $view_url, string $state = '', string $tone = 'ok' ): string {
 		Panel::style();
 		self::$printed = true;
 
@@ -91,6 +97,8 @@ final class UsageView {
 				'estimate' => $estimate,
 				'credit'   => \BeltoftServices\GiftCredit\GiftCredit::balance( get_current_user_id(), (string) $estimate['currency'] ),
 				'view_url' => $view_url,
+				'state'    => $state,
+				'tone'     => $tone,
 				'links'    => self::links( $estimate ),
 			), 'beltoft-services/account/', BELTOFT_SERVICES_PATH . 'templates/account/' );
 

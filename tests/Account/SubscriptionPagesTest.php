@@ -76,12 +76,31 @@ final class SubscriptionPagesTest extends UsageTestCase {
 		$html = (string) ob_get_clean();
 
 		$this->assertStringContainsString( '<h2 class="bs-subscriptions__title">Subscriptions</h2>', $html );
-		$this->assertStringContainsString( '<summary>Ended (1)</summary>', $html );
+		$this->assertStringContainsString( '<summary>Ended subscriptions (1)</summary>', $html );
 		$this->assertStringNotContainsString( 'Trashed', $html );
 		$this->assertLessThan( strpos( $html, 'Old live' ), strpos( $html, 'New live' ) );
 		$this->assertLessThan( strpos( $html, '<details' ), strpos( $html, 'Old live' ) );
 		$this->assertGreaterThan( strpos( $html, '<details' ), strpos( $html, 'Gone' ) );
 		$this->assertStringContainsString( '#' . $new->get_id(), $html );
+		$this->assertStringContainsString( 'class="beltoft-services-state is-bad">On hold', $html );
+		$this->assertStringContainsString( 'class="beltoft-services-state is-off">Cancelled', $html );
+		$this->assertStringContainsString( 'aria-label="New live, On hold"', $html );
+		$this->assertStringNotContainsString( '<table', $html );
+		$this->assertStringContainsString( 'beltoft-services-srv__figure', $html );
+	}
+
+	public function test_a_row_says_next_payment_and_end_date(): void {
+		$user = $this->new_user();
+		$sub  = $this->sub( $user, 'Backup', 'active' );
+		$sub->update_dates( array( 'next_payment' => gmdate( 'Y-m-d H:i:s', time() + 20 * DAY_IN_SECONDS ) ) );
+		$row = SubscriptionPages::row( wcs_get_subscription( $sub->get_id() ) );
+
+		$this->assertSame( 'ok', $row['tone'] );
+		$this->assertSame( 'Next payment ' . wp_date( (string) get_option( 'date_format' ), time() + 20 * DAY_IN_SECONDS ), $row['note'] );
+
+		$gone = SubscriptionPages::row( $this->sub( $user, 'Old', 'cancelled' ) );
+		$this->assertSame( 'off', $gone['tone'] );
+		$this->assertSame( '1', $gone['ended'] );
 	}
 
 	public function test_the_pay_as_you_go_card_replaces_its_row(): void {
@@ -98,6 +117,8 @@ final class SubscriptionPagesTest extends UsageTestCase {
 		$this->assertStringContainsString( 'Pay as you go', $card );
 		$this->assertStringContainsString( esc_url( $account->get_view_order_url() ), $card );
 		$this->assertStringContainsString( 'View account', $card );
+		$this->assertStringContainsString( 'aria-label="Pay as you go, Active"', $card );
+		$this->assertStringNotContainsString( 'Usage this month', $card );
 	}
 
 	public function test_no_card_without_pay_as_you_go(): void {
@@ -140,6 +161,8 @@ final class SubscriptionPagesTest extends UsageTestCase {
 		$this->assertStringContainsString( '<h2 class="bs-sub-head__title">Backup - 1 TB</h2>', $html );
 		$this->assertStringContainsString( 'Subscription #' . $sub->get_order_number(), $html );
 		$this->assertStringNotContainsString( 'beltoft-services-usage', $html );
+		$this->assertStringContainsString( 'bs-sub-summary', $html );
+		$this->assertStringContainsString( 'beltoft-services-srv__figure', $html );
 		$this->assertStringNotContainsString( 'invoiced here once a month', $html );
 	}
 
@@ -162,6 +185,7 @@ final class SubscriptionPagesTest extends UsageTestCase {
 
 		$this->assertStringContainsString( 'Servers and other services billed by the hour are invoiced here once a month. The amount depends on use.', $html );
 		$this->assertStringContainsString( 'beltoft-services-usage', $html );
+		$this->assertStringContainsString( 'bs-sub-summary', $html );
 		$this->assertFalse( has_action( 'woocommerce_subscription_totals_table', array( 'WCS_Template_Loader', 'get_subscription_totals_template' ) ) );
 	}
 

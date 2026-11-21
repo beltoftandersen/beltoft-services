@@ -96,6 +96,136 @@ final class SubscriptionPages {
 	}
 
 	/**
+	 * The colour group of a status, as the Servers list names them (ok, busy, off, bad).
+	 *
+	 * @param string $status Subscription status.
+	 */
+	public static function tone( string $status ): string {
+		if ( 'active' === $status ) {
+			return 'ok';
+		}
+
+		if ( 'on-hold' === $status ) {
+			return 'bad';
+		}
+
+		return in_array( $status, self::ENDED, true ) ? 'off' : 'busy';
+	}
+
+	/**
+	 * A date as the account shows dates.
+	 *
+	 * @param int $time Timestamp.
+	 */
+	private static function date( int $time ): string {
+		return wp_date( (string) get_option( 'date_format' ), $time );
+	}
+
+	/**
+	 * The plain values of one row: name, "#1230, via Google Pay", status word and tone, the price, and the line under it.
+	 *
+	 * @param \WC_Subscription $subscription Subscription.
+	 * @return array<string, string>
+	 */
+	public static function row( \WC_Subscription $subscription ): array {
+		$status = $subscription->get_status();
+		$ended  = in_array( $status, self::ENDED, true );
+		$names  = SubscriptionNames::names( $subscription );
+		$id     = '#' . $subscription->get_order_number();
+		$sub    = $id;
+		$note   = '';
+
+		if ( ! $ended && ! $subscription->is_manual() && $subscription->has_status( 'active' ) && $subscription->get_time( 'next_payment' ) > 0 ) {
+			$method = trim( (string) $subscription->get_payment_method_to_display( 'customer' ) );
+			$sub    = '' !== $method ? sprintf( '%1$s, %2$s', $id, lcfirst( $method ) ) : $id;
+		}
+
+		if ( $ended ) {
+			$when = 0;
+
+			foreach ( array( 'end', 'cancelled', 'last_order_date_created' ) as $type ) {
+				$when = $when > 0 ? $when : (int) $subscription->get_time( $type, 'gmt' );
+			}
+
+			/* translators: %s: date. */
+			$note = $when > 0 ? sprintf( __( 'Ended %s', 'beltoft-services' ), self::date( $when ) ) : '';
+		} elseif ( 'pending-cancel' === $status && (int) $subscription->get_time( 'end', 'gmt' ) > 0 ) {
+			/* translators: %s: date. */
+			$note = sprintf( __( 'Ends %s', 'beltoft-services' ), self::date( (int) $subscription->get_time( 'end', 'gmt' ) ) );
+		} elseif ( 'active' === $status && (int) $subscription->get_time( 'next_payment', 'gmt' ) > 0 ) {
+			/* translators: %s: date. */
+			$note = sprintf( __( 'Next payment %s', 'beltoft-services' ), self::date( (int) $subscription->get_time( 'next_payment', 'gmt' ) ) );
+		}
+
+		return array(
+			'url'    => $subscription->get_view_order_url(),
+			'name'   => '' !== $names ? $names : $id,
+			'sub'    => '' !== $names ? $sub : '',
+			'status' => wcs_get_subscription_status_name( $status ),
+			'tone'   => self::tone( $status ),
+			'price'  => (string) $subscription->get_formatted_order_total(),
+			'note'   => $note,
+			'ended'  => $ended ? '1' : '',
+		);
+	}
+
+	/**
+	 * The rows of the list as the Servers list prints them: one link per subscription.
+	 *
+	 * @param array<int, \WC_Subscription> $list Subscriptions.
+	 */
+	public static function rows_html( array $list ): string {
+		$html = '<div class="beltoft-services-servers beltoft-services-servers--area beltoft-services-servers--subs">';
+
+		foreach ( $list as $subscription ) {
+			$row    = self::row( $subscription );
+			$html  .= '<a class="beltoft-services-srv" href="' . esc_url( $row['url'] ) . '" aria-label="' . esc_attr( sprintf( '%1$s, %2$s', $row['name'], $row['status'] ) ) . '">';
+			$html  .= '<span class="beltoft-services-srv__id"><span class="beltoft-services-state is-' . esc_attr( $row['tone'] ) . '">' . esc_html( $row['status'] ) . '</span>';
+			$html  .= '<span class="beltoft-services-srv__name">' . esc_html( $row['name'] ) . '</span>';
+			$html  .= '' !== $row['sub'] ? '<span class="beltoft-services-srv__sub">' . esc_html( $row['sub'] ) . '</span>' : '';
+			$html  .= '</span>' . self::figures( $row ) . '<span class="beltoft-services-srv__go" aria-hidden="true">&rsaquo;</span></a>';
+		}
+
+		return $html . '</div>';
+	}
+
+	/**
+	 * The right column of a row: the price as the main figure and the date line under it. An ended subscription leads
+	 * with its end date and keeps the price small.
+	 *
+	 * @param array<string, string> $row Row values.
+	 */
+	private static function figures( array $row ): string {
+		$price = '<span class="beltoft-services-srv__figure">' . wp_kses_post( $row['price'] ) . '</span>';
+		$note  = '' !== $row['note'] ? '<span class="beltoft-services-srv__sub">' . esc_html( $row['note'] ) . '</span>' : '';
+
+		if ( '' !== $row['ended'] ) {
+			$price = '' !== $row['note'] ? '<span class="beltoft-services-srv__figure">' . esc_html( $row['note'] ) . '</span>' : '';
+			$note  = '<span class="beltoft-services-srv__sub">' . wp_kses_post( $row['price'] ) . '</span>';
+		}
+
+		return '<span class="beltoft-services-srv__state">' . $price . $note . '</span>';
+	}
+
+	/**
+	 * The summary row at the top of a subscription page: status on the left, price and next payment on the right.
+	 *
+	 * @param \WC_Subscription $subscription Subscription.
+	 * @param bool             $payg         The pay-as-you-go account (its price is its usage, so none is shown).
+	 */
+	private static function summary_html( \WC_Subscription $subscription, bool $payg ): string {
+		$row = self::row( $subscription );
+
+		if ( $payg ) {
+			$row['price'] = '';
+		}
+
+		return '<div class="beltoft-services-servers beltoft-services-servers--area beltoft-services-servers--subs bs-sub-summary"><div class="beltoft-services-srv">'
+			. '<span class="beltoft-services-srv__id"><span class="beltoft-services-state is-' . esc_attr( $row['tone'] ) . '">' . esc_html( $row['status'] ) . '</span></span>'
+			. self::figures( $row ) . '</div></div>';
+	}
+
+	/**
 	 * The heading of a subscription page, its note, and for the pay-as-you-go account the usage.
 	 *
 	 * @param mixed $subscription_id Subscription id.
@@ -134,6 +264,7 @@ final class SubscriptionPages {
 		}
 
 		echo '</div>';
+		echo self::summary_html( $subscription, $payg ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped when built.
 
 		if ( $payg ) {
 			// Nothing to total: the amount is the usage.
