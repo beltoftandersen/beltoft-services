@@ -181,6 +181,7 @@ class DbPhase4Test extends TestCase {
 						'block_smtp'             => '1',
 						// Every database has its public card with an IPv6 address: the cluster has a prefix.
 						'ipv6_prefix'            => '2001:db8:430c:1::/64',
+						'nameservers6'           => '2001:db8::53',
 						'fw_enabled'             => '1',
 						'fw_ipfilter'            => '1',
 					),
@@ -1406,5 +1407,57 @@ class DbPhase4Test extends TestCase {
 		$this->assertSame( (string) $fresh->get( 'db_address' ), $private[0]['job']['address'] );
 		$this->assertSame( (string) $fresh->get( 'db_cidr' ), $private[0]['job']['private_cidr'] );
 		$this->assertNull( $fresh->get( DbIp::RESYNC ) );
+	}
+
+	public function test_a_database_with_ipv6_only_gets_the_ipv6_name_servers_and_is_not_built_or_sold_without_them(): void {
+		$this->ready_db();
+		$this->assertSame( '2001:db8::53', (string) $this->fake->vm( 5000 )['config']['nameserver'], 'An IPv4 resolver is out of reach over IPv6.' );
+
+		$this->save_cluster( array( 'nameservers6' => '' ) );
+		$cluster = (array) Clusters::get( 'lab' );
+		$product = $this->service_product( 'proxmox-db', array( 'cluster' => 'lab', 'template' => 9100, 'engine' => 'postgres', 'major' => 18, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20 ), array( 'max' => 3 ) );
+		$license = $this->service_license( $product, array( 'fire' => false, 'email' => self::OWNER ) );
+		$r       = Resource::create( $license, Registry::get( 'proxmox-db' ), Product::plan( $product->get_id() ) );
+		$this->assertNotSame( '', ( new \BeltoftServices\Proxmox\Db\DbProfile( $r ) )->address_error( $cluster, 5001 ) );
+		$this->assertFalse( ( new \ReflectionMethod( \BeltoftServices\Proxmox\Vm\Stock::class, 'availability' ) )->invoke( null, $product ), 'Not sold where it could not resolve names.' );
+	}
+
+	public function test_the_end_of_an_ipv4_change_marks_the_database_sync_in_the_same_write(): void {
+		$r = $this->db_with_ip();
+		$fresh = Resource::find( $r->id() );
+		$this->assertNull( $fresh->get( \BeltoftServices\Proxmox\Ipv4\Ipv4Server::OP ) );
+
+		// The sync is what is left: a job that stopped after the server's step runs only the sync, no second restart.
+		$this->assertTrue( $fresh->set( array( DbIp::RESYNC => true ) ) );
+		$reboots = count( $this->calls( 'POST', '/status/reboot' ) );
+		$res     = $this->drive( $r, \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_ADD );
+		$this->assertTrue( $res->is_done(), $res->error() );
+		$this->assertCount( $reboots, $this->calls( 'POST', '/status/reboot' ) );
+		$this->assertNull( Resource::find( $r->id() )->get( DbIp::RESYNC ) );
+	}
+
+	public function test_ipv4_server_sets_the_database_sync_when_it_ends(): void {
+		$r = $this->ready_db();
+		$this->pool( 3 );
+		$this->public_ip_addon( Resource::find( $r->id() ) );
+		$this->assertNotNull( IpPool::hold( $r->id() ) );
+		$driver = Registry::get( 'proxmox-db' );
+		$seen   = false;
+
+		// Run only the server's step (as Actions does), never the sync: its end must leave the mark.
+		for ( $i = 0; $i < 40; $i++ ) {
+			$res = ( new \BeltoftServices\Proxmox\Vm\Actions( Resource::find( $r->id() ) ) )->run( \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_ADD, array() );
+
+			if ( $res->is_done() || $res->is_failed() ) {
+				$seen = true;
+				break;
+			}
+
+			$this->fake->elapse( 30 );
+		}
+
+		unset( $driver );
+		$this->assertTrue( $seen && $res->is_done(), $res->error() );
+		$this->assertTrue( Resource::find( $r->id() )->get( DbIp::RESYNC ) );
 	}
 }

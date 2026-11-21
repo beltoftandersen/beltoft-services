@@ -133,7 +133,15 @@ final class Ipv4Server {
 		}
 
 		// `ipv4_synced` is the start time (with microseconds, so a run in the same second as a request is told apart) of the last run that ended: an add-on that asked for a run waits for one that started after its request.
-		$this->r->set( array( self::OP => null, self::SYNCED => (float) ( $this->op()['started'] ?? microtime( true ) ) ) );
+		$end = array( self::OP => null, self::SYNCED => (float) ( $this->op()['started'] ?? microtime( true ) ) );
+
+		// A database's guest must follow the new addresses (DbDriver::server_change_then_sync runs the sync): marked in the same write
+		// that ends the operation, so a job that stops in between does not run the server's step (and its restart) a second time.
+		if ( Ipv4Meta::is_db( $this->r ) ) {
+			$end[ \BeltoftServices\Proxmox\Db\DbIp::RESYNC ] = true;
+		}
+
+		$this->r->set( $end );
 
 		if ( $resync ) {
 			Jobs::queue_act( $this->r->id(), self::SYNC );

@@ -263,6 +263,8 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 * The database's Access tab shows its IPv6 address and the allow-list also when it has no IPv4 address.
 * Moving a database to another private network survives a job that stops halfway (the address the pool gave is taken, not refused), changes nothing while all driver activity is paused, puts the new address in the firewall's set before the restart, and can be finished from the Network tab when the database server did not follow. The move is only offered on databases marked at build as made from a template that knows it.
 * The sync after a restore also sends the private range again (a backup from before a move carries the old one).
+* A database with IPv6 only gets the cluster's IPv6 name servers; a cluster with IPv6 but no IPv6 name servers neither sells nor builds one (as for a VPS Basic).
+* The end of an IPv4 change on a database marks the guest sync in the same write, so a job that stops in between does not restart the database a second time.
 
 = 0.54.2 =
 * The firewall's allowed-address set of a VM's public card takes the IPv6 address the VM is configured with when it is not recorded yet. A database built with its card wrote the set before the address was recorded, so with ipfilter on it could not send anything over IPv6.

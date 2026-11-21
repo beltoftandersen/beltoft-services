@@ -71,6 +71,22 @@ final class DbProfile implements BuildProfile {
 		return PrivateNic::params( $net, $net['address'], (string) ( $cluster['private_bridge'] ?? '' ) );
 	}
 
+	/**
+	 * Why a database cannot be built with these settings, or ''. One with its public card and no IPv4 address reaches the network
+	 * over IPv6 only, so it needs the cluster's IPv6 name servers (as a VPS Basic does). Without IPv6 on the cluster it has no card
+	 * and stays on its private network.
+	 *
+	 * @param array<string, mixed> $cluster Cluster.
+	 * @param int                  $vmid    VMID.
+	 */
+	public function address_error( array $cluster, int $vmid ): string {
+		if ( $this->uses_public_ip() || '' === Ipv6::ipconfig( $cluster, $vmid ) ) {
+			return '';
+		}
+
+		return array() === (array) ( $cluster['nameservers6'] ?? array() ) ? 'configure: this database has no IPv4 address and the cluster has no IPv6 name servers' : '';
+	}
+
 	public function network_params( array $cluster, ?array $ip, string $net0 ): array {
 		$nic = $this->nic( $cluster );
 

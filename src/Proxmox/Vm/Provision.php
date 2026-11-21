@@ -1183,8 +1183,8 @@ final class Provision {
 			return StepResult::fail( 'configure: the VM record or the address is missing' );
 		}
 
-		// A server with no IPv4 address needs the cluster's IPv6 and IPv6 name servers: without them it would have no way to the network.
-		if ( $this->profile instanceof VpsProfile && '' !== $this->profile->address_error( $this->cluster, (int) $record['vmid'] ) ) {
+		// A server (or a database with its card) with no IPv4 address needs the cluster's IPv6 name servers: without them it could not resolve names.
+		if ( ( $this->profile instanceof VpsProfile || $this->profile instanceof \BeltoftServices\Proxmox\Db\DbProfile ) && '' !== $this->profile->address_error( $this->cluster, (int) $record['vmid'] ) ) {
 			return StepResult::fail( $this->profile->address_error( $this->cluster, (int) $record['vmid'] ) );
 		}
 
@@ -1324,13 +1324,12 @@ final class Provision {
 				'digest'    => (string) ( $v['config']['digest'] ?? '' ),
 			) + $this->profile->network_params( $this->cluster, $ip, $this->net0( (string) ( $v['config']['net0'] ?? '' ) ) );
 
-			// A VM with no IPv4 address cannot reach an IPv4 resolver: it gets the cluster's IPv6 ones. A server with IPv6 only always
-			// has them (address_error() refused the build otherwise); a database without them keeps the IPv4 list, as before.
+			// A VM with no IPv4 address cannot reach an IPv4 resolver: it gets the cluster's IPv6 ones (address_error() refused the
+			// build without them). A database on a cluster without IPv6 has no public card at all and keeps the IPv4 list.
 			$resolvers = (array) $this->cluster['nameservers'];
 
-			if ( null === $ip && ! $this->profile->uses_public_ip() ) {
-				$six       = (array) ( $this->cluster['nameservers6'] ?? array() );
-				$resolvers = array() !== $six || $this->profile instanceof VpsProfile ? $six : $resolvers;
+			if ( null === $ip && ! $this->profile->uses_public_ip() && '' !== Ipv6::ipconfig( $this->cluster, (int) $record['vmid'] ) ) {
+				$resolvers = (array) ( $this->cluster['nameservers6'] ?? array() );
 			}
 
 			if ( array() !== $resolvers ) {
