@@ -137,7 +137,7 @@ final class SubscriptionPages {
 
 		if ( ! $ended && ! $subscription->is_manual() && $subscription->has_status( 'active' ) && $subscription->get_time( 'next_payment' ) > 0 ) {
 			$method = trim( (string) $subscription->get_payment_method_to_display( 'customer' ) );
-			$sub    = '' !== $method ? sprintf( '%1$s, %2$s', $id, lcfirst( $method ) ) : $id;
+			$sub    = '' !== $method ? sprintf( '%1$s, %2$s', $id, $method ) : $id;
 		}
 
 		if ( $ended ) {
@@ -208,24 +208,6 @@ final class SubscriptionPages {
 	}
 
 	/**
-	 * The summary row at the top of a subscription page: status on the left, price and next payment on the right.
-	 *
-	 * @param \WC_Subscription $subscription Subscription.
-	 * @param bool             $payg         The pay-as-you-go account (its price is its usage, so none is shown).
-	 */
-	private static function summary_html( \WC_Subscription $subscription, bool $payg ): string {
-		$row = self::row( $subscription );
-
-		if ( $payg ) {
-			$row['price'] = '';
-		}
-
-		return '<div class="beltoft-services-servers beltoft-services-servers--area beltoft-services-servers--subs bs-sub-summary"><div class="beltoft-services-srv">'
-			. '<span class="beltoft-services-srv__id"><span class="beltoft-services-state is-' . esc_attr( $row['tone'] ) . '">' . esc_html( $row['status'] ) . '</span></span>'
-			. self::figures( $row ) . '</div></div>';
-	}
-
-	/**
 	 * The heading of a subscription page, its note, and for the pay-as-you-go account the usage.
 	 *
 	 * @param mixed $subscription_id Subscription id.
@@ -264,12 +246,11 @@ final class SubscriptionPages {
 		}
 
 		echo '</div>';
-		echo self::summary_html( $subscription, $payg ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped when built.
 
 		if ( $payg ) {
 			// Nothing to total: the amount is the usage.
 			remove_action( 'woocommerce_subscription_totals_table', array( 'WCS_Template_Loader', 'get_subscription_totals_template' ) );
-			echo UsageView::html(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in the template.
+			echo UsageView::card( false ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in the template.
 		}
 	}
 

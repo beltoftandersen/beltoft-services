@@ -31,9 +31,6 @@ final class UsageView {
 	 */
 	public static function register(): void {
 		add_shortcode( 'beltoft_services_usage', array( __CLASS__, 'shortcode' ) );
-		// Before Billing's tab bar filter (10), which puts the bar in front of this section.
-		add_filter( 'bricks/frontend/render_element', array( __CLASS__, 'in_bricks' ), 9, 2 );
-		add_action( 'woocommerce_account_content', array( __CLASS__, 'in_content' ), 6 );
 	}
 
 	/**
@@ -65,7 +62,7 @@ final class UsageView {
 	 * The Pay as you go card at the top of the subscription list: usage, credit, next invoice and a link to the account's
 	 * subscription. '' for a customer without a pay-as-you-go account.
 	 */
-	public static function card(): string {
+	public static function card( bool $link = true ): string {
 		if ( ! is_user_logged_in() ) {
 			return '';
 		}
@@ -77,7 +74,7 @@ final class UsageView {
 			return '';
 		}
 
-		return self::render( $estimate, $account->get_view_order_url(), wcs_get_subscription_status_name( $account->get_status() ), SubscriptionPages::tone( $account->get_status() ) );
+		return self::render( $estimate, $link ? $account->get_view_order_url() : '', wcs_get_subscription_status_name( $account->get_status() ), SubscriptionPages::tone( $account->get_status() ), true );
 	}
 
 	/**
@@ -87,8 +84,9 @@ final class UsageView {
 	 * @param string               $view_url Address of the account's subscription ('' for the plain block).
 	 * @param string               $state    Status word of the account (the card).
 	 * @param string               $tone     Colour group of the status (the card).
+	 * @param bool                 $card     The card, not the plain block.
 	 */
-	private static function render( array $estimate, string $view_url, string $state = '', string $tone = 'ok' ): string {
+	private static function render( array $estimate, string $view_url, string $state = '', string $tone = 'ok', bool $card = false ): string {
 		Panel::style();
 		self::$printed = true;
 
@@ -99,6 +97,7 @@ final class UsageView {
 				'view_url' => $view_url,
 				'state'    => $state,
 				'tone'     => $tone,
+				'card'     => $card,
 				'links'    => self::links( $estimate ),
 			), 'beltoft-services/account/', BELTOFT_SERVICES_PATH . 'templates/account/' );
 
@@ -131,38 +130,5 @@ final class UsageView {
 	 */
 	public static function shortcode(): string {
 		return self::html();
-	}
-
-	/**
-	 * Whether the page is the one the section prints on.
-	 */
-	private static function here(): bool {
-		return ! self::$printed && 'subscriptions' === ( function_exists( 'WC' ) && WC()->query ? (string) WC()->query->get_current_endpoint() : '' );
-	}
-
-	/**
-	 * With Bricks: above the Account element (the tab bar goes above that).
-	 *
-	 * @param mixed $html    The element's markup.
-	 * @param mixed $element The element.
-	 * @return mixed
-	 */
-	public static function in_bricks( $html, $element ) {
-		if ( ! is_string( $html ) || ! is_object( $element ) || 'woocommerce-account-page-v2' !== ( $element->name ?? '' ) || ! self::here() ) {
-			return $html;
-		}
-
-		return self::card() . $html;
-	}
-
-	/**
-	 * Without Bricks: at the top of the account content, after the tab bar.
-	 */
-	public static function in_content(): void {
-		if ( defined( 'BRICKS_VERSION' ) || ! self::here() ) {
-			return;
-		}
-
-		echo self::card(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in the template.
 	}
 }

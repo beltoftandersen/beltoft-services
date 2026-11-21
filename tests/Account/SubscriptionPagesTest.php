@@ -129,23 +129,18 @@ final class SubscriptionPagesTest extends UsageTestCase {
 		$this->assertSame( '', UsageView::card() );
 	}
 
-	public function test_the_usage_block_is_on_the_list_only(): void {
+	public function test_the_card_comes_first_in_the_list_and_not_before_notices(): void {
 		$user = $this->new_user();
 		wp_set_current_user( $user );
 		$this->usage_account( $user );
+		$this->sub( $user, 'Backup', 'active' );
 
-		$this->endpoint( 'subscriptions' );
 		ob_start();
-		UsageView::in_content();
-		$this->assertStringContainsString( 'Pay as you go', (string) ob_get_clean() );
+		wc_get_template( 'myaccount/my-subscriptions.php', array(), '', '/nonexistent/' );
+		$html = (string) ob_get_clean();
 
-		UsageView::reset();
-		global $wp;
-		unset( $wp->query_vars['subscriptions'] );
-		$this->endpoint( 'view-subscription' );
-		ob_start();
-		UsageView::in_content();
-		$this->assertSame( '', (string) ob_get_clean() );
+		$this->assertLessThan( strpos( $html, 'bs-subscriptions__title' ), strpos( $html, 'Pay as you go' ) );
+		$this->assertFalse( has_action( 'woocommerce_account_content', array( UsageView::class, 'in_content' ) ) );
 	}
 
 	public function test_a_normal_subscription_page_has_a_heading_and_no_usage(): void {
@@ -161,8 +156,7 @@ final class SubscriptionPagesTest extends UsageTestCase {
 		$this->assertStringContainsString( '<h2 class="bs-sub-head__title">Backup - 1 TB</h2>', $html );
 		$this->assertStringContainsString( 'Subscription #' . $sub->get_order_number(), $html );
 		$this->assertStringNotContainsString( 'beltoft-services-usage', $html );
-		$this->assertStringContainsString( 'bs-sub-summary', $html );
-		$this->assertStringContainsString( 'beltoft-services-srv__figure', $html );
+		$this->assertStringNotContainsString( 'bs-sub-summary', $html );
 		$this->assertStringNotContainsString( 'invoiced here once a month', $html );
 	}
 
@@ -184,8 +178,10 @@ final class SubscriptionPagesTest extends UsageTestCase {
 		$html = (string) ob_get_clean();
 
 		$this->assertStringContainsString( 'Servers and other services billed by the hour are invoiced here once a month. The amount depends on use.', $html );
-		$this->assertStringContainsString( 'beltoft-services-usage', $html );
-		$this->assertStringContainsString( 'bs-sub-summary', $html );
+		$this->assertStringContainsString( 'beltoft-services-usage--card', $html );
+		$this->assertStringNotContainsString( 'View account', $html );
+		$this->assertStringNotContainsString( 'bs-sub-summary', $html );
+		$this->assertStringNotContainsString( 'Usage this month', $html );
 		$this->assertFalse( has_action( 'woocommerce_subscription_totals_table', array( 'WCS_Template_Loader', 'get_subscription_totals_template' ) ) );
 	}
 

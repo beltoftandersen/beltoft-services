@@ -54,6 +54,17 @@ class LineNamesTest extends UsageTestCase {
 		$this->assertSame( $name . ', pay as you go', LineNames::label( $old ) );
 	}
 
+	public function test_a_value_that_starts_with_the_product_name_is_not_repeated(): void {
+		$v    = $this->monthly_vps();
+		$name = wc_get_product( $v['m-None']->get_parent_id() )->get_name();
+		$var  = new \WC_Product_Variation( $v['m-None']->get_id() );
+		$var->set_attributes( array( 'plan' => $name . ' Shared' ) );
+		$this->assertSame( $name . ' Shared', LineNames::label( $var ) );
+
+		$var->set_attributes( array( 'plan' => 'Starter' ) );
+		$this->assertSame( $name . ' Starter', LineNames::label( $var ) );
+	}
+
 	public function test_a_linked_name_keeps_its_link(): void {
 		$v    = $this->usage_product();
 		$item = $this->line( $v['u-None'] );

@@ -1504,4 +1504,8 @@ body.woocommerce-account .woocommerce-MyAccount-content .bs-sub-head__title { ma
 body.woocommerce-account .woocommerce-MyAccount-content .bs-sub-head__id { margin: var(--bs-space-1) 0 0; color: var(--bs-muted); font-size: var(--bs-fs-small); }
 body.woocommerce-account .woocommerce-MyAccount-content .bs-sub-head .bs-note { margin: var(--bs-space-3) 0 0; }
 
-.bs-sub-head + .bs-sub-summary { margin: 0 0 var(--bs-space-5); }
+/* The Pay as you go card on a phone: the title row, then the amount and its note under it, left aligned. */
+@media (max-width: 767px) {
+	.beltoft-services-usage--card .beltoft-services-servers--subs.beltoft-services-servers--area :is(a, div).beltoft-services-srv { grid-template-columns: minmax(0, 1fr); }
+	.beltoft-services-usage--card .beltoft-services-servers--subs .beltoft-services-srv__state { justify-items: start; text-align: left; }
+}

@@ -232,6 +232,11 @@ final class LineNames {
 			$name = substr( $name, 0, $dash );
 		}
 
+		// "CloudLinux" with the value "CloudLinux Shared": the value already starts with the product name.
+		if ( array() !== $plain && '' !== $name && 0 === stripos( $plain[0], $name ) ) {
+			$name = '';
+		}
+
 		$label = trim( $name . ' ' . implode( ' ', $plain ) );
 
 		/**

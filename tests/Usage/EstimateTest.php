@@ -139,20 +139,14 @@ class EstimateTest extends UsageTestCase {
 		$this->assertNotSame( '', Estimate::cost_line( $r->id() ) );
 	}
 
-	public function test_billing_prints_the_section_on_the_subscriptions_page_only_and_once(): void {
+	public function test_the_card_is_printed_once_by_the_list_template(): void {
 		$this->customer( 20 );
 
-		$this->on( 'orders' );
 		ob_start();
-		UsageView::in_content();
-		$this->assertSame( '', ob_get_clean() );
-
-		$this->on( 'subscriptions' );
-		ob_start();
-		UsageView::in_content();
-		UsageView::in_content();
+		wc_get_template( 'myaccount/my-subscriptions.php', array(), '', '/nonexistent/' );
 		$out = ob_get_clean();
 		$this->assertSame( 1, substr_count( $out, 'Pay as you go<' ) );
+		$this->assertStringNotContainsString( 'Usage this month', $out );
 	}
 
 	public function test_the_overview_billing_box_shows_usage_so_far(): void {

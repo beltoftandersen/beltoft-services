@@ -11,6 +11,9 @@ defined( 'ABSPATH' ) || exit;
 
 use BeltoftServices\Account\SubscriptionPages;
 
+// The pay-as-you-go card first: this template runs after WooCommerce's notices, so notices stay on top.
+echo \BeltoftServices\Account\UsageView::card(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in the template.
+
 $beltoft_services_groups = SubscriptionPages::groups( get_current_user_id() );
 
 if ( array() === $beltoft_services_groups['live'] && array() === $beltoft_services_groups['ended'] ) {

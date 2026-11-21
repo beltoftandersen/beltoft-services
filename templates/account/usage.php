@@ -9,6 +9,7 @@
  * @var array{total: float, currency: string, next: int, resources: array<int, array{label: string, total: float, lines: array<int, array{item: string, label: string, hours: int, charge: float, capped: bool}>}>} $estimate The estimate (see BeltoftServices\Usage\Estimate).
  * @var int $credit Account credit in cents (0: none).
  * @var string $view_url Address of the pay-as-you-go subscription: set on the card of the subscription list.
+ * @var bool $card The card (state, title, month amount, services), not the plain block.
  * @var string $state Status word of the account (card only).
  * @var string $tone Colour group of the status (card only).
  * @var array<int, string> $links Page address of each service (resource id => address).
@@ -18,10 +19,14 @@ defined( 'ABSPATH' ) || exit;
 
 use BeltoftServices\Usage\Estimate;
 ?>
-<?php if ( ! empty( $view_url ) ) : ?>
+<?php if ( ! empty( $card ) ) : ?>
 <section class="beltoft-services-usage beltoft-services-usage--card">
 	<div class="beltoft-services-servers beltoft-services-servers--area beltoft-services-servers--subs">
+		<?php if ( ! empty( $view_url ) ) : ?>
 		<a class="beltoft-services-srv" href="<?php echo esc_url( $view_url ); ?>" aria-label="<?php echo esc_attr( sprintf( '%1$s, %2$s', __( 'Pay as you go', 'beltoft-services' ), $state ) ); ?>">
+		<?php else : ?>
+		<div class="beltoft-services-srv">
+		<?php endif; ?>
 			<span class="beltoft-services-srv__id">
 				<span class="beltoft-services-state is-<?php echo esc_attr( $tone ); ?>"><?php echo esc_html( $state ); ?></span>
 				<span class="beltoft-services-srv__name"><?php esc_html_e( 'Pay as you go', 'beltoft-services' ); ?></span>
@@ -32,8 +37,12 @@ use BeltoftServices\Usage\Estimate;
 					<span class="beltoft-services-srv__sub"><?php echo esc_html( Estimate::incl() ? __( 'so far this month, incl. VAT (estimate)', 'beltoft-services' ) : __( 'so far this month, excl. VAT (estimate)', 'beltoft-services' ) ); ?></span>
 				<?php endif; ?>
 			</span>
-			<span class="beltoft-services-srv__go" aria-hidden="true">&rsaquo;</span>
-		</a>
+			<?php if ( ! empty( $view_url ) ) : ?>
+				<span class="beltoft-services-srv__go" aria-hidden="true">&rsaquo;</span>
+			</a>
+			<?php else : ?>
+			</div>
+			<?php endif; ?>
 		<div class="beltoft-services-usage__body">
 			<?php if ( empty( $estimate['resources'] ) ) : ?>
 				<p class="beltoft-services-usage__note"><?php esc_html_e( 'No usage so far this month.', 'beltoft-services' ); ?></p>
@@ -43,7 +52,7 @@ use BeltoftServices\Usage\Estimate;
 						<tr>
 							<th scope="col"><?php esc_html_e( 'Service', 'beltoft-services' ); ?></th>
 							<th scope="col"><?php esc_html_e( 'Hours', 'beltoft-services' ); ?></th>
-							<th scope="col"><?php echo esc_html( Estimate::incl() ? __( 'Amount incl. VAT', 'beltoft-services' ) : __( 'Amount', 'beltoft-services' ) ); ?></th>
+							<th scope="col"><?php esc_html_e( 'Amount', 'beltoft-services' ); ?></th>
 						</tr>
 					</thead>
 					<tbody>
@@ -83,7 +92,9 @@ use BeltoftServices\Usage\Estimate;
 			<?php if ( array() !== $beltoft_services_usage_parts ) : ?>
 				<p class="beltoft-services-usage__note"><?php echo esc_html( implode( ' ', $beltoft_services_usage_parts ) ); ?></p>
 			<?php endif; ?>
-			<p class="beltoft-services-usage__note"><a href="<?php echo esc_url( $view_url ); ?>"><?php esc_html_e( 'View account', 'beltoft-services' ); ?> &rsaquo;</a></p>
+			<?php if ( ! empty( $view_url ) ) : ?>
+				<p class="beltoft-services-usage__note"><a href="<?php echo esc_url( $view_url ); ?>"><?php esc_html_e( 'View account', 'beltoft-services' ); ?> &rsaquo;</a></p>
+			<?php endif; ?>
 		</div>
 	</div>
 </section>
