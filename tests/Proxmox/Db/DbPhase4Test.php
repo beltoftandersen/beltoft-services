@@ -288,7 +288,7 @@ class DbPhase4Test extends TestCase {
 		unset( $r );
 		$job = json_decode( (string) $this->fake->guest_file( 5000, DbGuest::JOB ), true );
 
-		if ( ! is_array( $job ) || empty( $job['request'] ) || ! in_array( $job['op'] ?? '', array( 'allow', 'listen' ), true ) ) {
+		if ( ! is_array( $job ) || empty( $job['request'] ) || ! in_array( $job['op'] ?? '', array( 'allow', 'listen', 'private' ), true ) ) {
 			return;
 		}
 
@@ -1502,5 +1502,53 @@ class DbPhase4Test extends TestCase {
 		$this->assertStringNotContainsString( 'data-net-attach', $html );
 		$this->assertStringNotContainsString( 'data-net-detach', $html );
 		$this->assertStringNotContainsString( 'qemu-guest-agent', $html );
+	}
+
+	public function test_a_database_moves_to_another_private_network_with_one_restart(): void {
+		$this->assertTrue( \BeltoftServices\Proxmox\Network\PrivateNets::add( 1001, '10.64.0.16/28' ) );
+		$r     = $this->ready_db();
+		$user  = (int) Resource::find( $r->id() )->license()['user_id'];
+		$two   = \BeltoftServices\Proxmox\Network\PrivateNets::create_for_user( $user, 'Two' );
+		$this->assertNotNull( $two );
+		$old   = (string) Resource::find( $r->id() )->get( 'db_address' );
+		$this->assertStringStartsWith( '10.64.0.', $old );
+
+		$this->assertSame( 'The database is on that network already.', \BeltoftServices\Proxmox\Db\DbPrivateMove::check( Resource::find( $r->id() ), array( 'net' => (string) \BeltoftServices\Proxmox\Network\PrivateNets::for_resource( $r->id() )['net_id'] ) ) );
+		$this->assertNull( \BeltoftServices\Proxmox\Db\DbPrivateMove::check( Resource::find( $r->id() ), array( 'net' => (string) $two['id'] ) ) );
+		$this->assertTrue( \BeltoftServices\Proxmox\Network\PrivateAttach::view( Resource::find( $r->id() ) )['can_move'] );
+
+		$reboots = count( $this->calls( 'POST', '/status/reboot' ) );
+		$driver  = Registry::get( 'proxmox-db' );
+		$res     = null;
+
+		for ( $i = 0; $i < 40; $i++ ) {
+			$this->answer_guest( $r );
+			$res = $driver->act( Resource::find( $r->id() ), \BeltoftServices\Proxmox\Db\DbPrivateMove::ACTION, array( 'net' => (string) $two['id'] ) );
+
+			if ( $res->is_done() || $res->is_failed() || $res->is_refusal() ) {
+				break;
+			}
+
+			$this->fake->elapse( 30 );
+		}
+
+		$this->assertTrue( $res->is_done(), $res->error() );
+		$fresh   = Resource::find( $r->id() );
+		$address = (string) $fresh->get( 'db_address' );
+		$this->assertStringStartsWith( '10.64.0.', $address );
+		$this->assertTrue( \BeltoftServices\Proxmox\Network\PrivateNets::contains_host( '10.64.0.16/28', $address ), 'The new address is in the new network.' );
+		$this->assertSame( '10.64.0.16/28', (string) $fresh->get( 'db_cidr' ) );
+		$this->assertSame( (int) $two['id'], (int) \BeltoftServices\Proxmox\Network\PrivateNets::for_resource( $r->id() )['net_id'] );
+		$this->assertNull( $fresh->get( \BeltoftServices\Proxmox\Db\DbPrivateMove::OP ) );
+
+		$config = (array) $this->fake->vm( 5000 )['config'];
+		$this->assertStringContainsString( 'tag=1001', (string) $config['net1'] );
+		$this->assertSame( 'ip=' . $address . '/28', $config['ipconfig1'] );
+		$this->assertCount( $reboots + 1, $this->calls( 'POST', '/status/reboot' ), 'One restart.' );
+
+		$jobs = array_values( array_filter( $this->guest_jobs(), static fn( $j ) => 'private' === $j['job']['op'] ) );
+		$this->assertCount( 1, $jobs );
+		$this->assertSame( $address, $jobs[0]['job']['address'] );
+		$this->assertSame( '10.64.0.16/28', $jobs[0]['job']['private_cidr'] );
 	}
 }

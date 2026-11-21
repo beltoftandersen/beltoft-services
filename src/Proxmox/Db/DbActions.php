@@ -84,6 +84,11 @@ final class DbActions {
 			$out[ self::BACKUP_DELETE ] = __( 'Delete a backup', 'beltoft-services' );
 		}
 
+		// Moving to another private network (the Network tab, the same one as a server's).
+		if ( 'ready' === $r->get( 'db_state' ) && null !== \BeltoftServices\Proxmox\Network\PrivateNets::for_resource( $r->id() ) ) {
+			$out[ DbPrivateMove::ACTION ] = __( 'Move to another private network', 'beltoft-services' );
+		}
+
 		if ( DbPolicy::offered( $r ) ) {
 			$out[ DbPolicy::ACTION ] = __( 'When memory is full', 'beltoft-services' );
 		}
@@ -107,7 +112,7 @@ final class DbActions {
 	public static function buttons( $actions, $r ) {
 		if ( is_array( $actions ) && self::is_db( $r ) ) {
 			// The power buttons are drawn by the database page itself (a question first, its own note).
-			unset( $actions[ self::RESET ], $actions[ self::RESTORE ], $actions[ self::BACKUP_DELETE ], $actions[ DbPolicy::ACTION ], $actions[ Ipv6Switch::ADD ], $actions[ Ipv6Switch::REMOVE ], $actions['start'], $actions['shutdown'] );
+			unset( $actions[ self::RESET ], $actions[ self::RESTORE ], $actions[ self::BACKUP_DELETE ], $actions[ DbPolicy::ACTION ], $actions[ Ipv6Switch::ADD ], $actions[ Ipv6Switch::REMOVE ], $actions[ DbPrivateMove::ACTION ], $actions['start'], $actions['shutdown'] );
 		}
 
 		return $actions;
@@ -137,6 +142,10 @@ final class DbActions {
 
 		if ( self::is_db( $r ) && Ipv6Switch::is_action( $action ) ) {
 			return self::ipv6_refusal( $refusal, $r, (string) $action );
+		}
+
+		if ( self::is_db( $r ) && DbPrivateMove::ACTION === $action ) {
+			return null !== $refusal ? $refusal : DbPrivateMove::check( $r, is_array( $args ) ? $args : array() );
 		}
 
 		if ( self::is_db( $r ) && DbPolicy::ACTION === $action ) {

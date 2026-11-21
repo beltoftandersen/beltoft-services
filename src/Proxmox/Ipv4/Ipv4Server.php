@@ -42,6 +42,7 @@ defined( 'ABSPATH' ) || exit;
 final class Ipv4Server {
 
 	use Steps;
+	use \BeltoftServices\Proxmox\Pve\RebootsOnce;
 	use Prepares;
 	use ActionsRun;
 
@@ -313,48 +314,7 @@ final class Ipv4Server {
 	private function phase_restart( array $record, bool $add ) {
 		unset( $add );
 
-		$op = $this->op();
-
-		if ( ! empty( $op['restarted'] ) || ! empty( $op['skipped'] ) ) {
-			return null;
-		}
-
-		// The reboot task of the run before this one has ended.
-		if ( is_array( $this->finished ) && 'reboot' === $this->finished['phase'] && ! empty( $op['reboot_sent'] ) ) {
-			$op['restarted'] = true;
-
-			return $this->r->set( array( self::OP => $op ) ) ? null : StepResult::retry( 0, 'ipv4: progress could not be stored' );
-		}
-
-		$v = $this->verified( $record, 'ipv4' );
-
-		if ( $v instanceof StepResult ) {
-			return $v;
-		}
-
-		if ( 'running' !== $v['status'] ) {
-			$op['skipped'] = true;
-
-			return $this->r->set( array( self::OP => $op ) ) ? null : StepResult::retry( 0, 'ipv4: progress could not be stored' );
-		}
-
-		$op['reboot_sent'] = true;
-
-		if ( ! $this->r->set( array( self::OP => $op, 'stopped_by_customer' => time() ) ) ) {
-			return StepResult::retry( 0, 'ipv4: progress could not be stored' );
-		}
-
-		$done = $this->run_task( 'ipv4', 'POST', Actions::base( $record, $v ) . '/status/reboot', array( 'timeout' => max( 10, (int) Settings::get( 'shutdown_timeout' ) ) ), 'reboot' );
-
-		if ( $done instanceof StepResult ) {
-			return $done;
-		}
-
-		$op              = $this->op();
-		$op['restarted'] = true;
-
-		// A reboot that did not finish in time is left to finish by itself: the config is right, the server takes it when it restarts.
-		return $this->r->set( array( self::OP => $op ) ) ? null : StepResult::retry( 0, 'ipv4: progress could not be stored' );
+		return $this->reboot_once( $record, 'ipv4', fn(): array => $this->op(), fn( array $op ): bool => $this->r->set( array( self::OP => $op ) ) );
 	}
 
 	/**

@@ -28,6 +28,8 @@ final class DbCard {
 		$parent = \BeltoftServices\Account\Panel::HANDLE;
 
 		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/db.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/db.css' ) );
+		// The Network tab is the server's: its script and words come from NetworkTab.
+		\BeltoftServices\Proxmox\Network\NetworkTab::enqueue( $parent );
 		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/db.js', BELTOFT_SERVICES_FILE ), array( $parent, \BeltoftServices\Status::HANDLE, \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/db.js' ), true );
 		wp_localize_script( self::HANDLE, 'beltoftServicesDb', array(
 			'strings' => array(

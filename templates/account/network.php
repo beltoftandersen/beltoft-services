@@ -6,7 +6,8 @@
  * address, cidr, network (name of the network this server is on), networks (id, label and full of each
  * network of the customer), can_new, next_name, name_max, others (address and name of the customer's other servers on the
  * network), notice, mac, can_attach, can_detach, is_db (a database's page: it is always on this one network, no attach or
- * detach). assets/network-tab.js posts the actions and waits for the job.
+ * detach), can_move (a database: the Move button posts db_private_move with the chosen network). assets/network-tab.js posts the
+ * actions and waits for the job.
  *
  * @package BeltoftServices
  */
@@ -56,7 +57,7 @@ $beltoft_services_net_words = array(
 		</ul>
 	<?php endif; ?>
 
-	<?php if ( $view['can_attach'] && ( array() !== $view['networks'] || $view['can_new'] ) ) : ?>
+	<?php if ( ( $view['can_attach'] || ! empty( $view['can_move'] ) ) && ( array() !== $view['networks'] || $view['can_new'] ) ) : ?>
 		<?php $beltoft_services_net_has = array() !== $view['networks']; ?>
 		<div class="beltoft-services-net__choose" data-net-choose>
 			<?php if ( $beltoft_services_net_has ) : ?>
@@ -64,7 +65,7 @@ $beltoft_services_net_words = array(
 					<label for="beltoft-net-select"><?php esc_html_e( 'Network', 'beltoft-services' ); ?></label><br>
 					<select id="beltoft-net-select" data-net-select>
 						<?php foreach ( (array) $view['networks'] as $beltoft_services_net_opt ) : ?>
-							<option value="<?php echo (int) $beltoft_services_net_opt['id']; ?>"<?php disabled( ! empty( $beltoft_services_net_opt['full'] ) ); ?>><?php echo esc_html( (string) $beltoft_services_net_opt['label'] ); ?></option>
+							<option value="<?php echo (int) $beltoft_services_net_opt['id']; ?>"<?php disabled( ! empty( $beltoft_services_net_opt['full'] ) || ! empty( $beltoft_services_net_opt['current'] ) ); ?>><?php echo esc_html( (string) $beltoft_services_net_opt['label'] ); ?></option>
 						<?php endforeach; ?>
 						<?php if ( $view['can_new'] ) : ?>
 							<option value="new"><?php esc_html_e( 'New network', 'beltoft-services' ); ?></option>
@@ -92,6 +93,9 @@ $beltoft_services_net_words = array(
 		<?php endif; ?>
 		<?php if ( $view['can_detach'] ) : ?>
 			<button type="button" class="button woocommerce-button" data-net-detach><?php esc_html_e( 'Detach', 'beltoft-services' ); ?></button>
+		<?php endif; ?>
+		<?php if ( ! empty( $view['can_move'] ) ) : ?>
+			<button type="button" class="button woocommerce-button" data-net-move><?php esc_html_e( 'Move to this network', 'beltoft-services' ); ?></button>
 		<?php endif; ?>
 	</p>
 </div>

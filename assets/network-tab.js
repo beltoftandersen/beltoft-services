@@ -113,6 +113,12 @@
 					run( 'private_attach', target, chosen() );
 				}
 			} );
+		} else if ( target.hasAttribute( 'data-net-move' ) ) {
+			bs.confirm( { title: S.moveTitle, text: S.moveBody, confirm: S.move } ).then( function ( yes ) {
+				if ( yes ) {
+					run( 'db_private_move', target, chosen() );
+				}
+			} );
 		} else if ( target.hasAttribute( 'data-net-detach' ) ) {
 			bs.confirm( { title: S.detachTitle, text: S.detachBody, confirm: S.detach } ).then( function ( yes ) {
 				if ( yes ) {

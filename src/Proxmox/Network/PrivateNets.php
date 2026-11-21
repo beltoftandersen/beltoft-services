@@ -463,6 +463,58 @@ final class PrivateNets {
 		return (bool) $done;
 	}
 
+	/**
+	 * Moves a VM's private address to another network of the same customer (one of theirs by id, or a new one by name), under
+	 * the pool lock: the old address is let go and a new one taken in the target. When the target has no free address the old
+	 * one is put back and nothing changes. The old network stays the customer's (others may be on it).
+	 *
+	 * @param int    $user_id     Customer.
+	 * @param int    $resource_id Resource.
+	 * @param int    $net_id      Target network of the customer, or 0 with $new_name.
+	 * @param string $new_name    Name of a network to create, or ''.
+	 * @return ?array{network: array<string, mixed>, address: string, old_net_id: int, old_address: string}
+	 */
+	public static function move( int $user_id, int $resource_id, int $net_id, string $new_name = '' ): ?array {
+		if ( ! self::valid_resource_owner( $user_id, $resource_id ) || ! self::db_ready() ) {
+			return null;
+		}
+		list( $locked, $result ) = Locks::with( Locks::name( 'privnet', 0 ), Locks::allocation_wait(), static function () use ( $user_id, $resource_id, $net_id, $new_name ) {
+			global $wpdb;
+			$old = self::for_resource( $resource_id );
+			if ( null === $old || $old['user_id'] !== $user_id ) {
+				return null;
+			}
+			if ( $net_id > 0 ) {
+				$net = self::net_by_id( $net_id );
+				$net = null !== $net && $net['user_id'] === $user_id ? $net : null;
+			} else {
+				$net = '' !== $new_name ? self::create_locked( $user_id, $new_name ) : null;
+			}
+			if ( null === $net || $net['id'] === $old['net_id'] || ! in_array( $net['state'], array( 'held', 'held_return' ), true ) ) {
+				return null;
+			}
+			$table = Schema::tables()['private_ips'];
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- our own allocation table, under the pool lock.
+			if ( 1 !== $wpdb->delete( $table, array( 'resource_id' => $resource_id, 'net_id' => $old['net_id'] ) ) ) {
+				return null;
+			}
+			IpHistory::end( 'private', $resource_id );
+			$address = self::address_locked( $net, $resource_id );
+			if ( null === $address ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- the old address back, nothing changed.
+				$wpdb->insert( $table, array( 'net_id' => $old['net_id'], 'resource_id' => $resource_id, 'address' => $old['address'], 'updated_at' => gmdate( 'Y-m-d H:i:s' ) ) );
+				IpHistory::start( 'private', $old['address'], $resource_id );
+				return null;
+			}
+			return array( 'network' => $net, 'address' => $address, 'old_net_id' => (int) $old['net_id'], 'old_address' => (string) $old['address'] );
+		} );
+		if ( ! $locked ) {
+			throw new \RuntimeException( 'The private network pool is busy.' );
+		}
+		self::check_pool();
+		return $result;
+	}
+
 	private static function address_locked( array $net, int $resource_id ): ?string {
 		global $wpdb;
 		$table = Schema::tables()['private_ips'];

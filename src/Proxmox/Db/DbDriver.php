@@ -118,6 +118,11 @@ class DbDriver extends ProxmoxDriver {
 			return $this->ipv6( $r, $action );
 		}
 
+		// The customer moves the database to another of their private networks.
+		if ( DbPrivateMove::ACTION === $action ) {
+			return ( new DbPrivateMove( Resource::find( $r->id() ) ?? $r ) )->run( $args );
+		}
+
 		// A database with its public card takes and loses an IPv4 address the way a server does (Ipv4Server: ipconfig0, meta,
 		// firewall, one restart); then the guest gets the new listen addresses and allow-list (DbIp sync), as after an IPv6 switch.
 		if ( \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_ADD === $action || \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_REMOVE === $action ) {

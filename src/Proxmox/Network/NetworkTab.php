@@ -68,6 +68,9 @@ final class NetworkTab {
 			'detachTitle' => __( 'Detach the private network?', 'beltoft-services' ),
 			'detachBody'  => __( 'Your server restarts once and loses its private address. Anything that uses that address stops working.', 'beltoft-services' ),
 			'detach'      => __( 'Detach', 'beltoft-services' ),
+			'moveTitle'   => __( 'Move the database to this network?', 'beltoft-services' ),
+			'moveBody'    => __( 'The database restarts once and gets a new private address on the chosen network. Change the address in your applications afterwards.', 'beltoft-services' ),
+			'move'        => __( 'Move', 'beltoft-services' ),
 			'working'     => __( 'Working on it. This takes a few minutes.', 'beltoft-services' ),
 			'done'        => __( 'Done.', 'beltoft-services' ),
 			'failed'      => __( 'This did not finish. We have been told and will look into it.', 'beltoft-services' ),
@@ -81,6 +84,17 @@ final class NetworkTab {
 	 * @param mixed $parent   Handle of the generic account script.
 	 * @param mixed $endpoint The endpoint being shown.
 	 */
+	/**
+	 * The tab's script and style on a page that prints the tab itself (a database's page): the same files and words.
+	 *
+	 * @param string $parent Handle of the account script.
+	 */
+	public static function enqueue( string $parent ): void {
+		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/network-tab.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/network-tab.css' ) );
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/network-tab.js', BELTOFT_SERVICES_FILE ), array( $parent, 'beltoft-services-status', \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/network-tab.js' ), true );
+		wp_localize_script( self::HANDLE, 'beltoftServicesNetwork', array( 'strings' => self::strings() ) );
+	}
+
 	public static function assets( $parent, $endpoint = null ): void {
 		if ( ! is_string( $parent ) || ( is_string( $endpoint ) && ServerLinks::slug() !== $endpoint ) ) {
 			return;
@@ -94,9 +108,7 @@ final class NetworkTab {
 			return;
 		}
 
-		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/network-tab.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/network-tab.css' ) );
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/network-tab.js', BELTOFT_SERVICES_FILE ), array( $parent, 'beltoft-services-status', \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/network-tab.js' ), true );
-		wp_localize_script( self::HANDLE, 'beltoftServicesNetwork', array( 'strings' => self::strings() ) );
+		self::enqueue( $parent );
 	}
 
 	/**
