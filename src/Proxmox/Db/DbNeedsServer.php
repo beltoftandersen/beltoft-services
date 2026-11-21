@@ -104,8 +104,8 @@ final class DbNeedsServer {
 
 		$plan = Product::plan( $product_id, $variation_id > 0 ? $variation_id : null );
 
-		// A database with a public IP address is reached from anywhere: it needs no server with us, so no notice.
-		if ( DbIp::plan_wants( $plan ) || \BeltoftServices\Proxmox\Ipv4\Ipv4Cart::in_cart( 'cart_server' ) > 0 ) {
+		// A database with a public IP address (the IPv4 add-on in the cart) is reached from anywhere: it needs no server with us, so no notice.
+		if ( \BeltoftServices\Proxmox\Ipv4\Ipv4Cart::in_cart( 'cart_server' ) > 0 ) {
 			return null;
 		}
 

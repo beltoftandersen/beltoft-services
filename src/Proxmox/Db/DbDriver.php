@@ -76,7 +76,6 @@ class DbDriver extends ProxmoxDriver {
 			'memory_mb'   => $fields['memory_mb'],
 			'disk_gb'     => array( 'number', __( 'Data disk (GB)', 'beltoft-services' ), __( 'The disk the database lives on. It is part of the backup. Extra storage is added to it.', 'beltoft-services' ), 20, true ),
 			'backup_days' => $fields['backup_days'],
-			'public_ip'   => array( 'number', __( 'Public IP', 'beltoft-services' ), __( 'Only for a database built before the IPv4 address add-on: 1 means it has a public IPv4 address. New databases get theirs from the add-on, not from this field. Access is closed until the customer adds addresses to the allow-list.', 'beltoft-services' ), 0, true ),
 			DbDisk::FIELD => array( 'number', __( 'Extra storage (GB)', 'beltoft-services' ), __( 'Storage added to the data disk (an add-on: variations of one plan that differ only in this field and in the attribute "Extra storage", slug extra-storage). The data disk is the data disk above plus this. It can only grow.', 'beltoft-services' ), 0, true ),
 		);
 
@@ -315,12 +314,12 @@ class DbDriver extends ProxmoxDriver {
 			'single_line' => true,
 			'data_disk'   => true,
 			'parts'       => static function ( \WC_Product_Variation $usage, callable $price ): array {
-				$bare    = DbDisk::ladder( $usage )[0] ?? $usage;
-				$no_ip   = DbIp::plan_wants( Product::plan( $usage->get_parent_id(), $bare->get_id() ) ) ? \BeltoftServices\Proxmox\Backup\Backups::sibling_by( $bare, 'public_ip', false ) : null;
+				$bare = DbDisk::ladder( $usage )[0] ?? $usage;
 
+				// 'ip' stays in the parts for the readers of the breakdown: a public IPv4 address is its own add-on line now.
 				return array(
-					'base'    => $no_ip ? $price( $no_ip ) : $price( $bare ),
-					'ip'      => $no_ip ? $price( $bare ) - $price( $no_ip ) : 0.0,
+					'base'    => $price( $bare ),
+					'ip'      => 0.0,
 					'storage' => $price( $usage ) - $price( $bare ),
 					'backups' => 0.0,
 					'gb'      => DbDisk::extra( Product::plan( $usage->get_parent_id(), $usage->get_id() ) ),

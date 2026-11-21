@@ -152,16 +152,6 @@ class Ipv4ServerTest extends Ipv4TestCase {
 		$this->assertNull( IpPool::find( $addr )['resource_id'] );
 	}
 
-	public function test_a_database_with_the_old_public_ip_plan_has_no_room_for_an_addon_address(): void {
-		foreach ( array( 1 => false, 0 => true ) as $public => $room ) {
-			$product = $this->service_product( 'proxmox-db', array( 'cluster' => 'lab', 'template' => 9100, 'major' => '18', 'cores' => 1, 'memory_mb' => 2048, 'disk_gb' => 20, 'public_ip' => $public ), array( 'slug' => 'db-' . wp_generate_password( 5, false ) ) );
-			$db      = Resource::create( $this->service_license( $product, array( 'fire' => false ) ), Registry::get( 'proxmox-db' ), Product::plan( $product->get_id() ), array() );
-			$this->assertInstanceOf( Resource::class, $db );
-			$this->assertSame( $room, Ipv4Meta::room( $db ) );
-			$this->assertSame( $room, \BeltoftServices\Proxmox\Ipv4\Ipv4Cart::room( $db ) );
-		}
-	}
-
 	public function test_a_sync_does_not_replace_a_main_address_change_in_progress(): void {
 		$basic = $this->server( 0 );
 		$addon = $this->addon( $basic );

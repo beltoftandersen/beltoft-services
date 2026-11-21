@@ -21,11 +21,11 @@ require_once __DIR__ . '/UsageTestCase.php';
 class BreakdownTest extends UsageTestCase {
 
 	/**
-	 * A database plan "Standard": 45 a month, +5 with the public IP, +4 for 50 GB of extra storage, each as Monthly
-	 * and as Pay as you go.
+	 * A database plan "Standard": 45 a month, +4 for 50 GB of extra storage, each as Monthly and as Pay as you go. (A public
+	 * IPv4 address is its own add-on line, not a variation of the plan.)
 	 *
 	 * @param string $premium Premium percent.
-	 * @return array<string, \WC_Product_Variation> Keys such as m-0-0, u-50-1 (billing, extra GB, ip).
+	 * @return array<string, \WC_Product_Variation> Keys such as m-0-0, u-50-0 (billing, extra GB, 0).
 	 */
 	private function db( string $premium = '0' ): array {
 		$product = new \WC_Product_Variable();
@@ -34,7 +34,7 @@ class BreakdownTest extends UsageTestCase {
 
 		$attrs = array();
 
-		foreach ( array( 'Plan' => array( 'Standard' ), 'Billing' => array( 'Monthly', 'Pay as you go' ), 'Extra storage' => array( 'None', '50 GB' ), 'Public IP' => array( 'No', 'Yes' ) ) as $name => $options ) {
+		foreach ( array( 'Plan' => array( 'Standard' ), 'Billing' => array( 'Monthly', 'Pay as you go' ), 'Extra storage' => array( 'None', '50 GB' ) ) as $name => $options ) {
 			$a = new \WC_Product_Attribute();
 			$a->set_name( $name );
 			$a->set_options( $options );
@@ -60,13 +60,12 @@ class BreakdownTest extends UsageTestCase {
 
 		foreach ( array( 'm' => 'Monthly', 'u' => 'Pay as you go' ) as $short => $billing ) {
 			foreach ( array( 0 => array( 'None', 45 ), 50 => array( '50 GB', 49 ) ) as $extra => $set ) {
-				foreach ( array( 0, 1 ) as $with ) {
+				foreach ( array( 0 ) as $with ) {
 					$v = new \WC_Product_Variation();
 					$v->set_parent_id( $product->get_id() );
-					$v->set_attributes( array( 'plan' => 'Standard', 'billing' => $billing, 'extra-storage' => $set[0], 'public-ip' => $with ? 'Yes' : 'No' ) );
+					$v->set_attributes( array( 'plan' => 'Standard', 'billing' => $billing, 'extra-storage' => $set[0] ) );
 					$v->set_regular_price( 'm' === $short ? (string) ( $set[1] + ( $with ? 5 : 0 ) ) : '0' );
 					$v->set_status( 'publish' );
-					$v->update_meta_data( Product::META_PLAN . 'public_ip', (string) $with );
 					$v->update_meta_data( Product::META_PLAN . 'extra_disk_gb', (string) $extra );
 
 					if ( 'u' === $short ) {
@@ -103,20 +102,19 @@ class BreakdownTest extends UsageTestCase {
 		$this->assertSame( array( array( 'Standard plan', '€45 / month' ) ), Breakdown::rows( $parts, 'Standard' ) );
 	}
 
-	public function test_the_owners_case_is_54_a_month_and_0074_an_hour(): void {
+	public function test_a_plan_with_extra_storage_is_the_plan_plus_the_storage(): void {
 		$v     = $this->db();
-		$parts = Breakdown::parts( $v['u-50-1'] );
+		$parts = Breakdown::parts( $v['u-50-0'] );
 
 		$this->assertSame( 45.0, $parts['plan'] );
-		$this->assertSame( 5.0, $parts['ip'] );
+		$this->assertSame( 0.0, $parts['ip'] );
 		$this->assertSame( 4.0, $parts['storage'] );
 		$this->assertSame( 50, $parts['storage_gb'] );
-		$this->assertSame( 54.0, $parts['max'] );
-		$this->assertSame( '€0.0740', Rates::money( $parts['hourly'], 4 ) );
+		$this->assertSame( 49.0, $parts['max'] );
+		$this->assertSame( '€0.0671', Rates::money( $parts['hourly'], 4 ) );
 		$this->assertSame(
 			array(
 				array( 'Standard plan', '€45 / month' ),
-				array( 'Public IPv4 address', '+€5 / month' ),
 				array( 'Extra storage, 50 GB', '+€4 / month' ),
 			),
 			Breakdown::rows( $parts, 'Standard' )
@@ -124,12 +122,10 @@ class BreakdownTest extends UsageTestCase {
 		$this->assertSame( $parts['plan'] + $parts['ip'] + $parts['storage'], $parts['max'] );
 	}
 
-	public function test_each_database_add_on_alone(): void {
+	public function test_extra_storage_alone(): void {
 		$v  = $this->db();
-		$ip = Breakdown::parts( $v['u-0-1'] );
 		$gb = Breakdown::parts( $v['u-50-0'] );
 
-		$this->assertSame( array( 45.0, 5.0, 0.0, 50.0 ), array( $ip['plan'], $ip['ip'], $ip['storage'], $ip['max'] ) );
 		$this->assertSame( array( 45.0, 0.0, 4.0, 49.0 ), array( $gb['plan'], $gb['ip'], $gb['storage'], $gb['max'] ) );
 	}
 
@@ -143,12 +139,12 @@ class BreakdownTest extends UsageTestCase {
 
 	public function test_the_premium_is_part_of_every_amount(): void {
 		$v     = $this->db( '10' );
-		$parts = Breakdown::parts( $v['u-50-1'] );
+		$parts = Breakdown::parts( $v['u-50-0'] );
 
 		$this->assertSame( 49.5, $parts['plan'] );
-		$this->assertSame( 5.5, $parts['ip'] );
+		$this->assertSame( 0.0, $parts['ip'] );
 		$this->assertSame( 4.4, $parts['storage'] );
-		$this->assertSame( 59.4, $parts['max'] );
+		$this->assertSame( 53.9, $parts['max'] );
 	}
 
 	public function test_a_server_with_daily_backups(): void {
@@ -164,20 +160,19 @@ class BreakdownTest extends UsageTestCase {
 
 	public function test_the_name_cell_is_the_product_name_the_plan_and_the_amounts(): void {
 		$v    = $this->db();
-		$item = array( 'data' => $v['u-50-1'], 'quantity' => 1 );
-		$html = (string) apply_filters( 'woocommerce_cart_item_name', 'Managed SQL Server Express, Standard, pay as you go, public IPv4, 50 GB extra storage', $item, 'k' );
+		$item = array( 'data' => $v['u-50-0'], 'quantity' => 1 );
+		$html = (string) apply_filters( 'woocommerce_cart_item_name', 'Managed SQL Server Express, Standard, pay as you go, 50 GB extra storage', $item, 'k' );
 		$text = wp_strip_all_tags( str_replace( '</span>', ' | </span>', $html ) );
 
 		$this->assertStringContainsString( 'Managed SQL Server Express', $html );
 		$this->assertStringContainsString( 'Standard, 2 vCPU, 4 GB memory, 40 GB data disk', $html );
 		$this->assertStringContainsString( 'Standard plan', $html );
 		$this->assertStringContainsString( '€45 / month', $html );
-		$this->assertStringContainsString( '+€5 / month', $html );
 		$this->assertStringContainsString( 'Extra storage, 50 GB', $html );
 		$this->assertStringContainsString( '+€4 / month', $html );
 		$this->assertStringContainsString( 'Max per month', $html );
-		$this->assertStringContainsString( '€54', $html );
-		$this->assertStringContainsString( 'That is €0.0740 per hour, billed for the hours used.', $html );
+		$this->assertStringContainsString( '€49', $html );
+		$this->assertStringContainsString( 'That is €0.0671 per hour, billed for the hours used.', $html );
 		$this->assertStringNotContainsString( 'pay as you go,', $html, 'The long variation suffix is gone.' );
 		$this->assertStringNotContainsString( '/ hour', $text );
 		$this->assertStringNotContainsString( '0.0068', $html );
@@ -196,7 +191,7 @@ class BreakdownTest extends UsageTestCase {
 
 	public function test_the_price_cells_are_empty_and_the_row_has_its_class(): void {
 		$v    = $this->db();
-		$item = array( 'data' => $v['u-50-1'], 'quantity' => 1 );
+		$item = array( 'data' => $v['u-50-0'], 'quantity' => 1 );
 
 		$this->assertSame( '', apply_filters( 'woocommerce_cart_item_subtotal', '€0.00', $item, 'k' ) );
 		$this->assertSame( '', apply_filters( 'woocommerce_cart_item_price', '€0.00', $item, 'k' ) );
@@ -208,7 +203,7 @@ class BreakdownTest extends UsageTestCase {
 
 	public function test_the_hourly_add_on_rows_are_dropped(): void {
 		$v    = $this->db();
-		$item = array( 'data' => $v['u-50-1'], 'quantity' => 1 );
+		$item = array( 'data' => $v['u-50-0'], 'quantity' => 1 );
 		$rows = array(
 			array( 'key' => 'Operating system', 'value' => 'Ubuntu 24.04 LTS' ),
 			array( 'key' => 'Public IPv4 address', 'value' => '+€0.0068 / hour' ),
@@ -224,7 +219,7 @@ class BreakdownTest extends UsageTestCase {
 
 	public function test_monthly_lines_and_other_lines_are_untouched(): void {
 		$v    = $this->db();
-		$item = array( 'data' => $v['m-50-1'], 'quantity' => 1 );
+		$item = array( 'data' => $v['m-50-0'], 'quantity' => 1 );
 
 		$this->assertStringNotContainsString( 'beltoft-services-payg', (string) apply_filters( 'woocommerce_cart_item_name', 'Name', $item, 'k' ) );
 		$this->assertSame( '€54.00', apply_filters( 'woocommerce_cart_item_subtotal', '€54.00', $item, 'k' ) );
@@ -265,7 +260,6 @@ class BreakdownTest extends UsageTestCase {
 		$v = $this->db();
 
 		$this->assertSame( '+50 GB, +€4 per month', DbDiskField::step_label( 50, $v['u-0-0'], $v['u-50-0'] ) );
-		$this->assertSame( '+50 GB, +€4 per month', DbDiskField::step_label( 50, $v['u-0-1'], $v['u-50-1'] ) );
 	}
 
 	public function test_the_monthly_labels_keep_their_wording(): void {

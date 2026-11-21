@@ -198,14 +198,21 @@ class DbDiskTest extends TestCase {
 	 * @param array<string, mixed> $plan Plan overrides.
 	 */
 	private function ready_db( array $plan = array() ): Resource {
+		// A public IPv4 address is an IPv4 add-on now (the plan field public_ip is gone): `public_ip` => 1 links one.
+		$with_ip = ! empty( $plan['public_ip'] );
+		unset( $plan['public_ip'] );
 		$product = $this->service_product(
 			'proxmox-db',
-			array_merge( array( 'cluster' => 'lab', 'template' => 9100, 'engine' => 'postgres', 'major' => 18, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20, 'public_ip' => 0 ), $plan ),
+			array_merge( array( 'cluster' => 'lab', 'template' => 9100, 'engine' => 'postgres', 'major' => 18, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20 ), $plan ),
 			array( 'max' => 3 )
 		);
 		$license = $this->service_license( $product, array( 'fire' => false, 'email' => self::OWNER ) );
 		$r       = Resource::create( $license, Registry::get( 'proxmox-db' ), Product::plan( $product->get_id() ) );
 		$this->assertInstanceOf( Resource::class, $r );
+
+		if ( $with_ip ) {
+			$this->public_ip_addon( $r );
+		}
 
 		$driver = Registry::get( 'proxmox-db' );
 		$first  = $driver->provision( Resource::find( $r->id() ) );
@@ -428,7 +435,19 @@ class DbDiskTest extends TestCase {
 	 */
 	private function change( Resource $r, array $over ): \BeltoftServices\Drivers\StepResult {
 		$fresh = Resource::find( $r->id() );
-		$this->assertTrue( true === $fresh->change_plan( array_merge( (array) $fresh->get( 'plan' ), $over ), 'Plan changed' ) );
+
+		// A public IPv4 address is an IPv4 add-on now: `public_ip` => 1 links one (the plan field is gone).
+		if ( ! empty( $over['public_ip'] ) ) {
+			$this->public_ip_addon( $fresh );
+		}
+
+		unset( $over['public_ip'] );
+
+		if ( array() === $over ) {
+			$this->assertTrue( $fresh->set( array( 'plan_dirty' => true ) ) );
+		} else {
+			$this->assertTrue( true === $fresh->change_plan( array_merge( (array) $fresh->get( 'plan' ), $over ), 'Plan changed' ) );
+		}
 		$res = $this->drive( $r );
 
 		if ( $res->is_done() ) {
@@ -477,22 +496,11 @@ class DbDiskTest extends TestCase {
 		$this->assertArrayHasKey( 'db_disk_step_gb', apply_filters( 'beltoft_services_settings_fields', array() ) );
 	}
 
-	public function test_the_ladder_is_the_same_plan_with_other_extra_storage_and_keeps_the_public_ip(): void {
+	public function test_the_ladder_is_the_same_plan_with_other_extra_storage(): void {
 		$v = $this->ladder_variations();
 
 		$this->assertSame( array( 0, 50, 100, 250 ), array_keys( DbDisk::ladder( $v['e0-0'] ) ) );
 		$this->assertSame( array( 0, 50, 100, 250 ), array_keys( DbDisk::ladder( $v['e100-0'] ) ) );
-
-		$with = DbDisk::ladder( $v['e50-1'] );
-		$this->assertSame( array( 0, 50, 100, 250 ), array_keys( $with ) );
-
-		foreach ( $with as $step ) {
-			$this->assertSame( 1, (int) Product::plan( $step->get_parent_id(), $step->get_id() )['public_ip'], 'The public IP choice is kept.' );
-		}
-
-		foreach ( DbDisk::ladder( $v['e0-0'] ) as $step ) {
-			$this->assertSame( 0, (int) Product::plan( $step->get_parent_id(), $step->get_id() )['public_ip'] );
-		}
 
 		$this->assertStringContainsString( '4.00', DbDisk::price_label( $v['e0-0'], $v['e50-0'] ) );
 		$this->assertStringContainsString( '8.00', DbDisk::price_label( $v['e0-0'], $v['e100-0'] ) );
@@ -606,7 +614,7 @@ class DbDiskTest extends TestCase {
 
 		$this->assertArrayHasKey( $v['e0-0']->get_id(), $plans );
 
-		foreach ( array( 'e50-0', 'e100-0', 'e250-0', 'e0-1', 'e50-1' ) as $key ) {
+		foreach ( array( 'e50-0', 'e100-0', 'e250-0' ) as $key ) {
 			$this->assertArrayNotHasKey( $v[ $key ]->get_id(), $plans, $key . ' is chosen at checkout.' );
 		}
 

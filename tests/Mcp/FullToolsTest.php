@@ -306,7 +306,7 @@ final class FullToolsTest extends McpTestCase {
 
 		$this->assertNotNull( IpPool::hold( $db->id() ) );
 		$this->assertTrue( IpPool::assign( $db->id() ) );
-		$db->set( array( 'plan' => array_merge( (array) Resource::find( $db->id() )->get( 'plan' ), array( 'public_ip' => 1 ) ) ) );
+		$this->public_ip_addon( $db );
 		$tok = $this->oauth( $this->owner( $db ), Tokens::FULL );
 
 		$args  = array( 'id' => $db->id(), 'op' => 'world_on' );

@@ -170,8 +170,7 @@ final class Ipv4Meta {
 	 */
 	public static function limit( Resource $parent ): int {
 		if ( self::is_db( $parent ) ) {
-			// A database built with the old plan field `public_ip` already has its one address.
-			return \BeltoftServices\Proxmox\Db\DbIp::plan_wants( (array) $parent->get( 'plan' ) ) ? 0 : 1;
+			return 1;
 		}
 
 		return max( 1, (int) apply_filters( 'beltoft_services_ipv4_max_per_server', 16, $parent ) );
@@ -355,7 +354,28 @@ final class Ipv4Meta {
 	 * @param Resource $db Database.
 	 */
 	public static function db_wants( Resource $db ): bool {
-		return self::is_db( $db ) && ( array() !== self::reserved_for( $db ) || null !== self::build_addon( $db ) );
+		return self::is_db( $db ) && self::main_wanted( $db );
+	}
+
+	/**
+	 * THE rule for every VM (VPS, VPS Basic, database): does it want a main IPv4 address? Yes when its plan includes one (a VPS:
+	 * on by default, cannot be removed), or when an IPv4 add-on holds the main role for it (bought with it and taken at build,
+	 * or added later). Both build profiles answer uses_public_ip() from here.
+	 *
+	 * @param Resource $r Server or database.
+	 */
+	public static function main_wanted( Resource $r ): bool {
+		if ( self::has_plan_address( $r ) || null !== self::build_addon( $r ) ) {
+			return true;
+		}
+
+		foreach ( self::reserved_for( $r ) as $addon ) {
+			if ( self::is_db( $r ) || 'main' === $addon->get( self::ROLE ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -406,10 +426,6 @@ final class Ipv4Meta {
 		}
 
 		if ( in_array( 'clone', (array) $parent->get( 'steps' ), true ) || self::has_main( $parent ) ) {
-			return;
-		}
-
-		if ( self::is_db( $parent ) && \BeltoftServices\Proxmox\Db\DbIp::plan_wants( (array) $parent->get( 'plan' ) ) ) {
 			return;
 		}
 

@@ -23,7 +23,8 @@ defined( 'ABSPATH' ) || exit;
  * gone. The state lives in meta `dbmon` (key => time sent), written under the resource lock:
  *
  *  - down: `ok` false (or the file unreadable or older than STALE) for DOWN_AFTER seconds: customer and admin;
- *  - disk: disk_percent at DISK_AT or more: customer and admin, re-arms below DISK_REARM;
+ *  - disk: disk_percent at the warning level all services use (Monitoring\UsageRules::disk_levels()): customer and admin,
+ *    re-arms five points below it;
  *  - dump: no nightly dump for DUMP_MAX_AGE: admin;
  *  - cert: the certificate ends within CERT_DAYS days: admin;
  *  - bans: bans at or above the setting monitor_db_bans: admin;
@@ -41,9 +42,6 @@ final class DbMonitor {
 
 	/** A health file older than this counts as not ok (the guest writes it every 5 minutes). */
 	public const STALE = 1200;
-
-	public const DISK_AT    = 85;
-	public const DISK_REARM = 80;
 
 	/** Seconds without a nightly dump before the admin is told. */
 	public const DUMP_MAX_AGE = 36 * HOUR_IN_SECONDS;
@@ -197,7 +195,7 @@ final class DbMonitor {
 	}
 
 	/**
-	 * Disk: 85 percent or more; re-arms below 80.
+	 * Disk: the warning level of every service (setting monitor_disk_percent) or more; re-arms five points below it.
 	 *
 	 * @param Resource             $r      Resource.
 	 * @param array<string, mixed> $health Reading.
@@ -212,13 +210,15 @@ final class DbMonitor {
 			return;
 		}
 
-		if ( $percent < self::DISK_REARM ) {
+		$level = \BeltoftServices\Monitoring\UsageRules::disk_levels()[0];
+
+		if ( $percent < $level - \BeltoftServices\Monitoring\UsageRules::REARM ) {
 			unset( $state['disk_admin'], $state['disk_customer'] );
 
 			return;
 		}
 
-		if ( $percent < self::DISK_AT ) {
+		if ( $percent < $level ) {
 			return;
 		}
 

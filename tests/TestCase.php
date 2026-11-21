@@ -423,6 +423,34 @@ abstract class TestCase extends \WP_UnitTestCase {
 	 *
 	 * @param array<string, mixed> $values Settings.
 	 */
+	/**
+	 * An IPv4 add-on holding the main address of a server or database (linked, not run): what makes a VM want a public IPv4
+	 * under the one rule (Ipv4Meta::main_wanted). Tests that used the old database plan field `public_ip` use this.
+	 *
+	 * @param Resource $parent Server or database.
+	 */
+	protected function public_ip_addon( \BeltoftServices\Resource $parent ): \BeltoftServices\Resource {
+		static $n = 0;
+		++$n;
+		$product = $this->service_product( \BeltoftServices\Proxmox\Ipv4\Ipv4Driver::ID, array(), array( 'slug' => 'ipv4-main-' . $n . '-' . wp_generate_password( 4, false ) ) );
+		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => (int) ( $parent->license()['user_id'] ?? 0 ) ) );
+		$addon   = \BeltoftServices\Resource::create( $license, \BeltoftServices\Drivers\Registry::get( \BeltoftServices\Proxmox\Ipv4\Ipv4Driver::ID ), Product::plan( $product->get_id() ), array( 'server_license' => (int) ( $parent->license()['id'] ?? 0 ), \BeltoftServices\Proxmox\Ipv4\Ipv4Meta::ROLE => 'main' ) );
+		$this->assertInstanceOf( \BeltoftServices\Resource::class, $addon );
+
+		return $addon;
+	}
+
+	/**
+	 * Gives back every IPv4 add-on of a server or database (the add-on ended): the VM no longer wants a public IPv4.
+	 *
+	 * @param \BeltoftServices\Resource $parent Server or database.
+	 */
+	protected function public_ip_off( \BeltoftServices\Resource $parent ): void {
+		foreach ( \BeltoftServices\Proxmox\Ipv4\Ipv4Meta::for_parent( $parent ) as $addon ) {
+			$this->assertTrue( $addon->set( array( \BeltoftServices\Proxmox\Ipv4\Ipv4Meta::ENDED => true ) ) );
+		}
+	}
+
 	protected function settings( array $values ): void {
 		$current = get_option( Settings::OPTION, array() );
 		update_option( Settings::OPTION, array_merge( is_array( $current ) ? $current : array(), $values ) );

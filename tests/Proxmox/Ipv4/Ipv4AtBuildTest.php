@@ -121,4 +121,23 @@ class Ipv4AtBuildTest extends Ipv4TestCase {
 		Ipv4Meta::claim_at_build( Resource::find( $basic->id() ) );
 		$this->assertSame( '', (string) Resource::find( $basic->id() )->get( Ipv4Meta::AT_BUILD ), 'A VM already cloned takes nothing at build time.' );
 	}
+
+	public function test_one_rule_says_whether_any_vm_wants_a_main_address(): void {
+		$vps = $this->server( 1 );
+		$this->assertTrue( Ipv4Meta::main_wanted( $vps ), 'A VPS: its plan includes it.' );
+
+		$basic = $this->server( 0 );
+		$this->assertFalse( Ipv4Meta::main_wanted( $basic ), 'A VPS Basic without the add-on.' );
+		$addon = $this->addon( $basic );
+		$this->assertTrue( Ipv4Meta::main_wanted( Resource::find( $basic->id() ) ), 'A VPS Basic with its main add-on.' );
+		$addon->set( array( Ipv4Meta::ENDED => true ) );
+		$this->assertFalse( Ipv4Meta::main_wanted( Resource::find( $basic->id() ) ), 'An add-on given back no longer counts.' );
+
+		list( $db, $db_addon ) = $this->order_of( 'proxmox-db', array( 'cluster' => 'lab', 'template' => 9100, 'major' => '18', 'cores' => 1, 'memory_mb' => 2048, 'disk_gb' => 20 ) );
+		$this->assertFalse( Ipv4Meta::main_wanted( $db ) );
+		$db_addon->set( array( 'server_license' => (int) $db->license()['id'] ) );
+		$this->assertTrue( Ipv4Meta::main_wanted( Resource::find( $db->id() ) ), 'A database with an add-on linked to it.' );
+		$this->assertTrue( DbIp::wants( Resource::find( $db->id() ) ), 'The database asks the same rule.' );
+		$this->assertSame( Ipv4Meta::main_wanted( Resource::find( $db->id() ) ), Profiles::for_resource( Resource::find( $db->id() ) )->uses_public_ip() );
+	}
 }

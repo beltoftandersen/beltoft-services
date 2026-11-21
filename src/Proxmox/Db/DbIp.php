@@ -63,22 +63,12 @@ final class DbIp {
 	}
 
 	/**
-	 * Does the plan have the public IP (a database built before the IPv4 add-on: plan field `public_ip`)? No product sells it
-	 * any more; a database that has it keeps its address.
-	 *
-	 * @param array<string, mixed> $plan Plan.
-	 */
-	public static function plan_wants( array $plan ): bool {
-		return (int) ( $plan['public_ip'] ?? 0 ) > 0;
-	}
-
-	/**
-	 * Should the database have a public IPv4 address: an IPv4 add-on holds a place for it, or its old plan has one.
+	 * Should the database have a public IPv4 address: the shared rule (Ipv4Meta::main_wanted), an IPv4 add-on holds it.
 	 *
 	 * @param Resource $r Database.
 	 */
 	public static function wants( Resource $r ): bool {
-		return self::plan_wants( (array) $r->get( 'plan' ) ) || \BeltoftServices\Proxmox\Ipv4\Ipv4Meta::db_wants( $r );
+		return \BeltoftServices\Proxmox\Ipv4\Ipv4Meta::db_wants( $r );
 	}
 
 	/**

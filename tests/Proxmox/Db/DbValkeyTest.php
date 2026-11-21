@@ -171,7 +171,7 @@ class DbValkeyTest extends TestCase {
 	private function resource( array $plan = array(), array $meta = array() ): Resource {
 		$product = $this->service_product(
 			'proxmox-db',
-			array_merge( array( 'cluster' => 'lab', 'template' => 9110, 'engine' => 'valkey', 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20, 'public_ip' => 0 ), $plan ),
+			array_merge( array( 'cluster' => 'lab', 'template' => 9110, 'engine' => 'valkey', 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20 ), $plan ),
 			array( 'max' => 3 )
 		);
 		$license = $this->service_license( $product, array( 'fire' => false, 'email' => self::OWNER ) );
@@ -195,7 +195,15 @@ class DbValkeyTest extends TestCase {
 	 * @param array<string, mixed> $plan Plan overrides.
 	 */
 	private function built_until_init( array $plan = array() ): Resource {
+		// A public IPv4 address is an IPv4 add-on now (the plan field public_ip is gone): `public_ip` => 1 links one.
+		$with_ip = ! empty( $plan['public_ip'] );
+		unset( $plan['public_ip'] );
 		$r      = $this->resource( $plan );
+
+		if ( $with_ip ) {
+			$this->public_ip_addon( $r );
+		}
+
 		$result = $this->run_provision( $r );
 		$this->assertTrue( $result->is_poll(), 'The init job is sent and the build waits: ' . $result->error() );
 
@@ -261,7 +269,6 @@ class DbValkeyTest extends TestCase {
 		$this->assertSame( 'A Valkey plan needs at least 512 MB of memory', DbBuild::plan_error( $this->resource( array( 'memory_mb' => 256 ) ) ) );
 		$this->assertStringContainsString( 'engine of this plan (mysql) is not available', (string) DbBuild::plan_error( $this->resource( array( 'engine' => 'mysql' ) ) ) );
 		$this->assertStringContainsString( 'Supported: 17, 18', (string) DbBuild::plan_error( $this->resource( array( 'engine' => 'postgres', 'major' => 16 ) ) ), 'PostgreSQL keeps its own check.' );
-		$this->assertStringContainsString( 'must be 0 or 1', (string) DbBuild::plan_error( $this->resource( array( 'public_ip' => 2 ) ) ), 'The shared checks come first.' );
 	}
 
 	// -- Templates -----------------------------------------------------------------------------

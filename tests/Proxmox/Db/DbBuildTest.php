@@ -157,7 +157,7 @@ class DbBuildTest extends TestCase {
 	private function resource( array $plan = array(), array $meta = array() ): Resource {
 		$product = $this->service_product(
 			'proxmox-db',
-			array_merge( array( 'cluster' => 'lab', 'template' => 9100, 'engine' => 'postgres', 'major' => 18, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20, 'public_ip' => 0 ), $plan ),
+			array_merge( array( 'cluster' => 'lab', 'template' => 9100, 'engine' => 'postgres', 'major' => 18, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20 ), $plan ),
 			array( 'max' => 3 )
 		);
 		$license = $this->service_license( $product, array( 'fire' => false ) );
@@ -454,16 +454,6 @@ class DbBuildTest extends TestCase {
 		$this->assertTrue( $result->is_failed() );
 		$this->assertStringContainsString( 'No private network available', $result->error() );
 		$this->assertNull( VmRecords::for_resource( $r->id() ), 'Nothing was built.' );
-	}
-
-	public function test_a_public_ip_other_than_zero_or_one_is_refused(): void {
-		foreach ( array( 2, -1 ) as $value ) {
-			$r      = $this->resource( array( 'public_ip' => $value ) );
-			$result = $this->run_provision( $r );
-			$this->assertTrue( $result->is_failed(), (string) $value );
-			$this->assertStringContainsString( 'public IP', $result->error() );
-			$this->assertNull( VmRecords::for_resource( $r->id() ) );
-		}
 	}
 
 	public function test_cluster_without_a_private_bridge_fails(): void {

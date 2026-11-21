@@ -558,7 +558,8 @@ class DbPhase5Test extends TestCase {
 		$this->assertNotNull( IpPool::hold( $r->id() ) );
 		$this->assertTrue( IpPool::assign( $r->id() ) );
 		$fresh = Resource::find( $r->id() );
-		$this->assertTrue( $fresh->set( array( 'plan' => array_merge( (array) $fresh->get( 'plan' ), array( 'public_ip' => 1 ) ), 'ip' => '192.0.2.10' ) ) );
+		$this->public_ip_addon( $fresh );
+		$this->assertTrue( $fresh->set( array( 'ip' => '192.0.2.10' ) ) );
 
 		Jobs::act( $r->id(), 'restore', array( 'confirm' => 'RESTORE', 'volid' => $volid ) );
 
@@ -745,26 +746,37 @@ class DbPhase5Test extends TestCase {
 		$this->assertCount( 0, $this->to_customer() );
 	}
 
-	public function test_disk_alerts_at_85_percent_once_and_rearms_below_80(): void {
+	public function test_disk_alerts_at_the_level_every_service_uses_once_and_rearms_five_below(): void {
 		$r   = $this->ready_db();
 		$now = time();
 
-		DbMonitor::apply( $r, $this->reading( $now, array( 'disk_percent' => 84.9 ) ), $now );
-		$this->assertCount( 0, $this->mails );
+		DbMonitor::apply( $r, $this->reading( $now, array( 'disk_percent' => 89.9 ) ), $now );
+		$this->assertCount( 0, $this->mails, 'The default level is the servers\' one: 90.' );
 
-		DbMonitor::apply( $r, $this->reading( $now + 900, array( 'disk_percent' => 85.0 ) ), $now + 900 );
+		DbMonitor::apply( $r, $this->reading( $now + 900, array( 'disk_percent' => 90.0 ) ), $now + 900 );
 		$this->assertCount( 1, $this->to_admin() );
 		$this->assertCount( 1, $this->to_customer() );
-		$this->assertSame( 'Your database disk is 85 percent full', $this->to_customer()[0]['subject'] );
+		$this->assertSame( 'Your database disk is 90 percent full', $this->to_customer()[0]['subject'] );
 
-		DbMonitor::apply( $r, $this->reading( $now + 1800, array( 'disk_percent' => 92 ) ), $now + 1800 );
-		DbMonitor::apply( $r, $this->reading( $now + 2700, array( 'disk_percent' => 81 ) ), $now + 2700 );
-		DbMonitor::apply( $r, $this->reading( $now + 3600, array( 'disk_percent' => 86 ) ), $now + 3600 );
-		$this->assertCount( 2, $this->mails, 'Between 80 and 85 does not re-arm.' );
+		DbMonitor::apply( $r, $this->reading( $now + 1800, array( 'disk_percent' => 95 ) ), $now + 1800 );
+		DbMonitor::apply( $r, $this->reading( $now + 2700, array( 'disk_percent' => 86 ) ), $now + 2700 );
+		DbMonitor::apply( $r, $this->reading( $now + 3600, array( 'disk_percent' => 91 ) ), $now + 3600 );
+		$this->assertCount( 2, $this->mails, 'Between 85 and 90 does not re-arm.' );
 
-		DbMonitor::apply( $r, $this->reading( $now + 4500, array( 'disk_percent' => 79.9 ) ), $now + 4500 );
+		DbMonitor::apply( $r, $this->reading( $now + 4500, array( 'disk_percent' => 84.9 ) ), $now + 4500 );
 		DbMonitor::apply( $r, $this->reading( $now + 5400, array( 'disk_percent' => 90 ) ), $now + 5400 );
 		$this->assertCount( 4, $this->mails );
+	}
+
+	public function test_the_disk_level_setting_counts_for_databases_as_for_servers(): void {
+		$this->settings( array( 'monitor_disk_percent' => 80 ) );
+		$this->assertSame( 80, \BeltoftServices\Monitoring\UsageRules::disk_levels()[0] );
+
+		$r   = $this->ready_db();
+		$now = time();
+		DbMonitor::apply( $r, $this->reading( $now, array( 'disk_percent' => 80.0 ) ), $now );
+
+		$this->assertCount( 1, $this->to_customer() );
 	}
 
 	public function test_the_customer_usage_switch_stops_the_disk_email_not_the_admin_one(): void {

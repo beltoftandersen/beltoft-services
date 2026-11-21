@@ -195,14 +195,21 @@ class DbPhase4Test extends TestCase {
 	 * @param array<string, mixed> $plan Plan overrides.
 	 */
 	private function ready_db( array $plan = array() ): Resource {
+		// A public IPv4 address is an IPv4 add-on now (the plan field public_ip is gone): `public_ip` => 1 links one.
+		$with_ip = ! empty( $plan['public_ip'] );
+		unset( $plan['public_ip'] );
 		$product = $this->service_product(
 			'proxmox-db',
-			array_merge( array( 'cluster' => 'lab', 'template' => 9100, 'engine' => 'postgres', 'major' => 18, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20, 'public_ip' => 0 ), $plan ),
+			array_merge( array( 'cluster' => 'lab', 'template' => 9100, 'engine' => 'postgres', 'major' => 18, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20 ), $plan ),
 			array( 'max' => 3 )
 		);
 		$license = $this->service_license( $product, array( 'fire' => false, 'email' => self::OWNER ) );
 		$r       = Resource::create( $license, Registry::get( 'proxmox-db' ), Product::plan( $product->get_id() ) );
 		$this->assertInstanceOf( Resource::class, $r );
+
+		if ( $with_ip ) {
+			$this->public_ip_addon( $r );
+		}
 
 		$driver = Registry::get( 'proxmox-db' );
 		$first  = $driver->provision( Resource::find( $r->id() ) );
@@ -254,14 +261,21 @@ class DbPhase4Test extends TestCase {
 	 * @param array<string, mixed> $plan Plan overrides.
 	 */
 	private function bare_db( array $plan = array() ): Resource {
+		// A public IPv4 address is an IPv4 add-on now (the plan field public_ip is gone): `public_ip` => 1 links one.
+		$with_ip = ! empty( $plan['public_ip'] );
+		unset( $plan['public_ip'] );
 		$product = $this->service_product(
 			'proxmox-db',
-			array_merge( array( 'cluster' => 'lab', 'template' => 9100, 'engine' => 'postgres', 'major' => 18, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20, 'public_ip' => 0 ), $plan ),
+			array_merge( array( 'cluster' => 'lab', 'template' => 9100, 'engine' => 'postgres', 'major' => 18, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20 ), $plan ),
 			array( 'max' => 3 )
 		);
 		$license = $this->service_license( $product, array( 'fire' => false, 'email' => self::OWNER ) );
 		$r       = Resource::create( $license, Registry::get( 'proxmox-db' ), Product::plan( $product->get_id() ) );
 		$this->assertInstanceOf( Resource::class, $r );
+
+		if ( $with_ip ) {
+			$this->public_ip_addon( $r );
+		}
 		$this->assertTrue( $r->set( array( 'state' => 'ready', 'desired' => 'ready', 'db_state' => 'ready' ) ) );
 
 		return Resource::find( $r->id() );
@@ -328,8 +342,7 @@ class DbPhase4Test extends TestCase {
 
 	private function add_ip( Resource $r ): \BeltoftServices\Drivers\StepResult {
 		$fresh = Resource::find( $r->id() );
-		$plan  = (array) $fresh->get( 'plan' );
-		$this->assertTrue( true === $fresh->change_plan( array_merge( $plan, array( 'public_ip' => 1 ) ), 'Plan changed' ) );
+		$this->public_ip_addon( $fresh );
 		$res = $this->drive( $r );
 
 		if ( $res->is_done() ) {
@@ -341,8 +354,7 @@ class DbPhase4Test extends TestCase {
 
 	private function remove_ip( Resource $r ): \BeltoftServices\Drivers\StepResult {
 		$fresh = Resource::find( $r->id() );
-		$plan  = (array) $fresh->get( 'plan' );
-		$this->assertTrue( true === $fresh->change_plan( array_merge( $plan, array( 'public_ip' => 0 ) ), 'Plan changed' ) );
+		$this->public_ip_off( $fresh );
 		$res = $this->drive( $r );
 
 		if ( $res->is_done() ) {
@@ -406,36 +418,6 @@ class DbPhase4Test extends TestCase {
 		$this->assertSame( 1, IpPool::available_for_addon() );
 		$this->assertArrayHasKey( 'ip_reserve_for_vps', apply_filters( 'beltoft_services_settings_fields', array() ) );
 	}
-
-	public function test_a_public_ip_plan_is_sold_out_at_the_reserve_and_a_plan_without_is_not(): void {
-		$with    = $this->service_product( 'proxmox-db', array( 'cluster' => 'lab', 'template' => 9100, 'major' => 18, 'cores' => 2, 'memory_mb' => 2048, 'disk_gb' => 20, 'public_ip' => 1 ), array( 'slug' => 'dbip-' . wp_generate_password( 5, false ) ) );
-		$without = $this->service_product( 'proxmox-db', array( 'cluster' => 'lab', 'template' => 9100, 'major' => 18, 'cores' => 2, 'memory_mb' => 2048, 'disk_gb' => 20, 'public_ip' => 0 ), array( 'slug' => 'dbno-' . wp_generate_password( 5, false ) ) );
-		// The address pool is the one automatic closing left (an address cannot be oversold): it is written as the WooCommerce stock status.
-		$open = static function ( \WC_Product $p ): bool {
-			wp_cache_flush();
-
-			return wc_get_product( $p->get_id() )->is_in_stock();
-		};
-
-		Stock::sync();
-		$this->assertFalse( $open( $with ), 'No address at all.' );
-		$this->assertTrue( $open( $without ), 'A database without the add-on needs no address.' );
-
-		$this->pool( 1 );
-		Stock::sync();
-		$this->assertFalse( $open( $with ), 'The last address is kept for servers.' );
-		$this->assertTrue( $open( $without ) );
-
-		$this->pool( 1, 20 );
-		Stock::sync();
-		$this->assertTrue( $open( $with ) );
-
-		$this->settings( array( 'ip_reserve_for_vps' => 2 ) );
-		delete_transient( IpPool::FREE_TRANSIENT );
-		Stock::sync();
-		$this->assertFalse( $open( $with ) );
-	}
-	// -- The profile and the build ---------------------------------------------------------------
 
 	public function test_the_profile_asks_for_an_address_only_with_the_add_on(): void {
 		$without = new DbProfile( $this->bare_db() );
@@ -620,7 +602,7 @@ class DbPhase4Test extends TestCase {
 		$this->listen_guest = 'silent';
 
 		$fresh = Resource::find( $r->id() );
-		$this->assertTrue( true === $fresh->change_plan( array_merge( (array) $fresh->get( 'plan' ), array( 'public_ip' => 1 ) ), 'Plan changed' ) );
+		$this->public_ip_addon( $fresh );
 
 		for ( $i = 0; $i < 40; $i++ ) {
 			$res = Registry::get( 'proxmox-db' )->update_plan( Resource::find( $r->id() ) );
@@ -675,7 +657,7 @@ class DbPhase4Test extends TestCase {
 		$this->fake->lag_status( 5000, 1000 );
 
 		$fresh = Resource::find( $r->id() );
-		$this->assertTrue( true === $fresh->change_plan( array_merge( (array) $fresh->get( 'plan' ), array( 'public_ip' => 1 ) ), 'Plan changed' ) );
+		$this->public_ip_addon( $fresh );
 		$res = Registry::get( 'proxmox-db' )->update_plan( Resource::find( $r->id() ) );
 
 		$this->assertFalse( $res->is_done() );
@@ -736,7 +718,7 @@ class DbPhase4Test extends TestCase {
 		$this->fake->fail_next( 'PUT', '#/qemu/5000/config$#', array( 'status' => 500, 'message' => 'timeout' ) );
 
 		$fresh = Resource::find( $r->id() );
-		$this->assertTrue( true === $fresh->change_plan( array_merge( (array) $fresh->get( 'plan' ), array( 'public_ip' => 0 ) ), 'Plan changed' ) );
+		$this->public_ip_off( $fresh );
 		$res = Registry::get( 'proxmox-db' )->update_plan( Resource::find( $r->id() ) );
 
 		$this->assertFalse( $res->is_done() );
@@ -1256,15 +1238,8 @@ class DbPhase4Test extends TestCase {
 		WC()->cart->empty_cart();
 		wc_clear_notices();
 
-		$with    = $this->service_product( 'proxmox-db', array( 'cluster' => 'lab', 'major' => 18, 'cores' => 2, 'memory_mb' => 2048, 'disk_gb' => 20, 'public_ip' => 1 ), array( 'slug' => 'dbip-' . wp_generate_password( 5, false ) ) );
-		$without = $this->service_product( 'proxmox-db', array( 'cluster' => 'lab', 'major' => 18, 'cores' => 2, 'memory_mb' => 2048, 'disk_gb' => 20, 'public_ip' => 0 ), array( 'slug' => 'dbno-' . wp_generate_password( 5, false ) ) );
+		$without = $this->service_product( 'proxmox-db', array( 'cluster' => 'lab', 'major' => 18, 'cores' => 2, 'memory_mb' => 2048, 'disk_gb' => 20 ), array( 'slug' => 'dbno-' . wp_generate_password( 5, false ) ) );
 
-		WC()->cart->add_to_cart( $with->get_id() );
-		DbNeedsServer::cart_notice();
-		$this->assertSame( array(), wc_get_notices( 'notice' ), 'No notice for a database with a public IP address.' );
-
-		WC()->cart->empty_cart();
-		wc_clear_notices();
 		WC()->cart->add_to_cart( $without->get_id() );
 		DbNeedsServer::cart_notice();
 		$this->assertNotEmpty( wc_get_notices( 'notice' ) );

@@ -189,8 +189,7 @@ final class ActsTest extends McpTestCase {
 
 		$this->assertNotNull( IpPool::hold( $db->id() ) );
 		$this->assertTrue( IpPool::assign( $db->id() ) );
-		$plan = (array) Resource::find( $db->id() )->get( 'plan' );
-		$db->set( array( 'plan' => array_merge( $plan, array( 'public_ip' => 1 ) ) ) );
+		$this->public_ip_addon( $db );
 		$token = $this->oauth( $this->owner( $db ), Tokens::ACTIONS );
 
 		$add = $this->tool( 'set_database_access', array( 'id' => $db->id(), 'op' => 'add', 'address' => '203.0.113.7', 'label' => 'Office' ), $token );

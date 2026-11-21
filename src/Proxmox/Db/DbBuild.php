@@ -54,12 +54,6 @@ final class DbBuild {
 	public static function plan_error( Resource $r ): ?string {
 		$plan = (array) $r->get( 'plan' );
 
-		$public = $plan['public_ip'] ?? 0;
-
-		if ( ! ( is_int( $public ) || ( is_string( $public ) && ctype_digit( $public ) ) ) || ! in_array( (int) $public, array( 0, 1 ), true ) ) {
-			return 'The public IP of this plan must be 0 or 1';
-		}
-
 		$engine = DbEngines::for_plan( $plan );
 
 		if ( null === $engine ) {

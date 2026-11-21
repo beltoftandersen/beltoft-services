@@ -229,8 +229,9 @@ final class Stock {
 			return false; // A plan naming no saved cluster cannot be built.
 		}
 
+		// A database needs no address of its own (a public IPv4 address is its own add-on, which has its own stock rule above).
 		if ( $driver && DbDriver::ID === $driver->id() ) {
-			return ! ( (int) ( $plan['public_ip'] ?? 0 ) > 0 && 0 === IpPool::available_for_addon() );
+			return true;
 		}
 
 		// A server with no IPv4 address (VPS Basic without the add-on) needs the cluster's IPv6 and IPv6 name servers instead of a pool address.

@@ -160,7 +160,7 @@ class DbMssqlTest extends TestCase {
 	private function resource( array $plan = array(), array $meta = array( 'db_terms_accepted' => 1761800000 ) ): Resource {
 		$product = $this->service_product(
 			'proxmox-db',
-			array_merge( array( 'cluster' => 'lab', 'template' => 9120, 'engine' => 'mssql', 'major' => 2025, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20, 'public_ip' => 0 ), $plan ),
+			array_merge( array( 'cluster' => 'lab', 'template' => 9120, 'engine' => 'mssql', 'major' => 2025, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20 ), $plan ),
 			array( 'max' => 3 )
 		);
 		$license = $this->service_license( $product, array( 'fire' => false, 'email' => self::OWNER ) );
@@ -184,7 +184,15 @@ class DbMssqlTest extends TestCase {
 	 * @param array<string, mixed> $plan Plan overrides.
 	 */
 	private function ready_db( array $plan = array() ): Resource {
+		// A public IPv4 address is an IPv4 add-on now (the plan field public_ip is gone): `public_ip` => 1 links one.
+		$with_ip = ! empty( $plan['public_ip'] );
+		unset( $plan['public_ip'] );
 		$r      = $this->resource( $plan );
+
+		if ( $with_ip ) {
+			$this->public_ip_addon( $r );
+		}
+
 		$driver = Registry::get( 'proxmox-db' );
 		$first  = $driver->provision( Resource::find( $r->id() ) );
 		$this->assertTrue( $first->is_poll(), $first->error() );
@@ -419,7 +427,7 @@ class DbMssqlTest extends TestCase {
 	}
 
 	public function test_a_database_starts_with_the_time_of_the_acceptance_on_the_order_line(): void {
-		$product   = $this->service_product( 'proxmox-db', array( 'cluster' => 'lab', 'template' => 9120, 'engine' => 'mssql', 'major' => 2025, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20, 'public_ip' => 0 ), array( 'max' => 3 ) );
+		$product   = $this->service_product( 'proxmox-db', array( 'cluster' => 'lab', 'template' => 9120, 'engine' => 'mssql', 'major' => 2025, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20 ), array( 'max' => 3 ) );
 		$order     = wc_create_order();
 		$item      = new \WC_Order_Item_Product();
 		$item->set_product_id( $product->get_id() );
@@ -435,7 +443,7 @@ class DbMssqlTest extends TestCase {
 	}
 
 	public function test_checkout_without_the_box_is_refused_and_with_it_the_line_carries_the_time(): void {
-		$product = $this->service_product( 'proxmox-db', array( 'cluster' => 'lab', 'template' => 9120, 'engine' => 'mssql', 'major' => 2025, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20, 'public_ip' => 0 ), array( 'max' => 3 ) );
+		$product = $this->service_product( 'proxmox-db', array( 'cluster' => 'lab', 'template' => 9120, 'engine' => 'mssql', 'major' => 2025, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20 ), array( 'max' => 3 ) );
 		$item    = new \WC_Order_Item_Product();
 		$item->set_product_id( $product->get_id() );
 
@@ -448,7 +456,7 @@ class DbMssqlTest extends TestCase {
 	}
 
 	public function test_the_cart_with_such_a_database_asks_for_the_box(): void {
-		$product = $this->service_product( 'proxmox-db', array( 'cluster' => 'lab', 'template' => 9120, 'engine' => 'mssql', 'major' => 2025, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20, 'public_ip' => 0 ), array( 'max' => 3 ) );
+		$product = $this->service_product( 'proxmox-db', array( 'cluster' => 'lab', 'template' => 9120, 'engine' => 'mssql', 'major' => 2025, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20 ), array( 'max' => 3 ) );
 		WC()->cart->empty_cart();
 		WC()->cart->add_to_cart( $product->get_id() );
 

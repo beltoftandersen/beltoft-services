@@ -28,6 +28,25 @@ final class UsageRules {
 	}
 
 	/**
+	 * The disk levels every service uses (servers here, databases in Proxmox\Db\DbMonitor): the warning level (setting
+	 * monitor_disk_percent, default 90) and the urgent one (monitor_disk_urgent_percent, default 97, always above the
+	 * warning). Each re-arms five points below itself (REARM).
+	 *
+	 * @return array{0: int, 1: int} Warning level, urgent level, in percent.
+	 */
+	public static function disk_levels(): array {
+		$threshold = (int) Settings::get( 'monitor_disk_percent' );
+		$threshold = $threshold >= 50 && $threshold <= 99 ? $threshold : 90;
+		$urgent    = (int) Settings::get( 'monitor_disk_urgent_percent' );
+		$urgent    = $urgent >= 60 && $urgent <= 100 ? max( $urgent, $threshold + 1 ) : max( 97, $threshold + 1 );
+
+		return array( $threshold, $urgent );
+	}
+
+	/** Points under a disk level at which it re-arms. */
+	public const REARM = 5;
+
+	/**
 	 * Warn once per disk-full episode; a second, stronger email at the urgent level. Each level
 	 * re-arms five points below its threshold.
 	 */
@@ -36,10 +55,7 @@ final class UsageRules {
 		$used = (int) ( $disk['used'] ?? 0 );
 		$total = (int) ( $disk['total'] ?? 0 );
 		if ( $total <= 0 || $used < 0 ) { return; }
-		$threshold = (int) Settings::get( 'monitor_disk_percent' );
-		$threshold = $threshold >= 50 && $threshold <= 99 ? $threshold : 90;
-		$urgent = (int) Settings::get( 'monitor_disk_urgent_percent' );
-		$urgent = $urgent >= 60 && $urgent <= 100 ? max( $urgent, $threshold + 1 ) : max( 97, $threshold + 1 );
+		list( $threshold, $urgent ) = self::disk_levels();
 		$percent = 100 * $used / $total;
 		$r->locked( static function () use ( $r, $disk, $now, $threshold, $urgent, $percent ): bool {
 			if ( $percent < $threshold - 5 && ( $r->get( 'monitor_disk_notified' ) || $r->get( 'monitor_disk_urgent_notified' ) ) ) {

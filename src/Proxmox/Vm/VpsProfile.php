@@ -57,8 +57,8 @@ final class VpsProfile implements BuildProfile {
 	 */
 	public function uses_public_ip(): bool {
 		// A plan without IPv4 (VPS Basic) still has one once the IPv4 add-on gave it a main address (meta `ip`).
-		// Or it took the address of an IPv4 add-on of the same order while it was being built (Ipv4Meta::claim_at_build).
-		return null === $this->r || self::plan_has_ipv4( (array) $this->r->get( 'plan' ) ) || false !== filter_var( (string) $this->r->get( 'ip' ), FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) || null !== \BeltoftServices\Proxmox\Ipv4\Ipv4Meta::build_addon( $this->r );
+		// The shared rule (Ipv4Meta::main_wanted), or the main address the server has right now (an add-on being removed keeps it until it is gone).
+		return null === $this->r || \BeltoftServices\Proxmox\Ipv4\Ipv4Meta::main_wanted( $this->r ) || false !== filter_var( (string) $this->r->get( 'ip' ), FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 );
 	}
 
 	public function hold_address( int $resource_id ): ?array {
