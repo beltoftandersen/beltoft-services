@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.55.3
+Stable tag: 0.55.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.55.4 =
+* Billing, Subscriptions: a Pay as you go card at the top (usage this month, credit, next invoice); subscriptions as rows led by the product name with price and next payment, ended ones folded away; a subscription page opens with its name and a summary, and shows usage only on the pay-as-you-go account.
 
 = 0.55.3 =
 * When a server or database is deleted, the licences of its IPv4 address, extra disks, snapshot packs and other add-ons now end with it, as a deleted service does, and a flat-priced add-on's own subscription is cancelled. Before, the licence stayed active and the address showed as a lone row in the server list. An add-on's IPv4 address is never listed on its own. `wp beltoft-services addons end-orphans [--apply]` ends the licences already left over.
