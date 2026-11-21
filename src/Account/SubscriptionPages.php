@@ -136,7 +136,9 @@ final class SubscriptionPages {
 		$note   = '';
 
 		if ( ! $ended && ! $subscription->is_manual() && $subscription->has_status( 'active' ) && $subscription->get_time( 'next_payment' ) > 0 ) {
-			$method = trim( (string) $subscription->get_payment_method_to_display( 'customer' ) );
+			// The gateway's own title ("Google Pay"); the "customer" display text starts with "Via", which reads badly after "#id,".
+			$method = trim( (string) $subscription->get_payment_method_title() );
+			$method = '' !== $method ? $method : trim( (string) $subscription->get_payment_method_to_display( 'customer' ) );
 			$sub    = '' !== $method ? sprintf( '%1$s, %2$s', $id, $method ) : $id;
 		}
 
