@@ -1292,6 +1292,10 @@ class DbPhase4Test extends TestCase {
 		$this->assertSame( '', DbAccess::public_address( Resource::find( $r->id() ) ) );
 		$this->assertTrue( DbAccess::reachable( Resource::find( $r->id() ) ), 'Reachable over IPv6: the allow-list can be edited.' );
 		$this->assertSame( array(), $this->net0_rules(), 'Closed until the customer allows an address.' );
+
+		// With ipfilter on, the card may send only from the addresses in its set: the IPv6 one must be there from the build on.
+		$set = array_map( array( \BeltoftServices\Proxmox\Network\Firewall::class, 'ipset_key' ), array_column( (array) ( $this->fake->vm( 5000 )['firewall_ipsets']['ipfilter-net0'] ?? array() ), 'cidr' ) );
+		$this->assertSame( array( self::DB_V6 ), $set, 'The public card may send from its IPv6 address.' );
 	}
 
 	public function test_a_cluster_without_ipv6_builds_a_database_without_the_public_card(): void {

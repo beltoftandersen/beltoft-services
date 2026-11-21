@@ -48,7 +48,7 @@ final class IpfilterReport {
 				continue;
 			}
 
-			$expected = Firewall::expected_ipsets( $r, ! empty( $config['net1'] ) );
+			$expected = Firewall::expected_ipsets( $r, ! empty( $config['net1'] ), (array) $config );
 
 			// A set with two addresses (IPv4 and IPv6) is compared as the same sorted text the listing gives.
 			foreach ( (array) $expected as $set_name => $set_value ) {

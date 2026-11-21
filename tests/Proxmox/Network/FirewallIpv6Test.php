@@ -214,14 +214,16 @@ class FirewallIpv6Test extends FirewallTestCase {
 		$this->assertSame( 1, (int) $options['ipfilter'] );
 	}
 
-	public function test_the_ipfilter_set_holds_both_addresses_and_only_ipv4_before_the_meta_is_there(): void {
+	public function test_the_ipfilter_set_holds_both_addresses_also_before_the_meta_is_there(): void {
 		$this->v6_cluster();
 		list( $r ) = $this->ready();
 		$r->set( array( 'ip6' => null ) );
 		$r = $this->apply( $r, array( $this->rule( 'tcp', 22 ) ) );
 		$vm = $this->fake->vm( (int) $r->get( 'vmid' ) );
 
-		$this->assertSame( array( (string) $r->get( 'ip' ) ), array_column( $vm['firewall_ipsets']['ipfilter-net0'], 'cidr' ), 'No ip6 meta yet: IPv4 only.' );
+		// The VM is configured with its IPv6 address (ipconfig0) before the meta has it (the build writes the firewall first):
+		// the set follows the config, or the guest could not send from IPv6 at all.
+		$this->assertEqualsCanonicalizing( array( (string) $r->get( 'ip' ), self::ADDRESS ), array_map( array( \BeltoftServices\Proxmox\Network\Firewall::class, 'ipset_key' ), array_column( $vm['firewall_ipsets']['ipfilter-net0'], 'cidr' ) ), 'No ip6 meta yet: the configured IPv6 address is in the set.' );
 		$this->assertSame( 1, (int) $vm['firewall_options']['ipfilter'] );
 
 		$r->set( array( 'ip6' => self::ADDRESS ) );

@@ -27,7 +27,7 @@ trait FirewallIpfilter {
 	 * @return bool|StepResult True when the sets are right.
 	 */
 	private function ipfilter_sets( string $base, array $v ) {
-		$sets = self::expected_ipsets( $this->r, self::has_private_nic( $v ) );
+		$sets = self::expected_ipsets( $this->r, self::has_private_nic( $v ), (array) ( $v['config'] ?? array() ) );
 
 		if ( null === $sets ) {
 			return false;
@@ -130,16 +130,23 @@ trait FirewallIpfilter {
 	 * A server with neither gets no filter (null). A server whose profile has no public address (a managed
 	 * database) is filtered on net1 alone.
 	 *
-	 * @param Resource $r           Resource.
-	 * @param bool     $private_nic Whether the VM has a private NIC (net1).
+	 * @param Resource             $r           Resource.
+	 * @param bool                 $private_nic Whether the VM has a private NIC (net1).
+	 * @param array<string, mixed> $config      The VM's config as read: its ipconfig0 gives the IPv6 address while the meta does not
+	 *                                          have it yet (the build writes the firewall before the ready step records `ip6`).
 	 * @return array<string, string|string[]>|null Set name => address; ipfilter-net0 is a list of the IPv4 and the IPv6 address when the server has both.
 	 */
-	public static function expected_ipsets( Resource $r, bool $private_nic ): ?array {
+	public static function expected_ipsets( Resource $r, bool $private_nic, array $config = array() ): ?array {
 		$sets = array();
 
 		$wants4 = Profiles::for_resource( $r )->uses_public_ip();
 		$ip6    = (string) $r->get( 'ip6' );
 		$ip6    = Ipv6::is_address( $ip6 ) ? (string) Ipv6::normalise( $ip6 ) : '';
+
+		// Not recorded yet: the IPv6 address the VM is configured with (ip6= in ipconfig0), so the set never lacks it.
+		if ( '' === $ip6 && 1 === preg_match( '#(?:^|,)ip6=([0-9a-fA-F:]+)/\d+#', (string) ( $config['ipconfig0'] ?? '' ), $m ) && Ipv6::is_address( $m[1] ) ) {
+			$ip6 = (string) Ipv6::normalise( $m[1] );
+		}
 
 		if ( $wants4 ) {
 			$ip = (string) $r->get( 'ip' );
