@@ -1440,6 +1440,10 @@ body.woocommerce-account .woocommerce-MyAccount-content .bs-order .bs-order__clo
 /* A finished order is one compact card: the closing line and one button per service. The process lines (and their full bars)
    only show while something is being set up, waits, or failed. */
 .bs-order[data-state="ready"] .beltoft-next__services { display: none; }
+/* On the overview a process line says only where it is: the current step, not the whole checklist (that stays on the service's
+   own page and the order received page), and not "you can leave this site", which is for the order received page. */
+.bs-order .bs-flow .beltoft-services-progress__steps > li:not(.is-current) { display: none; }
+.bs-order .bs-flow .beltoft-services-progress__leave { display: none; }
 /* The theme caps account paragraphs at 70ch: the head of a process line spans the line, so its state sits at the right edge. */
 body.woocommerce-account .woocommerce-MyAccount-content .bs-flow .beltoft-service__head { max-width: none; }
 .bs-order__waiting { min-height: 24px; padding-bottom: var(--bs-space-2); }
