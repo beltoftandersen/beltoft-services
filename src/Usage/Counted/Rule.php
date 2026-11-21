@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * A service can carry a free rate for good: resource meta `counted_free_rate` = yes, set by staff (for example for a customer who
  * moves from a fixed plan). Its events are free (`free_reason` rate), never count towards the price steps, and show as free in
- * the customer's list. The filter `beltoft_services_counted_free_rate` can answer too, for a rule kept elsewhere.
+ * the customer's list.
  */
 final class Rule {
 
@@ -28,12 +28,6 @@ final class Rule {
 	public static function free_rate( Resource $r ): bool {
 		$free = 'yes' === (string) $r->get( self::META_FREE );
 
-		/**
-		 * Filters whether a counted service has a rate of 0 for good.
-		 *
-		 * @param bool     $free Whether.
-		 * @param Resource $r    Resource.
-		 */
-		return (bool) apply_filters( 'beltoft_services_counted_free_rate', $free, $r );
+		return $free;
 	}
 }

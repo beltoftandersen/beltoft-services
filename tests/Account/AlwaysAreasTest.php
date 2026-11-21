@@ -114,7 +114,7 @@ class AlwaysAreasTest extends TestCase {
 	}
 
 	public function test_the_button_address_can_be_changed_or_removed_with_a_filter(): void {
-		foreach ( array( 'servers' => 'proxmox', 'databases' => 'proxmox-db', 'email' => 'mail', 'domains' => 'domain' ) as $area => $driver ) {
+		foreach ( array( 'email' => 'mail', 'domains' => 'domain' ) as $area => $driver ) {
 			$this->product( $driver );
 			add_filter( 'beltoft_services_' . $area . '_add_url', static fn() => 'https://example.org/buy/' . $area );
 			$this->assertStringContainsString( 'href="https://example.org/buy/' . $area . '"', $this->page( $area ), $area );

@@ -90,12 +90,7 @@ final class Billing {
 	 * Whether the Billing grouping is on.
 	 */
 	public static function enabled(): bool {
-		/**
-		 * Whether My Account groups the billing pages under one Billing item with a tab bar.
-		 *
-		 * @param bool $on The setting, default off.
-		 */
-		return (bool) apply_filters( 'beltoft_services_billing_enabled', (bool) Settings::get( self::SETTING ) );
+		return (bool) Settings::get( self::SETTING );
 	}
 
 	/**
@@ -316,12 +311,7 @@ final class Billing {
 	 * The menu's label.
 	 */
 	private static function label(): string {
-		/**
-		 * The label of the Billing menu item.
-		 *
-		 * @param string $label Label.
-		 */
-		return (string) apply_filters( 'beltoft_services_billing_label', __( 'Billing', 'beltoft-services' ) );
+		return __( 'Billing', 'beltoft-services' );
 	}
 
 	/**

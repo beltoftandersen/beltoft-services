@@ -257,13 +257,7 @@ final class Account {
 			}
 		}
 
-		/**
-		 * Whether a usage account can be charged later without the customer.
-		 *
-		 * @param bool             $ok           Result of the built-in check.
-		 * @param \WC_Subscription $subscription The account.
-		 */
-		return (bool) apply_filters( 'beltoft_services_usage_account_chargeable', $ok, $subscription );
+		return $ok;
 	}
 
 	/**

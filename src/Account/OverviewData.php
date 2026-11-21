@@ -389,12 +389,7 @@ final class OverviewData {
 	private static function card_url(): string {
 		$url = function_exists( 'wc_get_account_endpoint_url' ) ? wc_get_account_endpoint_url( 'payment-methods' ) : '';
 
-		/**
-		 * Where the overview sends a customer whose payment failed.
-		 *
-		 * @param string $url Address, default the payment methods page of My Account.
-		 */
-		return (string) apply_filters( 'beltoft_services_overview_card_url', $url );
+		return (string) $url;
 	}
 
 	/**
@@ -515,12 +510,7 @@ final class OverviewData {
 			'covers' => implode( ', ', $names ),
 			'card'   => $card['text'],
 			'label'  => $card['is_card'] ? __( 'Card', 'beltoft-services' ) : __( 'Payment method', 'beltoft-services' ),
-			/**
-			 * Where "Go to Billing" leads.
-			 *
-			 * @param string $url Address, default the subscriptions page of My Account.
-			 */
-			'url'    => (string) apply_filters( 'beltoft_services_overview_billing_url', $billing ),
+			'url'    => $billing,
 		);
 	}
 

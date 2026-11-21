@@ -137,7 +137,7 @@ final class Cart {
 		if ( ! wp_verify_nonce( (string) $request->get_header( 'X-WC-Nonce' ), 'wc_store_api' ) ) {
 			return new \WP_Error( 'bad_nonce', __( 'Refresh the page and try again.', 'beltoft-services' ), array( 'status' => 403 ) );
 		}
-		if ( \BeltoftServices\RateLimit::exceeded( \BeltoftServices\RateLimit::visitor(), 'domain-cart', (int) apply_filters( 'beltoft_services_domain_cart_limit', 20 ) ) ) {
+		if ( \BeltoftServices\RateLimit::exceeded( \BeltoftServices\RateLimit::visitor(), 'domain-cart', 20 ) ) {
 			return new \WP_Error( 'rate_limited', __( 'Too many requests. Please wait a minute.', 'beltoft-services' ), array( 'status' => 429 ) );
 		}
 		$result = self::add_line( (string) $request['domain'], (string) $request['mode'], (string) ( $request['auth_code'] ?? '' ), (string) ( $request['dns'] ?? '' ), (int) ( $request['mail_for'] ?? 0 ), null === $request->get_param( 'whois_privacy' ) ? true : rest_sanitize_boolean( $request->get_param( 'whois_privacy' ) ) );

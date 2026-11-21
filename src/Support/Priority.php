@@ -52,12 +52,7 @@ final class Priority {
 
 	/** What priority support promises, in plain words. */
 	public static function promise(): string {
-		/**
-		 * Filters the promise of priority support (a site with other hours says so here).
-		 *
-		 * @param string $text The sentence.
-		 */
-		return (string) apply_filters( 'beltoft_services_priority_promise', __( 'Priority support: we answer within 4 hours, from 8 to 22 every day, weekends included.', 'beltoft-services' ) );
+		return __( 'Priority support: we answer within 4 hours, from 8 to 22 every day, weekends included.', 'beltoft-services' );
 	}
 
 	/**

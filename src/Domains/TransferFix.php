@@ -74,13 +74,7 @@ final class TransferFix {
 			$why = self::AUTH;
 		}
 
-		/**
-		 * The fixable reason of a transfer failure.
-		 *
-		 * @param string $why  auth_refused, locked or ''.
-		 * @param string $text The registrar's text, lower case.
-		 */
-		return (string) apply_filters( 'beltoft_services_transfer_fix_reason', $why, $text );
+		return $why;
 	}
 
 	/**

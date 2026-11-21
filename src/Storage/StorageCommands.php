@@ -48,13 +48,6 @@ final class StorageCommands {
 			),
 		);
 
-		/**
-		 * The ready-made commands of a storage box. Never add a password.
-		 *
-		 * @param array<string, string[]> $commands Tool => lines.
-		 * @param string                  $host     Host name.
-		 * @param string                  $user     User name.
-		 */
-		return (array) apply_filters( 'beltoft_services_storage_commands', $commands, $host, $user );
+		return $commands;
 	}
 }

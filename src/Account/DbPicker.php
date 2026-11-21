@@ -192,17 +192,6 @@ final class DbPicker {
 			return $fail( 'plan', __( 'That plan is out of stock. Choose another plan.', 'beltoft-services' ) );
 		}
 
-		/**
-		 * Whether this customer can order this database plan now (a site rule).
-		 *
-		 * @param bool                 $allowed Default true.
-		 * @param array<string, mixed> $plan    The plan.
-		 * @param int                  $user    Customer.
-		 */
-		if ( ! apply_filters( 'beltoft_services_db_picker_can_buy', true, $plan, $user ) ) {
-			return $fail( 'plan', __( 'This plan cannot be ordered right now.', 'beltoft-services' ) );
-		}
-
 		$added = self::add_to_cart( $plan );
 
 		if ( null !== $added ) {

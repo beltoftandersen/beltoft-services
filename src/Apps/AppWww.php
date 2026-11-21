@@ -67,7 +67,7 @@ final class AppWww {
 		}
 		$registrable = PublicSuffix::registrable( $name );
 		$apex        = null !== $registrable ? $registrable === $name : 2 === count( explode( '.', $name ) );
-		return (bool) apply_filters( 'beltoft_services_app_www_apex', $apex, $name );
+		return $apex;
 	}
 
 	/** The name an app serves for a domain: 'www.' plus the domain, '' when it does not apply. */

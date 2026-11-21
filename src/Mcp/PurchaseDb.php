@@ -98,11 +98,6 @@ final class PurchaseDb {
 			return $fail( __( 'That plan is out of stock. Choose another plan.', 'beltoft-services' ) );
 		}
 
-		/** This filter is documented in src/Account/DbPicker.php. */
-		if ( ! apply_filters( 'beltoft_services_db_picker_can_buy', true, $plan, $user_id ) ) {
-			return $fail( __( 'This plan cannot be ordered right now.', 'beltoft-services' ) );
-		}
-
 		$quote = Pricing::quote( array( 'plan' => (int) $plan['variation_id'], 'public_ipv4' => $ip, 'extra_storage_gb' => $gb ) );
 
 		if ( $quote instanceof \WP_Error ) {

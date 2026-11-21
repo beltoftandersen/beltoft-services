@@ -91,24 +91,10 @@ final class Reference {
 			return self::html_full();
 		}
 
-		/**
-		 * Whether to load the API reference stylesheet.
-		 *
-		 * @param bool $load Load it, default true.
-		 */
-		if ( apply_filters( 'beltoft_services_api_reference_css', true ) ) {
-			wp_enqueue_style( self::HANDLE, plugins_url( 'assets/api-reference.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/api-reference.css' ) );
-		}
+		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/api-reference.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/api-reference.css' ) );
 
-		/**
-		 * Whether to load the API reference script (copy buttons and the highlight of the current section).
-		 *
-		 * @param bool $load Load it, default true.
-		 */
-		if ( apply_filters( 'beltoft_services_api_reference_js', true ) ) {
-			self::core_script();
-			wp_enqueue_script( self::HANDLE, plugins_url( 'assets/api-reference.js', BELTOFT_SERVICES_FILE ), array( self::CORE_HANDLE, \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/api-reference.js' ), array( 'strategy' => 'defer', 'in_footer' => true ) );
-		}
+		self::core_script();
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/api-reference.js', BELTOFT_SERVICES_FILE ), array( self::CORE_HANDLE, \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/api-reference.js' ), array( 'strategy' => 'defer', 'in_footer' => true ) );
 
 		ob_start();
 		wc_get_template( 'api-reference.php', self::data(), 'beltoft-services/', BELTOFT_SERVICES_PATH . 'templates/' );
@@ -127,16 +113,10 @@ final class Reference {
 	 * The full width layout: its own stylesheet, script and template.
 	 */
 	private static function html_full(): string {
-		/** This filter is documented in html(). */
-		if ( apply_filters( 'beltoft_services_api_reference_css', true ) ) {
-			wp_enqueue_style( self::HANDLE . '-full', plugins_url( 'assets/api-reference-full.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/api-reference-full.css' ) );
-		}
+		wp_enqueue_style( self::HANDLE . '-full', plugins_url( 'assets/api-reference-full.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/api-reference-full.css' ) );
 
-		/** This filter is documented in html(). */
-		if ( apply_filters( 'beltoft_services_api_reference_js', true ) ) {
-			self::core_script();
-			wp_enqueue_script( self::HANDLE . '-full', plugins_url( 'assets/api-reference-full.js', BELTOFT_SERVICES_FILE ), array( self::CORE_HANDLE, \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/api-reference-full.js' ), array( 'strategy' => 'defer', 'in_footer' => true ) );
-		}
+		self::core_script();
+		wp_enqueue_script( self::HANDLE . '-full', plugins_url( 'assets/api-reference-full.js', BELTOFT_SERVICES_FILE ), array( self::CORE_HANDLE, \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/api-reference-full.js' ), array( 'strategy' => 'defer', 'in_footer' => true ) );
 
 		$data              = self::data();
 		$data['languages'] = self::languages();

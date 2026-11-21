@@ -65,14 +65,6 @@ final class Databases extends ServiceArea {
 	public function buttons(): array {
 		$url = '' !== self::product_url( array( DbDriver::ID ) ) ? $this->url_new() : '';
 
-		/**
-		 * The address of the "Create a database" button: the New database page when a database product is published.
-		 * Return '' for no button.
-		 *
-		 * @param string $url Address, or ''.
-		 */
-		$url = (string) apply_filters( 'beltoft_services_databases_add_url', $url );
-
 		return '' === $url ? array() : array(
 			array(
 				'label' => __( 'Create a database', 'beltoft-services' ),

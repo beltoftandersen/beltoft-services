@@ -773,13 +773,6 @@ final class HostingView {
 		$url = trim( (string) Settings::get( 'hosting_move_url' ) );
 		$url = '' === $url || 0 === strpos( $url, '//' ) ? '' : esc_url_raw( 0 === strpos( $url, '/' ) ? home_url( $url ) : $url );
 
-		/**
-		 * The address of the "Request a move" button on the hosting account page. Return '' for no panel.
-		 *
-		 * @param string $url The setting, as a full address, or ''.
-		 */
-		$url = (string) apply_filters( 'beltoft_services_hosting_move_url', $url );
-
 		if ( '' === $url ) {
 			return null;
 		}

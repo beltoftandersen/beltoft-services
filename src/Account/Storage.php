@@ -28,15 +28,10 @@ final class Storage extends ServiceArea {
 	}
 
 	/**
-	 * The "Order backup storage" button: the first published product that uses the storage driver, or what the filter says.
+	 * The "Order backup storage" button: the first published product that uses the storage driver.
 	 */
 	public function url_add(): string {
-		/**
-		 * The address of the "Order backup storage" button. Return '' for no button.
-		 *
-		 * @param string $url The first storage product, or ''.
-		 */
-		return (string) apply_filters( 'beltoft_services_storage_add_url', self::product_url( array( 'storage' ) ) );
+		return self::product_url( array( 'storage' ) );
 	}
 
 	/**

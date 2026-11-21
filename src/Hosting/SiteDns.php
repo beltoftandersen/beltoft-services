@@ -126,12 +126,7 @@ final class SiteDns {
 	public static function denied( string $host ): bool {
 		$list = preg_split( '/[\s,]+/', strtolower( (string) Settings::get( 'hosting_denied_domains' ) ), -1, PREG_SPLIT_NO_EMPTY );
 
-		/**
-		 * Domains customers may not point at their hosting.
-		 *
-		 * @param string[] $list Lower case domains.
-		 */
-		$list = (array) apply_filters( 'beltoft_services_hosting_denied_domains', is_array( $list ) ? $list : array() );
+		$list = is_array( $list ) ? $list : array();
 
 		foreach ( $list as $domain ) {
 			$domain = rtrim( strtolower( (string) $domain ), '.' );

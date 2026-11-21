@@ -438,7 +438,7 @@ final class Tokens {
 			return self::refuse( 'beltoft_services_token_scope', __( 'This token can only read. Make a token with actions to change something.', 'beltoft-services' ), 403 );
 		}
 
-		if ( preg_match( '#/actions/([a-z0-9_-]+)$#D', $route, $m ) && ( 1 === preg_match( self::BLOCKED_ACTION, $m[1] ) || in_array( $m[1], self::full_only_actions(), true ) || in_array( $m[1], self::dashboard_only_actions(), true ) || self::risky_action( $m[1], $request->get_param( 'args' ) ) || in_array( $m[1], (array) apply_filters( 'beltoft_services_token_blocked_actions', array() ), true ) ) ) {
+		if ( preg_match( '#/actions/([a-z0-9_-]+)$#D', $route, $m ) && ( 1 === preg_match( self::BLOCKED_ACTION, $m[1] ) || in_array( $m[1], self::full_only_actions(), true ) || in_array( $m[1], self::dashboard_only_actions(), true ) || self::risky_action( $m[1], $request->get_param( 'args' ) ) ) ) {
 			return self::refuse( 'beltoft_services_token_action', __( 'This action is only available in your dashboard.', 'beltoft-services' ), 403 );
 		}
 

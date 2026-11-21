@@ -478,7 +478,7 @@ final class TransferDns {
 			return new \WP_Error( 'bad_nonce', __( 'Refresh the page and try again.', 'beltoft-services' ), array( 'status' => 403 ) );
 		}
 
-		if ( RateLimit::exceeded( RateLimit::visitor(), 'transfer-dns', (int) apply_filters( 'beltoft_services_domain_cart_limit', 20 ) ) ) {
+		if ( RateLimit::exceeded( RateLimit::visitor(), 'transfer-dns', 20 ) ) {
 			return new \WP_Error( 'rate_limited', __( 'Too many requests. Please wait a minute.', 'beltoft-services' ), array( 'status' => 429 ) );
 		}
 

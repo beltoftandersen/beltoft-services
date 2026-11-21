@@ -222,14 +222,7 @@ final class StorageSettings {
 	public static function shown_host( string $alias, string $username, string $host ): string {
 		$shown = '' !== $alias && self::alias_enabled() ? $alias : $host;
 
-		/**
-		 * The host name a customer is shown for a storage box.
-		 *
-		 * @param string $shown    The name.
-		 * @param string $username Box user name.
-		 * @param string $host     The provider's own host name.
-		 */
-		return (string) apply_filters( 'beltoft_services_storage_host', $shown, $username, $host );
+		return $shown;
 	}
 
 	/**

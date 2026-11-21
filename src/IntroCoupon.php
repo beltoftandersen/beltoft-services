@@ -116,13 +116,7 @@ final class IntroCoupon {
 			return $label;
 		}
 
-		/**
-		 * Filters the name of the intro coupon in the cart and checkout totals.
-		 *
-		 * @param string     $name   Name.
-		 * @param \WC_Coupon $coupon Coupon.
-		 */
-		return (string) apply_filters( 'beltoft_services_intro_coupon_label', __( 'First year discount', 'beltoft-services' ), $coupon );
+		return __( 'First year discount', 'beltoft-services' );
 	}
 
 	/**

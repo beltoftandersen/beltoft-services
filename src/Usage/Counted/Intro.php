@@ -52,13 +52,7 @@ final class Intro {
 		$own       = $variation instanceof \WC_Product ? (string) $variation->get_meta( '_beltoft_services_intro_days' ) : '';
 		$days      = '' !== $own && is_numeric( $own ) ? (int) $own : (int) Settings::get( 'counted_intro_days' );
 
-		/**
-		 * Filters the days of free intro of a counted service.
-		 *
-		 * @param int      $days Days, 0 for none.
-		 * @param Resource $r    Resource.
-		 */
-		return max( 0, (int) apply_filters( 'beltoft_services_counted_intro_days', $days, $r ) );
+		return max( 0, (int) $days );
 	}
 
 	/**

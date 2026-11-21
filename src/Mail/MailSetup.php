@@ -74,14 +74,7 @@ final class MailSetup {
 			return '<!-- beltoft-services: the mail host name is not set -->';
 		}
 
-		/**
-		 * Whether to load the mail setup stylesheet.
-		 *
-		 * @param bool $load Load it, default true.
-		 */
-		if ( apply_filters( 'beltoft_services_mail_setup_css', true ) ) {
-			wp_enqueue_style( self::HANDLE, plugins_url( 'assets/mail-setup.css', BELTOFT_SERVICES_FILE ), array(), Assets::version( 'assets/mail-setup.css' ) );
-		}
+		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/mail-setup.css', BELTOFT_SERVICES_FILE ), array(), Assets::version( 'assets/mail-setup.css' ) );
 
 		$webmail = esc_url_raw( trim( (string) \BeltoftServices\Settings::get( 'mail_webmail_url' ) ), array( 'https' ) );
 

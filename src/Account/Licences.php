@@ -29,17 +29,12 @@ final class Licences extends ServiceArea {
 	}
 
 	/**
-	 * The "Order a licence" button: the first published product that uses the licence driver, or what the filter says.
+	 * The "Order a licence" button: the first published product that uses the licence driver.
 	 */
 	public function url_add(): string {
 		$url = self::product_url( array( 'licence-key' ) );
 
-		/**
-		 * The address of the "Order a licence" button. Return '' for no button.
-		 *
-		 * @param string $url The first licence product, or ''.
-		 */
-		return (string) apply_filters( 'beltoft_services_licences_add_url', $url );
+		return (string) $url;
 	}
 
 	/**

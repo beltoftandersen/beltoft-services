@@ -46,8 +46,7 @@ final class Rates {
 
 	/**
 	 * Variation meta: the price of one counted unit, a number in the shop's currency, excluding VAT. Another currency has its own
-	 * meta, this name plus an underscore and the code (`_beltoft_services_unit_price_DKK`), or an answer from the filter
-	 * `beltoft_services_unit_price`. The variation's own price stays 0: nothing is charged at checkout.
+	 * meta, this name plus an underscore and the code (`_beltoft_services_unit_price_DKK`). The variation's own price stays 0: nothing is charged at checkout.
 	 */
 	public const META_UNIT_PRICE = '_beltoft_services_unit_price';
 
@@ -173,15 +172,6 @@ final class Rates {
 		$code = '' !== $code ? $code : Currency::base();
 		$meta = Currency::base() === $code ? (string) $variation->get_meta( self::META_UNIT_PRICE ) : (string) $variation->get_meta( self::META_UNIT_PRICE . '_' . $code );
 		$price = is_numeric( $meta ) && (float) $meta > 0 ? (float) $meta : null;
-
-		/**
-		 * Filters the price of one counted unit: a site that keeps its prices elsewhere answers here.
-		 *
-		 * @param float|null  $price     Price excluding VAT in that currency, or null.
-		 * @param \WC_Product $variation Variation.
-		 * @param string      $currency  Currency code.
-		 */
-		$price = apply_filters( 'beltoft_services_unit_price', $price, $variation, $code );
 
 		return is_numeric( $price ) && (float) $price > 0 ? (float) $price : null;
 	}

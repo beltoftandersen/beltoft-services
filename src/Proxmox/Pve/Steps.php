@@ -240,7 +240,7 @@ trait Steps {
 	 * The VM read again after a power task, until it shows the wanted power state. A task that ended OK can be
 	 * followed by a status that still shows the old state for a moment (a VM that is still shutting down, a start
 	 * that is not listed yet, Proxmox refreshes the status every few seconds): the VM is read again every 2 seconds
-	 * for up to 20 seconds (filter `beltoft_services_power_settle`, seconds), never past the run's budget, so that
+	 * for up to 20 seconds, never past the run's budget, so that
 	 * lag is not taken for a failure. Filter `beltoft_services_proxmox_pause` (callable, seconds) replaces the
 	 * sleep, for tests; the settle time counts the seconds asked for, not the clock.
 	 *
@@ -252,12 +252,7 @@ trait Steps {
 	protected function reread_power( array $record, string $step, bool $running, ?int $seconds = null ) {
 		$v = $this->verified( $record, $step );
 
-		/**
-		 * Seconds a VM is read again for after a power task.
-		 *
-		 * @param int $seconds Default 20.
-		 */
-		$settle = max( 0, (int) apply_filters( 'beltoft_services_power_settle', $seconds ?? 20 ) );
+		$settle = max( 0, (int) ( $seconds ?? 20 ) );
 		$waited = 0;
 
 		while ( is_array( $v ) && $running !== ( 'running' === $v['status'] ) && $waited + 2 <= $settle && Jobs::time_left() >= 2 ) {

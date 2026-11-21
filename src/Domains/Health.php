@@ -33,7 +33,7 @@ final class Health {
 		$raw = Settings::get( 'domain_infrastructure_zones' );
 		$raw = is_string( $raw ) ? $raw : '';
 		$zones = array_map( static fn( $zone ) => strtolower( trim( $zone, " .\t\r\n" ) ), explode( ',', $raw ) );
-		return array_values( array_filter( apply_filters( 'beltoft_services_domain_infrastructure_zones', $zones ) ) );
+		return array_values( array_filter( $zones ) );
 	}
 
 	/** @return string[]|\WP_Error DNS problems found in the primary and configured secondaries. */

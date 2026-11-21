@@ -84,12 +84,6 @@ final class DbEngines {
 			'mssql'            => __( 'Microsoft SQL Server, Express edition', 'beltoft-services' ),
 		);
 
-		/**
-		 * The line under an engine's name on the New database page.
-		 *
-		 * @param string $line Line ('' for none).
-		 * @param string $id   Engine id.
-		 */
-		return (string) apply_filters( 'beltoft_services_db_engine_description', $lines[ $id ] ?? '', $id );
+		return $lines[ $id ] ?? '';
 	}
 }

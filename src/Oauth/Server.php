@@ -136,7 +136,7 @@ final class Server {
 			'authorization_servers'    => array( self::issuer() ),
 			'bearer_methods_supported' => array( 'header' ),
 			'scopes_supported'         => array( Tokens::READ, Tokens::ACTIONS, Tokens::FULL ),
-			'resource_name'            => (string) apply_filters( 'beltoft_services_mcp_resource_name', get_bloginfo( 'name' ) ),
+			'resource_name'            => (string) get_bloginfo( 'name' ),
 		);
 	}
 
@@ -236,7 +236,7 @@ final class Server {
 			return self::oauth_error( 'temporarily_unavailable', 'This feature is turned off.', 503 );
 		}
 
-		if ( RateLimit::exceeded( RateLimit::visitor(), 'beltoft-oauth:token', (int) apply_filters( 'beltoft_services_oauth_token_limit', 600 ) ) ) {
+		if ( RateLimit::exceeded( RateLimit::visitor(), 'beltoft-oauth:token', 600 ) ) {
 			return self::oauth_error( 'temporarily_unavailable', 'Too many requests.', 429 );
 		}
 

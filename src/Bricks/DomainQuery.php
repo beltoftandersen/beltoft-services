@@ -248,7 +248,7 @@ final class DomainQuery {
 		if ( ! wp_verify_nonce( $nonce, self::ACTION . '_' . $domain ) ) {
 			wp_die( esc_html__( 'This link has expired. Go back, search again and try again.', 'beltoft-services' ), '', array( 'response' => 403, 'back_link' => true ) );
 		}
-		if ( RateLimit::exceeded( RateLimit::visitor(), 'domain-cart', (int) apply_filters( 'beltoft_services_domain_cart_limit', 20 ) ) ) {
+		if ( RateLimit::exceeded( RateLimit::visitor(), 'domain-cart', 20 ) ) {
 			wp_die( esc_html__( 'Too many requests. Please wait a minute.', 'beltoft-services' ), '', array( 'response' => 429, 'back_link' => true ) );
 		}
 		// add_line asks the registrar again and refuses a name that is not free.

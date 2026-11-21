@@ -333,22 +333,14 @@ final class Panel {
 	}
 
 	/**
-	 * The layout stylesheet. Themes can turn it off with the beltoft_services_account_css filter.
+	 * The layout stylesheet.
 	 */
 	public static function style(): void {
-		/**
-		 * Whether to load the service panel's layout stylesheet on My Account.
-		 *
-		 * @param bool $load Load it, default true.
-		 */
-		if ( apply_filters( 'beltoft_services_account_css', true ) ) {
-			wp_enqueue_style( self::HANDLE, plugins_url( 'assets/account.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/account.css' ) );
-		}
+		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/account.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/account.css' ) );
 	}
 
 	/**
-	 * The script and stylesheet, only on the My Account licenses endpoint and its extra tabs. Themes can turn the
-	 * stylesheet off with the beltoft_services_account_css filter.
+	 * The script and stylesheet, only on the My Account licenses endpoint and its extra tabs.
 	 */
 	public static function assets(): void {
 		if ( ! function_exists( 'is_wc_endpoint_url' ) || ! array_filter( array_map( 'is_wc_endpoint_url', Endpoint::slugs() ) ) ) {

@@ -65,12 +65,10 @@ final class HostingAccount {
 	public const OPTIONAL_ITEMS = array( 'password' );
 
 	/**
-	 * The hosting panel's stylesheet. Themes can turn it off with the beltoft_services_account_css filter, like the panel's.
+	 * The hosting panel's stylesheet.
 	 */
 	public static function style(): void {
-		if ( apply_filters( 'beltoft_services_account_css', true ) ) {
-			wp_enqueue_style( self::HANDLE, plugins_url( 'assets/hosting.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/hosting.css' ) );
-		}
+		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/hosting.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/hosting.css' ) );
 	}
 
 	/**

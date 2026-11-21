@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * A counted item is billed per unit, not per hour, and has no monthly cap. Its ledger item is a base name and, for the second step
  * of a price in steps and later, an underscore and the step number (`order`, `order_2`, `order_3`). The base names and their words
- * are here and can be added to through the filter `beltoft_services_usage_item_defs`; the hourly items (server, database, ...)
+ * are here; the hourly items (server, database, ...)
  * are declared by the drivers (Drivers\UsageItems), read here.
  */
 final class Items {
@@ -37,13 +37,6 @@ final class Items {
 				'plural'   => __( 'orders', 'beltoft-services' ),
 			),
 		);
-
-		/**
-		 * Filters the counted items: base name => label (the line title), singular and plural (the unit).
-		 *
-		 * @param array<string, array<string, string>> $defs Definitions.
-		 */
-		$defs = apply_filters( 'beltoft_services_usage_item_defs', $defs );
 
 		if ( ! is_array( $defs[ $base ] ?? null ) ) {
 			return null;

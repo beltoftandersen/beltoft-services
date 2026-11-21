@@ -83,9 +83,7 @@ final class DedicatedClients {
 		}
 
 		$fake     = new FakeRobotClient();
-		$filtered = apply_filters( 'beltoft_services_dedicated_client', $fake );
-
-		return $filtered instanceof FakeRobotClient ? $filtered : $fake;
+		return $fake;
 	}
 
 	/**

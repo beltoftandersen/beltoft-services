@@ -18,8 +18,7 @@ defined( 'ABSPATH' ) || exit;
  * product, "Plesk" (software slug `plesk`, driver proxmox-app, plan field app=plesk), with a "Tier" attribute and three
  * monthly variations (plan fields `tier` and `tier_label`). The product is a draft: the owner publishes it. Without
  * --prices no price is set; with it each tier gets its monthly price (the shop's price as entered, EUR).
- * It refuses to run when a product with the slug exists, so it is safe to run twice. The tiers can be changed with the
- * filter `beltoft_services_plesk_tiers`.
+ * It refuses to run when a product with the slug exists, so it is safe to run twice.
  */
 final class PleskProductCommand {
 
@@ -37,14 +36,7 @@ final class PleskProductCommand {
 			'host'  => 'Web Host',
 		);
 
-		/**
-		 * The tiers of the Plesk product the CLI creates.
-		 *
-		 * @param array<string, string> $tiers Tier key => name.
-		 */
-		$filtered = apply_filters( 'beltoft_services_plesk_tiers', $tiers );
-
-		return is_array( $filtered ) && array() !== $filtered ? $filtered : $tiers;
+		return $tiers;
 	}
 
 	/**

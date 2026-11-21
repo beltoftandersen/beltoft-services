@@ -45,13 +45,7 @@ final class MenuCounts {
 			}
 		}
 
-		/**
-		 * The service counts of the My Account menu items.
-		 *
-		 * @param array<string, int> $counts  Menu item slug => number.
-		 * @param int                $user_id Customer.
-		 */
-		return self::$cache[ $user_id ] = (array) apply_filters( 'beltoft_services_account_menu_counts', $counts, $user_id );
+		return self::$cache[ $user_id ] = $counts;
 	}
 
 	/**

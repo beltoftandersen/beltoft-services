@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.55.1
+Stable tag: 0.55.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -37,7 +37,7 @@ Connection secrets are encrypted with a key from `wp-config.php`, and they are n
 = Hooks =
 
 * Actions: `beltoft_services_state_changed( $resource, $old_state, $new_state )` after each state change; `beltoft_services_deletion_warning( $resource, $deletes_at )` when a customer is warned before a deletion; `beltoft_services_resource_locked( $license_id )` when a service is busy in another request; `beltoft_services_settings_tab_<tab>` renders a settings tab added by a plugin.
-* Filters: `beltoft_services_drivers` (add a driver), `beltoft_services_connection` (supply or change an HTTP connection), `beltoft_services_http_unit_label` (the usage line, for example "%1$d of %2$d dashboards"), `beltoft_services_key` (the secrets key), `beltoft_services_settings_tabs`, `_settings_sections` and `_settings_fields`, `beltoft_services_account_css` (turn off the account stylesheet), `beltoft_services_rest_rate_limit`, `beltoft_services_usage_refresh_interval`, `beltoft_services_lock_timeout`, `beltoft_services_desire_lock_wait`, `beltoft_services_dependencies` and `beltoft_services_database_server_info`.
+* Filters: `beltoft_services_drivers` (add a driver), `beltoft_services_connection` (supply or change an HTTP connection), `beltoft_services_http_unit_label` (the usage line, for example "%1$d of %2$d dashboards"), `beltoft_services_key` (the secrets key), `beltoft_services_settings_tabs`, `_settings_sections` and `_settings_fields`, `beltoft_services_rest_rate_limit`, `beltoft_services_lock_timeout`, `beltoft_services_desire_lock_wait`, `beltoft_services_dependencies` and `beltoft_services_database_server_info`.
 
 = Developer API =
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.55.2 =
+* Removed 45 filters that nothing used (no change in behaviour).
 
 = 0.55.1 =
 * Filter `beltoft_services_licences_client`: licence orders may use the fake registrar while domains keep theirs (staging, where the Openprovider sandbox orders no licences). Only the fake is taken.

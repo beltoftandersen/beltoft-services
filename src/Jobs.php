@@ -883,7 +883,7 @@ final class Jobs {
 
 	/**
 	 * Queues a refresh of the driver's status (usage) for a resource, at most once per
-	 * interval (filter beltoft_services_usage_refresh_interval). The refresh runs as a job, so
+	 * interval. The refresh runs as a job, so
 	 * no page or REST request waits for the service.
 	 *
 	 * @param int $activation_id Activation id.
@@ -899,13 +899,7 @@ final class Jobs {
 			return;
 		}
 
-		/**
-		 * Seconds between two usage refreshes of one resource.
-		 *
-		 * @param int $seconds Seconds, default 300.
-		 * @param int $activation_id Activation id.
-		 */
-		$interval = max( 1, (int) apply_filters( 'beltoft_services_usage_refresh_interval', self::USAGE_INTERVAL, $activation_id ) );
+		$interval = max( 1, self::USAGE_INTERVAL );
 
 		set_transient( $transient, 1, $interval );
 

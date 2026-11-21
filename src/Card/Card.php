@@ -221,12 +221,7 @@ final class Card {
 	 * @param string $gateway Payment method id.
 	 */
 	public static function needs_token( string $gateway ): bool {
-		/**
-		 * Gateway id prefixes whose subscriptions are charged from a saved token (Stripe for WooCommerce: stripe_).
-		 *
-		 * @param string[] $prefixes Prefixes.
-		 */
-		$prefixes = (array) apply_filters( 'beltoft_services_card_token_gateways', array( 'stripe_' ) );
+		$prefixes = array( 'stripe_' );
 
 		foreach ( $prefixes as $prefix ) {
 			if ( '' !== (string) $prefix && str_starts_with( $gateway, (string) $prefix ) ) {
@@ -251,13 +246,7 @@ final class Card {
 			$keys[] = '_wc_stripe_customer';
 		}
 
-		/**
-		 * Subscription meta a renewal of this account needs.
-		 *
-		 * @param string[]         $keys    Meta keys.
-		 * @param \WC_Subscription $account The account.
-		 */
-		return (array) apply_filters( 'beltoft_services_card_required_meta', $keys, $account );
+		return $keys;
 	}
 
 	// ------------------------------------------------------------------ the saved card (a WooCommerce token).
@@ -386,14 +375,7 @@ final class Card {
 			}
 		}
 
-		/**
-		 * The fingerprint of the account's saved card.
-		 *
-		 * @param string                 $fingerprint Fingerprint, or ''.
-		 * @param \WC_Payment_Token|null $token       The saved token.
-		 * @param \WC_Subscription       $account     The account.
-		 */
-		return trim( (string) apply_filters( 'beltoft_services_card_fingerprint', $fingerprint, $token, $account ) );
+		return trim( (string) $fingerprint );
 	}
 
 	// ------------------------------------------------------------------ the default card is the account's card.

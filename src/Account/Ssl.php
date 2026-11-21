@@ -28,17 +28,12 @@ final class Ssl extends ServiceArea {
 	}
 
 	/**
-	 * The "Order a certificate" button: the first published product that uses the ssl driver, or what the filter says.
+	 * The "Order a certificate" button: the first published product that uses the ssl driver.
 	 */
 	public function url_add(): string {
 		$url = self::product_url( array( 'ssl' ) );
 
-		/**
-		 * The address of the "Order a certificate" button. Return '' for no button.
-		 *
-		 * @param string $url The first certificate product, or ''.
-		 */
-		return (string) apply_filters( 'beltoft_services_ssl_add_url', $url );
+		return (string) $url;
 	}
 
 	/**

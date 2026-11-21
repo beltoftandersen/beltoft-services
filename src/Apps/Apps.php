@@ -351,7 +351,7 @@ final class Apps {
 				return null;
 			}
 			$version['sha256'] = $hash;
-			$base = (string) apply_filters( 'beltoft_services_app_base_url', plugins_url( 'apps/', BELTOFT_SERVICES_FILE ) );
+			$base = plugins_url( 'apps/', BELTOFT_SERVICES_FILE );
 			$version['url'] = set_url_scheme( trailingslashit( $base ) . $id . '/' . $version_id . '/' . $script, 'https' );
 			return array_merge( $data, $version, array( 'version_id' => $version_id ) );
 		}
