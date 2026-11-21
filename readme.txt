@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.55.0
+Stable tag: 0.55.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.55.1 =
+* Filter `beltoft_services_licences_client`: licence orders may use the fake registrar while domains keep theirs (staging, where the Openprovider sandbox orders no licences). Only the fake is taken.
 
 = 0.55.0 =
 * Every database has its public card with IPv6: the setting "IPv6 for databases" and the old way of adding and removing a public card (shut down, write net0, start) are gone. An IPv4 address is added and removed like a server's main address (one restart). The IPv6 switch is no longer offered on databases.

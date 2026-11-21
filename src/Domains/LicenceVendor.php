@@ -28,10 +28,21 @@ final class LicenceVendor {
 	public const TRIES = 12;
 
 	/**
-	 * The registrar client (the fake, the sandbox or the live one, as Clients decides).
+	 * The registrar client (the fake, the sandbox or the live one, as Clients decides). The filter
+	 * `beltoft_services_licences_client` may swap it for the fake only (staging: the Openprovider sandbox orders no
+	 * licences), never for another real client.
 	 */
 	public static function client(): Client {
-		return Clients::registrar();
+		$client = Clients::registrar();
+
+		/**
+		 * The client for licence orders. Only a FakeClient is taken.
+		 *
+		 * @param Client $client The registrar client.
+		 */
+		$filtered = apply_filters( 'beltoft_services_licences_client', $client );
+
+		return $filtered instanceof FakeClient ? $filtered : $client;
 	}
 
 	/**

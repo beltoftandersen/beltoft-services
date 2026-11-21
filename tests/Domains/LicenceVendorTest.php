@@ -14,12 +14,31 @@ final class LicenceVendorTest extends TestCase {
 
 	public function tear_down(): void {
 		remove_all_filters( 'beltoft_services_domains_client' );
+		remove_all_filters( 'beltoft_services_licences_client' );
 		parent::tear_down();
 	}
 
 	public function test_the_client_is_the_one_clients_gives_so_a_test_or_staging_gets_the_fake(): void {
 		$fake = new FakeClient();
 		add_filter( 'beltoft_services_domains_client', fn() => $fake );
+
+		$this->assertSame( $fake, LicenceVendor::client() );
+	}
+
+	public function test_licences_alone_may_use_the_fake_while_domains_keep_the_registrar(): void {
+		$domains = new FakeClient();
+		$licences = new FakeClient();
+		add_filter( 'beltoft_services_domains_client', fn() => $domains );
+		add_filter( 'beltoft_services_licences_client', fn() => $licences );
+
+		$this->assertSame( $licences, LicenceVendor::client() );
+		$this->assertSame( $domains, \BeltoftServices\Domains\Clients::registrar() );
+	}
+
+	public function test_the_licence_filter_takes_nothing_but_the_fake(): void {
+		$fake = new FakeClient();
+		add_filter( 'beltoft_services_domains_client', fn() => $fake );
+		add_filter( 'beltoft_services_licences_client', fn() => new \BeltoftServices\Domains\LiveClient( 'sandbox', 'u', 'p' ) );
 
 		$this->assertSame( $fake, LicenceVendor::client() );
 	}
