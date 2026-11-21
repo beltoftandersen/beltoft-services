@@ -168,6 +168,41 @@ final class ProgressTest extends TestCase {
 		$this->assertSame( 'In progress', $p['steps'][2]['status_label'] );
 	}
 
+	public function test_a_server_plan_without_ipv4_shows_no_address_step(): void {
+		list( $r ) = $this->resource( 'proxmox', array( 'state' => 'provisioning', 'steps' => array( 'vmid' ) ) );
+
+		$p = Progress::build( $r );
+
+		$this->assertSame( array( 'vmid' => 'done', 'clone' => 'current', 'configure' => 'todo', 'start' => 'todo', 'ready' => 'todo' ), $this->statuses( $p ) );
+		$this->assertSame( 'clone', $p['current'] );
+	}
+
+	public function test_a_server_plan_with_ipv4_still_shows_the_address_step(): void {
+		list( $r ) = $this->resource( 'proxmox', array( 'state' => 'provisioning', 'steps' => array() ) );
+
+		$p = Progress::build( $r );
+
+		$this->assertArrayHasKey( 'ip', $this->statuses( $p ) );
+		$this->assertSame( 'ip', $p['current'] );
+	}
+
+	public function test_a_database_without_ipv4_shows_no_address_step(): void {
+		list( $r ) = $this->resource( 'proxmox-db', array( 'state' => 'provisioning', 'steps' => array( 'net', 'vmid' ) ) );
+
+		$p = Progress::build( $r );
+
+		$this->assertArrayNotHasKey( 'ip', $this->statuses( $p ) );
+		$this->assertSame( 'clone', $p['current'] );
+	}
+
+	public function test_a_step_left_open_while_a_later_one_is_done_does_not_block_the_view(): void {
+		list( $r ) = $this->resource( 'proxmox', array( 'state' => 'provisioning', 'steps' => array( 'vmid', 'clone' ) ) );
+
+		$p = Progress::build( $r );
+
+		$this->assertSame( array( 'vmid' => 'done', 'clone' => 'done', 'configure' => 'current', 'start' => 'todo', 'ready' => 'todo' ), $this->statuses( $p ) );
+	}
+
 	public function test_a_new_service_waits_in_the_queue_with_no_current_step(): void {
 		list( $r ) = $this->resource( 'proxmox', array( 'state' => 'requested' ) );
 

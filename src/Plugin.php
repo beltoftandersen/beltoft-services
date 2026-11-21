@@ -272,6 +272,7 @@ final class Plugin {
 		Proxmox\Db\DbAccessRoute::register();
 		Proxmox\Db\DbNeedsServer::register();
 		Proxmox\Db\DbNetGuard::register();
+		Proxmox\Db\DbIp::register();
 		Proxmox\Vm\Panels::register();
 		Proxmox\Vm\EmailDetails::register();
 		Proxmox\Vm\ProxmoxJobs::register();

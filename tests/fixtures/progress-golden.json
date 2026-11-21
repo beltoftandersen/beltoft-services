@@ -1260,12 +1260,6 @@
         "title": "Setting up your service",
         "steps": [
             {
-                "key": "ip",
-                "label": "Reserving a public IP address",
-                "status": "todo",
-                "status_label": "Waiting"
-            },
-            {
                 "key": "net",
                 "label": "Reserving a private address",
                 "status": "todo",
@@ -1330,16 +1324,10 @@
         "title": "Setting up your service",
         "steps": [
             {
-                "key": "ip",
-                "label": "Reserving a public IP address",
-                "status": "current",
-                "status_label": "In progress"
-            },
-            {
                 "key": "net",
                 "label": "Reserving a private address",
-                "status": "todo",
-                "status_label": "Waiting"
+                "status": "current",
+                "status_label": "In progress"
             },
             {
                 "key": "vmid",
@@ -1384,7 +1372,7 @@
                 "status_label": "Waiting"
             }
         ],
-        "current": "ip",
+        "current": "net",
         "minutes": 3,
         "eta": "Usually about 3 minutes.",
         "text": "Setting up your service. Usually about 3 minutes.",
@@ -1399,12 +1387,6 @@
         "active": true,
         "title": "Setting up your service",
         "steps": [
-            {
-                "key": "ip",
-                "label": "Reserving a public IP address",
-                "status": "done",
-                "status_label": "Done"
-            },
             {
                 "key": "net",
                 "label": "Reserving a private address",
@@ -1469,12 +1451,6 @@
         "active": false,
         "title": "Setting up your service",
         "steps": [
-            {
-                "key": "ip",
-                "label": "Reserving a public IP address",
-                "status": "done",
-                "status_label": "Done"
-            },
             {
                 "key": "net",
                 "label": "Reserving a private address",
@@ -1885,18 +1861,6 @@
         "title": "Setting up your service",
         "steps": [
             {
-                "key": "ip",
-                "label": "Reserving a public IP address",
-                "status": "done",
-                "status_label": "Done"
-            },
-            {
-                "key": "net",
-                "label": "Reserving a private address",
-                "status": "current",
-                "status_label": "In progress"
-            },
-            {
                 "key": "vmid",
                 "label": "Preparing the server",
                 "status": "done",
@@ -1905,8 +1869,8 @@
             {
                 "key": "clone",
                 "label": "Creating the server",
-                "status": "todo",
-                "status_label": "Waiting"
+                "status": "current",
+                "status_label": "In progress"
             },
             {
                 "key": "configure",
@@ -1939,7 +1903,7 @@
                 "status_label": "Waiting"
             }
         ],
-        "current": "net",
+        "current": "clone",
         "minutes": 3,
         "eta": "Usually about 3 minutes.",
         "text": "Setting up your service. Usually about 3 minutes.",
@@ -1969,12 +1933,6 @@
         "active": true,
         "title": "Setting up your service",
         "steps": [
-            {
-                "key": "ip",
-                "label": "Reserving a public IP address",
-                "status": "todo",
-                "status_label": "Waiting"
-            },
             {
                 "key": "net",
                 "label": "Reserving a private address",
@@ -2340,12 +2298,6 @@
         "title": "Setting up your service",
         "steps": [
             {
-                "key": "place",
-                "label": "Reserving resources",
-                "status": "failed",
-                "status_label": "Failed"
-            },
-            {
                 "key": "ip",
                 "label": "Reserving an address",
                 "status": "done",
@@ -2354,8 +2306,8 @@
             {
                 "key": "vmid",
                 "label": "Preparing your container",
-                "status": "todo",
-                "status_label": "Waiting"
+                "status": "failed",
+                "status_label": "Failed"
             },
             {
                 "key": "clone",
@@ -2424,7 +2376,7 @@
                 "status_label": "Waiting"
             }
         ],
-        "current": "place",
+        "current": "vmid",
         "minutes": 3,
         "eta": "Usually about 3 minutes.",
         "text": "This stopped before it was finished.",
@@ -2785,12 +2737,6 @@
         "title": "Setting up your service",
         "steps": [
             {
-                "key": "place",
-                "label": "Reserving resources",
-                "status": "current",
-                "status_label": "In progress"
-            },
-            {
                 "key": "ip",
                 "label": "Reserving an address",
                 "status": "done",
@@ -2805,8 +2751,8 @@
             {
                 "key": "clone",
                 "label": "Creating your container",
-                "status": "todo",
-                "status_label": "Waiting"
+                "status": "current",
+                "status_label": "In progress"
             },
             {
                 "key": "configure",
@@ -2869,7 +2815,7 @@
                 "status_label": "Waiting"
             }
         ],
-        "current": "place",
+        "current": "clone",
         "minutes": 3,
         "eta": "Usually about 3 minutes.",
         "text": "Setting up your service. Usually about 3 minutes.",
@@ -3746,12 +3692,6 @@
                 "status_label": "Done"
             },
             {
-                "key": "zone_prepared",
-                "label": "Preparing the DNS",
-                "status": "current",
-                "status_label": "In progress"
-            },
-            {
                 "key": "order",
                 "label": "Sending the order to the registry",
                 "status": "done",
@@ -3760,8 +3700,8 @@
             {
                 "key": "active",
                 "label": "Waiting for the registry",
-                "status": "todo",
-                "status_label": "Waiting"
+                "status": "current",
+                "status_label": "In progress"
             },
             {
                 "key": "zone",
@@ -3776,7 +3716,7 @@
                 "status_label": "Waiting"
             }
         ],
-        "current": "zone_prepared",
+        "current": "active",
         "minutes": 5,
         "eta": "Usually about 5 minutes.",
         "text": "Setting up your service. Usually about 5 minutes.",
@@ -4500,12 +4440,6 @@
         "title": "Setting up your service",
         "steps": [
             {
-                "key": "csr",
-                "label": "Making the certificate request",
-                "status": "failed",
-                "status_label": "Failed"
-            },
-            {
                 "key": "contact",
                 "label": "Saving the owner details",
                 "status": "done",
@@ -4514,8 +4448,8 @@
             {
                 "key": "order",
                 "label": "Placing the order",
-                "status": "todo",
-                "status_label": "Waiting"
+                "status": "failed",
+                "status_label": "Failed"
             },
             {
                 "key": "request",
@@ -4548,7 +4482,7 @@
                 "status_label": "Waiting"
             }
         ],
-        "current": "csr",
+        "current": "order",
         "minutes": 3,
         "eta": "Usually about 3 minutes.",
         "text": "This stopped before it was finished.",

@@ -526,7 +526,37 @@ final class Progress {
 			$phase  = (string) ( $work['phase'] ?? $phase );
 		} elseif ( 'build' === $kind ) {
 			$labels = self::build_steps( $driver );
-			$done   = array_intersect( (array) $r->get( 'steps' ), array_keys( $labels ) );
+
+			/**
+			 * Build steps this resource will not run (a server without IPv4 never reserves an address), so the view does not wait on them.
+			 *
+			 * @param string[]              $skipped Step keys, empty by default.
+			 * @param Resource              $r       Resource.
+			 * @param string                $kind    Kind (build).
+			 * @param string                $driver  Driver id.
+			 */
+			$skipped = (array) apply_filters( 'beltoft_services_progress_skipped_steps', array(), $r, $kind, $driver );
+			$labels  = array_diff_key( $labels, array_flip( array_map( 'strval', $skipped ) ) );
+			$done    = array_values( array_intersect( (array) $r->get( 'steps' ), array_keys( $labels ) ) );
+
+			// Safety net: a step that is not done while a later one is done was skipped, so it never blocks the view.
+			$last = -1;
+			$pos  = 0;
+
+			foreach ( array_keys( $labels ) as $key ) {
+				$last = in_array( (string) $key, $done, true ) ? $pos : $last;
+				++$pos;
+			}
+
+			$pos = 0;
+
+			foreach ( array_keys( $labels ) as $key ) {
+				if ( $pos < $last && ! in_array( (string) $key, $done, true ) ) {
+					unset( $labels[ $key ] );
+				}
+
+				++$pos;
+			}
 		} else {
 			$labels = array();
 		}

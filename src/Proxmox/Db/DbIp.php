@@ -36,6 +36,31 @@ final class DbIp {
 	use Steps;
 	use Prepares;
 
+	/**
+	 * Hooks the progress view: a database without the IPv4 add-on does not run the address step.
+	 */
+	public static function register(): void {
+		add_filter( 'beltoft_services_progress_skipped_steps', array( __CLASS__, 'skipped' ), 10, 4 );
+	}
+
+	/**
+	 * The address step is skipped for a database that wants no public IPv4 (the build's own rule, wants()).
+	 *
+	 * @param mixed    $skipped Keys skipped so far.
+	 * @param Resource $r       Resource.
+	 * @param string   $kind    Kind.
+	 * @param string   $driver  Driver id.
+	 * @return mixed
+	 */
+	public static function skipped( $skipped, $r, $kind, $driver ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- filter signature.
+		if ( DbDriver::ID === $driver && $r instanceof Resource && ! self::wants( $r ) ) {
+			$skipped   = (array) $skipped;
+			$skipped[] = 'ip';
+		}
+
+		return $skipped;
+	}
+
 	/** Meta: the sync in progress (phase, flags). */
 	public const OP = 'db_ip_op';
 

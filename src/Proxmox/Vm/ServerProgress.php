@@ -20,6 +20,25 @@ final class ServerProgress {
 	public static function register(): void {
 		add_filter( 'beltoft_services_progress_title', array( __CLASS__, 'title' ), 10, 3 );
 		add_filter( 'beltoft_services_progress_work', array( __CLASS__, 'work' ), 10, 4 );
+		add_filter( 'beltoft_services_progress_skipped_steps', array( __CLASS__, 'skipped' ), 10, 4 );
+	}
+
+	/**
+	 * The address step is not run for a server without a public IPv4 address (same rule as the build: the profile's).
+	 *
+	 * @param mixed    $skipped Keys skipped so far.
+	 * @param Resource $r       Resource.
+	 * @param string   $kind    Kind.
+	 * @param string   $driver  Driver id.
+	 * @return mixed
+	 */
+	public static function skipped( $skipped, $r, $kind, $driver ) {
+		if ( ProxmoxDriver::ID === $driver && $r instanceof Resource && ! ( new VpsProfile( $r ) )->uses_public_ip() ) {
+			$skipped   = (array) $skipped;
+			$skipped[] = 'ip';
+		}
+
+		return $skipped;
 	}
 
 	/**
