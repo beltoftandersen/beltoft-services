@@ -55,8 +55,9 @@ final class OrderProgressScriptTest extends TestCase {
 	public function test_a_ready_service_updates_its_row_in_the_server_list_and_the_open_button_keeps_white_text(): void {
 		$js = $this->script();
 
-		$this->assertStringContainsString( "document.querySelector( '#beltoft-service-' + row.id + ' .beltoft-services-state.is-busy' )", $js );
-		$this->assertStringContainsString( "listed.className = 'beltoft-services-state is-ok';", $js );
+		$this->assertStringContainsString( "'#beltoft-service-' + row.id + ' .beltoft-services-state.is-busy, [data-service-row=\"' + row.id + '\"] .beltoft-services-state.is-busy'", $js );
+		$this->assertStringContainsString( "el.className = 'beltoft-services-state is-ok';", $js );
+		$this->assertStringContainsString( 'data-service-row=', (string) file_get_contents( dirname( __DIR__, 2 ) . '/templates/account/overview/rows.php' ) );
 
 		$css = (string) file_get_contents( dirname( __DIR__, 2 ) . '/assets/account.css' );
 		$this->assertStringContainsString( 'body.woocommerce-account .woocommerce-MyAccount-content .bs-order .bs-flow .beltoft-service__open a { color: var(--bs-on-dark);', $css );

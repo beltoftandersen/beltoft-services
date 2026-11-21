@@ -10,7 +10,7 @@
  * @var string                                $heading Heading.
  * @var string                                $more    Link text.
  * @var string                                $url     Link address.
- * @var array<int, array<string, string>>     $rows    Rows: url, name, sub, state, tone, renews.
+ * @var array<int, array<string, string>>     $rows    Rows: url, name, sub, state, tone, renews, and service (the service id of a database, hosting, app or mail row, which the order card uses to update the row).
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -22,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
 	</div>
 	<div class="beltoft-services-ov__rows">
 		<?php foreach ( $rows as $beltoft_services_row ) : ?>
-			<a class="beltoft-services-ov__row" href="<?php echo esc_url( $beltoft_services_row['url'] ); ?>">
+			<a class="beltoft-services-ov__row" href="<?php echo esc_url( $beltoft_services_row['url'] ); ?>"<?php echo empty( $beltoft_services_row['service'] ) ? '' : ' data-service-row="' . esc_attr( (string) $beltoft_services_row['service'] ) . '"'; ?>>
 				<span class="beltoft-services-ov__id">
 					<b><?php echo esc_html( $beltoft_services_row['name'] ); ?></b>
 					<?php if ( '' !== $beltoft_services_row['sub'] ) : ?><span class="beltoft-services-srv__sub"><?php echo esc_html( $beltoft_services_row['sub'] ); ?></span><?php endif; ?>

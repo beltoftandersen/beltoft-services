@@ -202,12 +202,13 @@ final class OverviewData {
 				$row                                 = $area->row( $view, $resource );
 				$sub                                 = array_filter( array( $row['details'], $row['extra'] ), 'strlen' );
 				$data[ $key ][]                      = array(
-					'url'    => $row['url'],
-					'name'   => $row['name'],
-					'sub'    => implode( ', ', $sub ),
-					'state'  => $row['state'],
-					'tone'   => $row['tone'],
-					'renews' => '',
+					'url'     => $row['url'],
+					'name'    => $row['name'],
+					'sub'     => implode( ', ', $sub ),
+					'state'   => $row['state'],
+					'tone'    => $row['tone'],
+					'renews'  => '',
+					'service' => (string) $resource->id(),
 				);
 			}
 

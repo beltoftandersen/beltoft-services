@@ -294,12 +294,12 @@
 			// The server list on the same page is drawn once, while the service was still being set up: when it is ready, its row
 			// stops saying Working (the same words as the order line).
 			if ( row.ready && ! ( row.progress && row.progress.active ) ) {
-				listed = document.querySelector( '#beltoft-service-' + row.id + ' .beltoft-services-state.is-busy' );
+				listed = document.querySelectorAll( '#beltoft-service-' + row.id + ' .beltoft-services-state.is-busy, [data-service-row="' + row.id + '"] .beltoft-services-state.is-busy' );
 
-				if ( listed ) {
-					listed.textContent = row.label;
-					listed.className = 'beltoft-services-state is-ok';
-				}
+				Array.prototype.forEach.call( listed, function ( el ) {
+					el.textContent = row.label;
+					el.className = 'beltoft-services-state is-ok';
+				} );
 			}
 
 			if ( track ) {
