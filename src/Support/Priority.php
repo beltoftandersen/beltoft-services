@@ -112,7 +112,7 @@ final class Priority {
 		return array(
 			'active'  => false,
 			'promise' => self::promise(),
-			'price'   => wp_strip_all_tags( (string) $product->get_price_html() ),
+			'price'   => (string) $product->get_price_html(),
 			'url'     => add_query_arg( 'add-to-cart', $product->get_id(), wc_get_checkout_url() ),
 		);
 	}

@@ -104,6 +104,7 @@ class PriorityTest extends TestCase {
 		$html = \BeltoftServices\Account\Overview::section( 'support' );
 		$this->assertStringContainsString( 'Add priority support', $html );
 		$this->assertStringContainsString( esc_html( Priority::promise() ), $html );
+		$this->assertStringNotContainsString( '&amp;', $html, 'The price markup is printed, not escaped twice.' );
 
 		$this->service( $user );
 		$this->assertTrue( Priority::offer( $user )['active'] );

@@ -8,7 +8,7 @@
  *
  * @var bool   $active  Whether the customer has priority support.
  * @var string $promise What it promises, in one sentence.
- * @var string $price   The price, such as "49 kr. / month" ('' when active).
+ * @var string $price   The price as WooCommerce prints it, markup ('' when active).
  * @var string $url     The link that puts it in the checkout ('' when active).
  */
 
@@ -21,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
 	</div>
 	<p class="beltoft-licenses__empty"><?php echo esc_html( $promise ); ?></p>
 	<?php if ( ! $active ) : ?>
-		<?php if ( '' !== $price ) : ?><p class="beltoft-licenses__empty"><?php echo esc_html( $price ); ?></p><?php endif; ?>
+		<?php if ( '' !== $price ) : ?><p class="beltoft-licenses__empty"><?php echo wp_kses_post( $price ); ?></p><?php endif; ?>
 		<?php \BeltoftServices\Account\ServiceArea::actions( array( array( 'label' => __( 'Add priority support', 'beltoft-services' ), 'url' => $url ) ), true ); ?>
 	<?php endif; ?>
 </section>
