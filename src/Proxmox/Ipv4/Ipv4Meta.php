@@ -41,6 +41,9 @@ final class Ipv4Meta {
 	public const ADDRESS = 'ipv4_address';
 	public const ENDED   = 'ipv4_ended';
 
+	/** Parent meta: the add-on whose main address the server or database took while it was being built (the add-on id). */
+	public const AT_BUILD = 'ipv4_at_build';
+
 	/**
 	 * Hooks.
 	 */
@@ -352,7 +355,118 @@ final class Ipv4Meta {
 	 * @param Resource $db Database.
 	 */
 	public static function db_wants( Resource $db ): bool {
-		return self::is_db( $db ) && array() !== self::reserved_for( $db );
+		return self::is_db( $db ) && ( array() !== self::reserved_for( $db ) || null !== self::build_addon( $db ) );
+	}
+
+	/**
+	 * The add-ons bought in the same paid order as the parent that are not linked to it yet (an add-on links itself once the
+	 * parent is ready). Not failed, deleted, revoked or given back.
+	 *
+	 * @param Resource $parent Server or database.
+	 * @return Resource[]
+	 */
+	public static function from_order( Resource $parent ): array {
+		$license = $parent->license();
+		$order   = (int) ( $license['order_id'] ?? 0 );
+
+		if ( $order < 1 || (int) ( $license['user_id'] ?? 0 ) < 1 ) {
+			return array();
+		}
+
+		$out = array();
+
+		foreach ( Resource::find_by_meta( self::addon()->kind, 'server_order_id', array( $order, (string) $order ) ) as $id ) {
+			$addon = Resource::find( (int) $id );
+
+			if ( ! $addon || Ipv4Driver::ID !== $addon->get( 'driver' ) || (int) $addon->get( 'server_license' ) > 0 || ! self::alive( $addon ) ) {
+				continue;
+			}
+
+			$found = self::parent_of( $addon );
+
+			if ( $found && $found->id() === $parent->id() ) {
+				$out[] = $addon;
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * A new server or database bought together with an IPv4 address takes that address while it is built, so it starts with it
+	 * and needs no restart afterwards: the first such add-on is made the main one, the parent holds a pool address and remembers
+	 * the add-on (AT_BUILD). Only before the VM is cloned, only for a database or a server whose plan has no address of its own.
+	 * When the pool is empty nothing is taken: the parent is built without IPv4, as before, and the add-on reports it later.
+	 *
+	 * @param Resource $parent Server or database being built.
+	 */
+	public static function claim_at_build( Resource $parent ): void {
+		if ( ! self::is_parent( $parent ) || self::has_plan_address( $parent ) || '' !== (string) $parent->get( self::AT_BUILD ) ) {
+			return;
+		}
+
+		if ( in_array( 'clone', (array) $parent->get( 'steps' ), true ) || self::has_main( $parent ) ) {
+			return;
+		}
+
+		if ( self::is_db( $parent ) && \BeltoftServices\Proxmox\Db\DbIp::plan_wants( (array) $parent->get( 'plan' ) ) ) {
+			return;
+		}
+
+		$addons = self::from_order( $parent );
+
+		if ( array() === $addons ) {
+			return;
+		}
+
+		$addon = $addons[0];
+		$role  = (string) $addon->get( self::ROLE );
+
+		if ( '' === $role && ! $addon->set( array( self::ROLE => 'main' ) ) ) {
+			return;
+		}
+
+		if ( 'main' !== (string) $addon->get( self::ROLE ) ) {
+			return;
+		}
+
+		try {
+			$row = IpPool::hold( $parent->id() );
+		} catch ( \RuntimeException $e ) {
+			unset( $e );
+
+			return;
+		}
+
+		if ( null !== $row ) {
+			$parent->set( array( self::AT_BUILD => $addon->id() ) );
+		}
+	}
+
+	/**
+	 * The add-on whose address the parent took at build time, while that add-on still holds its place; null otherwise.
+	 *
+	 * @param Resource|null $parent Server or database.
+	 */
+	public static function build_addon( ?Resource $parent ): ?Resource {
+		$id = null === $parent ? 0 : (int) $parent->get( self::AT_BUILD );
+
+		if ( $id < 1 ) {
+			return null;
+		}
+
+		$addon = Resource::find( $id );
+
+		return $addon && Ipv4Driver::ID === $addon->get( 'driver' ) && self::alive( $addon ) ? $addon : null;
+	}
+
+	/**
+	 * Does an add-on still hold its place: not failed, deleted or revoked, and not given back?
+	 *
+	 * @param Resource $addon Add-on.
+	 */
+	private static function alive( Resource $addon ): bool {
+		return ! in_array( $addon->get( 'state' ), array( 'failed', 'deleted', 'deleting' ), true ) && 'revoked' !== ( $addon->license()['status'] ?? '' ) && true !== $addon->get( self::ENDED );
 	}
 
 	/**

@@ -146,6 +146,11 @@ final class Provision {
 			return $early;
 		}
 
+		// An IPv4 address bought in the same order is taken now, so the VM is built with it (no restart later).
+		if ( $this->profile instanceof VpsProfile || $this->profile instanceof DbProfile ) {
+			\BeltoftServices\Proxmox\Ipv4\Ipv4Meta::claim_at_build( $this->r );
+		}
+
 		$steps = $this->r->get( 'steps' );
 
 		foreach ( self::build_steps( $this->r, $this->profile->steps() ) as $name ) {
