@@ -25,17 +25,6 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Ipv6 {
 
-	/**
-	 * The one switch for IPv6 on databases: the setting `db_ipv6` (OFF by default; filter `beltoft_services_db_ipv6` has the
-	 * last word). Turn it on only when the database templates carry the guest script that knows `listen6` and `allow6`
-	 * (see the db-v1 guest notes): an older guest ignores both keys, so an IPv6 address would be given but never served.
-	 * ON: a new database with a public IP address gets an IPv6 address like a server (when its cluster has a prefix), the
-	 * access list takes IPv6 sources, and the guest is told to listen on the address.
-	 */
-	public static function databases(): bool {
-		return (bool) apply_filters( 'beltoft_services_db_ipv6', 1 === (int) Settings::get( 'db_ipv6' ) );
-	}
-
 	/** The log kind (IpHistory) of an IPv6 holding. */
 	public const KIND = 'public6';
 

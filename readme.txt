@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.54.2
+Stable tag: 0.55.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,12 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.55.0 =
+* Every database has its public card with IPv6: the setting "IPv6 for databases" and the old way of adding and removing a public card (shut down, write net0, start) are gone. An IPv4 address is added and removed like a server's main address (one restart). The IPv6 switch is no longer offered on databases.
+* The database's Access tab shows its IPv6 address and the allow-list also when it has no IPv4 address.
+* Moving a database to another private network survives a job that stops halfway (the address the pool gave is taken, not refused), changes nothing while all driver activity is paused, puts the new address in the firewall's set before the restart, and can be finished from the Network tab when the database server did not follow. The move is only offered on databases marked at build as made from a template that knows it.
+* The sync after a restore also sends the private range again (a backup from before a move carries the old one).
 
 = 0.54.2 =
 * The firewall's allowed-address set of a VM's public card takes the IPv6 address the VM is configured with when it is not recorded yet. A database built with its card wrote the set before the address was recorded, so with ipfilter on it could not send anything over IPv6.

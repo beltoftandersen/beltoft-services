@@ -353,14 +353,6 @@
         "label": "Database extra storage step (GB)",
         "desc": "The extra storage of a database variation must be a multiple of this, or it is not offered and a switch to it is refused."
     },
-    "db_ipv6": {
-        "tab": "proxmox",
-        "section": "proxmox",
-        "type": "checkbox",
-        "default": 0,
-        "label": "IPv6 for databases",
-        "desc": "A database with a public IP address also gets an IPv6 address (on a cluster that has an IPv6 prefix), the access list takes IPv6 addresses, and customers can add or remove IPv6. Turn it on only after the database templates have the guest script that listens on IPv6 (listen6 and allow6). An older template ignores them."
-    },
     "disk_reserve_gb": {
         "tab": "proxmox",
         "section": "proxmox",

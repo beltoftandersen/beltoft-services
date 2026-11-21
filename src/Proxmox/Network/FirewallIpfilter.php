@@ -127,8 +127,8 @@ trait FirewallIpfilter {
 	/**
 	 * The ipfilter sets a server should have: the public address in ipfilter-net0 when its profile has a public
 	 * address (null while that address is not known), and the private one in ipfilter-net1 when it has a private NIC.
-	 * A server with neither gets no filter (null). A server whose profile has no public address (a managed
-	 * database) is filtered on net1 alone.
+	 * A server with neither gets no filter (null). A managed database has its IPv6 address (and the IPv4 one, when it has
+	 * the add-on) in ipfilter-net0 and its private one in ipfilter-net1.
 	 *
 	 * @param Resource             $r           Resource.
 	 * @param bool                 $private_nic Whether the VM has a private NIC (net1).

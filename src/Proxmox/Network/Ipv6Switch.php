@@ -93,7 +93,8 @@ final class Ipv6Switch {
 			if ( ! Profiles::for_resource( $r ) instanceof VpsProfile ) {
 				return false;
 			}
-		} elseif ( ! DbActions::is_db( $r ) || ! Ipv6::databases() || '' === DbAccess::public_address( $r ) ) {
+		} else {
+			// A database always has IPv6 on its public card: nothing to switch.
 			return false;
 		}
 

@@ -46,6 +46,17 @@ final class DbPrivateMove {
 	/** Meta: the move in progress. */
 	public const OP = 'db_private_op';
 
+	/**
+	 * Did a started move stop on a failure (the guest did not follow)? The customer can then finish it (the same action again).
+	 *
+	 * @param Resource $r Database.
+	 */
+	public static function unfinished( Resource $r ): bool {
+		$op = $r->get( self::OP );
+
+		return is_array( $op ) && ! empty( $op['failed'] );
+	}
+
 	/** Seconds the guest has for the private job. */
 	private const GUEST_BUDGET = 600;
 
@@ -57,22 +68,22 @@ final class DbPrivateMove {
 	}
 
 	/**
+	 * Does the database's guest know the `private` job? Only the templates with the public card have it (db-v4, Valkey v2, SQL
+	 * Server v2), and a database built from them is marked at build (DbIp::knows_private). An older guest would refuse the job
+	 * after the VM had already moved, leaving the database on its old address: the move is not offered there.
+	 *
+	 * @param Resource $r Database.
+	 */
+	public static function supported( Resource $r ): bool {
+		return DbActions::is_db( $r ) && DbIp::knows_private( $r );
+	}
+
+	/**
 	 * May the database be moved now, with these arguments? Null, or the reason in words for the customer.
 	 *
 	 * @param Resource             $r    Database.
 	 * @param array<string, mixed> $args net (an id of the customer's networks, or `new`) and name.
 	 */
-	/**
-	 * Does the database's guest know the `private` job? Only the templates with IPv6 have it (db-v4, Valkey v2, SQL Server v2), and
-	 * a database built from them while database IPv6 is on has its public card. An older guest would refuse the job after the VM
-	 * had already moved, leaving the database on its old address: the move is not offered there.
-	 *
-	 * @param Resource $r Database.
-	 */
-	public static function supported( Resource $r ): bool {
-		return DbActions::is_db( $r ) && DbIp::has_card( $r );
-	}
-
 	public static function check( Resource $r, array $args ): ?string {
 		if ( ! self::supported( $r ) ) {
 			return __( 'This database cannot be moved to another private network.', 'beltoft-services' );
@@ -139,6 +150,14 @@ final class DbPrivateMove {
 		}
 
 		$op = $this->op();
+
+		if ( ! empty( $op['failed'] ) ) {
+			unset( $op['failed'] );
+
+			if ( ! $this->store( $op ) ) {
+				return StepResult::retry( 0, 'db_private: progress could not be stored' );
+			}
+		}
 
 		if ( array() === $op ) {
 			$why = self::check( $this->r, $args );
@@ -213,6 +232,43 @@ final class DbPrivateMove {
 			return null;
 		}
 
+		$row = PrivateNets::for_resource( $this->r->id() );
+
+		if ( null === $row ) {
+			$this->r->set( array( self::OP => null ) );
+
+			return StepResult::refused( array(), 'Move refused: ' . __( 'The private network is not available for this server.', 'beltoft-services' ) );
+		}
+
+		// The pool moved already, but its answer was not stored (the job stopped in between): the row is on another network now.
+		if ( isset( $op['old_net_id'] ) ) {
+			if ( (int) $row['net_id'] !== (int) $op['old_net_id'] ) {
+				$net = PrivateNets::net_of_user( (int) ( $this->r->license()['user_id'] ?? 0 ), (int) $row['net_id'] );
+
+				if ( null === $net ) {
+					return StepResult::fail( 'db_private: the new private network is not recorded' );
+				}
+
+				$op['address'] = (string) $row['address'];
+				$op['cidr']    = (string) $net['cidr'];
+
+				return $this->store( $op ) ? null : StepResult::retry( 0, 'db_private: progress could not be stored' );
+			}
+		} else {
+			// The network the database leaves, stored before the pool is changed.
+			$op['old_net_id']  = (int) $row['net_id'];
+			$op['old_address'] = (string) $row['address'];
+
+			if ( ! $this->store( $op ) ) {
+				return StepResult::retry( 0, 'db_private: progress could not be stored' );
+			}
+		}
+
+		// Paused: nothing is changed, not even the pool (the old address stays the database's while it is still on the VM).
+		if ( Settings::get( 'pause_all' ) ) {
+			return StepResult::wait( Jobs::PAUSED_DELAY, 'db_private: all driver activity is paused', time() + 7 * DAY_IN_SECONDS );
+		}
+
 		$user = (int) ( $this->r->license()['user_id'] ?? 0 );
 
 		try {
@@ -229,9 +285,8 @@ final class DbPrivateMove {
 			return StepResult::refused( array(), 'Move refused: ' . __( 'The chosen private network has no free address.', 'beltoft-services' ) );
 		}
 
-		$op['address']     = $moved['address'];
-		$op['cidr']        = (string) $moved['network']['cidr'];
-		$op['old_address'] = $moved['old_address'];
+		$op['address'] = $moved['address'];
+		$op['cidr']    = (string) $moved['network']['cidr'];
 
 		return $this->store( $op ) ? null : StepResult::retry( 0, 'db_private: progress could not be stored' );
 	}
@@ -263,7 +318,7 @@ final class DbPrivateMove {
 		}
 
 		if ( $this->in_place( (array) $v['config'], $want ) ) {
-			return null;
+			return $this->filter_new( $record, $v );
 		}
 
 		if ( Settings::get( 'pause_all' ) ) {
@@ -291,7 +346,21 @@ final class DbPrivateMove {
 			return is_wp_error( $answer ) ? $this->classify( $answer, 'db_private' ) : StepResult::retry( 0, 'db_private: the private network settings could not be confirmed' );
 		}
 
-		return null;
+		return $this->filter_new( $record, $after );
+	}
+
+	/**
+	 * The firewall's ipfilter set of net1 holds the new address (from the pool) before the VM restarts with it, so its private
+	 * traffic is not dropped while the guest and the record follow.
+	 *
+	 * @param array<string, mixed> $record VM record.
+	 * @param array<string, mixed> $v      Verified VM.
+	 * @return StepResult|null
+	 */
+	private function filter_new( array $record, array $v ) {
+		$sets = ( new Firewall( $this->r, $this->client, $this->cluster ) )->ensure_ipfilter( $record, $v );
+
+		return $sets instanceof StepResult ? $sets : null;
 	}
 
 	/**
@@ -375,13 +444,15 @@ final class DbPrivateMove {
 
 	/**
 	 * The guest did not follow: the VM is on the new network, the database still listens on the old address. The admin is told;
-	 * the move fails (a retry sends the job again).
+	 * the move fails and is marked so (unfinished()): the customer's Finish button runs it again from the guest job, and the
+	 * database counts as busy (DbIp::idle) until then.
 	 *
 	 * @param string $why Reason.
 	 */
 	private function guest_failed( string $why ): StepResult {
 		$op = $this->op();
 		unset( $op['request'], $op['sent'], $op['at'] );
+		$op['failed'] = true;
 		$this->store( $op );
 		\BeltoftServices\Alerts::admin( $this->r, $why . '. The VM is on the new private network but the database may not listen on its new address ' . (string) ( $op['address'] ?? '' ) . '.' );
 

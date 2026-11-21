@@ -54,6 +54,9 @@ class DbPhase4Test extends TestCase {
 	/** @var string How the guest treats the listen job: new, old (refuses it) or silent. */
 	private $listen_guest = 'new';
 
+	/** @var string How the guest answers the private job: new (applies it) or old (refuses the job). */
+	private $private_guest = 'new';
+
 	/** @var array<int, array<string, mixed>> */
 	private $mails = array();
 
@@ -124,7 +127,6 @@ class DbPhase4Test extends TestCase {
 		remove_all_filters( 'beltoft_services_key' );
 		remove_all_filters( 'beltoft_services_proxmox_client' );
 		remove_all_filters( 'beltoft_services_proxmox_pause' );
-		remove_all_filters( 'beltoft_services_db_ipv6' );
 		remove_all_filters( 'pre_wp_mail' );
 		delete_option( Clusters::OPTION );
 		$this->wipe();
@@ -177,6 +179,10 @@ class DbPhase4Test extends TestCase {
 						'vendor_snippet'         => 'local:snippets/vm-vendor-cloudinit-v2.yaml',
 						'db_vendor_snippet'      => 'local:snippets/vm-vendor-cloudinit-db-v1.yaml',
 						'block_smtp'             => '1',
+						// Every database has its public card with an IPv6 address: the cluster has a prefix.
+						'ipv6_prefix'            => '2001:db8:430c:1::/64',
+						'fw_enabled'             => '1',
+						'fw_ipfilter'            => '1',
 					),
 					$over
 				)
@@ -304,6 +310,12 @@ class DbPhase4Test extends TestCase {
 			return;
 		}
 
+		if ( 'private' === $job['op'] && 'old' === $this->private_guest ) {
+			$this->fake->set_guest_file( 5000, DbGuest::STATUS, wp_json_encode( array( 'request' => $job['request'], 'state' => 'failed', 'step' => 'job', 'updated' => gmdate( 'c' ) ) ) );
+
+			return;
+		}
+
 		$this->fake->set_guest_file( 5000, DbGuest::STATUS, wp_json_encode( array( 'request' => $job['request'], 'state' => 'ready', 'step' => 'allow', 'updated' => gmdate( 'c' ) ) ) );
 	}
 
@@ -344,13 +356,10 @@ class DbPhase4Test extends TestCase {
 	private function add_ip( Resource $r ): \BeltoftServices\Drivers\StepResult {
 		$fresh = Resource::find( $r->id() );
 		$this->public_ip_addon( $fresh );
-		// A database built with its public card gets the address the way a server does (the add-on holds it from the pool first,
-		// Ipv4Driver::take); an older one gets the card added (DbIp).
-		if ( DbIp::has_card( $fresh ) ) {
-			$this->assertNotNull( IpPool::hold( $r->id() ) );
-		}
+		// The address is taken the way a server's is: the add-on holds it from the pool first (Ipv4Driver::take), then the server's step.
+		$this->assertNotNull( IpPool::hold( $r->id() ) );
 
-		$res = DbIp::has_card( $fresh ) ? $this->drive( $r, \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_ADD ) : $this->drive( $r );
+		$res = $this->drive( $r, \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_ADD );
 
 		if ( $res->is_done() ) {
 			$this->assertTrue( Resource::find( $r->id() )->set( array_merge( $res->meta(), array( 'plan_dirty' => false ) ) ) );
@@ -362,7 +371,7 @@ class DbPhase4Test extends TestCase {
 	private function remove_ip( Resource $r ): \BeltoftServices\Drivers\StepResult {
 		$fresh = Resource::find( $r->id() );
 		$this->public_ip_off( $fresh );
-		$res = DbIp::has_card( $fresh ) ? $this->drive( $r, \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_REMOVE ) : $this->drive( $r );
+		$res = $this->drive( $r, \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_REMOVE );
 
 		if ( $res->is_done() ) {
 			$this->assertTrue( Resource::find( $r->id() )->set( array_merge( $res->meta(), array( 'plan_dirty' => false ) ) ) );
@@ -446,7 +455,7 @@ class DbPhase4Test extends TestCase {
 
 		$this->assertStringContainsString( 'bridge=vmbr9', $vm['config']['net0'] );
 		$this->assertStringContainsString( 'firewall=1', $vm['config']['net0'] );
-		$this->assertSame( 'ip=192.0.2.10/24,gw=192.0.2.1', $vm['config']['ipconfig0'] );
+		$this->assertSame( 'ip=192.0.2.10/24,gw=192.0.2.1,ip6=' . self::DB_V6 . '/64,gw6=2001:db8:430c:1::1', $vm['config']['ipconfig0'] );
 		$this->assertStringContainsString( 'bridge=vmbr2', $vm['config']['net1'] );
 		$this->assertSame( 'ip=10.64.0.2/28', $vm['config']['ipconfig1'] );
 
@@ -469,35 +478,6 @@ class DbPhase4Test extends TestCase {
 	}
 
 	// -- Adding and removing the public IP -------------------------------------------------------
-
-	public function test_adding_the_add_on_later_takes_an_address_after_a_restart_and_allows_nobody(): void {
-		$this->pool( 3 );
-		$r = $this->ready_db();
-		$this->assertArrayNotHasKey( 'net0', $this->fake->vm( 5000 )['config'] );
-		$this->assertSame( 3, IpPool::free_count() );
-
-		$res = $this->add_ip( $r );
-		$this->assertTrue( $res->is_done(), $res->error() );
-
-		$vm = $this->fake->vm( 5000 );
-		$this->assertSame( 'running', $vm['status'], 'The VM runs again.' );
-		$this->assertSame( 'ip=192.0.2.10/24,gw=192.0.2.1', $vm['config']['ipconfig0'] );
-		$this->assertStringContainsString( 'bridge=vmbr9', $vm['config']['net0'] );
-		$this->assertStringContainsString( 'bridge=vmbr2', $vm['config']['net1'], 'The private NIC is untouched.' );
-		$this->assertSame( 'assigned', IpPool::for_resource( $r->id() )['state'] );
-		$this->assertSame( 2, IpPool::free_count() );
-		$this->assertSame( array(), $this->net0_rules() );
-		$this->assertFalse( $this->fake->fake_inbound_allowed( 5000, 'tcp', 5432, '203.0.113.7', 'net0' ) );
-
-		$fresh = Resource::find( $r->id() );
-		$this->assertSame( '192.0.2.10', $fresh->get( 'ip' ) );
-		$this->assertNull( $fresh->get( DbIp::OP ), 'The operation is over.' );
-		$this->assertSame( 'allow', json_decode( (string) $this->fake->guest_file( 5000, DbGuest::JOB ), true )['op'] );
-		$this->assertSame( array(), json_decode( (string) $this->fake->guest_file( 5000, DbGuest::JOB ), true )['allow'] );
-
-		$shutdown = $this->calls( 'POST', '/status/shutdown' );
-		$this->assertCount( 1, $shutdown, 'One restart, announced on the page.' );
-	}
 
 	/**
 	 * The jobs written to the guest so far, in order (the job file is replaced each time).
@@ -553,209 +533,6 @@ class DbPhase4Test extends TestCase {
 		$rule = $this->first_call( static fn( $c ) => in_array( $c['method'], array( 'POST', 'PUT' ), true ) && false !== strpos( $c['path'], '/firewall/' ) && '/firewall/options' !== substr( $c['path'], -17 ) && false !== strpos( wp_json_encode( $c['params'] ), 'bs-db' ) );
 		$this->assertTrue( null === $rule || $rule > $listen[0]['at'], 'No firewall rule was written before the guest listened.' );
 		$this->assertNull( Resource::find( $r->id() )->get( DbIp::OP ) );
-	}
-
-	public function test_removing_the_add_on_sends_the_private_address_only_after_the_nic_is_gone(): void {
-		$r = $this->db_with_ip();
-		$this->assertTrue( $this->remove_ip( $r )->is_done() );
-
-		$private = (string) Resource::find( $r->id() )->get( 'db_address' );
-		$listen  = array_values( array_filter( $this->guest_jobs(), static fn( $j ) => 'listen' === $j['job']['op'] ) );
-		$this->assertCount( 2, $listen, 'One job for the add and one for the removal.' );
-		$this->assertSame( array( $private ), $listen[1]['job']['listen'] );
-
-		$gone = null;
-
-		foreach ( $this->fake->calls() as $i => $c ) {
-			if ( 'PUT' === $c['method'] && false !== strpos( (string) ( $c['params']['delete'] ?? '' ), 'net0' ) ) {
-				$gone = $i; // The last one: the removal (the build deleted a template NIC earlier).
-			}
-		}
-
-		$allow = array_values( array_filter( $this->guest_jobs(), static fn( $j ) => 'allow' === $j['job']['op'] && $j['at'] < ( $gone ?? 0 ) ) );
-		$this->assertNotNull( $gone );
-		$this->assertGreaterThan( $gone, $listen[1]['at'] );
-		$this->assertNotEmpty( $allow, 'The list was emptied in the guest before the card went.' );
-	}
-
-	public function test_a_guest_that_does_not_know_the_listen_job_fails_an_add_before_anything_is_opened_and_a_retry_works(): void {
-		$this->pool( 3 );
-		$r = $this->ready_db();
-		$this->listen_guest = 'old';
-
-		$res = $this->add_ip( $r );
-		$this->assertTrue( $res->is_failed() );
-		$this->assertStringContainsString( 'does not know the listen job', $res->error() );
-		$this->assertStringContainsString( 'Rebuild the database template', $res->error() );
-		$this->assertStringContainsString( 'nothing is open', $res->error() );
-		$this->assertSame( array(), $this->net0_rules() );
-
-		$fresh = Resource::find( $r->id() );
-		$op    = $fresh->get( DbIp::OP );
-		$this->assertIsArray( $op );
-		$this->assertArrayNotHasKey( 'listen_request', $op, 'A retry sends the job again.' );
-		$this->assertSame( 'listen', $op['phase'] );
-
-		$this->listen_guest = 'new';
-		$res                = $this->drive( $r );
-		$this->assertTrue( $res->is_done(), $res->error() );
-		$this->assertNull( Resource::find( $r->id() )->get( DbIp::OP ) );
-		$this->assertCount( 2, array_filter( $this->guest_jobs(), static fn( $j ) => 'listen' === $j['job']['op'] ) );
-	}
-
-	public function test_a_guest_that_never_answers_the_listen_job_fails_an_add_after_ten_minutes(): void {
-		$this->pool( 3 );
-		$r = $this->ready_db();
-		$this->listen_guest = 'silent';
-
-		$fresh = Resource::find( $r->id() );
-		$this->public_ip_addon( $fresh );
-
-		for ( $i = 0; $i < 40; $i++ ) {
-			$res = Registry::get( 'proxmox-db' )->update_plan( Resource::find( $r->id() ) );
-			$this->assertFalse( $res->is_failed(), $res->error() );
-			$op = Resource::find( $r->id() )->get( DbIp::OP );
-
-			if ( is_array( $op ) && ! empty( $op['listen_sent'] ) ) {
-				break;
-			}
-
-			$this->answer_guest( $r );
-			$this->fake->elapse( 30 );
-		}
-
-		$this->assertTrue( $res->is_poll(), 'The job was sent and nothing answers.' );
-		$op                = Resource::find( $r->id() )->get( DbIp::OP );
-		$op['listen_at']   = time() - 700;
-		$this->assertTrue( Resource::find( $r->id() )->set( array( DbIp::OP => $op ) ) );
-
-		$res = Registry::get( 'proxmox-db' )->update_plan( Resource::find( $r->id() ) );
-		$this->assertTrue( $res->is_failed() );
-		$this->assertStringContainsString( 'did not apply the listen addresses within 10 minutes', $res->error() );
-	}
-
-	public function test_a_remove_on_a_guest_without_the_listen_job_tells_the_admin_and_goes_on(): void {
-		$r = $this->db_with_ip();
-		$this->settings( array( 'admin_email' => self::OWNER ) );
-		$mails = array();
-		add_filter(
-			'pre_wp_mail',
-			function ( $pre, $atts ) use ( &$mails ) {
-				$mails[] = $atts;
-
-				return true;
-			},
-			10,
-			2
-		);
-		$this->listen_guest = 'old';
-
-		$res = $this->remove_ip( $r );
-		$this->assertTrue( $res->is_done(), $res->error() );
-		$this->assertNull( IpPool::for_resource( $r->id() ), 'The address is given back all the same.' );
-		$this->assertNull( Resource::find( $r->id() )->get( DbIp::OP ) );
-		$this->assertNotEmpty( $mails );
-		$this->assertStringContainsString( 'does not know the listen job', implode( "\n", array_column( $mails, 'message' ) ) );
-	}
-
-	public function test_a_running_vm_is_never_written_while_the_shutdown_is_pending(): void {
-		$this->pool( 2 );
-		$r = $this->ready_db();
-		$this->fake->lag_status( 5000, 1000 );
-
-		$fresh = Resource::find( $r->id() );
-		$this->public_ip_addon( $fresh );
-		$res = Registry::get( 'proxmox-db' )->update_plan( Resource::find( $r->id() ) );
-
-		$this->assertFalse( $res->is_done() );
-		$this->assertCount( 1, $this->calls( 'POST', '/status/shutdown' ) );
-		$puts = array_filter( $this->calls( 'PUT', '/config' ), static fn( $c ) => isset( $c['params']['net0'] ) );
-		$this->assertSame( array(), $puts, 'No NIC was written while the VM could still be running.' );
-	}
-
-	public function test_removing_the_add_on_clears_the_list_then_the_nic_and_only_then_frees_the_address(): void {
-		$r = $this->db_with_ip();
-		$this->assertTrue( true === Resource::find( $r->id() )->set( array( DbAccess::LIST => array( array( 'cidr' => '203.0.113.7/32', 'label' => 'office', 'added' => time() ) ) ) ) );
-		$this->assertTrue( $this->apply( $r )->is_done() );
-		$this->assertSame( array( 'bs-db:203.0.113.7' ), $this->net0_rules() );
-		$free = IpPool::free_count();
-
-		$res = $this->remove_ip( $r );
-		$this->assertTrue( $res->is_done(), $res->error() );
-
-		$vm = $this->fake->vm( 5000 );
-		$this->assertArrayNotHasKey( 'net0', $vm['config'] );
-		$this->assertArrayNotHasKey( 'ipconfig0', $vm['config'] );
-		$this->assertStringContainsString( 'bridge=vmbr2', $vm['config']['net1'] );
-		$this->assertSame( 'running', $vm['status'] );
-		$this->assertSame( array(), $this->net0_rules() );
-		$this->assertNull( IpPool::for_resource( $r->id() ) );
-		$this->assertSame( $free + 1, IpPool::free_count() );
-		$this->assertNull( VmRecords::for_resource( $r->id() )['ip_id'] );
-
-		$fresh = Resource::find( $r->id() );
-		$this->assertNull( $fresh->get( 'ip' ) );
-		$this->assertSame( array(), DbAccess::entries( $fresh ), 'The list goes with the address.' );
-		$this->assertFalse( DbAccess::world( $fresh ) );
-		$allow_jobs = array_values( array_filter( $this->guest_jobs(), static fn( $j ) => 'allow' === $j['job']['op'] ) );
-		$this->assertSame( array(), end( $allow_jobs )['job']['allow'] );
-
-		// The firewall rule went before the NIC did.
-		$calls   = $this->fake->calls();
-		$deleted = null;
-		$nic     = null;
-
-		foreach ( $calls as $i => $c ) {
-			if ( 'DELETE' === $c['method'] && false !== strpos( $c['path'], '/firewall/rules/' ) ) {
-				$deleted = $i;
-			}
-
-			if ( 'PUT' === $c['method'] && '/config' === substr( $c['path'], -7 ) && false !== strpos( (string) ( $c['params']['delete'] ?? '' ), 'net0' ) ) {
-				$nic = $i;
-			}
-		}
-
-		$this->assertNotNull( $deleted );
-		$this->assertNotNull( $nic );
-		$this->assertLessThan( $nic, $deleted );
-	}
-
-	public function test_the_address_is_not_given_back_while_the_nic_could_not_be_removed(): void {
-		$r = $this->db_with_ip();
-		$this->fake->fail_next( 'PUT', '#/qemu/5000/config$#', array( 'status' => 500, 'message' => 'timeout' ) );
-
-		$fresh = Resource::find( $r->id() );
-		$this->public_ip_off( $fresh );
-		$res = Registry::get( 'proxmox-db' )->update_plan( Resource::find( $r->id() ) );
-
-		$this->assertFalse( $res->is_done() );
-		$this->assertArrayHasKey( 'net0', $this->fake->vm( 5000 )['config'], 'The NIC is still there.' );
-		$this->assertSame( 'assigned', IpPool::for_resource( $r->id() )['state'], 'So the address is still ours.' );
-
-		// The next run removes it, and only then the address goes back.
-		$res = $this->drive( $r );
-		$this->assertTrue( $res->is_done(), $res->error() );
-		$this->assertNull( IpPool::for_resource( $r->id() ) );
-	}
-
-	public function test_a_refused_add_gives_the_address_back_starts_the_vm_again_and_an_unclear_one_keeps_it(): void {
-		$this->pool( 3 );
-		$r = $this->ready_db();
-		$this->fake->fail_next( 'PUT', '#/qemu/5000/config$#', array( 'status' => 422, 'message' => 'invalid' ) );
-
-		$res = $this->add_ip( $r );
-		$this->assertTrue( $res->is_failed() );
-		$this->assertNull( IpPool::for_resource( $r->id() ), 'A definite refusal frees the address.' );
-		$this->assertSame( 3, IpPool::free_count() );
-		$this->assertNull( Resource::find( $r->id() )->get( DbIp::OP ) );
-		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'], 'The change that did not happen leaves the database running.' );
-		$this->assertArrayNotHasKey( 'net0', $this->fake->vm( 5000 )['config'] );
-
-		// An unclear answer (the write may have been applied): the address stays reserved until the config shows the card.
-		$this->fake->fail_next( 'PUT', '#/qemu/5000/config$#', array( 'status' => 500, 'message' => 'timeout' ) );
-		$res = Registry::get( 'proxmox-db' )->update_plan( Resource::find( $r->id() ) );
-		$this->assertFalse( $res->is_done() );
-		$this->assertSame( 'held', IpPool::for_resource( $r->id() )['state'] );
 	}
 
 	public function test_a_blocked_address_is_never_taken_or_freed(): void {
@@ -863,11 +640,14 @@ class DbPhase4Test extends TestCase {
 		$this->assertSame( '', DbAccess::public_address( Resource::find( $r->id() ) ) );
 		$this->assertTrue( DbIp::wants( Resource::find( $r->id() ) ) );
 
-		// The database's own action puts it on the VM, one restart, and the guest listens on it.
-		$done = $this->drive( $r, DbIp::SYNC_ACTION );
+		// The add-on asks for the server's step: the address on the card, one restart, and the guest listens on it.
+		$this->assertSame( \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_ADD, ( new \ReflectionMethod( $driver, 'action_for' ) )->invoke( $driver, $addon, Resource::find( $r->id() ), true ) );
+		$done = $this->drive( $r, \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_ADD );
 		$this->assertTrue( $done->is_done(), $done->error() );
+		$this->assertTrue( Resource::find( $r->id() )->set( $done->meta() ) );
 		$this->assertSame( $row['address'], DbAccess::public_address( Resource::find( $r->id() ) ) );
-		$this->assertNotEmpty( $this->calls( 'POST', '/status/shutdown' ) );
+		$this->assertNotEmpty( $this->calls( 'POST', '/status/reboot' ) );
+		$this->assertEmpty( $this->calls( 'POST', '/status/shutdown' ) );
 
 		$second = $driver->provision( Resource::find( $addon->id() ) );
 		$this->assertTrue( $second->is_done(), $second->error() );
@@ -876,8 +656,10 @@ class DbPhase4Test extends TestCase {
 		$gone = $driver->delete( Resource::find( $addon->id() ) );
 		$this->assertTrue( $gone->is_poll(), $gone->error() );
 		$this->assertFalse( DbIp::wants( Resource::find( $r->id() ) ), 'The ended add-on no longer counts.' );
-		$removed = $this->drive( $r, DbIp::SYNC_ACTION );
+		$removed = $this->drive( $r, \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_REMOVE );
 		$this->assertTrue( $removed->is_done(), $removed->error() );
+		$this->assertTrue( Resource::find( $r->id() )->set( $removed->meta() ) );
+		$this->assertSame( self::DB_V6, Resource::find( $r->id() )->get( 'ip6' ), 'The card keeps its IPv6 address.' );
 		$this->assertSame( '', DbAccess::public_address( Resource::find( $r->id() ) ) );
 		$this->assertSame( 'free', IpPool::find( $row['address'] )['state'] );
 		$this->assertTrue( $driver->delete( Resource::find( $addon->id() ) )->is_done() );
@@ -945,7 +727,6 @@ class DbPhase4Test extends TestCase {
 	 * @dataProvider cidr_table
 	 */
 	public function test_allow_list_validation_table( string $input, ?string $expected ): void {
-		add_filter( 'beltoft_services_db_ipv6', '__return_true' );
 		$this->assertSame( $expected, DbAccess::normalise( $input ) );
 	}
 
@@ -1180,7 +961,8 @@ class DbPhase4Test extends TestCase {
 		$html = $this->card( $r );
 
 		$this->assertStringContainsString( 'No IPv4 address is free right now', $html, 'The pool is empty.' );
-		$this->assertStringNotContainsString( 'data-db-access-add', $html );
+		$this->assertStringContainsString( self::DB_V6, $html, 'The IPv6 address of the card is shown.' );
+		$this->assertStringContainsString( 'data-db-access-add', $html, 'The allow-list works over IPv6.' );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
 	}
 
@@ -1260,22 +1042,9 @@ class DbPhase4Test extends TestCase {
 
 	private const DB_V6 = '2001:db8:430c:1:1388::1';
 
-	/** A cluster with a prefix, and the switch for database IPv6 turned on (it is off by default, see Ipv6::databases()). */
+	/** A cluster with a prefix and the firewall's ipfilter on. */
 	private function ipv6_cluster(): void {
-		add_filter( 'beltoft_services_db_ipv6', '__return_true' );
 		$this->save_cluster( array( 'ipv6_prefix' => '2001:db8:430c:1::/64', 'fw_enabled' => '1', 'fw_ipfilter' => '1' ) );
-	}
-
-	public function test_databases_get_no_ipv6_while_the_switch_is_off(): void {
-		$this->save_cluster( array( 'ipv6_prefix' => '2001:db8:430c:1::/64', 'fw_enabled' => '1', 'fw_ipfilter' => '1' ) );
-		$r = $this->db_with_ip();
-
-		$this->assertStringNotContainsString( 'ip6', (string) $this->fake->vm( 5000 )['config']['ipconfig0'] );
-		$this->assertNull( Resource::find( $r->id() )->get( 'ip6' ) );
-		$this->assertSame( '', DbAccess::view( $r )['address6'] );
-		$this->assertNull( DbAccess::normalise( '2001:db8::1' ) );
-		$listen = array_values( array_filter( $this->guest_jobs(), static fn( $j ) => 'listen' === $j['job']['op'] ) );
-		$this->assertArrayNotHasKey( 'listen6', $listen[0]['job'] );
 	}
 
 	public function test_with_database_ipv6_on_every_database_is_built_with_its_public_card_and_ipv6(): void {
@@ -1299,7 +1068,6 @@ class DbPhase4Test extends TestCase {
 	}
 
 	public function test_a_cluster_without_ipv6_builds_a_database_without_the_public_card(): void {
-		add_filter( 'beltoft_services_db_ipv6', '__return_true' );
 		$this->save_cluster( array( 'ipv6_prefix' => '' ) );
 		$r = $this->ready_db();
 
@@ -1422,68 +1190,6 @@ class DbPhase4Test extends TestCase {
 
 	// -- The customer's IPv6 switch on a database --------------------------------------------------------
 
-	/** A database with the public IP add-on that was built while IPv6 for databases was off, on a cluster that has a prefix. */
-	private function db_without_ipv6(): Resource {
-		$this->save_cluster( array( 'ipv6_prefix' => '2001:db8:430c:1::/64', 'fw_enabled' => '1', 'fw_ipfilter' => '1' ) );
-
-		return $this->db_with_ip();
-	}
-
-	public function test_the_ipv6_switch_is_not_offered_while_databases_have_no_ipv6(): void {
-		$r = $this->db_without_ipv6();
-
-		$this->assertFalse( \BeltoftServices\Proxmox\Network\Ipv6Switch::applies( $r ) );
-		$this->assertArrayNotHasKey( 'ipv6_add', \BeltoftServices\Proxmox\Db\DbActions::offered( $r ) );
-		$this->assertFalse( \BeltoftServices\Proxmox\Network\Ipv6Switch::view( $r )['show'] );
-	}
-
-	public function test_add_and_remove_ipv6_on_a_database_restart_it_once_and_tell_the_guest(): void {
-		$r = $this->db_without_ipv6();
-		add_filter( 'beltoft_services_db_ipv6', '__return_true' );
-		$r = Resource::find( $r->id() );
-
-		$this->assertArrayHasKey( 'ipv6_add', \BeltoftServices\Proxmox\Db\DbActions::offered( $r ) );
-		$this->assertArrayNotHasKey( 'ipv6_remove', \BeltoftServices\Proxmox\Db\DbActions::offered( $r ) );
-		$this->assertTrue( DbAccess::view( $r )['ipv6']['can_add'] );
-
-		$mark = count( $this->fake->calls() );
-		$res  = $this->drive( $r, 'ipv6_add' );
-		$this->assertTrue( $res->is_done(), $res->error() );
-
-		$this->assertSame( 'ip=192.0.2.10/24,gw=192.0.2.1,ip6=' . self::DB_V6 . '/64,gw6=2001:db8:430c:1::1', $this->fake->vm( 5000 )['config']['ipconfig0'] );
-		$fresh = Resource::find( $r->id() );
-		$this->assertSame( self::DB_V6, $fresh->get( 'ip6' ) );
-		$this->assertNull( $fresh->get( 'ipv6_op' ) );
-		$this->assertNull( $fresh->get( DbIp::RESYNC ), 'The guest was told, the marker is gone.' );
-		$this->assertContains( self::DB_V6, array_column( (array) $this->fake->vm( 5000 )['firewall_ipsets']['ipfilter-net0'], 'cidr' ) );
-		$reboots = array_filter( array_slice( $this->fake->calls(), $mark ), static fn( $c ) => 'POST' === $c['method'] && '/status/reboot' === substr( $c['path'], -14 ) );
-		$this->assertCount( 1, $reboots );
-
-		$listen = array_values( array_filter( $this->guest_jobs(), static fn( $j ) => 'listen' === $j['job']['op'] ) );
-		$last   = end( $listen );
-		$this->assertSame( array( self::DB_V6 ), $last['job']['listen6'] );
-
-		$this->assertArrayHasKey( 'ipv6_remove', \BeltoftServices\Proxmox\Db\DbActions::offered( $fresh ) );
-		$res = $this->drive( $fresh, 'ipv6_remove' );
-		$this->assertTrue( $res->is_done(), $res->error() );
-		$this->assertSame( 'ip=192.0.2.10/24,gw=192.0.2.1', $this->fake->vm( 5000 )['config']['ipconfig0'] );
-		$this->assertNull( Resource::find( $r->id() )->get( 'ip6' ) );
-		$listen = array_values( array_filter( $this->guest_jobs(), static fn( $j ) => 'listen' === $j['job']['op'] ) );
-		$last   = end( $listen );
-		$this->assertArrayNotHasKey( 'listen6', $last['job'], 'The guest is told to stop listening on IPv6.' );
-		$this->assertNotNull( \BeltoftServices\Proxmox\Network\IpHistory::for_address( self::DB_V6 )[0]['ended_at'] );
-	}
-
-	public function test_the_ipv6_switch_of_a_database_needs_a_prefix(): void {
-		$r = $this->db_without_ipv6();
-		add_filter( 'beltoft_services_db_ipv6', '__return_true' );
-		$r = Resource::find( $r->id() );
-
-		$this->save_cluster( array( 'ipv6_prefix' => '' ) );
-		$this->assertFalse( \BeltoftServices\Proxmox\Network\Ipv6Switch::applies( $r ) );
-		$this->assertNotNull( \BeltoftServices\Proxmox\Vm\Actions::check( $r, 'ipv6_add', array() ) );
-	}
-
 	public function test_a_database_has_the_servers_network_tab_on_its_one_network(): void {
 		$r    = $this->ready_db();
 		$view = \BeltoftServices\Proxmox\Network\PrivateAttach::view( $r );
@@ -1556,5 +1262,149 @@ class DbPhase4Test extends TestCase {
 		$this->assertCount( 1, $jobs );
 		$this->assertSame( $address, $jobs[0]['job']['address'] );
 		$this->assertSame( '10.64.0.16/28', $jobs[0]['job']['private_cidr'] );
+	}
+
+	/**
+	 * Runs the move until it settles.
+	 *
+	 * @param array<string, mixed> $args Arguments.
+	 */
+	private function move( Resource $r, array $args ): \BeltoftServices\Drivers\StepResult {
+		$driver = Registry::get( 'proxmox-db' );
+		$res    = null;
+
+		for ( $i = 0; $i < 60; $i++ ) {
+			$this->answer_guest( $r );
+			$res = $driver->act( Resource::find( $r->id() ), \BeltoftServices\Proxmox\Db\DbPrivateMove::ACTION, $args );
+
+			if ( $res->is_done() || $res->is_failed() || $res->is_refusal() || $res->wait_until() > 0 ) {
+				return $res;
+			}
+
+			$this->fake->elapse( 30 );
+		}
+
+		$this->fail( 'The move did not settle: ' . $res->error() );
+	}
+
+	/** A ready database with its card and a second network of the same customer. */
+	private function db_and_second_net(): array {
+		$this->assertTrue( \BeltoftServices\Proxmox\Network\PrivateNets::add( 1001, '10.64.0.16/28' ) );
+		$r    = $this->ready_db();
+		$user = (int) Resource::find( $r->id() )->license()['user_id'];
+		$two  = \BeltoftServices\Proxmox\Network\PrivateNets::create_for_user( $user, 'Two' );
+		$this->assertNotNull( $two );
+
+		return array( $r, $two, $user );
+	}
+
+	public function test_only_a_database_marked_at_build_is_offered_the_move(): void {
+		$r = $this->ready_db();
+		$this->assertTrue( Resource::find( $r->id() )->get( DbIp::CARD ), 'The build marks a database built with its card.' );
+		$this->assertTrue( \BeltoftServices\Proxmox\Db\DbPrivateMove::supported( Resource::find( $r->id() ) ) );
+
+		// IPv6 alone (an older database that got it later) does not say the guest knows the private job.
+		$this->assertTrue( Resource::find( $r->id() )->set( array( DbIp::CARD => null ) ) );
+		$this->assertFalse( \BeltoftServices\Proxmox\Db\DbPrivateMove::supported( Resource::find( $r->id() ) ) );
+	}
+
+	public function test_a_move_whose_pool_answer_was_lost_takes_the_address_the_pool_gave(): void {
+		list( $r, $two, $user ) = $this->db_and_second_net();
+		$row = \BeltoftServices\Proxmox\Network\PrivateNets::for_resource( $r->id() );
+
+		// The job stored where the database came from, the pool moved, then the job stopped before it stored the answer.
+		$this->assertTrue( Resource::find( $r->id() )->set( array( \BeltoftServices\Proxmox\Db\DbPrivateMove::OP => array( 'phase' => 'pool', 'net' => (string) $two['id'], 'name' => '', 'old_net_id' => (int) $row['net_id'], 'old_address' => (string) $row['address'] ) ) ) );
+		$moved = \BeltoftServices\Proxmox\Network\PrivateNets::move( $user, $r->id(), (int) $two['id'] );
+		$this->assertNotNull( $moved );
+
+		$res = $this->move( $r, array() );
+		$this->assertTrue( $res->is_done(), $res->error() );
+		$this->assertSame( $moved['address'], (string) Resource::find( $r->id() )->get( 'db_address' ), 'The address the pool gave, not a refusal.' );
+		$this->assertSame( (int) $two['id'], (int) \BeltoftServices\Proxmox\Network\PrivateNets::for_resource( $r->id() )['net_id'] );
+		$this->assertSame( 'ip=' . $moved['address'] . '/28', $this->fake->vm( 5000 )['config']['ipconfig1'] );
+	}
+
+	public function test_a_paused_move_leaves_the_pool_alone(): void {
+		list( $r, $two ) = $this->db_and_second_net();
+		$before = \BeltoftServices\Proxmox\Network\PrivateNets::for_resource( $r->id() );
+		$this->settings( array( 'pause_all' => 1 ) );
+
+		$res = $this->move( $r, array( 'net' => (string) $two['id'] ) );
+		$this->assertGreaterThan( 0, $res->wait_until(), $res->error() );
+		$this->assertSame( $before, \BeltoftServices\Proxmox\Network\PrivateNets::for_resource( $r->id() ), 'The old address stays the database\'s while it is paused.' );
+	}
+
+	public function test_the_new_private_address_is_in_the_ipfilter_set_before_the_restart(): void {
+		list( $r, $two ) = $this->db_and_second_net();
+		$from = count( $this->fake->calls() );
+
+		$this->assertTrue( $this->move( $r, array( 'net' => (string) $two['id'] ) )->is_done() );
+		$address = (string) Resource::find( $r->id() )->get( 'db_address' );
+		$set     = null;
+		$reboot  = null;
+
+		foreach ( array_slice( $this->fake->calls(), $from ) as $i => $c ) {
+			if ( null === $set && 'POST' === $c['method'] && false !== strpos( $c['path'], '/firewall/ipset/ipfilter-net1' ) && $address === (string) ( $c['params']['cidr'] ?? '' ) ) {
+				$set = $i;
+			}
+
+			if ( null === $reboot && 'POST' === $c['method'] && false !== strpos( $c['path'], '/status/reboot' ) ) {
+				$reboot = $i;
+			}
+		}
+
+		$this->assertNotNull( $set );
+		$this->assertNotNull( $reboot );
+		$this->assertLessThan( $reboot, $set, 'The VM may send from its new address as soon as it has it.' );
+	}
+
+	public function test_a_move_the_guest_did_not_follow_is_busy_and_can_be_finished(): void {
+		list( $r, $two ) = $this->db_and_second_net();
+		$this->private_guest = 'old';
+
+		$res = $this->move( $r, array( 'net' => (string) $two['id'] ) );
+		$this->assertTrue( $res->is_failed(), $res->error() );
+		$fresh = Resource::find( $r->id() );
+		$this->assertTrue( \BeltoftServices\Proxmox\Db\DbPrivateMove::unfinished( $fresh ) );
+		$this->assertFalse( DbIp::idle( $fresh ), 'Nothing else runs on the database meanwhile.' );
+		$view = \BeltoftServices\Proxmox\Network\PrivateAttach::view( $fresh );
+		$this->assertTrue( $view['move_unfinished'] );
+		$this->assertFalse( $view['can_move'] );
+		$this->assertNull( \BeltoftServices\Proxmox\Db\DbPrivateMove::check( $fresh, array() ), 'The Finish button may run it again.' );
+
+		$this->private_guest = 'new';
+		$res = $this->move( $r, array() );
+		$this->assertTrue( $res->is_done(), $res->error() );
+		$fresh = Resource::find( $r->id() );
+		$this->assertFalse( \BeltoftServices\Proxmox\Db\DbPrivateMove::unfinished( $fresh ) );
+		$this->assertTrue( DbIp::idle( $fresh ) );
+		$this->assertSame( '10.64.0.16/28', (string) $fresh->get( 'db_cidr' ) );
+	}
+
+	public function test_the_sync_after_a_restore_sends_the_private_range_again(): void {
+		$r = $this->ready_db();
+		$this->assertTrue( Resource::find( $r->id() )->set( array( DbIp::RESYNC => true ) ) );
+		$this->assertSame( 'sync', DbIp::wanted( Resource::find( $r->id() ) ) );
+
+		$res = null;
+
+		for ( $i = 0; $i < 40; $i++ ) {
+			$this->answer_guest( $r );
+			$res = ( new DbIp( Resource::find( $r->id() ) ) )->run();
+
+			if ( $res->is_done() || $res->is_failed() ) {
+				break;
+			}
+
+			$this->fake->elapse( 30 );
+		}
+
+		$this->assertTrue( $res->is_done(), $res->error() );
+		$fresh   = Resource::find( $r->id() );
+		$private = array_values( array_filter( $this->guest_jobs(), static fn( $j ) => 'private' === $j['job']['op'] ) );
+		$this->assertCount( 1, $private );
+		$this->assertSame( (string) $fresh->get( 'db_address' ), $private[0]['job']['address'] );
+		$this->assertSame( (string) $fresh->get( 'db_cidr' ), $private[0]['job']['private_cidr'] );
+		$this->assertNull( $fresh->get( DbIp::RESYNC ) );
 	}
 }

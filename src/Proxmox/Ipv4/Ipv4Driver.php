@@ -252,11 +252,7 @@ final class Ipv4Driver implements Driver, \BeltoftServices\Drivers\UsageItems {
 	 * @param bool     $add    Add or remove.
 	 */
 	private function action_for( Resource $r, Resource $parent, bool $add ): string {
-		// A database built with its public card takes and loses the address like a server (one restart); an older one adds the card.
-		if ( Ipv4Meta::is_db( $parent ) && ! DbIp::has_card( $parent ) ) {
-			return DbIp::SYNC_ACTION;
-		}
-
+		// A database takes and loses the address on its public card like a server (one restart), then the guest is told.
 		if ( Ipv4Meta::is_db( $parent ) ) {
 			return $add ? Ipv4Server::MAIN_ADD : Ipv4Server::MAIN_REMOVE;
 		}

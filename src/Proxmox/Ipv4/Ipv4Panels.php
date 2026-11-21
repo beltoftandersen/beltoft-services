@@ -192,7 +192,7 @@ final class Ipv4Panels {
 			'remove_url' => null === $row ? '' : (string) $row['remove_url'],
 			'delete_id'  => null === $row ? 0 : (int) $row['delete_id'],
 			'adding'     => '' === $address && Ipv4Meta::db_wants( $db ),
-			'removing'   => 'remove' === \BeltoftServices\Proxmox\Db\DbIp::action( $db ),
+			'removing'   => Ipv4Server::MAIN_REMOVE === Ipv4Server::working( $db ),
 		);
 	}
 }

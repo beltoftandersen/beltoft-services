@@ -87,6 +87,10 @@ $beltoft_services_net_words = array(
 	<?php endif; ?>
 
 
+	<?php if ( ! empty( $view['move_unfinished'] ) ) : ?>
+		<p class="beltoft-services-panel__notice" role="status"><?php esc_html_e( 'The move to the other network did not finish. The database may not answer on its private address until it does.', 'beltoft-services' ); ?></p>
+	<?php endif; ?>
+
 	<p class="beltoft-services-net__buttons" data-bs-note-anchor>
 		<?php if ( $view['can_attach'] ) : ?>
 			<button type="button" class="button woocommerce-button" data-net-attach><?php esc_html_e( 'Attach', 'beltoft-services' ); ?></button>
@@ -96,6 +100,9 @@ $beltoft_services_net_words = array(
 		<?php endif; ?>
 		<?php if ( ! empty( $view['can_move'] ) ) : ?>
 			<button type="button" class="button woocommerce-button" data-net-move><?php esc_html_e( 'Move to this network', 'beltoft-services' ); ?></button>
+		<?php endif; ?>
+		<?php if ( ! empty( $view['move_unfinished'] ) ) : ?>
+			<button type="button" class="button woocommerce-button" data-net-move><?php esc_html_e( 'Finish the move', 'beltoft-services' ); ?></button>
 		<?php endif; ?>
 	</p>
 </div>

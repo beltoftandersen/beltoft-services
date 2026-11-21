@@ -216,16 +216,6 @@
 	}
 
 	// IPv6 on or off: a question first (the database restarts once), then the action; the page is read again when the job has run.
-	function ipv6( box, panel, button ) {
-		var action = button.getAttribute( 'data-db-ipv6' );
-
-		S.confirm( { title: button.getAttribute( 'data-title' ), text: button.getAttribute( 'data-text' ), confirm: button.getAttribute( 'data-confirm' ) } ).then( function ( yes ) {
-			if ( yes ) {
-				run( panel, button, db.strings.ipv6working, '/actions/' + action, JSON.stringify( { args: {} } ), action, undefined );
-			}
-		} );
-	}
-
 	// Copy: the text of the code block next to the button, read when it is clicked (it holds the password once that is shown).
 	function copy( box, button ) {
 		var code = button.parentNode ? button.parentNode.querySelector( 'code' ) : null;
@@ -328,7 +318,7 @@
 	} );
 
 	document.addEventListener( 'click', function ( event ) {
-		var button = event.target.closest( '[data-db-reveal], [data-db-reset], [data-db-power], [data-db-restore], [data-db-backup-delete], [data-db-policy-save], [data-db-copy], [data-db-access-mine], [data-db-access-add], [data-db-access-remove], [data-db-access-world], [data-db-ipv6]' );
+		var button = event.target.closest( '[data-db-reveal], [data-db-reset], [data-db-power], [data-db-restore], [data-db-backup-delete], [data-db-policy-save], [data-db-copy], [data-db-access-mine], [data-db-access-add], [data-db-access-remove], [data-db-access-world]' );
 		var panel = button ? button.closest( '[data-resource]' ) : null;
 		// The power buttons are in the page's head, outside the card.
 		var box = button ? ( button.closest( '[data-db-card]' ) || ( panel ? panel.querySelector( '[data-db-card]' ) : null ) ) : null;
@@ -343,8 +333,6 @@
 			reveal( box, panel, button );
 		} else if ( button.hasAttribute( 'data-db-power' ) ) {
 			power( box, panel, button );
-		} else if ( button.hasAttribute( 'data-db-ipv6' ) ) {
-			ipv6( box, panel, button );
 		} else if ( button.hasAttribute( 'data-db-policy-save' ) ) {
 			policy( box, panel, button );
 		} else if ( button.hasAttribute( 'data-db-restore' ) ) {

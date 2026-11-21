@@ -465,6 +465,7 @@ final class PrivateAttach {
 			'can_detach'  => ! $is_db && in_array( $state, array( 'attached', 'failed' ), true ),
 			'is_db'       => $is_db,
 			// A database moves to another of the customer's networks (one with room, or a new one) instead of attach and detach.
+			'move_unfinished' => $is_db && \BeltoftServices\Proxmox\Db\DbPrivateMove::unfinished( $r ),
 			'can_move'    => $is_db && \BeltoftServices\Proxmox\Db\DbPrivateMove::supported( $r ) && 'ready' === $r->get( 'db_state' ) && $r->accepts_actions() && ! is_array( $r->get( 'db_private_op' ) ) && ( PrivateNets::can_create( $user ) || count( array_filter( $nets, static fn( $n ) => null !== $row && $n['id'] !== (int) $row['net_id'] && ! $n['full'] ) ) > 0 ),
 		);
 	}

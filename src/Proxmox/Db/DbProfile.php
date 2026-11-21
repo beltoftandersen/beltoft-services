@@ -85,8 +85,8 @@ final class DbProfile implements BuildProfile {
 			return $nic + DbIp::public_params( $cluster, $ip, $net0, $vmid );
 		}
 
-		// Database IPv6 on and a cluster with IPv6: the public card with the IPv6 address, like a VPS Basic. An IPv4 address is
-		// added to it later through Ipv4Server (the IPv4 add-on). Otherwise no public card, as before.
+		// A cluster with IPv6: the public card with the IPv6 address, like a VPS Basic. An IPv4 address is added to it later
+		// through Ipv4Server (the IPv4 add-on). A cluster without IPv6: no public card.
 		$card = DbIp::public_card( $cluster, $net0, $vmid );
 
 		return '' === $card['ipconfig0'] ? $nic : $nic + $card;
@@ -103,8 +103,13 @@ final class DbProfile implements BuildProfile {
 		$meta    = $this->base_meta( $record, $ip );
 		$cluster = Clusters::get( (string) $record['cluster'] );
 
-		if ( null === $ip && null !== $cluster && Ipv6::databases() && '' !== Ipv6::ipconfig( $cluster, (int) $record['vmid'] ) ) {
+		if ( null === $ip && null !== $cluster && '' !== Ipv6::ipconfig( $cluster, (int) $record['vmid'] ) ) {
 			$meta['ip6'] = Ipv6::address( $cluster, (int) $record['vmid'] );
+		}
+
+		// Built with its card from a template whose guest knows the `private` job (DbPrivateMove::supported).
+		if ( Ipv6::is_address( (string) ( $meta['ip6'] ?? '' ) ) ) {
+			$meta[ DbIp::CARD ] = true;
 		}
 
 		return $meta;

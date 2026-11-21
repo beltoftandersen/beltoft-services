@@ -79,12 +79,6 @@ final class NetworkTab {
 	}
 
 	/**
-	 * Scripts and styles: only on the page of a server that can have the private network.
-	 *
-	 * @param mixed $parent   Handle of the generic account script.
-	 * @param mixed $endpoint The endpoint being shown.
-	 */
-	/**
 	 * The tab's script and style on a page that prints the tab itself (a database's page): the same files and words.
 	 *
 	 * @param string $parent Handle of the account script.
@@ -95,6 +89,12 @@ final class NetworkTab {
 		wp_localize_script( self::HANDLE, 'beltoftServicesNetwork', array( 'strings' => self::strings() ) );
 	}
 
+	/**
+	 * Scripts and styles: only on the page of a server that can have the private network.
+	 *
+	 * @param mixed $parent   Handle of the generic account script.
+	 * @param mixed $endpoint The endpoint being shown.
+	 */
 	public static function assets( $parent, $endpoint = null ): void {
 		if ( ! is_string( $parent ) || ( is_string( $endpoint ) && ServerLinks::slug() !== $endpoint ) ) {
 			return;

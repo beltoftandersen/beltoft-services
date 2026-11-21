@@ -11,7 +11,6 @@ use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Network\Ipv6Switch;
 use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
@@ -109,15 +108,6 @@ class DbDriver extends ProxmoxDriver {
 			return $result;
 		}
 
-		// The IPv4 add-on asks for the address to be put on the VM or taken off it (see Ipv4\Ipv4Driver).
-		if ( DbIp::SYNC_ACTION === $action ) {
-			return ( new DbIp( Resource::find( $r->id() ) ?? $r ) )->run();
-		}
-
-		if ( Ipv6Switch::is_action( $action ) ) {
-			return $this->ipv6( $r, $action );
-		}
-
 		// The customer moves the database to another of their private networks.
 		if ( DbPrivateMove::ACTION === $action ) {
 			return ( new DbPrivateMove( Resource::find( $r->id() ) ?? $r ) )->run( $args );
@@ -149,14 +139,6 @@ class DbDriver extends ProxmoxDriver {
 	}
 
 	/**
-	 * The IPv6 switch of a database: the server's own steps (ipconfig0, meta, ipfilter, one restart), then the guest is told
-	 * the new listen addresses and the allow list through DbIp's `sync` (the listen job with `listen6`, the access list
-	 * with `allow6`, the firewall). A repeat that finds the sync marked finishes the sync only.
-	 *
-	 * @param Resource $r      Resource.
-	 * @param string   $action ipv6_add or ipv6_remove.
-	 */
-	/**
 	 * A change made by the server's own action, then the guest told through DbIp's `sync`. A repeat that finds the sync marked
 	 * finishes the sync only.
 	 *
@@ -178,24 +160,6 @@ class DbDriver extends ProxmoxDriver {
 		$sync = ( new DbIp( Resource::find( $r->id() ) ?? $r ) )->run();
 
 		return $sync->is_done() ? StepResult::done( array(), $event ) : $sync;
-	}
-
-	private function ipv6( Resource $r, string $action ): StepResult {
-		if ( true !== $r->get( DbIp::RESYNC ) ) {
-			$res = ( new Actions( $r ) )->run( $action, array() );
-
-			if ( ! $res->is_done() || $res->is_refusal() ) {
-				return $res;
-			}
-
-			// The restart is over: the guest follows, with the IPv4 and IPv6 addresses the VM has now.
-			$r->set( array( DbIp::RESYNC => true ) );
-			$r = Resource::find( $r->id() ) ?? $r;
-		}
-
-		$sync = ( new DbIp( Resource::find( $r->id() ) ?? $r ) )->run();
-
-		return $sync->is_done() ? StepResult::done( array( Jobs::TEXT => ( Ipv6Switch::ADD === $action ? __( 'IPv6 was added to the database and it restarted.', 'beltoft-services' ) : __( 'IPv6 was removed from the database and it restarted.', 'beltoft-services' ) ) ), Ipv6Switch::ADD === $action ? 'Customer added IPv6 to the database' : 'Customer removed IPv6 from the database' ) : $sync;
 	}
 
 	/**
@@ -296,7 +260,7 @@ class DbDriver extends ProxmoxDriver {
 	 * The jobs only the plugin queues: the one that brings the firewall and the guest to the stored allow-list (queued by the route that stored it), and the one that puts the IPv4 add-on's address on the VM or takes it off (queued by the add-on).
 	 */
 	public function internal_actions(): array {
-		return array( DbAccess::APPLY, DbIp::SYNC_ACTION, \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_ADD, \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_REMOVE );
+		return array( DbAccess::APPLY, \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_ADD, \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_REMOVE );
 	}
 
 	public function render_account( Resource $r ): void {

@@ -894,24 +894,6 @@ class DbDiskTest extends TestCase {
 		$this->assertSame( 'Database restored from a backup', $res->event() );
 	}
 
-	public function test_the_ip_change_comes_first_and_the_grow_follows_in_one_update(): void {
-		$this->pool( 3 );
-		$r = $this->db_on_ladder( 'e0-0' );
-
-		$res = $this->change( $r, array( 'public_ip' => 1, 'extra_disk_gb' => 50 ) );
-		$this->assertTrue( $res->is_done(), $res->error() );
-		$this->assertNotEmpty( IpPool::for_resource( $r->id() ) );
-		$this->assertStringContainsString( 'size=70G', $this->size_of() );
-		$this->assertSame( 70, (int) Resource::find( $r->id() )->get( 'disk_gb' ) );
-		$this->assertStringContainsString( 'Public IP address added', $this->logged( $r, $res ) );
-		$this->assertStringContainsString( 'Data disk made larger', $this->logged( $r, $res ) );
-
-		$ops = array_column( array_column( $this->guest_jobs(), 'job' ), 'op' );
-		$this->assertLessThan( array_search( 'grow', $ops, true ), array_search( 'listen', $ops, true ), 'The listen job comes before the grow job.' );
-		$this->assertNull( Resource::find( $r->id() )->get( DbIp::OP ) );
-		$this->assertNull( Resource::find( $r->id() )->get( DbGrow::OP ) );
-	}
-
 	public function test_a_change_of_the_ip_alone_does_not_touch_the_disk_and_a_change_of_the_disk_alone_not_the_ip(): void {
 		$this->pool( 3 );
 		$r = $this->db_on_ladder( 'e0-0' );

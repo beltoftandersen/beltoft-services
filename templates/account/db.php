@@ -186,18 +186,13 @@ $beltoft_services_db_wait = array(
 	<?php if ( 'ready' === $view['kind'] && ( $beltoft_services_all || 'access' === $active ) ) : ?>
 		<?php $beltoft_services_access = $view['access']; ?>
 		<div class="beltoft-services-vm__more beltoft-services-db__access" data-db-access data-confirm-remove="<?php esc_attr_e( 'Remove this address from the list?', 'beltoft-services' ); ?>">
+			<?php if ( '' !== (string) $beltoft_services_access['address6'] ) : ?>
+				<h4><?php esc_html_e( 'IPv6 address', 'beltoft-services' ); ?></h4>
+				<p><?php esc_html_e( 'Address:', 'beltoft-services' ); ?> <code><?php echo esc_html( (string) $beltoft_services_access['address6'] ); ?></code> <?php esc_html_e( 'Port:', 'beltoft-services' ); ?> <code><?php echo esc_html( (string) $view['port'] ); ?></code></p>
+			<?php endif; ?>
 			<h4><?php esc_html_e( 'IPv4 address', 'beltoft-services' ); ?></h4>
 			<?php if ( '' !== $beltoft_services_access['address'] ) : ?>
 				<p><?php esc_html_e( 'Address:', 'beltoft-services' ); ?> <code><?php echo esc_html( (string) $beltoft_services_access['address'] ); ?></code> <?php esc_html_e( 'Port:', 'beltoft-services' ); ?> <code><?php echo esc_html( (string) $view['port'] ); ?></code></p>
-				<?php if ( '' !== (string) ( $beltoft_services_access['address6'] ?? '' ) ) : ?>
-					<p><?php esc_html_e( 'IPv6 address:', 'beltoft-services' ); ?> <code><?php echo esc_html( (string) $beltoft_services_access['address6'] ); ?></code></p>
-				<?php endif; ?>
-				<?php $beltoft_services_ipv6 = (array) ( $beltoft_services_access['ipv6'] ?? array() ); ?>
-				<?php if ( ! empty( $beltoft_services_ipv6['show'] ) && ( ! empty( $beltoft_services_ipv6['can_add'] ) || ! empty( $beltoft_services_ipv6['can_remove'] ) ) ) : ?>
-					<?php $beltoft_services_ipv6_words = \BeltoftServices\Proxmox\Network\Ipv6Switch::words( ! empty( $beltoft_services_ipv6['can_add'] ) ? 'ipv6_add' : 'ipv6_remove', true ); ?>
-					<p class="description"><?php echo esc_html( $beltoft_services_ipv6_words['text'] ); ?></p>
-					<p><button type="button" class="button woocommerce-button" data-db-ipv6="<?php echo ! empty( $beltoft_services_ipv6['can_add'] ) ? 'ipv6_add' : 'ipv6_remove'; ?>" data-title="<?php echo esc_attr( $beltoft_services_ipv6_words['title'] ); ?>" data-text="<?php echo esc_attr( $beltoft_services_ipv6_words['text'] ); ?>" data-confirm="<?php echo esc_attr( $beltoft_services_ipv6_words['confirm'] ); ?>"><?php echo esc_html( $beltoft_services_ipv6_words['confirm'] ); ?></button></p>
-				<?php endif; ?>
 				<?php if ( $beltoft_services_access['removing'] ) : ?>
 					<p><?php esc_html_e( 'The public IP address is being removed. Your database restarts once.', 'beltoft-services' ); ?></p>
 				<?php elseif ( '' !== $beltoft_services_access['remove_url'] ) : ?>
@@ -214,19 +209,19 @@ $beltoft_services_db_wait = array(
 			<?php elseif ( $beltoft_services_access['sold_out'] ) : ?>
 				<p><?php esc_html_e( 'No IPv4 address is free right now.', 'beltoft-services' ); ?></p>
 			<?php elseif ( '' !== $beltoft_services_access['add_url'] ) : ?>
-				<p><?php esc_html_e( 'Your database is reachable from your servers on the private network. A public IP address makes it reachable from elsewhere too, for the addresses you allow.', 'beltoft-services' ); ?></p>
+				<p><?php echo esc_html( '' !== (string) $beltoft_services_access['address6'] ? __( 'An IPv4 address makes your database reachable over IPv4 too, for the addresses you allow. Some networks and applications still have no IPv6.', 'beltoft-services' ) : __( 'Your database is reachable from your servers on the private network. A public IP address makes it reachable from elsewhere too, for the addresses you allow.', 'beltoft-services' ) ); ?></p>
 				<p class="description"><?php echo esc_html( '' !== $beltoft_services_access['add_price'] ? sprintf( /* translators: %s: the price per period, such as +€4.00 / month */ __( 'Price: %s. Your database restarts once, which takes about a minute.', 'beltoft-services' ), $beltoft_services_access['add_price'] ) : __( 'Your database restarts once, which takes about a minute.', 'beltoft-services' ) ); ?></p>
 				<p><a class="button woocommerce-button" href="<?php echo esc_url( (string) $beltoft_services_access['add_url'] ); ?>"><?php esc_html_e( 'Add an IPv4 address', 'beltoft-services' ); ?></a></p>
 			<?php else : ?>
 				<p><?php esc_html_e( 'This database has no public IP address. It is reachable from your servers on the private network.', 'beltoft-services' ); ?></p>
 			<?php endif; ?>
 
-			<?php if ( '' !== $beltoft_services_access['address'] ) : ?>
+			<?php if ( '' !== $beltoft_services_access['address'] || '' !== (string) $beltoft_services_access['address6'] ) : ?>
 				<h4><?php esc_html_e( 'Who may connect', 'beltoft-services' ); ?></h4>
 				<?php if ( $view['stopped'] ) : ?>
 					<p class="beltoft-services-panel__notice" data-db-stopped><?php echo esc_html( \BeltoftServices\Proxmox\Db\DbPower::start_first() ); ?> <?php esc_html_e( 'The list can be changed while the database runs.', 'beltoft-services' ); ?></p>
 				<?php endif; ?>
-				<p class="description"><?php esc_html_e( 'Only these addresses can reach the database over its public IP address. Everything else is refused.', 'beltoft-services' ); ?></p>
+				<p class="description"><?php esc_html_e( 'Only these addresses can reach the database over its public addresses. Everything else is refused.', 'beltoft-services' ); ?></p>
 				<?php if ( $beltoft_services_access['world'] ) : ?>
 					<p class="beltoft-services-panel__notice" role="status"><?php esc_html_e( 'The database is open to everyone. Anyone on the internet can try to log in. The list below is not used while this is on.', 'beltoft-services' ); ?></p>
 				<?php endif; ?>
