@@ -304,6 +304,12 @@ final class ThankYou {
 			'domain' => __( 'Open your domain', 'beltoft-services' ),
 			'dns'    => __( 'Open your DNS hosting', 'beltoft-services' ),
 			'hosting' => __( 'Open your hosting', 'beltoft-services' ),
+			'db'        => __( 'Open your database', 'beltoft-services' ),
+			'dedicated' => __( 'Open your server', 'beltoft-services' ),
+			'storage'   => __( 'Open your backup storage', 'beltoft-services' ),
+			'mail'      => __( 'Open your email', 'beltoft-services' ),
+			'ssl'       => __( 'Open your certificate', 'beltoft-services' ),
+			'lickey'    => __( 'Open your licence', 'beltoft-services' ),
 		);
 
 		return $labels[ $kind ] ?? __( 'Open in My Account', 'beltoft-services' );

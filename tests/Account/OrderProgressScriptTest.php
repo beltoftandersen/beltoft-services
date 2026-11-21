@@ -62,4 +62,16 @@ final class OrderProgressScriptTest extends TestCase {
 		$css = (string) file_get_contents( dirname( __DIR__, 2 ) . '/assets/account.css' );
 		$this->assertStringContainsString( 'body.woocommerce-account .woocommerce-MyAccount-content .bs-order .bs-flow .beltoft-service__open a { color: var(--bs-on-dark);', $css );
 	}
+
+	public function test_a_finished_order_is_one_compact_card_with_named_buttons(): void {
+		$css = (string) file_get_contents( dirname( __DIR__, 2 ) . '/assets/account.css' );
+
+		$this->assertStringContainsString( '.bs-order[data-state="ready"] .beltoft-next__services { display: none; }', $css );
+		$this->assertStringContainsString( '.woocommerce-MyAccount-content .bs-flow .beltoft-service__head { max-width: none; }', $css );
+		$this->assertStringNotContainsString( 'div.bs-order', $css, 'The card is a section: a div selector never matched.' );
+
+		foreach ( array( 'db' => 'Open your database', 'storage' => 'Open your backup storage', 'mail' => 'Open your email', 'ssl' => 'Open your certificate' ) as $kind => $label ) {
+			$this->assertSame( $label, \BeltoftServices\ThankYou::open_label( $kind ) );
+		}
+	}
 }

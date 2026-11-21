@@ -1434,9 +1434,14 @@ div.beltoft-services-domain__dnssec, div.beltoft-services-domain__whois { margin
 .bs-order.is-mixed .bs-order__closing-text, .bs-order.is-failed .bs-order__closing-text { color: var(--bs-status-fail); }
 .bs-order__closing-text { margin: 0; font-weight: var(--bs-fw-strong); }
 .bs-order__closing-list { display: flex; flex-wrap: wrap; gap: var(--bs-space-2); margin: 0; padding: 0; list-style: none; }
-div.bs-order .bs-order__closing-list a, div.bs-order .bs-order__closing-list a:visited { display: inline-flex; align-items: center; min-height: var(--bs-btn-h); padding: 0 var(--bs-space-4); border-radius: var(--bs-radius); background: var(--bs-dark); color: var(--bs-on-dark); font-weight: var(--bs-fw-medium); text-decoration: none; }
-div.bs-order .bs-order__closing-list a:hover, div.bs-order .bs-order__closing-list a:focus-visible { background: var(--bs-status-ok); }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-order .bs-order__closing-list a, body.woocommerce-account .woocommerce-MyAccount-content .bs-order .bs-order__closing-list a:visited { display: inline-flex; align-items: center; min-height: var(--bs-btn-h); padding: 0 var(--bs-space-4); border-radius: var(--bs-radius); background: var(--bs-dark); color: var(--bs-on-dark); font-weight: var(--bs-fw-medium); text-decoration: none; }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-order .bs-order__closing-list a:hover, body.woocommerce-account .woocommerce-MyAccount-content .bs-order .bs-order__closing-list a:focus-visible { background: var(--bs-status-ok); }
 .bs-order .beltoft-service-list { gap: var(--bs-space-4); }
+/* A finished order is one compact card: the closing line and one button per service. The process lines (and their full bars)
+   only show while something is being set up, waits, or failed. */
+.bs-order[data-state="ready"] .beltoft-next__services { display: none; }
+/* The theme caps account paragraphs at 70ch: the head of a process line spans the line, so its state sits at the right edge. */
+body.woocommerce-account .woocommerce-MyAccount-content .bs-flow .beltoft-service__head { max-width: none; }
 .bs-order__waiting { min-height: 24px; padding-bottom: var(--bs-space-2); }
 .bs-order__waiting .bs-loader__bar { bottom: 0; }
 .bs-flow { display: grid; gap: var(--bs-space-2); padding: var(--bs-space-4); border-radius: var(--bs-radius); background: var(--bs-surface); }
