@@ -199,7 +199,7 @@ class ServiceAreasTest extends TestCase {
 
 		$this->assertStringContainsString( 'aria-current="page">New password', $html );
 		$this->assertStringNotContainsString( 'Reachable from your servers', $html );
-		$this->assertSame( array( 'overview', 'access', 'backups', 'password' ), array_keys( $this->db_area()->nav() ) );
+		$this->assertSame( array( 'overview', 'access', 'network', 'backups', 'password' ), array_keys( $this->db_area()->nav() ) );
 	}
 
 	public function test_the_new_password_tab_has_its_own_section_with_the_show_once_button_and_no_old_notice_spots(): void {

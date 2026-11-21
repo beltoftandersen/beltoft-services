@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.53.0
+Stable tag: 0.54.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,11 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.54.0 =
+* Databases are built like a VPS Basic while database IPv6 is on (setting db_ipv6): a public network card with the database's own IPv6 address, closed until the customer allows addresses. An IPv4 address (the add-on) is then added and removed like a server's: on the same card, one restart.
+* Databases have the servers' Network tab (the same code): the private network, the private address and what else is on it. A database built from the IPv6 templates can be moved to another of the customer's private networks (one restart; the guest's new `private` job).
+* The one reboot after a network change is shared by the IPv4 change and the database move.
 
 = 0.53.0 =
 * One rule for every VM: whether a VPS, a VPS Basic or a database wants a main IPv4 address is answered in one place (the plan includes it, or an IPv4 add-on holds it). The old database plan field "Public IP" is removed (no database used it).
