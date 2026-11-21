@@ -8,6 +8,8 @@
  *
  * @var array{total: float, currency: string, next: int, resources: array<int, array{label: string, total: float, lines: array<int, array{item: string, label: string, hours: int, charge: float, capped: bool}>}>} $estimate The estimate (see BeltoftServices\Usage\Estimate).
  * @var int $credit Account credit in cents (0: none).
+ * @var string $view_url Address of the pay-as-you-go subscription: set on the card of the subscription list.
+ * @var array<int, string> $links Page address of each service (resource id => address).
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -16,8 +18,11 @@ use BeltoftServices\Usage\Estimate;
 ?>
 <section class="beltoft-services-usage">
 	<div class="beltoft-services-ov__head">
-		<h2><?php esc_html_e( 'Usage this month', 'beltoft-services' ); ?></h2>
+		<h2><?php echo esc_html( ! empty( $view_url ) ? __( 'Pay as you go', 'beltoft-services' ) : __( 'Usage this month', 'beltoft-services' ) ); ?></h2>
 	</div>
+	<?php if ( empty( $estimate['resources'] ) ) : ?>
+		<p class="beltoft-services-usage__note"><?php esc_html_e( 'No usage so far this month.', 'beltoft-services' ); ?></p>
+	<?php else : ?>
 	<div class="beltoft-services-credit__balance">
 		<span class="beltoft-services-credit__label"><?php echo esc_html( Estimate::incl() ? __( 'Total so far, incl. VAT (estimate)', 'beltoft-services' ) : __( 'Total so far, excl. VAT (estimate)', 'beltoft-services' ) ); ?></span>
 		<span class="beltoft-services-credit__amount"><?php echo esc_html( Estimate::money( Estimate::shown_total( $estimate ), $estimate['currency'] ) ); ?></span>
@@ -31,11 +36,16 @@ use BeltoftServices\Usage\Estimate;
 			</tr>
 		</thead>
 		<tbody>
-			<?php foreach ( $estimate['resources'] as $beltoft_services_usage_resource ) : ?>
+			<?php foreach ( $estimate['resources'] as $beltoft_services_usage_id => $beltoft_services_usage_resource ) : ?>
 				<?php foreach ( $beltoft_services_usage_resource['lines'] as $beltoft_services_usage_line ) : ?>
 					<tr>
 						<td>
-							<?php echo esc_html( $beltoft_services_usage_line['subject'] ?? $beltoft_services_usage_resource['label'] ); ?>
+							<?php $beltoft_services_usage_name = (string) ( $beltoft_services_usage_line['subject'] ?? $beltoft_services_usage_resource['label'] ); ?>
+							<?php if ( ! empty( $links[ $beltoft_services_usage_id ] ) ) : ?>
+								<a href="<?php echo esc_url( $links[ $beltoft_services_usage_id ] ); ?>"><?php echo esc_html( $beltoft_services_usage_name ); ?></a>
+							<?php else : ?>
+								<?php echo esc_html( $beltoft_services_usage_name ); ?>
+							<?php endif; ?>
 							<?php if ( $beltoft_services_usage_line['capped'] ) : ?>
 								<span class="beltoft-services-usage__cap"><?php esc_html_e( 'capped', 'beltoft-services' ); ?></span>
 							<?php endif; ?>
@@ -47,6 +57,7 @@ use BeltoftServices\Usage\Estimate;
 			<?php endforeach; ?>
 		</tbody>
 	</table>
+	<?php endif; ?>
 	<?php if ( ! empty( $estimate['carried'] ) && $estimate['carried'] > 0 && ! empty( $estimate['minimum'] ) ) : ?>
 		<p class="beltoft-services-usage__note">
 			<?php
@@ -86,5 +97,8 @@ use BeltoftServices\Usage\Estimate;
 			);
 			?>
 		</p>
+	<?php endif; ?>
+	<?php if ( ! empty( $view_url ) ) : ?>
+		<p class="beltoft-services-usage__note"><a href="<?php echo esc_url( $view_url ); ?>"><?php esc_html_e( 'View account', 'beltoft-services' ); ?></a></p>
 	<?php endif; ?>
 </section>

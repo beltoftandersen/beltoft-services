@@ -1479,3 +1479,21 @@ body.woocommerce-account .woocommerce-MyAccount-content .bs-order .bs-flow .belt
 	.bs-flow__track i, .bs-flow .beltoft-services-progress__steps li, .bs-flow .beltoft-services-progress__steps li::before { transition: none; }
 	.bs-flow.is-getting-ready .bs-flow__track[aria-valuenow="0"]::after { width: 100%; animation: none; opacity: .4; }
 }
+
+/* The subscription list: the product name leads a row, the number is small under it; ended ones are folded. */
+body.woocommerce-account .woocommerce-MyAccount-content .bs-subscriptions__title { margin: var(--bs-space-5) 0 var(--bs-space-3); }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-sub-title { display: block; font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); }
+body.woocommerce-account .woocommerce-MyAccount-content table.bs-subs td.subscription-id::before { content: none; display: none; }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-subscriptions__ended { margin: var(--bs-space-4) 0 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-subscriptions__ended > summary { cursor: pointer; padding: var(--bs-space-2) 0; color: var(--bs-muted); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-subscriptions__ended[open] > summary { margin-bottom: var(--bs-space-3); }
+@media (max-width: 767px) {
+	body.woocommerce-account .woocommerce-MyAccount-content table.bs-subs td.subscription-id { padding-bottom: var(--bs-space-2); }
+	body.woocommerce-account .woocommerce-MyAccount-content table.bs-subs td.subscription-actions .button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; box-sizing: border-box; }
+}
+
+/* The page of one subscription: the product names as its heading, the number under it. */
+body.woocommerce-account .woocommerce-MyAccount-content .bs-sub-head { margin: 0 0 var(--bs-space-5); }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-sub-head__title { margin: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-sub-head__id { margin: var(--bs-space-1) 0 0; color: var(--bs-muted); font-size: var(--bs-fs-small); }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-sub-head .bs-note { margin: var(--bs-space-3) 0 0; }

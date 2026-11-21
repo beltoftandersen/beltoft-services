@@ -152,7 +152,7 @@ class EstimateTest extends UsageTestCase {
 		UsageView::in_content();
 		UsageView::in_content();
 		$out = ob_get_clean();
-		$this->assertSame( 1, substr_count( $out, 'Usage this month' ) );
+		$this->assertSame( 1, substr_count( $out, 'Pay as you go<' ) );
 	}
 
 	public function test_the_overview_billing_box_shows_usage_so_far(): void {

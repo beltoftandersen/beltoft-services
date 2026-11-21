@@ -12,7 +12,8 @@ use BeltoftServices\Usage\Estimate;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Printed on the first Billing page (Subscriptions), under the tab bar. A shortcode, [beltoft_services_usage],
+ * Printed as the Pay as you go card on the Subscriptions list (not on the page of one subscription: the pay-as-you-go
+ * account's own page prints the block), under the tab bar. A shortcode, [beltoft_services_usage],
  * places it elsewhere. Nothing is printed for a customer without a usage account or without usage yet. The
  * template is templates/account/usage.php (copy to yourtheme/beltoft-services/account/usage.php).
  */
@@ -57,6 +58,31 @@ final class UsageView {
 			return '';
 		}
 
+		return self::render( $estimate, '' );
+	}
+
+	/**
+	 * The Pay as you go card at the top of the subscription list: usage, credit, next invoice and a link to the account's
+	 * subscription. '' for a customer without a pay-as-you-go account.
+	 */
+	public static function card(): string {
+		if ( ! is_user_logged_in() ) {
+			return '';
+		}
+
+		$estimate = Estimate::for_user( get_current_user_id() );
+		$account  = $estimate ? \BeltoftServices\Usage\Account::for_user( get_current_user_id() ) : null;
+
+		return $estimate && $account ? self::render( $estimate, $account->get_view_order_url() ) : '';
+	}
+
+	/**
+	 * Prints the template.
+	 *
+	 * @param array<string, mixed> $estimate Estimate.
+	 * @param string               $view_url Address of the account's subscription ('' for the plain block).
+	 */
+	private static function render( array $estimate, string $view_url ): string {
 		Panel::style();
 		self::$printed = true;
 
@@ -64,9 +90,32 @@ final class UsageView {
 		wc_get_template( 'usage.php', array(
 				'estimate' => $estimate,
 				'credit'   => \BeltoftServices\GiftCredit\GiftCredit::balance( get_current_user_id(), (string) $estimate['currency'] ),
+				'view_url' => $view_url,
+				'links'    => self::links( $estimate ),
 			), 'beltoft-services/account/', BELTOFT_SERVICES_PATH . 'templates/account/' );
 
 		return (string) ob_get_clean();
+	}
+
+	/**
+	 * The page of each service in the estimate (resource id => address).
+	 *
+	 * @param array<string, mixed> $estimate Estimate.
+	 * @return array<int, string>
+	 */
+	private static function links( array $estimate ): array {
+		$links = array();
+
+		foreach ( array_keys( (array) $estimate['resources'] ) as $id ) {
+			$resource = \BeltoftServices\Resource::find( (int) $id );
+			$url      = $resource ? OverviewData::follow_url( $resource->license() ) : '';
+
+			if ( '' !== $url ) {
+				$links[ (int) $id ] = $url;
+			}
+		}
+
+		return $links;
 	}
 
 	/**
@@ -80,7 +129,7 @@ final class UsageView {
 	 * Whether the page is the one the section prints on.
 	 */
 	private static function here(): bool {
-		return ! self::$printed && 'subscriptions' === Billing::current_tab();
+		return ! self::$printed && 'subscriptions' === ( function_exists( 'WC' ) && WC()->query ? (string) WC()->query->get_current_endpoint() : '' );
 	}
 
 	/**
@@ -95,7 +144,7 @@ final class UsageView {
 			return $html;
 		}
 
-		return self::html() . $html;
+		return self::card() . $html;
 	}
 
 	/**
@@ -106,6 +155,6 @@ final class UsageView {
 			return;
 		}
 
-		echo self::html(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in the template.
+		echo self::card(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in the template.
 	}
 }

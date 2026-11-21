@@ -143,9 +143,9 @@ final class LineNames {
 			return '';
 		}
 
-		if ( $item instanceof \WC_Order_Item_Product && self::is_account_product( (int) $item->get_product_id() ) ) {
-			// The same words as the order and cart lines, from the same code path.
-			$label = self::label( $item->get_product() );
+		if ( $item instanceof \WC_Order_Item_Product ) {
+			// The same words as the order and cart lines (and the subscription page), from the same code path.
+			$label = self::label( $item->get_product(), $item->get_meta( '_beltoft_services_disk_server' ) );
 
 			if ( '' !== $label ) {
 				return $label;
@@ -220,7 +220,7 @@ final class LineNames {
 					continue;
 				}
 				$extras[] = __( 'public IPv4', 'beltoft-services' );
-			} else {
+			} elseif ( ! in_array( $low, array( 'none', 'ingen' ), true ) ) {
 				$plain[] = $value;
 			}
 		}
