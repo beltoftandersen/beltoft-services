@@ -87,4 +87,33 @@ class PriorityTest extends TestCase {
 		$this->assertStringContainsString( Priority::promise(), $html );
 		wp_set_current_user( 0 );
 	}
+
+	public function test_the_overview_offers_it_with_price_and_link_and_says_active_once_bought(): void {
+		$user = self::factory()->user->create();
+		wp_set_current_user( $user );
+
+		$this->assertNull( Priority::offer( $user ), 'No product sells it: no section.' );
+
+		$product = $this->service_product( PriorityDriver::ID, array(), array( 'slug' => 'prio-offer' ) );
+		$offer   = Priority::offer( $user );
+
+		$this->assertFalse( $offer['active'] );
+		$this->assertStringContainsString( 'add-to-cart=' . $product->get_id(), $offer['url'] );
+		$this->assertNotSame( '', $offer['price'] );
+
+		$html = \BeltoftServices\Account\Overview::section( 'support' );
+		$this->assertStringContainsString( 'Add priority support', $html );
+		$this->assertStringContainsString( esc_html( Priority::promise() ), $html );
+
+		$this->service( $user );
+		$this->assertTrue( Priority::offer( $user )['active'] );
+		$html = \BeltoftServices\Account\Overview::section( 'support' );
+		$this->assertStringContainsString( 'Active', $html );
+		$this->assertStringNotContainsString( 'Add priority support', $html );
+	}
+
+	public function test_a_visitor_gets_no_offer(): void {
+		$this->service_product( PriorityDriver::ID, array(), array( 'slug' => 'prio-visitor' ) );
+		$this->assertNull( Priority::offer( 0 ) );
+	}
 }

@@ -38,6 +38,7 @@ final class Overview {
 		'mail'         => 'beltoft_services_mail',
 		'licenses'     => 'beltoft_services_licenses',
 		'next_payment' => 'beltoft_services_next_payment',
+		'support'      => 'beltoft_services_support',
 		'activity'     => 'beltoft_services_activity',
 		'welcome'      => 'beltoft_services_welcome',
 	);
@@ -294,6 +295,10 @@ final class Overview {
 						'next'    => $usage ? (int) $usage['next'] : 0,
 					)
 				);
+			case 'support':
+				$offer = \BeltoftServices\Support\Priority::offer( get_current_user_id() );
+
+				return $offer ? self::template( 'overview/support.php', $offer ) : '';
 			case 'activity':
 				if ( ! $data['activity']['days'] ) {
 					return '';

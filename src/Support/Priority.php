@@ -88,6 +88,44 @@ final class Priority {
 	}
 
 	/**
+	 * What the account overview offers: the promise, and either that it is active or the price and the link that buys it.
+	 * Null when the customer does not have it and no published product sells it.
+	 *
+	 * @param int $user_id Customer.
+	 * @return array{active: bool, promise: string, price: string, url: string}|null
+	 */
+	public static function offer( int $user_id ): ?array {
+		if ( $user_id < 1 ) {
+			return null;
+		}
+
+		if ( self::has( $user_id ) ) {
+			return array( 'active' => true, 'promise' => self::promise(), 'price' => '', 'url' => '' );
+		}
+
+		$product = self::product();
+
+		if ( null === $product ) {
+			return null;
+		}
+
+		return array(
+			'active'  => false,
+			'promise' => self::promise(),
+			'price'   => wp_strip_all_tags( (string) $product->get_price_html() ),
+			'url'     => add_query_arg( 'add-to-cart', $product->get_id(), wc_get_checkout_url() ),
+		);
+	}
+
+	/** The published product that sells priority support, or null. */
+	public static function product(): ?\WC_Product {
+		$ids = get_posts( array( 'post_type' => 'product', 'post_status' => 'publish', 'fields' => 'ids', 'posts_per_page' => 1, 'meta_key' => Product::META_DRIVER, 'meta_value' => PriorityDriver::ID ) ); // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key,WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- One product.
+		$product = $ids ? wc_get_product( (int) $ids[0] ) : null;
+
+		return $product instanceof \WC_Product && $product->is_purchasable() ? $product : null;
+	}
+
+	/**
 	 * Filter beltoft_services_has_priority_support.
 	 *
 	 * @param mixed $has     Answer so far.

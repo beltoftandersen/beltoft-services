@@ -6,7 +6,7 @@
  *
  * @package BeltoftServices
  *
- * @var array<string, string> $parts Printed sections by key (attention, servers, databases, domains, licenses, apps, mail, next_payment, activity, welcome). A section with nothing to show is ''.
+ * @var array<string, string> $parts Printed sections by key (attention, servers, databases, domains, licenses, apps, mail, next_payment, support, activity, welcome). A section with nothing to show is ''.
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
 $beltoft_services_columns = array(
 	// Databases share the 1 of servers: equal numbers keep the order they are listed in, so they come right after the servers.
 	array( 'servers' => 1, 'databases' => 1, 'hosting' => 1, 'licenses' => 3, 'apps' => 4, 'mail' => 4, 'next_payment' => 5 ),
-	array( 'domains' => 2, 'activity' => 6 ),
+	array( 'domains' => 2, 'support' => 3, 'activity' => 6 ),
 );
 $beltoft_services_filled = array();
 
