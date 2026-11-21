@@ -291,6 +291,29 @@ final class Resource {
 	}
 
 	/**
+	 * Ids of the last closed activation of every license that has one of this kind (a maintenance read, for the repair of add-ons
+	 * left behind).
+	 *
+	 * @param string $kind Activation kind.
+	 * @return int[]
+	 */
+	public static function latest_closed_ids_of_kind( string $kind ): array {
+		global $wpdb;
+
+		if ( '' === $kind || 'site' === $kind ) {
+			return array();
+		}
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, a rare maintenance read.
+		$ids = (array) $wpdb->get_col(
+			$wpdb->prepare( 'SELECT MAX(id) FROM %i WHERE kind = %s AND deactivated_at IS NOT NULL GROUP BY license_id', Install::tables()['activations'], $kind )
+		);
+		// phpcs:enable
+
+		return array_map( 'intval', $ids );
+	}
+
+	/**
 	 * The live resources of many licenses, one read (beltoft-licenses 0.8.10 and newer; one read per license before). A license
 	 * without one is left out.
 	 *

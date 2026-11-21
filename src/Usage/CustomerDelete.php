@@ -249,9 +249,11 @@ final class CustomerDelete {
 	/**
 	 * Ends the license without telling the customer: revoked is not undone by the usage account's payments.
 	 *
+	 * Public so that an add-on closed with its deleted parent ends the same way (Proxmox\Addon\AddonEnd).
+	 *
 	 * @param array<string, mixed> $license License row.
 	 */
-	private static function end_license( array $license ): void {
+	public static function end_license( array $license ): void {
 		$quiet = static fn( $send, $row = array() ) => (int) ( $row['id'] ?? 0 ) === (int) $license['id'] ? false : $send;
 
 		add_filter( 'beltoft_licenses_send_status_email', $quiet, 10, 2 );

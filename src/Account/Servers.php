@@ -228,6 +228,9 @@ final class Servers {
 			} elseif ( is_array( $view ) && isset( $view['license'] ) && ServiceArea::ended_and_gone( $view['license'], Resource::for_license( (int) $view['license']['id'] ) ) ) {
 				// An ended add-on with no live service (an expired disk or snapshot pack) is history, not a row.
 				continue;
+			} elseif ( is_array( $view ) && isset( $view['license'] ) && self::closed_add_on( (int) $view['license']['id'] ) ) {
+				// An add-on whose own service was closed (its parent was deleted) is not a server to list, whatever its licence says.
+				continue;
 			} else {
 				$others[] = $view;
 			}
@@ -240,7 +243,16 @@ final class Servers {
 				static function ( $view ) use ( $servers ): bool {
 					$parent = self::parent_of( $view );
 
-					if ( null === $parent || 0 === $parent['license_id'] ) {
+					if ( null === $parent ) {
+						return true;
+					}
+
+					// An IPv4 address is shown on the page of its server or database, never as a row of this list.
+					if ( \BeltoftServices\Proxmox\Ipv4\Ipv4Driver::ID === (string) $parent['resource']->get( 'driver' ) ) {
+						return false;
+					}
+
+					if ( 0 === $parent['license_id'] ) {
 						return true;
 					}
 
@@ -248,10 +260,7 @@ final class Servers {
 						return false;
 					}
 
-					// The IPv4 address of a database is shown on the database's own page, not as a row of this list.
-					$db = \BeltoftServices\Proxmox\Ipv4\Ipv4Driver::ID === (string) $parent['resource']->get( 'driver' ) ? Resource::for_license( $parent['license_id'] ) : null;
-
-					return ! ( $db && \BeltoftServices\Proxmox\Db\DbDriver::ID === (string) $db->get( 'driver' ) );
+					return true;
 				}
 			)
 		);
@@ -262,6 +271,21 @@ final class Servers {
 			'others'    => $others,
 			'gone'      => $gone,
 		);
+	}
+
+	/**
+	 * Is it the licence of an add-on (disk, snapshot pack, app licence, managed, IPv4) with no live service, its last one closed?
+	 *
+	 * @param int $license_id Licence id.
+	 */
+	private static function closed_add_on( int $license_id ): bool {
+		if ( $license_id < 1 || Resource::for_license( $license_id ) ) {
+			return false;
+		}
+
+		$closed = Resource::latest_closed( array( $license_id ) )[ $license_id ] ?? null;
+
+		return null !== $closed && in_array( (string) $closed->get( 'driver' ), \BeltoftServices\Proxmox\Addon\Addon::driver_ids(), true );
 	}
 
 	/**

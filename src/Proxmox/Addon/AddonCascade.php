@@ -45,6 +45,7 @@ final class AddonCascade {
 
 				if ( $addon->transition( 'deleted', $a->parent_deleted_event ) ) {
 					( $a->after_parent_deleted )( $addon );
+					AddonEnd::end( $addon );
 				}
 			}
 		}

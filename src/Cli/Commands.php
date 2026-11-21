@@ -324,6 +324,7 @@ final class Commands {
 			\WP_CLI::add_command( 'beltoft-services dedicated', DedicatedCommand::class );
 			\WP_CLI::add_command( 'beltoft-services parking', ParkingCommand::class );
 			\WP_CLI::add_command( 'beltoft-services payg', PaygCommand::class );
+			\WP_CLI::add_command( 'beltoft-services addons', AddonsCommand::class );
 		}
 	}
 
