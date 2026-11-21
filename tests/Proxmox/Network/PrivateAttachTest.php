@@ -621,8 +621,8 @@ class PrivateAttachTest extends TestCase {
 		};
 		$html = $pane();
 		$this->assertStringContainsString( 'data-net-select', $html );
-		$this->assertStringContainsString( 'Network 1, 10.64.0.0/28, 0 servers', $html );
-		$this->assertStringContainsString( 'Two, 10.64.0.16/28, 0 servers, database', $html );
+		$this->assertStringContainsString( 'Network 1 (10.64.0.0/28): empty', $html );
+		$this->assertStringContainsString( 'Two (10.64.0.16/28): 1 database', $html );
 		$this->assertStringContainsString( 'value="new"', $html );
 		$this->assertStringContainsString( 'data-net-name', $html );
 		$this->assertStringContainsString( 'value="Network 3"', $html, 'The name field is prefilled.' );

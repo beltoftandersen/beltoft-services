@@ -463,7 +463,7 @@ final class PrivateAttach {
 	}
 
 	/**
-	 * One line of the network choice: the name, the range, the servers on it, and a database when one is.
+	 * One line of the network choice: the name, the range and what is on it ("Network 1 (10.64.0.32/28): 2 servers and 1 database", or "empty").
 	 *
 	 * @param array<string, mixed> $net A row of PrivateNets::nets_for_user().
 	 */
@@ -485,12 +485,23 @@ final class PrivateAttach {
 			}
 		}
 
-		/* translators: 1: network name, 2: address range, 3: number of servers on it. */
-		$label = sprintf( _n( '%1$s, %2$s, %3$d server', '%1$s, %2$s, %3$d servers', $servers, 'beltoft-services' ), (string) $net['label'], (string) $net['cidr'], $servers );
+		$parts = array();
+
+		if ( $servers > 0 ) {
+			/* translators: %d: number of servers on the network. */
+			$parts[] = sprintf( _n( '%d server', '%d servers', $servers, 'beltoft-services' ), $servers );
+		}
 
 		if ( $databases > 0 ) {
-			$label .= ', ' . _n( 'database', 'databases', $databases, 'beltoft-services' );
+			/* translators: %d: number of databases on the network. */
+			$parts[] = sprintf( _n( '%d database', '%d databases', $databases, 'beltoft-services' ), $databases );
 		}
+
+		/* translators: 1: one count, 2: another count, such as "2 servers" and "1 database". */
+		$members = 2 === count( $parts ) ? sprintf( __( '%1$s and %2$s', 'beltoft-services' ), $parts[0], $parts[1] ) : ( $parts[0] ?? __( 'empty', 'beltoft-services' ) );
+
+		/* translators: 1: network name, 2: address range, 3: what is on it, such as "2 servers and 1 database" or "empty". */
+		$label = sprintf( __( '%1$s (%2$s): %3$s', 'beltoft-services' ), (string) $net['label'], (string) $net['cidr'], $members );
 
 		return $net['full'] ? $label . ', ' . __( 'full', 'beltoft-services' ) : $label;
 	}
