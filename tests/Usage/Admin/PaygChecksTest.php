@@ -54,8 +54,8 @@ class PaygChecksTest extends PaygTestCase {
 		return (string) $id;
 	}
 
-	public function test_a_billing_kind_on_a_subscription_product_type_is_an_error(): void {
-		$sub = new \WC_Product_Variable_Subscription();
+	public function test_a_billing_kind_on_a_product_without_variations_is_an_error(): void {
+		$sub = new \WC_Product_Subscription();
 		$sub->set_name( 'Sub' );
 		$sub->update_meta_data( Rates::META_BILLING, 'usage' );
 		$sub->save();
@@ -65,6 +65,15 @@ class PaygChecksTest extends PaygTestCase {
 		$this->assertSame( 'error', $check['level'] );
 		$this->assertStringContainsString( 'Create it as a Variable product', $check['text'] );
 		$this->assertSame( 'ok', $this->level( $this->payg_product(), 'type' ) );
+	}
+
+	public function test_a_converted_variable_subscription_passes_the_type_check(): void {
+		$sub = new \WC_Product_Variable_Subscription();
+		$sub->set_name( 'Converted' );
+		$sub->update_meta_data( Rates::META_BILLING, 'usage' );
+		$sub->save();
+
+		$this->assertSame( 'ok', $this->level( wc_get_product( $sub->get_id() ), 'type' ) );
 	}
 
 	public function test_rate_is_an_error_for_an_hourly_plan_without_a_monthly_price(): void {

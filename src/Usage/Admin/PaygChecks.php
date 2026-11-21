@@ -88,13 +88,14 @@ final class PaygChecks {
 	}
 
 	/**
-	 * A subscription type (or a simple product) with a billing kind.
+	 * A billing kind on a product without variations (simple or simple subscription). A variable subscription passes: the
+	 * products converted by `payg split` keep that type so a running monthly subscription keeps its class (plan 2026-11-20).
 	 *
 	 * @param \WC_Product $p Product.
 	 * @return array{0: string, 1: string, 2?: array<int, string>}|null
 	 */
 	private static function check_type( \WC_Product $p ): ?array {
-		return 'variable' === $p->get_type() ? null : array( self::ERROR, __( 'Pay as you go needs a Variable product, not a subscription product. Create it as a Variable product.', 'beltoft-services' ) );
+		return in_array( $p->get_type(), array( 'variable', 'variable-subscription' ), true ) ? null : array( self::ERROR, __( 'Pay as you go needs a Variable product, not a subscription product. Create it as a Variable product.', 'beltoft-services' ) );
 	}
 
 	/**

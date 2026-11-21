@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.50.0
+Stable tag: 0.50.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.50.1 =
+* Product check: a pay as you go product that is a variable subscription (the converted server, database and disk products) passes the type check.
 
 = 0.50.0 =
 * Pay as you go is its own product: servers, databases and disks are sold pay as you go, with no Monthly or Pay as you go choice at checkout. The monthly price each hourly rate is taken from is typed on the plan itself, per currency. Existing products are converted with `wp beltoft-services payg split` (dry run by default, `--apply`, `--rollback`, `--keep-monthly=<ids>`); running monthly subscriptions renew as before.
