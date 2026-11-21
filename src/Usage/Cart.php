@@ -28,6 +28,7 @@ final class Cart {
 	 */
 	public static function register(): void {
 		add_filter( 'woocommerce_is_subscription', array( __CLASS__, 'is_subscription' ), 20, 3 );
+		add_filter( 'woocommerce_add_to_cart_handler', array( __CLASS__, 'add_to_cart_handler' ), 20, 2 );
 		add_filter( 'woocommerce_attribute_label', array( __CLASS__, 'attribute_label' ), 10, 2 );
 		add_filter( 'beltoft_services_cart_companion', array( __CLASS__, 'companion' ), 10, 3 );
 		add_action( 'woocommerce_add_to_cart', array( __CLASS__, 'sync_account_line' ) );
@@ -61,6 +62,23 @@ final class Cart {
 	 */
 	public static function is_subscription( $is, $product_id = 0, $product = null ): bool {
 		return $is && ! ( $product instanceof \WC_Product && Rates::is_usage( $product ) );
+	}
+
+	/**
+	 * An add-to-cart link of a pay as you go product (`?add-to-cart=<parent>&variation_id=<plan>`) goes through the variable
+	 * handler. WooCommerce Subscriptions maps the type variable-subscription to it only for a product it sees as a subscription,
+	 * and the pay as you go parent is not one (is_subscription() above), so without this WooCommerce took the simple handler and
+	 * refused the line with "Please choose product options".
+	 *
+	 * @param mixed $handler Handler name.
+	 * @param mixed $product Product being added.
+	 */
+	public static function add_to_cart_handler( $handler, $product = null ) {
+		if ( 'variable-subscription' === $handler && $product instanceof \WC_Product_Variable && Rates::is_usage( $product ) ) {
+			return 'variable';
+		}
+
+		return $handler;
 	}
 
 	/**

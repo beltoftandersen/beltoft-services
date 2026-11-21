@@ -251,4 +251,15 @@ class CheckoutTest extends UsageTestCase {
 		$this->assertSame( 'order', Licenses::find( (int) $license['id'] )['source'] );
 		$this->assertNull( Licenses::find( (int) $license['id'] )['subscription_id'] );
 	}
+
+	public function test_an_add_to_cart_link_of_a_pay_as_you_go_product_takes_the_variable_handler(): void {
+		$v      = $this->usage_product();
+		$parent = wc_get_product( $v['u-None']->get_parent_id() );
+		$this->assertSame( 'variable', apply_filters( 'woocommerce_add_to_cart_handler', 'variable-subscription', $parent ) );
+
+		$m       = $this->monthly_vps();
+		$monthly = wc_get_product( $m['m-None']->get_parent_id() );
+		$this->assertSame( 'simple', \BeltoftServices\Usage\Cart::add_to_cart_handler( 'simple', $monthly ) );
+		$this->assertSame( 'variable-subscription', \BeltoftServices\Usage\Cart::add_to_cart_handler( 'variable-subscription', $monthly ) );
+	}
 }
