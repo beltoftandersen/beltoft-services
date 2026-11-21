@@ -210,7 +210,7 @@ final class Ipv4Driver implements Driver, \BeltoftServices\Drivers\UsageItems {
 		$address = (string) $r->get( Ipv4Meta::ADDRESS );
 
 		if ( Ipv4Meta::is_db( $fresh ) ) {
-			return DbAccess::public_address( $fresh ) === $address && DbIp::idle( $fresh );
+			return DbAccess::public_address( $fresh ) === $address && DbIp::idle( $fresh ) && '' === Ipv4Server::working( $fresh ) && true !== $fresh->get( DbIp::RESYNC );
 		}
 
 		$row = IpPool::find( $address );
@@ -252,8 +252,13 @@ final class Ipv4Driver implements Driver, \BeltoftServices\Drivers\UsageItems {
 	 * @param bool     $add    Add or remove.
 	 */
 	private function action_for( Resource $r, Resource $parent, bool $add ): string {
-		if ( Ipv4Meta::is_db( $parent ) ) {
+		// A database built with its public card takes and loses the address like a server (one restart); an older one adds the card.
+		if ( Ipv4Meta::is_db( $parent ) && ! DbIp::has_card( $parent ) ) {
 			return DbIp::SYNC_ACTION;
+		}
+
+		if ( Ipv4Meta::is_db( $parent ) ) {
+			return $add ? Ipv4Server::MAIN_ADD : Ipv4Server::MAIN_REMOVE;
 		}
 
 		if ( 'extra' === $r->get( Ipv4Meta::ROLE ) ) {
@@ -335,7 +340,7 @@ final class Ipv4Driver implements Driver, \BeltoftServices\Drivers\UsageItems {
 		$role  = (string) $r->get( Ipv4Meta::ROLE );
 
 		if ( 'main' === $role ) {
-			$gone = Ipv4Meta::is_db( $fresh ) ? '' === DbAccess::public_address( $fresh ) && null === IpPool::for_resource( $fresh->id() ) && DbIp::idle( $fresh ) : '' === (string) $fresh->get( 'ip' ) && null === IpPool::for_resource( $fresh->id() ) && '' === Ipv4Server::working( $fresh );
+			$gone = Ipv4Meta::is_db( $fresh ) ? '' === DbAccess::public_address( $fresh ) && null === IpPool::for_resource( $fresh->id() ) && DbIp::idle( $fresh ) && '' === Ipv4Server::working( $fresh ) && true !== $fresh->get( DbIp::RESYNC ) : '' === (string) $fresh->get( 'ip' ) && null === IpPool::for_resource( $fresh->id() ) && '' === Ipv4Server::working( $fresh );
 
 			if ( $gone ) {
 				IpHistory::end( 'public', $r->id() );

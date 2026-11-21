@@ -118,6 +118,12 @@ class DbDriver extends ProxmoxDriver {
 			return $this->ipv6( $r, $action );
 		}
 
+		// A database with its public card takes and loses an IPv4 address the way a server does (Ipv4Server: ipconfig0, meta,
+		// firewall, one restart); then the guest gets the new listen addresses and allow-list (DbIp sync), as after an IPv6 switch.
+		if ( \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_ADD === $action || \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_REMOVE === $action ) {
+			return $this->server_change_then_sync( $r, $action, \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_ADD === $action ? 'Public IPv4 address added to the database' : 'Public IPv4 address removed from the database' );
+		}
+
 		if ( DbActions::RESTORE === $action ) {
 			return ( new Actions( $r ) )->run( 'restore', $args );
 		}
@@ -145,6 +151,30 @@ class DbDriver extends ProxmoxDriver {
 	 * @param Resource $r      Resource.
 	 * @param string   $action ipv6_add or ipv6_remove.
 	 */
+	/**
+	 * A change made by the server's own action, then the guest told through DbIp's `sync`. A repeat that finds the sync marked
+	 * finishes the sync only.
+	 *
+	 * @param Resource $r      Resource.
+	 * @param string   $action The server action.
+	 * @param string   $event  Event text when done.
+	 */
+	private function server_change_then_sync( Resource $r, string $action, string $event ): StepResult {
+		if ( true !== $r->get( DbIp::RESYNC ) ) {
+			$res = ( new Actions( $r ) )->run( $action, array() );
+
+			if ( ! $res->is_done() || $res->is_refusal() ) {
+				return $res;
+			}
+
+			$r->set( array( DbIp::RESYNC => true ) );
+		}
+
+		$sync = ( new DbIp( Resource::find( $r->id() ) ?? $r ) )->run();
+
+		return $sync->is_done() ? StepResult::done( array(), $event ) : $sync;
+	}
+
 	private function ipv6( Resource $r, string $action ): StepResult {
 		if ( true !== $r->get( DbIp::RESYNC ) ) {
 			$res = ( new Actions( $r ) )->run( $action, array() );
@@ -261,7 +291,7 @@ class DbDriver extends ProxmoxDriver {
 	 * The jobs only the plugin queues: the one that brings the firewall and the guest to the stored allow-list (queued by the route that stored it), and the one that puts the IPv4 add-on's address on the VM or takes it off (queued by the add-on).
 	 */
 	public function internal_actions(): array {
-		return array( DbAccess::APPLY, DbIp::SYNC_ACTION );
+		return array( DbAccess::APPLY, DbIp::SYNC_ACTION, \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_ADD, \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_REMOVE );
 	}
 
 	public function render_account( Resource $r ): void {

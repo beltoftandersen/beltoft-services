@@ -335,7 +335,8 @@ class DbPhase4Test extends TestCase {
 	private function db_with_ip( array $plan = array() ): Resource {
 		$this->pool( 3 );
 		$r = $this->ready_db( $plan );
-		$this->assertTrue( $this->add_ip( $r )->is_done() );
+		$res = $this->add_ip( $r );
+		$this->assertTrue( $res->is_done(), 'add_ip: ' . $res->error() . ' ' . wp_json_encode( Resource::find( $r->id() )->get( 'ipv4_op' ) ) );
 
 		return Resource::find( $r->id() );
 	}
@@ -343,7 +344,13 @@ class DbPhase4Test extends TestCase {
 	private function add_ip( Resource $r ): \BeltoftServices\Drivers\StepResult {
 		$fresh = Resource::find( $r->id() );
 		$this->public_ip_addon( $fresh );
-		$res = $this->drive( $r );
+		// A database built with its public card gets the address the way a server does (the add-on holds it from the pool first,
+		// Ipv4Driver::take); an older one gets the card added (DbIp).
+		if ( DbIp::has_card( $fresh ) ) {
+			$this->assertNotNull( IpPool::hold( $r->id() ) );
+		}
+
+		$res = DbIp::has_card( $fresh ) ? $this->drive( $r, \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_ADD ) : $this->drive( $r );
 
 		if ( $res->is_done() ) {
 			$this->assertTrue( Resource::find( $r->id() )->set( array_merge( $res->meta(), array( 'plan_dirty' => false ) ) ) );
@@ -355,7 +362,7 @@ class DbPhase4Test extends TestCase {
 	private function remove_ip( Resource $r ): \BeltoftServices\Drivers\StepResult {
 		$fresh = Resource::find( $r->id() );
 		$this->public_ip_off( $fresh );
-		$res = $this->drive( $r );
+		$res = DbIp::has_card( $fresh ) ? $this->drive( $r, \BeltoftServices\Proxmox\Ipv4\Ipv4Server::MAIN_REMOVE ) : $this->drive( $r );
 
 		if ( $res->is_done() ) {
 			$this->assertTrue( Resource::find( $r->id() )->set( array_merge( $res->meta(), array( 'plan_dirty' => false ) ) ) );
@@ -1271,38 +1278,53 @@ class DbPhase4Test extends TestCase {
 		$this->assertArrayNotHasKey( 'listen6', $listen[0]['job'] );
 	}
 
-	public function test_a_database_without_the_add_on_has_no_ipv6_and_a_cluster_without_a_prefix_changes_nothing(): void {
+	public function test_with_database_ipv6_on_every_database_is_built_with_its_public_card_and_ipv6(): void {
 		$this->ipv6_cluster();
 		$r = $this->ready_db();
 
-		$this->assertNull( $r->get( 'ip6' ) );
-		$this->assertArrayNotHasKey( 'ipconfig0', (array) $this->fake->vm( 5000 )['config'] );
-
-		$this->save_cluster( array( 'ipv6_prefix' => '' ) );
-		$this->pool( 3 );
-		$this->assertTrue( $this->add_ip( $r )->is_done() );
-		$this->assertSame( 'ip=192.0.2.10/24,gw=192.0.2.1', $this->fake->vm( 5000 )['config']['ipconfig0'] );
-		$this->assertNull( Resource::find( $r->id() )->get( 'ip6' ) );
-		$listen = array_values( array_filter( $this->guest_jobs(), static fn( $j ) => 'listen' === $j['job']['op'] ) );
-		$this->assertArrayNotHasKey( 'listen6', $listen[0]['job'] );
+		$config = (array) $this->fake->vm( 5000 )['config'];
+		$this->assertSame( 'ip6=' . self::DB_V6 . '/64,gw6=2001:db8:430c:1::1', $config['ipconfig0'], 'The IPv6 address only, no IPv4.' );
+		$this->assertStringContainsString( 'bridge=vmbr9', (string) $config['net0'], 'The public card, like a VPS Basic.' );
+		$this->assertStringContainsString( 'firewall=1', (string) $config['net0'] );
+		$this->assertArrayHasKey( 'net1', $config, 'The private network stays.' );
+		$this->assertSame( self::DB_V6, Resource::find( $r->id() )->get( 'ip6' ) );
+		$this->assertTrue( DbIp::has_card( Resource::find( $r->id() ) ) );
+		$this->assertSame( '', DbAccess::public_address( Resource::find( $r->id() ) ) );
+		$this->assertTrue( DbAccess::reachable( Resource::find( $r->id() ) ), 'Reachable over IPv6: the allow-list can be edited.' );
+		$this->assertSame( array(), $this->net0_rules(), 'Closed until the customer allows an address.' );
 	}
 
-	public function test_the_add_on_gives_the_database_an_ipv6_address_and_removing_it_takes_it_back(): void {
-		$this->ipv6_cluster();
-		$r = $this->db_with_ip();
+	public function test_a_cluster_without_ipv6_builds_a_database_without_the_public_card(): void {
+		add_filter( 'beltoft_services_db_ipv6', '__return_true' );
+		$this->save_cluster( array( 'ipv6_prefix' => '' ) );
+		$r = $this->ready_db();
 
+		$this->assertArrayNotHasKey( 'net0', array_filter( (array) $this->fake->vm( 5000 )['config'], static fn( $v, $k ) => 'net0' === $k && false !== strpos( (string) $v, 'vmbr9' ), ARRAY_FILTER_USE_BOTH ) );
+		$this->assertArrayNotHasKey( 'ipconfig0', (array) $this->fake->vm( 5000 )['config'] );
+		$this->assertFalse( DbIp::has_card( Resource::find( $r->id() ) ) );
+	}
+
+	public function test_the_add_on_puts_ipv4_on_the_card_with_one_restart_and_removing_it_keeps_ipv6(): void {
+		$this->ipv6_cluster();
+		$r = $this->ready_db();
+		$this->pool( 3 );
+		$reboots = count( $this->calls( 'POST', '/status/reboot' ) );
+
+		$this->assertTrue( $this->add_ip( $r )->is_done() );
 		$this->assertSame( 'ip=192.0.2.10/24,gw=192.0.2.1,ip6=' . self::DB_V6 . '/64,gw6=2001:db8:430c:1::1', $this->fake->vm( 5000 )['config']['ipconfig0'] );
-		$this->assertSame( self::DB_V6, Resource::find( $r->id() )->get( 'ip6' ) );
-		$this->assertCount( 1, \BeltoftServices\Proxmox\Network\IpHistory::for_address( self::DB_V6 ) );
+		$this->assertSame( '192.0.2.10', DbAccess::public_address( Resource::find( $r->id() ) ) );
+		$this->assertCount( $reboots + 1, $this->calls( 'POST', '/status/reboot' ), 'One restart, as for a server.' );
+		$this->assertCount( 0, $this->calls( 'POST', '/status/shutdown' ), 'No stop and start to add a card.' );
 
 		$listen = array_values( array_filter( $this->guest_jobs(), static fn( $j ) => 'listen' === $j['job']['op'] ) );
-		$this->assertSame( array( self::DB_V6 ), $listen[0]['job']['listen6'] );
-		$this->assertNotContains( self::DB_V6, $listen[0]['job']['listen'], 'The IPv4 list is what an older guest reads.' );
+		$last   = end( $listen );
+		$this->assertContains( '192.0.2.10', $last['job']['listen'] );
+		$this->assertSame( array( self::DB_V6 ), $last['job']['listen6'] );
 
 		$this->assertTrue( $this->remove_ip( $r )->is_done() );
-		$this->assertArrayNotHasKey( 'ipconfig0', (array) $this->fake->vm( 5000 )['config'] );
-		$this->assertNull( Resource::find( $r->id() )->get( 'ip6' ) );
-		$this->assertNotNull( \BeltoftServices\Proxmox\Network\IpHistory::for_address( self::DB_V6 )[0]['ended_at'] );
+		$this->assertSame( 'ip6=' . self::DB_V6 . '/64,gw6=2001:db8:430c:1::1', $this->fake->vm( 5000 )['config']['ipconfig0'], 'Back to the card with IPv6 only.' );
+		$this->assertSame( self::DB_V6, Resource::find( $r->id() )->get( 'ip6' ) );
+		$this->assertNull( IpPool::for_resource( $r->id() ), 'The IPv4 address is back in the pool.' );
 	}
 
 	public function test_a_repair_leaves_ipv6_out_when_the_database_has_none(): void {

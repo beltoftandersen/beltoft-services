@@ -105,6 +105,11 @@ final class DbIp {
 
 		$row = IpPool::for_resource( $r->id() );
 
+		// A database with its public card gets and loses an IPv4 address through Ipv4Server: only the guest sync is left here.
+		if ( self::has_card( $r ) ) {
+			return true === $r->get( self::RESYNC ) ? 'sync' : '';
+		}
+
 		if ( self::wants( $r ) ) {
 			$change = null === $row || 'assigned' !== $row['state'] ? 'add' : '';
 		} else {
@@ -140,6 +145,14 @@ final class DbIp {
 			return self::matches( $config, $want ) ? null : $want;
 		}
 
+		// A database built with its public card keeps it without an IPv4 address: net0 and the IPv6 part of ipconfig0.
+		if ( null === $row && self::has_card( $r ) ) {
+			$record = VmRecords::for_resource( $r->id() );
+			$want   = self::public_card( $cluster, (string) ( $config['net0'] ?? '' ), null === $record ? 0 : (int) $record['vmid'] );
+
+			return '' === $want['ipconfig0'] || self::matches( $config, $want ) ? null : $want;
+		}
+
 		if ( null !== $row || ( empty( $config['net0'] ) && empty( $config['ipconfig0'] ) ) ) {
 			return null;
 		}
@@ -165,6 +178,27 @@ final class DbIp {
 	 * @return array<string, string>
 	 */
 	public static function public_params( array $cluster, array $ip, string $net0, int $vmid = 0 ): array {
+		$card    = self::public_card( $cluster, $net0, $vmid );
+		$gateway = null !== $ip['gateway'] && '' !== $ip['gateway'] ? $ip['gateway'] : (string) $cluster['gateway'];
+		$ip6     = $card['ipconfig0'];
+
+		return array(
+			'ipconfig0' => 'ip=' . $ip['address'] . '/' . (int) $cluster['prefix'] . ',gw=' . $gateway . ( '' === $ip6 ? '' : ',' . $ip6 ),
+			'net0'      => $card['net0'],
+		);
+	}
+
+	/**
+	 * The public card of a database (net0 on the public bridge, its firewall on) with the IPv6 part of ipconfig0 only: what every
+	 * new database is built with while database IPv6 is on (Ipv6::databases()), like a VPS Basic. ipconfig0 is '' when the
+	 * cluster has no IPv6 or no VMID is given.
+	 *
+	 * @param array<string, mixed> $cluster Cluster.
+	 * @param string               $net0    The VM's net0 now ('' for none).
+	 * @param int                  $vmid    The VMID.
+	 * @return array{net0: string, ipconfig0: string}
+	 */
+	public static function public_card( array $cluster, string $net0, int $vmid = 0 ): array {
 		$props = NetConfig::parse( $net0 );
 
 		if ( array() === $props ) {
@@ -178,14 +212,20 @@ final class DbIp {
 			$props['tag'] = (string) (int) $cluster['vlan'];
 		}
 
-		$gateway = null !== $ip['gateway'] && '' !== $ip['gateway'] ? $ip['gateway'] : (string) $cluster['gateway'];
-
-		$ip6 = $vmid > 0 && Ipv6::databases() ? Ipv6::ipconfig( $cluster, $vmid ) : '';
-
 		return array(
-			'ipconfig0' => 'ip=' . $ip['address'] . '/' . (int) $cluster['prefix'] . ',gw=' . $gateway . ( '' === $ip6 ? '' : ',' . $ip6 ),
+			'ipconfig0' => $vmid > 0 && Ipv6::databases() ? Ipv6::ipconfig( $cluster, $vmid ) : '',
 			'net0'      => NetConfig::format( $props ),
 		);
+	}
+
+	/**
+	 * Was the database built with its public card (an IPv6 address on net0)? Then an IPv4 address is added and taken away the way
+	 * a server's main address is (Ipv4Server, one restart), not by adding or removing the card (the add and remove of run()).
+	 *
+	 * @param Resource $r Database.
+	 */
+	public static function has_card( Resource $r ): bool {
+		return Ipv6::is_address( (string) $r->get( 'ip6' ) );
 	}
 
 	/**
@@ -376,7 +416,8 @@ final class DbIp {
 		$job = array( 'v' => 1, 'request' => $request, 'op' => 'listen', 'listen' => $listen );
 
 		// The IPv6 address is a list of its own (`listen6`): a guest that does not know the key keeps listening on the IPv4 addresses only.
-		if ( Ipv6::databases() && '' !== $public && Ipv6::is_address( (string) $r->get( 'ip6' ) ) ) {
+		// A database has it on its public card, with or without the IPv4 address.
+		if ( Ipv6::databases() && Ipv6::is_address( (string) $r->get( 'ip6' ) ) ) {
 			$job['listen6'] = array( (string) Ipv6::normalise( (string) $r->get( 'ip6' ) ) );
 		}
 

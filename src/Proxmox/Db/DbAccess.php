@@ -286,7 +286,16 @@ final class DbAccess {
 	 * @param Resource $r Resource.
 	 */
 	public static function editable( Resource $r ): bool {
-		return self::is_db( $r ) && 'ready' === $r->get( 'db_state' ) && '' !== self::public_address( $r ) && $r->accepts_actions() && DbIp::idle( $r );
+		return self::is_db( $r ) && 'ready' === $r->get( 'db_state' ) && self::reachable( $r ) && $r->accepts_actions() && DbIp::idle( $r );
+	}
+
+	/**
+	 * Can the database be reached from outside at all: a public IPv4 address, or its public card with an IPv6 address?
+	 *
+	 * @param Resource $r Database.
+	 */
+	public static function reachable( Resource $r ): bool {
+		return '' !== self::public_address( $r ) || DbIp::has_card( $r );
 	}
 
 	/**

@@ -219,8 +219,9 @@ final class DbBuild {
 			? DbEngines::for_resource( $this->r )->init_job( $this->r, $request, $listen, $cidr )
 			: array( 'v' => 1, 'request' => $request, 'op' => 'reset_password' );
 
-		// The IPv6 address of a database with the public IP add-on, as a list of its own that an older guest ignores.
-		$ip6 = null === $public || ! Ipv6::databases() ? null : Ipv6::address( (array) Clusters::get( (string) $record['cluster'] ), (int) $record['vmid'] );
+		// The IPv6 address of a database with its public card (Ipv6::databases(), with or without the IPv4 add-on), as a list of
+		// its own that an older guest ignores.
+		$ip6 = Ipv6::databases() ? Ipv6::address( (array) Clusters::get( (string) $record['cluster'] ), (int) $record['vmid'] ) : null;
 
 		if ( 'init' === $op && null !== $ip6 ) {
 			$job['listen6'] = array( $ip6 );

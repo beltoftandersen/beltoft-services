@@ -21,7 +21,6 @@ use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Proxmox\Vm\ActionsRun;
 use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Proxmox\Vm\VmRecords;
-use BeltoftServices\Proxmox\Vm\VpsProfile;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
 
@@ -184,13 +183,21 @@ final class Ipv4Server {
 				return StepResult::fail( 'ipv4: the address reservation of this server is gone' );
 			}
 
-			$want = ( new VpsProfile( $this->r ) )->network_params( $this->cluster, $row, (string) ( $v['config']['net0'] ?? '' ) )['ipconfig0'];
+			// The VM's own profile, as at build time: a server's or a database's ipconfig0 (a database keeps its private net1).
+			$want = (string) ( \BeltoftServices\Proxmox\Vm\Profiles::for_resource( $this->r )->network_params( $this->cluster, $row, (string) ( $v['config']['net0'] ?? '' ) )['ipconfig0'] ?? '' );
 
 			if ( ! $has6 ) {
 				$want = Ipv6::strip( $want );
 			}
 		} else {
 			$want = $ip6;
+		}
+
+		// A database changes its IPv4 address this way only on the public card it was built with (DbIp adds a card to an older one).
+		if ( \BeltoftServices\Proxmox\Ipv4\Ipv4Meta::is_db( $fresh ) && '' === (string) ( $v['config']['net0'] ?? '' ) ) {
+			$this->r->set( array( self::OP => null ) );
+
+			return StepResult::refused( array(), 'ipv4 refused: this database has no public network card (it was built before databases got one)' );
 		}
 
 		// A server must never be left with no address at all: without IPv6 it keeps its IPv4 address.
@@ -283,6 +290,14 @@ final class Ipv4Server {
 
 		$firewall = new Firewall( $this->r, $this->client, $this->cluster );
 		$fresh    = Resource::find( $this->r->id() ) ?? $this->r;
+
+		// A database: its allow-list rules on net0, then the ipfilter sets (as DbIp did).
+		if ( Ipv4Meta::is_db( $fresh ) ) {
+			$done = $firewall->ensure_database( $record, $v );
+
+			return $done instanceof StepResult ? $done : ( ( $sets = $firewall->ensure_ipfilter( $record, $v ) ) instanceof StepResult ? $sets : null );
+		}
+
 		$done     = FirewallRules::managed( $fresh ) && true !== $fresh->get( Firewall::LOCKED ) ? $firewall->ensure( $record, $v ) : $firewall->ensure_ipfilter( $record, $v );
 
 		return $done instanceof StepResult ? $done : null;

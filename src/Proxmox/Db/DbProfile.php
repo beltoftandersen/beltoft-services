@@ -8,6 +8,8 @@
 namespace BeltoftServices\Proxmox\Db;
 
 use BeltoftServices\Proxmox\Network\IpPool;
+use BeltoftServices\Proxmox\Network\Ipv6;
+use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Network\PrivateNets;
 use BeltoftServices\Proxmox\Network\PrivateNic;
 use BeltoftServices\Proxmox\Vm\BuildProfile;
@@ -23,7 +25,9 @@ defined( 'ABSPATH' ) || exit;
  */
 final class DbProfile implements BuildProfile {
 
-	use PostBuildMeta;
+	use PostBuildMeta {
+		post_build_meta as private base_meta;
+	}
 
 	/**
 	 * @var Resource
@@ -74,9 +78,36 @@ final class DbProfile implements BuildProfile {
 			return array();
 		}
 
-		$record = null === $ip ? null : VmRecords::for_resource( $this->r->id() );
+		$record = VmRecords::for_resource( $this->r->id() );
+		$vmid   = null === $record ? 0 : (int) $record['vmid'];
 
-		return null === $ip ? $nic : $nic + DbIp::public_params( $cluster, $ip, $net0, null === $record ? 0 : (int) $record['vmid'] );
+		if ( null !== $ip ) {
+			return $nic + DbIp::public_params( $cluster, $ip, $net0, $vmid );
+		}
+
+		// Database IPv6 on and a cluster with IPv6: the public card with the IPv6 address, like a VPS Basic. An IPv4 address is
+		// added to it later through Ipv4Server (the IPv4 add-on). Otherwise no public card, as before.
+		$card = DbIp::public_card( $cluster, $net0, $vmid );
+
+		return '' === $card['ipconfig0'] ? $nic : $nic + $card;
+	}
+
+	/**
+	 * The meta of a built database: the IPv6 address whenever it got its public card (with or without IPv4).
+	 *
+	 * @param array<string, mixed>      $record VM record.
+	 * @param array<string, mixed>|null $ip     The held pool row (null: none).
+	 * @return array<string, mixed>
+	 */
+	public function post_build_meta( array $record, ?array $ip ): array {
+		$meta    = $this->base_meta( $record, $ip );
+		$cluster = Clusters::get( (string) $record['cluster'] );
+
+		if ( null === $ip && null !== $cluster && Ipv6::databases() && '' !== Ipv6::ipconfig( $cluster, (int) $record['vmid'] ) ) {
+			$meta['ip6'] = Ipv6::address( $cluster, (int) $record['vmid'] );
+		}
+
+		return $meta;
 	}
 
 	public function cicustom( array $cluster ): ?string {

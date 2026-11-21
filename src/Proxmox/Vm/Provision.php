@@ -1324,8 +1324,14 @@ final class Provision {
 				'digest'    => (string) ( $v['config']['digest'] ?? '' ),
 			) + $this->profile->network_params( $this->cluster, $ip, $this->net0( (string) ( $v['config']['net0'] ?? '' ) ) );
 
-			// A server with no IPv4 address cannot reach an IPv4 resolver: it gets the cluster's IPv6 ones.
-			$resolvers = null === $ip && $this->profile instanceof VpsProfile && ! $this->profile->uses_public_ip() ? (array) ( $this->cluster['nameservers6'] ?? array() ) : (array) $this->cluster['nameservers'];
+			// A VM with no IPv4 address cannot reach an IPv4 resolver: it gets the cluster's IPv6 ones. A server with IPv6 only always
+			// has them (address_error() refused the build otherwise); a database without them keeps the IPv4 list, as before.
+			$resolvers = (array) $this->cluster['nameservers'];
+
+			if ( null === $ip && ! $this->profile->uses_public_ip() ) {
+				$six       = (array) ( $this->cluster['nameservers6'] ?? array() );
+				$resolvers = array() !== $six || $this->profile instanceof VpsProfile ? $six : $resolvers;
+			}
 
 			if ( array() !== $resolvers ) {
 				$params['nameserver'] = implode( ' ', $resolvers );
