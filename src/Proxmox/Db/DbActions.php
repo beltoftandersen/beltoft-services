@@ -84,8 +84,9 @@ final class DbActions {
 			$out[ self::BACKUP_DELETE ] = __( 'Delete a backup', 'beltoft-services' );
 		}
 
-		// Moving to another private network (the Network tab, the same one as a server's).
-		if ( 'ready' === $r->get( 'db_state' ) && null !== \BeltoftServices\Proxmox\Network\PrivateNets::for_resource( $r->id() ) ) {
+		// Moving to another private network (the Network tab, the same one as a server's). Only a database built from a template
+		// whose guest knows the move: one built with its public card (database IPv6 on, the db-v4 / v2 templates).
+		if ( DbPrivateMove::supported( $r ) && 'ready' === $r->get( 'db_state' ) && null !== \BeltoftServices\Proxmox\Network\PrivateNets::for_resource( $r->id() ) ) {
 			$out[ DbPrivateMove::ACTION ] = __( 'Move to another private network', 'beltoft-services' );
 		}
 

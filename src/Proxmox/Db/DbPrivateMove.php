@@ -62,7 +62,22 @@ final class DbPrivateMove {
 	 * @param Resource             $r    Database.
 	 * @param array<string, mixed> $args net (an id of the customer's networks, or `new`) and name.
 	 */
+	/**
+	 * Does the database's guest know the `private` job? Only the templates with IPv6 have it (db-v4, Valkey v2, SQL Server v2), and
+	 * a database built from them while database IPv6 is on has its public card. An older guest would refuse the job after the VM
+	 * had already moved, leaving the database on its old address: the move is not offered there.
+	 *
+	 * @param Resource $r Database.
+	 */
+	public static function supported( Resource $r ): bool {
+		return DbActions::is_db( $r ) && DbIp::has_card( $r );
+	}
+
 	public static function check( Resource $r, array $args ): ?string {
+		if ( ! self::supported( $r ) ) {
+			return __( 'This database cannot be moved to another private network.', 'beltoft-services' );
+		}
+
 		if ( ! DbActions::is_db( $r ) || 'ready' !== $r->get( 'db_state' ) || ! $r->accepts_actions() ) {
 			return __( 'The database can be moved when it is ready.', 'beltoft-services' );
 		}

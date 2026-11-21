@@ -1506,6 +1506,8 @@ class DbPhase4Test extends TestCase {
 
 	public function test_a_database_moves_to_another_private_network_with_one_restart(): void {
 		$this->assertTrue( \BeltoftServices\Proxmox\Network\PrivateNets::add( 1001, '10.64.0.16/28' ) );
+		$this->assertFalse( \BeltoftServices\Proxmox\Db\DbPrivateMove::supported( $this->bare_db() ), 'A database from an older template (no public card) is not offered the move.' );
+		$this->ipv6_cluster();
 		$r     = $this->ready_db();
 		$user  = (int) Resource::find( $r->id() )->license()['user_id'];
 		$two   = \BeltoftServices\Proxmox\Network\PrivateNets::create_for_user( $user, 'Two' );
