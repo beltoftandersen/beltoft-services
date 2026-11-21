@@ -50,6 +50,8 @@ final class SubscriptionNames {
 		foreach ( $subscription->get_items() as $item ) {
 			$name = trim( wp_strip_all_tags( \BeltoftServices\LineNames::display_name( $item ) ) );
 
+			$name = self::without_none( $name );
+
 			if ( '' !== $name ) {
 				$names[] = $name;
 			}
@@ -64,5 +66,22 @@ final class SubscriptionNames {
 		}
 
 		return implode( ', ', $names );
+	}
+
+	/**
+	 * A stored item name without its empty variation values ("VPS hosting - Starter, None" becomes "VPS hosting - Starter").
+	 * Danish "Ingen" is the same value.
+	 *
+	 * @param string $name Item name.
+	 */
+	public static function without_none( string $name ): string {
+		$parts = array_filter(
+			array_map( 'trim', explode( ',', $name ) ),
+			static function ( string $part ): bool {
+				return '' !== $part && ! in_array( strtolower( $part ), array( 'none', 'ingen' ), true );
+			}
+		);
+
+		return implode( ', ', $parts );
 	}
 }

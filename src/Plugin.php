@@ -192,6 +192,7 @@ final class Plugin {
 		Account\Billing::register();
 		Account\PageHead::register();
 		Account\UsageView::register();
+		Account\SubscriptionPages::register();
 
 		Lifecycle::register();
 		Retention::register();
