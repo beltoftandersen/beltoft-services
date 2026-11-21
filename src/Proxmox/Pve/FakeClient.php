@@ -856,6 +856,13 @@ class FakeClient extends FakePve {
 
 		$id = (int) $a[1];
 
+		// Proxmox refuses a write that sets and deletes the same key (400, "unable to delete '<key>' - option is also set").
+		foreach ( array_filter( array_map( 'trim', explode( ',', (string) ( $p['delete'] ?? '' ) ) ) ) as $key ) {
+			if ( array_key_exists( $key, $p ) ) {
+				return $this->error( 400, 'Bad Request: ' . $key . ' is both set and deleted' );
+			}
+		}
+
 		foreach ( array_filter( array_map( 'trim', explode( ',', (string) ( $p['delete'] ?? '' ) ) ) ) as $key ) {
 			if ( isset( $this->state['hold_detach'][ $id ] ) && 1 === preg_match( '/^scsi\d+$/D', $key ) && isset( $this->state['vms'][ $id ]['config'][ $key ] ) ) {
 				// Hot detach without disk hotplug (modelled): a pending change, the drive stays in the running configuration.

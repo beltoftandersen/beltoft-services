@@ -1344,10 +1344,11 @@ final class Provision {
 			}
 
 			if ( $this->profile instanceof DbProfile ) {
-				// The guest agent carries the setup files; the database has the private NIC only, and net0 with the public IP add-on.
+				// The guest agent carries the setup files. The template's net0 goes only when the database has no public card at all
+				// (database IPv6 off and no address): with its card (IPv6, or the IPv4 add-on) net0 is written above.
 				$params['agent'] = '1';
 
-				if ( null === $ip && ! empty( $v['config']['net0'] ) ) {
+				if ( ! isset( $params['net0'] ) && ! empty( $v['config']['net0'] ) ) {
 					$params['delete'] = 'net0';
 				}
 			}

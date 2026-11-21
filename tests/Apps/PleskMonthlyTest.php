@@ -52,9 +52,11 @@ final class PleskMonthlyTest extends PaidAppCase {
 		global $wpdb;
 		$wpdb->query( "DELETE FROM {$wpdb->prefix}woocommerce_tax_rates" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test fixture reset.
 		update_option( 'woocommerce_calc_taxes', 'no' );
+		parent::tear_down();
+		// The renewal test commits (wcs_create_renewal_order): what it left is removed AFTER the rollback, or the rollback brings
+		// it back and the next test file finds VMID 5000 taken.
 		$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->users} WHERE user_email = %s", 'christian.beltoft@gmail.com' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- the renewal test commits.
 		$wpdb->query( 'DELETE FROM ' . \BeltoftServices\Proxmox\Vm\Schema::tables()['vms'] ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- the renewal test commits.
-		parent::tear_down();
 	}
 
 	/**

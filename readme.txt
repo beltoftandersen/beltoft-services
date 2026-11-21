@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.54.0
+Stable tag: 0.54.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.54.1 =
+* A database built with its public card no longer asks Proxmox to set and delete net0 in the same write (Proxmox refused it with 400). The fake client refuses such a write too, so the tests catch it.
 
 = 0.54.0 =
 * Databases are built like a VPS Basic while database IPv6 is on (setting db_ipv6): a public network card with the database's own IPv6 address, closed until the customer allows addresses. An IPv4 address (the add-on) is then added and removed like a server's: on the same card, one restart.
