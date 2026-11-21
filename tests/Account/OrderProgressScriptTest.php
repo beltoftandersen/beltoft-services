@@ -72,7 +72,7 @@ final class OrderProgressScriptTest extends TestCase {
 		$this->assertStringContainsString( '.bs-order .bs-flow .beltoft-services-progress__steps > li:not(.is-current) { display: none; }', $css, 'Only the current step on the overview.' );
 		$this->assertStringContainsString( '.bs-order .bs-flow .beltoft-services-progress__leave { display: none; }', $css );
 
-		foreach ( array( 'db' => 'Open your database', 'storage' => 'Open your backup storage', 'mail' => 'Open your email', 'ssl' => 'Open your certificate' ) as $kind => $label ) {
+		foreach ( array( 'db' => 'Open your database', 'storage' => 'Open your online backup', 'mail' => 'Open your email', 'ssl' => 'Open your certificate' ) as $kind => $label ) {
 			$this->assertSame( $label, \BeltoftServices\ThankYou::open_label( $kind ) );
 		}
 	}

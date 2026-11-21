@@ -306,7 +306,7 @@ final class ThankYou {
 			'hosting' => __( 'Open your hosting', 'beltoft-services' ),
 			'db'        => __( 'Open your database', 'beltoft-services' ),
 			'dedicated' => __( 'Open your server', 'beltoft-services' ),
-			'storage'   => __( 'Open your backup storage', 'beltoft-services' ),
+			'storage'   => __( 'Open your online backup', 'beltoft-services' ),
 			'mail'      => __( 'Open your email', 'beltoft-services' ),
 			'ssl'       => __( 'Open your certificate', 'beltoft-services' ),
 			'lickey'    => __( 'Open your licence', 'beltoft-services' ),
