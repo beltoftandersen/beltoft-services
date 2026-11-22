@@ -37,7 +37,6 @@ final class ActionMap {
 		'reboot'             => 'reboot',
 		'rename'             => 'rename_server',
 		'snapshot_take'      => 'create_snapshot',
-		'app_retry'          => 'retry_app_install',
 		'private_attach'     => 'private_network',
 		'private_detach'     => 'private_network',
 		'snapshot_delete'    => 'delete_snapshot',
@@ -84,7 +83,6 @@ final class ActionMap {
 		'set_default_card'         => 'set_default_payment_method',
 		'reveal_server_password'   => 'reveal_server_password',
 		'reveal_database_password' => 'reveal_database_password',
-		'reveal_app_login'         => 'reveal_app_login',
 		'database_ca_certificate'  => 'get_database_ca_certificate',
 		'order_server'             => 'order_server',
 		'order_database'           => 'order_database',
@@ -123,7 +121,6 @@ final class ActionMap {
 		'usage_summary'      => array( 'GET #^/usage$#D' ),
 		'reveal_server_password'   => array( 'POST #^/resources/\d+/reveal$#D' ),
 		'reveal_database_password' => array( 'POST #^/resources/\d+/db-reveal$#D' ),
-		'reveal_app_login'         => array( 'POST #^/resources/\d+/app-reveal$#D' ),
 		'get_database_ca_certificate' => array( 'GET #^/resources/\d+/db-ca$#D' ),
 	);
 

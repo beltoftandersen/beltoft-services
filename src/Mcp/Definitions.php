@@ -248,7 +248,6 @@ final class Definitions {
 			),
 			'private_network'  => self::act( 'Attaches a server to one of the customer\'s private networks, or detaches it. The customer can have up to five; without a network id the first one is used. The change runs in the background.', self::obj( array( 'id' => $id, 'action' => array( 'type' => 'string', 'enum' => array( 'attach', 'detach' ) ), 'network' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'For attach: the id of one of the customer\'s private networks (see the private_networks of service_details). Optional.' ) ), array( 'id', 'action' ) ), true ),
 			'set_usage_alerts' => self::act( 'Turns the e-mails about high usage of one server on or off.', self::obj( array( 'id' => $id, 'on' => array( 'type' => 'boolean' ) ), array( 'id', 'on' ) ), false, true ),
-			'retry_app_install' => self::act( 'Tries again to install the app of a server whose installation failed or did not finish. It does not reinstall the server.', $by_id, false ),
 			'set_auto_renew'   => self::act( 'Turns automatic renewal of one subscription on or off, where the shop allows it. With it off the customer pays the renewal invoice by hand and the service ends if it is not paid. Ask the customer first.', self::obj( array( 'subscription_id' => $sub, 'on' => array( 'type' => 'boolean' ) ), array( 'subscription_id', 'on' ) ), true, true, 10 ),
 			'reactivate_subscription' => self::act( 'Reactivates a subscription that is on hold, when the dashboard offers reactivation for it (see list_subscriptions) and nothing is owed.', self::obj( array( 'subscription_id' => $sub ), array( 'subscription_id' ) ), false, true, 10 ),
 			'free_license_site' => self::act( 'Removes a site from a license so the license can be used on another site.', self::obj( array( 'license_id' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'The license id, from list_licenses.' ), 'domain' => array( 'type' => 'string', 'maxLength' => 253, 'description' => 'The site, as listed.' ) ), array( 'license_id', 'domain' ) ), true, false, 10 ),
@@ -385,11 +384,6 @@ final class Definitions {
 			),
 			'reveal_database_password' => self::full(
 				'Shows the password of a managed database once. The value then is in this conversation and we no longer have it. If there is none to show, the customer makes a new password in the dashboard.',
-				self::obj( array( 'id' => $id ), array( 'id' ), true ),
-				true
-			),
-			'reveal_app_login' => self::full(
-				'Shows the first login of the app on a server once. The value then is in this conversation and we no longer have it.',
 				self::obj( array( 'id' => $id ), array( 'id' ), true ),
 				true
 			),

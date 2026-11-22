@@ -33,7 +33,7 @@ final class Acts {
 	/**
 	 * The tools this class runs.
 	 */
-	public const NAMES = array( 'rename_server', 'set_firewall', 'set_database_access', 'private_network', 'set_usage_alerts', 'retry_app_install', 'set_auto_renew', 'reactivate_subscription', 'free_license_site', 'cancel_unpaid_order', 'update_billing_address' );
+	public const NAMES = array( 'rename_server', 'set_firewall', 'set_database_access', 'private_network', 'set_usage_alerts', 'set_auto_renew', 'reactivate_subscription', 'free_license_site', 'cancel_unpaid_order', 'update_billing_address' );
 
 	/**
 	 * Runs one of the tools.
@@ -88,9 +88,6 @@ final class Acts {
 				$done = Tools::route( 'POST', '/resources/' . $id . '/usage-alerts', array(), array( 'on' => (bool) $args['on'] ), $id, 'usage e-mails turned ' . ( $args['on'] ? 'on' : 'off' ) );
 
 				return $done instanceof \WP_Error ? $done : array( 'usage_emails' => ! empty( $done['on'] ) ? 'on' : 'off' );
-
-			case 'retry_app_install':
-				return Tools::action( (int) $args['id'], 'app_retry', array(), 'app install retry requested' );
 
 			case 'set_auto_renew':
 				return self::auto_renew( $user_id, (int) $args['subscription_id'], (bool) $args['on'] );
