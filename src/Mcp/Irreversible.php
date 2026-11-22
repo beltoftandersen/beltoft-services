@@ -31,7 +31,7 @@ final class Irreversible {
 	/**
 	 * The tools this class runs.
 	 */
-	public const NAMES = array( 'delete_snapshot', 'rollback_snapshot', 'restore_backup', 'reinstall_server', 'replace_ssh_key', 'reset_firewall', 'set_database_eviction_policy', 'cancel_subscription', 'remove_addon', 'set_default_payment_method', 'delete_mailbox', 'order_server', 'order_database', 'delete_server', 'delete_database' );
+	public const NAMES = array( 'delete_snapshot', 'rollback_snapshot', 'restore_backup', 'reinstall_server', 'replace_ssh_key', 'reset_firewall', 'set_database_eviction_policy', 'cancel_subscription', 'remove_addon', 'set_default_payment_method', 'order_server', 'order_database', 'delete_server', 'delete_database' );
 
 	/**
 	 * The summary of a call that needs a confirmation, and what the summary depends on.
@@ -72,9 +72,6 @@ final class Irreversible {
 
 			case PurchaseDb::NAME:
 				return PurchaseDb::summary( $args, $user_id );
-
-			case 'delete_mailbox':
-				return ServerActions::summary_mailbox( $args, $name );
 
 		}
 

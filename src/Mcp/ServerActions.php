@@ -9,9 +9,6 @@ namespace BeltoftServices\Mcp;
 
 use BeltoftServices\Domains\HostName;
 use BeltoftServices\Drivers\Registry;
-use BeltoftServices\Mail\MailClients;
-use BeltoftServices\Mail\MailGuard;
-use BeltoftServices\Mail\MailRoutes;
 use BeltoftServices\Proxmox\Snapshot\Policy;
 use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Apps\AppReinstallPaid;
@@ -82,12 +79,6 @@ final class ServerActions {
 	 */
 	public static function run( string $name, array $args ) {
 		switch ( $name ) {
-			case 'delete_mailbox':
-				$id   = (int) $args['id'];
-				$done = Tools::route( 'DELETE', '/resources/' . $id . '/mail/mailboxes/' . rawurlencode( (string) $args['email'] ), array( 'confirm' => MailRoutes::CONFIRM_DELETE ), null, $id, 'mailbox deleted' );
-
-				return $done instanceof \WP_Error ? $done : array( 'deleted' => (string) $done['deleted'], 'message' => 'The mailbox and every message in it were deleted.' );
-
 			case 'delete_snapshot':
 				return self::send( $args, 'snapshot_delete', array( 'id' => (string) $args['snapshot'] ), 'delete snapshot requested' );
 
@@ -173,49 +164,6 @@ final class ServerActions {
 	 */
 	private static function send( array $args, string $action, array $send, string $history ) {
 		return Tools::action( (int) $args['id'], $action, $send, $history );
-	}
-
-	/**
-	 * The summary of a mailbox deletion: the dashboard's checks (a ready email domain, a mailbox of it that exists).
-	 *
-	 * @param array<string, mixed> $args Arguments (id, email).
-	 * @param string               $name Tool: delete_mailbox.
-	 * @return array{text: string, state: string}|\WP_Error
-	 */
-	public static function summary_mailbox( array $args, string $name = 'delete_mailbox' ) {
-		$r = Tools::owned( (int) $args['id'], true );
-
-		if ( $r instanceof \WP_Error ) {
-			return $r;
-		}
-
-		$bad = MailGuard::check( $r );
-
-		if ( $bad ) {
-			return new \WP_Error( 'beltoft_services_tool', $bad->get_error_message() );
-		}
-
-		$email = MailGuard::inside( $r, $args['email'] );
-
-		if ( null === $email ) {
-			return new \WP_Error( 'beltoft_services_tool', __( 'That mailbox is not part of this email domain.', 'beltoft-services' ) );
-		}
-
-		$box = MailClients::for()->get_mailbox( $email );
-
-		if ( is_wp_error( $box ) || null === $box ) {
-			return new \WP_Error( 'beltoft_services_tool', is_wp_error( $box ) ? __( 'The mail server could not be reached. Try again in a moment.', 'beltoft-services' ) : __( 'That mailbox does not exist.', 'beltoft-services' ) );
-		}
-
-		return array(
-			'text'  => sprintf(
-				/* translators: 1: mailbox address, 2: name of the service. */
-				__( 'Delete the mailbox %1$s of %2$s. Every message in it is deleted for good and cannot be brought back. Its password stops working and mail sent to it afterwards bounces.', 'beltoft-services' ),
-				$email,
-				Irreversible::name( $r )
-			),
-			'state' => $r->id() . '|delete_mailbox|' . $email,
-		);
 	}
 
 	// -- Snapshots, backups ----------------------------------------------------------------------

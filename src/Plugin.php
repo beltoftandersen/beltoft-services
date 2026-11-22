@@ -240,6 +240,7 @@ final class Plugin {
 		Oauth\Server::register();
 		Mcp\Access::register();
 		Hosting\McpTools::register();
+		Mail\McpTools::register();
 		ManualServer\McpTools::register();
 		Mcp\Endpoint::register();
 		Account\ApiTokens::register();

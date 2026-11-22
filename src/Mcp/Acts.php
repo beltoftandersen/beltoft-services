@@ -33,10 +33,7 @@ final class Acts {
 	/**
 	 * The tools this class runs.
 	 */
-	/** What an email change that is queued answers: accepted, not done; the domain's task says how it ended. */
-	public const EMAIL_QUEUED = 'Accepted and queued: it runs in the background, one change of the domain at a time (another change is refused until it is done). email_domain_info shows the task of the domain: working while it runs, then last_result with ok and the outcome text.';
-
-	public const NAMES = array( 'rename_server', 'set_firewall', 'set_database_access', 'private_network', 'set_usage_alerts', 'retry_app_install', 'domain_settings', 'set_auto_renew', 'reactivate_subscription', 'free_license_site', 'cancel_unpaid_order', 'update_billing_address', 'create_mailbox', 'add_email_alias', 'remove_email_alias', 'email_dns_check' );
+	public const NAMES = array( 'rename_server', 'set_firewall', 'set_database_access', 'private_network', 'set_usage_alerts', 'retry_app_install', 'domain_settings', 'set_auto_renew', 'reactivate_subscription', 'free_license_site', 'cancel_unpaid_order', 'update_billing_address' );
 
 	/**
 	 * Runs one of the tools.
@@ -113,55 +110,9 @@ final class Acts {
 			case 'update_billing_address':
 				return self::billing_address( $user_id, $args );
 
-			case 'create_mailbox':
-			case 'add_email_alias':
-			case 'remove_email_alias':
-			case 'email_dns_check':
-				return self::email( $name, $args );
-
 		}
 
 		return new \WP_Error( 'beltoft_services_tool', __( 'This is not available.', 'beltoft-services' ) );
-	}
-
-	/**
-	 * The email tools: the dashboard's own routes, so the owner check, the plan limits and the names kept inside the domain
-	 * are the same. A password is never in a result.
-	 *
-	 * @param string               $name Tool.
-	 * @param array<string, mixed> $args Arguments, checked against the schema.
-	 * @return array<string, mixed>|\WP_Error
-	 */
-	private static function email( string $name, array $args ) {
-		$id   = (int) $args['id'];
-		$base = '/resources/' . $id . '/mail';
-
-		switch ( $name ) {
-			case 'create_mailbox':
-				$body = array( 'local' => (string) $args['name'] );
-
-				if ( isset( $args['display_name'] ) ) {
-					$body['name'] = (string) $args['display_name'];
-				}
-
-				$done = Tools::route( 'POST', $base . '/mailboxes', array(), $body, $id, 'mailbox created' );
-
-				return $done instanceof \WP_Error ? $done : array( 'queued' => true, 'address' => (string) $done['email'], 'quota_mb' => (int) $done['quota_mb'], 'message' => self::EMAIL_QUEUED . ' When it is done the mailbox is in the list with reveal true. Its password is not shown here: the customer shows it once in the dashboard, after a code we email to them.' );
-
-			case 'add_email_alias':
-				$done = Tools::route( 'POST', $base . '/aliases', array(), array( 'address' => (string) $args['name'], 'goto' => array_values( array_map( 'strval', (array) $args['deliver_to'] ) ) ), $id, 'alias created' );
-
-				return $done instanceof \WP_Error ? $done : array( 'created' => (string) $done['address'], 'delivers_to' => $done['goto'] );
-
-			case 'remove_email_alias':
-				$done = Tools::route( 'DELETE', $base . '/aliases/' . rawurlencode( (string) $args['address'] ), array(), null, $id, 'alias deleted' );
-
-				return $done instanceof \WP_Error ? $done : array( 'deleted' => (string) $done['deleted'] );
-		}
-
-		$done = Tools::route( 'POST', $base . '/dns/check', array(), array(), $id, 'email DNS check requested' );
-
-		return $done instanceof \WP_Error ? $done : array( 'queued' => true, 'message' => self::EMAIL_QUEUED . ' The records below are as they were when you asked.', 'dns' => (array) $done['dns'] );
 	}
 
 	/**
