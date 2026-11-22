@@ -3,7 +3,7 @@
 
 namespace BeltoftServices\Tests\Licences;
 
-use BeltoftServices\Account\Licences;
+use BeltoftServices\Licences\Licences;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Licences\LicenceProductCommand;
 use BeltoftServices\Crypto;

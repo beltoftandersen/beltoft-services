@@ -5,9 +5,11 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Account;
+namespace BeltoftServices\ManualServer;
 
 use BeltoftServices\Resource;
+use BeltoftServices\Account\ServiceArea;
+use BeltoftServices\Storage\Storage;
 
 defined( 'ABSPATH' ) || exit;
 

@@ -9,6 +9,5 @@
 return array(
 	'Billing/PaymentMethods.php -> Account\Cards', // Known and deferred, 2026-11-10.
 	'Billing/Subscriptions.php -> Usage\Rates', // Known and deferred, 2026-11-10.
-	'Emails/ServiceEmail.php -> Account\Licences', // Known and deferred, 2026-11-10 (the literal 'licence-key').
 	'Emails/ServiceEmail.php -> Account\ServiceArea', // Known and deferred, 2026-11-10.
 );

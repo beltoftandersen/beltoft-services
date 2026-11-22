@@ -487,8 +487,8 @@ class SmimeTest extends SslTestCase {
 		$this->assertStringNotContainsString( '—', $html . $waiting );
 		$this->assertStringNotContainsString( '·', $html . $waiting );
 		$this->assertStringNotContainsString( 'Openprovider', $html . $waiting );
-		$this->assertSame( 'S/MIME certificate', \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Ssl::class )->label_of( $built ) );
-		$this->assertSame( self::BOX, \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Ssl::class )->title_of( $built, array() ) );
+		$this->assertSame( 'S/MIME certificate', \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Ssl\Ssl::class )->label_of( $built ) );
+		$this->assertSame( self::BOX, \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Ssl\Ssl::class )->title_of( $built, array() ) );
 	}
 
 	public function test_the_emails_speak_of_the_mailbox_and_carry_no_secret(): void {

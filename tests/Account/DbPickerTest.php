@@ -362,7 +362,7 @@ class DbPickerTest extends BackupTestCase {
 	public function test_the_apps_list_has_no_action_bar(): void {
 		$GLOBALS['wp']->query_vars['apps'] = '';
 		ob_start();
-		ServiceArea::get( \BeltoftServices\Account\Apps::class )->render( array() );
+		ServiceArea::get( \BeltoftServices\Http\AccountApps::class )->render( array() );
 		$html = (string) ob_get_clean();
 		$this->assertStringNotContainsString( 'beltoft-services-list-actions', $html );
 		unset( $GLOBALS['wp']->query_vars['apps'] );

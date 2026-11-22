@@ -71,7 +71,7 @@ final class Panels {
 	public static function early( $parent = null, $endpoint = null ): void {
 		unset( $parent );
 
-		if ( is_string( $endpoint ) && \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Ssl::class )->slug() === $endpoint && is_user_logged_in() ) {
+		if ( is_string( $endpoint ) && \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Ssl\Ssl::class )->slug() === $endpoint && is_user_logged_in() ) {
 			self::assets();
 		}
 	}

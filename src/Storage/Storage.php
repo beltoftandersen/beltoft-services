@@ -5,10 +5,12 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Account;
+namespace BeltoftServices\Storage;
 
 use BeltoftServices\Resource;
 use BeltoftServices\Storage\StoragePanel;
+use BeltoftServices\Account\ServiceArea;
+use BeltoftServices\Licences\Licences;
 
 defined( 'ABSPATH' ) || exit;
 

@@ -4,7 +4,7 @@ namespace BeltoftServices\Tests\Account;
 
 use BeltoftLicenses\Account\Endpoint;
 use BeltoftLicenses\Account\View;
-use BeltoftServices\Account\Apps;
+use BeltoftServices\Http\AccountApps;
 use BeltoftServices\Account\Databases;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\ServiceArea;
@@ -103,8 +103,8 @@ class ServiceAreasTest extends TestCase {
 		return ServiceArea::get( Databases::class );
 	}
 
-	private function apps_area(): Apps {
-		return ServiceArea::get( Apps::class );
+	private function apps_area(): AccountApps {
+		return ServiceArea::get( AccountApps::class );
 	}
 
 	// -- Tabs ----------------------------------------------------------------------------------

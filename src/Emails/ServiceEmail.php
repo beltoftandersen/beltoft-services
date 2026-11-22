@@ -191,7 +191,7 @@ abstract class ServiceEmail extends \WC_Email {
 		}
 
 		if ( 'licence-key' === (string) $r->get( 'driver' ) && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
-			return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Licences::class )->url( $license );
+			return \BeltoftServices\Account\ServiceArea::by_key( 'licences' )->url( $license );
 		}
 
 		return Endpoint::url_for_license( $license );

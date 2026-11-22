@@ -5,12 +5,13 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Account;
+namespace BeltoftServices\Http;
 
 use BeltoftServices\Api\Routes;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Http\HttpDriver;
 use BeltoftServices\Resource;
+use BeltoftServices\Account\ServiceArea;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -18,7 +19,7 @@ defined( 'ABSPATH' ) || exit;
  * Apps provisioned over HTTP (driver kind `http`, for example an OdooWoo app): a row per app (name, state, usage
  * and an Open button that uses the open route) and a page with what the HTTP driver prints in the service panel.
  */
-final class Apps extends ServiceArea {
+final class AccountApps extends ServiceArea {
 
 	/**
 	 * Hooks: the place in the list of areas.

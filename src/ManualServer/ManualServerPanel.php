@@ -50,7 +50,7 @@ final class ManualServerPanel {
 	 */
 	public static function email_values( $values, $r ) {
 		if ( is_array( $values ) && $r instanceof Resource && ManualServerDriver::ID === $r->get( 'driver' ) && $r->license() && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
-			$values['account_url'] = ServiceArea::get( \BeltoftServices\Account\Dedicated::class )->url( $r->license() );
+			$values['account_url'] = ServiceArea::get( \BeltoftServices\ManualServer\Dedicated::class )->url( $r->license() );
 		}
 
 		return $values;

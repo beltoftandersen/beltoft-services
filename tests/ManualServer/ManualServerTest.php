@@ -8,7 +8,7 @@
 namespace BeltoftServices\Tests\ManualServer;
 
 use BeltoftLicenses\Licenses;
-use BeltoftServices\Account\Dedicated;
+use BeltoftServices\ManualServer\Dedicated;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Jobs;
 use BeltoftServices\ManualServer\ManualServerDelivery;

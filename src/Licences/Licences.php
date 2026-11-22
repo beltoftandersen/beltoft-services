@@ -5,10 +5,12 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Account;
+namespace BeltoftServices\Licences;
 
 use BeltoftServices\Licences\KeyPanel;
 use BeltoftServices\Resource;
+use BeltoftServices\Account\ServiceArea;
+use BeltoftServices\Ssl\Ssl;
 
 defined( 'ABSPATH' ) || exit;
 

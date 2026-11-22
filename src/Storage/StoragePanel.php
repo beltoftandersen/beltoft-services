@@ -47,7 +47,7 @@ final class StoragePanel {
 	 */
 	public static function email_values( $values, $r ) {
 		if ( is_array( $values ) && $r instanceof Resource && StorageDriver::ID === $r->get( 'driver' ) && $r->license() && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
-			$values['account_url'] = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Storage::class )->url( $r->license() );
+			$values['account_url'] = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Storage\Storage::class )->url( $r->license() );
 		}
 
 		return $values;
@@ -86,7 +86,7 @@ final class StoragePanel {
 	public static function early( $parent = null, $endpoint = null ): void {
 		unset( $parent );
 
-		if ( is_string( $endpoint ) && \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Storage::class )->slug() === $endpoint && is_user_logged_in() ) {
+		if ( is_string( $endpoint ) && \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Storage\Storage::class )->slug() === $endpoint && is_user_logged_in() ) {
 			self::assets();
 		}
 	}

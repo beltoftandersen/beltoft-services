@@ -5,9 +5,9 @@ namespace BeltoftServices\Tests\Account;
 use BeltoftServices\Account\Domains;
 use BeltoftServices\Account\Email;
 use BeltoftServices\Account\Hosting;
-use BeltoftServices\Account\Licences;
+use BeltoftServices\Licences\Licences;
 use BeltoftServices\Account\ServiceArea;
-use BeltoftServices\Account\Ssl;
+use BeltoftServices\Ssl\Ssl;
 use BeltoftServices\Tests\TestCase;
 
 class AreaHelpersTest extends TestCase {

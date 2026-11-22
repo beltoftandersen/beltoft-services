@@ -8,7 +8,7 @@
 namespace BeltoftServices\Tests\Storage;
 
 use BeltoftServices\Account\ServiceArea;
-use BeltoftServices\Account\Storage;
+use BeltoftServices\Storage\Storage;
 use BeltoftServices\Api\Tokens;
 use BeltoftServices\Resource;
 use BeltoftServices\Storage\Boxes;

@@ -3,7 +3,7 @@
 namespace BeltoftServices\Tests\Ssl;
 
 use BeltoftServices\Account\ServiceArea;
-use BeltoftServices\Account\Ssl;
+use BeltoftServices\Ssl\Ssl;
 use BeltoftServices\Api\Tokens;
 use BeltoftServices\Crypto;
 use BeltoftServices\Emails\Emails;

@@ -8,7 +8,7 @@
 namespace BeltoftServices\Licences;
 
 use BeltoftLicenses\Licenses;
-use BeltoftServices\Account\Licences as LicencesArea;
+use BeltoftServices\Licences\Licences as LicencesArea;
 use BeltoftServices\Account\Panel;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Alerts;

@@ -45,7 +45,7 @@ final class EmailValues {
 			$license               = $r->license();
 
 			if ( $license && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
-				$values['account_url'] = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Ssl::class )->url( $license );
+				$values['account_url'] = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Ssl\Ssl::class )->url( $license );
 			}
 		}
 

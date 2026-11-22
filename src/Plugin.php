@@ -185,12 +185,12 @@ final class Plugin {
 		Account\Domains::register();
 		Account\Databases::register();
 		Account\Hosting::register();
-		Account\Apps::register();
+		Http\AccountApps::register();
 		Account\Email::register();
-		Account\Ssl::register();
-		Account\Licences::register();
-		Account\Storage::register();
-		Account\Dedicated::register();
+		Ssl\Ssl::register();
+		Licences\Licences::register();
+		Storage\Storage::register();
+		ManualServer\Dedicated::register();
 		Account\DomainDanger::register();
 		Account\ServerPicker::register();
 		Account\DbPicker::register();

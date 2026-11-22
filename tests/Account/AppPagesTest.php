@@ -3,7 +3,7 @@
 namespace BeltoftServices\Tests\Account;
 
 use BeltoftLicenses\Account\View;
-use BeltoftServices\Account\Apps;
+use BeltoftServices\Http\AccountApps;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Account\Slugs;
@@ -71,8 +71,8 @@ class AppPagesTest extends TestCase {
 		return Resource::find( $resource->id() );
 	}
 
-	private function area(): Apps {
-		return ServiceArea::get( Apps::class );
+	private function area(): AccountApps {
+		return ServiceArea::get( AccountApps::class );
 	}
 
 	private function go( string $value ): void {
@@ -131,7 +131,7 @@ class AppPagesTest extends TestCase {
 		$this->assertSame( $this->area()->url( $app->license() ), $seen['base'] );
 		$this->assertStringContainsString( 'odoowoo', $seen['base'] );
 		$this->assertSame( (int) $app->license()['id'], (int) $seen['license']['id'] );
-		$this->assertInstanceOf( Apps::class, $seen['area'] );
+		$this->assertInstanceOf( AccountApps::class, $seen['area'] );
 		$this->assertArrayHasKey( 'view', $seen );
 	}
 
