@@ -11,7 +11,7 @@ namespace BeltoftServices\Tests\Mcp;
 require_once dirname( __DIR__ ) . '/Support/Ipv4Product.php';
 
 use BeltoftLicenses\Licenses;
-use BeltoftServices\Account\DbPicker;
+use BeltoftServices\Proxmox\Db\DbPicker;
 use BeltoftServices\Api\Tokens;
 use BeltoftServices\Mcp\Endpoint;
 use BeltoftServices\Mcp\Purchase;

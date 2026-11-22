@@ -1120,7 +1120,7 @@ class DbPhase5Test extends TestCase {
 		$GLOBALS['wp']->query_vars['databases'] = (string) $fresh->license()['id'];
 
 		ob_start();
-		\BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Databases::class )->render( array( \BeltoftLicenses\Account\View::license( \BeltoftLicenses\Licenses::find( (int) $fresh->license()['id'] ) ) ) );
+		\BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Proxmox\Db\Databases::class )->render( array( \BeltoftLicenses\Account\View::license( \BeltoftLicenses\Licenses::find( (int) $fresh->license()['id'] ) ) ) );
 		$html = (string) ob_get_clean();
 		unset( $GLOBALS['wp']->query_vars['databases'] );
 

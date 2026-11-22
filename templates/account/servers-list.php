@@ -6,7 +6,7 @@
  *
  * @package BeltoftServices
  *
- * @var array<int, array<string, mixed>> $rows Rows from BeltoftServices\Account\Servers::rows(): id, url, name, details, state, tone (ok, busy, off, bad), renews, bars (label, percent; the memory bar also has key, title, state, text, sub).
+ * @var array<int, array<string, mixed>> $rows Rows from BeltoftServices\Proxmox\Vm\Servers::rows(): id, url, name, details, state, tone (ok, busy, off, bad), renews, bars (label, percent; the memory bar also has key, title, state, text, sub).
  */
 
 defined( 'ABSPATH' ) || exit;

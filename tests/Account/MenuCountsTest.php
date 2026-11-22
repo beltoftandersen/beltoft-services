@@ -76,7 +76,7 @@ final class MenuCountsTest extends TestCase {
 		$this->db( $user, 'deleted', true );
 
 		MenuCounts::reset();
-		$area  = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Databases::class );
+		$area  = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Proxmox\Db\Databases::class );
 		$views = array_map( static fn( $l ) => array( 'id' => (int) $l['id'], 'license' => $l ), \BeltoftLicenses\Account\Endpoint::licenses_for_user( $user ) );
 
 		$this->assertCount( MenuCounts::of( $user )['databases'] ?? 0, $area->sort( $views )['members'] );

@@ -5,7 +5,7 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Account;
+namespace BeltoftServices\Proxmox\Vm;
 
 defined( 'ABSPATH' ) || exit;
 

@@ -12,7 +12,7 @@ use BeltoftServices\Proxmox\Disk\DiskField;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The picker (Account\ServerPicker) puts one small array of strings on the new server's cart item. Checkout uses it for two
+ * The picker (Proxmox\Vm\ServerPicker) puts one small array of strings on the new server's cart item. Checkout uses it for two
  * things only: to start the Server step's fields from it, and, for a field the posted form does not carry at all, as
  * the value the form would have had. A value in the post always wins, and every value goes through the same
  * validators and savers as a typed one: nothing here is trusted.

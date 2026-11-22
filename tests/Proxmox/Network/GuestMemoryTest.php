@@ -3,7 +3,7 @@
 namespace BeltoftServices\Tests\Proxmox\Network;
 
 use BeltoftLicenses\Account\View;
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Proxmox\Vm\Servers;
 use BeltoftServices\Mcp\Tools;
 use BeltoftServices\Monitoring\GuestMemory;
 use BeltoftServices\Monitoring\LiveUsage;

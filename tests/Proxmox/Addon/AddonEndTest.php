@@ -10,7 +10,7 @@ namespace BeltoftServices\Tests\Proxmox\Addon;
 
 use BeltoftLicenses\Account\View;
 use BeltoftLicenses\Licenses;
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Proxmox\Vm\Servers;
 use BeltoftServices\Proxmox\Addon\AddonEnd;
 use BeltoftServices\Reconciler;
 use BeltoftServices\Resource;

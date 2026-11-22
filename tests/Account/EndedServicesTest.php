@@ -11,7 +11,7 @@ use BeltoftLicenses\Account\View;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Account\MenuCounts;
 use BeltoftServices\Account\ServiceArea;
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Proxmox\Vm\Servers;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
@@ -114,7 +114,7 @@ final class EndedServicesTest extends TestCase {
 		$this->db( $user, 'revoked', true, 'deleted' );
 		$live = $this->db( $user, 'active' );
 
-		$area   = ServiceArea::get( \BeltoftServices\Account\Databases::class );
+		$area   = ServiceArea::get( \BeltoftServices\Proxmox\Db\Databases::class );
 		$sorted = $area->sort( $this->views( $user ) );
 
 		$this->assertSame( array( $live ), array_keys( $sorted['members'] ) );
@@ -125,7 +125,7 @@ final class EndedServicesTest extends TestCase {
 		$user   = $this->user();
 		$lapsed = $this->db( $user, 'expired', false, 'paused' );
 
-		$area   = ServiceArea::get( \BeltoftServices\Account\Databases::class );
+		$area   = ServiceArea::get( \BeltoftServices\Proxmox\Db\Databases::class );
 		$sorted = $area->sort( $this->views( $user ) );
 
 		$this->assertSame( array( $lapsed ), array_keys( $sorted['members'] ) );
@@ -136,7 +136,7 @@ final class EndedServicesTest extends TestCase {
 		$user = $this->user();
 		$held = $this->db( $user, 'suspended' );
 
-		$area = ServiceArea::get( \BeltoftServices\Account\Databases::class );
+		$area = ServiceArea::get( \BeltoftServices\Proxmox\Db\Databases::class );
 
 		$this->assertSame( array( $held ), array_keys( $area->sort( $this->views( $user ) )['members'] ) );
 		$this->assertSame( 1, $this->counts( $user )['databases'] ?? 0 );

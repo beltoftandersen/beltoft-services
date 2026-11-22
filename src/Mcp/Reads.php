@@ -11,7 +11,7 @@ use BeltoftLicenses\Account\Endpoint as LicenseAccount;
 use BeltoftLicenses\Account\View as LicenseView;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Account\Cards;
-use BeltoftServices\Account\DbPicker;
+use BeltoftServices\Proxmox\Db\DbPicker;
 use BeltoftServices\Api\Services;
 use BeltoftServices\Domains\DnsClaimRoutes;
 use BeltoftServices\Domains\Prices;

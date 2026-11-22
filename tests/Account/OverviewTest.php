@@ -6,7 +6,7 @@ use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\OverviewActivity;
 use BeltoftServices\Account\OverviewData;
 use BeltoftServices\Account\ServerLinks;
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Proxmox\Vm\Servers;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
 use BeltoftServices\Progress;

@@ -369,7 +369,7 @@ class DbMssqlTest extends TestCase {
 		$this->assertSame( 'SQL Server 2025 Express', $view['engine'] );
 		$this->assertSame( 1433, $view['port'] );
 
-		$ref = new \ReflectionMethod( \BeltoftServices\Account\DbPicker::class, 'engine' );
+		$ref = new \ReflectionMethod( \BeltoftServices\Proxmox\Db\DbPicker::class, 'engine' );
 		$ref->setAccessible( true );
 		$this->assertSame( 'SQL Server 2025 Express', $ref->invoke( null, array( 'engine' => 'mssql', 'major' => 2025 ) ) );
 		$this->assertSame( 'PostgreSQL 18', $ref->invoke( null, array( 'engine' => '', 'major' => 18 ) ) );

@@ -5,7 +5,7 @@ namespace BeltoftServices\Tests\Proxmox;
 use BeltoftLicenses\Account\Endpoint;
 use BeltoftLicenses\Account\View;
 use BeltoftServices\Account\ServerLinks;
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Proxmox\Vm\Servers;
 use BeltoftServices\Proxmox\Vm\Operations;
 use BeltoftServices\Tests\Proxmox\Network\MonitoringTestCase;
 

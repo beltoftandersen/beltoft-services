@@ -2,7 +2,7 @@
 /**
  * The virtual machine part of the service panel (My Account → Servers).
  *
- * On a server page (see BeltoftServices\Account\Servers) the card is split in tabs, each one a
+ * On a server page (see BeltoftServices\Proxmox\Vm\Servers) the card is split in tabs, each one a
  * link with its own address (overview, snapshots, backups, disks, access, reinstall). Every pane is
  * printed and the inactive ones are hidden, so the status poll and the forms keep working in any
  * tab, and without script the links still open the right tab. Elsewhere (a card on the Licenses tab)

@@ -3,7 +3,7 @@
 
 namespace BeltoftServices\Tests\Apps;
 
-use BeltoftServices\Account\ServerPicker;
+use BeltoftServices\Proxmox\Vm\ServerPicker;
 use BeltoftServices\Apps\AppField;
 use BeltoftServices\Apps\AppLicence;
 use BeltoftServices\Apps\AppLicenceCart;

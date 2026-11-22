@@ -7,8 +7,8 @@
 
 namespace BeltoftServices\Mcp;
 
-use BeltoftServices\Account\DbPicker;
-use BeltoftServices\Account\ServerPicker;
+use BeltoftServices\Proxmox\Db\DbPicker;
+use BeltoftServices\Proxmox\Vm\ServerPicker;
 use BeltoftServices\Proxmox\Db\DbDisk;
 use BeltoftServices\Proxmox\Db\DbDiskField;
 use BeltoftServices\Proxmox\Db\DbTermsField;

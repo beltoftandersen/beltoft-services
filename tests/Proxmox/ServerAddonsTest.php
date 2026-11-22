@@ -4,7 +4,7 @@ namespace BeltoftServices\Tests\Proxmox;
 
 use BeltoftLicenses\Account\View;
 use BeltoftServices\Account\ServerLinks;
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Proxmox\Vm\Servers;
 use BeltoftServices\Account\Tabs;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Emails\Emails;

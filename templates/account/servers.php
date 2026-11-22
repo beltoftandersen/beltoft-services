@@ -3,7 +3,7 @@
  * My Account → Servers: the list of servers, or one server's page.
  *
  * Override by copying to yourtheme/beltoft-services/account/servers.php. Reached through the
- * licenses template call of Beltoft Licenses (see BeltoftServices\Account\Servers).
+ * licenses template call of Beltoft Licenses (see BeltoftServices\Proxmox\Vm\Servers).
  *
  * @package BeltoftServices
  *
@@ -13,4 +13,4 @@
 
 defined( 'ABSPATH' ) || exit;
 
-\BeltoftServices\Account\Servers::render( $licenses, isset( $empty ) ? (string) $empty : '' );
+\BeltoftServices\Proxmox\Vm\Servers::render( $licenses, isset( $empty ) ? (string) $empty : '' );

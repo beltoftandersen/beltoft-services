@@ -9,7 +9,7 @@
 namespace BeltoftServices\Tests\Mcp;
 
 use BeltoftLicenses\Licenses;
-use BeltoftServices\Account\ServerPicker;
+use BeltoftServices\Proxmox\Vm\ServerPicker;
 use BeltoftServices\Api\Tokens;
 use BeltoftServices\Mcp\Purchase;
 use BeltoftServices\Product;

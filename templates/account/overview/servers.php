@@ -6,7 +6,7 @@
  *
  * @package BeltoftServices
  *
- * @var array<int, array<string, mixed>> $rows  Rows from BeltoftServices\Account\Servers::rows().
+ * @var array<int, array<string, mixed>> $rows  Rows from BeltoftServices\Proxmox\Vm\Servers::rows().
  * @var int                              $total Number of servers the customer has.
  * @var string                           $url   Address of the Servers page.
  */

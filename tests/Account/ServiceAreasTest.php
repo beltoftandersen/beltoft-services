@@ -5,7 +5,7 @@ namespace BeltoftServices\Tests\Account;
 use BeltoftLicenses\Account\Endpoint;
 use BeltoftLicenses\Account\View;
 use BeltoftServices\Http\AccountApps;
-use BeltoftServices\Account\Databases;
+use BeltoftServices\Proxmox\Db\Databases;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Drivers\Registry;

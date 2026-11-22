@@ -12,6 +12,7 @@ use BeltoftLicenses\Account\View;
 use BeltoftServices\Progress;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
+use BeltoftServices\Proxmox\Vm\Servers;
 
 defined( 'ABSPATH' ) || exit;
 

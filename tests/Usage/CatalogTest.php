@@ -7,8 +7,8 @@
 
 namespace BeltoftServices\Tests\Usage;
 
-use BeltoftServices\Account\ServerPicker;
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Proxmox\Vm\ServerPicker;
+use BeltoftServices\Proxmox\Vm\Servers;
 use BeltoftServices\Proxmox\Backup\BackupField;
 use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Proxmox\Vm\OsField;

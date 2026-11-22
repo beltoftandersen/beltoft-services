@@ -5,11 +5,12 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Account;
+namespace BeltoftServices\Proxmox\Db;
 
 use BeltoftServices\Proxmox\Db\DbCard;
 use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\Resource;
+use BeltoftServices\Account\ServiceArea;
 
 defined( 'ABSPATH' ) || exit;
 

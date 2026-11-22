@@ -11,6 +11,7 @@ use BeltoftLicenses\Licenses;
 use BeltoftLicenses\Account\View;
 use BeltoftServices\Locks;
 use BeltoftServices\Resource;
+use BeltoftServices\Proxmox\Vm\Servers;
 
 defined( 'ABSPATH' ) || exit;
 

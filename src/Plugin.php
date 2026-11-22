@@ -180,10 +180,10 @@ final class Plugin {
 		BillingRequirements::register();
 		Account\Tabs::register();
 		Account\Slugs::register();
-		Account\Servers::register();
+		Proxmox\Vm\Servers::register();
 		Account\ServiceArea::register();
 		Domains\Domains::register();
-		Account\Databases::register();
+		Proxmox\Db\Databases::register();
 		Hosting\Hosting::register();
 		Http\AccountApps::register();
 		Mail\Email::register();
@@ -192,8 +192,8 @@ final class Plugin {
 		Storage\Storage::register();
 		ManualServer\Dedicated::register();
 		Domains\DomainDanger::register();
-		Account\ServerPicker::register();
-		Account\DbPicker::register();
+		Proxmox\Vm\ServerPicker::register();
+		Proxmox\Db\DbPicker::register();
 		Account\Overview::register();
 		Account\OrderTarget::register();
 		Hosting\OrderTarget::register();

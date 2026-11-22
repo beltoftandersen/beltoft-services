@@ -166,7 +166,7 @@ final class DbCard {
 
 		$view = self::view( $r );
 		$page = \BeltoftServices\Account\ServiceArea::page();
-		$area = $page && ( $page['area'] ?? null ) instanceof \BeltoftServices\Account\Databases ? $page['area'] : null;
+		$area = $page && ( $page['area'] ?? null ) instanceof \BeltoftServices\Proxmox\Db\Databases ? $page['area'] : null;
 		$nav  = $area ? $area->nav() : array();
 		$tab  = $area && '' !== (string) $page['tab'] ? (string) $page['tab'] : 'overview';
 		$link = static fn( string $slug ): string => $area && $page ? $area->url( $page['license'], 'overview' === $slug ? '' : $slug ) : '';

@@ -2,7 +2,7 @@
 /** Live usage route: one cluster call, guest memory, disk refresh limits. @package BeltoftServices */
 namespace BeltoftServices\Tests\Proxmox\Network;
 
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Proxmox\Vm\Servers;
 use BeltoftServices\Monitoring\GuestMemory;
 use BeltoftServices\Monitoring\LiveUsage;
 use BeltoftServices\Proxmox\Vm\Operations;

@@ -8,8 +8,8 @@
 
 namespace BeltoftServices\Tests\Usage;
 
-use BeltoftServices\Account\DbPicker;
-use BeltoftServices\Account\ServerPicker;
+use BeltoftServices\Proxmox\Db\DbPicker;
+use BeltoftServices\Proxmox\Vm\ServerPicker;
 use BeltoftServices\Apps\AppLicence;
 use BeltoftServices\Billing\TaxNote;
 use BeltoftServices\Domains\PriceTags;

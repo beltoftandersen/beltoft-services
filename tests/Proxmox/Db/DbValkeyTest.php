@@ -8,7 +8,7 @@
 
 namespace BeltoftServices\Tests\Proxmox\Db;
 
-use BeltoftServices\Account\Databases;
+use BeltoftServices\Proxmox\Db\Databases;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Product;

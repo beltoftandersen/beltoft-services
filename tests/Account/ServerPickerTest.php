@@ -8,9 +8,9 @@
 
 namespace BeltoftServices\Tests\Account;
 
-use BeltoftServices\Account\ServerPicker;
+use BeltoftServices\Proxmox\Vm\ServerPicker;
 use BeltoftServices\Account\ServerLinks;
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Proxmox\Vm\Servers;
 use BeltoftServices\Product;
 use BeltoftServices\Apps\AppField;
 use BeltoftServices\Apps\Apps;

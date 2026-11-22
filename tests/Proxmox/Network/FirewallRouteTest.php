@@ -9,7 +9,7 @@ namespace BeltoftServices\Tests\Proxmox\Network;
 
 use BeltoftLicenses\Account\View;
 use BeltoftServices\Account\ServerLinks;
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Proxmox\Vm\Servers;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Network\Firewall;
 use BeltoftServices\Proxmox\Network\FirewallRules;

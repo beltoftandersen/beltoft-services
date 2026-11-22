@@ -31,7 +31,7 @@ use BeltoftServices\Api\Routes;
 use BeltoftServices\Proxmox\Vm\Schema;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
-use BeltoftServices\Account\DbPicker;
+use BeltoftServices\Proxmox\Db\DbPicker;
 use BeltoftServices\Proxmox\Db\DbDisk;
 use BeltoftServices\Proxmox\Db\DbGrow;
 use BeltoftServices\Proxmox\Pve\DiskCapacity;

@@ -5,7 +5,7 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Account;
+namespace BeltoftServices\Proxmox\Db;
 
 use BeltoftServices\Billing\TaxNote;
 use BeltoftServices\Product;
@@ -17,6 +17,10 @@ use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Proxmox\Db\PostgresEngine;
 use BeltoftServices\Proxmox\Backup\BackupField;
 use BeltoftServices\Usage\Rates;
+use BeltoftServices\Account\PickerCart;
+use BeltoftServices\Account\PickerSubmit;
+use BeltoftServices\Account\ServiceArea;
+use BeltoftServices\Proxmox\Vm\ServerPicker;
 
 defined( 'ABSPATH' ) || exit;
 

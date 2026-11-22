@@ -8,7 +8,7 @@
 
 namespace BeltoftServices\Mcp;
 
-use BeltoftServices\Account\DbPicker;
+use BeltoftServices\Proxmox\Db\DbPicker;
 use BeltoftServices\GiftCredit\GiftCredit;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Backup\Backups;

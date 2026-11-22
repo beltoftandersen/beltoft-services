@@ -3,7 +3,7 @@
 namespace BeltoftServices\Tests\Account;
 
 use BeltoftLicenses\Account\View;
-use BeltoftServices\Account\Databases;
+use BeltoftServices\Proxmox\Db\Databases;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;

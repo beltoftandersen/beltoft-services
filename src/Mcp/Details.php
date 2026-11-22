@@ -11,7 +11,7 @@ use BeltoftServices\Domains\DomainRows;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Account\Panel;
 use BeltoftServices\Account\ServerLinks;
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Proxmox\Vm\Servers;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Db\DbAccess;

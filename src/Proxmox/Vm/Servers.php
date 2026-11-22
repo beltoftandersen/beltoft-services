@@ -5,7 +5,7 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Account;
+namespace BeltoftServices\Proxmox\Vm;
 
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Registry;
@@ -19,6 +19,10 @@ use BeltoftServices\Proxmox\Snapshot\SnapshotDriver;
 use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
+use BeltoftServices\Account\Panel;
+use BeltoftServices\Account\ServerLinks;
+use BeltoftServices\Account\ServiceArea;
+use BeltoftServices\Account\Slugs;
 
 defined( 'ABSPATH' ) || exit;
 

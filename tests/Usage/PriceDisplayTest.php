@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Tests\Usage;
 
-use BeltoftServices\Account\ServerPicker;
+use BeltoftServices\Proxmox\Vm\ServerPicker;
 use BeltoftServices\Billing\TaxNote;
 use BeltoftServices\Domains\DomainQuery;
 use BeltoftServices\Domains\Prices;
@@ -252,7 +252,7 @@ class PriceDisplayTest extends UsageTestCase {
 	public function test_the_db_picker_summary_and_the_cart_rate_follow_the_display(): void {
 		$v = $this->usage_product() + $this->monthly_vps();
 		$plan = array( 'name' => 'Small', 'price' => 25.0, 'period' => 'month', 'variation_id' => $v['m-None']->get_id() );
-		$call = new \ReflectionMethod( \BeltoftServices\Account\DbPicker::class, 'summary' );
+		$call = new \ReflectionMethod( \BeltoftServices\Proxmox\Db\DbPicker::class, 'summary' );
 		$call->setAccessible( true );
 
 		$this->assertSame( 'Small: €25.00 per month excluding VAT', $call->invoke( null, $plan ) );

@@ -8,12 +8,12 @@
 
 namespace BeltoftServices\Tests\Account;
 
-use BeltoftServices\Account\Databases;
-use BeltoftServices\Account\DbPicker;
-use BeltoftServices\Account\ServerPicker;
+use BeltoftServices\Proxmox\Db\Databases;
+use BeltoftServices\Proxmox\Db\DbPicker;
+use BeltoftServices\Proxmox\Vm\ServerPicker;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Account\ServerLinks;
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Proxmox\Vm\Servers;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Db\DbEngines;

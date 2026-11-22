@@ -5,7 +5,7 @@ namespace BeltoftServices\Tests\Proxmox\Console;
 
 use BeltoftLicenses\Account\View;
 use BeltoftServices\Account\ServerLinks;
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Proxmox\Vm\Servers;
 use BeltoftServices\Proxmox\Console\Console;
 use BeltoftServices\Proxmox\Console\ConsoleTab;
 use BeltoftServices\Proxmox\Vm\Operations;

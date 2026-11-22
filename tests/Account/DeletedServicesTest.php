@@ -9,11 +9,11 @@ namespace BeltoftServices\Tests\Account;
 
 use BeltoftLicenses\Account\View;
 use BeltoftLicenses\Licenses;
-use BeltoftServices\Account\Databases;
+use BeltoftServices\Proxmox\Db\Databases;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\ServiceArea;
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Proxmox\Vm\Servers;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;

@@ -112,7 +112,7 @@ final class EmailDetails {
 		$tab    = '';
 
 		if ( DbDriver::ID === $driver && ! $gone ) {
-			return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Databases::class )->url( $license );
+			return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Proxmox\Db\Databases::class )->url( $license );
 		}
 
 		if ( \BeltoftServices\Proxmox\Ipv4\Ipv4Driver::ID === $driver ) {
@@ -120,7 +120,7 @@ final class EmailDetails {
 			$parent = \BeltoftServices\Proxmox\Ipv4\Ipv4Meta::parent_of( $r );
 
 			if ( $parent && DbDriver::ID === (string) $parent->get( 'driver' ) && ! $gone ) {
-				return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Databases::class )->url( (array) $parent->license() );
+				return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Proxmox\Db\Databases::class )->url( (array) $parent->license() );
 			}
 
 			$server = $parent;

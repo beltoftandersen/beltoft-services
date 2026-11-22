@@ -9,7 +9,7 @@ namespace BeltoftServices\Mcp;
 
 use BeltoftLicenses\Events;
 use BeltoftLicenses\Licenses;
-use BeltoftServices\Account\ServerPicker;
+use BeltoftServices\Proxmox\Vm\ServerPicker;
 use BeltoftServices\BillingRequirements;
 use BeltoftServices\Apps\AppField;
 use BeltoftServices\Apps\AppLicence;

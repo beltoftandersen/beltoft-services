@@ -2,12 +2,12 @@
 /** My Account: Servers, Databases, Domains and Email are there for every customer, with a create button. @package BeltoftServices */
 namespace BeltoftServices\Tests\Account;
 
-use BeltoftServices\Account\Databases;
+use BeltoftServices\Proxmox\Db\Databases;
 use BeltoftServices\Domains\Domains;
 use BeltoftServices\Mail\Email;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\ServerLinks;
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Proxmox\Vm\Servers;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Tests\TestCase;
 

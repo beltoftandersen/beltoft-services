@@ -9,7 +9,7 @@ namespace BeltoftServices\Tests\Apps;
 
 use BeltoftLicenses\Account\View;
 use BeltoftServices\Account\ServerLinks;
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Proxmox\Vm\Servers;
 use BeltoftServices\Crypto;
 use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Apps\AppReinstall;

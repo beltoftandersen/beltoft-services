@@ -8,8 +8,8 @@
 
 namespace BeltoftServices\Tests\Usage;
 
-use BeltoftServices\Account\DbPicker;
-use BeltoftServices\Account\ServerPicker;
+use BeltoftServices\Proxmox\Db\DbPicker;
+use BeltoftServices\Proxmox\Vm\ServerPicker;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Db\DbDiskField;
@@ -247,7 +247,7 @@ class DatabaseUsageTest extends UsageTestCase {
 	private function picker_page(): string {
 		$GLOBALS['wp']->query_vars['databases'] = 'new';
 		ob_start();
-		\BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Databases::class )->render( array() );
+		\BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Proxmox\Db\Databases::class )->render( array() );
 
 		return (string) ob_get_clean();
 	}

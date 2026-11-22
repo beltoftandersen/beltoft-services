@@ -4,7 +4,7 @@
 namespace BeltoftServices\Tests\Apps;
 
 use BeltoftLicenses\Account\View;
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Proxmox\Vm\Servers;
 use BeltoftServices\Domains\Clients as DnsClients;
 use BeltoftServices\Domains\DomainDriver;
 use BeltoftServices\Domains\FakeDns;

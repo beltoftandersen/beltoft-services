@@ -8,7 +8,7 @@
 
 namespace BeltoftServices\Tests\Proxmox\Network;
 
-use BeltoftServices\Account\DbPicker;
+use BeltoftServices\Proxmox\Db\DbPicker;
 use BeltoftServices\Alerts;
 use BeltoftServices\Proxmox\Db\DbNetGuard;
 use BeltoftServices\Proxmox\Network\PrivateNets;

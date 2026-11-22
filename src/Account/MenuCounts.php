@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Account;
 
+use BeltoftServices\Proxmox\Vm\Servers;
+
 defined( 'ABSPATH' ) || exit;
 
 /**

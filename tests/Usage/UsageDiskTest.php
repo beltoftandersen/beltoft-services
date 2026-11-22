@@ -193,9 +193,9 @@ final class UsageDiskTest extends UsageTestCase {
 	private function usage_server_cart(): void {
 		WC()->cart->empty_cart();
 		$plan    = Offers::find( $this->v['u-None']->get_id() );
-		$checked = \BeltoftServices\Account\ServerPicker::check( array( 'plan' => (string) $plan['variation_id'], 'backups' => '', 'os' => '9000', 'app' => '', 'version' => '', 'tier' => '', 'domain_on' => '', 'own_on' => '', 'own' => '', 'zone' => '', 'sub' => '', 'name' => 'web1', 'ssh_key' => '' ), $this->user );
+		$checked = \BeltoftServices\Proxmox\Vm\ServerPicker::check( array( 'plan' => (string) $plan['variation_id'], 'backups' => '', 'os' => '9000', 'app' => '', 'version' => '', 'tier' => '', 'domain_on' => '', 'own_on' => '', 'own' => '', 'zone' => '', 'sub' => '', 'name' => 'web1', 'ssh_key' => '' ), $this->user );
 		$this->assertSame( array(), $checked['errors'] );
-		$this->assertNull( \BeltoftServices\Account\ServerPicker::add_to_cart( $checked ) );
+		$this->assertNull( \BeltoftServices\Proxmox\Vm\ServerPicker::add_to_cart( $checked ) );
 	}
 
 	public function test_a_new_pay_as_you_go_server_gets_the_pay_as_you_go_disk_only(): void {

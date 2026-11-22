@@ -3,13 +3,13 @@
 namespace BeltoftServices\Tests\Account;
 
 use BeltoftLicenses\Account\View;
-use BeltoftServices\Account\Databases;
+use BeltoftServices\Proxmox\Db\Databases;
 use BeltoftServices\Domains\DomainRows;
 use BeltoftServices\Domains\Domains;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Account\ServerLinks;
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Proxmox\Vm\Servers;
 use BeltoftServices\Account\Slugs;
 use BeltoftServices\Domains\DomainDriver;
 use BeltoftServices\Drivers\Registry;

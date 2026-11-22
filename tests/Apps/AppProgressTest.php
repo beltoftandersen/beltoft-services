@@ -10,7 +10,7 @@ namespace BeltoftServices\Tests\Apps;
 use BeltoftLicenses\Account\View;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\Panel;
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Proxmox\Vm\Servers;
 use BeltoftServices\Progress;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Vm\Operations;

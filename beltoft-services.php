@@ -32,6 +32,8 @@ define( 'BELTOFT_SERVICES_VERSION', '0.57.0' );
 define(
 	'BELTOFT_SERVICES_CLASS_ALIASES',
 	array(
+		'BeltoftServices\\Account\\ServerPicker' => 'BeltoftServices\\Proxmox\\Vm\\ServerPicker',
+		'BeltoftServices\\Account\\Servers'      => 'BeltoftServices\\Proxmox\\Vm\\Servers',
 		'BeltoftServices\\Credit\\CheckoutCredit' => 'BeltoftServices\\GiftCredit\\Checkout',
 		'BeltoftServices\\Credit\\Topup'          => 'BeltoftServices\\GiftCredit\\Topup',
 		'BeltoftServices\\Proxmox\\AppField'    => 'BeltoftServices\\Apps\\AppField',

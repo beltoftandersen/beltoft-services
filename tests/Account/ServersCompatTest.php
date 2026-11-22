@@ -4,7 +4,7 @@
 namespace BeltoftServices\Tests\Account;
 
 use BeltoftServices\Account\ServerLinks;
-use BeltoftServices\Account\Servers;
+use BeltoftServices\Proxmox\Vm\Servers;
 use BeltoftServices\Tests\TestCase;
 
 final class ServersCompatTest extends TestCase {

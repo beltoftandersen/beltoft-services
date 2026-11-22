@@ -473,7 +473,7 @@ class FlowsTest extends FirewallTestCase {
 
 	public function test_the_server_page_and_the_list_show_the_quarantine_while_it_lasts(): void {
 		$r = $this->server();
-		$row = new \ReflectionMethod( \BeltoftServices\Account\Servers::class, 'row' );
+		$row = new \ReflectionMethod( \BeltoftServices\Proxmox\Vm\Servers::class, 'row' );
 		$row->setAccessible( true );
 		$view = array( 'product' => 'Server', 'license' => $r->license() );
 

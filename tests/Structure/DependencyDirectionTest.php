@@ -54,12 +54,11 @@ class DependencyDirectionTest extends TestCase {
 	);
 
 	/**
-	 * Layer => single classes it must not use (finer than FORBIDDEN): Proxmox shares ServerLinks with Account, never Servers.
+	 * Layer => single classes it must not use (finer than FORBIDDEN).
 	 * An entry ending in a backslash is a namespace prefix: Hosting reaches into Proxmox only through Proxmox\Pve, so every
 	 * other Proxmox sub-namespace is out of bounds for it.
 	 */
 	private const FORBIDDEN_CLASSES = array(
-		'Proxmox' => array( 'Account\\Servers' ),
 		'Hosting' => array(
 			'Proxmox\\Vm\\',
 			'Proxmox\\Disk\\',
