@@ -16,8 +16,6 @@ use BeltoftServices\Account\AddressService;
 use BeltoftServices\Account\Cards;
 use BeltoftServices\Domains\DomainDanger;
 use BeltoftServices\Billing\Subscriptions;
-use BeltoftServices\Proxmox\Db\DbAccess;
-use BeltoftServices\Proxmox\Network\PrivateAttach;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -33,10 +31,7 @@ final class Acts {
 	/**
 	 * The tools this class runs.
 	 */
-	/** What an email change that is queued answers: accepted, not done; the domain's task says how it ended. */
-	public const EMAIL_QUEUED = 'Accepted and queued: it runs in the background, one change of the domain at a time (another change is refused until it is done). email_domain_info shows the task of the domain: working while it runs, then last_result with ok and the outcome text.';
-
-	public const NAMES = array( 'dedicated_restart', 'dedicated_power_on', 'dedicated_set_rdns', 'dedicated_rescue', 'rename_server', 'set_firewall', 'set_database_access', 'private_network', 'set_usage_alerts', 'retry_app_install', 'domain_settings', 'set_auto_renew', 'reactivate_subscription', 'free_license_site', 'cancel_unpaid_order', 'update_billing_address', 'create_mailbox', 'add_email_alias', 'remove_email_alias', 'email_dns_check', 'add_site_domain', 'set_php_version', 'clear_site_cache', 'create_hosting_backup', 'ssl_resend_email' );
+	public const NAMES = array( 'rename_server', 'set_usage_alerts', 'set_auto_renew', 'reactivate_subscription', 'free_license_site', 'cancel_unpaid_order', 'update_billing_address' );
 
 	/**
 	 * Runs one of the tools.
@@ -51,52 +46,11 @@ final class Acts {
 			case 'rename_server':
 				return Tools::action( (int) $args['id'], 'rename', array( 'name' => (string) $args['name'] ), 'rename requested' );
 
-			case 'set_firewall':
-				$id   = (int) $args['id'];
-				$body = array( 'on' => (bool) $args['on'], 'rules' => $args['rules'] );
-
-				// Turning it off is a call that went through the confirmation (Tools::call): the dashboard's own "are you sure" is answered.
-				if ( ! $body['on'] ) {
-					$body['confirm_off'] = true;
-				}
-
-				$done = Tools::route( 'PUT', '/resources/' . $id . '/firewall', array(), $body, $id, 'firewall change requested' );
-
-				return $done instanceof \WP_Error ? $done : array( 'requested' => true, 'message' => 'Requested. It is applied in the background. Use get_firewall to follow it.' );
-
-			case 'set_database_access':
-				$id   = (int) $args['id'];
-				$body = array( 'op' => (string) $args['op'] );
-
-				// Opening to everyone went through the confirmation: the dashboard's typed phrase is supplied by the server.
-				if ( 'world_on' === $body['op'] ) {
-					$body['confirm'] = DbAccess::CONFIRM_WORLD;
-				}
-
-				foreach ( array( 'address' => 'cidr', 'label' => 'label' ) as $from => $to ) {
-					if ( isset( $args[ $from ] ) ) {
-						$body[ $to ] = (string) $args[ $from ];
-					}
-				}
-
-				$done = Tools::route( 'POST', '/resources/' . $id . '/db-access', array(), $body, $id, 'database access list: ' . str_replace( '_', ' ', (string) $args['op'] ) );
-
-				return $done instanceof \WP_Error ? $done : array( 'requested' => true, 'message' => 'Requested. It is applied in the background. Use get_database_access to follow it.' );
-
-			case 'private_network':
-				return Tools::action( (int) $args['id'], 'attach' === $args['action'] ? PrivateAttach::ATTACH : PrivateAttach::DETACH, 'attach' === $args['action'] && ! empty( $args['network'] ) ? array( 'net' => (string) (int) $args['network'] ) : array(), 'private network ' . (string) $args['action'] . ' requested' );
-
 			case 'set_usage_alerts':
 				$id   = (int) $args['id'];
 				$done = Tools::route( 'POST', '/resources/' . $id . '/usage-alerts', array(), array( 'on' => (bool) $args['on'] ), $id, 'usage e-mails turned ' . ( $args['on'] ? 'on' : 'off' ) );
 
 				return $done instanceof \WP_Error ? $done : array( 'usage_emails' => ! empty( $done['on'] ) ? 'on' : 'off' );
-
-			case 'retry_app_install':
-				return Tools::action( (int) $args['id'], 'app_retry', array(), 'app install retry requested' );
-
-			case 'domain_settings':
-				return self::domain_settings( $args );
 
 			case 'set_auto_renew':
 				return self::auto_renew( $user_id, (int) $args['subscription_id'], (bool) $args['on'] );
@@ -113,69 +67,9 @@ final class Acts {
 			case 'update_billing_address':
 				return self::billing_address( $user_id, $args );
 
-			case 'create_mailbox':
-			case 'add_email_alias':
-			case 'remove_email_alias':
-			case 'email_dns_check':
-				return self::email( $name, $args );
-
-			case 'ssl_resend_email':
-				return Tools::action( (int) $args['id'], 'ssl_resend_email', array(), 'SSL approval email requested again' );
-
-			case 'add_site_domain':
-			case 'set_php_version':
-			case 'clear_site_cache':
-			case 'create_hosting_backup':
-				return HostingTools::act( $name, $args );
-
-			case 'dedicated_restart':
-			case 'dedicated_power_on':
-			case 'dedicated_set_rdns':
-			case 'dedicated_rescue':
-				return DedicatedTools::act( $name, $args );
 		}
 
 		return new \WP_Error( 'beltoft_services_tool', __( 'This is not available.', 'beltoft-services' ) );
-	}
-
-	/**
-	 * The email tools: the dashboard's own routes, so the owner check, the plan limits and the names kept inside the domain
-	 * are the same. A password is never in a result.
-	 *
-	 * @param string               $name Tool.
-	 * @param array<string, mixed> $args Arguments, checked against the schema.
-	 * @return array<string, mixed>|\WP_Error
-	 */
-	private static function email( string $name, array $args ) {
-		$id   = (int) $args['id'];
-		$base = '/resources/' . $id . '/mail';
-
-		switch ( $name ) {
-			case 'create_mailbox':
-				$body = array( 'local' => (string) $args['name'] );
-
-				if ( isset( $args['display_name'] ) ) {
-					$body['name'] = (string) $args['display_name'];
-				}
-
-				$done = Tools::route( 'POST', $base . '/mailboxes', array(), $body, $id, 'mailbox created' );
-
-				return $done instanceof \WP_Error ? $done : array( 'queued' => true, 'address' => (string) $done['email'], 'quota_mb' => (int) $done['quota_mb'], 'message' => self::EMAIL_QUEUED . ' When it is done the mailbox is in the list with reveal true. Its password is not shown here: the customer shows it once in the dashboard, after a code we email to them.' );
-
-			case 'add_email_alias':
-				$done = Tools::route( 'POST', $base . '/aliases', array(), array( 'address' => (string) $args['name'], 'goto' => array_values( array_map( 'strval', (array) $args['deliver_to'] ) ) ), $id, 'alias created' );
-
-				return $done instanceof \WP_Error ? $done : array( 'created' => (string) $done['address'], 'delivers_to' => $done['goto'] );
-
-			case 'remove_email_alias':
-				$done = Tools::route( 'DELETE', $base . '/aliases/' . rawurlencode( (string) $args['address'] ), array(), null, $id, 'alias deleted' );
-
-				return $done instanceof \WP_Error ? $done : array( 'deleted' => (string) $done['deleted'] );
-		}
-
-		$done = Tools::route( 'POST', $base . '/dns/check', array(), array(), $id, 'email DNS check requested' );
-
-		return $done instanceof \WP_Error ? $done : array( 'queued' => true, 'message' => self::EMAIL_QUEUED . ' The records below are as they were when you asked.', 'dns' => (array) $done['dns'] );
 	}
 
 	/**
@@ -186,35 +80,6 @@ final class Acts {
 	 */
 	private static function said( array $errors, string $fallback ): string {
 		return $errors ? implode( ' ', $errors ) : $fallback;
-	}
-
-	/**
-	 * A setting of a domain: name servers, transfer lock, a check of the name servers, WHOIS privacy. Never the unlock, never DNSSEC (it needs the emailed code).
-	 *
-	 * @param array<string, mixed> $args Arguments.
-	 * @return array<string, mixed>|\WP_Error
-	 */
-	private static function domain_settings( array $args ) {
-		$action = (string) $args['action'];
-		$send   = array();
-
-		if ( 'set_nameservers' === $action ) {
-			$send['mode'] = (string) ( $args['mode'] ?? '' );
-
-			if ( isset( $args['hosts'] ) ) {
-				$send['hosts'] = implode( ',', array_map( 'strval', (array) $args['hosts'] ) );
-			}
-		}
-
-		if ( 'whois_privacy' === $action ) {
-			if ( ! isset( $args['enabled'] ) || ! is_bool( $args['enabled'] ) ) {
-				return new \WP_Error( 'beltoft_services_tool', __( 'Say whether WHOIS privacy should be on (enabled true) or off (enabled false).', 'beltoft-services' ) );
-			}
-
-			$send['enabled'] = $args['enabled'] ? '1' : '0';
-		}
-
-		return Tools::action( (int) $args['id'], $action, $send, str_replace( '_', ' ', $action ) . ' requested' );
 	}
 
 	/**

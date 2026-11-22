@@ -152,10 +152,10 @@ class WhoisPrivacyTest extends TestCase {
 	// -- The map of the connected app ------------------------------------------------------------------
 
 	public function test_the_connected_app_gets_whois_privacy_and_never_dnssec(): void {
-		$this->assertSame( 'domain_settings', ActionMap::ACTIONS['whois_privacy'] );
+		$this->assertSame( 'domain_settings', ActionMap::actions()['whois_privacy'] );
 		foreach ( array( 'dnssec_enable', 'dnssec_disable', 'dnssec_key_add', 'dnssec_key_remove' ) as $action ) {
-			$this->assertStringStartsWith( 'never:', ActionMap::EXCLUDED[ $action ] );
-			$this->assertArrayNotHasKey( $action, ActionMap::ACTIONS );
+			$this->assertStringStartsWith( 'never:', ActionMap::excluded()[ $action ] );
+			$this->assertArrayNotHasKey( $action, ActionMap::actions() );
 			$this->assertFalse( ActionMap::permits( 'domain_settings', 'POST', '/resources/1/actions/' . $action ) );
 		}
 		$this->assertTrue( ActionMap::permits( 'domain_settings', 'POST', '/resources/1/actions/whois_privacy' ) );

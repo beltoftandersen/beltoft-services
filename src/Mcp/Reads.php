@@ -13,7 +13,6 @@ use BeltoftLicenses\Licenses;
 use BeltoftServices\Account\Cards;
 use BeltoftServices\Proxmox\Db\DbPicker;
 use BeltoftServices\Api\Services;
-use BeltoftServices\Domains\DnsClaimRoutes;
 use BeltoftServices\Domains\Prices;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Apps\Apps;
@@ -66,29 +65,6 @@ final class Reads {
 			case 'list_recovery_points':
 				return self::recovery_points( (int) $args['id'] );
 
-			case 'get_firewall':
-				$view = Tools::route( 'GET', '/resources/' . (int) $args['id'] . '/firewall', array(), null, (int) $args['id'], 'firewall read' );
-
-				if ( $view instanceof \WP_Error ) {
-					return $view;
-				}
-
-				// The page's own address, button text and clock are not for a result.
-				unset( $view['my_ip'], $view['now'] );
-
-				return $view;
-
-			case 'get_database_access':
-				$id    = (int) $args['id'];
-				$state = Tools::route( 'GET', '/resources/' . $id . '/db-access', array(), null, $id, 'database access list read' );
-				$r     = $state instanceof \WP_Error ? null : Tools::owned( $id );
-
-				if ( $state instanceof \WP_Error || $r instanceof \WP_Error ) {
-					return $state instanceof \WP_Error ? $state : $r;
-				}
-
-				return $state + Details::access( $r );
-
 			case 'list_orders':
 				return self::orders( $user_id, (int) ( $args['limit'] ?? 10 ) );
 
@@ -112,47 +88,6 @@ final class Reads {
 
 			case 'price_quote':
 				return Pricing::quote( $args );
-
-			case 'list_dns_claims':
-				$list = Tools::route( 'GET', '/domains/dns-claims', array(), null, null );
-
-				if ( $list instanceof \WP_Error ) {
-					return $list;
-				}
-
-				$keep = array_flip( array( 'id', 'domain', 'status', 'expires_at', 'verified_at', 'checked_at', 'message' ) );
-
-				return array( 'claims' => array_map( static fn( $c ) => array_intersect_key( (array) $c, $keep ), array_values( $list ) ) );
-
-			case 'dedicated_info':
-				return DedicatedTools::read( $args );
-
-			case 'hosting_info':
-			case 'hosting_usage':
-			case 'list_hosting_backups':
-				return HostingTools::read( $name, $args );
-
-			case 'email_domain_info':
-				$id   = (int) $args['id'];
-				$view = Tools::route( 'GET', '/resources/' . $id . '/mail', array(), null, $id, 'email domain read' );
-
-				if ( $view instanceof \WP_Error ) {
-					return $view;
-				}
-
-				// The word the dashboard asks to be typed is not for a result.
-				unset( $view['delete_word'] );
-
-				return $view;
-
-			case 'ssl_info':
-				return SslTools::info( (int) $args['id'] );
-
-			case 'get_ssl_certificate':
-				$id   = (int) $args['id'];
-				$view = Tools::route( 'GET', '/resources/' . $id . '/ssl-certificate', array(), null, $id, 'SSL certificate read' );
-
-				return $view instanceof \WP_Error ? $view : array( 'name' => (string) $view['name'], 'valid_to' => (string) $view['valid_to'], 'certificate_with_chain' => (string) $view['pem'] );
 
 			case 'console_link':
 				$r = Tools::owned( (int) $args['id'] );

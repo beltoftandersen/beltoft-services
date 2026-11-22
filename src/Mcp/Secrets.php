@@ -8,9 +8,6 @@
 namespace BeltoftServices\Mcp;
 
 use BeltoftServices\Proxmox\Vm\Access;
-use BeltoftServices\Proxmox\Db\DbDriver;
-use BeltoftServices\Proxmox\Db\DbGuest;
-use BeltoftServices\Proxmox\Db\DbRoutes;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -53,6 +50,13 @@ final class Secrets {
 	 * @return array{text: string, state: string}|\WP_Error
 	 */
 	public static function summary( string $name, array $args ) {
+		// A feature that owns the tool checks and words its own (Secrets::wrap adds what every reveal says).
+		$own = ToolSets::summary( $name, $args, get_current_user_id() );
+
+		if ( null !== $own ) {
+			return $own;
+		}
+
 		$id = (int) $args['id'];
 		$r  = Tools::owned( $id, 'get_database_ca_certificate' !== $name );
 
@@ -71,42 +75,22 @@ final class Secrets {
 				/* translators: %s: server name. */
 				$text = sprintf( __( 'Show the password of server %s. It is shown once, then we no longer have it.', 'beltoft-services' ), $label );
 				break;
-
-			case 'reveal_database_password':
-				if ( DbDriver::ID !== $r->get( 'driver' ) || ! DbRoutes::revealable( $r ) ) {
-					return new \WP_Error( 'beltoft_services_tool', __( 'There is no password to show. It has been shown already or it is no longer available. The customer can make a new one in the dashboard.', 'beltoft-services' ) );
-				}
-
-				/* translators: %s: database name. */
-				$text = sprintf( __( 'Show the password of database %s. It is shown once, then we no longer have it.', 'beltoft-services' ), $label );
-				break;
-
-			case 'reveal_app_login':
-				$stored = $r->get( 'app_reveal' );
-
-				if ( ! is_string( $stored ) || '' === $stored || (int) $r->get( 'app_reveal_until' ) < time() ) {
-					return new \WP_Error( 'beltoft_services_tool', __( 'There is no app login to show. It has been shown already or it is no longer available.', 'beltoft-services' ) );
-				}
-
-				/* translators: %s: server name. */
-				$text = sprintf( __( 'Show the first login of the app on server %s. It is shown once, then we no longer have it.', 'beltoft-services' ), $label );
-				break;
-
-			default:
-				if ( DbDriver::ID !== $r->get( 'driver' ) || ! DbGuest::pem( (string) $r->get( 'db_ca_pem' ) ) ) {
-					return new \WP_Error( 'beltoft_services_tool', __( 'The certificate is not available.', 'beltoft-services' ) );
-				}
-
-				return array(
-					/* translators: %s: database name. */
-					'text'  => sprintf( __( 'Show the CA certificate of database %s. It is a public certificate, not a password: it is the text to save as a file so a client can check the database over TLS.', 'beltoft-services' ), $label ),
-					'state' => $id . '|ca',
-				);
 		}
 
+		return self::wrap( $text, $state ?? $id . '|' . $name );
+	}
+
+	/**
+	 * The summary of a reveal: the words of the tool and what every reveal says.
+	 *
+	 * @param string $text  What the tool shows, in words.
+	 * @param string $state What the confirmation depends on.
+	 * @return array{text: string, state: string}
+	 */
+	public static function wrap( string $text, string $state ): array {
 		return array(
 			'text'  => $text . ' ' . __( 'The value will then be in this conversation, which the app keeps, so anyone who can read the conversation can read it. The customer gets an e-mail about it, and the history of the service notes it. Afterwards the customer can change the password in their account, or ask for a new one.', 'beltoft-services' ),
-			'state' => $state ?? $id . '|' . $name,
+			'state' => $state,
 		);
 	}
 

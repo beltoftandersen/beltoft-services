@@ -10,10 +10,6 @@ namespace BeltoftServices\Mcp;
 use BeltoftLicenses\Events;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Api\Tokens;
-use BeltoftServices\Domains\Search;
-use BeltoftServices\Proxmox\Db\DbActions;
-use BeltoftServices\Proxmox\Db\DbCard;
-use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
@@ -54,7 +50,7 @@ final class Tools {
 	/**
 	 * Names that Reads, Details and Acts run.
 	 */
-	private const READS = array( 'dedicated_info', 'service_details', 'usage_summary', 'list_recovery_points', 'get_firewall', 'get_database_access', 'list_orders', 'get_order', 'list_subscriptions', 'list_payment_methods', 'get_account', 'catalog', 'list_server_plans', 'price_quote', 'list_dns_claims', 'console_link', 'list_licenses', 'get_license_key', 'email_domain_info', 'hosting_info', 'hosting_usage', 'list_hosting_backups', 'ssl_info', 'get_ssl_certificate' );
+	private const READS = array( 'service_details', 'usage_summary', 'list_recovery_points', 'list_orders', 'get_order', 'list_subscriptions', 'list_payment_methods', 'get_account', 'catalog', 'list_server_plans', 'price_quote', 'console_link', 'list_licenses', 'get_license_key' );
 
 	/**
 	 * The tool that is running, for the allow-list of the routes it calls.
@@ -118,94 +114,8 @@ final class Tools {
 	 * @param array<string, mixed> $args Arguments (not yet validated).
 	 */
 	public static function risky( string $name, array $args ): bool {
-		if ( 'set_database_access' === $name ) {
-			return 'world_on' === ( $args['op'] ?? null );
-		}
-
-		if ( 'set_firewall' === $name ) {
-			return false === ( $args['on'] ?? null ) || self::wide_open( $args['rules'] ?? null );
-		}
-
-		return 'domain_settings' === $name && 'set_nameservers' === ( $args['action'] ?? null ) && 'custom' === ( $args['mode'] ?? null );
-	}
-
-	/**
-	 * Does a rule list open more than 100 ports, all rules together, to anyone?
-	 *
-	 * @param mixed $rules Rules as sent.
-	 */
-	private static function wide_open( $rules ): bool {
-		return self::open_ports( $rules )['total'] > 100;
-	}
-
-	/**
-	 * The ports a rule list opens to anyone, with the rules put together: a port opened by several rules counts once, and
-	 * many small rules count as much as one big one. "Anyone" is no source at all, or a source broader than /8 (IPv4) or
-	 * /32 (IPv6), in any of the rule's sources.
-	 *
-	 * @param mixed $rules Rules as sent.
-	 * @return array{total: int, ranges: string[]} The number of ports and the merged ranges, such as "tcp 1-65535".
-	 */
-	public static function open_ports( $rules ): array {
-		$by_proto = array();
-
-		foreach ( is_array( $rules ) ? $rules : array() as $rule ) {
-			if ( ! is_array( $rule ) || ! in_array( $rule['proto'] ?? '', array( 'tcp', 'udp' ), true ) || ! self::open_to_anyone( $rule['sources'] ?? array() ) ) {
-				continue;
-			}
-
-			$from = is_int( $rule['from'] ?? null ) ? $rule['from'] : 0;
-			$to   = is_int( $rule['to'] ?? null ) ? $rule['to'] : $from;
-
-			if ( $from > 0 && $to >= $from ) {
-				$by_proto[ $rule['proto'] ][] = array( $from, $to );
-			}
-		}
-
-		$total  = 0;
-		$ranges = array();
-
-		foreach ( $by_proto as $proto => $list ) {
-			usort( $list, static fn( $a, $b ) => $a[0] <=> $b[0] );
-			$merged = array();
-
-			foreach ( $list as $range ) {
-				$last = count( $merged ) - 1;
-
-				if ( $last >= 0 && $range[0] <= $merged[ $last ][1] + 1 ) {
-					$merged[ $last ][1] = max( $merged[ $last ][1], $range[1] );
-				} else {
-					$merged[] = $range;
-				}
-			}
-
-			foreach ( $merged as $range ) {
-				$total   += $range[1] - $range[0] + 1;
-				$ranges[] = $proto . ' ' . $range[0] . '-' . $range[1];
-			}
-		}
-
-		return array( 'total' => $total, 'ranges' => $ranges );
-	}
-
-	/**
-	 * Is a rule's list of sources "anyone": empty, or with an address range broader than /8 (IPv4) or /32 (IPv6)?
-	 *
-	 * @param mixed $sources Sources as sent.
-	 */
-	private static function open_to_anyone( $sources ): bool {
-		if ( ! is_array( $sources ) || ! $sources ) {
+		if ( ToolSets::risky( $name, $args ) ) {
 			return true;
-		}
-
-		foreach ( $sources as $source ) {
-			$parts  = explode( '/', trim( (string) $source ), 2 );
-			$v6     = str_contains( $parts[0], ':' );
-			$prefix = isset( $parts[1] ) && ctype_digit( $parts[1] ) ? (int) $parts[1] : ( $v6 ? 128 : 32 );
-
-			if ( $prefix < ( $v6 ? 32 : 8 ) ) {
-				return true;
-			}
 		}
 
 		return false;
@@ -385,6 +295,10 @@ final class Tools {
 	private static function run( string $name, array $args ) {
 		$user_id = get_current_user_id();
 
+		if ( null !== ToolSets::owner( $name ) ) {
+			return ToolSets::run( $name, $args, $user_id );
+		}
+
 		if ( in_array( $name, self::READS, true ) ) {
 			return Reads::run( $name, $args, $user_id );
 		}
@@ -421,20 +335,6 @@ final class Tools {
 						'account'      => $account,
 					);
 
-			case 'domain_check':
-				// The search itself, not its public route: that route counts visitors by address, and every Claude user
-				// comes from the same few addresses. The customer is counted instead (the limit of the tool).
-				$found = Search::find( (string) $args['name'] );
-
-				if ( is_wp_error( $found ) ) {
-					return new \WP_Error( 'beltoft_services_tool', $found->get_error_message() );
-				}
-
-				$found = array_is_list( $found ) ? array( 'results' => $found ) : $found;
-				// Prices are per year, excluding tax, in the currency of the token's owner.
-				$found['currency'] = \BeltoftServices\Currency::current();
-
-				return $found;
 		}
 
 		$id = (int) $args['id'];
@@ -446,26 +346,9 @@ final class Tools {
 			case 'server_usage':
 				return self::server_usage( $id, (string) ( $args['range'] ?? 'hour' ) );
 
-			case 'database_info':
-				return self::database_info( $id );
-
-			case 'list_dns_records':
-				return self::route( 'GET', '/resources/' . $id . '/dns-records', array(), null, $id, 'DNS records read' );
-
 			case 'create_snapshot':
 				return self::action( $id, 'snapshot_take', isset( $args['label'] ) ? array( 'label' => (string) $args['label'] ) : array(), 'snapshot requested' );
 
-			case 'dns_upsert_record':
-				$body = array( 'records' => $args['records'] );
-
-				if ( isset( $args['ttl'] ) ) {
-					$body['ttl'] = (int) $args['ttl'];
-				}
-
-				return self::route( 'PUT', self::dns_path( $id, $args ), array(), $body, $id, 'DNS record set (' . self::dns_label( $args ) . ')' );
-
-			case 'dns_delete_record':
-				return self::route( 'DELETE', self::dns_path( $id, $args ), isset( $args['value'] ) ? array( 'value' => (string) $args['value'] ) : array(), null, $id, 'DNS record removed (' . self::dns_label( $args ) . ')' );
 		}
 
 		return self::action( $id, self::POWER[ $name ], array(), $name . ' requested' );
@@ -560,42 +443,6 @@ final class Tools {
 		}
 
 		return $out;
-	}
-
-	/**
-	 * How to connect to one database: no password, no certificate.
-	 *
-	 * @param int $id Service id.
-	 * @return array<string, mixed>|\WP_Error
-	 */
-	private static function database_info( int $id ) {
-		$status = self::route( 'GET', '/resources/' . $id, array(), null, $id, 'database details read' );
-
-		if ( $status instanceof \WP_Error ) {
-			return $status;
-		}
-
-		$r = Resource::find( $id );
-
-		if ( ! $r || DbDriver::ID !== $r->get( 'driver' ) ) {
-			return new \WP_Error( 'beltoft_services_forbidden', __( 'This service is not a database.', 'beltoft-services' ) );
-		}
-
-		$card = DbCard::view( $r );
-
-		return array(
-			'id'              => $id,
-			'engine'          => (string) $card['engine'],
-			'version'         => (int) $card['version'],
-			'state'           => (string) $card['kind'],
-			'host'            => (string) $card['host'],
-			'port'            => (int) $card['port'],
-			'database'        => (string) $card['database'],
-			'user'            => (string) $card['user'],
-			'tls_fingerprint' => (string) $card['fingerprint'],
-			'power'           => (string) $card['power']['state'],
-			'password'        => 'Not shown here. The customer reveals it, or makes a new one, in the dashboard.',
-		);
 	}
 
 	/**
@@ -700,25 +547,6 @@ final class Tools {
 		}
 
 		Events::add( (int) $r->license()['id'], 'api', 'Claude: ' . $text . ( $ok ? '' : ' (refused)' ) );
-	}
-
-	/**
-	 * The record route of a DNS tool.
-	 *
-	 * @param int                  $id   Service id.
-	 * @param array<string, mixed> $args Arguments.
-	 */
-	private static function dns_path( int $id, array $args ): string {
-		return '/resources/' . $id . '/dns-records/' . rawurlencode( preg_replace( '/[^A-Za-z]/', '', (string) $args['type'] ) ) . '/' . rawurlencode( (string) $args['name'] );
-	}
-
-	/**
-	 * "A www" for the history.
-	 *
-	 * @param array<string, mixed> $args Arguments.
-	 */
-	private static function dns_label( array $args ): string {
-		return strtoupper( preg_replace( '/[^A-Za-z]/', '', (string) $args['type'] ) ) . ' ' . sanitize_text_field( (string) $args['name'] );
 	}
 
 	/**

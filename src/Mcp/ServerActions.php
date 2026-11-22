@@ -7,19 +7,12 @@
 
 namespace BeltoftServices\Mcp;
 
-use BeltoftServices\Domains\HostName;
 use BeltoftServices\Drivers\Registry;
-use BeltoftServices\Mail\MailClients;
-use BeltoftServices\Mail\MailGuard;
-use BeltoftServices\Mail\MailRoutes;
 use BeltoftServices\Proxmox\Snapshot\Policy;
 use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Apps\AppReinstallPaid;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Pve\Clusters;
-use BeltoftServices\Proxmox\Db\DbAccess;
-use BeltoftServices\Proxmox\Db\DbPolicy;
-use BeltoftServices\Proxmox\Network\Firewall;
 use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Proxmox\Vm\SshKeyField;
@@ -59,15 +52,6 @@ final class ServerActions {
 			case 'replace_ssh_key':
 				return self::summary_key( $r, (string) $args['key'], $label );
 
-			case 'reset_firewall':
-				return self::checked( $r, $action, array(), sprintf(
-					/* translators: %s: server name. */
-					__( 'Start the firewall of server %s again from its default rules. The rules the customer has set are removed. Anything the default rules do not allow is blocked, and the change runs in the background.', 'beltoft-services' ),
-					$label
-				) );
-
-			case 'set_database_eviction_policy':
-				return self::summary_policy( $r, (string) $args['policy'], $label );
 		}
 
 		return new \WP_Error( 'beltoft_services_tool', __( 'This is not available.', 'beltoft-services' ) );
@@ -82,12 +66,6 @@ final class ServerActions {
 	 */
 	public static function run( string $name, array $args ) {
 		switch ( $name ) {
-			case 'delete_mailbox':
-				$id   = (int) $args['id'];
-				$done = Tools::route( 'DELETE', '/resources/' . $id . '/mail/mailboxes/' . rawurlencode( (string) $args['email'] ), array( 'confirm' => MailRoutes::CONFIRM_DELETE ), null, $id, 'mailbox deleted' );
-
-				return $done instanceof \WP_Error ? $done : array( 'deleted' => (string) $done['deleted'], 'message' => 'The mailbox and every message in it were deleted.' );
-
 			case 'delete_snapshot':
 				return self::send( $args, 'snapshot_delete', array( 'id' => (string) $args['snapshot'] ), 'delete snapshot requested' );
 
@@ -103,11 +81,6 @@ final class ServerActions {
 			case 'replace_ssh_key':
 				return self::send( $args, 'replace_ssh_key', array( 'key' => (string) $args['key'] ), 'SSH key change requested' );
 
-			case 'reset_firewall':
-				return self::send( $args, 'fw_reset', array(), 'firewall reset requested' );
-
-			case 'set_database_eviction_policy':
-				return self::send( $args, DbPolicy::ACTION, array( 'policy' => (string) $args['policy'] ), 'memory-full policy change requested' );
 		}
 
 		return new \WP_Error( 'beltoft_services_tool', __( 'This is not available.', 'beltoft-services' ) );
@@ -152,7 +125,7 @@ final class ServerActions {
 	 * @param string               $state  What the summary depends on, besides the service's state.
 	 * @return array{text: string, state: string}|\WP_Error
 	 */
-	private static function checked( Resource $r, string $action, array $args, string $text, string $state = '' ) {
+	public static function checked( Resource $r, string $action, array $args, string $text, string $state = '' ) {
 		$why = self::refusal( $r, $action, $args );
 
 		if ( null !== $why ) {
@@ -173,49 +146,6 @@ final class ServerActions {
 	 */
 	private static function send( array $args, string $action, array $send, string $history ) {
 		return Tools::action( (int) $args['id'], $action, $send, $history );
-	}
-
-	/**
-	 * The summary of a mailbox deletion: the dashboard's checks (a ready email domain, a mailbox of it that exists).
-	 *
-	 * @param array<string, mixed> $args Arguments (id, email).
-	 * @param string               $name Tool: delete_mailbox.
-	 * @return array{text: string, state: string}|\WP_Error
-	 */
-	public static function summary_mailbox( array $args, string $name = 'delete_mailbox' ) {
-		$r = Tools::owned( (int) $args['id'], true );
-
-		if ( $r instanceof \WP_Error ) {
-			return $r;
-		}
-
-		$bad = MailGuard::check( $r );
-
-		if ( $bad ) {
-			return new \WP_Error( 'beltoft_services_tool', $bad->get_error_message() );
-		}
-
-		$email = MailGuard::inside( $r, $args['email'] );
-
-		if ( null === $email ) {
-			return new \WP_Error( 'beltoft_services_tool', __( 'That mailbox is not part of this email domain.', 'beltoft-services' ) );
-		}
-
-		$box = MailClients::for()->get_mailbox( $email );
-
-		if ( is_wp_error( $box ) || null === $box ) {
-			return new \WP_Error( 'beltoft_services_tool', is_wp_error( $box ) ? __( 'The mail server could not be reached. Try again in a moment.', 'beltoft-services' ) : __( 'That mailbox does not exist.', 'beltoft-services' ) );
-		}
-
-		return array(
-			'text'  => sprintf(
-				/* translators: 1: mailbox address, 2: name of the service. */
-				__( 'Delete the mailbox %1$s of %2$s. Every message in it is deleted for good and cannot be brought back. Its password stops working and mail sent to it afterwards bounces.', 'beltoft-services' ),
-				$email,
-				Irreversible::name( $r )
-			),
-			'state' => $r->id() . '|delete_mailbox|' . $email,
-		);
 	}
 
 	// -- Snapshots, backups ----------------------------------------------------------------------
@@ -430,153 +360,5 @@ final class ServerActions {
 		);
 	}
 
-	/**
-	 * What a Valkey database does when its memory is full.
-	 *
-	 * @param Resource $r      Database.
-	 * @param string   $policy Policy.
-	 * @param string   $label  The database's name.
-	 * @return array{text: string, state: string}|\WP_Error
-	 */
-	private static function summary_policy( Resource $r, string $policy, string $label ) {
-		$engine  = DbPolicy::engine( $r );
-		$choices = null === $engine ? array() : $engine->eviction_choices();
-
-		if ( ! isset( $choices[ $policy ] ) ) {
-			return new \WP_Error( 'beltoft_services_tool', __( 'Choose one of the listed settings.', 'beltoft-services' ) );
-		}
-
-		$now     = DbPolicy::current( $r );
-		$current = isset( $choices[ $now ] ) ? (string) $choices[ $now ][0] : $now;
-
-		return array(
-			'text'  => sprintf(
-				/* translators: 1: database name, 2: the new setting, 3: what the new setting does, 4: the setting it has now. */
-				__( 'Change what database %1$s does when its memory is full to "%2$s". %3$s It is "%4$s" now. This decides whether writes fail or data is dropped, and it applies at once to the running database.', 'beltoft-services' ),
-				$label,
-				(string) $choices[ $policy ][0],
-				(string) $choices[ $policy ][1],
-				$current
-			),
-			'state' => $r->id() . '|policy|' . $policy . '|' . $now,
-		);
-	}
-
 	// -- Escalations of the everyday tools -------------------------------------------------------
-
-	/**
-	 * The firewall turned off, or rules that open many ports to anyone.
-	 *
-	 * @param array<string, mixed> $args Tool arguments.
-	 * @return array{text: string, state: string}|\WP_Error
-	 */
-	public static function summary_firewall( array $args ) {
-		$r = Tools::owned( (int) $args['id'], true );
-
-		if ( $r instanceof \WP_Error ) {
-			return $r;
-		}
-
-		$bad = self::not_offered( $r, 'fw_apply' );
-
-		if ( null !== $bad ) {
-			return $bad;
-		}
-
-		$label = Irreversible::name( $r );
-
-		if ( false === $args['on'] ) {
-			return array(
-				'text'  => sprintf(
-					/* translators: %s: server name. */
-					__( 'Turn the firewall of server %s off. Every port of the server can then be reached from the whole internet, whatever the rules say. The rules are kept and can be turned on again.', 'beltoft-services' ),
-					$label
-				),
-				'state' => $r->id() . '|fw_off|' . (string) wp_json_encode( $r->get( Firewall::ON ) ),
-			);
-		}
-
-		$wide = Tools::open_ports( $args['rules'] )['ranges'];
-
-		return array(
-			'text'  => sprintf(
-				/* translators: 1: server name, 2: the wide rules, for example tcp 1-65535. */
-				__( 'Change the firewall of server %1$s so that these rules let anyone on the internet reach many ports: %2$s. Anything listening on those ports, including software the customer forgot, can then be reached from everywhere. All the rules in the call replace the rules now in force.', 'beltoft-services' ),
-				$label,
-				implode( ', ', $wide )
-			),
-			'state' => $r->id() . '|fw_wide|' . (string) wp_json_encode( $wide ),
-		);
-	}
-
-	/**
-	 * A database opened to everyone.
-	 *
-	 * @param array<string, mixed> $args Tool arguments.
-	 * @return array{text: string, state: string}|\WP_Error
-	 */
-	public static function summary_world( array $args ) {
-		$r = Tools::owned( (int) $args['id'], true );
-
-		if ( $r instanceof \WP_Error ) {
-			return $r;
-		}
-
-		if ( ! DbAccess::editable( $r ) ) {
-			return new \WP_Error( 'beltoft_services_tool', __( 'The access list can be changed when the database is ready and has a public IP address.', 'beltoft-services' ) );
-		}
-
-		return array(
-			'text'  => sprintf(
-				/* translators: %s: database name. */
-				__( 'Open database %s to everyone. Anyone on the internet can then try to log in to it, and attacks on the password are likely. It stays open until it is closed again (world_off), and the customer gets an e-mail about it. Prefer adding the addresses that need access.', 'beltoft-services' ),
-				Irreversible::name( $r )
-			),
-			'state' => $r->id() . '|world|' . (string) wp_json_encode( $r->get( DbAccess::WORLD ) ),
-		);
-	}
-
-	/**
-	 * A domain moved to name servers that are not ours.
-	 *
-	 * @param array<string, mixed> $args Tool arguments.
-	 * @return array{text: string, state: string}|\WP_Error
-	 */
-	public static function summary_nameservers( array $args ) {
-		$r = Tools::owned( (int) $args['id'], true );
-
-		if ( $r instanceof \WP_Error ) {
-			return $r;
-		}
-
-		$bad = self::not_offered( $r, 'set_nameservers' );
-
-		if ( null !== $bad ) {
-			return $bad;
-		}
-
-		$list = array_map( static fn( $h ) => strtolower( trim( (string) $h, ". \t" ) ), (array) ( $args['hosts'] ?? array() ) );
-
-		foreach ( $list as $host ) {
-			if ( ! HostName::is_host( $host, 253, true ) ) {
-				return new \WP_Error( 'beltoft_services_tool', __( 'Each name server must be a host name such as ns1.example.net.', 'beltoft-services' ) );
-			}
-		}
-
-		if ( count( $list ) < 2 || count( $list ) > 6 || count( array_unique( $list ) ) !== count( $list ) ) {
-			return new \WP_Error( 'beltoft_services_tool', __( 'Give two to six different name servers.', 'beltoft-services' ) );
-		}
-
-		$hosts = "\n- " . implode( "\n- ", $list ) . "\n";
-
-		return array(
-			'text'  => sprintf(
-				/* translators: 1: domain name, 2: the name servers, one per line. */
-				__( 'Move the domain %1$s to these name servers:%2$s Our DNS records for it stop being used. If these name servers do not answer for the domain, its website and e-mail go offline until it is changed back.', 'beltoft-services' ),
-				Irreversible::name( $r ),
-				$hosts
-			),
-			'state' => $r->id() . '|ns|' . implode( ',', $list ),
-		);
-	}
 }

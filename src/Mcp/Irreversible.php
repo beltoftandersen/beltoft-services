@@ -31,7 +31,7 @@ final class Irreversible {
 	/**
 	 * The tools this class runs.
 	 */
-	public const NAMES = array( 'dedicated_hard_reset', 'dedicated_set_firewall', 'dedicated_reinstall', 'delete_snapshot', 'rollback_snapshot', 'restore_backup', 'reinstall_server', 'replace_ssh_key', 'reset_firewall', 'set_database_eviction_policy', 'cancel_subscription', 'remove_addon', 'set_default_payment_method', 'delete_mailbox', 'order_server', 'order_database', 'delete_server', 'delete_database', 'restore_hosting_backup', 'delete_site' );
+	public const NAMES = array( 'delete_snapshot', 'rollback_snapshot', 'restore_backup', 'reinstall_server', 'replace_ssh_key', 'cancel_subscription', 'remove_addon', 'set_default_payment_method', 'order_server', 'order_database', 'delete_server', 'delete_database' );
 
 	/**
 	 * The summary of a call that needs a confirmation, and what the summary depends on.
@@ -42,16 +42,13 @@ final class Irreversible {
 	 * @return array{text: string, state: string}|\WP_Error
 	 */
 	public static function summary( string $name, array $args, int $user_id ) {
+		$own = ToolSets::summary( $name, $args, $user_id );
+
+		if ( null !== $own ) {
+			return $own;
+		}
+
 		switch ( $name ) {
-			case 'set_firewall':
-				return ServerActions::summary_firewall( $args );
-
-			case 'set_database_access':
-				return ServerActions::summary_world( $args );
-
-			case 'domain_settings':
-				return ServerActions::summary_nameservers( $args );
-
 			case 'cancel_subscription':
 			case 'remove_addon':
 			case 'set_default_payment_method':
@@ -67,17 +64,6 @@ final class Irreversible {
 			case PurchaseDb::NAME:
 				return PurchaseDb::summary( $args, $user_id );
 
-			case 'delete_mailbox':
-				return ServerActions::summary_mailbox( $args, $name );
-
-			case 'restore_hosting_backup':
-			case 'delete_site':
-				return HostingTools::summary( $name, $args );
-
-			case 'dedicated_hard_reset':
-			case 'dedicated_set_firewall':
-			case 'dedicated_reinstall':
-				return DedicatedTools::summary( $name, $args );
 		}
 
 		$r = Tools::owned( (int) $args['id'], true );
@@ -86,7 +72,7 @@ final class Irreversible {
 			return $r;
 		}
 
-		$action = (string) array_search( $name, ActionMap::ACTIONS, true );
+		$action = (string) array_search( $name, ActionMap::actions(), true );
 		$bad    = ServerActions::not_offered( $r, $action );
 
 		if ( null !== $bad ) {
@@ -121,14 +107,6 @@ final class Irreversible {
 
 		if ( in_array( $name, BillingActions::NAMES, true ) ) {
 			return BillingActions::run( $name, $args, $user_id );
-		}
-
-		if ( in_array( $name, HostingTools::FULL, true ) ) {
-			return HostingTools::run( $name, $args );
-		}
-
-		if ( in_array( $name, DedicatedTools::FULL, true ) ) {
-			return DedicatedTools::run( $name, $args );
 		}
 
 		return ServerActions::run( $name, $args );

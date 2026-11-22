@@ -5,11 +5,13 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Mcp;
+namespace BeltoftServices\Hosting;
 
-use BeltoftServices\Hosting\HostingBackups;
-use BeltoftServices\Hosting\HostingDriver;
-use BeltoftServices\Hosting\Sites;
+use BeltoftServices\Mcp\Definitions;
+use BeltoftServices\Mcp\Irreversible;
+use BeltoftServices\Mcp\Tools;
+use BeltoftServices\Mcp\ToolSet;
+use BeltoftServices\Mcp\ToolSetDefaults;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -26,9 +28,11 @@ defined( 'ABSPATH' ) || exit;
  * Not here, on purpose or for later: reading logs (the agent has no log operation yet), the SFTP password tools and the
  * WordPress sign-in link (a secret that needs the Secrets machinery and an agent job that is not built), and ordering
  * hosting (the purchase flow of the cart). Nothing here shows a password or a sign-in link, and no tool shows the database password or
- * sets a scheduled job (hosting_info lists the jobs, read only; ActionMap::CAPABILITIES_EXCLUDED gives the reasons).
+ * sets a scheduled job (hosting_info lists the jobs, read only; ActionMap::capabilities_excluded() gives the reasons).
  */
-final class HostingTools {
+final class McpTools implements ToolSet {
+
+	use ToolSetDefaults;
 
 	/** What a change that is queued answers: it is accepted, not done. A second change waits for it. */
 	public const QUEUED = 'Accepted and queued: it runs in the background, one change of the account at a time (another change is refused until it is done). hosting_info shows the current task of the account and of each website.';
@@ -38,6 +42,87 @@ final class HostingTools {
 
 	/** Full access tools, each with a confirmation. */
 	public const FULL = array( 'restore_hosting_backup', 'delete_site' );
+
+	/**
+	 * @return array<string, array<string, mixed>>
+	 */
+	public static function tools(): array {
+		return array(
+			'hosting_info'     => Definitions::read( 'Shows one hosting account: its websites (name, whether it has WordPress, PHP version, workers, addresses with their state, the database name, user and host, the scheduled jobs), the plan ceilings (websites, PHP workers, PHP memory, upload size, offered PHP versions) and what an external domain must point at, and the task the account is busy with now (task: a change runs in the background, one at a time) and the last change that failed (last).' . Definitions::DATA, Definitions::by_id(), 30 ),
+			'hosting_usage'    => Definitions::read( 'Shows the usage of one hosting account: CPU, memory in use (without the file cache, in percent), disk and database size, and how full the storage is of the plan. Files and databases count together.' . Definitions::DATA, Definitions::by_id(), 30 ),
+			'list_hosting_backups' => Definitions::read( 'Lists the backups of one hosting account (nightly and manual, with date, size and the volume id that restore_hosting_backup takes) and the safety copy of the last restore, if there is one.' . Definitions::DATA, Definitions::by_id(), 30 ),
+			'add_site_domain'  => Definitions::act( 'Adds a domain name to a website of a hosting account. A domain the customer holds on our name servers is pointed at the hosting at once; for another domain the result says which DNS records the customer must add. Connecting the name to the website runs in the background (queued: hosting_info shows the account\'s task until it is done; another change is refused until then). Ask the customer first.', Definitions::obj( array( 'id' => Definitions::id(), 'site' => array( 'type' => 'string', 'maxLength' => 32, 'description' => 'The website name, from hosting_info.' ), 'domain' => array( 'type' => 'string', 'maxLength' => 253, 'description' => 'The domain name, for example www.example.com.' ) ), array( 'id', 'site', 'domain' ) ), false ),
+			'set_php_version'  => Definitions::act( 'Changes the PHP version of a website, and optionally its PHP memory limit and upload size (never above the plan). The website restarts its PHP. The change is queued and runs in the background (hosting_info shows the account\'s task; another change is refused until it is done). Ask the customer first.', Definitions::obj( array( 'id' => Definitions::id(), 'site' => array( 'type' => 'string', 'maxLength' => 32, 'description' => 'The website name, from hosting_info.' ), 'php' => array( 'type' => 'string', 'maxLength' => 8, 'description' => 'A version from hosting_info, for example 8.4.' ), 'memory_mb' => array( 'type' => 'integer', 'minimum' => 64, 'description' => 'PHP memory limit in MB. Optional.' ), 'upload_mb' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'Upload size in MB. Optional.' ) ), array( 'id', 'site', 'php' ) ), false, true ),
+			'clear_site_cache' => Definitions::act( 'Clears the page cache of a website of a hosting account. Queued: it runs in the background, and another change of the account is refused until it is done (hosting_info shows the task).', Definitions::obj( array( 'id' => Definitions::id(), 'site' => array( 'type' => 'string', 'maxLength' => 32, 'description' => 'The website name, from hosting_info.' ) ), array( 'id', 'site' ) ), false, true ),
+			'create_hosting_backup' => Definitions::act( 'Starts a backup of a hosting account now. Up to 3 a day; the 3 newest manual backups are kept. It runs in the background.', Definitions::by_id(), false ),
+			'restore_hosting_backup' => Definitions::full(
+				'Restores a hosting account from one of its backups: the whole account, the files of one website or the database of one website. What was changed since is replaced. A safety copy is made first and the customer can undo it in the dashboard for 24 hours. Get the backup from list_hosting_backups.',
+				Definitions::obj( array( 'id' => Definitions::id(), 'scope' => array( 'type' => 'string', 'enum' => array( 'account', 'files', 'database' ) ), 'backup' => array( 'type' => 'string', 'maxLength' => 200, 'description' => 'The volume id of the backup, from list_hosting_backups.' ), 'site' => array( 'type' => 'string', 'maxLength' => 32, 'description' => 'The website name, for files and database.' ) ), array( 'id', 'scope', 'backup' ), true )
+			),
+			'delete_site'      => Definitions::full(
+				'Deletes one website of a hosting account: its files, its database and its addresses, for good. The last website of an account cannot be deleted. The deletion is queued and runs in the background; hosting_info shows the website and its task until it is gone.',
+				Definitions::obj( array( 'id' => Definitions::id(), 'site' => array( 'type' => 'string', 'maxLength' => 32, 'description' => 'The website name, from hosting_info.' ) ), array( 'id', 'site' ), true )
+			),
+		);
+	}
+
+	/**
+	 * @return array<string, string[]>
+	 */
+	public static function routes(): array {
+		return array(
+			'hosting_info'             => array( 'GET #^/resources/\d+/hosting$#D' ),
+			'hosting_usage'            => array( 'GET #^/resources/\d+/hosting/usage$#D' ),
+			'list_hosting_backups'     => array( 'GET #^/resources/\d+/hosting/backups$#D' ),
+			'add_site_domain'          => array( 'POST #^/resources/\d+/hosting/sites/[a-z0-9-]+/domains$#D' ),
+			'set_php_version'          => array( 'POST #^/resources/\d+/hosting/sites/[a-z0-9-]+/php$#D' ),
+			'clear_site_cache'         => array( 'POST #^/resources/\d+/hosting/sites/[a-z0-9-]+/cache$#D' ),
+			'create_hosting_backup'    => array( 'POST #^/resources/\d+/hosting/backups$#D' ),
+			'restore_hosting_backup'   => array( 'POST #^/resources/\d+/hosting/backups/restore$#D' ),
+			'delete_site'              => array( 'DELETE #^/resources/\d+/hosting/sites/[a-z0-9-]+$#D' ),
+		);
+	}
+
+	/**
+	 * @return array<string, string>
+	 */
+	public static function capabilities(): array {
+		return array(
+			'restore_hosting_backup'   => 'restore_hosting_backup',
+			'delete_site'              => 'delete_site',
+		);
+	}
+
+	/**
+	 * @return array<string, string>
+	 */
+	public static function capabilities_excluded(): array {
+		return array(
+			'delete_hosting_backup'       => 'never: a backup is the last copy after a mistake or an attack; deleting one is only done in the dashboard',
+			'reveal_hosting_database_password' => 'never: showing the database password of a hosting account needs the code emailed to the account address, so it is only available in the dashboard',
+			'hosting_scheduled_jobs'      => 'never: a scheduled job runs code on the hosting, so it is only set in the dashboard; hosting_info lists the jobs read only',
+		);
+	}
+
+	/**
+	 * Runs one of the tools of this set.
+	 *
+	 * @param string               $name    Tool.
+	 * @param array<string, mixed> $args    Arguments, checked against the schema.
+	 * @param int                  $user_id Customer.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function run( string $name, array $args, int $user_id ) {
+		if ( in_array( $name, self::READS, true ) ) {
+			return self::read( $name, $args );
+		}
+
+		if ( in_array( $name, self::FULL, true ) ) {
+			return self::run_full( $name, $args );
+		}
+
+		return self::act( $name, $args );
+	}
 
 	/**
 	 * A hosting account of the customer, or the refusal.
@@ -131,7 +216,7 @@ final class HostingTools {
 	 * @param array<string, mixed> $args Arguments.
 	 * @return array{text: string, state: string}|\WP_Error
 	 */
-	public static function summary( string $name, array $args ) {
+	public static function summary( string $name, array $args, int $user_id ) {
 		$r = self::account( (int) $args['id'] );
 
 		if ( $r instanceof \WP_Error ) {
@@ -206,7 +291,7 @@ final class HostingTools {
 	 * @param array<string, mixed> $args Arguments.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	public static function run( string $name, array $args ) {
+	private static function run_full( string $name, array $args ) {
 		$id = (int) $args['id'];
 
 		if ( 'delete_site' === $name ) {

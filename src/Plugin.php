@@ -235,10 +235,17 @@ final class Plugin {
 		Domains\ApiDocs::register();
 		Mail\ApiDocs::register();
 		Ssl\ApiDocs::register();
+		Ssl\McpTools::register();
 		Storage\ApiDocs::register();
 		Oauth\Server::register();
 		Mcp\Access::register();
-		Mcp\DedicatedTools::register();
+		Apps\McpTools::register();
+		Proxmox\Db\McpTools::register();
+		Proxmox\Network\McpTools::register();
+		Domains\McpTools::register();
+		Hosting\McpTools::register();
+		Mail\McpTools::register();
+		ManualServer\McpTools::register();
 		Mcp\Endpoint::register();
 		Account\ApiTokens::register();
 		Account\Flash::register();

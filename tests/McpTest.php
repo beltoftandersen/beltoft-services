@@ -366,10 +366,10 @@ final class McpTest extends McpTestCase {
 			$this->assertArrayHasKey( 'error', $reply, $name );
 		}
 
-		$this->assertStringContainsString( 'emailed', \BeltoftServices\Mcp\ActionMap::EXCLUDED['reset_password'] );
-		$this->assertStringContainsString( 'emailed', \BeltoftServices\Mcp\ActionMap::EXCLUDED['db_reset_password'] );
-		$this->assertArrayNotHasKey( 'reset_password', \BeltoftServices\Mcp\ActionMap::ACTIONS );
-		$this->assertArrayNotHasKey( 'db_reset_password', \BeltoftServices\Mcp\ActionMap::ACTIONS );
+		$this->assertStringContainsString( 'emailed', \BeltoftServices\Mcp\ActionMap::excluded()['reset_password'] );
+		$this->assertStringContainsString( 'emailed', \BeltoftServices\Mcp\ActionMap::excluded()['db_reset_password'] );
+		$this->assertArrayNotHasKey( 'reset_password', \BeltoftServices\Mcp\ActionMap::actions() );
+		$this->assertArrayNotHasKey( 'db_reset_password', \BeltoftServices\Mcp\ActionMap::actions() );
 		$this->assertFalse( Jobs::acting( $db->id() ) );
 	}
 

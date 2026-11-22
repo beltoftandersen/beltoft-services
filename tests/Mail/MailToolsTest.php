@@ -128,13 +128,13 @@ final class MailToolsTest extends MailTestCase {
 
 		$this->assertSame( Tokens::FULL, $tools['delete_mailbox']['level'] );
 		$this->assertTrue( $tools['delete_mailbox']['confirm'] );
-		$this->assertSame( 'delete_mailbox', ActionMap::CAPABILITIES['delete_mailbox'] );
+		$this->assertSame( 'delete_mailbox', ActionMap::capabilities()['delete_mailbox'] );
 
 		// A mailbox password is shown or reset only in the dashboard, after the emailed code (StepUp): no tool, and no route open to one.
 		foreach ( array( 'reset_mailbox_password', 'reveal_mailbox_password' ) as $name ) {
 			$this->assertArrayNotHasKey( $name, $tools, $name );
-			$this->assertArrayNotHasKey( $name, ActionMap::CAPABILITIES, $name );
-			$this->assertStringStartsWith( 'never:', ActionMap::CAPABILITIES_EXCLUDED[ $name ], $name );
+			$this->assertArrayNotHasKey( $name, ActionMap::capabilities(), $name );
+			$this->assertStringStartsWith( 'never:', ActionMap::capabilities_excluded()[ $name ], $name );
 			$this->assertNotContains( $name, Secrets::NAMES );
 		}
 

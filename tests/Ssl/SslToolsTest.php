@@ -53,8 +53,8 @@ final class SslToolsTest extends SslTestCase {
 		}
 
 		foreach ( array( 'ssl_reissue', 'ssl_change_validation', 'ssl_cancel' ) as $action ) {
-			$this->assertArrayNotHasKey( $action, ActionMap::ACTIONS );
-			$this->assertStringStartsWith( 'never', ActionMap::EXCLUDED[ $action ], $action );
+			$this->assertArrayNotHasKey( $action, ActionMap::actions() );
+			$this->assertStringStartsWith( 'never', ActionMap::excluded()[ $action ], $action );
 			$this->assertContains( $action, Tokens::dashboard_only_actions(), $action . ' is closed to every token.' );
 		}
 		$this->assertTrue( ActionMap::permits( 'get_ssl_certificate', 'GET', '/resources/5/ssl-certificate' ) );
