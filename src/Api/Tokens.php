@@ -65,12 +65,30 @@ final class Tokens {
 	public const RATE_LIMIT = 60;
 
 	/**
-	 * Customer routes a token may reach (after the namespace). Email: the overview, making a mailbox, making and deleting an
-	 * alias and the DNS check. Deleting a mailbox, a new mailbox password and showing a password (mail/mailboxes/<address>,
-	 * .../password, mail-reveal) are left out on purpose: only the MCP tools do these, with Full access and the customer's
-	 * confirmation.
+	 * Customer routes a token may reach (after the namespace): the regular expression, built from the platform's own parts and
+	 * the parts the features add with the filter beltoft_services_token_path_fragments (array{resource: string[], root: string[]}:
+	 * expression parts below resources/<id>/ and at the top of the namespace). The platform reaches resources, their status, metrics
+	 * and actions, usage, activity and the OpenAPI document. A feature adds its own: email (the overview, making a mailbox, making
+	 * and deleting an alias and the DNS check), DNS records, the SSL certificate, the database CA, the domain check. Deleting a
+	 * mailbox, a new mailbox password and showing a password (mail/mailboxes/<address>, .../password, mail-reveal) are left out on
+	 * purpose: only the MCP tools do these, with Full access and the customer's confirmation.
 	 */
-	private const ALLOWED = '#^/beltoft-services/v1/(resources(/\d+(/(metrics|db-ca|dns-records(/[A-Za-z]+/[^/]+)?|actions/[a-z0-9_-]+|ssl-certificate|mail(/(mailboxes|aliases(/[^/]+)?|dns/check))?))?)?|usage|activity|domains/check|openapi\.json)$#D';
+	private static function allowed(): string {
+		/**
+		 * Route parts a token may reach.
+		 *
+		 * @param array{resource: string[], root: string[]} $fragments Expression parts so far.
+		 */
+		$fragments = apply_filters(
+			'beltoft_services_token_path_fragments',
+			array(
+				'resource' => array( 'metrics', 'actions/[a-z0-9_-]+' ),
+				'root'     => array( 'usage', 'activity', 'openapi\.json' ),
+			)
+		);
+
+		return '#^/beltoft-services/v1/(resources(/\d+(/(' . implode( '|', (array) ( $fragments['resource'] ?? array() ) ) . '))?)?|' . implode( '|', (array) ( $fragments['root'] ?? array() ) ) . ')$#D';
+	}
 
 	/**
 	 * Actions a token can never run.
@@ -140,7 +158,7 @@ final class Tokens {
 	 * @param string $route Route.
 	 */
 	public static function reachable( string $route ): bool {
-		return 1 === preg_match( self::ALLOWED, $route );
+		return 1 === preg_match( self::allowed(), $route );
 	}
 
 	/**
@@ -430,7 +448,7 @@ final class Tokens {
 		$scope  = self::FULL === self::$current['scope'] ? self::ACTIONS : (string) self::$current['scope'];
 		$read   = in_array( $method, array( 'GET', 'HEAD' ), true );
 
-		if ( '' === $scope || 1 !== preg_match( self::ALLOWED, $route ) ) {
+		if ( '' === $scope || 1 !== preg_match( self::allowed(), $route ) ) {
 			return self::refuse( 'beltoft_services_token_route', __( 'This token cannot be used for this address.', 'beltoft-services' ), 403 );
 		}
 

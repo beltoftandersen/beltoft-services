@@ -221,6 +221,12 @@ final class Plugin {
 		Api\OpenApi::register();
 		Api\Reference::register();
 		Api\Tokens::register();
+		Proxmox\Network\ApiDocs::register();
+		Proxmox\Db\ApiDocs::register();
+		Domains\ApiDocs::register();
+		Mail\ApiDocs::register();
+		Ssl\ApiDocs::register();
+		Storage\ApiDocs::register();
 		Oauth\Server::register();
 		Mcp\Access::register();
 		Mcp\DedicatedTools::register();
@@ -299,6 +305,7 @@ final class Plugin {
 		Admin\LicenceServiceColumn::register();
 		Emails\Emails::register();
 		Proxmox\Disk\UsageDisk::register();
+		Proxmox\Network\PowerWatch::register();
 		Usage\CoreHooks::register();
 		// After CoreHooks: the editor block replaces its premium field.
 		Usage\Admin\PaygPanel::register();

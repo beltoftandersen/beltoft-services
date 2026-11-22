@@ -125,17 +125,6 @@ final class Routes {
 
 		register_rest_route(
 			self::NAMESPACE,
-			'/resources/(?P<id>\d+)/grow',
-			array(
-				'methods'             => \WP_REST_Server::CREATABLE,
-				'callback'            => array( __CLASS__, 'grow' ),
-				'permission_callback' => 'is_user_logged_in',
-				'args'                => array( 'id' => $id ),
-			)
-		);
-
-		register_rest_route(
-			self::NAMESPACE,
 			'/resources/(?P<id>\d+)/open',
 			array(
 				'methods'             => \WP_REST_Server::READABLE,
@@ -191,9 +180,26 @@ final class Routes {
 				// The outcome of the last customer action (action, ok, at, text) and the server's clock to compare it with.
 				'last_result' => is_array( $resource->get( Jobs::RESULT ) ) ? $resource->get( Jobs::RESULT ) : null,
 				'now'      => time(),
-			) + \BeltoftServices\Proxmox\Network\PowerWatch::view( $resource ),
+			) + self::status_extra( $resource ),
 			200
 		);
+	}
+
+	/**
+	 * What a feature adds to the status reply (the filter beltoft_services_status_extra: array, Resource). The base keys of the
+	 * reply win over an added key of the same name.
+	 *
+	 * @param Resource $resource The resource.
+	 * @return array<string, mixed>
+	 */
+	private static function status_extra( Resource $resource ): array {
+		/**
+		 * Extra fields of the status reply, for example the power state of a server.
+		 *
+		 * @param array<string, mixed> $extra    Fields so far.
+		 * @param Resource             $resource The resource.
+		 */
+		return (array) apply_filters( 'beltoft_services_status_extra', array(), $resource );
 	}
 
 	/**
@@ -386,45 +392,6 @@ final class Routes {
 	}
 
 	/**
-	 * POST resources/<id>/grow: the customer makes their pay as you go extra disk the next larger size. Dashboard only: the
-	 * token gate does not allow this address. No subscription is read or changed (UsageDisk).
-	 *
-	 * @param \WP_REST_Request $request Request.
-	 * @return \WP_REST_Response
-	 */
-	public static function grow( \WP_REST_Request $request ): \WP_REST_Response {
-		$limited = self::limited( $request, 5 );
-
-		if ( $limited ) {
-			return $limited;
-		}
-
-		$resource = Resource::find( (int) $request['id'] );
-		$user_id  = get_current_user_id();
-
-		if ( ! $resource || ! $resource->owned_by( $user_id ) || ! $resource->is_live() ) {
-			return self::error( 'beltoft_services_forbidden', __( 'This service is not available.', 'beltoft-services' ), 403 );
-		}
-
-		$done = \BeltoftServices\Proxmox\Disk\UsageDisk::grow( $resource, $user_id );
-
-		if ( $done instanceof \WP_Error ) {
-			$data = $done->get_error_data();
-
-			return self::error( $done->get_error_code(), $done->get_error_message(), is_array( $data ) && isset( $data['status'] ) ? (int) $data['status'] : 422 );
-		}
-
-		return new \WP_REST_Response(
-			array(
-				'growing' => true,
-				'at'      => time(),
-				'message' => __( 'Your disk is being made larger. This can take a minute.', 'beltoft-services' ),
-			),
-			202
-		);
-	}
-
-	/**
 	 * GET resources/<id>/open: sends the customer to the service with a token made now.
 	 *
 	 * @param \WP_REST_Request $request Request.
@@ -586,7 +553,7 @@ final class Routes {
 	 * @param string $message Message for the customer.
 	 * @param int    $status  HTTP status.
 	 */
-	private static function error( string $code, string $message, int $status ): \WP_REST_Response {
+	public static function error( string $code, string $message, int $status ): \WP_REST_Response {
 		return rest_convert_error_to_response( new \WP_Error( $code, $message, array( 'status' => $status ) ) );
 	}
 }

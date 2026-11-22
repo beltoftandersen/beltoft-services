@@ -65,7 +65,7 @@ final class OpenApi {
 	 * @return array<string, array<string, mixed>>
 	 */
 	public static function operations(): array {
-		// A literal table: it depends on nothing that changes, so one build per request cannot go stale.
+		// The platform's literal table plus what the features add: it depends on nothing that changes, so one build per request cannot go stale.
 		static $table = null;
 
 		if ( null !== $table ) {
@@ -75,19 +75,6 @@ final class OpenApi {
 		$text = array( 'type' => 'string' );
 		$int  = array( 'type' => 'integer' );
 		$bool = array( 'type' => 'boolean' );
-		$rows = array(
-			'type'  => 'array',
-			'items' => array(
-				'type'       => 'object',
-				'properties' => array(
-					'name'  => $text,
-					'type'  => $text,
-					'value' => $text,
-					'ttl'   => $int,
-				),
-			),
-		);
-
 		$table = array(
 			'GET /resources'                             => array(
 				'summary' => 'List your services: servers, databases, domains and apps.',
@@ -203,104 +190,6 @@ final class OpenApi {
 				),
 				'errors'  => array( 401, 403, 429 ),
 			),
-			'GET /resources/{id}/dns-records'            => array(
-				'summary' => 'The DNS records of a domain or DNS service that we host.',
-				'scope'   => 'read',
-				'reply'   => array(
-					'rows'        => $rows,
-					'ttl_default' => $int,
-					'paused'      => $bool,
-					'serial'      => $int,
-				),
-				'errors'  => array( 401, 403, 404, 409, 429 ),
-			),
-			'PUT /resources/{id}/dns-records/{type}/{name}' => array(
-				'summary' => 'Create or replace the records of one name and type. Other records stay as they are.',
-				'scope'   => 'actions',
-				'body'    => array(
-					'records'  => array( 'type' => 'array', 'items' => array( 'type' => 'object' ), 'description' => 'The records after the change; each has a value.' ),
-					'ttl'      => $int,
-					'expect'   => array( 'type' => 'array', 'items' => array( 'type' => 'object' ), 'description' => 'The records you saw before; the change is refused if they changed.' ),
-					'new_name' => $text,
-					'new_type' => $text,
-				),
-				'required' => array( 'records' ),
-				'reply'   => array( 'rows' => $rows ),
-				'errors'  => array( 401, 403, 404, 409, 422, 429 ),
-			),
-			'DELETE /resources/{id}/dns-records/{type}/{name}' => array(
-				'summary' => 'Remove the records of one name and type, or one record when value is given.',
-				'scope'   => 'actions',
-				'query'   => array( 'value' => array( 'type' => 'string', 'description' => 'Remove only the record with this value.' ) ),
-				'reply'   => array( 'rows' => $rows ),
-				'errors'  => array( 401, 403, 404, 409, 422, 429 ),
-			),
-			'GET /resources/{id}/mail'                   => array(
-				'summary' => 'One email domain: plan limits, mailboxes with their storage use, aliases, the DNS records with their status, and the settings for a mail program. Nothing secret is in the reply.',
-				'scope'   => 'read',
-				'reply'   => array(
-					'domain'    => $text,
-					'kind'      => $text,
-					'ready'     => $bool,
-					'limits'    => array( 'type' => 'object' ),
-					'mailboxes' => array( 'type' => array( 'array', 'null' ), 'items' => array( 'type' => 'object' ) ),
-					'aliases'   => array( 'type' => array( 'array', 'null' ), 'items' => array( 'type' => 'object' ) ),
-					'dns'       => array( 'type' => 'object' ),
-					'connect'   => array( 'type' => 'object' ),
-				),
-				'errors'  => array( 401, 403, 409, 429 ),
-			),
-			'POST /resources/{id}/mail/mailboxes'        => array(
-				'summary' => 'Make a mailbox in an email domain. The work runs in the background (answer 202): read GET /resources/{id} until `working` is false and look at `last_result` (action mailbox_create, ok, text); GET /resources/{id}/mail lists the mailbox when it is ready. Without `password` it gets a generated secret that is never in the reply: the customer shows it once in the dashboard. With `password` (10 to 128 characters, at least one letter and one digit, not containing the address) the mailbox gets that password and nothing is shown afterwards; the password is never in a reply or a log.',
-				'scope'   => 'actions',
-				'body'    => array( 'local' => array( 'type' => 'string', 'description' => 'The part before the @.' ), 'name' => array( 'type' => 'string', 'description' => 'The name shown for the mailbox. Optional.' ), 'quota_mb' => array( 'type' => 'integer', 'description' => 'The size in MB, up to the size of the plan. Optional.' ), 'password' => array( 'type' => 'string', 'description' => 'The password of the mailbox. Optional: without it one is generated.' ) ),
-				'required' => array( 'local' ),
-				'reply'   => array( 'queued' => $bool, 'action' => $text, 'at' => $int, 'status' => $text, 'email' => $text, 'quota_mb' => $int, 'message' => $text ),
-				'status'  => 202,
-				'errors'  => array( 401, 403, 409, 422, 429, 503 ),
-			),
-			'POST /resources/{id}/mail/aliases'          => array(
-				'summary' => 'Make an alias: an address that delivers to one or more other addresses. There is no catch-all.',
-				'scope'   => 'actions',
-				'body'    => array( 'address' => array( 'type' => 'string', 'description' => 'The part before the @.' ), 'goto' => array( 'type' => 'array', 'items' => array( 'type' => 'string' ), 'description' => 'One to ten addresses.' ) ),
-				'required' => array( 'address', 'goto' ),
-				'reply'   => array( 'address' => $text, 'goto' => array( 'type' => 'array', 'items' => $text ), 'message' => $text ),
-				'status'  => 201,
-				'errors'  => array( 401, 403, 409, 422, 429, 503 ),
-			),
-			'DELETE /resources/{id}/mail/aliases/{address}' => array(
-				'summary' => 'Delete an alias of an email domain.',
-				'scope'   => 'actions',
-				'reply'   => array( 'deleted' => $text ),
-				'errors'  => array( 401, 403, 409, 422, 429, 503 ),
-			),
-			'POST /resources/{id}/mail/dns/check'        => array(
-				'summary' => 'Look at the DNS of an email domain now. The look runs in the background (answer 202): read GET /resources/{id} until `working` is false and look at `last_result` (action mail_dns_check); GET /resources/{id}/mail shows which records are ok, missing or in conflict. The reply carries the records as they were when you asked.',
-				'scope'   => 'actions',
-				'reply'   => array( 'queued' => $bool, 'action' => $text, 'at' => $int, 'status' => $text, 'message' => $text, 'dns' => array( 'type' => 'object' ) ),
-				'status'  => 202,
-				'errors'  => array( 401, 403, 409, 429 ),
-			),
-			'GET /resources/{id}/ssl-certificate'        => array(
-				'summary' => 'The current certificate of an SSL certificate service and its chain, as PEM text, for a script that installs it. Only public parts: the private key is never in a reply.',
-				'scope'   => 'read',
-				'query'   => array( 'part' => array( 'type' => 'string', 'enum' => array( 'fullchain', 'cert', 'chain' ), 'description' => 'Which part to return. Default fullchain.' ) ),
-				'reply'   => array(
-					'name'       => $text,
-					'serial'     => $text,
-					'valid_from' => $text,
-					'valid_to'   => $text,
-					'part'       => $text,
-					'pem'        => $text,
-				),
-				'errors'  => array( 401, 403, 404, 429 ),
-			),
-			'GET /domains/check'                         => array(
-				'summary' => 'Whether a domain name is available, and its price per year excluding tax, in the currency named in the answer.',
-				'scope'   => 'read',
-				'reply'   => array( 'results' => array( 'type' => 'array', 'items' => array( 'type' => 'object' ) ), 'currency' => $text ),
-				'errors'  => array( 400, 429, 503 ),
-			),
 			'GET /openapi.json'                          => array(
 				'summary' => 'This document.',
 				'scope'   => 'none',
@@ -308,6 +197,14 @@ final class OpenApi {
 				'errors'  => array(),
 			),
 		);
+
+		/**
+		 * The documented operations of the features: "METHOD /path" => operation (the shape of the entries above). The
+		 * platform lists only its own routes here; each feature adds its own (Domains\ApiDocs, Mail\ApiDocs, Ssl\ApiDocs).
+		 *
+		 * @param array<string, array<string, mixed>> $table Operations so far.
+		 */
+		$table = (array) apply_filters( 'beltoft_services_openapi_operations', $table );
 
 		return $table;
 	}

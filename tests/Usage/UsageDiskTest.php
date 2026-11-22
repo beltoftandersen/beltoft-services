@@ -326,14 +326,14 @@ final class UsageDiskTest extends UsageTestCase {
 
 		foreach ( array( 0, $this->new_user() ) as $stranger ) {
 			wp_set_current_user( $stranger );
-			$r = \BeltoftServices\Api\Routes::grow( $request );
+			$r = \BeltoftServices\Proxmox\Disk\UsageDisk::rest_grow( $request );
 			$this->assertSame( 403, $r->get_status() );
 			$this->assertSame( 'beltoft_services_forbidden', $r->get_data()['code'] );
 			$this->assertSame( 50.0, Rates::items( Resource::find( $disk->id() ) )[0]['quantity'], 'Nothing was grown.' );
 		}
 
 		wp_set_current_user( $this->user );
-		$r = \BeltoftServices\Api\Routes::grow( $request );
+		$r = \BeltoftServices\Proxmox\Disk\UsageDisk::rest_grow( $request );
 		$this->assertSame( 202, $r->get_status() );
 		$this->assertTrue( $r->get_data()['growing'] );
 		remove_filter( 'beltoft_services_rest_rate_limit', '__return_zero' );

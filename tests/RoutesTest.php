@@ -146,6 +146,23 @@ final class RoutesTest extends TestCase {
 		$this->assertSame( array(), $driver->calls(), 'A REST request never calls the driver.' );
 	}
 
+	public function test_the_status_reply_asks_the_features_for_extra_fields_and_the_platform_keys_win(): void {
+		list( $resource, , $user ) = $this->resource();
+		$add = static function ( $extra ) {
+			$extra['beltoft_test_field'] = 'x';
+			$extra['now']                = 'ignored';
+			return $extra;
+		};
+		add_filter( 'beltoft_services_status_extra', $add );
+
+		$data = $this->request( 'GET', '/resources/' . $resource->id(), $user )->get_data();
+
+		remove_filter( 'beltoft_services_status_extra', $add );
+
+		$this->assertSame( 'x', $data['beltoft_test_field'] );
+		$this->assertIsInt( $data['now'] );
+	}
+
 	public function test_status_says_while_a_queued_action_is_still_working(): void {
 		list( $resource, , $user ) = $this->resource();
 		$status = fn(): bool => $this->request( 'GET', '/resources/' . $resource->id(), $user )->get_data()['working'];

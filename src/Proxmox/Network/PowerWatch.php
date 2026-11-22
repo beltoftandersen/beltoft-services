@@ -42,6 +42,26 @@ final class PowerWatch {
 	}
 
 	/**
+	 * Hooks.
+	 */
+	public static function register(): void {
+		add_filter( 'beltoft_services_status_extra', array( __CLASS__, 'status_extra' ), 10, 2 );
+	}
+
+	/**
+	 * Filter beltoft_services_status_extra: the power fields of a VM's status reply.
+	 *
+	 * @param mixed $extra    Fields so far.
+	 * @param mixed $resource Resource.
+	 * @return array<string, mixed>
+	 */
+	public static function status_extra( $extra, $resource = null ): array {
+		$extra = is_array( $extra ) ? $extra : array();
+
+		return $resource instanceof Resource ? $extra + self::view( $resource ) : $extra;
+	}
+
+	/**
 	 * Power, power_pending and power_failed for the status reply; empty for a service that is not a VM.
 	 *
 	 * @param Resource $r Resource.

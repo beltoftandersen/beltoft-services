@@ -40,6 +40,7 @@ final class Reference {
 	 */
 	public static function register(): void {
 		add_filter( 'beltoft_services_settings_fields', array( __CLASS__, 'settings_fields' ), 6 );
+		add_filter( 'beltoft_services_api_reference_tags', array( __CLASS__, 'tag_usage' ), 80 );
 		add_shortcode( self::SHORTCODE, array( __CLASS__, 'shortcode' ) );
 	}
 
@@ -182,23 +183,46 @@ final class Reference {
 	}
 
 	/**
-	 * The resource groups: title and one line for each, in the order they are shown.
+	 * The resource groups: title and one line for each (keys 0 and 1), and the path parts that belong to the group (key
+	 * 'paths': the second segment after resources/<id>/), in the order they are shown. The platform has Services, Usage and the
+	 * API document; each feature adds its own group with the filter beltoft_services_api_reference_tags, in its place by
+	 * priority (Servers 10, Databases 20, DNS 30, Email 40, SSL 50, Backup storage 60, Domains 70, Usage 80).
 	 *
-	 * @return array<string, array{0: string, 1: string}>
+	 * @return array<string, array{0: string, 1: string, paths?: string[]}>
 	 */
 	private static function group_texts(): array {
-		return array(
-			'services'  => array( __( 'Services', 'beltoft-services' ), __( 'List your services and get their ids, read the status of one, and ask for an action such as start, shutdown or reboot.', 'beltoft-services' ) ),
-			'servers'   => array( __( 'Servers', 'beltoft-services' ), __( 'Usage figures and the firewall of your servers.', 'beltoft-services' ) ),
-			'databases' => array( __( 'Databases', 'beltoft-services' ), __( 'Which addresses may connect to a database.', 'beltoft-services' ) ),
-			'dns'       => array( __( 'DNS', 'beltoft-services' ), __( 'Read and change the records of the domains and DNS services we host.', 'beltoft-services' ) ),
-			'email'     => array( __( 'Email', 'beltoft-services' ), __( 'Read an email domain, make mailboxes and aliases, and check its DNS records. Deleting a mailbox and everything to do with its secret are only possible in the dashboard, or through Claude with Full access.', 'beltoft-services' ) ),
-			'ssl'       => array( __( 'SSL certificates', 'beltoft-services' ), __( 'Fetch the current certificate and its chain, for a script that installs each new certificate. The private key is only available in the dashboard, once.', 'beltoft-services' ) ),
-			'storage'   => array( __( 'Backup storage', 'beltoft-services' ), __( 'The connection details, usage and snapshots of a backup storage. Showing or changing the password and restoring a snapshot need the code we email to the account address, so they are only possible in the dashboard.', 'beltoft-services' ) ),
-			'domains'   => array( __( 'Domains', 'beltoft-services' ), __( 'Check whether a domain name is available.', 'beltoft-services' ) ),
-			'usage'     => array( __( 'Usage', 'beltoft-services' ), __( 'Current use of CPU, memory and disk, and usage alerts.', 'beltoft-services' ) ),
-			'reference' => array( __( 'API document', 'beltoft-services' ), __( 'The machine readable description of this API.', 'beltoft-services' ) ),
+		$tags = array(
+			'services' => array( __( 'Services', 'beltoft-services' ), __( 'List your services and get their ids, read the status of one, and ask for an action such as start, shutdown or reboot.', 'beltoft-services' ) ),
 		);
+
+		/**
+		 * The groups of the API reference.
+		 *
+		 * @param array<string, array{0: string, 1: string, paths?: string[]}> $tags Group key => title, one line and path parts.
+		 */
+		$tags = (array) apply_filters( 'beltoft_services_api_reference_tags', $tags );
+
+		$tags['reference'] = array( __( 'API document', 'beltoft-services' ), __( 'The machine readable description of this API.', 'beltoft-services' ) );
+
+		return $tags;
+	}
+
+	/**
+	 * Filter beltoft_services_api_reference_tags: the Usage group (current use of CPU, memory and disk, and usage alerts).
+	 *
+	 * @param mixed $tags Groups so far.
+	 * @return array<string, mixed>
+	 */
+	public static function tag_usage( $tags ): array {
+		$tags = is_array( $tags ) ? $tags : array();
+
+		$tags['usage'] = array(
+			0       => __( 'Usage', 'beltoft-services' ),
+			1       => __( 'Current use of CPU, memory and disk, and usage alerts.', 'beltoft-services' ),
+			'paths' => array( 'usage-alerts' ),
+		);
+
+		return $tags;
 	}
 
 	/**
@@ -211,19 +235,13 @@ final class Reference {
 		$first = (string) $segs[0];
 
 		if ( 'resources' === $first ) {
-			$sub = array(
-				'dns-records'  => 'dns',
-				'metrics'      => 'servers',
-				'firewall'     => 'servers',
-				'db-access'    => 'databases',
-				'usage-alerts' => 'usage',
-				'mail'         => 'email',
-				'ssl-certificate' => 'ssl',
-				'storage'         => 'storage',
-				'storage-password' => 'storage',
-				'storage-password-reset' => 'storage',
-				'storage-rollback' => 'storage',
-			);
+			$sub = array();
+
+			foreach ( self::group_texts() as $key => $text ) {
+				foreach ( (array) ( $text['paths'] ?? array() ) as $part ) {
+					$sub[ (string) $part ] = $key;
+				}
+			}
 
 			return $sub[ (string) ( $segs[2] ?? '' ) ] ?? 'services';
 		}

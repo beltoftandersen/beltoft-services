@@ -10,6 +10,7 @@ namespace BeltoftServices\Proxmox\Disk;
 use BeltoftLicenses\Events;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Alerts;
+use BeltoftServices\Api\Routes;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Pve\Clusters;
@@ -39,6 +40,68 @@ final class UsageDisk {
 	 */
 	public static function register(): void {
 		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'on_state_changed' ), 10, 3 );
+		add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
+	}
+
+	/**
+	 * The route POST resources/<id>/grow (it used to be registered by Api\Routes; the path and the answers are the same).
+	 */
+	public static function routes(): void {
+		register_rest_route(
+			Routes::NAMESPACE,
+			'/resources/(?P<id>\d+)/grow',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( __CLASS__, 'rest_grow' ),
+				'permission_callback' => 'is_user_logged_in',
+				'args'                => array(
+					'id' => array(
+						'type'     => 'integer',
+						'minimum'  => 1,
+						'required' => true,
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * POST resources/<id>/grow: the customer makes their pay as you go extra disk the next larger size. Dashboard only: the
+	 * token gate does not allow this address. No subscription is read or changed (UsageDisk).
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response
+	 */
+	public static function rest_grow( \WP_REST_Request $request ): \WP_REST_Response {
+		$limited = Routes::limited( $request, 5 );
+
+		if ( $limited ) {
+			return $limited;
+		}
+
+		$resource = Resource::find( (int) $request['id'] );
+		$user_id  = get_current_user_id();
+
+		if ( ! $resource || ! $resource->owned_by( $user_id ) || ! $resource->is_live() ) {
+			return Routes::error( 'beltoft_services_forbidden', __( 'This service is not available.', 'beltoft-services' ), 403 );
+		}
+
+		$done = self::grow( $resource, $user_id );
+
+		if ( $done instanceof \WP_Error ) {
+			$data = $done->get_error_data();
+
+			return Routes::error( $done->get_error_code(), $done->get_error_message(), is_array( $data ) && isset( $data['status'] ) ? (int) $data['status'] : 422 );
+		}
+
+		return new \WP_REST_Response(
+			array(
+				'growing' => true,
+				'at'      => time(),
+				'message' => __( 'Your disk is being made larger. This can take a minute.', 'beltoft-services' ),
+			),
+			202
+		);
 	}
 
 	/**
