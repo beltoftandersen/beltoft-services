@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * The same output as the shortcode [beltoft_services_api_reference] (Reference::html), in either layout. Looks map to
  * the --apiref-* (page column layout) and --bsdocs-* (full width docs app) custom properties of the two stylesheets;
- * layout and script behaviour stay in those files. Loaded only when Bricks is active (see DocsElements).
+ * layout and script behaviour stay in those files. Loaded only when Bricks is active (see Integration).
  */
 class ApiReferenceElement extends \Bricks\Element {
 

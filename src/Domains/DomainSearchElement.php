@@ -3,14 +3,12 @@
  * The public domain search as a native Bricks element: the same form and script as the shortcode,
  * with the texts as content controls and the look as style controls.
  *
- * Loaded only by Integration::register_elements(), when Bricks is active.
+ * Loaded only by Bricks\Integration::register_elements() (through Domains\BricksElements), when Bricks is active.
  *
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Bricks;
-
-use BeltoftServices\Domains\Search;
+namespace BeltoftServices\Domains;
 
 defined( 'ABSPATH' ) || exit;
 

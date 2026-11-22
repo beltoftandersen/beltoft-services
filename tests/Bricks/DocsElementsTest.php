@@ -9,8 +9,8 @@ namespace BeltoftServices\Tests\Bricks;
 
 use BeltoftServices\Api\Reference;
 use BeltoftServices\Bricks\ApiReferenceElement;
-use BeltoftServices\Bricks\DocsElements;
-use BeltoftServices\Bricks\MailSetupElement;
+use BeltoftServices\Bricks\Integration;
+use BeltoftServices\Mail\MailSetupElement;
 use BeltoftServices\Mail\MailSetup;
 
 require_once dirname( __DIR__ ) . '/Mail/MailTestCase.php';
@@ -52,25 +52,45 @@ final class DocsElementsTest extends \BeltoftServices\Tests\Mail\MailTestCase {
 
 	public function test_nothing_is_registered_without_bricks(): void {
 		$this->assertFalse( class_exists( '\Bricks\Elements', false ) );
-		$this->assertNotFalse( has_action( 'init', array( DocsElements::class, 'add_elements' ) ) );
+		$this->assertNotFalse( has_action( 'init', array( Integration::class, 'register_elements' ) ) );
 
-		DocsElements::add_elements();
+		Integration::register_elements();
 
-		$this->assertFalse( class_exists( 'BeltoftServices\Bricks\MailSetupElement', false ), 'The element classes are not loaded without Bricks.' );
+		$this->assertFalse( class_exists( 'BeltoftServices\Mail\MailSetupElement', false ), 'The element classes are not loaded without Bricks.' );
 	}
 
 	public function test_both_elements_register_when_bricks_exists(): void {
 		$this->stub_bricks();
 		\Bricks\Elements::$registered = array();
 
-		DocsElements::add_elements();
+		Integration::register_elements();
 
-		$this->assertSame( array( 'beltoft-mail-setup', 'beltoft-api-reference' ), array_keys( \Bricks\Elements::$registered ) );
+		$this->assertSame( array( 'beltoft-mail-setup', 'beltoft-api-reference', 'beltoft-domain-search', 'beltoft-domain-search-form', 'beltoft-domain-transfer' ), array_keys( \Bricks\Elements::$registered ), 'One list, in the order the features and the platform add them.' );
 		foreach ( \Bricks\Elements::$registered as $name => $entry ) {
 			$this->assertFileExists( $entry[0] );
 			require_once $entry[0];
 			$this->assertTrue( class_exists( $entry[1] ), $name );
 		}
+	}
+
+	public function test_the_elements_come_from_one_filter_each_owner_adds_its_own(): void {
+		$this->stub_bricks();
+		\Bricks\Elements::$registered = array();
+
+		$this->assertSame( 10, has_filter( 'beltoft_services_bricks_elements', array( \BeltoftServices\Mail\BricksElements::class, 'elements' ) ) );
+		$this->assertSame( 20, has_filter( 'beltoft_services_bricks_elements', array( Integration::class, 'platform_elements' ) ) );
+		$this->assertSame( 30, has_filter( 'beltoft_services_bricks_elements', array( \BeltoftServices\Domains\BricksElements::class, 'elements' ) ) );
+
+		$add = static function ( $elements ) {
+			$elements['beltoft-test-element'] = array( 'file' => __FILE__, 'class' => 'Beltoft_Test_Element' );
+			return $elements;
+		};
+		add_filter( 'beltoft_services_bricks_elements', $add, 99 );
+
+		$this->assertSame( 'beltoft-test-element', array_slice( Integration::register_elements(), -1 )[0] );
+		$this->assertSame( array( __FILE__, 'Beltoft_Test_Element' ), \Bricks\Elements::$registered['beltoft-test-element'] );
+
+		remove_filter( 'beltoft_services_bricks_elements', $add, 99 );
 	}
 
 	/**
@@ -85,7 +105,7 @@ final class DocsElementsTest extends \BeltoftServices\Tests\Mail\MailTestCase {
 
 	public function test_controls_have_groups_labels_and_square_css_only(): void {
 		$this->stub_bricks();
-		require_once dirname( __DIR__, 2 ) . '/src/Bricks/MailSetupElement.php';
+		require_once dirname( __DIR__, 2 ) . '/src/Mail/MailSetupElement.php';
 		require_once dirname( __DIR__, 2 ) . '/src/Bricks/ApiReferenceElement.php';
 
 		foreach ( array( new MailSetupElement(), new ApiReferenceElement() ) as $element ) {
@@ -111,7 +131,7 @@ final class DocsElementsTest extends \BeltoftServices\Tests\Mail\MailTestCase {
 
 	public function test_mail_controls_map_to_the_stylesheet_variables(): void {
 		$this->stub_bricks();
-		require_once dirname( __DIR__, 2 ) . '/src/Bricks/MailSetupElement.php';
+		require_once dirname( __DIR__, 2 ) . '/src/Mail/MailSetupElement.php';
 		$controls = $this->controls_of( new MailSetupElement() );
 		$css      = file_get_contents( dirname( __DIR__, 2 ) . '/assets/mail-setup.css' );
 
@@ -148,7 +168,7 @@ final class DocsElementsTest extends \BeltoftServices\Tests\Mail\MailTestCase {
 
 	public function test_the_mail_element_renders_the_shortcode_markup_with_custom_texts(): void {
 		$this->stub_bricks();
-		require_once dirname( __DIR__, 2 ) . '/src/Bricks/MailSetupElement.php';
+		require_once dirname( __DIR__, 2 ) . '/src/Mail/MailSetupElement.php';
 		$this->settings( array( 'mail_host' => 'mail.example.net', 'mail_dav_url' => 'https://dav.example.net/' ) );
 
 		$shortcode = do_shortcode( '[' . MailSetup::SHORTCODE . ']' );

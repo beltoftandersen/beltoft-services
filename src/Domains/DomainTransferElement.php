@@ -3,14 +3,12 @@
  * The domain transfer form as a native Bricks element: a section apart from the search, where a customer enters a
  * domain they own, sees the price and the lock state, and adds the transfer with its code to the order.
  *
- * Loaded only by Integration::register_elements(), when Bricks is active.
+ * Loaded only by Bricks\Integration::register_elements() (through Domains\BricksElements), when Bricks is active.
  *
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Bricks;
-
-use BeltoftServices\Domains\Search;
+namespace BeltoftServices\Domains;
 
 defined( 'ABSPATH' ) || exit;
 

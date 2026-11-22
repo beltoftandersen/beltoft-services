@@ -41,8 +41,8 @@ final class DomainSearchElementTest extends TestCase {
 	}
 
 	private function element( array $settings = array() ) {
-		$class         = Integration::ELEMENTS['beltoft-domain-search']['class'];
-		require_once BELTOFT_SERVICES_PATH . 'src/Bricks/DomainSearchElement.php';
+		$class         = \BeltoftServices\Domains\DomainSearchElement::class;
+		require_once BELTOFT_SERVICES_PATH . 'src/Domains/DomainSearchElement.php';
 		$element           = new $class();
 		$element->settings = $settings;
 		$element->set_control_groups();
@@ -51,8 +51,8 @@ final class DomainSearchElementTest extends TestCase {
 	}
 
 	public function test_the_element_is_registered_when_bricks_exists(): void {
-		$this->assertSame( array( 'beltoft-domain-search', 'beltoft-domain-search-form', 'beltoft-domain-transfer' ), Integration::register_elements() );
-		$this->assertSame( Integration::ELEMENTS['beltoft-domain-search']['class'], \Bricks\Elements::$registered['beltoft-domain-search'][1] );
+		$this->assertSame( array( 'beltoft-mail-setup', 'beltoft-api-reference', 'beltoft-domain-search', 'beltoft-domain-search-form', 'beltoft-domain-transfer' ), Integration::register_elements() );
+		$this->assertSame( \BeltoftServices\Domains\DomainSearchElement::class, \Bricks\Elements::$registered['beltoft-domain-search'][1] );
 		$this->assertFileExists( \Bricks\Elements::$registered['beltoft-domain-search'][0] );
 	}
 
@@ -146,8 +146,8 @@ final class DomainSearchElementTest extends TestCase {
 
 	public function test_the_transfer_element_renders_its_own_form_without_search_controls(): void {
 		Integration::register_elements();
-		require_once BELTOFT_SERVICES_PATH . 'src/Bricks/DomainTransferElement.php';
-		$el           = new \BeltoftServices\Bricks\DomainTransferElement();
+		require_once BELTOFT_SERVICES_PATH . 'src/Domains/DomainTransferElement.php';
+		$el           = new \BeltoftServices\Domains\DomainTransferElement();
 		$el->settings = array( 'buttonText' => 'Check' );
 		$el->set_control_groups();
 		$el->set_controls();
@@ -175,10 +175,10 @@ final class DomainSearchElementTest extends TestCase {
 	}
 
 	public function test_the_form_element_is_a_get_form_with_the_param_and_the_current_term(): void {
-		$this->assertCount( 3, Integration::register_elements() );
-		require_once BELTOFT_SERVICES_PATH . 'src/Bricks/DomainSearchFormElement.php';
+		$this->assertCount( 5, Integration::register_elements() );
+		require_once BELTOFT_SERVICES_PATH . 'src/Domains/DomainSearchFormElement.php';
 		$_GET['domain'] = 'abc.com';
-		$form           = new \BeltoftServices\Bricks\DomainSearchFormElement();
+		$form           = new \BeltoftServices\Domains\DomainSearchFormElement();
 		$form->settings = array( 'buttonText' => 'Find' );
 		$form->set_control_groups();
 		$form->set_controls();
@@ -198,8 +198,8 @@ final class DomainSearchElementTest extends TestCase {
 	}
 
 	public function test_the_tags_resolve_in_a_domain_row_and_stay_empty_elsewhere(): void {
-		\BeltoftServices\Bricks\DomainQuery::register();
-		$row = \BeltoftServices\Bricks\DomainQuery::rows( array( array( 'domain' => 'a.com', 'status' => 'free', 'price' => 14, 'note' => '' ) ), 'a.com' )[0];
+		\BeltoftServices\Domains\DomainQuery::register();
+		$row = \BeltoftServices\Domains\DomainQuery::rows( array( array( 'domain' => 'a.com', 'status' => 'free', 'price' => 14, 'note' => '' ) ), 'a.com' )[0];
 		$list = apply_filters( 'bricks/dynamic_tags_list', array() );
 		$names = array_column( $list, 'name' );
 		$this->assertContains( '{bds_domain}', $names );
@@ -216,7 +216,7 @@ final class DomainSearchElementTest extends TestCase {
 		$this->assertSame( '{post_title} a.com', apply_filters( 'bricks/dynamic_data/render_content', '{post_title} {bds_domain}', null, 'text' ), 'Unrelated tags stay.' );
 		$link = apply_filters( 'bricks/dynamic_data/render_content', '{bds_add_url}', null, 'link' );
 		$this->assertStringContainsString( 'admin-post.php?action=beltoft_domain_add&domain=a.com', $link );
-		$this->assertSame( \BeltoftServices\Bricks\DomainQuery::TYPE, apply_filters( 'bricks/query/loop_object_type', null, $row, '' ) );
+		$this->assertSame( \BeltoftServices\Domains\DomainQuery::TYPE, apply_filters( 'bricks/query/loop_object_type', null, $row, '' ) );
 		$this->assertNotNull( apply_filters( 'bricks/query/loop_object_id', 0, $row, '' ) );
 		$this->assertSame( 'p', apply_filters( 'bricks/query/loop_object_type', 'p', array( 'x' ), '' ), 'Other loop objects are not touched.' );
 	}

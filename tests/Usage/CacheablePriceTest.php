@@ -8,7 +8,7 @@
 
 namespace BeltoftServices\Tests\Usage;
 
-use BeltoftServices\Bricks\DomainQuery;
+use BeltoftServices\Domains\DomainQuery;
 use BeltoftServices\Currency;
 use BeltoftServices\Domains\Prices;
 use BeltoftServices\Domains\PriceTags;

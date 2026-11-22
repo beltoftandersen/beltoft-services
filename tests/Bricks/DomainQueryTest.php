@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Tests\Bricks;
 
-use BeltoftServices\Bricks\DomainQuery;
+use BeltoftServices\Domains\DomainQuery;
 use BeltoftServices\Domains\FakeClient;
 use BeltoftServices\Domains\Prices;
 use BeltoftServices\Tests\TestCase;

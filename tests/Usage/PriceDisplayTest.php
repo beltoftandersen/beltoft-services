@@ -9,7 +9,7 @@ namespace BeltoftServices\Tests\Usage;
 
 use BeltoftServices\Account\ServerPicker;
 use BeltoftServices\Billing\TaxNote;
-use BeltoftServices\Bricks\DomainQuery;
+use BeltoftServices\Domains\DomainQuery;
 use BeltoftServices\Domains\Prices;
 use BeltoftServices\Domains\PriceTags;
 use BeltoftServices\Domains\Search;
@@ -245,7 +245,7 @@ class PriceDisplayTest extends UsageTestCase {
 
 		$this->assertSame( $money . ' / year', $rows[0]['price'] );
 		$this->assertSame( 'Renews at ' . $money . ' / year', $rows[0]['renewal_price'] );
-		$this->assertStringNotContainsString( 'x€', file_get_contents( BELTOFT_SERVICES_PATH . 'src/Bricks/DomainQuery.php' ) );
+		$this->assertStringNotContainsString( 'x€', file_get_contents( BELTOFT_SERVICES_PATH . 'src/Domains/DomainQuery.php' ) );
 		$this->assertStringNotContainsString( '€', file_get_contents( BELTOFT_SERVICES_PATH . 'assets/domain-search.js' ) );
 	}
 

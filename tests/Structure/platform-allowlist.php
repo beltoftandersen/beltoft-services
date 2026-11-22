@@ -1,7 +1,7 @@
 <?php
 /**
  * The platform folders' imports of true features (see DependencyDirectionTest, rule PLATFORM; plan 2026-11-22-feature-code-home).
- * Generated 2026-11-22 with DEP_DUMP (233 entries), now 187, now 206. Remove entries as code moves into its feature; never add. Ends empty.
+ * Generated 2026-11-22 with DEP_DUMP (233 entries), now 181, now 187, now 206. Remove entries as code moves into its feature; never add. Ends empty.
  */
 return array(
 	'Account/Databases.php -> Proxmox\Db\DbCard',
@@ -99,12 +99,6 @@ return array(
 	'Admin/Screen.php -> Proxmox\Network\IpWho',
 	'Api/Routes.php -> Proxmox\Disk\UsageDisk',
 	'Api/Routes.php -> Proxmox\Network\PowerWatch',
-	'Bricks/DomainQuery.php -> Domains\Cart',
-	'Bricks/DomainQuery.php -> Domains\Search',
-	'Bricks/DomainSearchElement.php -> Domains\Search',
-	'Bricks/DomainSearchFormElement.php -> Domains\Search',
-	'Bricks/DomainTransferElement.php -> Domains\Search',
-	'Bricks/MailSetupElement.php -> Mail\MailSetup',
 	'Cli/Commands.php -> Proxmox\Network\IpWho',
 	'Mcp/Acts.php -> Proxmox\Db\DbAccess',
 	'Mcp/Acts.php -> Proxmox\Network\PrivateAttach',

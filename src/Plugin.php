@@ -102,7 +102,7 @@ final class Plugin {
 		Mail\MailSettings::register();
 		Mail\MailPacks::register();
 		Mail\MailSetup::register();
-		Bricks\DocsElements::register();
+		Mail\BricksElements::register();
 		Mail\MailDns::register();
 		Mail\MailHold::register();
 		Mail\EmailValues::register();
@@ -139,6 +139,7 @@ final class Plugin {
 		add_filter( 'woocommerce_account_menu_items', array( Account\Dedicated::class, 'menu' ), 104 );
 		Domains\Search::register();
 		Bricks\Integration::register();
+		Domains\BricksElements::register();
 		Domains\Cart::register();
 		Domains\PendingLines::register();
 		Domains\TldRules::register();

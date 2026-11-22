@@ -5,16 +5,16 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Bricks;
+namespace BeltoftServices\Mail;
 
-use BeltoftServices\Mail\MailSetup;
+use BeltoftServices\Bricks\DocsControls;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * The same markup as the shortcode [beltoft_services_mail_setup] (MailSetup::html), with controls for the headings and
  * the intro and for the looks. Looks map to the --bsms-* variables of assets/mail-setup.css where one exists; the
- * layout stays in that stylesheet. Loaded only when Bricks is active (see DocsElements).
+ * layout stays in that stylesheet. Loaded only when Bricks is active (see Mail\BricksElements and Bricks\Integration).
  */
 class MailSetupElement extends \Bricks\Element {
 

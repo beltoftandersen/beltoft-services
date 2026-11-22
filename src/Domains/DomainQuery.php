@@ -9,10 +9,8 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Bricks;
+namespace BeltoftServices\Domains;
 
-use BeltoftServices\Domains\Cart;
-use BeltoftServices\Domains\Search;
 use BeltoftServices\RateLimit;
 
 defined( 'ABSPATH' ) || exit;

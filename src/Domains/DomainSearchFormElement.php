@@ -3,14 +3,12 @@
  * Only the domain search form (label, input, button) as a GET form to the current page, with the term in the URL.
  * It is the front half of a native Bricks query loop of the type "Domain availability".
  *
- * Loaded only by Integration::register_elements(), when Bricks is active.
+ * Loaded only by Bricks\Integration::register_elements() (through Domains\BricksElements), when Bricks is active.
  *
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Bricks;
-
-use BeltoftServices\Domains\Search;
+namespace BeltoftServices\Domains;
 
 defined( 'ABSPATH' ) || exit;
 
