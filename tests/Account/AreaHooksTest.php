@@ -51,7 +51,7 @@ class AreaHooksTest extends TestCase {
 			$name = get_class( $area );
 
 			// The Domains area overrides them on purpose (see DomainsAreaTest).
-			if ( $area instanceof \BeltoftServices\Account\Domains ) {
+			if ( $area instanceof \BeltoftServices\Domains\Domains ) {
 				continue;
 			}
 

@@ -14,7 +14,7 @@ use BeltoftLicenses\Key;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Account\AddressService;
 use BeltoftServices\Account\Cards;
-use BeltoftServices\Account\DomainDanger;
+use BeltoftServices\Domains\DomainDanger;
 use BeltoftServices\Billing\Subscriptions;
 use BeltoftServices\Proxmox\Db\DbAccess;
 use BeltoftServices\Proxmox\Network\PrivateAttach;

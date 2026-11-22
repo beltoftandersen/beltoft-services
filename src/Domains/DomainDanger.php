@@ -5,12 +5,13 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Account;
+namespace BeltoftServices\Domains;
 
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Billing\Subscriptions;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
+use BeltoftServices\Account\ServiceArea;
 
 defined( 'ABSPATH' ) || exit;
 

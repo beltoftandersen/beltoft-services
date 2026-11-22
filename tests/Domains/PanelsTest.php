@@ -17,7 +17,7 @@ class PanelsTest extends TestCase {
 		$this->assertInstanceOf( Resource::class, $r );
 		if ( $ready ) { $r->set( array( 'state' => 'ready' ) ); }
 		// The domain's page: the card is gone, every pane is in the HTML.
-		$d = \BeltoftServices\Account\DomainPage::build( $r, array( 'license' => $r->license(), 'tab' => 'dns' ) );
+		$d = \BeltoftServices\Domains\DomainPage::build( $r, array( 'license' => $r->license(), 'tab' => 'dns' ) );
 		ob_start();
 		include BELTOFT_SERVICES_PATH . 'templates/account/domain-page.php';
 		return (string) ob_get_clean();

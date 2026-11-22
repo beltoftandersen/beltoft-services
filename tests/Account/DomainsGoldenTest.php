@@ -10,7 +10,7 @@
 namespace BeltoftServices\Tests\Account;
 
 use BeltoftLicenses\Account\View;
-use BeltoftServices\Account\Domains;
+use BeltoftServices\Domains\Domains;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Account\Slugs;
@@ -48,7 +48,7 @@ final class DomainsGoldenTest extends TestCase {
 		$this->user = self::factory()->user->create();
 		wp_set_current_user( $this->user );
 		Overview::reset();
-		\BeltoftServices\Account\DomainDanger::register();
+		\BeltoftServices\Domains\DomainDanger::register();
 	}
 
 	public function tear_down(): void {

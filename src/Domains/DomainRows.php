@@ -5,9 +5,12 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Account;
+namespace BeltoftServices\Domains;
 
 use BeltoftServices\Resource;
+use BeltoftServices\Account\Panel;
+use BeltoftServices\Account\ServerLinks;
+use BeltoftServices\Account\ServiceArea;
 
 defined( 'ABSPATH' ) || exit;
 

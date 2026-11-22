@@ -3,8 +3,8 @@
 namespace BeltoftServices\Tests\Account;
 
 use BeltoftLicenses\Account\View;
-use BeltoftServices\Account\DomainDanger;
-use BeltoftServices\Account\Domains;
+use BeltoftServices\Domains\DomainDanger;
+use BeltoftServices\Domains\Domains;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Domains\DnsDriver;
 use BeltoftServices\Domains\DomainDriver;

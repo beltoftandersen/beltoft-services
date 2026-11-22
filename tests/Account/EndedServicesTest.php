@@ -189,7 +189,7 @@ final class EndedServicesTest extends TestCase {
 		$paused  = $this->domain( $user, 'lapsed.example', 'expired', 'paused' );
 		$live    = $this->domain( $user, 'live.example', 'active' );
 
-		$area   = ServiceArea::get( \BeltoftServices\Account\Domains::class );
+		$area   = ServiceArea::get( \BeltoftServices\Domains\Domains::class );
 		$sorted = $area->sort( $this->views( $user ) );
 
 		$this->assertEqualsCanonicalizing( array( $removed, $paused, $live ), array_keys( $sorted['members'] ) );
@@ -215,7 +215,7 @@ final class EndedServicesTest extends TestCase {
 		$GLOBALS['wp']->query_vars['domains'] = (string) $id;
 
 		ob_start();
-		ServiceArea::get( \BeltoftServices\Account\Domains::class )->render( $this->views( $user ) );
+		ServiceArea::get( \BeltoftServices\Domains\Domains::class )->render( $this->views( $user ) );
 		$html = (string) ob_get_clean();
 		unset( $GLOBALS['wp']->query_vars['domains'] );
 

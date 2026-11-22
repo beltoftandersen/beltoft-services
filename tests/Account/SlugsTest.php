@@ -4,8 +4,8 @@ namespace BeltoftServices\Tests\Account;
 
 use BeltoftLicenses\Account\View;
 use BeltoftServices\Account\Databases;
-use BeltoftServices\Account\DomainRows;
-use BeltoftServices\Account\Domains;
+use BeltoftServices\Domains\DomainRows;
+use BeltoftServices\Domains\Domains;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Account\ServerLinks;

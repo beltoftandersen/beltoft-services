@@ -3,9 +3,9 @@
 namespace BeltoftServices\Tests\Account;
 
 use BeltoftLicenses\Account\View;
-use BeltoftServices\Account\DomainPage;
-use BeltoftServices\Account\DomainRows;
-use BeltoftServices\Account\Domains;
+use BeltoftServices\Domains\DomainPage;
+use BeltoftServices\Domains\DomainRows;
+use BeltoftServices\Domains\Domains;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Domains\DnsClaims;

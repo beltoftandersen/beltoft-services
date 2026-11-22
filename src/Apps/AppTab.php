@@ -5,7 +5,7 @@ namespace BeltoftServices\Apps;
 
 use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Account\ServerTabHooks;
-use BeltoftServices\Account\Domains;
+use BeltoftServices\Domains\Domains;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Resource;
 use BeltoftServices\Domains\ZoneAccess;

@@ -132,7 +132,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 							<p><button type="button" class="button woocommerce-button" data-mail-domain-submit><?php esc_html_e( 'Add domain', 'beltoft-services' ); ?></button></p>
 						</div>
 						<?php
-						$beltoft_services_register = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Domains::class )->url_register();
+						$beltoft_services_register = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Domains\Domains::class )->url_register();
 						/**
 						 * The address of the "Transfer a domain to us" link on the email page.
 						 *

@@ -182,7 +182,7 @@ final class OverviewData {
 
 			if ( $resource && ! ServiceArea::ended_and_gone( $view['license'], $resource ) ) {
 				$domain_resources[ (int) $view['id'] ] = $resource;
-				$data['domains'][]                     = DomainRows::row( $view, $resource );
+				$data['domains'][]                     = ServiceArea::by_key( 'domains' )->row( $view, $resource );
 			}
 		}
 

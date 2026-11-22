@@ -8,7 +8,7 @@
 namespace BeltoftServices\Domains;
 
 use BeltoftLicenses\Account\Endpoint;
-use BeltoftServices\Account\Domains;
+use BeltoftServices\Domains\Domains;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Api\Routes;
 

@@ -3,7 +3,7 @@
 namespace BeltoftServices\Tests\Account;
 
 use BeltoftServices\Account\Databases;
-use BeltoftServices\Account\Domains;
+use BeltoftServices\Domains\Domains;
 use BeltoftServices\Mail\Email;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\ServerLinks;

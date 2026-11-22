@@ -2,7 +2,7 @@
 /**
  * The Danger zone tab of a domain page: auto-renew for a registered domain, stop DNS hosting for a DNS-only one.
  *
- * Plain posts to the page with a nonce, handled by BeltoftServices\Account\DomainDanger::handle(). The registrar is
+ * Plain posts to the page with a nonce, handled by BeltoftServices\Domains\DomainDanger::handle(). The registrar is
  * never asked to delete anything.
  *
  * Override by copying to yourtheme/beltoft-services/account/domain-danger.php.
@@ -21,7 +21,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-$beltoft_field = \BeltoftServices\Account\DomainDanger::FIELD;
+$beltoft_field = \BeltoftServices\Domains\DomainDanger::FIELD;
 $beltoft_form  = static function ( string $what ) use ( $action, $nonce, $license, $beltoft_field ): void {
 	?>
 	<input type="hidden" name="<?php echo esc_attr( $beltoft_field ); ?>" value="<?php echo esc_attr( $what ); ?>">

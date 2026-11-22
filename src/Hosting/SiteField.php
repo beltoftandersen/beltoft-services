@@ -554,7 +554,7 @@ final class SiteField {
 		OrderDomain::print_tiles( array( 'name' => $name . '[mode]', 'id' => $id, 'legend' => __( 'Website address', 'beltoft-services' ), 'checked' => $mode, 'items' => $items ) );
 		OrderDomain::print_value( $name . '[host_new]', $chosen );
 
-		$find = (string) \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Domains::class )->url_register();
+		$find = (string) \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Domains\Domains::class )->url_register();
 
 		foreach ( array( OrderDomain::REGISTER, OrderDomain::TRANSFER ) as $kind ) {
 			OrderDomain::print_panel( $kind, $id, $kind === $mode, $have_new && $cart['mode'] === $kind ? $chosen : '', $find, __( 'The website starts on a temporary address and moves to this domain when its registration is finished.', 'beltoft-services' ) );

@@ -12,7 +12,7 @@ use BeltoftServices\Mail\MailDriver;
 use BeltoftServices\Mail\MailGuard;
 use BeltoftServices\Mail\MailPlan;
 use BeltoftServices\Resource;
-use BeltoftServices\Account\Domains;
+use BeltoftServices\Domains\Domains;
 use BeltoftServices\Account\ServiceArea;
 
 defined( 'ABSPATH' ) || exit;

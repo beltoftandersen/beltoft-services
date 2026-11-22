@@ -315,7 +315,7 @@ final class MailField {
 		OrderDomain::print_tiles( array( 'name' => $name . '[mode]', 'id' => $id, 'legend' => __( 'Domain for your email', 'beltoft-services' ), 'checked' => $tile, 'items' => $items ) );
 		OrderDomain::print_value( $name . '[new]', $chosen );
 
-		$find = (string) \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Domains::class )->url_register();
+		$find = (string) \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Domains\Domains::class )->url_register();
 
 		foreach ( array( OrderDomain::REGISTER, OrderDomain::TRANSFER ) as $kind ) {
 			OrderDomain::print_panel( $kind, $id, $kind === $tile, $cart['mode'] === $kind ? $chosen : '', $find, __( 'Email is set up when the domain is ready. We add the email records for you.', 'beltoft-services' ) );

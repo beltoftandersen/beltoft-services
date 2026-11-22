@@ -5,7 +5,7 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Account;
+namespace BeltoftServices\Domains;
 
 use BeltoftServices\Domains\Cart;
 use BeltoftServices\Domains\Clients;

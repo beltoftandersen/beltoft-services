@@ -5,7 +5,7 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Account;
+namespace BeltoftServices\Domains;
 
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Domains\DnsClaimPanel;
@@ -14,6 +14,9 @@ use BeltoftServices\Domains\DnsClaimsFeature;
 use BeltoftServices\Domains\DnsSchema;
 use BeltoftServices\Domains\HostName;
 use BeltoftServices\Resource;
+use BeltoftServices\Account\Panel;
+use BeltoftServices\Account\ServiceArea;
+use BeltoftServices\Account\Slugs;
 
 defined( 'ABSPATH' ) || exit;
 

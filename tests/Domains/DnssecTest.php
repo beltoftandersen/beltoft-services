@@ -468,7 +468,7 @@ class DnssecTest extends TestCase {
 
 	public function test_the_page_has_a_security_tab_only_when_something_is_offered_and_shows_the_state(): void {
 		$this->table();
-		$page = static fn( \BeltoftServices\Resource $r ) => \BeltoftServices\Account\DomainPage::build( $r, array( 'license' => $r->license(), 'tab' => 'security' ) );
+		$page = static fn( \BeltoftServices\Resource $r ) => \BeltoftServices\Domains\DomainPage::build( $r, array( 'license' => $r->license(), 'tab' => 'security' ) );
 		$dk = $page( $this->domain( 'plain-example.dk', array( 'whois_privacy_allowed' => false ) ) );
 		$this->assertArrayNotHasKey( 'security', $dk['tabs'] );
 		$this->assertNull( $dk['dnssec'] );

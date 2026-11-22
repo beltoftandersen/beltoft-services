@@ -3,8 +3,8 @@
 namespace BeltoftServices\Tests\Account;
 
 use BeltoftLicenses\Account\View;
-use BeltoftServices\Account\Domains;
-use BeltoftServices\Account\DomainRows;
+use BeltoftServices\Domains\Domains;
+use BeltoftServices\Domains\DomainRows;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Domains\DnsClaims;
@@ -163,7 +163,7 @@ class DomainsAreaTest extends TestCase {
 			foreach ( $wp_filter[ $hook ]->callbacks ?? array() as $callbacks ) {
 				foreach ( $callbacks as $callback ) {
 					$fn = $callback['function'];
-					if ( is_array( $fn ) && ( ServiceArea::class === $fn[0] || ( is_object( $fn[0] ) && $fn[0] instanceof ServiceArea ) ) || is_array( $fn ) && 'BeltoftServices\\Account\\Domains' === $fn[0] ) {
+					if ( is_array( $fn ) && ( ServiceArea::class === $fn[0] || ( is_object( $fn[0] ) && $fn[0] instanceof ServiceArea ) ) || is_array( $fn ) && 'BeltoftServices\\Domains\\Domains' === $fn[0] ) {
 						++$n;
 					}
 				}
@@ -189,7 +189,7 @@ class DomainsAreaTest extends TestCase {
 			}
 		}
 
-		$this->assertNotContains( \BeltoftServices\Account\DomainPage::class . '::head', $listeners );
+		$this->assertNotContains( \BeltoftServices\Domains\DomainPage::class . '::head', $listeners );
 		$this->assertContains( ServiceArea::class . '::head', $listeners );
 
 		$domain = $this->service( 'head.example' );

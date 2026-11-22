@@ -182,7 +182,7 @@ final class Plugin {
 		Account\Slugs::register();
 		Account\Servers::register();
 		Account\ServiceArea::register();
-		Account\Domains::register();
+		Domains\Domains::register();
 		Account\Databases::register();
 		Hosting\Hosting::register();
 		Http\AccountApps::register();
@@ -191,7 +191,7 @@ final class Plugin {
 		Licences\Licences::register();
 		Storage\Storage::register();
 		ManualServer\Dedicated::register();
-		Account\DomainDanger::register();
+		Domains\DomainDanger::register();
 		Account\ServerPicker::register();
 		Account\DbPicker::register();
 		Account\Overview::register();

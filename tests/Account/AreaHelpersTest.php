@@ -2,7 +2,7 @@
 /** The small helpers the account areas share: moving a menu item, and the setting-to-address rule. @package BeltoftServices */
 namespace BeltoftServices\Tests\Account;
 
-use BeltoftServices\Account\Domains;
+use BeltoftServices\Domains\Domains;
 use BeltoftServices\Mail\Email;
 use BeltoftServices\Hosting\Hosting;
 use BeltoftServices\Licences\Licences;

@@ -11,7 +11,7 @@
  *
  * @package BeltoftServices
  *
- * @var array<string, mixed> $d Values from BeltoftServices\Account\DomainPage::build().
+ * @var array<string, mixed> $d Values from BeltoftServices\Domains\DomainPage::build().
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -20,9 +20,9 @@ defined( 'ABSPATH' ) || exit;
 $r        = $d['r'];
 $beltoft_tabs   = $d['tabs'];
 $beltoft_active = $d['active'];
-$beltoft_next   = \BeltoftServices\Account\DomainPage::next_step( $d );
+$beltoft_next   = \BeltoftServices\Domains\DomainPage::next_step( $d );
 $beltoft_link   = static function ( string $slug ) use ( $d ): string {
-	return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Domains::class )->url( $d['license'], 'overview' === $slug ? '' : $slug );
+	return \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Domains\Domains::class )->url( $d['license'], 'overview' === $slug ? '' : $slug );
 };
 $beltoft_open   = static function ( string $slug ) use ( $beltoft_active, $r ): void {
 	?>

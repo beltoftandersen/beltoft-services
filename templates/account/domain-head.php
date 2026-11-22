@@ -2,7 +2,7 @@
 /**
  * The head of a page of a service in an area (a domain, mail, an app): the back link, the name, and the state line (the state, then $kind, or what the page is doing: see assets/status.js).
  *
- * Variables (set by BeltoftServices\Account\DomainPage::head()): $title, $group (getting-ready, ready, paused, removed or failed),
+ * Variables (set by BeltoftServices\Domains\DomainPage::head()): $title, $group (getting-ready, ready, paused, removed or failed),
  * $badge (the state text), $message (a sentence about the state), $show_message (print the message line), $kind, $renews.
  * The state text and the message are the ones the status poll keeps up to date, so the elements keep their data attributes.
  *

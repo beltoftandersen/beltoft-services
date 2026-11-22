@@ -3,7 +3,7 @@
 namespace BeltoftServices\Tests\Domains;
 
 use BeltoftLicenses\Account\View;
-use BeltoftServices\Account\Domains;
+use BeltoftServices\Domains\Domains;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Domains\DomainDriver;
