@@ -13,7 +13,6 @@ use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Apps\AppReinstallPaid;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Pve\Clusters;
-use BeltoftServices\Proxmox\Network\Firewall;
 use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Proxmox\Vm\SshKeyField;
@@ -53,13 +52,6 @@ final class ServerActions {
 			case 'replace_ssh_key':
 				return self::summary_key( $r, (string) $args['key'], $label );
 
-			case 'reset_firewall':
-				return self::checked( $r, $action, array(), sprintf(
-					/* translators: %s: server name. */
-					__( 'Start the firewall of server %s again from its default rules. The rules the customer has set are removed. Anything the default rules do not allow is blocked, and the change runs in the background.', 'beltoft-services' ),
-					$label
-				) );
-
 		}
 
 		return new \WP_Error( 'beltoft_services_tool', __( 'This is not available.', 'beltoft-services' ) );
@@ -88,9 +80,6 @@ final class ServerActions {
 
 			case 'replace_ssh_key':
 				return self::send( $args, 'replace_ssh_key', array( 'key' => (string) $args['key'] ), 'SSH key change requested' );
-
-			case 'reset_firewall':
-				return self::send( $args, 'fw_reset', array(), 'firewall reset requested' );
 
 		}
 
@@ -136,7 +125,7 @@ final class ServerActions {
 	 * @param string               $state  What the summary depends on, besides the service's state.
 	 * @return array{text: string, state: string}|\WP_Error
 	 */
-	private static function checked( Resource $r, string $action, array $args, string $text, string $state = '' ) {
+	public static function checked( Resource $r, string $action, array $args, string $text, string $state = '' ) {
 		$why = self::refusal( $r, $action, $args );
 
 		if ( null !== $why ) {
@@ -372,49 +361,4 @@ final class ServerActions {
 	}
 
 	// -- Escalations of the everyday tools -------------------------------------------------------
-
-	/**
-	 * The firewall turned off, or rules that open many ports to anyone.
-	 *
-	 * @param array<string, mixed> $args Tool arguments.
-	 * @return array{text: string, state: string}|\WP_Error
-	 */
-	public static function summary_firewall( array $args ) {
-		$r = Tools::owned( (int) $args['id'], true );
-
-		if ( $r instanceof \WP_Error ) {
-			return $r;
-		}
-
-		$bad = self::not_offered( $r, 'fw_apply' );
-
-		if ( null !== $bad ) {
-			return $bad;
-		}
-
-		$label = Irreversible::name( $r );
-
-		if ( false === $args['on'] ) {
-			return array(
-				'text'  => sprintf(
-					/* translators: %s: server name. */
-					__( 'Turn the firewall of server %s off. Every port of the server can then be reached from the whole internet, whatever the rules say. The rules are kept and can be turned on again.', 'beltoft-services' ),
-					$label
-				),
-				'state' => $r->id() . '|fw_off|' . (string) wp_json_encode( $r->get( Firewall::ON ) ),
-			);
-		}
-
-		$wide = Tools::open_ports( $args['rules'] )['ranges'];
-
-		return array(
-			'text'  => sprintf(
-				/* translators: 1: server name, 2: the wide rules, for example tcp 1-65535. */
-				__( 'Change the firewall of server %1$s so that these rules let anyone on the internet reach many ports: %2$s. Anything listening on those ports, including software the customer forgot, can then be reached from everywhere. All the rules in the call replace the rules now in force.', 'beltoft-services' ),
-				$label,
-				implode( ', ', $wide )
-			),
-			'state' => $r->id() . '|fw_wide|' . (string) wp_json_encode( $wide ),
-		);
-	}
 }

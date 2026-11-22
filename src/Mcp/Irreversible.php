@@ -31,7 +31,7 @@ final class Irreversible {
 	/**
 	 * The tools this class runs.
 	 */
-	public const NAMES = array( 'delete_snapshot', 'rollback_snapshot', 'restore_backup', 'reinstall_server', 'replace_ssh_key', 'reset_firewall', 'cancel_subscription', 'remove_addon', 'set_default_payment_method', 'order_server', 'order_database', 'delete_server', 'delete_database' );
+	public const NAMES = array( 'delete_snapshot', 'rollback_snapshot', 'restore_backup', 'reinstall_server', 'replace_ssh_key', 'cancel_subscription', 'remove_addon', 'set_default_payment_method', 'order_server', 'order_database', 'delete_server', 'delete_database' );
 
 	/**
 	 * The summary of a call that needs a confirmation, and what the summary depends on.
@@ -49,9 +49,6 @@ final class Irreversible {
 		}
 
 		switch ( $name ) {
-			case 'set_firewall':
-				return ServerActions::summary_firewall( $args );
-
 			case 'cancel_subscription':
 			case 'remove_addon':
 			case 'set_default_payment_method':

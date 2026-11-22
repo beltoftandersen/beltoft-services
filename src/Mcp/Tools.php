@@ -50,7 +50,7 @@ final class Tools {
 	/**
 	 * Names that Reads, Details and Acts run.
 	 */
-	private const READS = array( 'service_details', 'usage_summary', 'list_recovery_points', 'get_firewall', 'list_orders', 'get_order', 'list_subscriptions', 'list_payment_methods', 'get_account', 'catalog', 'list_server_plans', 'price_quote', 'console_link', 'list_licenses', 'get_license_key' );
+	private const READS = array( 'service_details', 'usage_summary', 'list_recovery_points', 'list_orders', 'get_order', 'list_subscriptions', 'list_payment_methods', 'get_account', 'catalog', 'list_server_plans', 'price_quote', 'console_link', 'list_licenses', 'get_license_key' );
 
 	/**
 	 * The tool that is running, for the allow-list of the routes it calls.
@@ -116,92 +116,6 @@ final class Tools {
 	public static function risky( string $name, array $args ): bool {
 		if ( ToolSets::risky( $name, $args ) ) {
 			return true;
-		}
-
-		if ( 'set_firewall' === $name ) {
-			return false === ( $args['on'] ?? null ) || self::wide_open( $args['rules'] ?? null );
-		}
-
-		return false;
-	}
-
-	/**
-	 * Does a rule list open more than 100 ports, all rules together, to anyone?
-	 *
-	 * @param mixed $rules Rules as sent.
-	 */
-	private static function wide_open( $rules ): bool {
-		return self::open_ports( $rules )['total'] > 100;
-	}
-
-	/**
-	 * The ports a rule list opens to anyone, with the rules put together: a port opened by several rules counts once, and
-	 * many small rules count as much as one big one. "Anyone" is no source at all, or a source broader than /8 (IPv4) or
-	 * /32 (IPv6), in any of the rule's sources.
-	 *
-	 * @param mixed $rules Rules as sent.
-	 * @return array{total: int, ranges: string[]} The number of ports and the merged ranges, such as "tcp 1-65535".
-	 */
-	public static function open_ports( $rules ): array {
-		$by_proto = array();
-
-		foreach ( is_array( $rules ) ? $rules : array() as $rule ) {
-			if ( ! is_array( $rule ) || ! in_array( $rule['proto'] ?? '', array( 'tcp', 'udp' ), true ) || ! self::open_to_anyone( $rule['sources'] ?? array() ) ) {
-				continue;
-			}
-
-			$from = is_int( $rule['from'] ?? null ) ? $rule['from'] : 0;
-			$to   = is_int( $rule['to'] ?? null ) ? $rule['to'] : $from;
-
-			if ( $from > 0 && $to >= $from ) {
-				$by_proto[ $rule['proto'] ][] = array( $from, $to );
-			}
-		}
-
-		$total  = 0;
-		$ranges = array();
-
-		foreach ( $by_proto as $proto => $list ) {
-			usort( $list, static fn( $a, $b ) => $a[0] <=> $b[0] );
-			$merged = array();
-
-			foreach ( $list as $range ) {
-				$last = count( $merged ) - 1;
-
-				if ( $last >= 0 && $range[0] <= $merged[ $last ][1] + 1 ) {
-					$merged[ $last ][1] = max( $merged[ $last ][1], $range[1] );
-				} else {
-					$merged[] = $range;
-				}
-			}
-
-			foreach ( $merged as $range ) {
-				$total   += $range[1] - $range[0] + 1;
-				$ranges[] = $proto . ' ' . $range[0] . '-' . $range[1];
-			}
-		}
-
-		return array( 'total' => $total, 'ranges' => $ranges );
-	}
-
-	/**
-	 * Is a rule's list of sources "anyone": empty, or with an address range broader than /8 (IPv4) or /32 (IPv6)?
-	 *
-	 * @param mixed $sources Sources as sent.
-	 */
-	private static function open_to_anyone( $sources ): bool {
-		if ( ! is_array( $sources ) || ! $sources ) {
-			return true;
-		}
-
-		foreach ( $sources as $source ) {
-			$parts  = explode( '/', trim( (string) $source ), 2 );
-			$v6     = str_contains( $parts[0], ':' );
-			$prefix = isset( $parts[1] ) && ctype_digit( $parts[1] ) ? (int) $parts[1] : ( $v6 ? 128 : 32 );
-
-			if ( $prefix < ( $v6 ? 32 : 8 ) ) {
-				return true;
-			}
 		}
 
 		return false;

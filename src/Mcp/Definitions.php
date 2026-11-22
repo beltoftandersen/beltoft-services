@@ -178,7 +178,6 @@ final class Definitions {
 			'service_details'  => self::read( 'Shows one service in full: plan, state, renewal and its subscription (status, next payment, auto-renew), and what belongs to its kind: for a server its address, system, firewall, private network, snapshots, backups and app; for a database its connection details, backups and access list; for a domain its name servers, transfer lock and expiry. It also says which actions the dashboard offers now.' . self::DATA, $by_id, 30 ),
 			'usage_summary'    => self::read( 'Shows the live CPU, memory and disk use of the customer\'s running servers, and, for pay-as-you-go, what the usage costs so far this month (an estimate, excluding VAT, each service capped at its max per month). It also says whether a card is saved and the account credit balance.' . self::DATA, $none, 30 ),
 			'list_recovery_points' => self::read( 'Lists the snapshots (with free slots) and the backups of one server, or the backups of one database, with their ids and dates.' . self::DATA, $by_id, 30 ),
-			'get_firewall'     => self::read( 'Shows the firewall of one server: whether it is on, its rules (protocol, ports, allowed addresses, label) and whether a change is being applied.' . self::DATA, $by_id ),
 			'list_orders'      => self::read( 'Lists the customer\'s recent orders with date, status, total, items, and whether one is waiting for payment (then the customer pays on the order page in the dashboard).' . self::DATA, self::obj( array( 'limit' => array( 'type' => 'integer', 'minimum' => 1, 'maximum' => 20, 'description' => 'How many, newest first. Default 10.' ) ) ), 30 ),
 			'get_order'        => self::read( 'Shows one of the customer\'s orders: status, dates, items with prices, tax, total, payment method and its subscriptions.' . self::DATA, self::obj( array( 'order_id' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'The order id, from list_orders.' ) ), array( 'order_id' ) ), 30 ),
 			'list_subscriptions' => self::read( 'Lists the customer\'s subscriptions with status, price and period, next payment, whether it renews by itself, and what the dashboard offers on each (for example reactivate).' . self::DATA, self::obj( array( 'status' => array( 'type' => 'string', 'enum' => array( 'any', 'active', 'on-hold', 'pending', 'pending-cancel', 'cancelled', 'expired' ), 'description' => 'Only this status. Default any.' ) ) ), 30 ),
@@ -201,36 +200,6 @@ final class Definitions {
 				false
 			),
 			'rename_server'    => self::act( 'Gives a server a new name. The name is shown in the dashboard and used as its host name.', self::obj( array( 'id' => $id, 'name' => array( 'type' => 'string', 'maxLength' => 63, 'description' => 'The new name: letters, numbers and dashes.' ) ), array( 'id', 'name' ) ), true, true ),
-			'set_firewall'     => self::act(
-				'Replaces the firewall rules of one server and turns the firewall on. Read get_firewall first and send the whole list you want. Ask the customer first. Through Claude, SSH (port 22) must stay open to anyone, or the rules that let SSH in must stay as they are, so the customer cannot lock themselves out. Turning the firewall off, or opening a wide range of ports to anyone, needs Full access and a confirmation: the first call returns a summary and a confirm value, show the summary to the customer and send the value only after their clear yes.',
-				self::obj(
-					array(
-						'id'    => $id,
-						'on'    => array( 'type' => 'boolean', 'description' => 'true to apply the rules.' ),
-						'rules' => array(
-							'type'        => 'array',
-							'description' => 'The rules after the change. Each has proto (tcp, udp or icmp), from and to (ports; to is optional), sources (IPv4 addresses or ranges; empty means anyone) and an optional label.',
-							'maxItems'    => 100,
-							'items'       => array(
-								'type'       => 'object',
-								'properties' => array(
-									'proto'   => array( 'type' => 'string', 'enum' => array( 'tcp', 'udp', 'icmp' ) ),
-									'from'    => array( 'type' => 'integer', 'minimum' => 1, 'maximum' => 65535 ),
-									'to'      => array( 'type' => 'integer', 'minimum' => 1, 'maximum' => 65535 ),
-									'sources' => array( 'type' => 'array', 'maxItems' => 20, 'items' => array( 'type' => 'string', 'maxLength' => 64 ) ),
-									'label'   => array( 'type' => 'string', 'maxLength' => 60 ),
-								),
-								'required'   => array( 'proto' ),
-							),
-						),
-					),
-					array( 'id', 'on', 'rules' ),
-					true
-				),
-				true,
-				true
-			),
-			'private_network'  => self::act( 'Attaches a server to one of the customer\'s private networks, or detaches it. The customer can have up to five; without a network id the first one is used. The change runs in the background.', self::obj( array( 'id' => $id, 'action' => array( 'type' => 'string', 'enum' => array( 'attach', 'detach' ) ), 'network' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'For attach: the id of one of the customer\'s private networks (see the private_networks of service_details). Optional.' ) ), array( 'id', 'action' ) ), true ),
 			'set_usage_alerts' => self::act( 'Turns the e-mails about high usage of one server on or off.', self::obj( array( 'id' => $id, 'on' => array( 'type' => 'boolean' ) ), array( 'id', 'on' ) ), false, true ),
 			'set_auto_renew'   => self::act( 'Turns automatic renewal of one subscription on or off, where the shop allows it. With it off the customer pays the renewal invoice by hand and the service ends if it is not paid. Ask the customer first.', self::obj( array( 'subscription_id' => $sub, 'on' => array( 'type' => 'boolean' ) ), array( 'subscription_id', 'on' ) ), true, true, 10 ),
 			'reactivate_subscription' => self::act( 'Reactivates a subscription that is on hold, when the dashboard offers reactivation for it (see list_subscriptions) and nothing is owed.', self::obj( array( 'subscription_id' => $sub ), array( 'subscription_id' ) ), false, true, 10 ),
@@ -290,12 +259,6 @@ final class Definitions {
 			'replace_ssh_key'  => self::full(
 				'Adds or replaces the SSH key of a server. The old key stops working, so the customer must have the matching private key or they are locked out.',
 				self::obj( array( 'id' => $id, 'key' => array( 'type' => 'string', 'maxLength' => 2000, 'description' => 'The public key, one line, for example ssh-ed25519 AAAA... name.' ) ), array( 'id', 'key' ), true )
-			),
-			'reset_firewall'   => self::full(
-				'Starts the firewall of a server again from its default rules. The rules the customer set are removed.',
-				self::obj( array( 'id' => $id ), array( 'id' ), true ),
-				false,
-				true
 			),
 			'order_server'     => self::full(
 				'Orders a new pay as you go server. Choose the plan, system or app, name, backups, extra disk and SSH key with the customer first (list_server_plans). Nothing is charged now: the hours are billed monthly to the card saved on the customer\'s usage account (a saved card is required, credit alone is not enough; VAT is added on the invoice and credit is applied first). A customer who has no usage account yet gets a link to finish the first order once in the browser, and nothing is ordered.',

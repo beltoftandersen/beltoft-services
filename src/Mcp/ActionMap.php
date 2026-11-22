@@ -37,30 +37,23 @@ final class ActionMap {
 		'reboot'             => 'reboot',
 		'rename'             => 'rename_server',
 		'snapshot_take'      => 'create_snapshot',
-		'private_attach'     => 'private_network',
-		'private_detach'     => 'private_network',
 		'snapshot_delete'    => 'delete_snapshot',
 		'snapshot_rollback'  => 'rollback_snapshot',
 		'restore'            => 'restore_backup',
 		'reinstall'          => 'reinstall_server',
 		'replace_ssh_key'    => 'replace_ssh_key',
-		'fw_reset'           => 'reset_firewall',
 	);
 
 	/**
 	 * Action name => why no tool runs it. "never" is for good, "route" means a tool reaches it through its own REST route.
 	 */
 	private const EXCLUDED = array(
-		'fw_apply'          => 'route: the firewall has its own tool (set_firewall)',
 		'backup_delete'     => 'never: a backup is the last copy after a mistake or an attack; deleting one is only done in the dashboard',
 		'storage_snapshot'  => 'never: backup storage is changed in the dashboard only in this version (no tool, no API token)',
 		'storage_snapshot_delete' => 'never: a snapshot can be the last copy after a mistake or an attack; deleting one is only done in the dashboard',
 		'storage_snapshot_plan' => 'never: backup storage is changed in the dashboard only in this version (no tool, no API token)',
 		'storage_access'    => 'never: switching access of backup storage is only done in the dashboard',
 		'reset_password'    => 'never: a new server password needs the code emailed to the account address, so it is only available in the dashboard',
-		'ipv6_add'          => 'never: adding or removing IPv6 restarts the server and makes its SSH host keys again, so it is only done in the dashboard',
-		'ipv6_remove'       => 'never: adding or removing IPv6 restarts the server and makes its SSH host keys again, so it is only done in the dashboard',
-		'ipv4_guest'        => 'never: it runs a script inside the customer\'s server through the guest agent, so it is only done in the dashboard',
 	);
 
 	/**
@@ -74,8 +67,6 @@ final class ActionMap {
 		'remove_snapshot_slots'    => 'remove_addon',
 		'remove_app_licence'       => 'remove_addon',
 		'stop_dns_hosting'         => 'cancel_subscription',
-		'firewall_off'             => 'set_firewall',
-		'firewall_wide_open'       => 'set_firewall',
 		'set_default_card'         => 'set_default_payment_method',
 		'reveal_server_password'   => 'reveal_server_password',
 		'order_server'             => 'order_server',
@@ -106,8 +97,6 @@ final class ActionMap {
 	private const ROUTES = array(
 		'server_status'      => array( 'GET #^/resources/\d+$#D' ),
 		'server_usage'       => array( 'GET #^/resources/\d+/metrics$#D' ),
-		'get_firewall'       => array( 'GET #^/resources/\d+/firewall$#D' ),
-		'set_firewall'       => array( 'PUT #^/resources/\d+/firewall$#D' ),
 		'set_usage_alerts'   => array( 'POST #^/resources/\d+/usage-alerts$#D' ),
 		'usage_summary'      => array( 'GET #^/usage$#D' ),
 		'reveal_server_password'   => array( 'POST #^/resources/\d+/reveal$#D' ),

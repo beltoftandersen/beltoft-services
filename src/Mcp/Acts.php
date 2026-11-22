@@ -16,7 +16,6 @@ use BeltoftServices\Account\AddressService;
 use BeltoftServices\Account\Cards;
 use BeltoftServices\Domains\DomainDanger;
 use BeltoftServices\Billing\Subscriptions;
-use BeltoftServices\Proxmox\Network\PrivateAttach;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -32,7 +31,7 @@ final class Acts {
 	/**
 	 * The tools this class runs.
 	 */
-	public const NAMES = array( 'rename_server', 'set_firewall', 'private_network', 'set_usage_alerts', 'set_auto_renew', 'reactivate_subscription', 'free_license_site', 'cancel_unpaid_order', 'update_billing_address' );
+	public const NAMES = array( 'rename_server', 'set_usage_alerts', 'set_auto_renew', 'reactivate_subscription', 'free_license_site', 'cancel_unpaid_order', 'update_billing_address' );
 
 	/**
 	 * Runs one of the tools.
@@ -46,22 +45,6 @@ final class Acts {
 		switch ( $name ) {
 			case 'rename_server':
 				return Tools::action( (int) $args['id'], 'rename', array( 'name' => (string) $args['name'] ), 'rename requested' );
-
-			case 'set_firewall':
-				$id   = (int) $args['id'];
-				$body = array( 'on' => (bool) $args['on'], 'rules' => $args['rules'] );
-
-				// Turning it off is a call that went through the confirmation (Tools::call): the dashboard's own "are you sure" is answered.
-				if ( ! $body['on'] ) {
-					$body['confirm_off'] = true;
-				}
-
-				$done = Tools::route( 'PUT', '/resources/' . $id . '/firewall', array(), $body, $id, 'firewall change requested' );
-
-				return $done instanceof \WP_Error ? $done : array( 'requested' => true, 'message' => 'Requested. It is applied in the background. Use get_firewall to follow it.' );
-
-			case 'private_network':
-				return Tools::action( (int) $args['id'], 'attach' === $args['action'] ? PrivateAttach::ATTACH : PrivateAttach::DETACH, 'attach' === $args['action'] && ! empty( $args['network'] ) ? array( 'net' => (string) (int) $args['network'] ) : array(), 'private network ' . (string) $args['action'] . ' requested' );
 
 			case 'set_usage_alerts':
 				$id   = (int) $args['id'];

@@ -256,7 +256,7 @@ final class HardeningTest extends McpTestCase {
 		$this->assertSame( Tokens::ACTIONS, $level( array( array( 'proto' => 'tcp', 'from' => 1, 'to' => 65535, 'sources' => array( '2001:db8::/32' ) ) ) ) );
 		$this->assertSame( Tokens::ACTIONS, $level( array( array( 'proto' => 'tcp', 'from' => 1, 'to' => 100 ), array( 'proto' => 'tcp', 'from' => 1, 'to' => 100 ) ) ), 'The same ports twice are counted once.' );
 		$this->assertSame( Tokens::ACTIONS, $level( array( array( 'proto' => 'tcp', 'from' => 22 ), array( 'proto' => 'icmp', 'from' => 1, 'to' => 65535 ) ) ), 'icmp has no ports.' );
-		$this->assertSame( 101, Tools::open_ports( array( array( 'proto' => 'tcp', 'from' => 1, 'to' => 100 ), array( 'proto' => 'tcp', 'from' => 101 ) ) )['total'] );
+		$this->assertSame( 101, \BeltoftServices\Proxmox\Network\McpTools::open_ports( array( array( 'proto' => 'tcp', 'from' => 1, 'to' => 100 ), array( 'proto' => 'tcp', 'from' => 101 ) ) )['total'] );
 
 		// And the call through the tool: refused at the actions level.
 		$r     = $this->offering( array( 'fw_apply' ) );

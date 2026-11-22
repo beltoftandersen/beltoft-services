@@ -241,6 +241,7 @@ final class Plugin {
 		Mcp\Access::register();
 		Apps\McpTools::register();
 		Proxmox\Db\McpTools::register();
+		Proxmox\Network\McpTools::register();
 		Domains\McpTools::register();
 		Hosting\McpTools::register();
 		Mail\McpTools::register();

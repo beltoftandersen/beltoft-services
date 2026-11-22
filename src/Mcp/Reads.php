@@ -65,18 +65,6 @@ final class Reads {
 			case 'list_recovery_points':
 				return self::recovery_points( (int) $args['id'] );
 
-			case 'get_firewall':
-				$view = Tools::route( 'GET', '/resources/' . (int) $args['id'] . '/firewall', array(), null, (int) $args['id'], 'firewall read' );
-
-				if ( $view instanceof \WP_Error ) {
-					return $view;
-				}
-
-				// The page's own address, button text and clock are not for a result.
-				unset( $view['my_ip'], $view['now'] );
-
-				return $view;
-
 			case 'list_orders':
 				return self::orders( $user_id, (int) ( $args['limit'] ?? 10 ) );
 
