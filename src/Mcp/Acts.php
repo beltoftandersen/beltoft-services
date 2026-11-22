@@ -16,7 +16,6 @@ use BeltoftServices\Account\AddressService;
 use BeltoftServices\Account\Cards;
 use BeltoftServices\Domains\DomainDanger;
 use BeltoftServices\Billing\Subscriptions;
-use BeltoftServices\Proxmox\Db\DbAccess;
 use BeltoftServices\Proxmox\Network\PrivateAttach;
 use BeltoftServices\Resource;
 
@@ -33,7 +32,7 @@ final class Acts {
 	/**
 	 * The tools this class runs.
 	 */
-	public const NAMES = array( 'rename_server', 'set_firewall', 'set_database_access', 'private_network', 'set_usage_alerts', 'set_auto_renew', 'reactivate_subscription', 'free_license_site', 'cancel_unpaid_order', 'update_billing_address' );
+	public const NAMES = array( 'rename_server', 'set_firewall', 'private_network', 'set_usage_alerts', 'set_auto_renew', 'reactivate_subscription', 'free_license_site', 'cancel_unpaid_order', 'update_billing_address' );
 
 	/**
 	 * Runs one of the tools.
@@ -60,25 +59,6 @@ final class Acts {
 				$done = Tools::route( 'PUT', '/resources/' . $id . '/firewall', array(), $body, $id, 'firewall change requested' );
 
 				return $done instanceof \WP_Error ? $done : array( 'requested' => true, 'message' => 'Requested. It is applied in the background. Use get_firewall to follow it.' );
-
-			case 'set_database_access':
-				$id   = (int) $args['id'];
-				$body = array( 'op' => (string) $args['op'] );
-
-				// Opening to everyone went through the confirmation: the dashboard's typed phrase is supplied by the server.
-				if ( 'world_on' === $body['op'] ) {
-					$body['confirm'] = DbAccess::CONFIRM_WORLD;
-				}
-
-				foreach ( array( 'address' => 'cidr', 'label' => 'label' ) as $from => $to ) {
-					if ( isset( $args[ $from ] ) ) {
-						$body[ $to ] = (string) $args[ $from ];
-					}
-				}
-
-				$done = Tools::route( 'POST', '/resources/' . $id . '/db-access', array(), $body, $id, 'database access list: ' . str_replace( '_', ' ', (string) $args['op'] ) );
-
-				return $done instanceof \WP_Error ? $done : array( 'requested' => true, 'message' => 'Requested. It is applied in the background. Use get_database_access to follow it.' );
 
 			case 'private_network':
 				return Tools::action( (int) $args['id'], 'attach' === $args['action'] ? PrivateAttach::ATTACH : PrivateAttach::DETACH, 'attach' === $args['action'] && ! empty( $args['network'] ) ? array( 'net' => (string) (int) $args['network'] ) : array(), 'private network ' . (string) $args['action'] . ' requested' );

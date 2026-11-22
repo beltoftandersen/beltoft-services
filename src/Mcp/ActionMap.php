@@ -45,7 +45,6 @@ final class ActionMap {
 		'reinstall'          => 'reinstall_server',
 		'replace_ssh_key'    => 'replace_ssh_key',
 		'fw_reset'           => 'reset_firewall',
-		'db_set_policy'      => 'set_database_eviction_policy',
 	);
 
 	/**
@@ -54,13 +53,11 @@ final class ActionMap {
 	private const EXCLUDED = array(
 		'fw_apply'          => 'route: the firewall has its own tool (set_firewall)',
 		'backup_delete'     => 'never: a backup is the last copy after a mistake or an attack; deleting one is only done in the dashboard',
-		'db_private_move'   => 'never: moving a database to another private network changes the address the customer\'s applications use; it is done in the dashboard, on the Network tab',
 		'storage_snapshot'  => 'never: backup storage is changed in the dashboard only in this version (no tool, no API token)',
 		'storage_snapshot_delete' => 'never: a snapshot can be the last copy after a mistake or an attack; deleting one is only done in the dashboard',
 		'storage_snapshot_plan' => 'never: backup storage is changed in the dashboard only in this version (no tool, no API token)',
 		'storage_access'    => 'never: switching access of backup storage is only done in the dashboard',
 		'reset_password'    => 'never: a new server password needs the code emailed to the account address, so it is only available in the dashboard',
-		'db_reset_password' => 'never: a new database password needs the code emailed to the account address, so it is only available in the dashboard',
 		'ipv6_add'          => 'never: adding or removing IPv6 restarts the server and makes its SSH host keys again, so it is only done in the dashboard',
 		'ipv6_remove'       => 'never: adding or removing IPv6 restarts the server and makes its SSH host keys again, so it is only done in the dashboard',
 		'ipv4_guest'        => 'never: it runs a script inside the customer\'s server through the guest agent, so it is only done in the dashboard',
@@ -79,11 +76,8 @@ final class ActionMap {
 		'stop_dns_hosting'         => 'cancel_subscription',
 		'firewall_off'             => 'set_firewall',
 		'firewall_wide_open'       => 'set_firewall',
-		'database_open_to_everyone' => 'set_database_access',
 		'set_default_card'         => 'set_default_payment_method',
 		'reveal_server_password'   => 'reveal_server_password',
-		'reveal_database_password' => 'reveal_database_password',
-		'database_ca_certificate'  => 'get_database_ca_certificate',
 		'order_server'             => 'order_server',
 		'order_database'           => 'order_database',
 		'delete_server'            => 'delete_server',
@@ -111,17 +105,12 @@ final class ActionMap {
 	 */
 	private const ROUTES = array(
 		'server_status'      => array( 'GET #^/resources/\d+$#D' ),
-		'database_info'      => array( 'GET #^/resources/\d+$#D' ),
 		'server_usage'       => array( 'GET #^/resources/\d+/metrics$#D' ),
 		'get_firewall'       => array( 'GET #^/resources/\d+/firewall$#D' ),
 		'set_firewall'       => array( 'PUT #^/resources/\d+/firewall$#D' ),
-		'get_database_access' => array( 'GET #^/resources/\d+/db-access$#D' ),
-		'set_database_access' => array( 'POST #^/resources/\d+/db-access$#D' ),
 		'set_usage_alerts'   => array( 'POST #^/resources/\d+/usage-alerts$#D' ),
 		'usage_summary'      => array( 'GET #^/usage$#D' ),
 		'reveal_server_password'   => array( 'POST #^/resources/\d+/reveal$#D' ),
-		'reveal_database_password' => array( 'POST #^/resources/\d+/db-reveal$#D' ),
-		'get_database_ca_certificate' => array( 'GET #^/resources/\d+/db-ca$#D' ),
 	);
 
 	/**

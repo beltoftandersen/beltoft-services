@@ -77,17 +77,6 @@ final class Reads {
 
 				return $view;
 
-			case 'get_database_access':
-				$id    = (int) $args['id'];
-				$state = Tools::route( 'GET', '/resources/' . $id . '/db-access', array(), null, $id, 'database access list read' );
-				$r     = $state instanceof \WP_Error ? null : Tools::owned( $id );
-
-				if ( $state instanceof \WP_Error || $r instanceof \WP_Error ) {
-					return $state instanceof \WP_Error ? $state : $r;
-				}
-
-				return $state + Details::access( $r );
-
 			case 'list_orders':
 				return self::orders( $user_id, (int) ( $args['limit'] ?? 10 ) );
 

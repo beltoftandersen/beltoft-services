@@ -174,13 +174,11 @@ final class Definitions {
 					array( 'id' )
 				)
 			),
-			'database_info'    => self::read( 'Shows how to connect to one managed database: engine, host, port, database name, user name and the TLS fingerprint. The password is never shown here.', $by_id ),
 			'billing_summary'  => self::read( 'Shows the next payment of the customer: the date, the amount, what it covers and how it is paid. It also says whether a card is saved (needed to order servers and databases), the account credit balance, and the pay as you go usage so far this month. Prices exclude VAT; VAT is added on the usage invoice.', $none, 30 ),
 			'service_details'  => self::read( 'Shows one service in full: plan, state, renewal and its subscription (status, next payment, auto-renew), and what belongs to its kind: for a server its address, system, firewall, private network, snapshots, backups and app; for a database its connection details, backups and access list; for a domain its name servers, transfer lock and expiry. It also says which actions the dashboard offers now.' . self::DATA, $by_id, 30 ),
 			'usage_summary'    => self::read( 'Shows the live CPU, memory and disk use of the customer\'s running servers, and, for pay-as-you-go, what the usage costs so far this month (an estimate, excluding VAT, each service capped at its max per month). It also says whether a card is saved and the account credit balance.' . self::DATA, $none, 30 ),
 			'list_recovery_points' => self::read( 'Lists the snapshots (with free slots) and the backups of one server, or the backups of one database, with their ids and dates.' . self::DATA, $by_id, 30 ),
 			'get_firewall'     => self::read( 'Shows the firewall of one server: whether it is on, its rules (protocol, ports, allowed addresses, label) and whether a change is being applied.' . self::DATA, $by_id ),
-			'get_database_access' => self::read( 'Shows which addresses may connect to one managed database that has a public IP address, whether it is open to everyone, and whether a change is being applied.' . self::DATA, $by_id, 30 ),
 			'list_orders'      => self::read( 'Lists the customer\'s recent orders with date, status, total, items, and whether one is waiting for payment (then the customer pays on the order page in the dashboard).' . self::DATA, self::obj( array( 'limit' => array( 'type' => 'integer', 'minimum' => 1, 'maximum' => 20, 'description' => 'How many, newest first. Default 10.' ) ) ), 30 ),
 			'get_order'        => self::read( 'Shows one of the customer\'s orders: status, dates, items with prices, tax, total, payment method and its subscriptions.' . self::DATA, self::obj( array( 'order_id' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'The order id, from list_orders.' ) ), array( 'order_id' ) ), 30 ),
 			'list_subscriptions' => self::read( 'Lists the customer\'s subscriptions with status, price and period, next payment, whether it renews by itself, and what the dashboard offers on each (for example reactivate).' . self::DATA, self::obj( array( 'status' => array( 'type' => 'string', 'enum' => array( 'any', 'active', 'on-hold', 'pending', 'pending-cancel', 'cancelled', 'expired' ), 'description' => 'Only this status. Default any.' ) ) ), 30 ),
@@ -230,20 +228,6 @@ final class Definitions {
 					true
 				),
 				true,
-				true
-			),
-			'set_database_access' => self::act(
-				'Adds an address to, or removes one from, the list of addresses that may connect to a managed database with a public IP address, or closes the database again after it was open to everyone (world_off). The address is a public IPv4 address or range such as 203.0.113.7 or 203.0.113.0/24. Opening the database to everyone (world_on) needs Full access and a confirmation: the first call returns a summary and a confirm value, show the summary to the customer and send the value only after their clear yes. Ask the customer first.',
-				self::obj(
-					array(
-						'id'      => $id,
-						'op'      => array( 'type' => 'string', 'enum' => array( 'add', 'remove', 'world_on', 'world_off' ), 'description' => 'add, remove, world_on or world_off.' ),
-						'address' => array( 'type' => 'string', 'maxLength' => 64, 'description' => 'For add and remove.' ),
-						'label'   => array( 'type' => 'string', 'maxLength' => 60, 'description' => 'For add: a name the customer recognises. Optional.' ),
-					),
-					array( 'id', 'op' ),
-					true
-				),
 				true
 			),
 			'private_network'  => self::act( 'Attaches a server to one of the customer\'s private networks, or detaches it. The customer can have up to five; without a network id the first one is used. The change runs in the background.', self::obj( array( 'id' => $id, 'action' => array( 'type' => 'string', 'enum' => array( 'attach', 'detach' ) ), 'network' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'For attach: the id of one of the customer\'s private networks (see the private_networks of service_details). Optional.' ) ), array( 'id', 'action' ) ), true ),
@@ -313,12 +297,6 @@ final class Definitions {
 				false,
 				true
 			),
-			'set_database_eviction_policy' => self::full(
-				'Sets what a Valkey database does when its memory is full: the choice decides whether writes fail or data is dropped. Read database details with service_details first.',
-				self::obj( array( 'id' => $id, 'policy' => array( 'type' => 'string', 'maxLength' => 40, 'description' => 'The policy, for example noeviction or allkeys-lru, as the database offers it.' ) ), array( 'id', 'policy' ), true ),
-				false,
-				true
-			),
 			'order_server'     => self::full(
 				'Orders a new pay as you go server. Choose the plan, system or app, name, backups, extra disk and SSH key with the customer first (list_server_plans). Nothing is charged now: the hours are billed monthly to the card saved on the customer\'s usage account (a saved card is required, credit alone is not enough; VAT is added on the invoice and credit is applied first). A customer who has no usage account yet gets a link to finish the first order once in the browser, and nothing is ordered.',
 				self::obj(
@@ -381,18 +359,6 @@ final class Definitions {
 				'Shows the password of a server once. The value then is in this conversation and we no longer have it. If there is none to show, the customer makes a new password in the dashboard.',
 				self::obj( array( 'id' => $id ), array( 'id' ), true ),
 				true
-			),
-			'reveal_database_password' => self::full(
-				'Shows the password of a managed database once. The value then is in this conversation and we no longer have it. If there is none to show, the customer makes a new password in the dashboard.',
-				self::obj( array( 'id' => $id ), array( 'id' ), true ),
-				true
-			),
-			'get_database_ca_certificate' => self::full(
-				'Shows the CA certificate of a managed database, the text the customer saves as a file to connect over TLS. It is a public certificate, not a password.',
-				self::obj( array( 'id' => $id ), array( 'id' ), true ),
-				true,
-				true,
-				false
 			),
 		);
 

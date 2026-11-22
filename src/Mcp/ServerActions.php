@@ -13,8 +13,6 @@ use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Apps\AppReinstallPaid;
 use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Pve\Clusters;
-use BeltoftServices\Proxmox\Db\DbAccess;
-use BeltoftServices\Proxmox\Db\DbPolicy;
 use BeltoftServices\Proxmox\Network\Firewall;
 use BeltoftServices\Proxmox\Snapshot\Snapshots;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
@@ -62,8 +60,6 @@ final class ServerActions {
 					$label
 				) );
 
-			case 'set_database_eviction_policy':
-				return self::summary_policy( $r, (string) $args['policy'], $label );
 		}
 
 		return new \WP_Error( 'beltoft_services_tool', __( 'This is not available.', 'beltoft-services' ) );
@@ -96,8 +92,6 @@ final class ServerActions {
 			case 'reset_firewall':
 				return self::send( $args, 'fw_reset', array(), 'firewall reset requested' );
 
-			case 'set_database_eviction_policy':
-				return self::send( $args, DbPolicy::ACTION, array( 'policy' => (string) $args['policy'] ), 'memory-full policy change requested' );
 		}
 
 		return new \WP_Error( 'beltoft_services_tool', __( 'This is not available.', 'beltoft-services' ) );
@@ -377,38 +371,6 @@ final class ServerActions {
 		);
 	}
 
-	/**
-	 * What a Valkey database does when its memory is full.
-	 *
-	 * @param Resource $r      Database.
-	 * @param string   $policy Policy.
-	 * @param string   $label  The database's name.
-	 * @return array{text: string, state: string}|\WP_Error
-	 */
-	private static function summary_policy( Resource $r, string $policy, string $label ) {
-		$engine  = DbPolicy::engine( $r );
-		$choices = null === $engine ? array() : $engine->eviction_choices();
-
-		if ( ! isset( $choices[ $policy ] ) ) {
-			return new \WP_Error( 'beltoft_services_tool', __( 'Choose one of the listed settings.', 'beltoft-services' ) );
-		}
-
-		$now     = DbPolicy::current( $r );
-		$current = isset( $choices[ $now ] ) ? (string) $choices[ $now ][0] : $now;
-
-		return array(
-			'text'  => sprintf(
-				/* translators: 1: database name, 2: the new setting, 3: what the new setting does, 4: the setting it has now. */
-				__( 'Change what database %1$s does when its memory is full to "%2$s". %3$s It is "%4$s" now. This decides whether writes fail or data is dropped, and it applies at once to the running database.', 'beltoft-services' ),
-				$label,
-				(string) $choices[ $policy ][0],
-				(string) $choices[ $policy ][1],
-				$current
-			),
-			'state' => $r->id() . '|policy|' . $policy . '|' . $now,
-		);
-	}
-
 	// -- Escalations of the everyday tools -------------------------------------------------------
 
 	/**
@@ -453,33 +415,6 @@ final class ServerActions {
 				implode( ', ', $wide )
 			),
 			'state' => $r->id() . '|fw_wide|' . (string) wp_json_encode( $wide ),
-		);
-	}
-
-	/**
-	 * A database opened to everyone.
-	 *
-	 * @param array<string, mixed> $args Tool arguments.
-	 * @return array{text: string, state: string}|\WP_Error
-	 */
-	public static function summary_world( array $args ) {
-		$r = Tools::owned( (int) $args['id'], true );
-
-		if ( $r instanceof \WP_Error ) {
-			return $r;
-		}
-
-		if ( ! DbAccess::editable( $r ) ) {
-			return new \WP_Error( 'beltoft_services_tool', __( 'The access list can be changed when the database is ready and has a public IP address.', 'beltoft-services' ) );
-		}
-
-		return array(
-			'text'  => sprintf(
-				/* translators: %s: database name. */
-				__( 'Open database %s to everyone. Anyone on the internet can then try to log in to it, and attacks on the password are likely. It stays open until it is closed again (world_off), and the customer gets an e-mail about it. Prefer adding the addresses that need access.', 'beltoft-services' ),
-				Irreversible::name( $r )
-			),
-			'state' => $r->id() . '|world|' . (string) wp_json_encode( $r->get( DbAccess::WORLD ) ),
 		);
 	}
 }

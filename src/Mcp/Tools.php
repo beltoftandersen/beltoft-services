@@ -10,9 +10,6 @@ namespace BeltoftServices\Mcp;
 use BeltoftLicenses\Events;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Api\Tokens;
-use BeltoftServices\Proxmox\Db\DbActions;
-use BeltoftServices\Proxmox\Db\DbCard;
-use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
@@ -53,7 +50,7 @@ final class Tools {
 	/**
 	 * Names that Reads, Details and Acts run.
 	 */
-	private const READS = array( 'service_details', 'usage_summary', 'list_recovery_points', 'get_firewall', 'get_database_access', 'list_orders', 'get_order', 'list_subscriptions', 'list_payment_methods', 'get_account', 'catalog', 'list_server_plans', 'price_quote', 'console_link', 'list_licenses', 'get_license_key' );
+	private const READS = array( 'service_details', 'usage_summary', 'list_recovery_points', 'get_firewall', 'list_orders', 'get_order', 'list_subscriptions', 'list_payment_methods', 'get_account', 'catalog', 'list_server_plans', 'price_quote', 'console_link', 'list_licenses', 'get_license_key' );
 
 	/**
 	 * The tool that is running, for the allow-list of the routes it calls.
@@ -119,10 +116,6 @@ final class Tools {
 	public static function risky( string $name, array $args ): bool {
 		if ( ToolSets::risky( $name, $args ) ) {
 			return true;
-		}
-
-		if ( 'set_database_access' === $name ) {
-			return 'world_on' === ( $args['op'] ?? null );
 		}
 
 		if ( 'set_firewall' === $name ) {
@@ -439,9 +432,6 @@ final class Tools {
 			case 'server_usage':
 				return self::server_usage( $id, (string) ( $args['range'] ?? 'hour' ) );
 
-			case 'database_info':
-				return self::database_info( $id );
-
 			case 'create_snapshot':
 				return self::action( $id, 'snapshot_take', isset( $args['label'] ) ? array( 'label' => (string) $args['label'] ) : array(), 'snapshot requested' );
 
@@ -539,42 +529,6 @@ final class Tools {
 		}
 
 		return $out;
-	}
-
-	/**
-	 * How to connect to one database: no password, no certificate.
-	 *
-	 * @param int $id Service id.
-	 * @return array<string, mixed>|\WP_Error
-	 */
-	private static function database_info( int $id ) {
-		$status = self::route( 'GET', '/resources/' . $id, array(), null, $id, 'database details read' );
-
-		if ( $status instanceof \WP_Error ) {
-			return $status;
-		}
-
-		$r = Resource::find( $id );
-
-		if ( ! $r || DbDriver::ID !== $r->get( 'driver' ) ) {
-			return new \WP_Error( 'beltoft_services_forbidden', __( 'This service is not a database.', 'beltoft-services' ) );
-		}
-
-		$card = DbCard::view( $r );
-
-		return array(
-			'id'              => $id,
-			'engine'          => (string) $card['engine'],
-			'version'         => (int) $card['version'],
-			'state'           => (string) $card['kind'],
-			'host'            => (string) $card['host'],
-			'port'            => (int) $card['port'],
-			'database'        => (string) $card['database'],
-			'user'            => (string) $card['user'],
-			'tls_fingerprint' => (string) $card['fingerprint'],
-			'power'           => (string) $card['power']['state'],
-			'password'        => 'Not shown here. The customer reveals it, or makes a new one, in the dashboard.',
-		);
 	}
 
 	/**

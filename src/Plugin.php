@@ -240,6 +240,7 @@ final class Plugin {
 		Oauth\Server::register();
 		Mcp\Access::register();
 		Apps\McpTools::register();
+		Proxmox\Db\McpTools::register();
 		Domains\McpTools::register();
 		Hosting\McpTools::register();
 		Mail\McpTools::register();

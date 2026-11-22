@@ -8,9 +8,6 @@
 namespace BeltoftServices\Mcp;
 
 use BeltoftServices\Proxmox\Vm\Access;
-use BeltoftServices\Proxmox\Db\DbDriver;
-use BeltoftServices\Proxmox\Db\DbGuest;
-use BeltoftServices\Proxmox\Db\DbRoutes;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -78,26 +75,6 @@ final class Secrets {
 				/* translators: %s: server name. */
 				$text = sprintf( __( 'Show the password of server %s. It is shown once, then we no longer have it.', 'beltoft-services' ), $label );
 				break;
-
-			case 'reveal_database_password':
-				if ( DbDriver::ID !== $r->get( 'driver' ) || ! DbRoutes::revealable( $r ) ) {
-					return new \WP_Error( 'beltoft_services_tool', __( 'There is no password to show. It has been shown already or it is no longer available. The customer can make a new one in the dashboard.', 'beltoft-services' ) );
-				}
-
-				/* translators: %s: database name. */
-				$text = sprintf( __( 'Show the password of database %s. It is shown once, then we no longer have it.', 'beltoft-services' ), $label );
-				break;
-
-			default:
-				if ( DbDriver::ID !== $r->get( 'driver' ) || ! DbGuest::pem( (string) $r->get( 'db_ca_pem' ) ) ) {
-					return new \WP_Error( 'beltoft_services_tool', __( 'The certificate is not available.', 'beltoft-services' ) );
-				}
-
-				return array(
-					/* translators: %s: database name. */
-					'text'  => sprintf( __( 'Show the CA certificate of database %s. It is a public certificate, not a password: it is the text to save as a file so a client can check the database over TLS.', 'beltoft-services' ), $label ),
-					'state' => $id . '|ca',
-				);
 		}
 
 		return self::wrap( $text, $state ?? $id . '|' . $name );
