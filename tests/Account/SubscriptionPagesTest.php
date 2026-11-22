@@ -121,6 +121,23 @@ final class SubscriptionPagesTest extends UsageTestCase {
 		$this->assertStringNotContainsString( 'Usage this month', $card );
 	}
 
+	public function test_a_deleted_service_in_the_card_has_no_link(): void {
+		$user = $this->new_user();
+		wp_set_current_user( $user );
+		$this->usage_account( $user );
+		$v  = $this->usage_product();
+		$vm = $this->usage_vm( $v['u-None'], $user );
+
+		$links = new \ReflectionMethod( UsageView::class, 'links' );
+		$links->setAccessible( true );
+		$estimate = array( 'resources' => array( $vm->id() => array() ) );
+		$this->assertArrayHasKey( $vm->id(), $links->invoke( null, $estimate ), 'A live server links to its page.' );
+
+		global $wpdb;
+		$wpdb->update( \BeltoftLicenses\Install::tables()['activations'], array( 'deactivated_at' => gmdate( 'Y-m-d H:i:s' ), 'live_domain' => null ), array( 'id' => $vm->id() ) );
+		$this->assertArrayNotHasKey( $vm->id(), $links->invoke( null, $estimate ), 'A deleted server is plain text.' );
+	}
+
 	public function test_no_card_without_pay_as_you_go(): void {
 		$user = $this->new_user();
 		wp_set_current_user( $user );

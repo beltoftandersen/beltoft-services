@@ -115,7 +115,8 @@ final class UsageView {
 
 		foreach ( array_keys( (array) $estimate['resources'] ) as $id ) {
 			$resource = \BeltoftServices\Resource::find( (int) $id );
-			$url      = $resource ? OverviewData::follow_url( $resource->license() ) : '';
+			// A service deleted this month still has hours on the bill, but its page is gone: plain text, no link.
+			$url = $resource && $resource->is_live() ? OverviewData::follow_url( $resource->license() ) : '';
 
 			if ( '' !== $url ) {
 				$links[ (int) $id ] = $url;

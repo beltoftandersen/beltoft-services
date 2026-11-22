@@ -260,6 +260,7 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 = 0.56.0 =
 * Extra IPv4 addresses of a server are set up inside the server automatically, live and without a restart: after a build or reinstall, when an extra address is added or removed, and with an "Apply again" button on the IPv4 block. The main address is never touched. Where the server cannot be reached the page says "Not set up" and shows the lines to put in by hand, now with the real network card name.
+* The Pay as you go card lists a service deleted this month without a link (its page is gone).
 
 = 0.55.6 =
 * A line name leaves out an option the product name already says as a whole word ("IPv4 address - IPv4" is shown as "IPv4 address").
