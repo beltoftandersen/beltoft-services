@@ -162,6 +162,23 @@ final class McpDumpTest extends McpTestCase {
 			}
 		}
 
+		// The everyday actions that need no confirmation (release 4 moved their code home).
+		$acts = '';
+
+		foreach ( array( 'create_snapshot', 'rename_server', 'set_usage_alerts', 'start', 'shutdown', 'reboot' ) as $name ) {
+			foreach ( $candidates as $label => $id ) {
+				$args = (array) $this->dummy( Definitions::all()[ $name ]['schema'], $id );
+
+				if ( 'rename_server' === $name ) {
+					$args['name'] = 'dump-name';
+				}
+
+				$result = $this->tool( $name, $args, $token );
+				$acts  .= $name . ' [' . $label . '] ' . ( ! empty( $result['isError'] ) ? 'ERROR ' : '' ) . $this->normal( $this->text( $result ), $ids ) . "\n";
+			}
+		}
+
+		$put( 'mcp-acts.txt', $acts );
 		$put( 'mcp-reads.txt', $reads );
 		$put( 'mcp-summaries.txt', $sums );
 	}
