@@ -239,6 +239,7 @@ final class Plugin {
 		Storage\ApiDocs::register();
 		Oauth\Server::register();
 		Mcp\Access::register();
+		Hosting\McpTools::register();
 		ManualServer\McpTools::register();
 		Mcp\Endpoint::register();
 		Account\ApiTokens::register();
