@@ -2,7 +2,7 @@
 /** Domain CLI tests. @package BeltoftServices */
 namespace BeltoftServices\Tests\Domains;
 
-use BeltoftServices\Cli\Commands;
+use BeltoftServices\Domains\DomainsCommand;
 use BeltoftServices\Domains\FakeClient;
 use BeltoftServices\Tests\TestCase;
 
@@ -15,7 +15,7 @@ class CliTest extends TestCase {
 		$fake->reply( 'GET', '/tlds', $fixture['data'] );
 		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
 		\WP_CLI::reset();
-		( new Commands() )->domain_prices( array(), array() );
+		( new DomainsCommand() )->domain_prices( array(), array() );
 		$this->assertStringContainsString( '7', \WP_CLI::text() );
 	}
 
@@ -25,7 +25,7 @@ class CliTest extends TestCase {
 		$license = $this->service_license( $product, array( 'fire' => false ) );
 		\WP_CLI::reset();
 		try {
-			( new Commands() )->link_domain( array( (string) $license['id'], $domain ), array( 'registrar-id' => $id ) );
+			( new DomainsCommand() )->link_domain( array( (string) $license['id'], $domain ), array( 'registrar-id' => $id ) );
 		} catch ( \RuntimeException $e ) {
 			$this->assertNull( \BeltoftServices\Resource::for_license( (int) $license['id'] ), 'Nothing was linked.' );
 			return $e;
@@ -59,7 +59,7 @@ class CliTest extends TestCase {
 		$license = $this->service_license( $product, array( 'fire' => false ) );
 		\WP_CLI::reset();
 
-		( new Commands() )->link_domain( array( (string) $license['id'], 'linked-dry.com' ), array( 'registrar-id' => '448', 'dry-run' => true ) );
+		( new DomainsCommand() )->link_domain( array( (string) $license['id'], 'linked-dry.com' ), array( 'registrar-id' => '448', 'dry-run' => true ) );
 
 		$this->assertStringContainsString( 'Dry run', \WP_CLI::text() );
 		$this->assertNull( \BeltoftServices\Resource::for_license( (int) $license['id'] ), 'Nothing was linked.' );
@@ -70,7 +70,7 @@ class CliTest extends TestCase {
 		remove_all_filters( 'beltoft_services_domains_client' );
 		add_filter( 'beltoft_services_domains_client', static fn() => $wrong );
 		$this->expectException( \RuntimeException::class );
-		( new Commands() )->link_domain( array( (string) $license['id'], 'linked-dry.com' ), array( 'registrar-id' => '449', 'dry-run' => true ) );
+		( new DomainsCommand() )->link_domain( array( (string) $license['id'], 'linked-dry.com' ), array( 'registrar-id' => '449', 'dry-run' => true ) );
 	}
 
 	public function test_link_domain_stops_when_the_registrar_cannot_confirm(): void {

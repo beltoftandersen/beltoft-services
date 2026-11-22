@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Tests;
 
+use BeltoftServices\Http\HttpCommand;
+
 use BeltoftLicenses\Events;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Account\Panel as AccountPanel;
@@ -612,7 +614,7 @@ final class BreachHoldTest extends TestCase {
 
 		\WP_CLI::reset();
 		try {
-			( new \BeltoftServices\Cli\Commands() )->link_http( array( (string) $license['id'], 'remote-1' ), array() );
+			( new HttpCommand() )->link_http( array( (string) $license['id'], 'remote-1' ), array() );
 			$this->fail( 'Expected an error.' );
 		} catch ( \Throwable $e ) {
 			$this->assertNull( Resource::for_license( (int) $license['id'] ) );

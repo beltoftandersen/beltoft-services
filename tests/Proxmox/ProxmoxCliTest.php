@@ -7,7 +7,8 @@
 
 namespace BeltoftServices\Tests\Proxmox;
 
-use BeltoftServices\Cli\Commands;
+use BeltoftServices\Proxmox\Network\NetworkCommand;
+use BeltoftServices\Proxmox\Pve\PveCommand;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Proxmox\Pve\Clusters;
@@ -177,7 +178,7 @@ class ProxmoxCliTest extends TestCase {
 		$license = $this->license();
 		$this->vm();
 
-		( new Commands() )->link_vm( array( (string) $license['id'] ), array( 'cluster' => 'lab', 'node' => 'node-a', 'vmid' => '200', 'ip' => '192.0.2.10', 'dry-run' => true ) );
+		( new PveCommand() )->link_vm( array( (string) $license['id'] ), array( 'cluster' => 'lab', 'node' => 'node-a', 'vmid' => '200', 'ip' => '192.0.2.10', 'dry-run' => true ) );
 
 		$text = \WP_CLI::text();
 		$this->assertStringContainsString( 'READ   GET /cluster/resources', $text );
@@ -414,7 +415,7 @@ class ProxmoxCliTest extends TestCase {
 	}
 
 	public function test_ip_pool_cli(): void {
-		$cli = new Commands();
+		$cli = new NetworkCommand();
 		$cli->ip_pool_add( array( '198.51.100.8/30' ), array( 'gateway' => '198.51.100.9' ) );
 		$this->assertStringContainsString( '1 address', \WP_CLI::text(), 'The gateway is not a host.' );
 
@@ -622,7 +623,7 @@ class ProxmoxCliTest extends TestCase {
 	}
 
 	public function test_ip_pool_release_cli_and_typed_confirmation_for_a_failed_leftover_with_a_vm_record(): void {
-		$cli     = new Commands();
+		$cli     = new NetworkCommand();
 		$license = $this->license();
 		$r       = Resource::create( $license, \BeltoftServices\Drivers\Registry::get( 'proxmox' ), \BeltoftServices\Product::plan( (int) $license['product_id'] ) );
 		$held    = IpPool::hold( $r->id() );
@@ -653,7 +654,7 @@ class ProxmoxCliTest extends TestCase {
 		$mysqli->query( "SELECT GET_LOCK('" . $mysqli->real_escape_string( $name ) . "', 0)" );
 
 		add_filter( 'beltoft_services_alloc_lock_wait', fn() => 0 );
-		$message = $this->failure( fn() => ( new Commands() )->ip_pool_block( array( '192.0.2.10' ), array() ) );
+		$message = $this->failure( fn() => ( new NetworkCommand() )->ip_pool_block( array( '192.0.2.10' ), array() ) );
 		remove_all_filters( 'beltoft_services_alloc_lock_wait' );
 		$mysqli->close();
 

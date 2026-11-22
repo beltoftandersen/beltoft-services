@@ -8,7 +8,7 @@
 
 namespace BeltoftServices\Tests\Proxmox\Network;
 
-use BeltoftServices\Cli\Commands;
+use BeltoftServices\Proxmox\Network\NetworkCommand;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Network\Firewall;
 use BeltoftServices\Proxmox\Network\FirewallRules;
@@ -144,7 +144,7 @@ class IpfilterTest extends FirewallTestCase {
 		\WP_CLI::reset();
 		$before = count( array_filter( $this->fake->calls(), static fn( $c ) => 'GET' !== $c['method'] ) );
 
-		( new Commands() )->ipfilter_report( array( 'lab' ), array( 'format' => 'json' ) );
+		( new NetworkCommand() )->ipfilter_report( array( 'lab' ), array( 'format' => 'json' ) );
 		$rows = json_decode( \WP_CLI::$lines[0][1], true );
 		$this->assertSame( 'ok', $rows[0]['status'] );
 		$this->assertSame( 'on', $rows[0]['ipfilter'] );
@@ -157,7 +157,7 @@ class IpfilterTest extends FirewallTestCase {
 		$this->fake->request( 'DELETE', $base . '/ipset/ipfilter-net0/' . $r->get( 'ip' ) );
 		$this->fake->request( 'POST', $base . '/ipset/ipfilter-net0', array( 'cidr' => '192.0.2.200' ) );
 		\WP_CLI::reset();
-		( new Commands() )->ipfilter_report( array( 'lab' ), array( 'format' => 'json' ) );
+		( new NetworkCommand() )->ipfilter_report( array( 'lab' ), array( 'format' => 'json' ) );
 		$rows = json_decode( \WP_CLI::$lines[0][1], true );
 		$this->assertStringStartsWith( 'mismatch', $rows[0]['status'] );
 
@@ -165,7 +165,7 @@ class IpfilterTest extends FirewallTestCase {
 		$this->fake->request( 'DELETE', $base . '/ipset/ipfilter-net0/192.0.2.200' );
 		$this->fake->request( 'POST', $base . '/ipset/ipfilter-net0', array( 'cidr' => (string) $r->get( 'ip' ) ) );
 		\WP_CLI::reset();
-		( new Commands() )->ipfilter_report( array( 'lab' ), array( 'format' => 'json' ) );
+		( new NetworkCommand() )->ipfilter_report( array( 'lab' ), array( 'format' => 'json' ) );
 		$rows = json_decode( \WP_CLI::$lines[0][1], true );
 		$this->assertSame( 'sets ready, filter off', $rows[0]['status'] );
 

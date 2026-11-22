@@ -208,6 +208,10 @@ final class Plugin {
 		Domains\ParkingCommand::register();
 		Usage\PaygCommand::register();
 		Proxmox\Addon\AddonsCommand::register();
+		Http\HttpCommand::register();
+		Domains\DomainsCommand::register();
+		Proxmox\Pve\PveCommand::register();
+		Proxmox\Network\NetworkCommand::register();
 
 		Account\Panel::register();
 		Api\Routes::register();

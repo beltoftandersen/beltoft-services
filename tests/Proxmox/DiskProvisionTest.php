@@ -3,7 +3,7 @@
 
 namespace BeltoftServices\Tests\Proxmox;
 
-use BeltoftServices\Cli\Commands;
+use BeltoftServices\Proxmox\Pve\PveCommand;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
@@ -283,10 +283,10 @@ class DiskProvisionTest extends BackupTestCase {
 		$volid = $this->fake->request( 'POST', '/nodes/node-a/storage/disk-store/content', array( 'filename' => $name, 'size' => '50G', 'vmid' => 5000, 'format' => 'raw' ) );
 		$this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( 'scsi2' => $volid . ',backup=0' ) );
 		\WP_CLI::reset();
-		( new Commands() )->link_disk( array( (string) $license['id'], (string) $server_license['id'], 'scsi2' ), array( 'dry-run' => true ) );
+		( new PveCommand() )->link_disk( array( (string) $license['id'], (string) $server_license['id'], 'scsi2' ), array( 'dry-run' => true ) );
 		$this->assertNull( Resource::for_license( (int) $license['id'] ) );
 		$this->assertStringContainsString( 'No remote write', \WP_CLI::text() );
-		( new Commands() )->link_disk( array( (string) $license['id'], (string) $server_license['id'], 'scsi2' ), array() );
+		( new PveCommand() )->link_disk( array( (string) $license['id'], (string) $server_license['id'], 'scsi2' ), array() );
 		$disk = Resource::for_license( (int) $license['id'] );
 		$this->assertTrue( (bool) $disk->get( 'linked' ) );
 		$this->assertTrue( (bool) $disk->get( 'protected' ) );

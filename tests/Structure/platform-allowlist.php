@@ -1,7 +1,7 @@
 <?php
 /**
  * The platform folders' imports of true features (see DependencyDirectionTest, rule PLATFORM; plan 2026-11-22-feature-code-home).
- * Generated 2026-11-22 with DEP_DUMP (233 entries), now 206. Remove entries as code moves into its feature; never add. Ends empty.
+ * Generated 2026-11-22 with DEP_DUMP (233 entries), now 187, now 206. Remove entries as code moves into its feature; never add. Ends empty.
  */
 return array(
 	'Account/Databases.php -> Proxmox\Db\DbCard',
@@ -105,26 +105,7 @@ return array(
 	'Bricks/DomainSearchFormElement.php -> Domains\Search',
 	'Bricks/DomainTransferElement.php -> Domains\Search',
 	'Bricks/MailSetupElement.php -> Mail\MailSetup',
-	'Cli/Commands.php -> Domains\Clients',
-	'Cli/Commands.php -> Domains\Health',
-	'Cli/Commands.php -> Domains\Prices',
-	'Cli/Commands.php -> Domains\Search',
-	'Cli/Commands.php -> Proxmox\Disk\DiskDriver',
-	'Cli/Commands.php -> Proxmox\Disk\DiskMeta',
-	'Cli/Commands.php -> Proxmox\Network\IpPool',
-	'Cli/Commands.php -> Proxmox\Network\IpPoolScreen',
 	'Cli/Commands.php -> Proxmox\Network\IpWho',
-	'Cli/Commands.php -> Proxmox\Network\IpfilterReport',
-	'Cli/Commands.php -> Proxmox\Network\Quarantine',
-	'Cli/Commands.php -> Proxmox\Pve\Clients',
-	'Cli/Commands.php -> Proxmox\Pve\Clusters',
-	'Cli/Commands.php -> Proxmox\Pve\Ownership',
-	'Cli/Commands.php -> Proxmox\Vm\GuestDisk',
-	'Cli/Commands.php -> Proxmox\Vm\LinkVm',
-	'Cli/Commands.php -> Proxmox\Vm\Operations',
-	'Cli/Commands.php -> Proxmox\Vm\Provision',
-	'Cli/Commands.php -> Proxmox\Vm\ProxmoxDriver',
-	'Cli/Commands.php -> Proxmox\Vm\VmRecords',
 	'Mcp/Acts.php -> Proxmox\Db\DbAccess',
 	'Mcp/Acts.php -> Proxmox\Network\PrivateAttach',
 	'Mcp/DedicatedTools.php -> ManualServer\DedicatedReinstall',

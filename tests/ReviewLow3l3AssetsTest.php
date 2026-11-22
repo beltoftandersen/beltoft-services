@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Tests;
 
+use BeltoftServices\Proxmox\Network\NetworkCommand;
+
 require_once __DIR__ . '/Support/WpCliStub.php';
 
 /**
@@ -85,7 +87,7 @@ final class ReviewLow3l3AssetsTest extends TestCase {
 		$resource = \BeltoftServices\Resource::create( $license, $this->fake_driver(), array(), array( 'server_name' => 'web-quarantined' ) );
 		$this->assertInstanceOf( \BeltoftServices\Resource::class, $resource );
 
-		$message = $this->fails( fn() => ( new \BeltoftServices\Cli\Commands() )->quarantine_lift( array( (string) $license['id'] ), array() ) );
+		$message = $this->fails( fn() => ( new NetworkCommand() )->quarantine_lift( array( (string) $license['id'] ), array() ) );
 
 		$this->assertStringContainsString( 'web-quarantined', $message );
 		$this->assertStringContainsString( '--yes', $message );

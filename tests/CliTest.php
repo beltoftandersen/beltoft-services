@@ -8,6 +8,7 @@
 namespace BeltoftServices\Tests;
 
 use BeltoftServices\Cli\Commands;
+use BeltoftServices\Http\HttpCommand;
 use BeltoftServices\Http\Connections;
 use BeltoftServices\Jobs;
 use BeltoftServices\Reconciler;
@@ -63,7 +64,7 @@ class CliTest extends TestCase {
 	public function test_link_http_records_ready_without_calling_provision(): void {
 		$license = $this->license();
 
-		( new Commands() )->link_http( array( (string) $license['id'] ), array( 'remote-id' => 'tenant-42' ) );
+		( new HttpCommand() )->link_http( array( (string) $license['id'] ), array( 'remote-id' => 'tenant-42' ) );
 
 		$resource = Resource::for_license( (int) $license['id'] );
 		$this->assertNotNull( $resource );
@@ -77,7 +78,7 @@ class CliTest extends TestCase {
 	public function test_linked_resource_is_protected(): void {
 		$license = $this->license();
 
-		( new Commands() )->link_http( array( (string) $license['id'] ), array( 'remote-id' => 'tenant-42' ) );
+		( new HttpCommand() )->link_http( array( (string) $license['id'] ), array( 'remote-id' => 'tenant-42' ) );
 
 		$this->assertTrue( Resource::for_license( (int) $license['id'] )->get( 'protected' ) );
 	}
@@ -85,7 +86,7 @@ class CliTest extends TestCase {
 	public function test_link_queues_one_plan_push_not_a_provision(): void {
 		$license = $this->license();
 
-		( new Commands() )->link_http( array( (string) $license['id'] ), array( 'remote-id' => 'tenant-42' ) );
+		( new HttpCommand() )->link_http( array( (string) $license['id'] ), array( 'remote-id' => 'tenant-42' ) );
 
 		$resource = Resource::for_license( (int) $license['id'] );
 		$this->assertTrue( $resource->get( 'plan_dirty' ) );
@@ -99,7 +100,7 @@ class CliTest extends TestCase {
 		$pending = array( 'hook' => Jobs::HOOK, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => -1 );
 		$before  = array_keys( as_get_scheduled_actions( $pending ) );
 
-		( new Commands() )->link_http(
+		( new HttpCommand() )->link_http(
 			array( (string) $license['id'] ),
 			array(
 				'remote-id' => 'tenant-42',
@@ -116,7 +117,7 @@ class CliTest extends TestCase {
 
 	public function test_link_refuses_a_license_that_already_has_a_resource(): void {
 		$license = $this->license();
-		$cli     = new Commands();
+		$cli     = new HttpCommand();
 		$cli->link_http( array( (string) $license['id'] ), array( 'remote-id' => 'tenant-1' ) );
 
 		$message = $this->failure( fn() => $cli->link_http( array( (string) $license['id'] ), array( 'remote-id' => 'tenant-2' ) ) );
@@ -127,7 +128,7 @@ class CliTest extends TestCase {
 
 	public function test_link_refuses_a_non_http_product_an_empty_remote_id_and_unknown_license(): void {
 		$this->fake_driver( 'fake' );
-		$cli = new Commands();
+		$cli = new HttpCommand();
 
 		$fake = $this->license( 'fake' );
 		$this->assertNotSame( '', $this->failure( fn() => $cli->link_http( array( (string) $fake['id'] ), array( 'remote-id' => 'x' ) ) ) );
@@ -145,8 +146,8 @@ class CliTest extends TestCase {
 
 	public function test_status_prints_meta_without_secrets(): void {
 		$license = $this->license();
-		$cli     = new Commands();
-		$cli->link_http( array( (string) $license['id'] ), array( 'remote-id' => 'tenant-42' ) );
+		( new HttpCommand() )->link_http( array( (string) $license['id'] ), array( 'remote-id' => 'tenant-42' ) );
+		$cli = new Commands();
 		Resource::for_license( (int) $license['id'] )->set(
 			array(
 				'connection_secret' => 'TOPSECRET',
@@ -207,7 +208,7 @@ class CliTest extends TestCase {
 	}
 
 	public function test_link_http_refuses_a_product_whose_connection_does_not_exist(): void {
-		$cli = new Commands();
+		$cli = new HttpCommand();
 
 		foreach ( array( '', 'nowhere' ) as $connection ) {
 			$product = $this->service_product( 'http', array(), array( 'connection' => $connection, 'slug' => 'cli-noconn-' . $connection ) );
@@ -221,7 +222,7 @@ class CliTest extends TestCase {
 	}
 
 	public function test_link_http_refuses_a_remote_id_already_linked_to_another_license(): void {
-		$cli   = new Commands();
+		$cli   = new HttpCommand();
 		$first = $this->license();
 		$cli->link_http( array( (string) $first['id'] ), array( 'remote-id' => 'tenant-dup' ) );
 
@@ -239,7 +240,7 @@ class CliTest extends TestCase {
 	}
 
 	public function test_inactive_license_is_refused_and_nothing_is_written(): void {
-		$cli = new Commands();
+		$cli = new HttpCommand();
 
 		foreach ( array( 'revoked', 'suspended' ) as $status ) {
 			$license = $this->license();
@@ -261,7 +262,7 @@ class CliTest extends TestCase {
 		$this->connection();
 		$product = $this->service_product( 'http', array(), array( 'connection' => 'svc', 'slug' => 'cli-pause' ) );
 		$license = $this->service_license( $product, array( 'fire' => false ) );
-		( new Commands() )->link_http( array( (string) $license['id'] ), array( 'remote-id' => 'tenant-9' ) );
+		( new HttpCommand() )->link_http( array( (string) $license['id'] ), array( 'remote-id' => 'tenant-9' ) );
 		$this->run_jobs();
 
 		$resource = Resource::for_license( (int) $license['id'] );
@@ -287,7 +288,7 @@ class CliTest extends TestCase {
 		$variation = $product->get_children()[1];
 		$license   = $this->service_license( $product, array( 'fire' => false, 'variation_id' => $variation ) );
 
-		( new Commands() )->link_http( array( (string) $license['id'] ), array( 'remote-id' => 'tenant-v' ) );
+		( new HttpCommand() )->link_http( array( (string) $license['id'] ), array( 'remote-id' => 'tenant-v' ) );
 		$this->assertSame( 11, Resource::for_license( (int) $license['id'] )->get( 'plan' )['limit'] );
 
 		$this->run_jobs();
@@ -313,7 +314,7 @@ class CliTest extends TestCase {
 			}
 		);
 
-		$message = $this->failure( fn() => ( new Commands() )->link_http( array( (string) $license['id'] ), array( 'remote-id' => 'mine' ) ) );
+		$message = $this->failure( fn() => ( new HttpCommand() )->link_http( array( (string) $license['id'] ), array( 'remote-id' => 'mine' ) ) );
 
 		$this->assertStringContainsString( 'meantime', $message );
 		$this->assertSame( 'other', Resource::for_license( (int) $license['id'] )->get( 'remote_id' ) );
@@ -335,7 +336,7 @@ class CliTest extends TestCase {
 		$product = $this->service_product( 'http', array(), array( 'connection' => 'svc', 'slug' => 'cli-mail' ) );
 		$license = $this->service_license( $product, array( 'fire' => false ) );
 
-		( new Commands() )->link_http( array( (string) $license['id'] ), array( 'remote-id' => 'tenant-m' ) );
+		( new HttpCommand() )->link_http( array( (string) $license['id'] ), array( 'remote-id' => 'tenant-m' ) );
 		$this->run_jobs();
 		$this->assertSame( 'ready', Resource::for_license( (int) $license['id'] )->get( 'notified' ) );
 		$this->assertSame( array(), $mails, 'Linking sends no ready email.' );

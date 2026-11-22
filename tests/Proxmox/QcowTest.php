@@ -3,7 +3,7 @@
 
 namespace BeltoftServices\Tests\Proxmox;
 
-use BeltoftServices\Cli\Commands;
+use BeltoftServices\Proxmox\Pve\PveCommand;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
@@ -138,7 +138,7 @@ class QcowTest extends BackupTestCase {
 			$volid   = $this->fake->request( 'POST', '/nodes/node-a/storage/disk-store/content', array( 'filename' => 'vm-5000-existing-' . $slot . '.' . $format, 'size' => '50G', 'vmid' => 5000, 'format' => $format ) );
 			$this->fake->request( 'PUT', '/nodes/node-a/qemu/5000/config', array( $slot => $volid . ',backup=0' ) );
 			\WP_CLI::reset();
-			( new Commands() )->link_disk( array( (string) $license['id'], (string) $server_license['id'], $slot ), array() );
+			( new PveCommand() )->link_disk( array( (string) $license['id'], (string) $server_license['id'], $slot ), array() );
 			$linked = Resource::for_license( (int) $license['id'] );
 			$this->assertNotNull( $linked, $format );
 			$this->assertSame( 'vm-5000-existing-' . $slot . '.' . $format, $linked->get( 'volname' ) );
