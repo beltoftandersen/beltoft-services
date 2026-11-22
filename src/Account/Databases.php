@@ -25,6 +25,51 @@ final class Databases extends ServiceArea {
 	public const NEW_VALUE = 'new';
 
 	/**
+	 * Hooks: the place in the list, the head of a database's page.
+	 */
+	public static function register(): void {
+		ServiceArea::offer( self::class, 20 );
+		add_filter( 'beltoft_services_area_card', array( __CLASS__, 'card' ), 10, 4 );
+	}
+
+	/**
+	 * A database's head has the state line, the power buttons and no renewal date on a pay as you go service.
+	 *
+	 * @param mixed $card     Template file and variables so far.
+	 * @param mixed $area     The area of the page.
+	 * @param mixed $resource The service.
+	 * @param mixed $license  The license row.
+	 * @return mixed
+	 */
+	public static function card( $card, $area, $resource, $license ) {
+		if ( ! $area instanceof self || ! $resource instanceof Resource || ! is_array( $card ) ) {
+			return $card;
+		}
+
+		$vars = (array) ( $card['vars'] ?? array() );
+		$view = DbCard::view( $resource );
+
+		if ( 'usage' === (string) ( is_array( $license ) ? ( $license['source'] ?? '' ) : '' ) ) {
+			$vars['renews'] = '';
+		}
+
+		$vars['power']      = $view['power']['state'];
+		$vars['busy']       = $view['power']['busy'];
+		$vars['actions']    = $view['power']['actions'];
+		$vars['note']       = $view['power']['note'];
+		$vars['show_power'] = 'ready' === $view['kind'] && ( $view['power']['busy'] || in_array( $view['power']['state'], array( 'running', 'stopped' ), true ) );
+
+		return array( 'file' => 'db-head.php', 'vars' => $vars );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function marker(): string {
+		return self::NEW_VALUE;
+	}
+
+	/**
 	 * The address of the New database page.
 	 */
 	public function url_new(): string {

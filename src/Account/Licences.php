@@ -19,6 +19,14 @@ defined( 'ABSPATH' ) || exit;
 final class Licences extends ServiceArea {
 
 	/**
+	 * Hooks: the place in the list of areas, the menu position.
+	 */
+	public static function register(): void {
+		ServiceArea::offer( self::class, 70 );
+		add_filter( 'woocommerce_account_menu_items', array( __CLASS__, 'menu' ), 102 );
+	}
+
+	/**
 	 * The menu item goes after SSL certificates, with the other services.
 	 *
 	 * @param mixed $items Menu items.

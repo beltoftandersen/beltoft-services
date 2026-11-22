@@ -90,6 +90,20 @@ final class ServerName {
 		add_action( 'woocommerce_init', array( __CLASS__, 'register_block_field' ) );
 		add_filter( 'beltoft_services_initial_meta', array( __CLASS__, 'initial_meta' ), 10, 3 );
 		add_filter( 'beltoft_licenses_account_title', array( __CLASS__, 'title' ), 10, 2 );
+		add_filter( 'beltoft_services_slug_name', array( __CLASS__, 'slug_name' ), 10, 4 );
+	}
+
+	/**
+	 * The name a server's My Account address is made from.
+	 *
+	 * @param mixed $name     Name so far.
+	 * @param mixed $type     Type of service.
+	 * @param mixed $resource Resource.
+	 * @param mixed $license  License row.
+	 * @return mixed
+	 */
+	public static function slug_name( $name, $type, $resource, $license ) {
+		return 'servers' === $type && $resource instanceof Resource && is_array( $license ) ? self::display( $resource, $license ) : $name;
 	}
 
 	/**

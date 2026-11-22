@@ -70,7 +70,8 @@ final class Panel {
 	public static function group( string $state, ?Resource $r = null ): string {
 		switch ( $state ) {
 			case 'ready':
-				return $r && 'installing' === \BeltoftServices\Apps\AppProgress::state( $r ) ? 'getting-ready' : 'ready';
+				$group = 'ready';
+				break;
 			case 'failed':
 				return 'failed';
 			case 'paused':
@@ -85,6 +86,15 @@ final class Panel {
 				// An unknown state, or none (metadata missing): something is wrong.
 				return 'failed';
 		}
+
+		/**
+		 * Filters the badge group of a ready service: a server whose app is still being installed is still getting ready.
+		 *
+		 * @param string        $group Group so far ('ready').
+		 * @param string        $state Resource state.
+		 * @param Resource|null $r     The resource.
+		 */
+		return (string) apply_filters( 'beltoft_services_panel_group', $group, $state, $r );
 	}
 
 	/**
@@ -106,7 +116,7 @@ final class Panel {
 			return self::domain_label( $state, $r );
 		}
 
-		$app = $r ? \BeltoftServices\Apps\AppProgress::line( $r ) : '';
+		$app = self::line_of( $state, $r );
 
 		if ( '' !== $app ) {
 			return $app;
@@ -126,6 +136,23 @@ final class Panel {
 		);
 
 		return $labels[ self::group( $state, $r ) ];
+	}
+
+	/**
+	 * The badge text a feature words itself (an app being installed), or '' for the standard text.
+	 *
+	 * @param string        $state Resource state.
+	 * @param Resource|null $r     The resource.
+	 */
+	public static function line_of( string $state, ?Resource $r = null ): string {
+		/**
+		 * Filters the badge text of a state that a feature words itself. '' keeps the standard text.
+		 *
+		 * @param string        $label Text so far ('').
+		 * @param string        $state Resource state.
+		 * @param Resource|null $r     The resource.
+		 */
+		return (string) apply_filters( 'beltoft_services_panel_label', '', $state, $r );
 	}
 
 	/**
@@ -175,18 +202,18 @@ final class Panel {
 			return __( "There's a delay setting up your service. We're on it.", 'beltoft-services' );
 		}
 
-		if ( $r && 'getting-ready' === self::group( $state ) && \BeltoftServices\Mail\MailField::waiting_for_registration( $r ) ) {
-			return \BeltoftServices\Mail\MailField::wait_text();
-		}
+		/**
+		 * Filters the sentence of a state that a feature words itself (an email domain waiting for its registration, an app
+		 * being installed). '' keeps the standard sentence.
+		 *
+		 * @param string        $message Sentence so far ('').
+		 * @param string        $state   Resource state.
+		 * @param Resource|null $r       The resource.
+		 */
+		$own = (string) apply_filters( 'beltoft_services_panel_message', '', $state, $r );
 
-		if ( $r && 'getting-ready' === self::group( $state ) && \BeltoftServices\Mail\MailField::waiting_for_proof( $r ) ) {
-			return \BeltoftServices\Mail\MailField::proof_text();
-		}
-
-		$app = $r ? \BeltoftServices\Apps\AppProgress::message( $r ) : '';
-
-		if ( '' !== $app ) {
-			return $app;
+		if ( '' !== $own ) {
+			return $own;
 		}
 
 		$messages = array(
@@ -210,7 +237,7 @@ final class Panel {
 	 */
 	public static function render( $license, $view = array() ): void {
 		// An extra domain of an email plan has a license without a service product, and still has a page.
-		if ( ! is_array( $license ) || empty( $license['id'] ) || ( ! Product::is_service_license( $license ) && ! ServiceArea::get( Email::class )->is_member( $license ) ) ) {
+		if ( ! is_array( $license ) || empty( $license['id'] ) || ( ! Product::is_service_license( $license ) && ! ServiceArea::by_key( 'email' )->is_member( $license ) ) ) {
 			return;
 		}
 

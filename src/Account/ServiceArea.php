@@ -66,12 +66,93 @@ abstract class ServiceArea {
 	private static $page = null;
 
 	/**
-	 * Every area, in tab order.
+	 * Every area, in tab order: the classes the features offer through beltoft_services_account_areas, each at the priority of its
+	 * place (Domains 10, Databases 20, Hosting 30, Apps 40, Email 50, SSL 60, Licences 70, Storage 80, Dedicated 90).
 	 *
 	 * @return array<int, ServiceArea>
 	 */
 	public static function all(): array {
-		return array( self::get( Domains::class ), self::get( Databases::class ), self::get( Hosting::class ), self::get( Apps::class ), self::get( Email::class ), self::get( Ssl::class ), self::get( Licences::class ), self::get( Storage::class ), self::get( Dedicated::class ) );
+		/**
+		 * Lists the My Account service areas: class names of ServiceArea subclasses, appended by each feature (see ServiceArea::offer()).
+		 *
+		 * @param array<int, string> $classes Area classes so far.
+		 */
+		$classes = apply_filters( 'beltoft_services_account_areas', array() );
+		$areas   = array();
+
+		foreach ( is_array( $classes ) ? $classes : array() as $class ) {
+			if ( is_string( $class ) && is_subclass_of( $class, self::class ) ) {
+				$areas[ $class ] = self::get( $class );
+			}
+		}
+
+		return array_values( $areas );
+	}
+
+	/**
+	 * Offers an area class to the list (a feature's register() calls this).
+	 *
+	 * @param string $class    Area class.
+	 * @param int    $priority Place in the list: lower comes first.
+	 */
+	public static function offer( string $class, int $priority ): void {
+		add_filter(
+			'beltoft_services_account_areas',
+			static function ( $classes ) use ( $class ) {
+				$classes   = is_array( $classes ) ? $classes : array();
+				$classes[] = $class;
+
+				return $classes;
+			},
+			$priority
+		);
+	}
+
+	/**
+	 * The area with a key (databases, hosting, apps, email, domains ...), whichever feature owns it.
+	 *
+	 * @param string $key Area key (key_name()).
+	 * @throws \OutOfBoundsException When no area has the key.
+	 */
+	public static function by_key( string $key ): ServiceArea {
+		foreach ( self::all() as $area ) {
+			if ( $area->key_name() === $key ) {
+				return $area;
+			}
+		}
+
+		throw new \OutOfBoundsException( 'No My Account area has the key ' . $key . '.' );
+	}
+
+	/**
+	 * Does the area lead the tab list (before the VPS tab)? Domains does.
+	 */
+	public function leads(): bool {
+		return false;
+	}
+
+	/**
+	 * The value after the endpoint that is the area's "new" or "add" page, or '' when it has none.
+	 */
+	public function marker(): string {
+		return '';
+	}
+
+	/**
+	 * The My Account markers of every area (the words "new" and "add" a service address must not be).
+	 *
+	 * @return array<int, string>
+	 */
+	public static function markers(): array {
+		$out = array();
+
+		foreach ( self::all() as $area ) {
+			if ( '' !== $area->marker() ) {
+				$out[] = $area->marker();
+			}
+		}
+
+		return $out;
 	}
 
 	/**
@@ -898,23 +979,20 @@ abstract class ServiceArea {
 		);
 
 		$vars = self::$page['area']->head_vars( $resource, $vars );
-		$file = 'domain-head.php';
+		$card = array( 'file' => 'domain-head.php', 'vars' => $vars );
 
-		// A database's head has the state line, the power buttons and no renewal date on a pay as you go service.
-		if ( self::$page['area'] instanceof Databases ) {
-			$card = \BeltoftServices\Proxmox\Db\DbCard::view( $resource );
-			$file = 'db-head.php';
-
-			if ( 'usage' === (string) ( self::$page['license']['source'] ?? '' ) ) {
-				$vars['renews'] = '';
-			}
-
-			$vars['power']      = $card['power']['state'];
-			$vars['busy']       = $card['power']['busy'];
-			$vars['actions']    = $card['power']['actions'];
-			$vars['note']       = $card['power']['note'];
-			$vars['show_power'] = 'ready' === $card['kind'] && ( $card['power']['busy'] || in_array( $card['power']['state'], array( 'running', 'stopped' ), true ) );
-		}
+		/**
+		 * Filters the head of a service page: the template file (in templates/account/) and its variables. An area with a head of its
+		 * own (a database's state line and power buttons) answers for itself.
+		 *
+		 * @param array{file: string, vars: array<string, mixed>} $card     Template file and variables so far.
+		 * @param ServiceArea                                     $area     The area of the page.
+		 * @param Resource                                        $resource The service.
+		 * @param array<string, mixed>                            $license  The license row.
+		 */
+		$card = apply_filters( 'beltoft_services_area_card', $card, self::$page['area'], $resource, self::$page['license'] );
+		$vars = (array) ( $card['vars'] ?? $vars );
+		$file = (string) ( $card['file'] ?? 'domain-head.php' );
 
 		( static function ( array $vars, string $file ): void {
 			// phpcs:ignore WordPress.PHP.DontExtract.extract_extract -- Template variables, a fixed list built above.

@@ -49,7 +49,7 @@ final class Tabs {
 
 		$missing = array();
 
-		foreach ( array( ServerLinks::slug(), ServiceArea::get( Databases::class )->slug(), ServiceArea::get( Hosting::class )->slug(), ServiceArea::get( Domains::class )->slug(), ServiceArea::get( Email::class )->slug(), ServiceArea::get( Apps::class )->slug(), ServiceArea::get( Ssl::class )->slug(), ServiceArea::get( Licences::class )->slug() ) as $slug ) {
+		foreach ( array_merge( array( ServerLinks::slug() ), array_map( static fn( string $key ): string => ServiceArea::by_key( $key )->slug(), array( 'databases', 'hosting', 'domains', 'email', 'apps', 'ssl', 'licences' ) ) ) as $slug ) {
 			if ( ! isset( $items[ $slug ] ) && isset( $labels[ $slug ] ) ) {
 				$missing[ $slug ] = $labels[ $slug ];
 			}
@@ -83,22 +83,30 @@ final class Tabs {
 	 */
 	public static function groups( $groups ): array {
 		$groups = is_array( $groups ) ? $groups : array();
-		// Domains first, then the VPS tab, then the other areas.
-		$tabs   = array(
-			ServiceArea::get( Domains::class )->group(),
-			array(
-				'slug'  => ServerLinks::slug(),
-				'label' => __( 'VPS', 'beltoft-services' ),
-				'empty' => __( 'You have no servers yet.', 'beltoft-services' ),
-				'match' => static fn( $license ): bool => self::has_kind( $license, array( 'vm', 'disk', 'snapshot', 'applic', 'managed', 'ipv4' ) ),
-			),
-		);
+		// The area that leads (Domains) first, then the VPS tab, then the other areas.
+		$lead = array();
+		$rest = array();
 
 		foreach ( ServiceArea::all() as $area ) {
-			if ( ! $area instanceof Domains ) {
-				$tabs[] = $area->group();
+			if ( $area->leads() ) {
+				$lead[] = $area->group();
+			} else {
+				$rest[] = $area->group();
 			}
 		}
+
+		$tabs = array_merge(
+			$lead,
+			array(
+				array(
+					'slug'  => ServerLinks::slug(),
+					'label' => __( 'VPS', 'beltoft-services' ),
+					'empty' => __( 'You have no servers yet.', 'beltoft-services' ),
+					'match' => static fn( $license ): bool => self::has_kind( $license, array( 'vm', 'disk', 'snapshot', 'applic', 'managed', 'ipv4' ) ),
+				),
+			),
+			$rest
+		);
 
 		/**
 		 * Filters the My Account tabs of the services: slug, label, empty text and a match rule.

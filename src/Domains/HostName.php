@@ -14,6 +14,24 @@ defined( 'ABSPATH' ) || exit;
  */
 final class HostName {
 
+	/**
+	 * Hooks.
+	 */
+	public static function register(): void {
+		add_filter( 'beltoft_services_slug_keeps_host', array( __CLASS__, 'keeps_host' ), 10, 2 );
+	}
+
+	/**
+	 * A plain host name keeps its dots in a My Account address.
+	 *
+	 * @param mixed $keep Answer so far.
+	 * @param mixed $name Lowercased name.
+	 * @return mixed
+	 */
+	public static function keeps_host( $keep, $name ) {
+		return is_string( $name ) && self::is_host( $name ) ? true : $keep;
+	}
+
 	/** Top-level names that can never get a public certificate. */
 	private const REFUSED_TLDS = array( 'localhost', 'local', 'internal', 'invalid', 'onion', 'lan', 'home' );
 

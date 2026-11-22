@@ -21,6 +21,13 @@ defined( 'ABSPATH' ) || exit;
 final class Apps extends ServiceArea {
 
 	/**
+	 * Hooks: the place in the list of areas.
+	 */
+	public static function register(): void {
+		ServiceArea::offer( self::class, 40 );
+	}
+
+	/**
 	 * {@inheritDoc}
 	 */
 	protected function key(): string {

@@ -32,6 +32,27 @@ defined( 'ABSPATH' ) || exit;
 final class Domains extends ServiceArea {
 
 	/**
+	 * Hooks: the place in the list of areas.
+	 */
+	public static function register(): void {
+		ServiceArea::offer( self::class, 10 );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function leads(): bool {
+		return true;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function marker(): string {
+		return self::ADD_VALUE;
+	}
+
+	/**
 	 * The tabs of a domain page after the overview, by address part.
 	 */
 	public const TABS = array( 'dns', 'nameservers', 'security', 'transfer', 'danger' );

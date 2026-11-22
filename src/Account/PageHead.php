@@ -40,7 +40,7 @@ final class PageHead {
 
 		if ( ServerLinks::slug() === $endpoint && ServerLinks::is_new() ) {
 			$text = __( 'Choose a plan and set up a new server', 'beltoft-services' );
-		} elseif ( ServiceArea::get( Databases::class )->slug() === $endpoint && ServiceArea::get( Databases::class )->is_new() ) {
+		} elseif ( ServiceArea::by_key( 'databases' )->slug() === $endpoint && ServiceArea::by_key( 'databases' )->is_new() ) {
 			$text = __( 'Choose an engine and set up a new database', 'beltoft-services' );
 		}
 

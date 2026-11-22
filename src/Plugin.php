@@ -132,11 +132,6 @@ final class Plugin {
 		Mail\MailWake::register();
 		add_action( 'beltoft_services_account_assets', array( Mail\MailCard::class, 'early' ), 20, 2 );
 		add_action( 'beltoft_services_account_assets', array( Hosting\HostingAccount::class, 'style' ), 20, 0 );
-		add_filter( 'woocommerce_account_menu_items', array( Account\Email::class, 'menu' ), 100 );
-		add_filter( 'woocommerce_account_menu_items', array( Account\Ssl::class, 'menu' ), 101 );
-		add_filter( 'woocommerce_account_menu_items', array( Account\Licences::class, 'menu' ), 102 );
-		add_filter( 'woocommerce_account_menu_items', array( Account\Storage::class, 'menu' ), 103 );
-		add_filter( 'woocommerce_account_menu_items', array( Account\Dedicated::class, 'menu' ), 104 );
 		Domains\Search::register();
 		Bricks\Integration::register();
 		Domains\BricksElements::register();
@@ -170,6 +165,9 @@ final class Plugin {
 		Proxmox\Pve\ClustersScreen::register();
 		Proxmox\Vm\ServerProgress::register();
 		Apps\AppProgress::register();
+		Licences\KeyPanel::register();
+		Domains\HostName::register();
+		Hosting\ActivitySentence::register();
 		Status::register();
 		Checkout::register();
 		IntroCoupon::register();
@@ -184,6 +182,15 @@ final class Plugin {
 		Account\Slugs::register();
 		Account\Servers::register();
 		Account\ServiceArea::register();
+		Account\Domains::register();
+		Account\Databases::register();
+		Account\Hosting::register();
+		Account\Apps::register();
+		Account\Email::register();
+		Account\Ssl::register();
+		Account\Licences::register();
+		Account\Storage::register();
+		Account\Dedicated::register();
 		Account\DomainDanger::register();
 		Account\ServerPicker::register();
 		Account\DbPicker::register();

@@ -14,6 +14,25 @@ defined( 'ABSPATH' ) || exit;
 final class KeyPanel {
 
 	/**
+	 * Hooks.
+	 */
+	public static function register(): void {
+		add_filter( 'beltoft_services_slug_name', array( __CLASS__, 'slug_name' ), 10, 4 );
+	}
+
+	/**
+	 * The name a licence's My Account address is made from.
+	 *
+	 * @param mixed $name     Name so far.
+	 * @param mixed $type     Type of service.
+	 * @param mixed $resource Resource.
+	 * @return mixed
+	 */
+	public static function slug_name( $name, $type, $resource ) {
+		return 'licences' === $type && $resource instanceof Resource ? self::label( $resource ) : $name;
+	}
+
+	/**
 	 * What the customer calls the licence.
 	 *
 	 * @param Resource $r Licence resource.

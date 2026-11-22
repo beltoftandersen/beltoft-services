@@ -18,6 +18,14 @@ defined( 'ABSPATH' ) || exit;
 final class Ssl extends ServiceArea {
 
 	/**
+	 * Hooks: the place in the list of areas, the menu position.
+	 */
+	public static function register(): void {
+		ServiceArea::offer( self::class, 60 );
+		add_filter( 'woocommerce_account_menu_items', array( __CLASS__, 'menu' ), 101 );
+	}
+
+	/**
 	 * The menu item goes after Email, with the other services.
 	 *
 	 * @param mixed $items Menu items.

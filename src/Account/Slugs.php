@@ -9,9 +9,7 @@ namespace BeltoftServices\Account;
 
 use BeltoftLicenses\Licenses;
 use BeltoftLicenses\Account\View;
-use BeltoftServices\Domains\HostName;
 use BeltoftServices\Locks;
-use BeltoftServices\Proxmox\Vm\ServerName;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -168,10 +166,6 @@ final class Slugs {
 			}
 		}
 
-		if ( 'licences' === $type ) {
-			return \BeltoftServices\Licences\KeyPanel::label( $resource );
-		}
-
 		if ( 'domains' === $type ) {
 			$domain = strtolower( trim( (string) $resource->get( 'domain' ) ) );
 
@@ -180,8 +174,19 @@ final class Slugs {
 			}
 		}
 
-		if ( 'servers' === $type ) {
-			return ServerName::display( $resource, $license );
+		/**
+		 * Filters the name a service's address is made from, for the types whose name is not in the resource's own meta: the
+		 * licence key's label for licences, the server's name for servers. Return null to use the product name.
+		 *
+		 * @param string|null          $name     Name so far.
+		 * @param string               $type     Type of service (servers, licences ...).
+		 * @param Resource             $resource Resource.
+		 * @param array<string, mixed> $license  License row.
+		 */
+		$named = apply_filters( 'beltoft_services_slug_name', null, $type, $resource, $license );
+
+		if ( is_string( $named ) ) {
+			return $named;
 		}
 
 		return (string) apply_filters( 'beltoft_licenses_account_title', View::product_name( $license ), $license );
@@ -197,7 +202,14 @@ final class Slugs {
 	public static function slugify( string $name, string $type ): string {
 		$name = strtolower( trim( $name ) );
 
-		if ( in_array( $type, array( 'domains', 'email', 'ssl' ), true ) && HostName::is_host( $name ) ) {
+		/**
+		 * Filters whether a name keeps its dots in an address: true for a plain host name of a domain, an email domain or a certificate.
+		 *
+		 * @param bool   $keep Whether the name stays as it is.
+		 * @param string $name Lowercased name.
+		 * @param string $type Type of service.
+		 */
+		if ( in_array( $type, array( 'domains', 'email', 'ssl' ), true ) && apply_filters( 'beltoft_services_slug_keeps_host', false, $name, $type ) ) {
 			return substr( $name, 0, self::MAX );
 		}
 
@@ -243,7 +255,7 @@ final class Slugs {
 	 * @param string $type Type of service.
 	 */
 	public static function reserved( string $slug, string $type ): bool {
-		if ( '' === $slug || ctype_digit( $slug ) || in_array( $slug, array( ServerLinks::NEW_VALUE, Domains::ADD_VALUE, Databases::NEW_VALUE ), true ) ) {
+		if ( '' === $slug || ctype_digit( $slug ) || in_array( $slug, array_merge( array( ServerLinks::NEW_VALUE ), ServiceArea::markers() ), true ) ) {
 			return true;
 		}
 
@@ -401,7 +413,7 @@ final class Slugs {
 		$numeric = ctype_digit( $first );
 		$id      = $numeric ? (int) $first : 0;
 
-		if ( ! $numeric && '' !== $first && ! in_array( $first, array( ServerLinks::NEW_VALUE, Domains::ADD_VALUE ), true ) ) {
+		if ( ! $numeric && '' !== $first && ! in_array( $first, array_merge( array( ServerLinks::NEW_VALUE ), ServiceArea::markers() ), true ) ) {
 			$id = self::resolve( $first, $type );
 		}
 
@@ -441,7 +453,7 @@ final class Slugs {
 	 * @param array{first: string, id: int} $asked Result of parse().
 	 */
 	public static function unknown( array $asked ): bool {
-		return '' !== $asked['first'] && 0 === $asked['id'] && ! in_array( $asked['first'], array( ServerLinks::NEW_VALUE, Domains::ADD_VALUE ), true );
+		return '' !== $asked['first'] && 0 === $asked['id'] && ! in_array( $asked['first'], array_merge( array( ServerLinks::NEW_VALUE ), ServiceArea::markers() ), true );
 	}
 
 	/**

@@ -53,6 +53,7 @@ final class MailField {
 	 */
 	public static function register(): void {
 		add_filter( Ownership::FILTER, array( MailDomain::class, 'answer' ), 10, 3 );
+		add_filter( 'beltoft_services_panel_message', array( __CLASS__, 'panel_message' ), 10, 3 );
 		// Under the billing details: the theme's checkout shows the order notes step only for server and database carts.
 		add_action( 'woocommerce_after_checkout_billing_form', array( __CLASS__, 'render' ), 20 );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
@@ -426,6 +427,26 @@ final class MailField {
 	}
 
 	// -- Hand-over to the resource --------------------------------------------------------------
+
+	/**
+	 * The sentence of an email domain that waits for its registration or for the customer's DNS record (My Account panel).
+	 *
+	 * @param mixed $message Sentence so far.
+	 * @param mixed $state   Resource state.
+	 * @param mixed $r       Resource.
+	 * @return mixed
+	 */
+	public static function panel_message( $message, $state, $r ) {
+		if ( '' !== (string) $message || ! $r instanceof Resource || 'getting-ready' !== \BeltoftServices\Account\Panel::group( (string) $state ) ) {
+			return $message;
+		}
+
+		if ( self::waiting_for_registration( $r ) ) {
+			return self::wait_text();
+		}
+
+		return self::waiting_for_proof( $r ) ? self::proof_text() : $message;
+	}
 
 	/**
 	 * True while the domain of the same order is still being registered or transferred and no proof step has run.

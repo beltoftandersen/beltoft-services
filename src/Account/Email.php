@@ -22,6 +22,14 @@ defined( 'ABSPATH' ) || exit;
 final class Email extends ServiceArea {
 
 	/**
+	 * Hooks: the place in the list of areas, the menu position.
+	 */
+	public static function register(): void {
+		ServiceArea::offer( self::class, 50 );
+		add_filter( 'woocommerce_account_menu_items', array( __CLASS__, 'menu' ), 100 );
+	}
+
+	/**
 	 * The Email menu item goes right after Domains, with the other services, before Billing and Support. Without a
 	 * Domains item it stays where it is.
 	 *

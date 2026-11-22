@@ -22,10 +22,49 @@ final class AppProgress {
 	 * Tells Progress about the app: the work of a ready server that is still installing it, its steps, its words.
 	 */
 	public static function register(): void {
+		add_filter( 'beltoft_services_panel_group', array( __CLASS__, 'panel_group' ), 10, 3 );
+		add_filter( 'beltoft_services_panel_label', array( __CLASS__, 'panel_label' ), 10, 3 );
+		add_filter( 'beltoft_services_panel_message', array( __CLASS__, 'panel_message' ), 20, 3 );
 		add_filter( 'beltoft_services_progress_idle_kind', array( __CLASS__, 'idle_kind' ), 10, 2 );
 		add_filter( 'beltoft_services_progress_work', array( __CLASS__, 'work' ), 10, 4 );
 		add_filter( 'beltoft_services_progress_extra_steps', array( __CLASS__, 'extra_steps' ), 10, 4 );
 		add_filter( 'beltoft_services_progress_text', array( __CLASS__, 'text' ), 10, 5 );
+	}
+
+	/**
+	 * A server that is ready but still installing its app is still getting ready (the badge group of My Account).
+	 *
+	 * @param mixed $group Group so far.
+	 * @param mixed $state Resource state.
+	 * @param mixed $r     Resource.
+	 * @return mixed
+	 */
+	public static function panel_group( $group, $state, $r ) {
+		return 'ready' === $group && 'ready' === $state && $r instanceof Resource && 'installing' === self::state( $r ) ? 'getting-ready' : $group;
+	}
+
+	/**
+	 * The badge text of a server with an app to speak of.
+	 *
+	 * @param mixed $label Text so far.
+	 * @param mixed $state Resource state (unused).
+	 * @param mixed $r     Resource.
+	 * @return mixed
+	 */
+	public static function panel_label( $label, $state, $r ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- filter signature.
+		return '' === (string) $label && $r instanceof Resource ? self::line( $r ) : $label;
+	}
+
+	/**
+	 * The sentence of a server with an app to speak of, unless an earlier answer is there.
+	 *
+	 * @param mixed $message Sentence so far.
+	 * @param mixed $state   Resource state (unused).
+	 * @param mixed $r       Resource.
+	 * @return mixed
+	 */
+	public static function panel_message( $message, $state, $r ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- filter signature.
+		return '' === (string) $message && $r instanceof Resource ? self::message( $r ) : $message;
 	}
 
 	/**

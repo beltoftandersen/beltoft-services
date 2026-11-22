@@ -19,6 +19,13 @@ defined( 'ABSPATH' ) || exit;
 final class Hosting extends ServiceArea {
 
 	/**
+	 * Hooks: the place in the list of areas.
+	 */
+	public static function register(): void {
+		ServiceArea::offer( self::class, 30 );
+	}
+
+	/**
 	 * The address of the "Order hosting" button: the "Hosting order page" setting (a path on this site or a full
 	 * address), else the first published product that uses the hosting driver, or what the filter says. '' when
 	 * there is none (then there is no button).

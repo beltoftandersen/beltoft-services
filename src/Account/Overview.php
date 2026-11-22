@@ -44,13 +44,13 @@ final class Overview {
 	);
 
 	/**
-	 * Section => the area (ServiceArea) that draws its rows.
+	 * Section => the key of the area (ServiceArea::by_key()) that draws its rows.
 	 */
 	public const AREAS = array(
-		'databases' => Databases::class,
-		'hosting'   => Hosting::class,
-		'apps'      => Apps::class,
-		'mail'      => Email::class,
+		'databases' => 'databases',
+		'hosting'   => 'hosting',
+		'apps'      => 'apps',
+		'mail'      => 'email',
 	);
 
 	/**
@@ -231,7 +231,7 @@ final class Overview {
 				) : '';
 			case 'domains':
 				if ( ! $data['domains'] ) {
-					return self::empty_section( 'domains', __( 'Domains & DNS', 'beltoft-services' ), __( 'You have no domains yet.', 'beltoft-services' ), ServiceArea::get( Domains::class )->buttons() );
+					return self::empty_section( 'domains', __( 'Domains & DNS', 'beltoft-services' ), __( 'You have no domains yet.', 'beltoft-services' ), ServiceArea::by_key( 'domains' )->buttons() );
 				}
 
 				return $data['domains'] ? self::template(
@@ -250,7 +250,7 @@ final class Overview {
 			case 'mail':
 				// Every area shows, with its empty line and create button when the customer has nothing in it.
 				if ( ! $data[ $section ] ) {
-					$area = ServiceArea::get( self::AREAS[ $section ] );
+					$area = ServiceArea::by_key( self::AREAS[ $section ] );
 
 					return self::empty_section( $section, $area->label(), $area->empty_line(), $area->buttons() );
 				}
@@ -259,8 +259,8 @@ final class Overview {
 					'overview/rows.php',
 					array(
 						'class'   => $section,
-						'heading' => ServiceArea::get( self::AREAS[ $section ] )->label(),
-						'more'    => ServiceArea::get( self::AREAS[ $section ] )->all_label(),
+						'heading' => ServiceArea::by_key( self::AREAS[ $section ] )->label(),
+						'more'    => ServiceArea::by_key( self::AREAS[ $section ] )->all_label(),
 						'url'     => $data[ $section . '_url' ],
 						'rows'    => array_slice( $data[ $section ], 0, self::limit() ),
 					)

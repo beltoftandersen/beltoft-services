@@ -142,8 +142,8 @@ final class OverviewData {
 
 		$area_views = array( 'databases' => array(), 'hosting' => array(), 'apps' => array(), 'mail' => array() );
 
-		foreach ( Overview::AREAS as $key => $class ) {
-			foreach ( array_slice( (array) ( $groups[ ServiceArea::get( $class )->slug() ] ?? array() ), 0, 50 ) as $license ) {
+		foreach ( Overview::AREAS as $key => $area_key ) {
+			foreach ( array_slice( (array) ( $groups[ ServiceArea::by_key( $area_key )->slug() ] ?? array() ), 0, 50 ) as $license ) {
 				$view                          = View::license( $license );
 				$area_views[ $key ][]          = $view;
 				$names[ (int) $license['id'] ] = (string) $view['product'];
@@ -188,8 +188,8 @@ final class OverviewData {
 
 		$area_resources = array();
 
-		foreach ( Overview::AREAS as $key => $class ) {
-			$area = ServiceArea::get( $class );
+		foreach ( Overview::AREAS as $key => $area_key ) {
+			$area = ServiceArea::by_key( $area_key );
 
 			foreach ( $area_views[ $key ] as $view ) {
 				$resource = Resource::for_license( (int) $view['license']['id'] );
@@ -219,7 +219,7 @@ final class OverviewData {
 			$data['licenses'][] = self::license_row( $view );
 		}
 
-		$data['domains_url']  = $domains ? ServiceArea::get( Domains::class )->url_list() : '';
+		$data['domains_url']  = $domains ? ServiceArea::by_key( 'domains' )->url_list() : '';
 		$data['licenses_url'] = $plain ? Endpoint::url_for_license( $plain[0] ) : '';
 
 		$subscriptions = self::subscriptions( $user_id );
@@ -322,7 +322,7 @@ final class OverviewData {
 				'sep'   => ':',
 				'state' => __( 'Working', 'beltoft-services' ),
 				'name'  => $names[ $id ] ?? View::product_name( $license ),
-				'text'  => 'app' === $progress['kind'] ? \BeltoftServices\Apps\AppProgress::line( $resource ) : (string) $progress['title'],
+				'text'  => 'app' === $progress['kind'] ? Panel::line_of( (string) $resource->get( 'state' ), $resource ) : (string) $progress['title'],
 				'link'  => self::follow_url( $license ),
 				'label' => __( 'Follow it', 'beltoft-services' ),
 			);
