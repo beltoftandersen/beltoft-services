@@ -121,7 +121,7 @@ abstract class ServiceArea {
 			}
 		}
 
-		throw new \OutOfBoundsException( 'No My Account area has the key ' . $key . '.' );
+		throw new \OutOfBoundsException( 'No My Account area has the key ' . esc_html( $key ) . '.' );
 	}
 
 	/**
