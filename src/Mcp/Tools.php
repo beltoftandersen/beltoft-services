@@ -10,7 +10,6 @@ namespace BeltoftServices\Mcp;
 use BeltoftLicenses\Events;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Api\Tokens;
-use BeltoftServices\Domains\Search;
 use BeltoftServices\Proxmox\Db\DbActions;
 use BeltoftServices\Proxmox\Db\DbCard;
 use BeltoftServices\Proxmox\Db\DbDriver;
@@ -54,7 +53,7 @@ final class Tools {
 	/**
 	 * Names that Reads, Details and Acts run.
 	 */
-	private const READS = array( 'service_details', 'usage_summary', 'list_recovery_points', 'get_firewall', 'get_database_access', 'list_orders', 'get_order', 'list_subscriptions', 'list_payment_methods', 'get_account', 'catalog', 'list_server_plans', 'price_quote', 'list_dns_claims', 'console_link', 'list_licenses', 'get_license_key' );
+	private const READS = array( 'service_details', 'usage_summary', 'list_recovery_points', 'get_firewall', 'get_database_access', 'list_orders', 'get_order', 'list_subscriptions', 'list_payment_methods', 'get_account', 'catalog', 'list_server_plans', 'price_quote', 'console_link', 'list_licenses', 'get_license_key' );
 
 	/**
 	 * The tool that is running, for the allow-list of the routes it calls.
@@ -130,7 +129,7 @@ final class Tools {
 			return false === ( $args['on'] ?? null ) || self::wide_open( $args['rules'] ?? null );
 		}
 
-		return 'domain_settings' === $name && 'set_nameservers' === ( $args['action'] ?? null ) && 'custom' === ( $args['mode'] ?? null );
+		return false;
 	}
 
 	/**
@@ -429,20 +428,6 @@ final class Tools {
 						'account'      => $account,
 					);
 
-			case 'domain_check':
-				// The search itself, not its public route: that route counts visitors by address, and every Claude user
-				// comes from the same few addresses. The customer is counted instead (the limit of the tool).
-				$found = Search::find( (string) $args['name'] );
-
-				if ( is_wp_error( $found ) ) {
-					return new \WP_Error( 'beltoft_services_tool', $found->get_error_message() );
-				}
-
-				$found = array_is_list( $found ) ? array( 'results' => $found ) : $found;
-				// Prices are per year, excluding tax, in the currency of the token's owner.
-				$found['currency'] = \BeltoftServices\Currency::current();
-
-				return $found;
 		}
 
 		$id = (int) $args['id'];
@@ -457,23 +442,9 @@ final class Tools {
 			case 'database_info':
 				return self::database_info( $id );
 
-			case 'list_dns_records':
-				return self::route( 'GET', '/resources/' . $id . '/dns-records', array(), null, $id, 'DNS records read' );
-
 			case 'create_snapshot':
 				return self::action( $id, 'snapshot_take', isset( $args['label'] ) ? array( 'label' => (string) $args['label'] ) : array(), 'snapshot requested' );
 
-			case 'dns_upsert_record':
-				$body = array( 'records' => $args['records'] );
-
-				if ( isset( $args['ttl'] ) ) {
-					$body['ttl'] = (int) $args['ttl'];
-				}
-
-				return self::route( 'PUT', self::dns_path( $id, $args ), array(), $body, $id, 'DNS record set (' . self::dns_label( $args ) . ')' );
-
-			case 'dns_delete_record':
-				return self::route( 'DELETE', self::dns_path( $id, $args ), isset( $args['value'] ) ? array( 'value' => (string) $args['value'] ) : array(), null, $id, 'DNS record removed (' . self::dns_label( $args ) . ')' );
 		}
 
 		return self::action( $id, self::POWER[ $name ], array(), $name . ' requested' );
@@ -708,25 +679,6 @@ final class Tools {
 		}
 
 		Events::add( (int) $r->license()['id'], 'api', 'Claude: ' . $text . ( $ok ? '' : ' (refused)' ) );
-	}
-
-	/**
-	 * The record route of a DNS tool.
-	 *
-	 * @param int                  $id   Service id.
-	 * @param array<string, mixed> $args Arguments.
-	 */
-	private static function dns_path( int $id, array $args ): string {
-		return '/resources/' . $id . '/dns-records/' . rawurlencode( preg_replace( '/[^A-Za-z]/', '', (string) $args['type'] ) ) . '/' . rawurlencode( (string) $args['name'] );
-	}
-
-	/**
-	 * "A www" for the history.
-	 *
-	 * @param array<string, mixed> $args Arguments.
-	 */
-	private static function dns_label( array $args ): string {
-		return strtoupper( preg_replace( '/[^A-Za-z]/', '', (string) $args['type'] ) ) . ' ' . sanitize_text_field( (string) $args['name'] );
 	}
 
 	/**

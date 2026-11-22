@@ -7,7 +7,6 @@
 
 namespace BeltoftServices\Mcp;
 
-use BeltoftServices\Domains\HostName;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Proxmox\Snapshot\Policy;
 use BeltoftServices\Proxmox\Vm\Actions;
@@ -481,50 +480,6 @@ final class ServerActions {
 				Irreversible::name( $r )
 			),
 			'state' => $r->id() . '|world|' . (string) wp_json_encode( $r->get( DbAccess::WORLD ) ),
-		);
-	}
-
-	/**
-	 * A domain moved to name servers that are not ours.
-	 *
-	 * @param array<string, mixed> $args Tool arguments.
-	 * @return array{text: string, state: string}|\WP_Error
-	 */
-	public static function summary_nameservers( array $args ) {
-		$r = Tools::owned( (int) $args['id'], true );
-
-		if ( $r instanceof \WP_Error ) {
-			return $r;
-		}
-
-		$bad = self::not_offered( $r, 'set_nameservers' );
-
-		if ( null !== $bad ) {
-			return $bad;
-		}
-
-		$list = array_map( static fn( $h ) => strtolower( trim( (string) $h, ". \t" ) ), (array) ( $args['hosts'] ?? array() ) );
-
-		foreach ( $list as $host ) {
-			if ( ! HostName::is_host( $host, 253, true ) ) {
-				return new \WP_Error( 'beltoft_services_tool', __( 'Each name server must be a host name such as ns1.example.net.', 'beltoft-services' ) );
-			}
-		}
-
-		if ( count( $list ) < 2 || count( $list ) > 6 || count( array_unique( $list ) ) !== count( $list ) ) {
-			return new \WP_Error( 'beltoft_services_tool', __( 'Give two to six different name servers.', 'beltoft-services' ) );
-		}
-
-		$hosts = "\n- " . implode( "\n- ", $list ) . "\n";
-
-		return array(
-			'text'  => sprintf(
-				/* translators: 1: domain name, 2: the name servers, one per line. */
-				__( 'Move the domain %1$s to these name servers:%2$s Our DNS records for it stop being used. If these name servers do not answer for the domain, its website and e-mail go offline until it is changed back.', 'beltoft-services' ),
-				Irreversible::name( $r ),
-				$hosts
-			),
-			'state' => $r->id() . '|ns|' . implode( ',', $list ),
 		);
 	}
 }

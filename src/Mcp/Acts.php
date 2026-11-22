@@ -33,7 +33,7 @@ final class Acts {
 	/**
 	 * The tools this class runs.
 	 */
-	public const NAMES = array( 'rename_server', 'set_firewall', 'set_database_access', 'private_network', 'set_usage_alerts', 'retry_app_install', 'domain_settings', 'set_auto_renew', 'reactivate_subscription', 'free_license_site', 'cancel_unpaid_order', 'update_billing_address' );
+	public const NAMES = array( 'rename_server', 'set_firewall', 'set_database_access', 'private_network', 'set_usage_alerts', 'retry_app_install', 'set_auto_renew', 'reactivate_subscription', 'free_license_site', 'cancel_unpaid_order', 'update_billing_address' );
 
 	/**
 	 * Runs one of the tools.
@@ -92,9 +92,6 @@ final class Acts {
 			case 'retry_app_install':
 				return Tools::action( (int) $args['id'], 'app_retry', array(), 'app install retry requested' );
 
-			case 'domain_settings':
-				return self::domain_settings( $args );
-
 			case 'set_auto_renew':
 				return self::auto_renew( $user_id, (int) $args['subscription_id'], (bool) $args['on'] );
 
@@ -123,35 +120,6 @@ final class Acts {
 	 */
 	private static function said( array $errors, string $fallback ): string {
 		return $errors ? implode( ' ', $errors ) : $fallback;
-	}
-
-	/**
-	 * A setting of a domain: name servers, transfer lock, a check of the name servers, WHOIS privacy. Never the unlock, never DNSSEC (it needs the emailed code).
-	 *
-	 * @param array<string, mixed> $args Arguments.
-	 * @return array<string, mixed>|\WP_Error
-	 */
-	private static function domain_settings( array $args ) {
-		$action = (string) $args['action'];
-		$send   = array();
-
-		if ( 'set_nameservers' === $action ) {
-			$send['mode'] = (string) ( $args['mode'] ?? '' );
-
-			if ( isset( $args['hosts'] ) ) {
-				$send['hosts'] = implode( ',', array_map( 'strval', (array) $args['hosts'] ) );
-			}
-		}
-
-		if ( 'whois_privacy' === $action ) {
-			if ( ! isset( $args['enabled'] ) || ! is_bool( $args['enabled'] ) ) {
-				return new \WP_Error( 'beltoft_services_tool', __( 'Say whether WHOIS privacy should be on (enabled true) or off (enabled false).', 'beltoft-services' ) );
-			}
-
-			$send['enabled'] = $args['enabled'] ? '1' : '0';
-		}
-
-		return Tools::action( (int) $args['id'], $action, $send, str_replace( '_', ' ', $action ) . ' requested' );
 	}
 
 	/**

@@ -13,7 +13,6 @@ use BeltoftLicenses\Licenses;
 use BeltoftServices\Account\Cards;
 use BeltoftServices\Proxmox\Db\DbPicker;
 use BeltoftServices\Api\Services;
-use BeltoftServices\Domains\DnsClaimRoutes;
 use BeltoftServices\Domains\Prices;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Apps\Apps;
@@ -112,17 +111,6 @@ final class Reads {
 
 			case 'price_quote':
 				return Pricing::quote( $args );
-
-			case 'list_dns_claims':
-				$list = Tools::route( 'GET', '/domains/dns-claims', array(), null, null );
-
-				if ( $list instanceof \WP_Error ) {
-					return $list;
-				}
-
-				$keep = array_flip( array( 'id', 'domain', 'status', 'expires_at', 'verified_at', 'checked_at', 'message' ) );
-
-				return array( 'claims' => array_map( static fn( $c ) => array_intersect_key( (array) $c, $keep ), array_values( $list ) ) );
 
 			case 'console_link':
 				$r = Tools::owned( (int) $args['id'] );

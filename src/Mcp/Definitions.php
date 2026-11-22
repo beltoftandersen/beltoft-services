@@ -175,8 +175,6 @@ final class Definitions {
 				)
 			),
 			'database_info'    => self::read( 'Shows how to connect to one managed database: engine, host, port, database name, user name and the TLS fingerprint. The password is never shown here.', $by_id ),
-			'list_dns_records' => self::read( 'Lists the DNS records of one domain or DNS service that we host.' . self::DATA, $by_id ),
-			'domain_check'     => self::read( 'Checks whether a domain name can be registered and what it costs.', self::obj( array( 'name' => array( 'type' => 'string', 'maxLength' => 253, 'description' => 'A full domain name, for example example.com.' ) ), array( 'name' ) ), 20 ),
 			'billing_summary'  => self::read( 'Shows the next payment of the customer: the date, the amount, what it covers and how it is paid. It also says whether a card is saved (needed to order servers and databases), the account credit balance, and the pay as you go usage so far this month. Prices exclude VAT; VAT is added on the usage invoice.', $none, 30 ),
 			'service_details'  => self::read( 'Shows one service in full: plan, state, renewal and its subscription (status, next payment, auto-renew), and what belongs to its kind: for a server its address, system, firewall, private network, snapshots, backups and app; for a database its connection details, backups and access list; for a domain its name servers, transfer lock and expiry. It also says which actions the dashboard offers now.' . self::DATA, $by_id, 30 ),
 			'usage_summary'    => self::read( 'Shows the live CPU, memory and disk use of the customer\'s running servers, and, for pay-as-you-go, what the usage costs so far this month (an estimate, excluding VAT, each service capped at its max per month). It also says whether a card is saved and the account credit balance.' . self::DATA, $none, 30 ),
@@ -191,7 +189,6 @@ final class Definitions {
 			'catalog'          => self::read( 'Shows what can be bought, with prices excluding VAT: server plans and database plans (pay as you go: price per hour and the max per month; a database plan also lists its public IPv4 address and extra storage options with their prices, and a server plan lists the extra disk sizes that can be ordered with it), the systems and apps a server plan offers (variation_id), add-ons for one of the customer\'s services (id: snapshot packs, extra disks, backups, and for a database extra storage and the public IPv4 address, each with an hourly and a max monthly price), and domain prices per year and ending. Servers and databases are only sold pay as you go. Use price_quote for the total of a plan with add-ons.', self::obj( array( 'kind' => array( 'type' => 'string', 'enum' => array( 'server_plans', 'database_plans', 'os_and_apps', 'addons', 'domain_prices' ), 'description' => 'What to list.' ), 'variation_id' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'For os_and_apps: the server plan, from server_plans.' ), 'id' => $id ), array( 'kind' ) ), 20 ),
 			'price_quote'      => self::read( 'Prices a configuration the way the checkout does, and orders nothing: a server plan, with daily backups if wanted, or a database plan with extra storage. A server plan can also get an extra disk. Pay as you go: the lines per month, the max per month, and the price per hour, excluding VAT. Pick the plan and the extra storage steps from catalog (database_plans).', self::obj( array( 'plan' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'The plan variation_id from catalog server_plans or database_plans.' ), 'backups' => array( 'type' => 'boolean', 'description' => 'Server only: daily backups.' ), 'extra_disk_gb' => array( 'type' => 'integer', 'minimum' => 0, 'maximum' => 100000, 'description' => 'Server only: an extra disk in GB, one of the sizes listed for the plan in catalog server_plans (options.extra_disk).' ), 'public_ipv4' => array( 'type' => 'boolean', 'description' => 'Database only: with a public IPv4 address, billed by the hour with the database. For a server it is added in the dashboard after the server is ready.' ), 'extra_storage_gb' => array( 'type' => 'integer', 'minimum' => 0, 'maximum' => 100000, 'description' => 'Database only: extra storage in GB, one of the steps listed for the plan in catalog database_plans.' ) ), array( 'plan' ) ), 20 ),
 			'list_server_plans' => self::read( 'Lists the server plans that can be ordered through Claude, pay as you go: id, name, CPU, memory and disk, price per hour and the max per month (excluding VAT), what daily backups add, the extra disk sizes with their price, the systems and the apps each plan offers. Use it before order_server.', $none, 20 ),
-			'list_dns_claims'  => self::read( 'Lists the domains the customer has asked us to host DNS for while the domain is registered elsewhere, with the state of each. Only when the site offers it.' . self::DATA, $none, 30 ),
 			'console_link'     => self::read( 'Gives the address of the console page of one server in the customer\'s dashboard. The customer opens it in the browser and logs in there. No console session is made here.', $by_id, 30 ),
 			'list_licenses'    => self::read( 'Lists the customer\'s licenses with product, status, how many sites are used of how many are allowed, and the sites. Use get_license_key for the key.' . self::DATA, $none, 30 ),
 			'get_license_key'  => self::read( 'Shows the key of one of the customer\'s licenses.', self::obj( array( 'license_id' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'The license id, from list_licenses.' ) ), array( 'license_id' ) ), 20 ),
@@ -204,40 +201,6 @@ final class Definitions {
 				'Takes a snapshot of a server, if the customer has a free snapshot slot. It cannot restore or delete one.',
 				self::obj( array( 'id' => $id, 'label' => array( 'type' => 'string', 'maxLength' => 60, 'description' => 'A name for the snapshot. Letters, numbers, spaces, dots, dashes and underscores. Optional.' ) ), array( 'id' ) ),
 				false
-			),
-			'dns_upsert_record' => self::act(
-				'Creates or replaces the records of one name and type in the domain, for example every A record of www. Other records stay as they are. Ask the customer first and read list_dns_records before.',
-				self::obj(
-					$dns + array(
-						'records' => array(
-							'type'        => 'array',
-							'description' => 'The records of this name and type after the change. Each has a value; MX also priority; SRV also priority, weight and port; CAA also flag and tag.',
-							'maxItems'    => 100,
-							'items'       => array(
-								'type'       => 'object',
-								'properties' => array(
-									'value'    => array( 'type' => 'string', 'maxLength' => 500 ),
-									'priority' => array( 'type' => 'integer', 'minimum' => 0, 'maximum' => 65535 ),
-									'weight'   => array( 'type' => 'integer', 'minimum' => 0, 'maximum' => 65535 ),
-									'port'     => array( 'type' => 'integer', 'minimum' => 0, 'maximum' => 65535 ),
-									'flag'     => array( 'type' => 'integer', 'minimum' => 0, 'maximum' => 255 ),
-									'tag'      => array( 'type' => 'string', 'maxLength' => 20 ),
-								),
-								'required'   => array( 'value' ),
-							),
-						),
-						'ttl'     => array( 'type' => 'integer', 'minimum' => 60, 'maximum' => 86400, 'description' => 'Seconds, 60 to 86400. Optional.' ),
-					),
-					array( 'id', 'type', 'name', 'records' )
-				),
-				true,
-				true
-			),
-			'dns_delete_record' => self::act(
-				'Removes the records of one name and type, or only the record with the given value. Ask the customer first.',
-				self::obj( $dns + array( 'value' => array( 'type' => 'string', 'maxLength' => 500, 'description' => 'Remove only the record with this value. Optional.' ) ), array( 'id', 'type', 'name' ) ),
-				true,
-				true
 			),
 			'rename_server'    => self::act( 'Gives a server a new name. The name is shown in the dashboard and used as its host name.', self::obj( array( 'id' => $id, 'name' => array( 'type' => 'string', 'maxLength' => 63, 'description' => 'The new name: letters, numbers and dashes.' ) ), array( 'id', 'name' ) ), true, true ),
 			'set_firewall'     => self::act(
@@ -286,22 +249,6 @@ final class Definitions {
 			'private_network'  => self::act( 'Attaches a server to one of the customer\'s private networks, or detaches it. The customer can have up to five; without a network id the first one is used. The change runs in the background.', self::obj( array( 'id' => $id, 'action' => array( 'type' => 'string', 'enum' => array( 'attach', 'detach' ) ), 'network' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'For attach: the id of one of the customer\'s private networks (see the private_networks of service_details). Optional.' ) ), array( 'id', 'action' ) ), true ),
 			'set_usage_alerts' => self::act( 'Turns the e-mails about high usage of one server on or off.', self::obj( array( 'id' => $id, 'on' => array( 'type' => 'boolean' ) ), array( 'id', 'on' ) ), false, true ),
 			'retry_app_install' => self::act( 'Tries again to install the app of a server whose installation failed or did not finish. It does not reinstall the server.', $by_id, false ),
-			'domain_settings'  => self::act(
-				'Changes a setting of one of the customer\'s domains: set_nameservers (mode ours; mode custom, with two to six hosts, needs Full access and a confirmation because the domain can go offline if the hosts are wrong: the first call returns a summary and a confirm value, show the summary to the customer and send the value only after their clear yes), lock (the transfer lock on), check_delegation (looks at the name servers now), or whois_privacy (WHOIS privacy on or off with enabled, only where the extension allows it, free). DNSSEC is not changed here: it needs a code emailed to the customer and is done in the dashboard. Ask the customer first. Moving a domain away is not possible here.',
-				self::obj(
-					array(
-						'id'     => $id,
-						'action' => array( 'type' => 'string', 'enum' => array( 'set_nameservers', 'lock', 'check_delegation', 'whois_privacy' ) ),
-						'enabled' => array( 'type' => 'boolean', 'description' => 'For whois_privacy: true for on, false for off.' ),
-						'mode'   => array( 'type' => 'string', 'enum' => array( 'ours', 'custom' ), 'description' => 'For set_nameservers.' ),
-						'hosts'  => array( 'type' => 'array', 'maxItems' => 6, 'items' => array( 'type' => 'string', 'maxLength' => 253 ), 'description' => 'For set_nameservers with mode custom.' ),
-					),
-					array( 'id', 'action' ),
-					true
-				),
-				true,
-				true
-			),
 			'set_auto_renew'   => self::act( 'Turns automatic renewal of one subscription on or off, where the shop allows it. With it off the customer pays the renewal invoice by hand and the service ends if it is not paid. Ask the customer first.', self::obj( array( 'subscription_id' => $sub, 'on' => array( 'type' => 'boolean' ) ), array( 'subscription_id', 'on' ) ), true, true, 10 ),
 			'reactivate_subscription' => self::act( 'Reactivates a subscription that is on hold, when the dashboard offers reactivation for it (see list_subscriptions) and nothing is owed.', self::obj( array( 'subscription_id' => $sub ), array( 'subscription_id' ) ), false, true, 10 ),
 			'free_license_site' => self::act( 'Removes a site from a license so the license can be used on another site.', self::obj( array( 'license_id' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'The license id, from list_licenses.' ), 'domain' => array( 'type' => 'string', 'maxLength' => 253, 'description' => 'The site, as listed.' ) ), array( 'license_id', 'domain' ) ), true, false, 10 ),

@@ -55,9 +55,6 @@ final class Irreversible {
 			case 'set_database_access':
 				return ServerActions::summary_world( $args );
 
-			case 'domain_settings':
-				return ServerActions::summary_nameservers( $args );
-
 			case 'cancel_subscription':
 			case 'remove_addon':
 			case 'set_default_payment_method':
