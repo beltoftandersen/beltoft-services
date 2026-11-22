@@ -285,7 +285,7 @@ final class SecretsTest extends McpTestCase {
 			$this->assertFalse( ActionMap::permits( $tool, 'POST', '/resources/' . $domain->id() . '/console' ), $tool );
 		}
 
-		$this->assertArrayNotHasKey( 'unlock', ActionMap::ACTIONS );
-		$this->assertArrayHasKey( 'domain_transfer_code', ActionMap::CAPABILITIES_EXCLUDED );
+		$this->assertArrayNotHasKey( 'unlock', ActionMap::actions() );
+		$this->assertArrayHasKey( 'domain_transfer_code', ActionMap::capabilities_excluded() );
 	}
 }

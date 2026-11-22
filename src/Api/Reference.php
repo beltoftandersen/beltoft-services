@@ -317,7 +317,7 @@ final class Reference {
 		$found  = array();
 
 		if ( 'POST' === $method && preg_match( '#/actions/\{action\}$#D', $path ) ) {
-			$found = array_values( array_unique( array_values( ActionMap::ACTIONS ) ) );
+			$found = array_values( array_unique( array_values( ActionMap::actions() ) ) );
 		} else {
 			$extra = array(
 				'GET /resources'      => 'list_services',

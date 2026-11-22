@@ -42,6 +42,12 @@ final class Irreversible {
 	 * @return array{text: string, state: string}|\WP_Error
 	 */
 	public static function summary( string $name, array $args, int $user_id ) {
+		$own = ToolSets::summary( $name, $args, $user_id );
+
+		if ( null !== $own ) {
+			return $own;
+		}
+
 		switch ( $name ) {
 			case 'set_firewall':
 				return ServerActions::summary_firewall( $args );
@@ -86,7 +92,7 @@ final class Irreversible {
 			return $r;
 		}
 
-		$action = (string) array_search( $name, ActionMap::ACTIONS, true );
+		$action = (string) array_search( $name, ActionMap::actions(), true );
 		$bad    = ServerActions::not_offered( $r, $action );
 
 		if ( null !== $bad ) {

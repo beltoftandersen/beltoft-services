@@ -213,13 +213,13 @@ class DatabaseDetailsTest extends HostingCase {
 	public function test_no_tool_of_the_mcp_server_reaches_the_reveal_route(): void {
 		$route = 'POST /resources/12/hosting/database/password';
 
-		foreach ( ActionMap::ROUTES as $tool => $patterns ) {
+		foreach ( ActionMap::routes() as $tool => $patterns ) {
 			foreach ( $patterns as $pattern ) {
 				list( $method, $regex ) = explode( ' ', $pattern, 2 );
 				$this->assertFalse( 0 === strpos( $route, $method . ' ' ) && 1 === preg_match( $regex, substr( $route, strlen( $method ) + 1 ) ), $tool . ' must not reach the database password.' );
 			}
 		}
 
-		$this->assertStringStartsWith( 'never', ActionMap::CAPABILITIES_EXCLUDED['reveal_hosting_database_password'] );
+		$this->assertStringStartsWith( 'never', ActionMap::capabilities_excluded()['reveal_hosting_database_password'] );
 	}
 }

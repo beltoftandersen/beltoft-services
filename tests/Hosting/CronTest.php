@@ -803,7 +803,7 @@ class CronTest extends HostingCase {
 		$this->assertStringContainsString( $key, $this->panel( $r ), 'The owner sees it on the page.' );
 
 		foreach ( array( 'PUT /resources/1/hosting/sites/x/cron', 'POST /resources/1/hosting/sites/x/cron', 'DELETE /resources/1/hosting/sites/x/cron' ) as $route ) {
-			foreach ( ActionMap::ROUTES as $tool => $patterns ) {
+			foreach ( ActionMap::routes() as $tool => $patterns ) {
 				foreach ( $patterns as $pattern ) {
 					list( $method, $regex ) = explode( ' ', $pattern, 2 );
 					$this->assertFalse( 0 === strpos( $route, $method . ' ' ) && 1 === preg_match( $regex, substr( $route, strlen( $method ) + 1 ) ), $tool . ' must not reach ' . $route );
@@ -811,7 +811,7 @@ class CronTest extends HostingCase {
 			}
 		}
 
-		$this->assertStringStartsWith( 'never', ActionMap::CAPABILITIES_EXCLUDED['hosting_scheduled_jobs'] );
+		$this->assertStringStartsWith( 'never', ActionMap::capabilities_excluded()['hosting_scheduled_jobs'] );
 	}
 
 	// -- A website that goes, a restore ---------------------------------------------------------------------------------------

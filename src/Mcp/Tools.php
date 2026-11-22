@@ -118,6 +118,10 @@ final class Tools {
 	 * @param array<string, mixed> $args Arguments (not yet validated).
 	 */
 	public static function risky( string $name, array $args ): bool {
+		if ( ToolSets::risky( $name, $args ) ) {
+			return true;
+		}
+
 		if ( 'set_database_access' === $name ) {
 			return 'world_on' === ( $args['op'] ?? null );
 		}
@@ -384,6 +388,10 @@ final class Tools {
 	 */
 	private static function run( string $name, array $args ) {
 		$user_id = get_current_user_id();
+
+		if ( null !== ToolSets::owner( $name ) ) {
+			return ToolSets::run( $name, $args, $user_id );
+		}
 
 		if ( in_array( $name, self::READS, true ) ) {
 			return Reads::run( $name, $args, $user_id );

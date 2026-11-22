@@ -106,7 +106,7 @@ final class Tokens {
 		$tools = \BeltoftServices\Mcp\Definitions::all();
 		$out   = array();
 
-		foreach ( \BeltoftServices\Mcp\ActionMap::ACTIONS as $action => $tool ) {
+		foreach ( \BeltoftServices\Mcp\ActionMap::actions() as $action => $tool ) {
 			if ( self::FULL === ( $tools[ $tool ]['level'] ?? self::FULL ) ) {
 				$out[] = $action;
 			}
@@ -116,14 +116,14 @@ final class Tokens {
 	}
 
 	/**
-	 * The actions the dashboard alone may run (ActionMap::EXCLUDED with "never"), so a token never reaches them.
+	 * The actions the dashboard alone may run (ActionMap::excluded() with "never"), so a token never reaches them.
 	 *
 	 * @return string[]
 	 */
 	public static function dashboard_only_actions(): array {
 		$out = array();
 
-		foreach ( \BeltoftServices\Mcp\ActionMap::EXCLUDED as $action => $why ) {
+		foreach ( \BeltoftServices\Mcp\ActionMap::excluded() as $action => $why ) {
 			if ( 0 === strpos( (string) $why, 'never' ) ) {
 				$out[] = $action;
 			}
@@ -140,7 +140,7 @@ final class Tokens {
 	 * @param mixed  $args   The request's args.
 	 */
 	public static function risky_action( string $action, $args ): bool {
-		$tool = \BeltoftServices\Mcp\ActionMap::ACTIONS[ $action ] ?? null;
+		$tool = \BeltoftServices\Mcp\ActionMap::actions()[ $action ] ?? null;
 
 		if ( null === $tool ) {
 			return false;

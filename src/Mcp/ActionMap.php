@@ -31,7 +31,7 @@ final class ActionMap {
 	/**
 	 * Action name => the tool that posts it.
 	 */
-	public const ACTIONS = array(
+	private const ACTIONS = array(
 		'start'              => 'start',
 		'shutdown'           => 'shutdown',
 		'reboot'             => 'reboot',
@@ -57,7 +57,7 @@ final class ActionMap {
 	/**
 	 * Action name => why no tool runs it. "never" is for good, "route" means a tool reaches it through its own REST route.
 	 */
-	public const EXCLUDED = array(
+	private const EXCLUDED = array(
 		'unlock'            => 'never: a domain transfer is only possible in the dashboard',
 		'dnssec_enable'     => 'never: DNSSEC changes the keys the registry holds and needs the code emailed to the account address, so it is only available in the dashboard',
 		'dnssec_disable'    => 'never: DNSSEC changes the keys the registry holds and needs the code emailed to the account address, so it is only available in the dashboard',
@@ -86,7 +86,7 @@ final class ActionMap {
 	 * capability and the tool that does it. Every irreversible or secret capability of the dashboard is here or in
 	 * CAPABILITIES_EXCLUDED, so none is missing without a reason.
 	 */
-	public const CAPABILITIES = array(
+	private const CAPABILITIES = array(
 		'cancel_subscription'      => 'cancel_subscription',
 		'remove_extra_disk'        => 'remove_addon',
 		'remove_snapshot_slots'    => 'remove_addon',
@@ -117,7 +117,7 @@ final class ActionMap {
 	 * Capabilities of the dashboard that have no tool, with the reason. "never" is for good; "later" is a phase of the plan
 	 * that is not built; "dashboard" is a flow that cannot be done without the customer's own browser.
 	 */
-	public const CAPABILITIES_EXCLUDED = array(
+	private const CAPABILITIES_EXCLUDED = array(
 		'delete_hosting_backup'       => 'never: a backup is the last copy after a mistake or an attack; deleting one is only done in the dashboard',
 		'reveal_hosting_database_password' => 'never: showing the database password of a hosting account needs the code emailed to the account address, so it is only available in the dashboard',
 		'dedicated_rescue_password'  => 'never: the rescue password of a dedicated server needs the code emailed to the account address, so it is only available in the dashboard',
@@ -142,7 +142,7 @@ final class ActionMap {
 	 * Tool => the REST routes below beltoft-services/v1 it may call: "METHOD pattern". The generic action route is
 	 * allowed only through ACTIONS.
 	 */
-	public const ROUTES = array(
+	private const ROUTES = array(
 		'server_status'      => array( 'GET #^/resources/\d+$#D' ),
 		'database_info'      => array( 'GET #^/resources/\d+$#D' ),
 		'server_usage'       => array( 'GET #^/resources/\d+/metrics$#D' ),
@@ -187,6 +187,51 @@ final class ActionMap {
 	);
 
 	/**
+	 * Action name => the tool that posts it: the platform's own and those of the feature sets.
+	 *
+	 * @return array<string, string>
+	 */
+	public static function actions(): array {
+		return array_merge( self::ACTIONS, ToolSets::table( 'actions' ) );
+	}
+
+	/**
+	 * Action name => why no tool runs it.
+	 *
+	 * @return array<string, string>
+	 */
+	public static function excluded(): array {
+		return array_merge( self::EXCLUDED, ToolSets::table( 'excluded' ) );
+	}
+
+	/**
+	 * Capability => the tool that does it.
+	 *
+	 * @return array<string, string>
+	 */
+	public static function capabilities(): array {
+		return array_merge( self::CAPABILITIES, ToolSets::table( 'capabilities' ) );
+	}
+
+	/**
+	 * Capability => why it has no tool.
+	 *
+	 * @return array<string, string>
+	 */
+	public static function capabilities_excluded(): array {
+		return array_merge( self::CAPABILITIES_EXCLUDED, ToolSets::table( 'capabilities_excluded' ) );
+	}
+
+	/**
+	 * Tool => the REST routes it may call.
+	 *
+	 * @return array<string, string[]>
+	 */
+	public static function routes(): array {
+		return array_merge( self::ROUTES, ToolSets::table( 'routes' ) );
+	}
+
+	/**
 	 * May this tool make this call?
 	 *
 	 * @param string $tool   Tool name.
@@ -197,10 +242,10 @@ final class ActionMap {
 		$method = strtoupper( $method );
 
 		if ( 'POST' === $method && 1 === preg_match( '#^/resources/\d+/actions/([a-z0-9_-]+)$#D', $path, $m ) ) {
-			return ( self::ACTIONS[ $m[1] ] ?? null ) === $tool;
+			return ( self::actions()[ $m[1] ] ?? null ) === $tool;
 		}
 
-		foreach ( self::ROUTES[ $tool ] ?? array() as $allowed ) {
+		foreach ( self::routes()[ $tool ] ?? array() as $allowed ) {
 			list( $verb, $pattern ) = explode( ' ', $allowed, 2 );
 
 			if ( $verb === $method && 1 === preg_match( $pattern, $path ) ) {

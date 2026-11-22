@@ -89,10 +89,10 @@ final class ToolsMapTest extends McpTestCase {
 		}
 
 		foreach ( array_unique( $seen ) as $action ) {
-			$tool     = ActionMap::ACTIONS[ $action ] ?? null;
-			$excluded = ActionMap::EXCLUDED[ $action ] ?? null;
+			$tool     = ActionMap::actions()[ $action ] ?? null;
+			$excluded = ActionMap::excluded()[ $action ] ?? null;
 
-			$this->assertTrue( null !== $tool || null !== $excluded, 'The dashboard action "' . $action . '" has no tool in ActionMap::ACTIONS and no reason in ActionMap::EXCLUDED.' );
+			$this->assertTrue( null !== $tool || null !== $excluded, 'The dashboard action "' . $action . '" has no tool in ActionMap::actions() and no reason in ActionMap::excluded().' );
 			$this->assertFalse( null !== $tool && null !== $excluded, $action . ' is both mapped and excluded.' );
 
 			if ( null !== $tool ) {
@@ -101,7 +101,7 @@ final class ToolsMapTest extends McpTestCase {
 		}
 
 		// Nothing in the map is about an action the dashboard does not have.
-		foreach ( array_merge( array_keys( ActionMap::ACTIONS ), array_keys( ActionMap::EXCLUDED ) ) as $action ) {
+		foreach ( array_merge( array_keys( ActionMap::actions() ), array_keys( ActionMap::excluded() ) ) as $action ) {
 			$this->assertContains( $action, $seen, $action . ' is in ActionMap but no offered() list has it any more.' );
 		}
 	}
@@ -124,8 +124,8 @@ final class ToolsMapTest extends McpTestCase {
 			}
 		}
 
-		$this->assertArrayNotHasKey( 'unlock', ActionMap::ACTIONS );
-		$this->assertStringStartsWith( 'never', ActionMap::EXCLUDED['unlock'] );
+		$this->assertArrayNotHasKey( 'unlock', ActionMap::actions() );
+		$this->assertStringStartsWith( 'never', ActionMap::excluded()['unlock'] );
 
 		// No action enum of any tool holds the unlock, and no tool takes a free action name.
 		foreach ( Tools::definitions() as $name => $tool ) {
@@ -179,7 +179,7 @@ final class ToolsMapTest extends McpTestCase {
 			}
 		}
 
-		foreach ( ActionMap::ACTIONS as $action => $owner ) {
+		foreach ( ActionMap::actions() as $action => $owner ) {
 			foreach ( array_keys( Tools::definitions() ) as $tool ) {
 				$this->assertSame( $tool === $owner, ActionMap::permits( $tool, 'POST', '/resources/1/actions/' . $action ), $tool . ' and ' . $action );
 			}
@@ -291,10 +291,10 @@ final class ToolsMapTest extends McpTestCase {
 		);
 
 		foreach ( $known as $capability ) {
-			$tool   = ActionMap::CAPABILITIES[ $capability ] ?? null;
-			$reason = ActionMap::CAPABILITIES_EXCLUDED[ $capability ] ?? null;
+			$tool   = ActionMap::capabilities()[ $capability ] ?? null;
+			$reason = ActionMap::capabilities_excluded()[ $capability ] ?? null;
 
-			$this->assertTrue( null !== $tool || null !== $reason, $capability . ' has no tool in ActionMap::CAPABILITIES and no reason in ActionMap::CAPABILITIES_EXCLUDED.' );
+			$this->assertTrue( null !== $tool || null !== $reason, $capability . ' has no tool in ActionMap::capabilities() and no reason in ActionMap::capabilities_excluded().' );
 			$this->assertFalse( null !== $tool && null !== $reason, $capability . ' is both mapped and excluded.' );
 
 			if ( null !== $tool ) {
@@ -302,12 +302,12 @@ final class ToolsMapTest extends McpTestCase {
 			}
 		}
 
-		foreach ( array_merge( array_keys( ActionMap::CAPABILITIES ), array_keys( ActionMap::CAPABILITIES_EXCLUDED ) ) as $capability ) {
+		foreach ( array_merge( array_keys( ActionMap::capabilities() ), array_keys( ActionMap::capabilities_excluded() ) ) as $capability ) {
 			$this->assertContains( $capability, $known, $capability . ' is in ActionMap but not in the list of known capabilities of this test.' );
 		}
 
 		// Every tool of Full access is the answer to an action or a capability, or an escalation of an everyday tool: none is orphaned.
-		$mapped = array_merge( array_values( ActionMap::ACTIONS ), array_values( ActionMap::CAPABILITIES ) );
+		$mapped = array_merge( array_values( ActionMap::actions() ), array_values( ActionMap::capabilities() ) );
 
 		foreach ( Tools::definitions() as $name => $tool ) {
 			if ( Tokens::FULL === $tool['level'] ) {
@@ -317,25 +317,25 @@ final class ToolsMapTest extends McpTestCase {
 
 		// "never" stays never: the transfer and the console have a reason that says so, and no tool.
 		foreach ( array( 'domain_transfer_code', 'domain_unlock', 'console_ticket' ) as $capability ) {
-			$this->assertStringStartsWith( 'never', ActionMap::CAPABILITIES_EXCLUDED[ $capability ] );
+			$this->assertStringStartsWith( 'never', ActionMap::capabilities_excluded()[ $capability ] );
 		}
 
-		$this->assertStringStartsWith( 'never', ActionMap::EXCLUDED['unlock'] );
+		$this->assertStringStartsWith( 'never', ActionMap::excluded()['unlock'] );
 	}
 
 	public function test_deleting_a_backup_has_no_tool_anywhere_and_says_why(): void {
-		$this->assertArrayNotHasKey( 'backup_delete', ActionMap::ACTIONS );
-		$this->assertStringStartsWith( 'never', ActionMap::EXCLUDED['backup_delete'] );
-		$this->assertArrayNotHasKey( 'delete_hosting_backup', ActionMap::CAPABILITIES );
-		$this->assertStringStartsWith( 'never', ActionMap::CAPABILITIES_EXCLUDED['delete_hosting_backup'] );
-		$this->assertStringContainsString( 'last copy', ActionMap::EXCLUDED['backup_delete'] );
+		$this->assertArrayNotHasKey( 'backup_delete', ActionMap::actions() );
+		$this->assertStringStartsWith( 'never', ActionMap::excluded()['backup_delete'] );
+		$this->assertArrayNotHasKey( 'delete_hosting_backup', ActionMap::capabilities() );
+		$this->assertStringStartsWith( 'never', ActionMap::capabilities_excluded()['delete_hosting_backup'] );
+		$this->assertStringContainsString( 'last copy', ActionMap::excluded()['backup_delete'] );
 
 		foreach ( array_keys( Tools::definitions() ) as $name ) {
 			$this->assertDoesNotMatchRegularExpression( '/delete.*backup|backup.*delete/', $name );
 		}
 
 		// No tool may call the hosting delete route either.
-		foreach ( ActionMap::ROUTES as $tool => $routes ) {
+		foreach ( ActionMap::routes() as $tool => $routes ) {
 			foreach ( $routes as $route ) {
 				$this->assertFalse( 0 === strpos( $route, 'DELETE' ) && false !== strpos( $route, 'hosting/backups' ), $tool . ' reaches the hosting backup delete.' );
 			}

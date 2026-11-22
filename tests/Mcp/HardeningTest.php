@@ -204,7 +204,7 @@ final class HardeningTest extends McpTestCase {
 
 		$full_only = array();
 
-		foreach ( ActionMap::ACTIONS as $action => $tool ) {
+		foreach ( ActionMap::actions() as $action => $tool ) {
 			if ( Tokens::FULL === Tools::definitions()[ $tool ]['level'] ) {
 				$full_only[] = $action;
 			}

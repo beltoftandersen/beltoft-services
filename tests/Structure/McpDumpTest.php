@@ -115,6 +115,7 @@ final class McpDumpTest extends McpTestCase {
 		krsort( $ids );
 
 		$candidates = array( 'server' => $server->id(), 'db' => $db->id(), 'domain' => $domain->id(), 'unknown' => 999999 );
+		$licenses   = array( 'server' => (int) $server->license()['id'], 'db' => (int) $db->license()['id'], 'domain' => (int) $domain->license()['id'] );
 		$reads      = '';
 		$sums       = '';
 
@@ -127,6 +128,13 @@ final class McpDumpTest extends McpTestCase {
 
 			foreach ( $candidates as $label => $id ) {
 				$args = (array) $this->dummy( $tool['schema'], $id );
+
+				// Ids of other things are real or certainly unknown, never a number that may or may not exist.
+				foreach ( array( 'license_id', 'subscription_id', 'order_id', 'network' ) as $key ) {
+					if ( isset( $args[ $key ] ) ) {
+						$args[ $key ] = 'unknown' === $label ? 999999 : ( 'license_id' === $key ? $licenses[ $label ] : ( 'subscription_id' === $key ? $sub->get_id() : 999999 ) );
+					}
+				}
 
 				if ( ! $is_read && in_array( $name, array( 'order_server', 'order_database', 'delete_server', 'delete_database' ), true ) ) {
 					// Described only for the unknown id: they are money and deletion paths with their own tests.
