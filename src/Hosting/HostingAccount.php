@@ -300,7 +300,7 @@ final class HostingAccount {
 	private static function page_tabs( Resource $r ): ?array {
 		$page = \BeltoftServices\Account\ServiceArea::page();
 
-		if ( ! $page || ! ( $page['area'] ?? null ) instanceof \BeltoftServices\Account\Hosting ) {
+		if ( ! $page || ! ( $page['area'] ?? null ) instanceof \BeltoftServices\Hosting\Hosting ) {
 			return null;
 		}
 

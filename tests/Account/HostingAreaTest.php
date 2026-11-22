@@ -2,7 +2,7 @@
 /** My Account: the hosting tab is there for every customer, with an empty state and an order button. @package BeltoftServices */
 namespace BeltoftServices\Tests\Account;
 
-use BeltoftServices\Account\Hosting;
+use BeltoftServices\Hosting\Hosting;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Tests\TestCase;

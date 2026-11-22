@@ -11,7 +11,7 @@
 namespace BeltoftServices\Tests\Account;
 
 use BeltoftLicenses\Account\Endpoint;
-use BeltoftServices\Account\Email;
+use BeltoftServices\Mail\Email;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Mail\MailDriver;

@@ -45,7 +45,7 @@ final class EmailValues {
 			$values['domain_name'] = HostName::display( (string) $mail->get( 'mail_domain' ) );
 
 			if ( $license && ! in_array( (string) $r->get( 'state' ), array( 'deleting', 'deleted' ), true ) ) {
-				$values['account_url'] = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Email::class )->url( $license );
+				$values['account_url'] = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Mail\Email::class )->url( $license );
 			}
 		}
 

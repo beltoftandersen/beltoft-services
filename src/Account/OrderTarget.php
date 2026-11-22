@@ -8,9 +8,6 @@
 namespace BeltoftServices\Account;
 
 use BeltoftLicenses\Licenses;
-use BeltoftServices\Hosting\Addons;
-use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Addon\Addon;
 use BeltoftServices\Resource;
 use BeltoftServices\ThankYou;
 
@@ -55,12 +52,10 @@ final class OrderTarget {
 	 * @return array<string, mixed>|null
 	 */
 	public static function license_for( \WC_Order $order ): ?array {
-		$meta = $order->get_meta( Addons::ORDER_META );
+		$named = self::ask( $order, 'meta' );
 
-		if ( is_array( $meta ) && (int) ( $meta['resource'] ?? 0 ) > 0 ) {
-			$r = Resource::find( (int) $meta['resource'] );
-
-			return $r ? $r->license() : null;
+		if ( null !== $named ) {
+			return $named ?: null;
 		}
 
 		if ( function_exists( 'wcs_get_subscriptions_for_order' ) && function_exists( 'wcs_order_contains_subscription' ) && wcs_order_contains_subscription( $order, array( 'renewal', 'switch', 'resubscribe' ) ) ) {
@@ -76,7 +71,7 @@ final class OrderTarget {
 		}
 
 		// An add-on line names its server in its own line meta (set at add to cart), so the page is known before the add-on's service exists.
-		$by_line = self::server_from_lines( $order );
+		$by_line = self::ask( $order, 'lines' );
 
 		if ( null !== $by_line ) {
 			return $by_line ?: null;
@@ -106,52 +101,21 @@ final class OrderTarget {
 	}
 
 	/**
-	 * The server the add-on lines of the order are for, read from the lines' own meta: the licence row of that server, false when the
-	 * lines point to no single server of the customer (a mix, or another customer's), null when no line is an add-on line.
+	 * What a feature knows of the order: asked at two places of license_for(), 'meta' (before the renewal check: an order whose own meta
+	 * names the service) and 'lines' (after it: add-on lines that name their server).
 	 *
 	 * @param \WC_Order $order Order.
-	 * @return array<string, mixed>|false|null
+	 * @param string    $phase  'meta' or 'lines'.
+	 * @return array<string, mixed>|false|null The licence row, false when the feature found that the order leads to no single service, null when it has no answer.
 	 */
-	private static function server_from_lines( \WC_Order $order ) {
-		$parent = 0;
-		$linked = 0;
-		$other  = 0;
-
-		foreach ( $order->get_items() as $item ) {
-			if ( ! $item instanceof \WC_Order_Item_Product || ! Product::is_service( (int) ( $item->get_variation_id() ?: $item->get_product_id() ) ) ) {
-				continue;
-			}
-
-			$link = 0;
-
-			foreach ( Addon::all() as $addon ) {
-				$value = $item->get_meta( $addon->item_server(), true );
-
-				if ( is_numeric( $value ) && (int) $value > 0 ) {
-					$link = (int) $value;
-					break;
-				}
-			}
-
-			if ( $link < 1 ) {
-				++$other;
-				continue;
-			}
-
-			if ( $parent > 0 && $parent !== $link ) {
-				return false;
-			}
-
-			$parent = $link;
-			++$linked;
-		}
-
-		if ( 0 === $linked ) {
-			return null;
-		}
-
-		$server = 0 === $other ? Licenses::find( $parent ) : null;
-
-		return $server && (int) $server['user_id'] === (int) $order->get_customer_id() ? $server : false;
+	private static function ask( \WC_Order $order, string $phase ) {
+		/**
+		 * Filters the licence row of the service an order from the account area was for. Null is no answer, false is "no single service".
+		 *
+		 * @param array<string, mixed>|false|null $found Answer so far.
+		 * @param \WC_Order                       $order Order.
+		 * @param string                          $phase 'meta' or 'lines'.
+		 */
+		return apply_filters( 'beltoft_services_order_target_license', null, $order, $phase );
 	}
 }

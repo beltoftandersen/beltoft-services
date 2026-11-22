@@ -56,12 +56,12 @@ class NeutralNamesTest extends HostingCase {
 	public function test_the_product_is_called_hosting_until_the_shop_names_it(): void {
 		$this->assertSame( 'Hosting', Config::label() );
 		$this->assertSame( 'Hosting', ( new HostingDriver() )->label() );
-		$this->assertSame( 'Hosting', \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Hosting::class )->label() );
+		$this->assertSame( 'Hosting', \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Hosting\Hosting::class )->label() );
 
 		$this->settings( array( 'hosting_label' => 'Web hosting' ) );
 		$this->assertSame( 'Web hosting', Config::label() );
 		$this->assertSame( 'Web hosting', ( new HostingDriver() )->label() );
-		$this->assertSame( 'Web hosting', \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Hosting::class )->label() );
+		$this->assertSame( 'Web hosting', \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Hosting\Hosting::class )->label() );
 
 		$this->settings( array( 'hosting_label' => '   ' ) );
 		$this->assertSame( 'Hosting', Config::label(), 'An empty name is the neutral one.' );
@@ -98,7 +98,7 @@ class NeutralNamesTest extends HostingCase {
 			glob( $root . 'templates/account/hosting/*.php' ),
 			glob( $root . 'templates/emails/*hosting*.php' ),
 			glob( $root . 'templates/emails/plain/*hosting*.php' ),
-			array( $root . 'src/Account/Hosting.php' )
+			array( $root . 'src/Hosting/Hosting.php' )
 		);
 		$this->assertNotEmpty( $files );
 

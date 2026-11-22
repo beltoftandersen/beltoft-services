@@ -9,7 +9,6 @@ namespace BeltoftServices\Ssl;
 
 use BeltoftServices\Resource;
 use BeltoftServices\Ssl\Panels;
-use BeltoftServices\Account\Email;
 use BeltoftServices\Account\ServiceArea;
 
 defined( 'ABSPATH' ) || exit;
@@ -34,7 +33,7 @@ final class Ssl extends ServiceArea {
 	 * @return mixed
 	 */
 	public static function menu( $items ) {
-		return self::move_after( $items, ServiceArea::get( self::class )->slug(), ServiceArea::get( Email::class )->slug() );
+		return self::move_after( $items, ServiceArea::get( self::class )->slug(), ServiceArea::by_key( 'email' )->slug() );
 	}
 
 	/**

@@ -3,8 +3,8 @@
 namespace BeltoftServices\Tests\Account;
 
 use BeltoftServices\Account\Domains;
-use BeltoftServices\Account\Email;
-use BeltoftServices\Account\Hosting;
+use BeltoftServices\Mail\Email;
+use BeltoftServices\Hosting\Hosting;
 use BeltoftServices\Licences\Licences;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Ssl\Ssl;

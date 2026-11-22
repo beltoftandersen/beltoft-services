@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Mail;
 
-use BeltoftServices\Account\Email;
+use BeltoftServices\Mail\Email;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Api\Routes;
 use BeltoftServices\Jobs;

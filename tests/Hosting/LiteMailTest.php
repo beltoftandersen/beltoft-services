@@ -119,7 +119,7 @@ class LiteMailTest extends HostingCase {
 	public function test_an_email_lite_child_is_listed_in_the_email_area_with_its_own_page_and_label(): void {
 		$parent = $this->account();
 		$child  = $this->make_ready( $this->lite( $parent, 'lite.example' ) );
-		$area   = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Email::class );
+		$area   = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Mail\Email::class );
 
 		$this->assertTrue( $area->is_member( $child->license() ), 'The licence is grouped under Email, so the Licenses tab does not list it as a separate key.' );
 
@@ -328,7 +328,7 @@ class LiteMailTest extends HostingCase {
 	public function test_the_email_lite_page_is_headed_email_lite_and_a_plan_domain_keeps_business_email(): void {
 		$r     = $this->account();
 		$child = $this->lite( $r, 'lite.customer.example' );
-		$area  = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Account\Email::class );
+		$area  = \BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Mail\Email::class );
 		$this->assertSame( 'Email lite', $area->label_of( Resource::find( $child->id() ) ) );
 
 		$css = (string) file_get_contents( dirname( __DIR__, 2 ) . '/assets/mail.css' );

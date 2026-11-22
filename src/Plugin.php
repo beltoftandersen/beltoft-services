@@ -184,9 +184,9 @@ final class Plugin {
 		Account\ServiceArea::register();
 		Account\Domains::register();
 		Account\Databases::register();
-		Account\Hosting::register();
+		Hosting\Hosting::register();
 		Http\AccountApps::register();
-		Account\Email::register();
+		Mail\Email::register();
 		Ssl\Ssl::register();
 		Licences\Licences::register();
 		Storage\Storage::register();
@@ -196,6 +196,8 @@ final class Plugin {
 		Account\DbPicker::register();
 		Account\Overview::register();
 		Account\OrderTarget::register();
+		Hosting\OrderTarget::register();
+		Proxmox\Addon\OrderTarget::register();
 		Account\OverviewOrder::register();
 		Account\Billing::register();
 		Account\PageHead::register();

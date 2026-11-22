@@ -830,7 +830,7 @@ final class HostingView {
 
 		if ( $mail ) {
 			$mail_domain = \BeltoftServices\Domains\HostName::display( (string) $mail->get( \BeltoftServices\Mail\MailDomain::META_DOMAIN ) );
-			$area        = ServiceArea::get( \BeltoftServices\Account\Email::class );
+			$area        = ServiceArea::get( \BeltoftServices\Mail\Email::class );
 			$url         = $area->url( $mail->license() );
 			$dns_url     = $area->url( $mail->license(), 'dns' );
 			$proof       = \BeltoftServices\Mail\MailField::waiting_for_proof( $mail );

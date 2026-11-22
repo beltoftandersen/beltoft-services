@@ -9,7 +9,7 @@ namespace BeltoftServices\Tests\Mail;
 
 use BeltoftLicenses\Account\Endpoint;
 use BeltoftLicenses\Account\View;
-use BeltoftServices\Account\Email;
+use BeltoftServices\Mail\Email;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Account\Slugs;
@@ -493,7 +493,7 @@ final class MailAccountTest extends MailTestCase {
 	}
 
 	public function test_the_files_keep_the_design_rules(): void {
-		$files = array( 'assets/mail.css', 'assets/mail.js', 'templates/account/mail.php', 'src/Account/Email.php', 'src/Mail/MailCard.php', 'src/Mail/MailView.php', 'src/Mail/MailRoutes.php' );
+		$files = array( 'assets/mail.css', 'assets/mail.js', 'templates/account/mail.php', 'src/Mail/Email.php', 'src/Mail/MailCard.php', 'src/Mail/MailView.php', 'src/Mail/MailRoutes.php' );
 
 		foreach ( $files as $file ) {
 			$text = (string) file_get_contents( BELTOFT_SERVICES_PATH . $file );

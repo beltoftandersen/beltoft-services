@@ -10,7 +10,7 @@ namespace BeltoftServices\Tests\Hosting;
 
 require_once __DIR__ . '/HostingCase.php';
 
-use BeltoftServices\Account\Hosting;
+use BeltoftServices\Hosting\Hosting;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Hosting\HostingAccount;
 use BeltoftServices\Hosting\HostingView;

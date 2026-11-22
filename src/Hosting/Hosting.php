@@ -5,9 +5,10 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Account;
+namespace BeltoftServices\Hosting;
 
 use BeltoftServices\Resource;
+use BeltoftServices\Account\ServiceArea;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -23,6 +24,19 @@ final class Hosting extends ServiceArea {
 	 */
 	public static function register(): void {
 		ServiceArea::offer( self::class, 30 );
+		add_filter( 'beltoft_services_email_label', array( __CLASS__, 'email_label' ), 10, 3 );
+	}
+
+	/**
+	 * Email lite is the mail domain that comes with a hosting account: a child of the hosting resource.
+	 *
+	 * @param mixed $label    Text so far.
+	 * @param mixed $resource The mail resource (unused).
+	 * @param mixed $parent   The resource it is a child of.
+	 * @return mixed
+	 */
+	public static function email_label( $label, $resource = null, $parent = null ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- filter signature.
+		return $parent instanceof Resource && HostingDriver::ID === (string) $parent->get( 'driver' ) ? __( 'Email lite', 'beltoft-services' ) : $label;
 	}
 
 	/**

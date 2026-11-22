@@ -5,13 +5,15 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Account;
+namespace BeltoftServices\Mail;
 
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Mail\MailDriver;
 use BeltoftServices\Mail\MailGuard;
 use BeltoftServices\Mail\MailPlan;
 use BeltoftServices\Resource;
+use BeltoftServices\Account\Domains;
+use BeltoftServices\Account\ServiceArea;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -231,14 +233,15 @@ final class Email extends ServiceArea {
 	 * @param Resource $resource Resource.
 	 */
 	public function label_of( Resource $resource ): string {
-		// Email lite is the mail domain that comes with a hosting account: a child of the hosting resource.
-		$parent = \BeltoftServices\Children::parent_of( $resource );
-
-		if ( $parent && \BeltoftServices\Hosting\HostingDriver::ID === (string) $parent->get( 'driver' ) ) {
-			return __( 'Email lite', 'beltoft-services' );
-		}
-
-		return __( 'Business email', 'beltoft-services' );
+		/**
+		 * Filters the small text next to the title of an email domain. Hosting says "Email lite" for the mail domain that comes with a
+		 * hosting account (a child of the hosting resource).
+		 *
+		 * @param string        $label    "Business email".
+		 * @param Resource      $resource The mail resource.
+		 * @param Resource|null $parent   The resource it is a child of, if any.
+		 */
+		return (string) apply_filters( 'beltoft_services_email_label', __( 'Business email', 'beltoft-services' ), $resource, \BeltoftServices\Children::parent_of( $resource ) );
 	}
 
 	/**
