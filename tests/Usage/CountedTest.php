@@ -568,8 +568,9 @@ class CountedTest extends TestCase {
 
 	public function test_an_ended_service_still_bills_its_last_orders_and_gets_one_final_pull(): void {
 		$r   = $this->service();
-		$now = (int) strtotime( '2026-11-20 12:30:00 UTC' );
-		$this->seed_billable( $r, array( '2026-11-18 10:00:00' => 4 ) );
+		// Relative to today: the remote orders the fake answers with carry today's date (a fixed date broke on 2026-11-22).
+		$now = time();
+		$this->seed_billable( $r, array( gmdate( 'Y-m-d H:00:00', $now - 2 * DAY_IN_SECONDS ) => 4 ) );
 		$r->set( array( 'state' => 'deleted' ) );
 
 		Meter::run( $now );
