@@ -7,7 +7,6 @@
 
 namespace BeltoftServices\Hosting;
 
-use BeltoftServices\Mcp\ActionMap;
 use BeltoftServices\Mcp\Definitions;
 use BeltoftServices\Mcp\Irreversible;
 use BeltoftServices\Mcp\Tools;
