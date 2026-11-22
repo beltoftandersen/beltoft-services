@@ -31,18 +31,7 @@ final class ActionMap {
 	/**
 	 * Action name => the tool that posts it.
 	 */
-	private const ACTIONS = array(
-		'start'              => 'start',
-		'shutdown'           => 'shutdown',
-		'reboot'             => 'reboot',
-		'rename'             => 'rename_server',
-		'snapshot_take'      => 'create_snapshot',
-		'snapshot_delete'    => 'delete_snapshot',
-		'snapshot_rollback'  => 'rollback_snapshot',
-		'restore'            => 'restore_backup',
-		'reinstall'          => 'reinstall_server',
-		'replace_ssh_key'    => 'replace_ssh_key',
-	);
+	private const ACTIONS = array();
 
 	/**
 	 * Action name => why no tool runs it. "never" is for good, "route" means a tool reaches it through its own REST route.
@@ -68,9 +57,6 @@ final class ActionMap {
 		'remove_app_licence'       => 'remove_addon',
 		'stop_dns_hosting'         => 'cancel_subscription',
 		'set_default_card'         => 'set_default_payment_method',
-		'reveal_server_password'   => 'reveal_server_password',
-		'order_server'             => 'order_server',
-		'order_database'           => 'order_database',
 		'delete_server'            => 'delete_server',
 		'delete_database'          => 'delete_database',
 	);
@@ -95,11 +81,7 @@ final class ActionMap {
 	 * allowed only through ACTIONS.
 	 */
 	private const ROUTES = array(
-		'server_status'      => array( 'GET #^/resources/\d+$#D' ),
-		'server_usage'       => array( 'GET #^/resources/\d+/metrics$#D' ),
-		'set_usage_alerts'   => array( 'POST #^/resources/\d+/usage-alerts$#D' ),
 		'usage_summary'      => array( 'GET #^/usage$#D' ),
-		'reveal_server_password'   => array( 'POST #^/resources/\d+/reveal$#D' ),
 	);
 
 	/**

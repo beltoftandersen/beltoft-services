@@ -84,6 +84,14 @@ trait ToolSetDefaults {
 	 * @param string               $name Tool.
 	 * @param array<string, mixed> $args Arguments.
 	 */
+	public static function needs_confirmation( string $name, array $args ): ?bool { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- default.
+		return null;
+	}
+
+	/**
+	 * @param string               $name Tool.
+	 * @param array<string, mixed> $args Arguments.
+	 */
 	public static function risky( string $name, array $args ): ?bool {
 		return null;
 	}

@@ -20,7 +20,7 @@ use PHPUnit\Framework\TestCase;
  *
  * Second rule (2026-11-22, plan 2026-11-22-feature-code-home): the platform folders (PLATFORM) must not import true features
  * (TRUE_FEATURES). Usage, Monitoring, GiftCredit, Card, Http and Oauth are shared services the platform may import. Its violations
- * are in platform-allowlist.php, which only shrinks and ends empty. Feature files named McpTools.php may import Mcp (they implement
+ * are in platform-allowlist.php, which only shrinks and ends empty. Feature files named Mcp*.php (McpTools.php and the files it calls) may import Mcp (they implement
  * Mcp\ToolSet), no other feature file may.
  */
 class DependencyDirectionTest extends TestCase {
@@ -227,8 +227,9 @@ class DependencyDirectionTest extends TestCase {
 			foreach ( array_unique( $names ) as $name ) {
 				$to = $this->layer( $name );
 
-				// A feature's McpTools.php implements Mcp\ToolSet, so it may import Mcp.
-				if ( 'Mcp' === $to && 'McpTools.php' === basename( $rel ) ) {
+				// A feature's McpTools.php implements Mcp\ToolSet, and the files it calls (McpPricing.php, McpPurchase.php ...) are the MCP
+				// side of the feature, so they may import Mcp.
+				if ( 'Mcp' === $to && str_starts_with( basename( $rel ), 'Mcp' ) ) {
 					continue;
 				}
 

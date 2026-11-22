@@ -5,19 +5,22 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Mcp;
+namespace BeltoftServices\Proxmox\Vm;
 
 use BeltoftLicenses\Events;
 use BeltoftLicenses\Licenses;
-use BeltoftServices\Proxmox\Vm\ServerPicker;
+use BeltoftServices\Mcp\Access as McpAccess;
+use BeltoftServices\Mcp\Acts;
+use BeltoftServices\Mcp\Audit;
+use BeltoftServices\Mcp\Irreversible;
+use BeltoftServices\Mcp\Pricing;
+use BeltoftServices\Mcp\Sandbox;
 use BeltoftServices\BillingRequirements;
 use BeltoftServices\Apps\AppField;
 use BeltoftServices\Apps\AppLicence;
 use BeltoftServices\Apps\Apps;
 use BeltoftServices\Proxmox\Disk\DiskField;
-use BeltoftServices\Proxmox\Vm\Offers;
-use BeltoftServices\Proxmox\Vm\OsField;
-use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
+use BeltoftServices\Proxmox\Disk\McpServerDisk;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
 use BeltoftServices\Usage\Account;
@@ -38,7 +41,7 @@ defined( 'ABSPATH' ) || exit;
  *
  * The picker's check() is the source of truth for what may be ordered; nothing of it is repeated here.
  */
-final class Purchase {
+final class McpPurchase {
 
 	/**
 	 * The tool.
@@ -104,8 +107,8 @@ final class Purchase {
 				'specs'          => array( 'cpu_cores' => (int) $plan['cores'], 'memory_mb' => (int) $plan['memory_mb'], 'disk_gb' => (int) $plan['disk_gb'] ),
 				'in_stock'       => (bool) $plan['in_stock'],
 				'price'          => Pricing::payg( (float) $usage['hourly'], (float) $usage['cap'] ),
-				'backups'        => Pricing::server_backups( $plan ),
-				'options'        => ServerDisk::options( $plan ),
+				'backups'        => McpPricing::server_backups( $plan ),
+				'options'        => McpServerDisk::options( $plan ),
 				'systems'        => $systems,
 				'apps'           => $apps,
 			);
@@ -192,7 +195,7 @@ final class Purchase {
 	public static function prepare( array $args, int $user_id ) {
 		$fail = static fn( string $text ) => new \WP_Error( 'beltoft_services_tool', $text );
 
-		if ( $user_id < 1 || ! Access::user_allowed( $user_id ) ) {
+		if ( $user_id < 1 || ! McpAccess::user_allowed( $user_id ) ) {
 			return $fail( __( 'This is not available.', 'beltoft-services' ) );
 		}
 
@@ -258,8 +261,8 @@ final class Purchase {
 
 		if ( $gb > 0 ) {
 			// The same check and the same amounts as price_quote; the totals include the disk.
-			$disk  = ServerDisk::pick( $plan, $gb );
-			$quote = $disk instanceof \WC_Product_Variation ? Pricing::quote( array( 'plan' => (int) $plan['variation_id'], 'backups' => $backups, 'extra_disk_gb' => $gb ) ) : null;
+			$disk  = McpServerDisk::pick( $plan, $gb );
+			$quote = $disk instanceof \WC_Product_Variation ? McpPricing::quote( array( 'plan' => (int) $plan['variation_id'], 'backups' => $backups, 'extra_disk_gb' => $gb ) ) : null;
 
 			if ( is_string( $disk ) ) {
 				return $fail( $disk );

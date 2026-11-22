@@ -242,6 +242,7 @@ final class Plugin {
 		Apps\McpTools::register();
 		Proxmox\Db\McpTools::register();
 		Proxmox\Network\McpTools::register();
+		Proxmox\Vm\McpTools::register();
 		Domains\McpTools::register();
 		Hosting\McpTools::register();
 		Mail\McpTools::register();

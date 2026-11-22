@@ -116,6 +116,22 @@ final class ToolSets {
 	}
 
 	/**
+	 * Does a set say this call needs no confirmation, whatever the tool asks (an order that only gives a link)?
+	 *
+	 * @param string               $name Tool.
+	 * @param array<string, mixed> $args Arguments.
+	 */
+	public static function exempt_from_confirmation( string $name, array $args ): bool {
+		foreach ( self::all() as $set ) {
+			if ( false === $set::needs_confirmation( $name, $args ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * Does any set say this call is worse than the tool usually is?
 	 *
 	 * @param string               $name Tool.

@@ -332,7 +332,7 @@ class GuestMemoryTest extends MonitoringTestCase {
 		$running = new \ReflectionProperty( Tools::class, 'running' );
 		$running->setAccessible( true );
 		$running->setValue( null, 'server_usage' );
-		$method = new \ReflectionMethod( Tools::class, 'server_usage' );
+		$method = new \ReflectionMethod( \BeltoftServices\Proxmox\Vm\McpTools::class, 'server_usage' );
 		$method->setAccessible( true );
 		$out = $method->invoke( null, $r->id(), 'hour' );
 		$running->setValue( null, '' );

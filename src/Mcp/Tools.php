@@ -12,7 +12,6 @@ use BeltoftServices\Account\Overview;
 use BeltoftServices\Api\Tokens;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
-use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -39,18 +38,9 @@ defined( 'ABSPATH' ) || exit;
 final class Tools {
 
 	/**
-	 * Tool name => the action route it posts to, for the three power tools.
+	 * Names that Reads runs.
 	 */
-	private const POWER = array(
-		'reboot'   => 'reboot',
-		'start'    => 'start',
-		'shutdown' => 'shutdown',
-	);
-
-	/**
-	 * Names that Reads, Details and Acts run.
-	 */
-	private const READS = array( 'service_details', 'usage_summary', 'list_recovery_points', 'list_orders', 'get_order', 'list_subscriptions', 'list_payment_methods', 'get_account', 'catalog', 'list_server_plans', 'price_quote', 'console_link', 'list_licenses', 'get_license_key' );
+	private const READS = array( 'service_details', 'usage_summary', 'list_orders', 'get_order', 'list_subscriptions', 'list_payment_methods', 'get_account', 'catalog', 'list_licenses', 'get_license_key' );
 
 	/**
 	 * The tool that is running, for the allow-list of the routes it calls.
@@ -98,7 +88,7 @@ final class Tools {
 	 */
 	public static function confirmation_needed( string $name, array $args ): bool {
 		// A customer who has to finish the first order in the browser gets a link and nothing is done: no confirmation to ask for.
-		if ( ( Purchase::NAME === $name || PurchaseDb::NAME === $name ) && ! Purchase::goes_direct( get_current_user_id() ) ) {
+		if ( ToolSets::exempt_from_confirmation( $name, $args ) ) {
 			return false;
 		}
 
@@ -337,112 +327,7 @@ final class Tools {
 
 		}
 
-		$id = (int) $args['id'];
-
-		switch ( $name ) {
-			case 'server_status':
-				return self::server_status( $id );
-
-			case 'server_usage':
-				return self::server_usage( $id, (string) ( $args['range'] ?? 'hour' ) );
-
-			case 'create_snapshot':
-				return self::action( $id, 'snapshot_take', isset( $args['label'] ) ? array( 'label' => (string) $args['label'] ) : array(), 'snapshot requested' );
-
-		}
-
-		return self::action( $id, self::POWER[ $name ], array(), $name . ' requested' );
-	}
-
-	/**
-	 * One server's state.
-	 *
-	 * @param int $id Service id.
-	 * @return array<string, mixed>|\WP_Error
-	 */
-	private static function server_status( int $id ) {
-		$status = self::route( 'GET', '/resources/' . $id, array(), null, $id, 'server status read' );
-
-		if ( $status instanceof \WP_Error ) {
-			return $status;
-		}
-
-		$r   = Resource::find( $id );
-		$out = array(
-			'id'      => $id,
-			'state'   => (string) $status['state'],
-			'status'  => (string) $status['label'],
-			'message' => (string) $status['message'],
-			'working' => (bool) $status['working'],
-		);
-
-		if ( $r && ProxmoxDriver::ID === $r->get( 'driver' ) ) {
-			$out += Details::vm( $r );
-			$out['app_state'] = (string) $status['app_state'];
-		}
-
-		return $out;
-	}
-
-	/**
-	 * A server's load, summarised so the answer stays short.
-	 *
-	 * @param int    $id    Service id.
-	 * @param string $range hour, day or month.
-	 * @return array<string, mixed>|\WP_Error
-	 */
-	private static function server_usage( int $id, string $range ) {
-		$series = self::route( 'GET', '/resources/' . $id . '/metrics', array( 'range' => $range ), null, $id, 'server usage read' );
-
-		if ( $series instanceof \WP_Error ) {
-			return $series;
-		}
-
-		$out = array(
-			'range'     => (string) $series['range'],
-			'available' => ! empty( $series['available'] ),
-			'samples'   => count( (array) $series['points'] ),
-			'units'     => array( 'cpu' => 'percent', 'mem_percent' => 'percent of memory in use, without the file cache', 'netin' => 'bytes per second', 'netout' => 'bytes per second', 'diskread' => 'bytes per second', 'diskwrite' => 'bytes per second' ),
-		);
-
-		foreach ( array( 'cpu', 'netin', 'netout', 'diskread', 'diskwrite' ) as $field ) {
-			$values = array();
-
-			foreach ( (array) $series['points'] as $point ) {
-				if ( isset( $point[ $field ] ) && is_numeric( $point[ $field ] ) ) {
-					$values[] = (float) $point[ $field ];
-				}
-			}
-
-			$out[ $field ] = $values ? array(
-				'average' => round( array_sum( $values ) / count( $values ), 1 ),
-				'highest' => round( max( $values ), 1 ),
-				'latest'  => round( (float) end( $values ), 1 ),
-			) : null;
-		}
-
-		// Memory comes from the guest's own readings kept by the plugin (never the hypervisor's figure).
-		$mem  = array();
-		$peak = array();
-
-		foreach ( (array) ( $series['memory']['points'] ?? array() ) as $point ) {
-			if ( isset( $point['percent'] ) && is_numeric( $point['percent'] ) ) {
-				$mem[]  = (float) $point['percent'];
-				$peak[] = (float) ( $point['peak_percent'] ?? $point['percent'] );
-			}
-		}
-
-		$out['mem_percent'] = $mem ? array(
-			'average' => round( array_sum( $mem ) / count( $mem ), 1 ),
-			'highest' => round( max( $peak ), 1 ),
-			'latest'  => round( (float) end( $mem ), 1 ),
-		) : null;
-
-		if ( isset( $series['disk']['used'], $series['disk']['total'] ) && $series['disk']['total'] > 0 ) {
-			$out['disk_percent'] = (int) round( $series['disk']['used'] / $series['disk']['total'] * 100 );
-		}
-
-		return $out;
+		return new \WP_Error( 'beltoft_services_tool', __( 'This is not available.', 'beltoft-services' ) );
 	}
 
 	/**

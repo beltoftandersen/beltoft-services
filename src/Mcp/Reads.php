@@ -11,25 +11,11 @@ use BeltoftLicenses\Account\Endpoint as LicenseAccount;
 use BeltoftLicenses\Account\View as LicenseView;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Account\Cards;
-use BeltoftServices\Proxmox\Db\DbPicker;
 use BeltoftServices\Api\Services;
-use BeltoftServices\Domains\Prices;
-use BeltoftServices\Drivers\Registry;
-use BeltoftServices\Apps\Apps;
-use BeltoftServices\Proxmox\Backup\Backups;
-use BeltoftServices\Proxmox\Pve\Clusters;
-use BeltoftServices\Proxmox\Db\DbDisk;
-use BeltoftServices\Proxmox\Db\DbDriver;
-use BeltoftServices\Proxmox\Disk\DiskField;
-use BeltoftServices\Proxmox\Snapshot\PanelData;
-use BeltoftServices\Proxmox\Vm\Offers;
-use BeltoftServices\Proxmox\Vm\OsField;
-use BeltoftServices\Proxmox\Snapshot\SnapshotCart;
 use BeltoftServices\Resource;
 use BeltoftServices\Usage\Estimate;
 use BeltoftServices\Usage\Rates;
 use BeltoftServices\Usage\Renewal;
-use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -62,9 +48,6 @@ final class Reads {
 			case 'usage_summary':
 				return self::usage( $user_id );
 
-			case 'list_recovery_points':
-				return self::recovery_points( (int) $args['id'] );
-
 			case 'list_orders':
 				return self::orders( $user_id, (int) ( $args['limit'] ?? 10 ) );
 
@@ -82,26 +65,6 @@ final class Reads {
 
 			case 'catalog':
 				return self::catalog( (string) $args['kind'], (int) ( $args['variation_id'] ?? 0 ), (int) ( $args['id'] ?? 0 ) );
-
-			case 'list_server_plans':
-				return Purchase::plans();
-
-			case 'price_quote':
-				return Pricing::quote( $args );
-
-			case 'console_link':
-				$r = Tools::owned( (int) $args['id'] );
-
-				if ( $r instanceof \WP_Error ) {
-					return $r;
-				}
-
-				$driver = Registry::get( (string) $r->get( 'driver' ) );
-				$url    = $driver && 'vm' === $driver->kind() ? Details::page( $r, 'vm', $r->license(), 'console' ) : '';
-
-				return '' === $url
-					? new \WP_Error( 'beltoft_services_tool', __( 'This service has no console.', 'beltoft-services' ) )
-					: array( 'console_page' => $url, 'note' => 'The customer opens this page in the browser and logs in. No console session is started here.' );
 
 			case 'list_licenses':
 				return self::licenses( $user_id );
@@ -168,24 +131,6 @@ final class Reads {
 	 * @param int $user_id Customer.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	/**
-	 * The IPv4 addresses of a server or a database: the ones it has through the add-on, and whether one more can be added
-	 * (it is added in the dashboard: the add-on has its own subscription).
-	 *
-	 * @param Resource $r Server or database.
-	 * @return array<string, mixed>
-	 */
-	public static function ipv4_of( Resource $r ): array {
-		$view = \BeltoftServices\Proxmox\Ipv4\Ipv4Panels::view( $r );
-
-		return array(
-			'addresses'   => array_map( static fn( array $row ) => array( 'address' => $row['address'], 'role' => $row['role'], 'in_use' => $row['live'] ), null === $view ? array() : $view['addresses'] ),
-			'can_add'     => null !== $view && '' !== $view['add_url'],
-			'sold_out'    => null !== $view && $view['sold_out'],
-			'how_to_add'  => __( 'Add or remove an IPv4 address from the server or the database page in the dashboard. A new database can be ordered with one (order_database).', 'beltoft-services' ),
-		);
-	}
-
 	private static function usage( int $user_id ) {
 		$live = Tools::route( 'GET', '/usage', array(), null, null );
 
@@ -217,60 +162,6 @@ final class Reads {
 						array_keys( $estimate['resources'] ),
 						$estimate['resources']
 					)
-				),
-			);
-		}
-
-		return $out;
-	}
-
-	/**
-	 * Snapshots and backups of one server, or the backups of one database.
-	 *
-	 * @param int $id Service id.
-	 * @return array<string, mixed>|\WP_Error
-	 */
-	private static function recovery_points( int $id ) {
-		$r = Tools::owned( $id );
-
-		if ( $r instanceof \WP_Error ) {
-			return $r;
-		}
-
-		$driver = (string) $r->get( 'driver' );
-
-		if ( ProxmoxDriver::ID !== $driver && DbDriver::ID !== $driver ) {
-			return new \WP_Error( 'beltoft_services_tool', __( 'This service has no snapshots or backups.', 'beltoft-services' ) );
-		}
-
-		$backups = Backups::listing( $r );
-		$out     = array(
-			'backups' => array(
-				'enabled' => Backups::enabled( $r ),
-				'days'    => Backups::days( $r ),
-				'last_ok' => $backups['last_ok'],
-				'list'    => array_map( static fn( $b ) => array( 'id' => (string) $b['volid'], 'when' => (string) $b['when'], 'size' => (string) $b['size'] ), $backups['list'] ),
-			),
-		);
-
-		if ( ProxmoxDriver::ID === $driver ) {
-			$panel = PanelData::panel( $r );
-
-			$out['snapshots'] = null === $panel ? null : array(
-				'enabled' => $panel['enabled'],
-				'slots'   => $panel['slots'],
-				'used'    => $panel['used'],
-				'free'    => max( 0, (int) $panel['slots'] - (int) $panel['used'] ),
-				'days'    => $panel['days'],
-				'list'    => array_map(
-					static fn( $e ) => array(
-						'id'      => $e['id'],
-						'label'   => $e['label'],
-						'taken'   => $e['taken_at'] > 0 ? gmdate( 'Y-m-d\TH:i:s\Z', $e['taken_at'] ) : '',
-						'expires' => $e['expires_at'] > 0 ? gmdate( 'Y-m-d\TH:i:s\Z', $e['expires_at'] ) : '',
-						'state'   => $e['state'],
-					),
-					$panel['entries']
 				),
 			);
 		}
@@ -497,130 +388,10 @@ final class Reads {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	private static function catalog( string $kind, int $variation_id, int $id ) {
-		switch ( $kind ) {
-			case 'server_plans':
-				return array(
-					'currency' => get_woocommerce_currency(),
-					'note'     => Pricing::note(),
-					'plans'    => Pricing::server_plans(),
-				);
+		// The feature that sells the kind answers: server plans, systems and add-ons (servers), database plans (databases), domain prices (domains).
+		$answer = apply_filters( 'beltoft_services_mcp_catalog', null, $kind, $variation_id, $id );
 
-			case 'database_plans':
-				return array(
-					'currency' => get_woocommerce_currency(),
-					'note'     => Pricing::note() . ' ' . __( 'A database is ordered with order_database (Full access, after the customer confirms). Each plan lists its options: the public IPv4 address and the extra storage steps, with their price per month and per hour.', 'beltoft-services' ),
-					'plans'    => Pricing::database_plans(),
-				);
-
-			case 'os_and_apps':
-				$plan = $variation_id > 0 ? Offers::find( $variation_id ) : null;
-
-				if ( null === $plan ) {
-					return new \WP_Error( 'beltoft_services_tool', __( 'Give the variation_id of a server plan from server_plans.', 'beltoft-services' ) );
-				}
-
-				$cluster = (array) Clusters::get( (string) $plan['cluster'] );
-				$apps    = array();
-
-				foreach ( Apps::offered( $cluster ) as $app_id => $app ) {
-					$apps[] = array(
-						'id'       => (string) $app_id,
-						'name'     => (string) ( $app['name'] ?? $app_id ),
-						'versions' => array_values( array_map( static fn( $v ) => array( 'id' => (string) $v['version_id'], 'name' => Apps::version_label( $v ) ), (array) $app['choices'] ) ),
-					);
-				}
-
-				$systems = array();
-
-				foreach ( OsField::options_for( (string) $plan['cluster'] ) as $template => $label ) {
-					$systems[] = array( 'id' => (int) $template, 'name' => (string) $label );
-				}
-
-				return array( 'systems' => $systems, 'apps' => $apps );
-
-			case 'addons':
-				$r = $id > 0 ? Tools::owned( $id ) : new \WP_Error( 'beltoft_services_tool', __( 'Give the id of one of your services.', 'beltoft-services' ) );
-
-				if ( $r instanceof \WP_Error ) {
-					return $r;
-				}
-
-				return self::addons( $r );
-
-			case 'domain_prices':
-				$table = get_option( Prices::OPTION, array() );
-				$out   = array();
-
-				foreach ( is_array( $table ) ? array_keys( $table ) : array() as $tld ) {
-					$price = Prices::price( (string) $tld );
-
-					if ( null !== $price ) {
-						$out[] = array( 'ending' => (string) $tld, 'price_per_year' => $price );
-					}
-				}
-
-				return array( 'currency' => \BeltoftServices\Currency::current(), 'note' => 'Prices are per year and exclude tax. Use domain_check for one name.', 'endings' => array_slice( $out, 0, 500 ) );
-		}
-
-		return new \WP_Error( 'beltoft_services_tool', __( 'This is not available.', 'beltoft-services' ) );
-	}
-
-	/**
-	 * What can be added to one service.
-	 *
-	 * @param Resource $r Service.
-	 * @return array<string, mixed>
-	 */
-	private static function addons( Resource $r ): array {
-		$driver   = (string) $r->get( 'driver' );
-		$currency = get_woocommerce_currency();
-		$out      = array(
-			'currency' => $currency,
-			'note'     => Pricing::note() . ' ' . __( 'Add-ons are priced by the hour and capped at the max per month shown.', 'beltoft-services' ),
-		);
-		$current  = wc_get_product( (int) ( $r->license()['variation_id'] ?? 0 ) );
-
-		if ( ProxmoxDriver::ID === $driver ) {
-			$out['snapshot_packs'] = array_values(
-				array_map(
-					static fn( $v ) => array( 'variation_id' => $v->get_id(), 'slots' => SnapshotCart::slots_of( $v ), 'price' => Pricing::variation_price( $v ) ),
-					SnapshotCart::packs()
-				)
-			);
-			$out['extra_disks']    = array_values(
-				array_map(
-					static fn( $v ) => array( 'variation_id' => $v->get_id(), 'price' => Pricing::variation_price( $v ) ),
-					DiskField::sizes_for( 'usage' === (string) ( $r->license()['source'] ?? '' ) )
-				)
-			);
-		}
-
-		if ( ProxmoxDriver::ID === $driver || DbDriver::ID === $driver ) {
-			$with           = $current instanceof \WC_Product_Variation && ! Backups::enabled( $r ) ? Backups::sibling( $current, true ) : null;
-			$out['backups'] = Backups::enabled( $r ) ? array( 'enabled' => true ) : array( 'enabled' => false, 'adds' => $with ? Pricing::addon_between( $current, $with ) : null );
-		}
-
-		if ( DbDriver::ID === $driver && $current instanceof \WC_Product_Variation ) {
-			$own  = DbDisk::extra( (array) $r->get( 'plan' ) );
-			$step = array();
-
-			foreach ( DbDisk::ladder( $current ) as $gb => $variation ) {
-				if ( $gb > $own ) {
-					$step[] = array( 'extra_gb' => (int) $gb, 'more_gb' => (int) $gb - $own, 'adds' => Pricing::addon_between( $current, $variation ) );
-				}
-			}
-
-			$out['extra_storage'] = array(
-				'current_extra_gb' => $own,
-				'max_data_disk_gb' => DbDisk::max_gb(),
-				'steps'            => $step,
-				'note'             => __( 'Storage can be made larger from the database page in the dashboard, never smaller. It is billed by the hour with the database and capped. Claude cannot grow it yet.', 'beltoft-services' ),
-			);
-
-			$out['public_ipv4'] = self::ipv4_of( $r );
-		}
-
-		return $out;
+		return null !== $answer ? $answer : new \WP_Error( 'beltoft_services_tool', __( 'This is not available.', 'beltoft-services' ) );
 	}
 
 	/**

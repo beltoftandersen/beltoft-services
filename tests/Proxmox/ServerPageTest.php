@@ -255,10 +255,10 @@ class ServerPageTest extends MonitoringTestCase {
 		$r = $this->ready_vm();
 		$r->set( array( 'ip' => '192.0.2.10', 'ip6' => '<b>x</b>' ) );
 		$this->assertSame( '', \BeltoftServices\Proxmox\Vm\Panels::ip6( \BeltoftServices\Resource::find( $r->id() ) ) );
-		$this->assertSame( '', \BeltoftServices\Mcp\Details::vm( \BeltoftServices\Resource::find( $r->id() ) )['ip6'] );
+		$this->assertSame( '', \BeltoftServices\Proxmox\Vm\McpDetails::vm( \BeltoftServices\Resource::find( $r->id() ) )['ip6'] );
 
 		$r->set( array( 'ip6' => '2001:db8::5' ) );
-		$this->assertSame( '2001:db8::5', \BeltoftServices\Mcp\Details::vm( \BeltoftServices\Resource::find( $r->id() ) )['ip6'] );
+		$this->assertSame( '2001:db8::5', \BeltoftServices\Proxmox\Vm\McpDetails::vm( \BeltoftServices\Resource::find( $r->id() ) )['ip6'] );
 	}
 
 	public function test_the_ready_email_carries_the_ipv6_address_line_only_when_set(): void {

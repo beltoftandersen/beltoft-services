@@ -42,6 +42,10 @@ final class ProbeToolSet implements ToolSet {
 	public static function run( string $name, array $args, int $user_id ) {
 		return array( 'probe' => (int) $args['id'], 'user' => $user_id );
 	}
+
+	public static function needs_confirmation( string $name, array $args ): ?bool {
+		return 'zz_probe' === $name && ! empty( $args['link_only'] ) ? false : null;
+	}
 }
 
 final class ToolSetsTest extends McpTestCase {
@@ -108,5 +112,22 @@ final class ToolSetsTest extends McpTestCase {
 		$user = (int) self::factory()->user->create();
 		$tok  = $this->oauth( $user, Tokens::ACTIONS );
 		$this->assertSame( array( 'probe' => 7, 'user' => $user ), $this->json( $this->tool( 'zz_probe', array( 'id' => 7 ), $tok ) ) );
+	}
+
+	public function test_a_set_can_say_a_call_needs_no_confirmation(): void {
+		remove_all_filters( ToolSets::FILTER );
+		add_filter(
+			ToolSets::FILTER,
+			static function ( $sets ) {
+				$sets[] = ProbeToolSet::class;
+
+				return $sets;
+			}
+		);
+
+		$this->assertTrue( ToolSets::exempt_from_confirmation( 'zz_probe', array( 'link_only' => true ) ) );
+		$this->assertFalse( ToolSets::exempt_from_confirmation( 'zz_probe', array() ) );
+		$this->assertFalse( ToolSets::exempt_from_confirmation( 'other', array( 'link_only' => true ) ) );
+		$this->assertFalse( Tools::confirmation_needed( 'zz_probe', array( 'id' => 1 ) ), 'An ordinary action of the probe asks for none.' );
 	}
 }

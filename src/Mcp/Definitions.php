@@ -163,44 +163,19 @@ final class Definitions {
 		$tools = array(
 			// -- Reads ------------------------------------------------------------------------------
 			'list_services'    => self::read( 'Lists the services of the customer: servers, databases, domains, DNS hosting, email domains, apps and add-ons, each with its id, name, state, renewal date, license id and subscription. Optional: only one type.' . self::DATA, self::obj( array( 'type' => array( 'type' => 'string', 'maxLength' => 20, 'description' => 'Only this type: vm (server), db (database), domain, dns, mail, hosting, ssl, disk, snapshot, applic (app licence) or lickey (licence key).' ) ) ), 30 ),
-			'server_status'    => self::read( 'Shows one server: whether it is running, CPU, memory and disk use as percent, its IP address, system and size, and what it is doing now.' . self::DATA, $by_id ),
-			'server_usage'     => self::read(
-				'Shows the load of one server or hosting account over the last hour, day or month: average, highest and latest CPU, memory (in use without the file cache, in percent) and network figures.',
-				self::obj(
-					array(
-						'id'    => $id,
-						'range' => array( 'type' => 'string', 'enum' => array( 'hour', 'day', 'month' ), 'description' => 'The period. Default hour.' ),
-					),
-					array( 'id' )
-				)
-			),
 			'billing_summary'  => self::read( 'Shows the next payment of the customer: the date, the amount, what it covers and how it is paid. It also says whether a card is saved (needed to order servers and databases), the account credit balance, and the pay as you go usage so far this month. Prices exclude VAT; VAT is added on the usage invoice.', $none, 30 ),
 			'service_details'  => self::read( 'Shows one service in full: plan, state, renewal and its subscription (status, next payment, auto-renew), and what belongs to its kind: for a server its address, system, firewall, private network, snapshots, backups and app; for a database its connection details, backups and access list; for a domain its name servers, transfer lock and expiry. It also says which actions the dashboard offers now.' . self::DATA, $by_id, 30 ),
 			'usage_summary'    => self::read( 'Shows the live CPU, memory and disk use of the customer\'s running servers, and, for pay-as-you-go, what the usage costs so far this month (an estimate, excluding VAT, each service capped at its max per month). It also says whether a card is saved and the account credit balance.' . self::DATA, $none, 30 ),
-			'list_recovery_points' => self::read( 'Lists the snapshots (with free slots) and the backups of one server, or the backups of one database, with their ids and dates.' . self::DATA, $by_id, 30 ),
 			'list_orders'      => self::read( 'Lists the customer\'s recent orders with date, status, total, items, and whether one is waiting for payment (then the customer pays on the order page in the dashboard).' . self::DATA, self::obj( array( 'limit' => array( 'type' => 'integer', 'minimum' => 1, 'maximum' => 20, 'description' => 'How many, newest first. Default 10.' ) ) ), 30 ),
 			'get_order'        => self::read( 'Shows one of the customer\'s orders: status, dates, items with prices, tax, total, payment method and its subscriptions.' . self::DATA, self::obj( array( 'order_id' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'The order id, from list_orders.' ) ), array( 'order_id' ) ), 30 ),
 			'list_subscriptions' => self::read( 'Lists the customer\'s subscriptions with status, price and period, next payment, whether it renews by itself, and what the dashboard offers on each (for example reactivate).' . self::DATA, self::obj( array( 'status' => array( 'type' => 'string', 'enum' => array( 'any', 'active', 'on-hold', 'pending', 'pending-cancel', 'cancelled', 'expired' ), 'description' => 'Only this status. Default any.' ) ) ), 30 ),
 			'list_payment_methods' => self::read( 'Lists the customer\'s saved payment methods: card brand, last four digits, expiry and which is the default. The card data itself is never shown. Adding a card is done in the dashboard.', $none, 30 ),
 			'get_account'      => self::read( 'Shows the customer\'s name, e-mail address and billing and shipping address.' . self::DATA, $none, 30 ),
 			'catalog'          => self::read( 'Shows what can be bought, with prices excluding VAT: server plans and database plans (pay as you go: price per hour and the max per month; a database plan also lists its public IPv4 address and extra storage options with their prices, and a server plan lists the extra disk sizes that can be ordered with it), the systems and apps a server plan offers (variation_id), add-ons for one of the customer\'s services (id: snapshot packs, extra disks, backups, and for a database extra storage and the public IPv4 address, each with an hourly and a max monthly price), and domain prices per year and ending. Servers and databases are only sold pay as you go. Use price_quote for the total of a plan with add-ons.', self::obj( array( 'kind' => array( 'type' => 'string', 'enum' => array( 'server_plans', 'database_plans', 'os_and_apps', 'addons', 'domain_prices' ), 'description' => 'What to list.' ), 'variation_id' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'For os_and_apps: the server plan, from server_plans.' ), 'id' => $id ), array( 'kind' ) ), 20 ),
-			'price_quote'      => self::read( 'Prices a configuration the way the checkout does, and orders nothing: a server plan, with daily backups if wanted, or a database plan with extra storage. A server plan can also get an extra disk. Pay as you go: the lines per month, the max per month, and the price per hour, excluding VAT. Pick the plan and the extra storage steps from catalog (database_plans).', self::obj( array( 'plan' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'The plan variation_id from catalog server_plans or database_plans.' ), 'backups' => array( 'type' => 'boolean', 'description' => 'Server only: daily backups.' ), 'extra_disk_gb' => array( 'type' => 'integer', 'minimum' => 0, 'maximum' => 100000, 'description' => 'Server only: an extra disk in GB, one of the sizes listed for the plan in catalog server_plans (options.extra_disk).' ), 'public_ipv4' => array( 'type' => 'boolean', 'description' => 'Database only: with a public IPv4 address, billed by the hour with the database. For a server it is added in the dashboard after the server is ready.' ), 'extra_storage_gb' => array( 'type' => 'integer', 'minimum' => 0, 'maximum' => 100000, 'description' => 'Database only: extra storage in GB, one of the steps listed for the plan in catalog database_plans.' ) ), array( 'plan' ) ), 20 ),
-			'list_server_plans' => self::read( 'Lists the server plans that can be ordered through Claude, pay as you go: id, name, CPU, memory and disk, price per hour and the max per month (excluding VAT), what daily backups add, the extra disk sizes with their price, the systems and the apps each plan offers. Use it before order_server.', $none, 20 ),
-			'console_link'     => self::read( 'Gives the address of the console page of one server in the customer\'s dashboard. The customer opens it in the browser and logs in there. No console session is made here.', $by_id, 30 ),
 			'list_licenses'    => self::read( 'Lists the customer\'s licenses with product, status, how many sites are used of how many are allowed, and the sites. Use get_license_key for the key.' . self::DATA, $none, 30 ),
 			'get_license_key'  => self::read( 'Shows the key of one of the customer\'s licenses.', self::obj( array( 'license_id' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'The license id, from list_licenses.' ) ), array( 'license_id' ) ), 20 ),
 
 			// -- Everyday actions ----------------------------------------------------------------
-			'reboot'           => self::act( 'Restarts a server. Running programs stop. Ask the customer first. The restart runs in the background.', $by_id, true ),
-			'start'            => self::act( 'Starts a server or a managed database that is stopped. The start runs in the background.', $by_id, false, true ),
-			'shutdown'         => self::act( 'Shuts a server or a managed database down. It stays stopped until it is started, and a stopped service is still billed until it is deleted. A database cannot be reached while it is stopped. Ask the customer first. The shutdown runs in the background.', $by_id, true, true ),
-			'create_snapshot'  => self::act(
-				'Takes a snapshot of a server, if the customer has a free snapshot slot. It cannot restore or delete one.',
-				self::obj( array( 'id' => $id, 'label' => array( 'type' => 'string', 'maxLength' => 60, 'description' => 'A name for the snapshot. Letters, numbers, spaces, dots, dashes and underscores. Optional.' ) ), array( 'id' ) ),
-				false
-			),
-			'rename_server'    => self::act( 'Gives a server a new name. The name is shown in the dashboard and used as its host name.', self::obj( array( 'id' => $id, 'name' => array( 'type' => 'string', 'maxLength' => 63, 'description' => 'The new name: letters, numbers and dashes.' ) ), array( 'id', 'name' ) ), true, true ),
-			'set_usage_alerts' => self::act( 'Turns the e-mails about high usage of one server on or off.', self::obj( array( 'id' => $id, 'on' => array( 'type' => 'boolean' ) ), array( 'id', 'on' ) ), false, true ),
 			'set_auto_renew'   => self::act( 'Turns automatic renewal of one subscription on or off, where the shop allows it. With it off the customer pays the renewal invoice by hand and the service ends if it is not paid. Ask the customer first.', self::obj( array( 'subscription_id' => $sub, 'on' => array( 'type' => 'boolean' ) ), array( 'subscription_id', 'on' ) ), true, true, 10 ),
 			'reactivate_subscription' => self::act( 'Reactivates a subscription that is on hold, when the dashboard offers reactivation for it (see list_subscriptions) and nothing is owed.', self::obj( array( 'subscription_id' => $sub ), array( 'subscription_id' ) ), false, true, 10 ),
 			'free_license_site' => self::act( 'Removes a site from a license so the license can be used on another site.', self::obj( array( 'license_id' => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'The license id, from list_licenses.' ), 'domain' => array( 'type' => 'string', 'maxLength' => 253, 'description' => 'The site, as listed.' ) ), array( 'license_id', 'domain' ) ), true, false, 10 ),
@@ -227,73 +202,6 @@ final class Definitions {
 				10
 			),
 			// -- Full access: cannot be undone, or changes where money goes. Each needs the customer's confirmation ---
-			'delete_snapshot'  => self::full(
-				'Deletes one snapshot of a server for good. Get the snapshot id from list_recovery_points.',
-				self::obj( array( 'id' => $id, 'snapshot' => array( 'type' => 'string', 'maxLength' => 20, 'description' => 'The snapshot id, from list_recovery_points.' ) ), array( 'id', 'snapshot' ), true )
-			),
-			'rollback_snapshot' => self::full(
-				'Rolls a server back to one of its snapshots. Everything on the server changed since the snapshot is lost, and the server is stopped while it runs. Get the snapshot id from list_recovery_points.',
-				self::obj( array( 'id' => $id, 'snapshot' => array( 'type' => 'string', 'maxLength' => 20, 'description' => 'The snapshot id, from list_recovery_points.' ) ), array( 'id', 'snapshot' ), true )
-			),
-			'restore_backup'   => self::full(
-				'Restores a server or a managed database from one of its backups. It replaces everything on it with the backup, and it is unavailable while this runs. Get the backup id from list_recovery_points.',
-				self::obj( array( 'id' => $id, 'backup' => array( 'type' => 'string', 'maxLength' => 200, 'description' => 'The backup id, from list_recovery_points.' ) ), array( 'id', 'backup' ), true )
-			),
-			'reinstall_server' => self::full(
-				'Erases a server and installs it again, with a system and optionally an app. Everything on the server is lost. All choices are optional; what is left out stays as it is. An app that has a licence is not bought here: the answer then says where the customer finishes it.',
-				self::obj(
-					array(
-						'id'          => $id,
-						'os'          => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'The system, an id from catalog (os_and_apps, systems).' ),
-						'app'         => array( 'type' => 'string', 'maxLength' => 80, 'description' => 'keep (the same app and version), none (no app), a version id of the server\'s own app, or app_id/version_id for another app, from catalog (os_and_apps).' ),
-						'tier'        => array( 'type' => 'string', 'maxLength' => 40, 'description' => 'The tier of an app that has a licence.' ),
-						'domain_mode' => array( 'type' => 'string', 'enum' => array( 'none', 'keep', 'change', 'own' ), 'description' => 'For an app that uses a domain: none, keep the one it has, change to a name below one of the customer\'s domains, or own for a domain hosted elsewhere.' ),
-						'domain_zone' => array( 'type' => 'string', 'maxLength' => 253, 'description' => 'For domain_mode change: the domain the name is below.' ),
-						'domain_sub'  => array( 'type' => 'string', 'maxLength' => 63, 'description' => 'For domain_mode change: the part before the domain.' ),
-						'domain_own'  => array( 'type' => 'string', 'maxLength' => 253, 'description' => 'For domain_mode own: the full name.' ),
-					),
-					array( 'id' ),
-					true
-				)
-			),
-			'replace_ssh_key'  => self::full(
-				'Adds or replaces the SSH key of a server. The old key stops working, so the customer must have the matching private key or they are locked out.',
-				self::obj( array( 'id' => $id, 'key' => array( 'type' => 'string', 'maxLength' => 2000, 'description' => 'The public key, one line, for example ssh-ed25519 AAAA... name.' ) ), array( 'id', 'key' ), true )
-			),
-			'order_server'     => self::full(
-				'Orders a new pay as you go server. Choose the plan, system or app, name, backups, extra disk and SSH key with the customer first (list_server_plans). Nothing is charged now: the hours are billed monthly to the card saved on the customer\'s usage account (a saved card is required, credit alone is not enough; VAT is added on the invoice and credit is applied first). A customer who has no usage account yet gets a link to finish the first order once in the browser, and nothing is ordered.',
-				self::obj(
-					array(
-						'plan'        => array( 'type' => 'string', 'maxLength' => 120, 'description' => 'The plan id or its exact name, from list_server_plans.' ),
-						'os'          => array( 'type' => 'string', 'maxLength' => 80, 'description' => 'The system: an id or exact name from list_server_plans. Not needed when an app is chosen.' ),
-						'app'         => array( 'type' => 'string', 'maxLength' => 80, 'description' => 'An app from list_server_plans: app_id, or app_id/version_id. Optional; the app runs on its own system.' ),
-						'server_name' => array( 'type' => 'string', 'maxLength' => 63, 'description' => 'The host name of the server: letters, digits and hyphens. Optional.' ),
-						'backups'     => array( 'type' => 'boolean', 'description' => 'Daily backups, if the plan offers them. Default false.' ),
-						'extra_disk_gb' => array( 'type' => 'integer', 'minimum' => 0, 'maximum' => 100000, 'description' => 'An extra disk in GB, one of the sizes listed for the plan in list_server_plans (options.extra_disk). Billed by the hour with the server. Default 0, none.' ),
-						'ssh_key'     => array( 'type' => 'string', 'maxLength' => 8192, 'description' => 'A public SSH key, one line. Optional.' ),
-					),
-					array( 'plan' ),
-					true
-				),
-				false,
-				false,
-				false
-			),
-			'order_database'   => self::full(
-				'Orders a new pay as you go managed database. Choose the plan (it fixes the engine and version), the public IPv4 address and the extra storage with the customer first, with catalog (database_plans) and price_quote. Nothing is charged now: the hours are billed monthly to the card saved on the customer\'s usage account (a saved card is required, credit alone is not enough; VAT is added on the invoice and credit is applied first). The confirmation summary shows the monthly lines, the max per month and the price per hour. A customer who has no usage account yet gets a link to finish the first order once in the browser, and nothing is ordered.',
-				self::obj(
-					array(
-						'plan'             => array( 'type' => 'string', 'maxLength' => 120, 'description' => 'The plan variation_id or its exact name, from catalog database_plans.' ),
-						'public_ipv4'      => array( 'type' => 'boolean', 'description' => 'With a public IPv4 address, billed by the hour with the database (a cart line of its own, price in price_quote).' ),
-						'extra_storage_gb' => array( 'type' => 'integer', 'minimum' => 0, 'maximum' => 100000, 'description' => 'Extra storage in GB, one of the steps listed for the plan in catalog database_plans. Default 0.' ),
-					),
-					array( 'plan' ),
-					true
-				),
-				false,
-				false,
-				false
-			),
 			'cancel_subscription' => self::full(
 				'Cancels a subscription, and with it the services it pays for (a server, a database, an add-on or DNS hosting). A registered domain cannot be cancelled here. The summary says when the service ends and what happens to its data.',
 				self::obj( array( 'subscription_id' => $sub ), array( 'subscription_id' ), true )
@@ -317,12 +225,6 @@ final class Definitions {
 				true
 			),
 
-			// -- Full access: secrets, shown once. Each needs the customer's confirmation ----------
-			'reveal_server_password' => self::full(
-				'Shows the password of a server once. The value then is in this conversation and we no longer have it. If there is none to show, the customer makes a new password in the dashboard.',
-				self::obj( array( 'id' => $id ), array( 'id' ), true ),
-				true
-			),
 		);
 
 		return $tools;

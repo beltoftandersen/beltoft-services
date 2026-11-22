@@ -8,25 +8,36 @@
 namespace BeltoftServices\Proxmox\Db;
 
 use BeltoftServices\Mcp\Definitions;
-use BeltoftServices\Mcp\Details;
 use BeltoftServices\Mcp\Irreversible;
+use BeltoftServices\Mcp\Pricing;
 use BeltoftServices\Mcp\Secrets;
 use BeltoftServices\Mcp\ServerActions;
 use BeltoftServices\Mcp\Tools;
 use BeltoftServices\Mcp\ToolSet;
 use BeltoftServices\Mcp\ToolSetDefaults;
+use BeltoftServices\Mcp\ToolSets;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * The MCP tools of the databases: how to connect, the access list, the memory-full policy, the CA certificate and the password
- * (shown once, through the platform's reveal in Secrets). Ordering a database (order_database) is the purchase machinery of the
- * platform (PurchaseDb).
+ * (shown once, through the platform's reveal in Secrets) and ordering a new database (order_database, McpPurchase: a customer who has
+ * to finish the first order in the browser gets a link and nothing to confirm). The set also answers for the database plans of the
+ * catalogue and for what service_details says about a database.
  */
 final class McpTools implements ToolSet {
 
 	use ToolSetDefaults;
+
+	/**
+	 * Joins the set to the MCP server, and answers for the platform's catalogue and the details of a database.
+	 */
+	public static function register(): void {
+		add_filter( ToolSets::FILTER, array( __CLASS__, 'add' ) );
+		add_filter( 'beltoft_services_mcp_service_details', array( __CLASS__, 'service_details' ), 10, 3 );
+		add_filter( 'beltoft_services_mcp_catalog', array( __CLASS__, 'catalog' ), 10, 4 );
+	}
 
 	/**
 	 * @return array<string, array<string, mixed>>
@@ -59,6 +70,21 @@ final class McpTools implements ToolSet {
 				'Shows the password of a managed database once. The value then is in this conversation and we no longer have it. If there is none to show, the customer makes a new password in the dashboard.',
 				Definitions::obj( array( 'id' => Definitions::id() ), array( 'id' ), true ),
 				true
+			),
+			'order_database'   => Definitions::full(
+				'Orders a new pay as you go managed database. Choose the plan (it fixes the engine and version), the public IPv4 address and the extra storage with the customer first, with catalog (database_plans) and price_quote. Nothing is charged now: the hours are billed monthly to the card saved on the customer\'s usage account (a saved card is required, credit alone is not enough; VAT is added on the invoice and credit is applied first). The confirmation summary shows the monthly lines, the max per month and the price per hour. A customer who has no usage account yet gets a link to finish the first order once in the browser, and nothing is ordered.',
+				Definitions::obj(
+					array(
+						'plan'             => array( 'type' => 'string', 'maxLength' => 120, 'description' => 'The plan variation_id or its exact name, from catalog database_plans.' ),
+						'public_ipv4'      => array( 'type' => 'boolean', 'description' => 'With a public IPv4 address, billed by the hour with the database (a cart line of its own, price in price_quote).' ),
+						'extra_storage_gb' => array( 'type' => 'integer', 'minimum' => 0, 'maximum' => 100000, 'description' => 'Extra storage in GB, one of the steps listed for the plan in catalog database_plans. Default 0.' ),
+					),
+					array( 'plan' ),
+					true
+				),
+				false,
+				false,
+				false
 			),
 			'get_database_ca_certificate' => Definitions::full(
 				'Shows the CA certificate of a managed database, the text the customer saves as a file to connect over TLS. It is a public certificate, not a password.',
@@ -108,6 +134,7 @@ final class McpTools implements ToolSet {
 	public static function capabilities(): array {
 		return array(
 			'database_open_to_everyone' => 'set_database_access',
+			'order_database'           => 'order_database',
 			'reveal_database_password' => 'reveal_database_password',
 			'database_ca_certificate'  => 'get_database_ca_certificate',
 		);
@@ -136,7 +163,7 @@ final class McpTools implements ToolSet {
 					return $state instanceof \WP_Error ? $state : $r;
 				}
 
-				return $state + Details::access( $r );
+				return $state + self::access( $r );
 
 			case 'set_database_access':
 				$id   = (int) $args['id'];
@@ -159,6 +186,9 @@ final class McpTools implements ToolSet {
 
 			case 'set_database_eviction_policy':
 				return Tools::action( (int) $args['id'], DbPolicy::ACTION, array( 'policy' => (string) $args['policy'] ), 'memory-full policy change requested' );
+
+			case McpPurchase::NAME:
+				return McpPurchase::run( $args, $user_id );
 		}
 
 		return Secrets::run( $name, $args );
@@ -174,6 +204,10 @@ final class McpTools implements ToolSet {
 	 * @return array{text: string, state: string}|\WP_Error|null
 	 */
 	public static function summary( string $name, array $args, int $user_id ) {
+		if ( McpPurchase::NAME === $name ) {
+			return McpPurchase::summary( $args, $user_id );
+		}
+
 		if ( 'set_database_access' === $name ) {
 			return self::summary_world( $args );
 		}
@@ -211,6 +245,16 @@ final class McpTools implements ToolSet {
 			'text'  => sprintf( __( 'Show the CA certificate of database %s. It is a public certificate, not a password: it is the text to save as a file so a client can check the database over TLS.', 'beltoft-services' ), $label ),
 			'state' => $id . '|ca',
 		);
+	}
+
+	/**
+	 * A customer who has to finish the first order in the browser gets a link and nothing is done: no confirmation to ask for.
+	 *
+	 * @param string               $name Tool.
+	 * @param array<string, mixed> $args Arguments.
+	 */
+	public static function needs_confirmation( string $name, array $args ): ?bool { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- interface.
+		return McpPurchase::NAME === $name && ! McpPurchase::goes_direct( get_current_user_id() ) ? false : null;
 	}
 
 	/**
@@ -315,6 +359,99 @@ final class McpTools implements ToolSet {
 				Irreversible::name( $r )
 			),
 			'state' => $r->id() . '|world|' . (string) wp_json_encode( $r->get( DbAccess::WORLD ) ),
+		);
+	}
+
+	/**
+	 * What service_details says about a database (filter beltoft_services_mcp_service_details).
+	 *
+	 * @param mixed  $extra What the features added so far.
+	 * @param mixed  $r     Service.
+	 * @param string $kind  Driver kind.
+	 * @return mixed
+	 */
+	public static function service_details( $extra, $r, $kind ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- filter signature.
+		if ( ! $r instanceof Resource || DbDriver::ID !== $r->get( 'driver' ) || ! is_array( $extra ) ) {
+			return $extra;
+		}
+
+		return $extra + array( 'database' => self::details( $r ) );
+	}
+
+	/**
+	 * The database plans of the catalogue (filter beltoft_services_mcp_catalog).
+	 *
+	 * @param mixed  $answer       Answer so far, or null.
+	 * @param string $kind         What to list.
+	 * @param int    $variation_id Unused here.
+	 * @param int    $id           Unused here.
+	 * @return mixed
+	 */
+	public static function catalog( $answer, $kind, $variation_id, $id ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- filter signature.
+		if ( null !== $answer || 'database_plans' !== $kind ) {
+			return $answer;
+		}
+
+		return array(
+			'currency' => get_woocommerce_currency(),
+			'note'     => Pricing::note() . ' ' . __( 'A database is ordered with order_database (Full access, after the customer confirms). Each plan lists its options: the public IPv4 address and the extra storage steps, with their price per month and per hour.', 'beltoft-services' ),
+			'plans'    => McpPricing::database_plans(),
+		);
+	}
+
+	/**
+	 * A database: how to connect, backups and the access list. No password, no certificate, no link.
+	 *
+	 * @param Resource $r Database.
+	 * @return array<string, mixed>
+	 */
+	private static function details( Resource $r ): array {
+		$card   = DbCard::view( $r );
+		$access = $card['access'];
+
+		return array(
+			'engine'          => (string) $card['engine'],
+			'version'         => (int) $card['version'],
+			'state'           => (string) $card['kind'],
+			'host'            => (string) $card['host'],
+			'port'            => (int) $card['port'],
+			'database'        => (string) $card['database'],
+			'user'            => (string) $card['user'],
+			'tls_fingerprint' => (string) $card['fingerprint'],
+			'size'            => (string) $card['size'],
+			'cost_so_far'     => (string) ( $card['cost_net'] ?? $card['cost'] ),
+			'backups'         => array(
+				'enabled'   => (bool) $card['backups']['enabled'],
+				'days'      => (int) $card['backups']['days'],
+				'last_ok'   => (string) $card['backups']['last_ok'],
+				'last_dump' => (string) $card['backups']['last_dump'],
+			),
+			'public_access'   => array(
+				'address'  => (string) $access['address'],
+				'open_to_everyone' => (bool) $access['world'],
+				'state'    => (string) $access['state'],
+				'editable' => (bool) $access['editable'],
+				'entries'  => array_map( static fn( $e ) => array( 'address' => (string) $e['cidr'], 'label' => (string) $e['label'] ), (array) $access['entries'] ),
+				'max'      => (int) $access['max'],
+			),
+		);
+	}
+
+	/**
+	 * The access list of a database, the part get_database_access adds to the route's state.
+	 *
+	 * @param Resource $r Database.
+	 * @return array<string, mixed>
+	 */
+	private static function access( Resource $r ): array {
+		$view = DbAccess::view( $r );
+
+		return array(
+			'public_address'   => (string) $view['address'],
+			'open_to_everyone' => (bool) $view['world'],
+			'editable'         => (bool) $view['editable'],
+			'max'              => (int) $view['max'],
+			'entries'          => array_map( static fn( $e ) => array( 'address' => (string) $e['cidr'], 'label' => (string) $e['label'], 'added' => (string) $e['added'] ), (array) $view['entries'] ),
 		);
 	}
 }

@@ -87,6 +87,15 @@ interface ToolSet {
 	public static function summary( string $name, array $args, int $user_id );
 
 	/**
+	 * Is the call exempt from the customer's confirmation although the tool asks for one (false), or is the tool's own rule
+	 * the one (null)? An order that only gives a link to the browser has nothing to confirm.
+	 *
+	 * @param string               $name Tool.
+	 * @param array<string, mixed> $args Arguments.
+	 */
+	public static function needs_confirmation( string $name, array $args ): ?bool;
+
+	/**
 	 * Does this call make things worse than the tool usually does (needs Full access and a confirmation)? Null when the
 	 * set has no opinion.
 	 *

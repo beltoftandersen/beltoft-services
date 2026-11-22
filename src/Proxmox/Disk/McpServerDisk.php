@@ -5,10 +5,10 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Mcp;
+namespace BeltoftServices\Proxmox\Disk;
 
+use BeltoftServices\Mcp\Pricing;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Settings;
 use BeltoftServices\Usage\Rates;
 
@@ -19,7 +19,7 @@ defined( 'ABSPATH' ) || exit;
  * go twin of each monthly size, price 0 at checkout, billed by the hour). Room on a node is not asked: capacity never
  * stops an order.
  */
-final class ServerDisk {
+final class McpServerDisk {
 
 	/**
 	 * The pay as you go disk sizes of a plan, by extra GB.

@@ -14,7 +14,6 @@ use BeltoftLicenses\Key;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Account\AddressService;
 use BeltoftServices\Account\Cards;
-use BeltoftServices\Domains\DomainDanger;
 use BeltoftServices\Billing\Subscriptions;
 use BeltoftServices\Resource;
 
@@ -22,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Each one does what the dashboard does and goes through the same code: the service routes and actions (Tools::route,
- * Tools::action, which the dashboard's own guards answer), DomainDanger::set_auto_renew, WCS's status handler,
+ * Tools::action, which the dashboard's own guards answer), the domain page's auto-renew switch (DomainDanger::set_auto_renew, through a filter), WCS's status handler,
  * Licenses, AddressService. Each writes a "Claude: ..." line where the customer can find it: the service's history, the
  * subscription's or order's notes, or the customer's own log (Audit).
  */
@@ -31,7 +30,7 @@ final class Acts {
 	/**
 	 * The tools this class runs.
 	 */
-	public const NAMES = array( 'rename_server', 'set_usage_alerts', 'set_auto_renew', 'reactivate_subscription', 'free_license_site', 'cancel_unpaid_order', 'update_billing_address' );
+	public const NAMES = array( 'set_auto_renew', 'reactivate_subscription', 'free_license_site', 'cancel_unpaid_order', 'update_billing_address' );
 
 	/**
 	 * Runs one of the tools.
@@ -43,15 +42,6 @@ final class Acts {
 	 */
 	public static function run( string $name, array $args, int $user_id ) {
 		switch ( $name ) {
-			case 'rename_server':
-				return Tools::action( (int) $args['id'], 'rename', array( 'name' => (string) $args['name'] ), 'rename requested' );
-
-			case 'set_usage_alerts':
-				$id   = (int) $args['id'];
-				$done = Tools::route( 'POST', '/resources/' . $id . '/usage-alerts', array(), array( 'on' => (bool) $args['on'] ), $id, 'usage e-mails turned ' . ( $args['on'] ? 'on' : 'off' ) );
-
-				return $done instanceof \WP_Error ? $done : array( 'usage_emails' => ! empty( $done['on'] ) ? 'on' : 'off' );
-
 			case 'set_auto_renew':
 				return self::auto_renew( $user_id, (int) $args['subscription_id'], (bool) $args['on'] );
 
@@ -133,7 +123,12 @@ final class Acts {
 			return new \WP_Error( 'beltoft_services_tool', __( 'There is no valid default saved payment method. The customer adds a card in the dashboard first, then auto-renew can be turned on.', 'beltoft-services' ) );
 		}
 
-		$done = DomainDanger::set_auto_renew( $s, $on, true );
+		// The switch itself is the domain page's own code (filter beltoft_services_mcp_auto_renew, answered by Domains).
+		$done = apply_filters( 'beltoft_services_mcp_auto_renew', null, $s, $on );
+
+		if ( ! is_array( $done ) ) {
+			return new \WP_Error( 'beltoft_services_tool', __( 'This is not available.', 'beltoft-services' ) );
+		}
 
 		if ( ! $done['ok'] ) {
 			return new \WP_Error( 'beltoft_services_tool', $done['message'] );

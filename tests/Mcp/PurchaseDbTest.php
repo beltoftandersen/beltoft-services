@@ -14,7 +14,7 @@ use BeltoftLicenses\Licenses;
 use BeltoftServices\Proxmox\Db\DbPicker;
 use BeltoftServices\Api\Tokens;
 use BeltoftServices\Mcp\Endpoint;
-use BeltoftServices\Mcp\Purchase;
+use BeltoftServices\Proxmox\Vm\McpPurchase as Purchase;
 use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Tests\Usage\UsageTestCase;
 

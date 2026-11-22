@@ -7,7 +7,6 @@
 
 namespace BeltoftServices\Mcp;
 
-use BeltoftServices\Proxmox\Vm\Access;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -50,34 +49,10 @@ final class Secrets {
 	 * @return array{text: string, state: string}|\WP_Error
 	 */
 	public static function summary( string $name, array $args ) {
-		// A feature that owns the tool checks and words its own (Secrets::wrap adds what every reveal says).
+		// The feature that owns the tool checks and words its own (Secrets::wrap adds what every reveal says).
 		$own = ToolSets::summary( $name, $args, get_current_user_id() );
 
-		if ( null !== $own ) {
-			return $own;
-		}
-
-		$id = (int) $args['id'];
-		$r  = Tools::owned( $id, 'get_database_ca_certificate' !== $name );
-
-		if ( $r instanceof \WP_Error ) {
-			return $r;
-		}
-
-		$label = Irreversible::name( $r );
-
-		switch ( $name ) {
-			case 'reveal_server_password':
-				if ( ! Access::revealable( $r ) ) {
-					return new \WP_Error( 'beltoft_services_tool', __( 'There is no password to show. It has been shown already or it is no longer available. The customer can make a new one in the dashboard.', 'beltoft-services' ) );
-				}
-
-				/* translators: %s: server name. */
-				$text = sprintf( __( 'Show the password of server %s. It is shown once, then we no longer have it.', 'beltoft-services' ), $label );
-				break;
-		}
-
-		return self::wrap( $text, $state ?? $id . '|' . $name );
+		return null !== $own ? $own : new \WP_Error( 'beltoft_services_tool', __( 'This is not available.', 'beltoft-services' ) );
 	}
 
 	/**

@@ -267,12 +267,12 @@ final class McpTest extends McpTestCase {
 		$this->assertGreaterThan( 0, $owner );
 		set_transient( \BeltoftServices\Proxmox\Vm\Operations::STATUS_PREFIX . $server->id(), array( 'power' => 'running', 'cpu' => 0.1, 'mem' => 1073741824 ), HOUR_IN_SECONDS );
 
-		$details = \BeltoftServices\Mcp\Details::vm( $server );
+		$details = \BeltoftServices\Proxmox\Vm\McpDetails::vm( $server );
 		$this->assertArrayHasKey( 'memory_percent', $details );
 		$this->assertNull( $details['memory_percent'], 'No agent reading: no figure, not the Proxmox one.' );
 
 		\BeltoftServices\Monitoring\GuestMemory::store( $server->id(), array( 'used_mb' => 840, 'total_mb' => 2048 ) );
-		$this->assertSame( 41, \BeltoftServices\Mcp\Details::vm( $server )['memory_percent'] );
+		$this->assertSame( 41, \BeltoftServices\Proxmox\Vm\McpDetails::vm( $server )['memory_percent'] );
 	}
 
 	public function test_no_tool_gives_another_customers_resource(): void {

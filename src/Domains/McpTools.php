@@ -7,12 +7,15 @@
 
 namespace BeltoftServices\Domains;
 
+use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Mcp\Definitions;
 use BeltoftServices\Mcp\Irreversible;
 use BeltoftServices\Mcp\ServerActions;
 use BeltoftServices\Mcp\Tools;
 use BeltoftServices\Mcp\ToolSet;
 use BeltoftServices\Mcp\ToolSetDefaults;
+use BeltoftServices\Mcp\ToolSets;
+use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -23,6 +26,18 @@ defined( 'ABSPATH' ) || exit;
 final class McpTools implements ToolSet {
 
 	use ToolSetDefaults;
+
+	/**
+	 * Joins the set to the MCP server, and answers for the platform's catalogue, the details and page of a domain and the
+	 * auto-renew switch of a subscription.
+	 */
+	public static function register(): void {
+		add_filter( ToolSets::FILTER, array( __CLASS__, 'add' ) );
+		add_filter( 'beltoft_services_mcp_service_details', array( __CLASS__, 'service_details' ), 10, 3 );
+		add_filter( 'beltoft_services_mcp_service_page', array( __CLASS__, 'service_page' ), 10, 5 );
+		add_filter( 'beltoft_services_mcp_catalog', array( __CLASS__, 'catalog' ), 10, 4 );
+		add_filter( 'beltoft_services_mcp_auto_renew', array( __CLASS__, 'auto_renew' ), 10, 3 );
+	}
 
 	/**
 	 * @return array<string, array<string, mixed>>
@@ -318,5 +333,95 @@ final class McpTools implements ToolSet {
 	 */
 	private static function dns_label( array $args ): string {
 		return strtoupper( preg_replace( '/[^A-Za-z]/', '', (string) $args['type'] ) ) . ' ' . sanitize_text_field( (string) $args['name'] );
+	}
+
+	/**
+	 * What service_details says about a domain or a DNS service (filter beltoft_services_mcp_service_details).
+	 *
+	 * @param mixed  $extra What the features added so far.
+	 * @param mixed  $r     Service.
+	 * @param string $kind  Driver kind.
+	 * @return mixed
+	 */
+	public static function service_details( $extra, $r, $kind ) {
+		if ( ! in_array( $kind, array( 'domain', 'dns' ), true ) || ! $r instanceof Resource || ! is_array( $extra ) ) {
+			return $extra;
+		}
+
+		return $extra + array( 'domain' => self::details( $r ) );
+	}
+
+	/**
+	 * The address of the page of a domain in the dashboard (filter beltoft_services_mcp_service_page).
+	 *
+	 * @param mixed                $url     Address so far.
+	 * @param mixed                $r       Service.
+	 * @param string               $kind    Driver kind.
+	 * @param array<string, mixed> $license License.
+	 * @param string               $tab     A tab of the page, or ''.
+	 * @return mixed
+	 */
+	public static function service_page( $url, $r, $kind, $license, $tab ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- filter signature.
+		return in_array( $kind, array( 'domain', 'dns' ), true ) ? ServiceArea::by_key( 'domains' )->url( (array) $license, (string) $tab ) : $url;
+	}
+
+	/**
+	 * The domain prices of the catalogue (filter beltoft_services_mcp_catalog).
+	 *
+	 * @param mixed  $answer       Answer so far, or null.
+	 * @param string $kind         What to list.
+	 * @param int    $variation_id Unused here.
+	 * @param int    $id           Unused here.
+	 * @return mixed
+	 */
+	public static function catalog( $answer, $kind, $variation_id, $id ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- filter signature.
+		if ( null !== $answer || 'domain_prices' !== $kind ) {
+			return $answer;
+		}
+
+		$table = get_option( Prices::OPTION, array() );
+		$out   = array();
+
+		foreach ( is_array( $table ) ? array_keys( $table ) : array() as $tld ) {
+			$price = Prices::price( (string) $tld );
+
+			if ( null !== $price ) {
+				$out[] = array( 'ending' => (string) $tld, 'price_per_year' => $price );
+			}
+		}
+
+		return array( 'currency' => \BeltoftServices\Currency::current(), 'note' => 'Prices are per year and exclude tax. Use domain_check for one name.', 'endings' => array_slice( $out, 0, 500 ) );
+	}
+
+	/**
+	 * Turns the automatic renewal of a subscription on or off, the way the domain page does (filter beltoft_services_mcp_auto_renew).
+	 *
+	 * @param mixed $done         The answer so far, or null.
+	 * @param mixed $subscription The subscription.
+	 * @param mixed $on           On or off.
+	 * @return mixed array{ok: bool, message: string} or the answer so far.
+	 */
+	public static function auto_renew( $done, $subscription, $on ) {
+		return null === $done && $subscription instanceof \WC_Subscription ? DomainDanger::set_auto_renew( $subscription, (bool) $on, true ) : $done;
+	}
+
+	/**
+	 * A domain or DNS hosting service.
+	 *
+	 * @param Resource $r Domain or DNS service.
+	 * @return array<string, mixed>
+	 */
+	private static function details( Resource $r ): array {
+		$dns_only = 'dns' === $r->get( 'driver' );
+
+		return array(
+			'name'             => (string) $r->get( 'domain' ),
+			'what'             => DomainRows::kind( $r ),
+			'dns_hosted_here'  => ! (bool) $r->get( 'dns_external' ),
+			'name_servers'     => $dns_only ? array() : array_values( array_map( 'strval', (array) $r->get( 'nameservers' ) ) ),
+			'name_server_mode' => $dns_only ? '' : (string) $r->get( 'ns_mode' ),
+			'transfer_locked'  => $dns_only ? null : (bool) $r->get( 'is_locked' ),
+			'expires'          => (string) $r->get( 'expires_at' ),
+		);
 	}
 }

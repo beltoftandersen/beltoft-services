@@ -5,25 +5,23 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Mcp;
+namespace BeltoftServices\Proxmox\Db;
 
-use BeltoftServices\Proxmox\Db\DbPicker;
+use BeltoftServices\Mcp\Access as McpAccess;
+use BeltoftServices\Proxmox\Vm\McpPricing;
+use BeltoftServices\Proxmox\Vm\McpPurchase as ServerPurchase;
 use BeltoftServices\Proxmox\Vm\ServerPicker;
-use BeltoftServices\Proxmox\Db\DbDisk;
-use BeltoftServices\Proxmox\Db\DbDiskField;
-use BeltoftServices\Proxmox\Db\DbTermsField;
-use BeltoftServices\Usage\Rates;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * The counterpart of order_server, and it uses the same machinery: the rules and the order are those of the dashboard's
  * database page (DbPicker::process() puts the plan in the cart, DbDiskField::swap() makes the choice
- * the checkout's own boxes make) and WooCommerce's own checkout inside the Sandbox, through Purchase::execute(). A database
+ * the checkout's own boxes make) and WooCommerce's own checkout inside the Sandbox, through McpPurchase::execute() of the servers. A database
  * is sold pay as you go through Claude: the order is a pay as you go variation at 0, never a fixed monthly one. A customer
  * without a usage account gets a link and nothing is ordered.
  */
-final class PurchaseDb {
+final class McpPurchase {
 
 	/**
 	 * The tool.
@@ -71,7 +69,7 @@ final class PurchaseDb {
 	public static function prepare( array $args, int $user_id ) {
 		$fail = static fn( string $text ) => new \WP_Error( 'beltoft_services_tool', $text );
 
-		if ( $user_id < 1 || ! Access::user_allowed( $user_id ) ) {
+		if ( $user_id < 1 || ! McpAccess::user_allowed( $user_id ) ) {
 			return $fail( __( 'This is not available.', 'beltoft-services' ) );
 		}
 
@@ -98,7 +96,7 @@ final class PurchaseDb {
 			return $fail( __( 'That plan is out of stock. Choose another plan.', 'beltoft-services' ) );
 		}
 
-		$quote = Pricing::quote( array( 'plan' => (int) $plan['variation_id'], 'public_ipv4' => $ip, 'extra_storage_gb' => $gb ) );
+		$quote = McpPricing::quote( array( 'plan' => (int) $plan['variation_id'], 'public_ipv4' => $ip, 'extra_storage_gb' => $gb ) );
 
 		if ( $quote instanceof \WP_Error ) {
 			return $quote;
@@ -115,7 +113,7 @@ final class PurchaseDb {
 			}
 		}
 
-		$state = Purchase::account_state( $user_id, $url );
+		$state = ServerPurchase::account_state( $user_id, $url );
 
 		if ( $state instanceof \WP_Error ) {
 			return $state;
@@ -159,7 +157,7 @@ final class PurchaseDb {
 	 * @param int $user_id Customer.
 	 */
 	public static function goes_direct( int $user_id ): bool {
-		return Purchase::goes_direct( $user_id );
+		return ServerPurchase::goes_direct( $user_id );
 	}
 
 	/**
@@ -248,6 +246,6 @@ final class PurchaseDb {
 	public static function run( array $args, int $user_id ) {
 		$p = self::prepare( $args, $user_id );
 
-		return $p instanceof \WP_Error ? $p : Purchase::execute( $p, $user_id, 'database' );
+		return $p instanceof \WP_Error ? $p : ServerPurchase::execute( $p, $user_id, 'database' );
 	}
 }

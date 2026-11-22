@@ -14,7 +14,7 @@ use BeltoftServices\Proxmox\Vm\ServerPicker;
 use BeltoftServices\Api\Tokens;
 use BeltoftServices\BillingRequirements;
 use BeltoftServices\Mcp\Access;
-use BeltoftServices\Mcp\Purchase;
+use BeltoftServices\Proxmox\Vm\McpPurchase as Purchase;
 use BeltoftServices\Mcp\Sandbox;
 use BeltoftServices\Proxmox\Vm\Offers;
 use BeltoftServices\Proxmox\Vm\OsField;

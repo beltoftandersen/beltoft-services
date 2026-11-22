@@ -11,7 +11,7 @@ namespace BeltoftServices\Tests\Mcp;
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Proxmox\Vm\ServerPicker;
 use BeltoftServices\Api\Tokens;
-use BeltoftServices\Mcp\Purchase;
+use BeltoftServices\Proxmox\Vm\McpPurchase as Purchase;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Proxmox\Vm\Offers;

@@ -8,7 +8,6 @@
 
 namespace BeltoftServices\Mcp;
 
-use BeltoftServices\Proxmox\Vm\ServerName;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
 
@@ -31,7 +30,7 @@ final class Irreversible {
 	/**
 	 * The tools this class runs.
 	 */
-	public const NAMES = array( 'delete_snapshot', 'rollback_snapshot', 'restore_backup', 'reinstall_server', 'replace_ssh_key', 'cancel_subscription', 'remove_addon', 'set_default_payment_method', 'order_server', 'order_database', 'delete_server', 'delete_database' );
+	public const NAMES = array( 'cancel_subscription', 'remove_addon', 'set_default_payment_method', 'delete_server', 'delete_database' );
 
 	/**
 	 * The summary of a call that needs a confirmation, and what the summary depends on.
@@ -58,30 +57,9 @@ final class Irreversible {
 			case 'delete_database':
 				return DeleteService::summary( $name, $args, $user_id );
 
-			case Purchase::NAME:
-				return Purchase::summary( $args, $user_id );
-
-			case PurchaseDb::NAME:
-				return PurchaseDb::summary( $args, $user_id );
-
 		}
 
-		$r = Tools::owned( (int) $args['id'], true );
-
-		if ( $r instanceof \WP_Error ) {
-			return $r;
-		}
-
-		$action = (string) array_search( $name, ActionMap::actions(), true );
-		$bad    = ServerActions::not_offered( $r, $action );
-
-		if ( null !== $bad ) {
-			return $bad;
-		}
-
-		$label = self::name( $r );
-
-		return ServerActions::summary( $name, $args, $r, $action, $label );
+		return new \WP_Error( 'beltoft_services_tool', __( 'This is not available.', 'beltoft-services' ) );
 	}
 
 	/**
@@ -93,14 +71,6 @@ final class Irreversible {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public static function run( string $name, array $args, int $user_id ) {
-		if ( Purchase::NAME === $name ) {
-			return Purchase::run( $args, $user_id );
-		}
-
-		if ( PurchaseDb::NAME === $name ) {
-			return PurchaseDb::run( $args, $user_id );
-		}
-
 		if ( in_array( $name, DeleteService::NAMES, true ) ) {
 			return DeleteService::run( $name, $args, $user_id );
 		}
@@ -109,7 +79,7 @@ final class Irreversible {
 			return BillingActions::run( $name, $args, $user_id );
 		}
 
-		return ServerActions::run( $name, $args );
+		return new \WP_Error( 'beltoft_services_tool', __( 'This is not available.', 'beltoft-services' ) );
 	}
 
 	/**
@@ -153,7 +123,8 @@ final class Irreversible {
 	 */
 	public static function name( Resource $r ): string {
 		$license = $r->license();
-		$name    = $license ? trim( wp_strip_all_tags( ServerName::email_label( $r, $license ) ) ) : '';
+		// How a service is called is the feature's word (filter beltoft_services_mcp_service_name).
+		$name    = $license ? trim( wp_strip_all_tags( (string) apply_filters( 'beltoft_services_mcp_service_name', '', $r, $license ) ) ) : '';
 
 		/* translators: 1: name of the service, 2: its id. */
 		return '' !== $name ? sprintf( __( '%1$s (service #%2$d)', 'beltoft-services' ), $name, $r->id() ) : sprintf(
