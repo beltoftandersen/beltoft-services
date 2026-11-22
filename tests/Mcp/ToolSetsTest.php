@@ -79,6 +79,8 @@ final class ToolSetsTest extends McpTestCase {
 	public function test_a_registered_set_adds_a_tool_its_tables_and_its_run(): void {
 		$this->assertArrayNotHasKey( 'zz_probe', Definitions::all() );
 		$this->assertFalse( Tools::exists( 'zz_probe' ) );
+		// Only the probe: the real sets are left out of the list, and the tools of their features do not exist for this test.
+		remove_all_filters( ToolSets::FILTER );
 
 		add_filter(
 			ToolSets::FILTER,

@@ -235,6 +235,7 @@ final class Plugin {
 		Domains\ApiDocs::register();
 		Mail\ApiDocs::register();
 		Ssl\ApiDocs::register();
+		Ssl\McpTools::register();
 		Storage\ApiDocs::register();
 		Oauth\Server::register();
 		Mcp\Access::register();

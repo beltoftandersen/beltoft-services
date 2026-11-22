@@ -51,7 +51,6 @@ final class ActionMap {
 		'replace_ssh_key'    => 'replace_ssh_key',
 		'fw_reset'           => 'reset_firewall',
 		'db_set_policy'      => 'set_database_eviction_policy',
-		'ssl_resend_email'   => 'ssl_resend_email',
 	);
 
 	/**
@@ -65,8 +64,6 @@ final class ActionMap {
 		'dnssec_key_remove' => 'never: DNSSEC changes the keys the registry holds and needs the code emailed to the account address, so it is only available in the dashboard',
 		'set_records'       => 'route: DNS records have their own tools (dns_upsert_record, dns_delete_record)',
 		'fw_apply'          => 'route: the firewall has its own tool (set_firewall)',
-		'ssl_reissue'       => 'never: a reissue replaces the key and the certificate that works; it is done in the dashboard, where the key is taken once',
-		'ssl_change_validation' => 'never: the validation method, approver and request are chosen on the certificate page, in the dashboard',
 		'backup_delete'     => 'never: a backup is the last copy after a mistake or an attack; deleting one is only done in the dashboard',
 		'db_private_move'   => 'never: moving a database to another private network changes the address the customer\'s applications use; it is done in the dashboard, on the Network tab',
 		'storage_snapshot'  => 'never: backup storage is changed in the dashboard only in this version (no tool, no API token)',
@@ -78,7 +75,6 @@ final class ActionMap {
 		'ipv6_add'          => 'never: adding or removing IPv6 restarts the server and makes its SSH host keys again, so it is only done in the dashboard',
 		'ipv6_remove'       => 'never: adding or removing IPv6 restarts the server and makes its SSH host keys again, so it is only done in the dashboard',
 		'ipv4_guest'        => 'never: it runs a script inside the customer\'s server through the guest agent, so it is only done in the dashboard',
-		'ssl_cancel'        => 'never: cancelling is irreversible and ends in a refund a person decides; it is only done in the dashboard',
 	);
 
 	/**
@@ -178,7 +174,6 @@ final class ActionMap {
 		'restore_hosting_backup'   => array( 'POST #^/resources/\d+/hosting/backups/restore$#D' ),
 		'delete_site'              => array( 'DELETE #^/resources/\d+/hosting/sites/[a-z0-9-]+$#D' ),
 		'email_domain_info'        => array( 'GET #^/resources/\d+/mail$#D' ),
-		'get_ssl_certificate'      => array( 'GET #^/resources/\d+/ssl-certificate$#D' ),
 		'create_mailbox'           => array( 'POST #^/resources/\d+/mail/mailboxes$#D' ),
 		'delete_mailbox'           => array( 'DELETE #^/resources/\d+/mail/mailboxes/[^/]+$#D' ),
 		'add_email_alias'          => array( 'POST #^/resources/\d+/mail/aliases$#D' ),

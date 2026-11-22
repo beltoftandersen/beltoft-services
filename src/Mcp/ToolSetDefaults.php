@@ -10,9 +10,30 @@ namespace BeltoftServices\Mcp;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Use it in a McpTools class and write only what the feature has.
+ * Use it in a McpTools class and write only what the feature has. register() joins the set to the server (Plugin::boot
+ * calls it).
  */
 trait ToolSetDefaults {
+
+	/**
+	 * Joins the set to the MCP server.
+	 */
+	public static function register(): void {
+		add_filter( ToolSets::FILTER, array( static::class, 'add' ) );
+	}
+
+	/**
+	 * The filter beltoft_services_mcp_toolsets.
+	 *
+	 * @param mixed $sets Class names so far.
+	 * @return array<int, string>
+	 */
+	public static function add( $sets ): array {
+		$sets   = is_array( $sets ) ? $sets : array();
+		$sets[] = static::class;
+
+		return $sets;
+	}
 
 	/**
 	 * @return array<string, string[]>

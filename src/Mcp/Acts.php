@@ -36,7 +36,7 @@ final class Acts {
 	/** What an email change that is queued answers: accepted, not done; the domain's task says how it ended. */
 	public const EMAIL_QUEUED = 'Accepted and queued: it runs in the background, one change of the domain at a time (another change is refused until it is done). email_domain_info shows the task of the domain: working while it runs, then last_result with ok and the outcome text.';
 
-	public const NAMES = array( 'dedicated_restart', 'dedicated_power_on', 'dedicated_set_rdns', 'dedicated_rescue', 'rename_server', 'set_firewall', 'set_database_access', 'private_network', 'set_usage_alerts', 'retry_app_install', 'domain_settings', 'set_auto_renew', 'reactivate_subscription', 'free_license_site', 'cancel_unpaid_order', 'update_billing_address', 'create_mailbox', 'add_email_alias', 'remove_email_alias', 'email_dns_check', 'add_site_domain', 'set_php_version', 'clear_site_cache', 'create_hosting_backup', 'ssl_resend_email' );
+	public const NAMES = array( 'dedicated_restart', 'dedicated_power_on', 'dedicated_set_rdns', 'dedicated_rescue', 'rename_server', 'set_firewall', 'set_database_access', 'private_network', 'set_usage_alerts', 'retry_app_install', 'domain_settings', 'set_auto_renew', 'reactivate_subscription', 'free_license_site', 'cancel_unpaid_order', 'update_billing_address', 'create_mailbox', 'add_email_alias', 'remove_email_alias', 'email_dns_check', 'add_site_domain', 'set_php_version', 'clear_site_cache', 'create_hosting_backup' );
 
 	/**
 	 * Runs one of the tools.
@@ -118,9 +118,6 @@ final class Acts {
 			case 'remove_email_alias':
 			case 'email_dns_check':
 				return self::email( $name, $args );
-
-			case 'ssl_resend_email':
-				return Tools::action( (int) $args['id'], 'ssl_resend_email', array(), 'SSL approval email requested again' );
 
 			case 'add_site_domain':
 			case 'set_php_version':

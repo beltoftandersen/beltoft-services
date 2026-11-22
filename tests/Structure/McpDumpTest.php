@@ -88,7 +88,9 @@ final class McpDumpTest extends McpTestCase {
 			$map .= '== ' . $table . "\n" . wp_json_encode( $rows, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) . "\n";
 		}
 
-		$map .= "== dashboard_only\n" . wp_json_encode( array_values( Tokens::dashboard_only_actions() ) ) . "\n";
+		$dashboard_only = array_values( Tokens::dashboard_only_actions() );
+		sort( $dashboard_only );
+		$map .= "== dashboard_only\n" . wp_json_encode( $dashboard_only ) . "\n";
 		$put( 'mcp-map.txt', $map );
 
 		$user   = (int) self::factory()->user->create();
@@ -107,9 +109,9 @@ final class McpDumpTest extends McpTestCase {
 			$server->id()                    => 'SERVER',
 			$db->id()                        => 'DB',
 			$domain->id()                    => 'DOMAIN',
-			(int) $server->license()['id']   => 'SERVER_LICENSE',
-			(int) $db->license()['id']       => 'DB_LICENSE',
-			(int) $domain->license()['id']   => 'DOMAIN_LICENSE',
+			(int) $server->license()['id']   => 'SERVER',
+			(int) $db->license()['id']       => 'DB',
+			(int) $domain->license()['id']   => 'DOMAIN',
 			$sub->get_id()                   => 'SUBSCRIPTION',
 		);
 		krsort( $ids );
