@@ -17,10 +17,25 @@ use PHPUnit\Framework\TestCase;
  * FEATURES lists every feature folder (widened 2026-11 to Hosting, Ssl, Licences, Credit (since removed), Card, Admin and Cli; the widening found no new leak).
  * Drivers, Billing, Checkout and Emails count as core when they are the importing side (CORE_FOLDERS, widened 2026-11-10);
  * as imported classes they are not features, because core imports Billing\CartFlow and the email registry.
+ *
+ * Second rule (2026-11-22, plan 2026-11-22-feature-code-home): the platform folders (PLATFORM) must not import true features
+ * (TRUE_FEATURES). Usage, Monitoring, GiftCredit, Card, Http and Oauth are shared services the platform may import. Its violations
+ * are in platform-allowlist.php, which only shrinks and ends empty. Feature files named McpTools.php may import Mcp (they implement
+ * Mcp\ToolSet), no other feature file may.
  */
 class DependencyDirectionTest extends TestCase {
 
 	private const FEATURES = array( 'Proxmox', 'Domains', 'Mail', 'Mcp', 'Account', 'Usage', 'Http', 'Oauth', 'Api', 'Bricks', 'Hosting', 'Ssl', 'Licences', 'GiftCredit', 'Card', 'Admin', 'Cli', 'Apps', 'Storage', 'ManualServer', 'Support' );
+
+	/**
+	 * Platform folders (the plugin's own account, API, MCP, CLI, admin and Bricks code) as sources.
+	 */
+	private const PLATFORM = array( 'Mcp', 'Account', 'Api', 'Cli', 'Admin', 'Bricks' );
+
+	/**
+	 * Features the platform folders must not import: each owns its code, the platform asks through filters.
+	 */
+	private const TRUE_FEATURES = array( 'Proxmox', 'Domains', 'Apps', 'Hosting', 'Mail', 'Ssl', 'ManualServer', 'Licences', 'Storage', 'Support' );
 
 	/**
 	 * Folders that belong to the core layer as sources (they may not import a feature). As targets they stay what they are.
@@ -67,11 +82,46 @@ class DependencyDirectionTest extends TestCase {
 	}
 
 	/**
+	 * Today's platform violations, "relative/file.php -> Target\Class". Shrink only, empty at the end of the plan.
+	 *
+	 * @return string[]
+	 */
+	private static function platform_allowed(): array {
+		return require __DIR__ . '/platform-allowlist.php';
+	}
+
+	/**
 	 * @return array<string, true> "file -> class" => true
 	 */
 	private function violations(): array {
-		$root = dirname( __DIR__, 2 ) . '/src';
-		$out  = array();
+		return $this->scan()['core'];
+	}
+
+	/**
+	 * @return array<string, true> "file -> class" => true
+	 */
+	private function platform_violations(): array {
+		return $this->scan()['platform'];
+	}
+
+	/**
+	 * @var array{core: array<string, true>, platform: array<string, true>}|null
+	 */
+	private static $scan = null;
+
+	/**
+	 * One pass over src/: the layer rules (core and features) and the platform rule.
+	 *
+	 * @return array{core: array<string, true>, platform: array<string, true>}
+	 */
+	private function scan(): array {
+		if ( null !== self::$scan ) {
+			return self::$scan;
+		}
+
+		$root     = dirname( __DIR__, 2 ) . '/src';
+		$out      = array();
+		$platform = array();
 		$it   = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $root, \FilesystemIterator::SKIP_DOTS ) );
 
 		foreach ( $it as $file ) {
@@ -162,12 +212,26 @@ class DependencyDirectionTest extends TestCase {
 				$from = 'core';
 			}
 
+			if ( in_array( $from, self::PLATFORM, true ) ) {
+				foreach ( array_unique( $names ) as $name ) {
+					if ( in_array( $this->layer( $name ), self::TRUE_FEATURES, true ) ) {
+						$platform[ $rel . ' -> ' . $this->class_of( $name ) ] = true;
+					}
+				}
+				continue;
+			}
+
 			if ( ! isset( self::FORBIDDEN[ $from ] ) && ! isset( self::FORBIDDEN_CLASSES[ $from ] ) ) {
 				continue;
 			}
 
 			foreach ( array_unique( $names ) as $name ) {
 				$to = $this->layer( $name );
+
+				// A feature's McpTools.php implements Mcp\ToolSet, so it may import Mcp.
+				if ( 'Mcp' === $to && 'McpTools.php' === basename( $rel ) ) {
+					continue;
+				}
 
 				if ( in_array( $to, self::FORBIDDEN[ $from ] ?? array(), true ) || $this->in_forbidden_classes( $this->class_of( $name ), self::FORBIDDEN_CLASSES[ $from ] ?? array() ) ) {
 					$out[ $rel . ' -> ' . $this->class_of( $name ) ] = true;
@@ -176,8 +240,14 @@ class DependencyDirectionTest extends TestCase {
 		}
 
 		ksort( $out );
+		ksort( $platform );
 
-		return $out;
+		self::$scan = array(
+			'core'     => $out,
+			'platform' => $platform,
+		);
+
+		return self::$scan;
 	}
 
 	/**
@@ -244,9 +314,19 @@ class DependencyDirectionTest extends TestCase {
 		$this->assertSame( array(), $stale, 'Allowlist entries that no longer exist, remove them:' . "\n" . implode( "\n", $stale ) );
 	}
 
+	public function test_no_new_platform_dependencies_on_features(): void {
+		$found   = array_keys( $this->platform_violations() );
+		$allowed = self::platform_allowed();
+		$new     = array_values( array_diff( $found, $allowed ) );
+		$stale   = array_values( array_diff( $allowed, $found ) );
+
+		$this->assertSame( array(), $new, sprintf( 'Platform folders import features (platform allowlist has %d entries): ask through a filter instead.', count( $allowed ) ) . "\n" . implode( "\n", $new ) );
+		$this->assertSame( array(), $stale, 'Platform allowlist entries that no longer exist, remove them:' . "\n" . implode( "\n", $stale ) );
+	}
+
 	public function test_allowlist_size(): void {
 		$this->addToAssertionCount( 1 );
-		fwrite( STDERR, sprintf( "\n[dependency allowlist: %d entries]\n", count( self::allowed() ) ) );
+		fwrite( STDERR, sprintf( "\n[dependency allowlist: %d entries, platform allowlist: %d entries]\n", count( self::allowed() ), count( self::platform_allowed() ) ) );
 	}
 
 	/**
@@ -259,5 +339,9 @@ class DependencyDirectionTest extends TestCase {
 
 		$written = file_put_contents( getenv( 'DEP_DUMP' ), implode( "\n", array_keys( $this->violations() ) ) . "\n" );
 		$this->assertNotFalse( $written );
+
+		if ( getenv( 'DEP_DUMP_PLATFORM' ) ) {
+			$this->assertNotFalse( file_put_contents( getenv( 'DEP_DUMP_PLATFORM' ), implode( "\n", array_keys( $this->platform_violations() ) ) . "\n" ) );
+		}
 	}
 }
