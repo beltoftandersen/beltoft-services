@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.55.5
+Stable tag: 0.55.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.55.6 =
+* A line name leaves out an option the product name already says as a whole word ("IPv4 address - IPv4" is shown as "IPv4 address").
 
 = 0.55.5 =
 * The progress view of a new server or database no longer waits on "Reserving an IP address" when there is no IPv4 address to reserve (VPS Basic, databases without the IPv4 add-on). Steps that are not run are left out.

@@ -237,6 +237,16 @@ final class LineNames {
 			$name = '';
 		}
 
+		// "IPv4 address" with the value "IPv4": the name already says it (a whole word, so plan "S" stays in "VPS Basic").
+		if ( '' !== $name ) {
+			$plain = array_values(
+				array_filter(
+					$plain,
+					static fn( $value ) => '' === trim( (string) $value ) || 1 !== preg_match( '/(?<![\p{L}\p{N}])' . preg_quote( trim( (string) $value ), '/' ) . '(?![\p{L}\p{N}])/iu', $name )
+				)
+			);
+		}
+
 		$label = trim( $name . ' ' . implode( ' ', $plain ) );
 
 		/**

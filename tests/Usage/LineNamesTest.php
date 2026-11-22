@@ -65,6 +65,22 @@ class LineNamesTest extends UsageTestCase {
 		$this->assertSame( $name . ' Starter', LineNames::label( $var ) );
 	}
 
+	public function test_a_value_the_product_name_already_says_is_dropped(): void {
+		$v      = $this->monthly_vps();
+		$parent = wc_get_product( $v['m-None']->get_parent_id() );
+		$parent->set_name( 'IPv4 address' );
+		$parent->save();
+		$var = new \WC_Product_Variation( $v['m-None']->get_id() );
+		$var->set_attributes( array( 'plan' => 'IPv4' ) );
+		$this->assertSame( 'IPv4 address', LineNames::label( $var ), 'The name says IPv4 already.' );
+
+		$parent->set_name( 'VPS Basic' );
+		$parent->save();
+		$var = new \WC_Product_Variation( $v['m-None']->get_id() );
+		$var->set_attributes( array( 'plan' => 'S' ) );
+		$this->assertSame( 'VPS Basic S', LineNames::label( $var ), 'Only a whole word counts: the S in VPS and Basic is not the plan.' );
+	}
+
 	public function test_a_linked_name_keeps_its_link(): void {
 		$v    = $this->usage_product();
 		$item = $this->line( $v['u-None'] );
