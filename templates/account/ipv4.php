@@ -7,7 +7,7 @@
 
 defined( 'ABSPATH' ) || exit;
 ?>
-<div class="beltoft-services-vm__ipv4" id="beltoft-services-ipv4">
+<div class="beltoft-services-vm__ipv4" id="beltoft-services-ipv4"<?php if ( ! empty( $ipv4['guest'] ) ) : ?> data-ipv4-guest data-resource="<?php echo (int) $ipv4['guest']['resource_id']; ?>" data-ipv4-guest-busy="<?php echo $ipv4['guest']['busy'] ? '1' : '0'; ?>"<?php endif; ?>>
 	<h4><?php esc_html_e( 'IPv4 addresses', 'beltoft-services' ); ?></h4>
 	<?php if ( array() === $ipv4['addresses'] ) : ?>
 		<p class="description"><?php esc_html_e( 'This server has an IPv6 address and no IPv4 address. Add an IPv4 address if visitors or services must reach the server over IPv4. Some services, for example GitHub, cannot be reached from a server with IPv6 only.', 'beltoft-services' ); ?></p>
@@ -26,6 +26,12 @@ defined( 'ABSPATH' ) || exit;
 							/* translators: %s: date the address ends */
 							echo ', ' . esc_html( sprintf( __( 'ends %s', 'beltoft-services' ), $beltoft_services_row['ending'] ) );
 						}
+
+						if ( 'applied' === $beltoft_services_row['guest'] ) {
+							echo ', ' . esc_html__( 'Set up in the server', 'beltoft-services' );
+						} elseif ( 'not_set_up' === $beltoft_services_row['guest'] ) {
+							echo ', ' . esc_html__( 'Not set up', 'beltoft-services' );
+						}
 						?>
 					</span>
 					<?php if ( '' !== $beltoft_services_row['remove_url'] ) : ?>
@@ -41,8 +47,18 @@ defined( 'ABSPATH' ) || exit;
 				</li>
 			<?php endforeach; ?>
 		</ul>
+		<?php if ( ! empty( $ipv4['guest'] ) ) : ?>
+			<?php if ( 'applied' === $ipv4['guest']['state'] && ! $ipv4['guest']['persisted'] ) : ?>
+				<p class="description"><?php esc_html_e( 'The extra addresses work now but are not kept after a restart. Use the lines below to keep them.', 'beltoft-services' ); ?></p>
+			<?php elseif ( '' !== $ipv4['guest']['state'] && 'applied' !== $ipv4['guest']['state'] ) : ?>
+				<p class="description"><?php esc_html_e( 'We could not set the extra addresses up in your server. Press Apply again once the server runs and its guest agent is on, or use the lines below.', 'beltoft-services' ); ?></p>
+			<?php endif; ?>
+			<?php if ( $ipv4['guest']['can_apply'] ) : ?>
+				<p><button type="button" class="button woocommerce-button bs-btn" data-ipv4-guest-action="<?php echo esc_attr( \BeltoftServices\Proxmox\Ipv4\Ipv4Guest::ACTION ); ?>"><?php esc_html_e( 'Apply again', 'beltoft-services' ); ?></button></p>
+			<?php endif; ?>
+		<?php endif; ?>
 		<?php if ( array() !== $ipv4['setup'] ) : ?>
-			<details class="beltoft-services-vm__ipv4-setup">
+			<details class="beltoft-services-vm__ipv4-setup"<?php echo ! empty( $ipv4['guest'] ) && 'applied' !== $ipv4['guest']['state'] ? ' open' : ''; ?>>
 				<summary><?php esc_html_e( 'Set up the extra addresses in your server', 'beltoft-services' ); ?></summary>
 				<p class="description"><?php esc_html_e( 'The firewall allows the extra addresses already. Put them in the network settings of your server with the tool it uses. No restart is needed.', 'beltoft-services' ); ?></p>
 				<?php foreach ( array( 'netplan' => 'Netplan', 'ifupdown' => 'ifupdown (/etc/network/interfaces)', 'networkmanager' => 'NetworkManager' ) as $beltoft_services_tool => $beltoft_services_label ) : ?>

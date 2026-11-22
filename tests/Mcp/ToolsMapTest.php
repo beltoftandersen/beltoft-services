@@ -67,6 +67,7 @@ final class ToolsMapTest extends McpTestCase {
 			'BeltoftServices\Proxmox\Network\FirewallRules',
 			'BeltoftServices\Proxmox\Network\PrivateAttach',
 			'BeltoftServices\Proxmox\Network\Ipv6Switch',
+			'BeltoftServices\Proxmox\Ipv4\Ipv4Guest',
 			'BeltoftServices\Proxmox\Db\DbActions',
 			'BeltoftServices\Domains\Actions',
 			'BeltoftServices\Domains\Dnssec',

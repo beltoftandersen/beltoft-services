@@ -167,10 +167,17 @@ class LiveClient implements Client {
 		}
 
 		$clean = array();
+		$lists = array();
 		$scrub = array( $this->secret );
 
 		foreach ( $params as $name => $value ) {
 			if ( null === $value ) {
+				continue;
+			}
+
+			// The one list the plugin sends: the command of agent/exec (program and arguments), sent as repeated keys.
+			if ( 'command' === $name && is_array( $value ) && array() !== $value && array() === array_filter( $value, static fn( $part ) => ! is_string( $part ) || '' === $part ) ) {
+				$lists[ $name ] = array_values( $value );
 				continue;
 			}
 
@@ -197,7 +204,14 @@ class LiveClient implements Client {
 		}
 
 		$encoded = http_build_query( $clean, '', '&', PHP_QUERY_RFC3986 );
-		$url     = $this->base . '/api2/json' . $path;
+
+		foreach ( $lists as $name => $parts ) {
+			foreach ( $parts as $part ) {
+				$encoded .= ( '' === $encoded ? '' : '&' ) . rawurlencode( $name ) . '=' . rawurlencode( $part );
+			}
+		}
+
+		$url = $this->base . '/api2/json' . $path;
 		$args    = array(
 			'method'      => $method,
 			'timeout'     => $this->request_timeout,

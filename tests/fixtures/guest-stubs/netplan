@@ -1,0 +1,12 @@
+#!/bin/sh
+# Test stub of netplan(8): "get" prints $STUB_DIR/netplan_get, "generate" answers $STUB_GEN_RC (default 0).
+D=${STUB_DIR:?}
+echo "netplan $*" >>"$D/netplan.log"
+case "$1" in
+get)
+	[ -f "$D/netplan_get" ] && cat "$D/netplan_get" && exit 0
+	exit 1
+	;;
+generate) exit "${STUB_GEN_RC:-0}" ;;
+esac
+exit 1

@@ -201,25 +201,58 @@ final class Provision {
 	 * @return string[]
 	 */
 	private static function build_steps( Resource $r, array $steps ): array {
-		if ( ! PrivateAttach::rebuild_wanted( $r ) || ! in_array( 'start', $steps, true ) ) {
+		if ( ! in_array( 'start', $steps, true ) ) {
+			return $steps;
+		}
+
+		$private = PrivateAttach::rebuild_wanted( $r );
+		// A server with extra IPv4 addresses (add-ons it already holds) gets them in the guest after its start.
+		$extra   = \BeltoftServices\Proxmox\Ipv4\Ipv4Guest::wanted_at_build( $r );
+
+		if ( ! $private && ! $extra ) {
 			return $steps;
 		}
 
 		$out = array();
 
 		foreach ( $steps as $name ) {
-			if ( 'start' === $name ) {
+			if ( 'start' === $name && $private ) {
 				$out[] = 'private';
 			}
 
 			$out[] = $name;
 
-			if ( 'start' === $name ) {
+			if ( 'start' === $name && $private ) {
 				$out[] = 'private_guest';
+			}
+
+			if ( 'start' === $name && $extra ) {
+				$out[] = 'extra_ips';
 			}
 		}
 
 		return $out;
+	}
+
+	/**
+	 * Step: the extra IPv4 addresses are set up in the guest (waits for the guest agent, never fails the build).
+	 *
+	 * @return array<string, mixed>|StepResult
+	 */
+	private function step_extra_ips() {
+		$record = VmRecords::for_resource( $this->r->id() );
+
+		if ( null === $record ) {
+			return StepResult::fail( 'extra ipv4: the VM record is missing' );
+		}
+
+		$v = $this->verified( $record, 'extra_ips' );
+
+		if ( $v instanceof StepResult ) {
+			return $v;
+		}
+
+		return ( new \BeltoftServices\Proxmox\Ipv4\Ipv4Guest( $this->r, $this->client ) )->at_build( $record, $v );
 	}
 
 	/**

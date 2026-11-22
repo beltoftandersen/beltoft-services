@@ -586,6 +586,19 @@ class ClientTest extends TestCase {
 		$this->assertSame( 'bad_path', $this->live()->request( 'GET', 'nodes' )->get_error_code() );
 	}
 
+	public function test_an_exec_command_is_sent_as_repeated_keys_and_no_other_list_is_accepted(): void {
+		$this->answer( array( 'pid' => 7 ) );
+		$live = $this->live();
+
+		$live->request( 'POST', '/nodes/pve1/qemu/123/agent/exec', array( 'command' => array( '/bin/sh', '/var/lib/beltoft-app/a b.sh' ) ) );
+		$this->assertSame( 'command=%2Fbin%2Fsh&command=%2Fvar%2Flib%2Fbeltoft-app%2Fa%20b.sh', $this->sent[0]['args']['body'] );
+
+		$this->assertSame( 'bad_params', $live->request( 'POST', '/x', array( 'cores' => array( 1 ) ) )->get_error_code() );
+		$this->assertSame( 'bad_params', $live->request( 'POST', '/x', array( 'command' => array( array( 'x' ) ) ) )->get_error_code() );
+		$this->assertSame( 'bad_params', $live->request( 'POST', '/x', array( 'command' => array() ) )->get_error_code() );
+		$this->assertCount( 1, $this->sent, 'The refused calls were not sent.' );
+	}
+
 	public function test_sshkeys_is_urlencoded_once_before_form_encoding(): void {
 		$this->answer( null );
 		$this->live()->request( 'PUT', '/nodes/pve1/qemu/123/config', array( 'sshkeys' => 'ssh-ed25519 AAAAC3 me@host', 'cores' => 1 ) );

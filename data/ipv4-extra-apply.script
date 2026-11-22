@@ -1,0 +1,405 @@
+#!/bin/sh
+# Beltoft Services: puts the EXTRA IPv4 addresses of this server on its network card, live and for every boot.
+# The plugin writes this file and the wanted list into the guest through the guest agent and runs it once.
+#
+#   input : $STATE/ipv4-extra.json         {"v":1,"run":"<token>","main":"a.b.c.d","extras":["a.b.c.d"]}
+#   output: $STATE/ipv4-extra.status.json  what was done (stack, card, addresses, errors); the plugin reads it back
+#   owned : $STATE/ipv4-extra.owned        one line per address this script manages: "<address> added|adopted"
+#
+# Rules this script keeps:
+#   - The main address and the default route are never changed. They are read first and checked after every step. If one
+#     is gone the script puts it back, stops and reports.
+#   - Only /32 addresses are added, with no gateway, so the way out stays the main address.
+#   - An address is removed live only when this script added it. An address that was already there ("adopted") is left in place.
+#   - The network is never restarted: live changes are "ip addr add/del", persistent changes are files this script owns
+#     (netplan drop-in, interfaces.d file) or addresses added to the EXISTING active NetworkManager profile (never a second profile).
+#   - Running it twice gives the same result.
+
+STATE=${BELTOFT_XIP_STATE:-/var/lib/beltoft-app}
+ETC=${BELTOFT_XIP_ETC:-/etc}
+# The agent starts commands with a short PATH. (Tests set BELTOFT_XIP_KEEP_PATH to run against stub commands only.)
+if [ -z "${BELTOFT_XIP_KEEP_PATH:-}" ]; then
+	PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+fi
+export PATH
+
+WANT_FILE=$STATE/ipv4-extra.json
+STATUS_FILE=$STATE/ipv4-extra.status.json
+OWNED_FILE=$STATE/ipv4-extra.owned
+NETPLAN_FILE=$ETC/netplan/61-beltoft-extra.yaml
+IFUP_FILE=$ETC/network/interfaces.d/61-beltoft-extra
+
+RUN=
+MAIN=
+MAIN_CIDR=
+DEF_ROUTE=
+NIC=
+MAC=
+STACK=none
+PERSISTED=false
+PROFILE=
+WANTED=
+KEEP=
+ADDED=
+REMOVED=
+ADOPTED=
+ERRORS=
+NEW_OWNED=
+
+json_esc() {
+	printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | tr '\n\t' '  '
+}
+
+# Helper functions keep to their own variable names: the loops of the main script use item, kind and out.
+jlist() {
+	jl_out=
+	for jl_item in $1; do
+		jl_out="$jl_out${jl_out:+,}\"$jl_item\""
+	done
+	printf '[%s]' "$jl_out"
+}
+
+err() {
+	ERRORS="$ERRORS$1
+"
+}
+
+errors_json() {
+	ej_out=
+	ej_ifs=$IFS
+	IFS='
+'
+	for ej_line in $ERRORS; do
+		[ -n "$ej_line" ] || continue
+		ej_out="$ej_out${ej_out:+,}\"$(json_esc "$ej_line")\""
+	done
+	IFS=$ej_ifs
+	printf '[%s]' "$ej_out"
+}
+
+# The addresses of the wanted list that are on the card now.
+applied_now() {
+	an_out=
+	for an_item in $WANTED; do
+		if on_nic "$an_item"; then
+			an_out="$an_out $an_item"
+		fi
+	done
+	printf '%s' "$an_out"
+}
+
+finish() {
+	ok=true
+	[ -n "$ERRORS" ] && ok=false
+	applied=
+	[ -n "$NIC" ] && applied=$(applied_now)
+	tmp=$STATUS_FILE.tmp
+	{
+		printf '{"v":1,"run":"%s","at":%s,"ok":%s,"stack":"%s","nic":"%s","main":"%s","profile":"%s","persisted":%s,' \
+			"$(json_esc "$RUN")" "$(date +%s)" "$ok" "$STACK" "$(json_esc "$NIC")" "$MAIN" "$(json_esc "$PROFILE")" "$PERSISTED"
+		printf '"wanted":%s,"applied":%s,"added":%s,"removed":%s,"adopted":%s,"errors":%s}\n' \
+			"$(jlist "$WANTED")" "$(jlist "$applied")" "$(jlist "$ADDED")" "$(jlist "$REMOVED")" "$(jlist "$ADOPTED")" "$(errors_json)"
+	} >"$tmp" 2>/dev/null && mv -f "$tmp" "$STATUS_FILE"
+	[ "$ok" = true ] && exit 0
+	exit 1
+}
+
+die() {
+	err "$1"
+	finish
+}
+
+valid_ip() {
+	printf '%s\n' "$1" | awk -F. 'NF != 4 { exit 1 } { for (i = 1; i <= 4; i++) if ($i !~ /^[0-9]+$/ || length($i) > 3 || $i + 0 > 255) exit 1 }'
+}
+
+# Address list of the card: a.b.c.d only.
+nic_ips() {
+	ip -4 -o addr show dev "$NIC" 2>/dev/null | awk '{ split($4, a, "/"); print a[1] }'
+}
+
+on_nic() {
+	nic_ips | grep -qx "$1"
+}
+
+on_other_nic() {
+	ip -4 -o addr show 2>/dev/null | awk -v n="$NIC" -v a="$1" '$2 != n { split($4, p, "/"); if (p[1] == a) { found = 1 } } END { exit found ? 0 : 1 }'
+}
+
+route_now() {
+	ip -4 route show default 2>/dev/null | head -n 1
+}
+
+owned_kind() {
+	[ -f "$OWNED_FILE" ] || return 0
+	awk -v a="$1" '$1 == a { print $2; exit }' "$OWNED_FILE"
+}
+
+in_list() {
+	for il_item in $2; do
+		[ "$il_item" = "$1" ] && return 0
+	done
+	return 1
+}
+
+# The main address and the default route must be as they were. Puts them back when not, and says so.
+main_check() {
+	lost=
+	if ! on_nic "$MAIN"; then
+		ip addr add "$MAIN_CIDR" dev "$NIC" 2>/dev/null
+		lost="the main address $MAIN was gone after $1 and was put back"
+	fi
+	if [ "$(route_now)" != "$DEF_ROUTE" ] && [ -n "$DEF_ROUTE" ]; then
+		# shellcheck disable=SC2086
+		ip route replace $DEF_ROUTE 2>/dev/null
+		lost="${lost:+$lost; }the default route changed after $1 and was put back"
+	fi
+	if [ -n "$lost" ]; then
+		err "$lost"
+		return 1
+	fi
+	return 0
+}
+
+# ---- 1. what is wanted ------------------------------------------------------------------------------------------------
+
+[ -r "$WANT_FILE" ] || die "the wanted list $WANT_FILE is missing"
+grep -q '"extras"' "$WANT_FILE" || die "the wanted list has no extras key"
+
+RUN=$(sed -n 's/.*"run" *: *"\([A-Za-z0-9_-]*\)".*/\1/p' "$WANT_FILE" | head -n 1)
+MAIN=$(sed -n 's/.*"main" *: *"\([0-9.]*\)".*/\1/p' "$WANT_FILE" | head -n 1)
+LIST=$(sed -n 's/.*"extras" *: *\[\([^]]*\)\].*/\1/p' "$WANT_FILE" | grep -Eo '[0-9]{1,3}(\.[0-9]{1,3}){3}')
+
+for item in $LIST; do
+	if ! valid_ip "$item"; then
+		err "$item is not an IPv4 address"
+	elif [ "$item" = "$MAIN" ]; then
+		err "$item is the main address and is not an extra"
+	elif ! in_list "$item" "$WANTED"; then
+		WANTED="$WANTED${WANTED:+ }$item"
+	fi
+done
+
+# ---- 2. the card of the main address ----------------------------------------------------------------------------------
+
+if [ -n "$MAIN" ]; then
+	NIC=$(ip -4 -o addr show 2>/dev/null | awk -v m="$MAIN" '{ split($4, a, "/"); if (a[1] == m) { print $2; exit } }')
+	[ -n "$NIC" ] || die "the main address $MAIN is not on any network interface"
+else
+	NIC=$(ip -4 route show default 2>/dev/null | awk '/^default/ { for (i = 1; i <= NF; i++) if ($i == "dev") { print $(i + 1); exit } }')
+	[ -n "$NIC" ] || die "no main address was given and there is no default route"
+	MAIN=$(nic_ips | head -n 1)
+	[ -n "$MAIN" ] || die "the interface $NIC has no IPv4 address"
+fi
+
+MAIN_CIDR=$(ip -4 -o addr show dev "$NIC" 2>/dev/null | awk -v m="$MAIN" '{ split($4, a, "/"); if (a[1] == m) { print $4; exit } }')
+DEF_ROUTE=$(route_now)
+MAC=$(ip -o link show "$NIC" 2>/dev/null | awk '{ for (i = 1; i < NF; i++) if ($i == "link/ether") { print tolower($(i + 1)); exit } }')
+
+# ---- 3. the network stack, from the guest itself ----------------------------------------------------------------------
+
+nm_conn() {
+	command -v nmcli >/dev/null 2>&1 || return 0
+	c=$(nmcli -g GENERAL.CONNECTION device show "$NIC" 2>/dev/null | head -n 1)
+	[ "$c" = "--" ] && c=
+	printf '%s' "$c"
+}
+
+if command -v netplan >/dev/null 2>&1 && ls "$ETC"/netplan/*.yaml >/dev/null 2>&1; then
+	STACK=netplan
+elif [ -n "$(nm_conn)" ]; then
+	STACK=networkmanager
+	PROFILE=$(nm_conn)
+elif [ -f "$ETC/network/interfaces" ]; then
+	STACK=ifupdown
+fi
+
+# ---- 4. live: only addresses this script adds, only addresses it added are removed ------------------------------------
+
+OWNED_BEFORE=
+if [ -f "$OWNED_FILE" ]; then
+	OWNED_BEFORE=$(awk '{ print $1 }' "$OWNED_FILE")
+fi
+
+for item in $WANTED; do
+	if on_nic "$item"; then
+		kind=$(owned_kind "$item")
+		if [ -z "$kind" ]; then
+			kind=adopted
+			ADOPTED="$ADOPTED${ADOPTED:+ }$item"
+		fi
+		NEW_OWNED="$NEW_OWNED$item $kind
+"
+		KEEP="$KEEP${KEEP:+ }$item"
+	elif on_other_nic "$item"; then
+		err "$item is already on another network interface and was left alone"
+	elif ip addr add "$item/32" dev "$NIC" 2>/dev/null; then
+		ADDED="$ADDED${ADDED:+ }$item"
+		NEW_OWNED="$NEW_OWNED$item added
+"
+		KEEP="$KEEP${KEEP:+ }$item"
+	else
+		err "ip addr add $item/32 dev $NIC failed"
+		KEEP="$KEEP${KEEP:+ }$item"
+	fi
+done
+
+for item in $OWNED_BEFORE; do
+	in_list "$item" "$WANTED" && continue
+	kind=$(owned_kind "$item")
+	if [ "$kind" = added ] && on_nic "$item"; then
+		if ip addr del "$item/32" dev "$NIC" 2>/dev/null; then
+			REMOVED="$REMOVED${REMOVED:+ }$item"
+		else
+			err "ip addr del $item/32 dev $NIC failed"
+			NEW_OWNED="$NEW_OWNED$item added
+"
+		fi
+	else
+		# Not added by this script: left in place, no longer ours.
+		REMOVED="$REMOVED${REMOVED:+ }$item"
+	fi
+done
+
+main_check "the live change" || finish
+
+# ---- 5. persistent: survives a reboot and leaves the main address alone -----------------------------------------------
+
+# The id of the ethernet definition of the card in netplan (the merged view, else the files).
+netplan_id() {
+	{
+		netplan get 2>/dev/null || cat "$ETC"/netplan/*.yaml 2>/dev/null
+	} | awk -v nic="$NIC" -v mac="$MAC" '
+		/^[ \t]*#/ { next }
+		/^[ \t]*$/ { next }
+		{
+			line = $0
+			match(line, /^ */)
+			ind = RLENGTH
+			sub(/^ +/, "", line)
+			if (line ~ /^ethernets:/) { in_eth = 1; eth_ind = ind; id_ind = -1; next }
+			if (in_eth && ind <= eth_ind) { in_eth = 0 }
+			if (!in_eth) { next }
+			if (id_ind < 0) { id_ind = ind }
+			if (ind == id_ind) {
+				cur = line
+				sub(/:.*/, "", cur)
+				gsub(/["\047]/, "", cur)
+				if (cur == nic && byname == "") { byname = cur }
+				next
+			}
+			val = tolower(line)
+			gsub(/["\047 ]/, "", val)
+			if (mac != "" && val == "macaddress:" mac) { hit = cur }
+			if (val == "set-name:" nic) { hit = cur }
+		}
+		END { if (hit != "") { print hit } else if (byname != "") { print byname } }
+	'
+}
+
+persist_netplan() {
+	id=$(netplan_id)
+	if [ -z "$id" ]; then
+		err "netplan has no ethernet definition for $NIC; the addresses are live only"
+		return
+	fi
+	prev=
+	if [ -f "$NETPLAN_FILE" ]; then
+		prev=$(mktemp "$STATE/netplan.prev.XXXXXX") || prev=
+		[ -n "$prev" ] && cp -p "$NETPLAN_FILE" "$prev"
+	fi
+	{
+		printf '# Managed by Beltoft Services: extra IPv4 addresses. Changes are overwritten.\n'
+		printf 'network:\n  version: 2\n'
+		if [ -n "$KEEP" ]; then
+			printf '  ethernets:\n    %s:\n      addresses:\n' "$id"
+			for item in $KEEP; do
+				printf '        - %s/32\n' "$item"
+			done
+		fi
+	} >"$NETPLAN_FILE"
+	chmod 600 "$NETPLAN_FILE"
+	if netplan generate >/dev/null 2>&1; then
+		PERSISTED=true
+	else
+		err "netplan generate refused the drop-in; it was removed again and the addresses are live only"
+		if [ -n "$prev" ] && [ -s "$prev" ]; then
+			cp -p "$prev" "$NETPLAN_FILE"
+		else
+			rm -f "$NETPLAN_FILE"
+		fi
+	fi
+	[ -n "$prev" ] && rm -f "$prev"
+}
+
+nm_addrs() {
+	nmcli -g ipv4.addresses connection show "$1" 2>/dev/null | grep -Eo '[0-9]{1,3}(\.[0-9]{1,3}){3}/[0-9]+'
+}
+
+persist_nm() {
+	conn=$(nm_conn)
+	PROFILE=$conn
+	if [ -z "$conn" ]; then
+		err "NetworkManager has no active profile for $NIC; the addresses are live only"
+		return
+	fi
+	before=$(nm_addrs "$conn")
+	for item in $KEEP; do
+		if ! printf '%s\n' "$before" | grep -qx "$item/32"; then
+			nmcli connection modify "$conn" +ipv4.addresses "$item/32" >/dev/null 2>&1 || err "nmcli could not add $item/32 to the profile $conn"
+		fi
+	done
+	for item in $REMOVED; do
+		if [ "$(owned_kind "$item")" = added ] && printf '%s\n' "$before" | grep -qx "$item/32"; then
+			nmcli connection modify "$conn" -ipv4.addresses "$item/32" >/dev/null 2>&1 || err "nmcli could not remove $item/32 from the profile $conn"
+		fi
+	done
+	after=$(nm_addrs "$conn")
+	for item in $before; do
+		base=${item%/32}
+		if [ "$base/32" = "$item" ] && in_list "$base" "$REMOVED" && [ "$(owned_kind "$base")" = added ]; then
+			continue
+		fi
+		if ! printf '%s\n' "$after" | grep -qx "$item"; then
+			joined=$(printf '%s\n' "$before" | tr '\n' ',' | sed 's/,$//')
+			nmcli connection modify "$conn" ipv4.addresses "$joined" >/dev/null 2>&1
+			err "the profile $conn lost $item; its addresses were put back and the addresses are live only"
+			return
+		fi
+	done
+	PERSISTED=true
+}
+
+persist_ifupdown() {
+	if ! grep -Eq '^[[:space:]]*source(-directory)?[[:space:]]+[^#]*interfaces\.d' "$ETC/network/interfaces" 2>/dev/null; then
+		err "/etc/network/interfaces does not include interfaces.d; the addresses are live only"
+		return
+	fi
+	mkdir -p "$ETC/network/interfaces.d" 2>/dev/null
+	{
+		printf '# Managed by Beltoft Services: extra IPv4 addresses. Changes are overwritten.\n'
+		n=0
+		for item in $KEEP; do
+			n=$((n + 1))
+			printf 'auto %s:%s\niface %s:%s inet manual\n    up ip addr add %s/32 dev %s\n    down ip addr del %s/32 dev %s\n' "$NIC" "$n" "$NIC" "$n" "$item" "$NIC" "$item" "$NIC"
+		done
+	} >"$IFUP_FILE" && PERSISTED=true
+}
+
+# Nothing wanted and nothing owned before: nothing to write.
+if [ -n "$KEEP" ] || [ -n "$OWNED_BEFORE" ]; then
+	case "$STACK" in
+	netplan) persist_netplan ;;
+	networkmanager) persist_nm ;;
+	ifupdown) persist_ifupdown ;;
+	*) err "no known network stack was found; the addresses are live only" ;;
+	esac
+else
+	PERSISTED=true
+fi
+
+main_check "the persistent change" || finish
+
+printf '%s' "$NEW_OWNED" >"$OWNED_FILE"
+
+finish

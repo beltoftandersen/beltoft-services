@@ -1,0 +1,34 @@
+#!/bin/sh
+# Test stub of nmcli(1): one active profile named in $STUB_DIR/nm_conn, its addresses in $STUB_DIR/nm_addrs (one per line).
+D=${STUB_DIR:?}
+echo "nmcli $*" >>"$D/nmcli.log"
+case "$1 $2 $3 $4" in
+"-g GENERAL.CONNECTION device show")
+	cat "$D/nm_conn"
+	exit 0
+	;;
+"-g ipv4.addresses connection show")
+	tr '\n' ',' <"$D/nm_addrs" | sed 's/,$//; s/,/, /g'
+	echo
+	exit 0
+	;;
+esac
+if [ "$1 $2" = "connection modify" ]; then
+	case "$4" in
+	+ipv4.addresses)
+		[ -n "$STUB_NM_FAIL" ] && exit 1
+		echo "$5" >>"$D/nm_addrs"
+		exit 0
+		;;
+	-ipv4.addresses)
+		grep -vx "$5" "$D/nm_addrs" >"$D/nm_addrs.tmp"
+		mv "$D/nm_addrs.tmp" "$D/nm_addrs"
+		exit 0
+		;;
+	ipv4.addresses)
+		echo "$5" | tr ',' '\n' >"$D/nm_addrs"
+		exit 0
+		;;
+	esac
+fi
+exit 1

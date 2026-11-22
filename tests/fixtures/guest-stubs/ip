@@ -1,0 +1,55 @@
+#!/bin/sh
+# Test stub of ip(8): addresses in $STUB_DIR/addrs ("<nic> <cidr>"), default route in $STUB_DIR/route, MAC in $STUB_DIR/mac.
+# STUB_ADD_FAIL=1 makes "addr add" fail; STUB_DROP_MAIN=<cidr> makes the first "addr add" also drop that address (a dangerous change).
+D=${STUB_DIR:?}
+echo "ip $*" >>"$D/ip.log"
+case "$1 $2 $3 $4" in
+"-4 -o addr show")
+	nic=
+	[ "$5" = dev ] && nic=$6
+	n=0
+	while read -r dev cidr; do
+		n=$((n + 1))
+		[ -z "$nic" ] || [ "$dev" = "$nic" ] || continue
+		printf '%s: %s    inet %s scope global %s\\       valid_lft forever preferred_lft forever\n' "$n" "$dev" "$cidr" "$dev"
+	done <"$D/addrs"
+	exit 0
+	;;
+"-4 route show default")
+	[ -f "$D/route" ] && cat "$D/route"
+	exit 0
+	;;
+"-o link show "*)
+	printf '2: %s: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP mode DEFAULT group default qlen 1000\\    link/ether %s brd ff:ff:ff:ff:ff:ff\n' "$5" "$(cat "$D/mac")"
+	exit 0
+	;;
+esac
+case "$1 $2" in
+"addr add")
+	[ -n "$STUB_ADD_FAIL" ] && exit 2
+	echo "$5 $3" >>"$D/addrs"
+	if [ -n "$STUB_DROP_MAIN" ] && [ ! -f "$D/dropped" ]; then
+		: >"$D/addrs.tmp"
+		while read -r dev cidr; do
+			[ "$cidr" = "$STUB_DROP_MAIN" ] || echo "$dev $cidr" >>"$D/addrs.tmp"
+		done <"$D/addrs"
+		mv "$D/addrs.tmp" "$D/addrs"
+		echo 1 >"$D/dropped"
+	fi
+	exit 0
+	;;
+"addr del")
+	: >"$D/addrs.tmp"
+	while read -r dev cidr; do
+		[ "$dev $cidr" = "$5 $3" ] || echo "$dev $cidr" >>"$D/addrs.tmp"
+	done <"$D/addrs"
+	mv "$D/addrs.tmp" "$D/addrs"
+	exit 0
+	;;
+"route replace")
+	shift 2
+	echo "$*" >"$D/route"
+	exit 0
+	;;
+esac
+exit 1

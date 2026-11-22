@@ -48,6 +48,9 @@ final class Reinstall {
 			'task'              => null,
 			'agent'             => null,
 			'configured'        => array(),
+			// What was set up inside the old guest is gone with it: the build's extra_ips step does it again.
+			'ipv4_guest'        => null,
+			'ipv4_guest_until'  => null,
 			// A new password: the old one is gone, and the build stores a fresh one before sending it.
 			Access::META_REVEAL => '',
 			Access::META_UNTIL  => 0,

@@ -21,6 +21,45 @@ final class Ipv4Panels {
 	 */
 	public static function register(): void {
 		add_filter( 'beltoft_services_server_ipv4', array( __CLASS__, 'for_server' ), 10, 2 );
+		add_action( 'beltoft_services_account_assets', array( __CLASS__, 'assets' ), 20, 2 );
+	}
+
+	public const HANDLE = 'beltoft-services-ipv4-guest';
+
+	/**
+	 * The words the script of the "Apply again" button prints.
+	 *
+	 * @return array<string, string>
+	 */
+	public static function strings(): array {
+		return array(
+			'working' => __( 'Working on it. This takes a minute.', 'beltoft-services' ),
+			'failed'  => __( 'This did not finish. We have been told and will look into it.', 'beltoft-services' ),
+			'error'   => __( 'Something went wrong. Please try again.', 'beltoft-services' ),
+		);
+	}
+
+	/**
+	 * Script of the "Apply again" button: only on the page of a server that has extra addresses.
+	 *
+	 * @param mixed $parent   Handle of the generic account script.
+	 * @param mixed $endpoint The endpoint being shown.
+	 */
+	public static function assets( $parent, $endpoint = null ): void {
+		if ( ! is_string( $parent ) || ( is_string( $endpoint ) && \BeltoftServices\Account\ServerLinks::slug() !== $endpoint ) ) {
+			return;
+		}
+
+		$asked   = \BeltoftServices\Account\ServerLinks::requested();
+		$license = $asked['id'] > 0 ? \BeltoftLicenses\Licenses::find( $asked['id'] ) : null;
+		$r       = is_array( $license ) && (int) ( $license['user_id'] ?? 0 ) === get_current_user_id() && get_current_user_id() > 0 ? Resource::for_license( (int) $license['id'] ) : null;
+
+		if ( ! $r || ! Ipv4Guest::wanted_at_build( $r ) ) {
+			return;
+		}
+
+		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/ipv4-guest.js', BELTOFT_SERVICES_FILE ), array( $parent, 'beltoft-services-status', \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/ipv4-guest.js' ), true );
+		wp_localize_script( self::HANDLE, 'beltoftServicesIpv4Guest', array( 'strings' => self::strings() ) );
 	}
 
 	/**
@@ -40,7 +79,8 @@ final class Ipv4Panels {
 	 *
 	 * Keys: `addresses` (role main or extra, address, state, ending date, remove link), `add_url`, `add_price`, `sold_out`,
 	 * `busy`, `first_restarts` (adding the first address of a server that has none restarts it), `setup` (for a server with
-	 * extra addresses: the lines for the guest's network settings, by tool), `can_add`.
+	 * extra addresses: the lines for the guest's network settings, by tool), `guest` (for a server with extra addresses: whether
+	 * they are set up in the server, from Ipv4Guest, and whether "Apply again" is offered; each extra row has `guest` too), `can_add`.
 	 *
 	 * @param Resource $parent Server or database.
 	 * @return array<string, mixed>|null
@@ -60,6 +100,7 @@ final class Ipv4Panels {
 
 		$rows   = array();
 		$extras = 0;
+		$guest  = Ipv4Guest::state( $parent );
 
 		foreach ( $entries as $entry ) {
 			$addon        = $entry['addon'];
@@ -76,6 +117,7 @@ final class Ipv4Panels {
 			$rows[] = array(
 				'address'    => $entry['address'],
 				'role'       => $entry['role'],
+				'guest'      => 'extra' === $entry['role'] && $entry['live'] && ! $db ? ( in_array( $entry['address'], $guest['applied'], true ) ? 'applied' : 'not_set_up' ) : '',
 				'live'       => $entry['live'],
 				'ending'     => $ending ? self::end_date( $subscription ) : '',
 				'remove_url' => $entry['live'] && ! $ending && ! $locked && '' === Ipv4Server::working( $parent ) ? (string) ( $actions['cancel']['url'] ?? '' ) : '',
@@ -93,6 +135,7 @@ final class Ipv4Panels {
 				array(
 					'address'    => $own,
 					'role'       => 'main',
+					'guest'      => '',
 					'live'       => true,
 					'ending'     => '',
 					'remove_url' => '',
@@ -120,6 +163,14 @@ final class Ipv4Panels {
 			'sold_out'       => null !== $product && '' === $add_url && Ipv4Cart::room( $parent ) && ! Ipv4Cart::in_stock(),
 			'first_restarts' => ! Ipv4Meta::has_main( $parent ),
 			'setup'          => $extras > 0 && ! $db ? self::setup_lines( $parent ) : array(),
+			'guest'          => $extras > 0 && ! $db ? array(
+				'resource_id' => $parent->id(),
+				'state'       => $guest['state'],
+				'persisted'   => $guest['persisted'],
+				'nic'         => $guest['nic'],
+				'can_apply'   => array() !== Ipv4Guest::offered( $parent ) && '' === Ipv4Server::working( $parent ),
+				'busy'        => Ipv4Server::GUEST === Ipv4Server::working( $parent ),
+			) : array(),
 		);
 	}
 
@@ -153,6 +204,9 @@ final class Ipv4Panels {
 		$main    = (string) $server->get( 'ip' );
 		$prefix  = null === $cluster ? 32 : (int) $cluster['prefix'];
 
+		$state   = Ipv4Guest::state( $server );
+		$nic     = '' !== $state['nic'] ? $state['nic'] : 'eth0';
+		$profile = '' !== $state['profile'] ? str_replace( '"', '', $state['profile'] ) : 'Wired connection 1';
 		$netplan = "addresses:\n";
 		$nm      = array();
 		$ifup    = array();
@@ -163,14 +217,14 @@ final class Ipv4Panels {
 
 		foreach ( $extras as $i => $address ) {
 			$netplan .= '  - ' . $address . "/32\n";
-			$nm[]     = 'nmcli connection modify "Wired connection 1" +ipv4.addresses ' . $address . '/32';
-			$ifup[]   = 'up ip addr add ' . $address . '/32 dev eth0 label eth0:' . ( $i + 1 );
+			$nm[]     = 'nmcli connection modify "' . $profile . '" +ipv4.addresses ' . $address . '/32';
+			$ifup[]   = 'up ip addr add ' . $address . '/32 dev ' . $nic . ' label ' . $nic . ':' . ( $i + 1 );
 		}
 
 		return array(
 			'netplan'        => rtrim( $netplan ),
 			'ifupdown'       => implode( "\n", $ifup ),
-			'networkmanager' => implode( "\n", $nm ) . "\nnmcli connection up \"Wired connection 1\"",
+			'networkmanager' => implode( "\n", $nm ) . "\nnmcli connection up \"" . $profile . '"',
 		);
 	}
 

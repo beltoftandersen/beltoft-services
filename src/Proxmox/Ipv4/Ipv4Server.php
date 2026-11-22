@@ -36,8 +36,10 @@ defined( 'ABSPATH' ) || exit;
  * - `ipv4_main_remove`: the same the other way. config (ipconfig0 keeps the IPv6 part only), meta (`ip` cleared), firewall,
  *   restart, then the address goes back to the pool: only after the server stopped using it.
  * - `ipv4_sync`: an extra address came or went. No restart: the ipfilter set is made to hold the extra addresses that are
- *   in use, and the pool rows of new extra addresses become "assigned". The customer puts the address in the guest's own
- *   network settings.
+ *   in use, the guest is told about them (phase guest: Ipv4Guest sets them up through the guest agent; never a failure), and
+ *   the pool rows of new extra addresses become "assigned". Where the guest could not be set up the customer puts the
+ *   address in the guest's own network settings (the page shows the lines).
+ * - `ipv4_guest`: the customer's "Apply again": only the guest phase.
  */
 final class Ipv4Server {
 
@@ -49,7 +51,8 @@ final class Ipv4Server {
 	public const MAIN_ADD    = 'ipv4_main_add';
 	public const MAIN_REMOVE = 'ipv4_main_remove';
 	public const SYNC        = 'ipv4_sync';
-	public const ACTIONS     = array( self::MAIN_ADD, self::MAIN_REMOVE, self::SYNC );
+	public const GUEST       = 'ipv4_guest';
+	public const ACTIONS     = array( self::MAIN_ADD, self::MAIN_REMOVE, self::SYNC, self::GUEST );
 
 	/** Meta: the operation in progress (action, phase, restart flags). */
 	public const OP = 'ipv4_op';
@@ -100,7 +103,7 @@ final class Ipv4Server {
 		}
 
 		if ( ( $op['action'] ?? '' ) !== $action ) {
-			$op = array( 'action' => $action, 'phase' => self::SYNC === $action ? 'firewall' : 'config', 'started' => microtime( true ) );
+			$op = array( 'action' => $action, 'phase' => self::SYNC === $action ? 'firewall' : ( self::GUEST === $action ? 'guest' : 'config' ), 'started' => microtime( true ) );
 
 			if ( ! $this->r->set( array( self::OP => $op ) ) ) {
 				return StepResult::retry( 0, 'ipv4: progress could not be stored' );
@@ -110,7 +113,8 @@ final class Ipv4Server {
 		$orders = array(
 			self::MAIN_ADD    => array( 'config', 'meta', 'firewall', 'restart' ),
 			self::MAIN_REMOVE => array( 'config', 'meta', 'firewall', 'restart', 'release' ),
-			self::SYNC        => array( 'firewall', 'assign' ),
+			self::SYNC        => array( 'firewall', 'guest', 'assign' ),
+			self::GUEST       => array( 'guest' ),
 		);
 		$order  = $orders[ $action ];
 		$at     = array_search( (string) $op['phase'], $order, true );
@@ -133,7 +137,12 @@ final class Ipv4Server {
 		}
 
 		// `ipv4_synced` is the start time (with microseconds, so a run in the same second as a request is told apart) of the last run that ended: an add-on that asked for a run waits for one that started after its request.
-		$end = array( self::OP => null, self::SYNCED => (float) ( $this->op()['started'] ?? microtime( true ) ) );
+		$end = array( self::OP => null );
+
+		// The customer's "Apply again" is not a sync: an add-on waiting for its own sync must not take its end for the answer.
+		if ( self::GUEST !== $action ) {
+			$end[ self::SYNCED ] = (float) ( $this->op()['started'] ?? microtime( true ) );
+		}
 
 		// A database's guest must follow the new addresses (DbDriver::server_change_then_sync runs the sync): marked in the same write
 		// that ends the operation, so a job that stops in between does not run the server's step (and its restart) a second time.
@@ -147,7 +156,14 @@ final class Ipv4Server {
 			Jobs::queue_act( $this->r->id(), self::SYNC );
 		}
 
-		return StepResult::done( array(), self::MAIN_ADD === $action ? 'IPv4 address added to the server' : ( self::MAIN_REMOVE === $action ? 'IPv4 address removed from the server' : 'Extra IPv4 addresses synced' ) );
+		$words = array(
+			self::MAIN_ADD    => 'IPv4 address added to the server',
+			self::MAIN_REMOVE => 'IPv4 address removed from the server',
+			self::SYNC        => 'Extra IPv4 addresses synced',
+			self::GUEST       => 'Extra IPv4 addresses applied in the server',
+		);
+
+		return StepResult::done( array(), $words[ $action ] );
 	}
 
 	/**
@@ -310,6 +326,34 @@ final class Ipv4Server {
 		$done     = FirewallRules::managed( $fresh ) && true !== $fresh->get( Firewall::LOCKED ) ? $firewall->ensure( $record, $v ) : $firewall->ensure_ipfilter( $record, $v );
 
 		return $done instanceof StepResult ? $done : null;
+	}
+
+	/**
+	 * Phase guest (sync, apply again): the extra addresses are set up in the guest, or taken away from it. Never a failure: a guest
+	 * that cannot be reached is recorded (Ipv4Guest::META) and the customer gets the lines for it. A database has no extra address.
+	 *
+	 * @param array<string, mixed> $record VM record.
+	 * @param bool                 $add    Unused.
+	 * @return StepResult|null
+	 */
+	private function phase_guest( array $record, bool $add ) {
+		unset( $add );
+
+		$fresh = Resource::find( $this->r->id() ) ?? $this->r;
+
+		if ( Ipv4Meta::is_db( $fresh ) ) {
+			return null;
+		}
+
+		$v = $this->verified( $record, 'ipv4' );
+
+		if ( $v instanceof StepResult ) {
+			return $v;
+		}
+
+		( new Ipv4Guest( $fresh, $this->client ) )->apply( $record, $v );
+
+		return null;
 	}
 
 	/**

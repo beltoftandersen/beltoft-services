@@ -540,6 +540,16 @@ class FakeClient extends FakePve {
 			),
 			array( 'GET', $node . '/agent/file-read$#', 'h_agent_file_read', array( 'file' => array( 'string', true ) ) ),
 			array(
+				'POST',
+				$node . '/agent/exec$#',
+				'h_agent_exec',
+				array(
+					'command' => array( 'list', true ),
+					'timeout' => array( 'int', false, array( 'min' => 0 ) ),
+				),
+			),
+			array( 'GET', $node . '/agent/exec-status$#', 'h_agent_exec_status', array( 'pid' => array( 'int', true, array( 'min' => 1 ) ) ) ),
+			array(
 				'GET',
 				$node . '/rrddata$#',
 				'h_rrd',
@@ -650,12 +660,22 @@ class FakeClient extends FakePve {
 				return $this->error( 400, 'Parameter verification failed: ' . $name . ': property is not defined in schema and the schema does not allow additional properties' );
 			}
 
+			$type = $schema[ $name ][0];
+			$opts = $schema[ $name ][2] ?? array();
+
+			// A list of strings (agent exec `command`): sent as repeated keys by the live client.
+			if ( 'list' === $type ) {
+				if ( ! is_array( $value ) || array() === $value || array_filter( $value, static fn( $item ) => ! is_string( $item ) || '' === $item ) ) {
+					return $this->error( 400, 'Parameter verification failed: ' . $name . ': type check failed' );
+				}
+
+				$out[ $name ] = array_values( $value );
+				continue;
+			}
+
 			if ( ! is_scalar( $value ) ) {
 				return $this->error( 400, 'Parameter verification failed: ' . $name . ': type check failed' );
 			}
-
-			$type = $schema[ $name ][0];
-			$opts = $schema[ $name ][2] ?? array();
 
 			switch ( $type ) {
 				case 'int':
@@ -1884,6 +1904,10 @@ class FakeClient extends FakePve {
 			return $vm;
 		}
 
+		if ( ! empty( $vm['agent_down'] ) ) {
+			return $this->error( 500, 'QEMU guest agent is not running' );
+		}
+
 		return 'running' === $vm['status'] ? array( 'result' => null ) : $this->error( 500, 'VM ' . $a[1] . ' is not running' );
 	}
 
@@ -1916,6 +1940,9 @@ class FakeClient extends FakePve {
 		if ( 'running' !== $vm['status'] ) {
 			return $this->error( 500, 'VM ' . $a[1] . ' is not running' );
 		}
+		if ( ! empty( $vm['agent_down'] ) ) {
+			return $this->error( 500, 'QEMU guest agent is not running' );
+		}
 		if ( Apps::JOB === $p['file'] && 'missing' === ( $vm['app_directory'] ?? '' ) ) {
 			return $this->error( 500, 'No such directory' );
 		}
@@ -1946,6 +1973,144 @@ class FakeClient extends FakePve {
 		}
 		$truncated = strlen( $file ) > 65536;
 		return array( 'content' => $truncated ? substr( $file, 0, 65536 ) : $file, 'truncated' => $truncated );
+	}
+
+	/**
+	 * How the guest answers agent/exec (the extra IPv4 apply script): `ok` (default: the wanted list is applied and a status file
+	 * written, on a card `nic` with the `stack`), `blocked` (the agent refuses exec), `error` (exit 1, no status file), `no_status`
+	 * (exit 0, no status file), `other_run` (a status of another run), `hang` (never ends), `partial` (nothing applied, an error
+	 * reported), `unpersisted` (applied live only, an error reported), `main_lost` (an error: the main address was lost and put back).
+	 *
+	 * @param int                  $vmid VMID.
+	 * @param string               $mode Mode.
+	 * @param array<string, mixed> $opts stack, nic, profile.
+	 */
+	public function set_guest_exec( int $vmid, string $mode, array $opts = array() ): void {
+		$this->load();
+		if ( isset( $this->state['vms'][ $vmid ] ) ) {
+			$this->state['vms'][ $vmid ]['exec_mode'] = array_merge( array( 'mode' => $mode, 'stack' => 'netplan', 'nic' => 'ens18', 'profile' => '' ), $opts, array( 'mode' => $mode ) );
+			$this->save();
+		}
+	}
+
+	/**
+	 * Switches the guest agent of a running VM off or on (file-write, file-read and exec then answer "agent is not running").
+	 *
+	 * @param int  $vmid VMID.
+	 * @param bool $down True for a guest whose agent does not answer.
+	 */
+	public function set_guest_agent_down( int $vmid, bool $down ): void {
+		$this->load();
+		if ( isset( $this->state['vms'][ $vmid ] ) ) {
+			$this->state['vms'][ $vmid ]['agent_down'] = $down;
+			$this->save();
+		}
+	}
+
+	/**
+	 * The commands the guest was asked to run, in order.
+	 *
+	 * @param int $vmid VMID.
+	 * @return array<int, string[]>
+	 */
+	public function guest_execs( int $vmid ): array {
+		$this->load();
+
+		return (array) ( $this->state['vms'][ $vmid ]['exec_log'] ?? array() );
+	}
+
+	/**
+	 * POST agent/exec: only the extra IPv4 apply script is modelled (see set_guest_exec()). Answers a pid; the result is kept for
+	 * exec-status.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_agent_exec( array $a, array $p ) {
+		$vm = $this->find( $a );
+
+		if ( is_wp_error( $vm ) ) {
+			return $vm;
+		}
+
+		if ( 'running' !== $vm['status'] ) {
+			return $this->error( 500, 'VM ' . $a[1] . ' is not running' );
+		}
+
+		if ( ! empty( $vm['agent_down'] ) ) {
+			return $this->error( 500, 'QEMU guest agent is not running' );
+		}
+
+		$model = (array) ( $vm['exec_mode'] ?? array( 'mode' => 'ok', 'stack' => 'netplan', 'nic' => 'ens18', 'profile' => '' ) );
+		$vmid  = (int) $a[1];
+
+		if ( 'blocked' === $model['mode'] ) {
+			return $this->error( 500, 'Call to guest-exec is not allowed on this guest' );
+		}
+
+		$pid  = 1000 + count( (array) ( $vm['exec_log'] ?? array() ) );
+		$out  = array( 'exited' => 1, 'exitcode' => 0, 'out-data' => '', 'err-data' => '' );
+		$want = json_decode( (string) ( $vm['guest_files'][ \BeltoftServices\Proxmox\Ipv4\Ipv4Guest::WANT ] ?? '' ), true );
+		$want = is_array( $want ) ? $want : array( 'run' => '', 'extras' => array() );
+		$list = array_values( array_filter( (array) ( $want['extras'] ?? array() ), 'is_string' ) );
+
+		$this->state['vms'][ $vmid ]['exec_log'][] = (array) $p['command'];
+
+		if ( 'hang' === $model['mode'] ) {
+			$out['exited'] = 0;
+		} elseif ( 'error' === $model['mode'] ) {
+			$out['exitcode'] = 1;
+			$out['err-data'] = 'boom';
+		} elseif ( 'no_status' !== $model['mode'] ) {
+			$errors    = array(
+				'partial'     => 'ip addr add failed',
+				'unpersisted' => 'netplan generate refused the drop-in; it was removed again and the addresses are live only',
+				'main_lost'   => 'the main address ' . (string) ( $want['main'] ?? '' ) . ' was gone after the live change and was put back',
+			);
+			$applied   = in_array( $model['mode'], array( 'partial', 'main_lost' ), true ) ? array() : $list;
+			$status    = array(
+				'v'         => 1,
+				'run'       => 'other_run' === $model['mode'] ? 'someone-else' : (string) ( $want['run'] ?? '' ),
+				'at'        => time(),
+				'ok'        => ! isset( $errors[ $model['mode'] ] ),
+				'stack'     => (string) $model['stack'],
+				'nic'       => (string) $model['nic'],
+				'main'      => (string) ( $want['main'] ?? '' ),
+				'profile'   => (string) $model['profile'],
+				'persisted' => 'ok' === $model['mode'] || 'other_run' === $model['mode'],
+				'wanted'    => $list,
+				'applied'   => $applied,
+				'added'     => $applied,
+				'removed'   => array(),
+				'adopted'   => array(),
+				'errors'    => isset( $errors[ $model['mode'] ] ) ? array( $errors[ $model['mode'] ] ) : array(),
+			);
+
+			$this->state['vms'][ $vmid ]['guest_files'][ \BeltoftServices\Proxmox\Ipv4\Ipv4Guest::STATUS ] = wp_json_encode( $status );
+			$this->state['vms'][ $vmid ]['guest_extra_ips']                                                = $applied;
+		}
+
+		$this->state['vms'][ $vmid ]['exec_results'][ $pid ] = $out;
+
+		return array( 'pid' => $pid );
+	}
+
+	/**
+	 * GET agent/exec-status.
+	 *
+	 * @param array<int, string>   $a Captures.
+	 * @param array<string, mixed> $p Parameters.
+	 */
+	private function h_agent_exec_status( array $a, array $p ) {
+		$vm = $this->find( $a );
+
+		if ( is_wp_error( $vm ) ) {
+			return $vm;
+		}
+
+		$result = $vm['exec_results'][ (int) $p['pid'] ] ?? null;
+
+		return is_array( $result ) ? $result : $this->error( 500, 'no such pid' );
 	}
 
 	/** Simulate only the guest-produced files; no install script runs in tests. */
