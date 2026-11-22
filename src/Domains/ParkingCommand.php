@@ -5,9 +5,8 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Cli;
+namespace BeltoftServices\Domains;
 
-use BeltoftServices\Domains\Parking;
 use BeltoftServices\Hosting\ParkedEdge;
 
 defined( 'ABSPATH' ) || exit;
@@ -88,5 +87,14 @@ final class ParkingCommand {
 
 		\WP_CLI\Utils\format_items( (string) ( $assoc_args['format'] ?? 'table' ), $rows, array( 'node', 'result' ) );
 		\WP_CLI::log( count( $names ) . ' names sent to ' . count( $rows ) . ' node(s).' );
+	}
+
+	/**
+	 * Registers the command when WP-CLI is running.
+	 */
+	public static function register(): void {
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			\WP_CLI::add_command( 'beltoft-services parking', self::class );
+		}
 	}
 }

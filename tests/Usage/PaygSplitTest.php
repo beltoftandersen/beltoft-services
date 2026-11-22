@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Tests\Usage;
 
-use BeltoftServices\Cli\PaygSplit;
+use BeltoftServices\Usage\PaygSplit;
 use BeltoftServices\Currency;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;

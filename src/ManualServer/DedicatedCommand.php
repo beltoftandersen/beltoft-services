@@ -5,11 +5,8 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Cli;
+namespace BeltoftServices\ManualServer;
 
-use BeltoftServices\ManualServer\DedicatedClients;
-use BeltoftServices\ManualServer\ManualServerSettings;
-use BeltoftServices\ManualServer\LiveRobotClient;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -72,5 +69,14 @@ final class DedicatedCommand {
 		}
 
 		\WP_CLI::success( 'The supplier accepted the test order (nothing was ordered). Answer: ' . wp_json_encode( $answer ) );
+	}
+
+	/**
+	 * Registers the command when WP-CLI is running.
+	 */
+	public static function register(): void {
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			\WP_CLI::add_command( 'beltoft-services dedicated', self::class );
+		}
 	}
 }

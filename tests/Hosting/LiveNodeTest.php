@@ -10,7 +10,7 @@ namespace BeltoftServices\Tests\Hosting;
 
 require_once __DIR__ . '/HostingCase.php';
 
-use BeltoftServices\Cli\HostingCommand;
+use BeltoftServices\Hosting\HostingCommand;
 use BeltoftServices\Hosting\Clients;
 use BeltoftServices\Hosting\FakeNode;
 use BeltoftServices\Hosting\Nodes;
@@ -95,7 +95,7 @@ class LiveNodeTest extends HostingCase {
 		}
 
 		$this->assertStringContainsString( 'checks passed', \WP_CLI::text() );
-		$source = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'src/Cli/HostingCommand.php' );
+		$source = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'src/Hosting/HostingCommand.php' );
 		$this->assertStringContainsString( 'new ReadOnlyClient( Clients::for_node( $node ) )', $source, 'The check cannot be given a writing client by accident.' );
 	}
 }

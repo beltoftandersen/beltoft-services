@@ -5,13 +5,11 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Cli;
+namespace BeltoftServices\Ssl;
 
 use BeltoftServices\Product;
 use BeltoftServices\RenewalReminder;
 use BeltoftServices\Resource;
-use BeltoftServices\Ssl\SslCatalog;
-use BeltoftServices\Ssl\SslDriver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -531,6 +529,15 @@ final class SslCommand {
 		foreach ( array( 'state', 'ssl_name', 'remote_id', 'ssl_status', 'ssl_validation', 'ssl_key_mode', 'steps', 'ssl_serial', 'ssl_valid_from', 'ssl_valid_to', 'ssl_order_expires', 'ssl_reissue_pending', 'ssl_cancelled', 'last_error' ) as $key ) {
 			$value = $r->get( $key );
 			\WP_CLI::log( sprintf( '%-20s %s', $key, is_array( $value ) ? implode( ',', $value ) : (string) ( is_bool( $value ) ? ( $value ? 'yes' : 'no' ) : $value ) ) );
+		}
+	}
+
+	/**
+	 * Registers the command when WP-CLI is running.
+	 */
+	public static function register(): void {
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			\WP_CLI::add_command( 'beltoft-services ssl', self::class );
 		}
 	}
 }

@@ -314,17 +314,6 @@ final class Commands {
 	public static function register(): void {
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
 			\WP_CLI::add_command( 'beltoft-services', self::class );
-			\WP_CLI::add_command( 'beltoft-services dns-claims', DnsClaimsCommand::class );
-			\WP_CLI::add_command( 'beltoft-services private-net', PrivateNetCommand::class );
-			\WP_CLI::add_command( 'beltoft-services mail-products', MailProductsCommand::class );
-			\WP_CLI::add_command( 'beltoft-services plesk-product', PleskProductCommand::class );
-			\WP_CLI::add_command( 'beltoft-services ssl', SslCommand::class );
-			\WP_CLI::add_command( 'beltoft-services licence-product', LicenceProductCommand::class );
-			\WP_CLI::add_command( 'beltoft-services hosting', HostingCommand::class );
-			\WP_CLI::add_command( 'beltoft-services dedicated', DedicatedCommand::class );
-			\WP_CLI::add_command( 'beltoft-services parking', ParkingCommand::class );
-			\WP_CLI::add_command( 'beltoft-services payg', PaygCommand::class );
-			\WP_CLI::add_command( 'beltoft-services addons', AddonsCommand::class );
 		}
 	}
 

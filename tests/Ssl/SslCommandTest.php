@@ -2,7 +2,7 @@
 /** The SSL product command and the licence-to-resource hand-over. @package BeltoftServices */
 namespace BeltoftServices\Tests\Ssl;
 
-use BeltoftServices\Cli\SslCommand;
+use BeltoftServices\Ssl\SslCommand;
 use BeltoftServices\Product;
 use BeltoftServices\RenewalReminder;
 use BeltoftServices\Resource;

@@ -5,9 +5,8 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Cli;
+namespace BeltoftServices\Proxmox\Network;
 
-use BeltoftServices\Proxmox\Network\PrivateNets;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -87,5 +86,14 @@ final class PrivateNetCommand {
 		}
 
 		\WP_CLI\Utils\format_items( 'json' === ( $assoc_args['format'] ?? 'table' ) ? 'json' : 'table', $items, array( 'vlan', 'cidr', 'state', 'user', 'name', 'addresses' ) );
+	}
+
+	/**
+	 * Registers the command when WP-CLI is running.
+	 */
+	public static function register(): void {
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			\WP_CLI::add_command( 'beltoft-services private-net', self::class );
+		}
 	}
 }

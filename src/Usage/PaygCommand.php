@@ -5,12 +5,11 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Cli;
+namespace BeltoftServices\Usage;
 
 use BeltoftServices\Usage\Admin\PaygChecks;
 use BeltoftServices\Usage\Admin\PaygPreview;
 use BeltoftServices\Usage\Admin\PaygProduct;
-use BeltoftServices\Usage\Rates;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -138,5 +137,14 @@ final class PaygCommand {
 		}
 
 		return $product;
+	}
+
+	/**
+	 * Registers the command when WP-CLI is running.
+	 */
+	public static function register(): void {
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			\WP_CLI::add_command( 'beltoft-services payg', self::class );
+		}
 	}
 }

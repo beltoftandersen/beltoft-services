@@ -66,7 +66,7 @@ final class ReviewLow3l3AssetsTest extends TestCase {
 		$license  = $this->service_license( $product, array( 'fire' => false ) );
 		$resource = \BeltoftServices\Resource::create( $license, new \BeltoftServices\Ssl\SslDriver(), array(), array( 'ssl_name' => 'example.com', 'ssl_post_attempted' => time() ) );
 		$this->assertInstanceOf( \BeltoftServices\Resource::class, $resource );
-		$cmd = new \BeltoftServices\Cli\SslCommand();
+		$cmd = new \BeltoftServices\Ssl\SslCommand();
 
 		$message = $this->fails( fn() => $cmd->order_retry( array( (string) $resource->id() ), array() ) );
 		$this->assertStringContainsString( '--yes', $message );

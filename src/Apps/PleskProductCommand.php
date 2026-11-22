@@ -5,11 +5,9 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Cli;
+namespace BeltoftServices\Apps;
 
 use BeltoftServices\Product;
-use BeltoftServices\Apps\AppLicenceDriver;
-use BeltoftServices\Apps\PleskLicence;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -234,5 +232,14 @@ final class PleskProductCommand {
 		$id = self::create( $prices );
 
 		\WP_CLI::success( sprintf( 'Created draft product %1$d with %2$d tiers%3$s. Set the licence costs (Settings, Domains, Plesk licence costs) and publish it.', $id, count( self::tiers() ), array() === $prices ? ' and no prices' : ' and the given prices' ) );
+	}
+
+	/**
+	 * Registers the command when WP-CLI is running.
+	 */
+	public static function register(): void {
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			\WP_CLI::add_command( 'beltoft-services plesk-product', self::class );
+		}
 	}
 }

@@ -5,7 +5,7 @@ namespace BeltoftServices\Tests\Licences;
 
 use BeltoftServices\Account\Licences;
 use BeltoftServices\Account\ServiceArea;
-use BeltoftServices\Cli\LicenceProductCommand;
+use BeltoftServices\Licences\LicenceProductCommand;
 use BeltoftServices\Crypto;
 use BeltoftServices\Domains\FakeClient as Registrar;
 use BeltoftServices\Drivers\Registry;

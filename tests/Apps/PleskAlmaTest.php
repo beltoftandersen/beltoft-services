@@ -3,7 +3,7 @@
 
 namespace BeltoftServices\Tests\Apps;
 
-use BeltoftServices\Cli\PleskProductCommand;
+use BeltoftServices\Apps\PleskProductCommand;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Apps\AppField;
 use BeltoftServices\Apps\AppReinstall;

@@ -5,9 +5,8 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Cli;
+namespace BeltoftServices\Proxmox\Addon;
 
-use BeltoftServices\Proxmox\Addon\AddonEnd;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -62,5 +61,14 @@ final class AddonsCommand {
 		}
 
 		\WP_CLI::success( sprintf( '%d add-on licence(s) would be ended. Add --apply to do it.', count( $rows ) ) );
+	}
+
+	/**
+	 * Registers the command when WP-CLI is running.
+	 */
+	public static function register(): void {
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			\WP_CLI::add_command( 'beltoft-services addons', self::class );
+		}
 	}
 }

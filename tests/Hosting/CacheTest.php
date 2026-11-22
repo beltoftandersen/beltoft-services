@@ -12,7 +12,7 @@ require_once __DIR__ . '/HostingCase.php';
 require_once dirname( __DIR__ ) . '/Support/WpCliStub.php';
 
 use BeltoftServices\Api\Routes;
-use BeltoftServices\Cli\HostingCommand;
+use BeltoftServices\Hosting\HostingCommand;
 use BeltoftServices\Hosting\CacheSetup;
 use BeltoftServices\Hosting\HostingAccount;
 use BeltoftServices\Hosting\HostingActions;

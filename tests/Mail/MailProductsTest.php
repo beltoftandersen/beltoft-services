@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Tests\Mail;
 
-use BeltoftServices\Cli\MailProductsCommand;
+use BeltoftServices\Mail\MailProductsCommand;
 use BeltoftServices\Product;
 
 require_once __DIR__ . '/MailTestCase.php';

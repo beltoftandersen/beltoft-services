@@ -3,7 +3,7 @@
 namespace BeltoftServices\Tests\Domains;
 
 use BeltoftServices\Apps\AppDomains;
-use BeltoftServices\Cli\ParkingCommand;
+use BeltoftServices\Domains\ParkingCommand;
 use BeltoftServices\Domains\DnsAssignments;
 use BeltoftServices\Domains\DnsClaims;
 use BeltoftServices\Domains\DnsDriver;

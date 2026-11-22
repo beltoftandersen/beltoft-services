@@ -2,7 +2,7 @@
 /** The list of parked names goes to the edge of every enabled node. @package BeltoftServices */
 namespace BeltoftServices\Tests\Hosting;
 
-use BeltoftServices\Cli\ParkingCommand;
+use BeltoftServices\Domains\ParkingCommand;
 use BeltoftServices\Hosting\ParkedEdge;
 use BeltoftServices\Jobs;
 

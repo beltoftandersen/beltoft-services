@@ -5,14 +5,12 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Cli;
+namespace BeltoftServices\Usage;
 
 use BeltoftServices\Currency;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
-use BeltoftServices\Usage\Items;
-use BeltoftServices\Usage\Rates;
 
 defined( 'ABSPATH' ) || exit;
 

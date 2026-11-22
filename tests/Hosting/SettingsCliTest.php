@@ -10,7 +10,7 @@ namespace BeltoftServices\Tests\Hosting;
 require_once __DIR__ . '/HostingCase.php';
 require_once dirname( __DIR__ ) . '/Support/WpCliStub.php';
 
-use BeltoftServices\Cli\HostingCommand;
+use BeltoftServices\Hosting\HostingCommand;
 use BeltoftServices\Hosting\Config;
 use BeltoftServices\Hosting\HostingSettings;
 use BeltoftServices\Hosting\Nodes;

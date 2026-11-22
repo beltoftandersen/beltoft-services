@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Tests\Proxmox\Network;
 
-use BeltoftServices\Cli\PrivateNetCommand;
+use BeltoftServices\Proxmox\Network\PrivateNetCommand;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;

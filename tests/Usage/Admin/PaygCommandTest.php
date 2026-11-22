@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Tests\Usage\Admin;
 
-use BeltoftServices\Cli\PaygCommand;
+use BeltoftServices\Usage\PaygCommand;
 use BeltoftServices\Usage\Rates;
 
 require_once __DIR__ . '/PaygTestCase.php';

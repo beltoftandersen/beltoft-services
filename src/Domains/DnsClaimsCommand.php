@@ -5,12 +5,8 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Cli;
+namespace BeltoftServices\Domains;
 
-use BeltoftServices\Domains\Clients;
-use BeltoftServices\Domains\DnsAssignments;
-use BeltoftServices\Domains\DnsClaims;
-use BeltoftServices\Domains\Delegation;
 use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 
@@ -275,5 +271,14 @@ final class DnsClaimsCommand {
 		}
 
 		return $found;
+	}
+
+	/**
+	 * Registers the command when WP-CLI is running.
+	 */
+	public static function register(): void {
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			\WP_CLI::add_command( 'beltoft-services dns-claims', self::class );
+		}
 	}
 }

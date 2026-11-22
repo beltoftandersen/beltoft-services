@@ -3,7 +3,7 @@
 namespace BeltoftServices\Tests\Ssl;
 
 use BeltoftLicenses\Licenses;
-use BeltoftServices\Cli\SslCommand;
+use BeltoftServices\Ssl\SslCommand;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
 use BeltoftServices\Ssl\Csr;

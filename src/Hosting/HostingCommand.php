@@ -5,11 +5,8 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Cli;
+namespace BeltoftServices\Hosting;
 
-use BeltoftServices\Hosting\Clients;
-use BeltoftServices\Hosting\Nodes;
-use BeltoftServices\Hosting\ReadOnlyClient;
 use BeltoftServices\Proxmox\Pve\Ownership;
 
 defined( 'ABSPATH' ) || exit;
@@ -311,5 +308,14 @@ class HostingCommand {
 		}
 
 		\WP_CLI::success( 'Node ' . $id . ' checks passed.' );
+	}
+
+	/**
+	 * Registers the command when WP-CLI is running.
+	 */
+	public static function register(): void {
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			\WP_CLI::add_command( 'beltoft-services hosting', self::class );
+		}
 	}
 }

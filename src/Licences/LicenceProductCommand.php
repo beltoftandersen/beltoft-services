@@ -5,10 +5,8 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Cli;
+namespace BeltoftServices\Licences;
 
-use BeltoftServices\Licences\KeyCatalog;
-use BeltoftServices\Licences\KeyDriver;
 use BeltoftServices\Product;
 
 defined( 'ABSPATH' ) || exit;
@@ -237,5 +235,14 @@ final class LicenceProductCommand {
 		$id = self::create( $family, $prices );
 
 		\WP_CLI::success( sprintf( 'Created draft product %1$d with %2$d licences%3$s. Set the licence key items and costs (Settings, Services, Domains) and publish it.', $id, count( KeyCatalog::keys_of( $family ) ), array() === $prices ? ' and no prices' : ' and the given prices' ) );
+	}
+
+	/**
+	 * Registers the command when WP-CLI is running.
+	 */
+	public static function register(): void {
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			\WP_CLI::add_command( 'beltoft-services licence-product', self::class );
+		}
 	}
 }

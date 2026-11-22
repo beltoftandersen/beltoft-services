@@ -2,7 +2,7 @@
 /** DNS claims CLI and DNS-only emails. @package BeltoftServices */
 namespace BeltoftServices\Tests\Domains;
 
-use BeltoftServices\Cli\DnsClaimsCommand;
+use BeltoftServices\Domains\DnsClaimsCommand;
 use BeltoftServices\Domains\DnsAssignments;
 use BeltoftServices\Domains\DnsClaims;
 use BeltoftServices\Domains\DnsDriver;

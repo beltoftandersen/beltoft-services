@@ -1,7 +1,7 @@
 <?php
 /**
  * The platform folders' imports of true features (see DependencyDirectionTest, rule PLATFORM; plan 2026-11-22-feature-code-home).
- * Generated 2026-11-22 with DEP_DUMP (233 entries). Remove entries as code moves into its feature; never add. Ends empty.
+ * Generated 2026-11-22 with DEP_DUMP (233 entries), now 206. Remove entries as code moves into its feature; never add. Ends empty.
  */
 return array(
 	'Account/Databases.php -> Proxmox\Db\DbCard',
@@ -105,7 +105,6 @@ return array(
 	'Bricks/DomainSearchFormElement.php -> Domains\Search',
 	'Bricks/DomainTransferElement.php -> Domains\Search',
 	'Bricks/MailSetupElement.php -> Mail\MailSetup',
-	'Cli/AddonsCommand.php -> Proxmox\Addon\AddonEnd',
 	'Cli/Commands.php -> Domains\Clients',
 	'Cli/Commands.php -> Domains\Health',
 	'Cli/Commands.php -> Domains\Prices',
@@ -126,32 +125,6 @@ return array(
 	'Cli/Commands.php -> Proxmox\Vm\Provision',
 	'Cli/Commands.php -> Proxmox\Vm\ProxmoxDriver',
 	'Cli/Commands.php -> Proxmox\Vm\VmRecords',
-	'Cli/DedicatedCommand.php -> ManualServer\DedicatedClients',
-	'Cli/DedicatedCommand.php -> ManualServer\LiveRobotClient',
-	'Cli/DedicatedCommand.php -> ManualServer\ManualServerSettings',
-	'Cli/DnsClaimsCommand.php -> Domains\Clients',
-	'Cli/DnsClaimsCommand.php -> Domains\Delegation',
-	'Cli/DnsClaimsCommand.php -> Domains\DnsAssignments',
-	'Cli/DnsClaimsCommand.php -> Domains\DnsClaims',
-	'Cli/HostingCommand.php -> Hosting\CacheSetup',
-	'Cli/HostingCommand.php -> Hosting\Clients',
-	'Cli/HostingCommand.php -> Hosting\HostingDriver',
-	'Cli/HostingCommand.php -> Hosting\MalwareScan',
-	'Cli/HostingCommand.php -> Hosting\Nodes',
-	'Cli/HostingCommand.php -> Hosting\ReadOnlyClient',
-	'Cli/HostingCommand.php -> Proxmox\Pve\Ownership',
-	'Cli/LicenceProductCommand.php -> Licences\KeyCatalog',
-	'Cli/LicenceProductCommand.php -> Licences\KeyDriver',
-	'Cli/MailProductsCommand.php -> Mail\MailDriver',
-	'Cli/ParkingCommand.php -> Domains\Parking',
-	'Cli/ParkingCommand.php -> Hosting\ParkedEdge',
-	'Cli/PleskProductCommand.php -> Apps\AppLicenceDriver',
-	'Cli/PleskProductCommand.php -> Apps\PleskLicence',
-	'Cli/PrivateNetCommand.php -> Proxmox\Network\PrivateNets',
-	'Cli/SslCommand.php -> Ssl\Provision',
-	'Cli/SslCommand.php -> Ssl\SslCatalog',
-	'Cli/SslCommand.php -> Ssl\SslDriver',
-	'Cli/SslCommand.php -> Ssl\SslRenewals',
 	'Mcp/Acts.php -> Proxmox\Db\DbAccess',
 	'Mcp/Acts.php -> Proxmox\Network\PrivateAttach',
 	'Mcp/DedicatedTools.php -> ManualServer\DedicatedReinstall',

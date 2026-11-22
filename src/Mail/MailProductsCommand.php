@@ -5,9 +5,8 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Cli;
+namespace BeltoftServices\Mail;
 
-use BeltoftServices\Mail\MailDriver;
 use BeltoftServices\Product;
 
 defined( 'ABSPATH' ) || exit;
@@ -257,5 +256,14 @@ final class MailProductsCommand {
 		}
 
 		\WP_CLI::success( 'Created product ' . self::create() . ' with ' . count( self::plans() ) . ' plans.' );
+	}
+
+	/**
+	 * Registers the command when WP-CLI is running.
+	 */
+	public static function register(): void {
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			\WP_CLI::add_command( 'beltoft-services mail-products', self::class );
+		}
 	}
 }

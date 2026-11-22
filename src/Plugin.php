@@ -197,6 +197,17 @@ final class Plugin {
 		Lifecycle::register();
 		Retention::register();
 		Cli\Commands::register();
+		Domains\DnsClaimsCommand::register();
+		Proxmox\Network\PrivateNetCommand::register();
+		Mail\MailProductsCommand::register();
+		Apps\PleskProductCommand::register();
+		Ssl\SslCommand::register();
+		Licences\LicenceProductCommand::register();
+		Hosting\HostingCommand::register();
+		ManualServer\DedicatedCommand::register();
+		Domains\ParkingCommand::register();
+		Usage\PaygCommand::register();
+		Proxmox\Addon\AddonsCommand::register();
 
 		Account\Panel::register();
 		Api\Routes::register();

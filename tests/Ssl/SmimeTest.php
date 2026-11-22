@@ -3,7 +3,7 @@
 namespace BeltoftServices\Tests\Ssl;
 
 use BeltoftServices\Api\Tokens;
-use BeltoftServices\Cli\SslCommand;
+use BeltoftServices\Ssl\SslCommand;
 use BeltoftServices\Emails\Emails;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;

@@ -4,7 +4,7 @@
 namespace BeltoftServices\Tests\Apps;
 
 use BeltoftLicenses\Licenses;
-use BeltoftServices\Cli\PleskProductCommand;
+use BeltoftServices\Apps\PleskProductCommand;
 use BeltoftServices\Crypto;
 use BeltoftServices\Domains\FakeClient as Registrar;
 use BeltoftServices\Domains\LiveClient;
