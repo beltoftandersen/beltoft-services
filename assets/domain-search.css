@@ -74,6 +74,11 @@
   opacity: var(--bds-taken-opacity, .55);
 }
 
+/* Still waiting for the registrar: the status line is muted until the row is replaced by the answer. */
+:where(.beltoft-domain-search .beltoft-domain-result--checking) .beltoft-domain-result__status {
+  color: var(--bds-muted, var(--ink-grey, #59615c));
+}
+
 :where(.beltoft-domain-result__transfer) {
   font-size: .9em;
   color: var(--bds-muted, var(--ink-grey, #59615c));

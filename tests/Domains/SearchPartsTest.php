@@ -92,6 +92,6 @@ class SearchPartsTest extends TestCase {
 	public function test_an_unknown_part_is_refused_by_the_route(): void {
 		$routes = rest_get_server()->get_routes();
 		$args   = $routes['/beltoft-services/v1/domains/check'][0]['args']['part'] ?? array();
-		$this->assertSame( array( 'first', 'rest' ), $args['enum'] ?? null );
+		$this->assertSame( array( 'first', 'rest', 'quick' ), $args['enum'] ?? null );
 	}
 }

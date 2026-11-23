@@ -39,8 +39,8 @@ final class Search {
 				'name' => array( 'type' => 'string', 'required' => true ),
 				// The tax display the page prints its prices in (the checkout shows the cart's display, which a REST call cannot know).
 				'tax'  => array( 'type' => 'string', 'required' => false, 'enum' => array( 'incl', 'excl' ) ),
-				// The search page asks in two parts at once, so the quick extensions show before the slow registries answer. Without it: everything in one answer.
-				'part' => array( 'type' => 'string', 'required' => false, 'enum' => array( 'first', 'rest' ) ),
+				// The search page asks in two parts at once, so the quick extensions show before the slow registries answer, and 'quick' for an answer from public DNS and RDAP without the registrar. Without it: everything in one answer.
+				'part' => array( 'type' => 'string', 'required' => false, 'enum' => array( 'first', 'rest', 'quick' ) ),
 			),
 		) );
 	}
@@ -68,7 +68,7 @@ final class Search {
 	public static function visitor_search( string $name, bool $decorate = true, string $part = '' ): array|\WP_Error {
 		$id = RateLimit::visitor();
 		// The second part of a search counts in a bucket of its own, so one search in two parts costs the visitor one search.
-		$bucket     = 'rest' === $part ? '-rest' : '';
+		$bucket     = in_array( $part, array( 'rest', 'quick' ), true ) ? '-' . $part : '';
 		/** Searches allowed per visitor: per minute and per hour. */
 		$per_minute = (int) apply_filters( 'beltoft_services_domain_search_limit', 20 );
 		$per_hour   = 200;
@@ -196,7 +196,11 @@ final class Search {
 		}
 		if ( ! $domains ) { return new \WP_Error( 'bad_domain', __( 'A valid domain name is required.', 'beltoft-services' ) ); }
 		$found = array();
-		if ( $check ) {
+		if ( 'quick' === $part ) {
+			foreach ( QuickCheck::status( array_map( static fn( $c ) => $c['name'] . '.' . $c['extension'], $check ) ) as $domain => $quick ) {
+				$found[ $domain ] = array( 'domain' => $domain, 'status' => $quick, 'quick' => true );
+			}
+		} elseif ( $check ) {
 			$reply = self::availability( $check, $fresh );
 			if ( is_wp_error( $reply ) ) { return $reply; }
 			foreach ( (array) ( $reply['results'] ?? array() ) as $item ) {
@@ -207,7 +211,7 @@ final class Search {
 		foreach ( $domains as $entry ) {
 			$available = Prices::sellable( $entry['tld'] ) && ( 'dk' !== $entry['tld'] || DkAgreement::ready() );
 			$item = $found[ $entry['domain'] ] ?? array();
-			$status = ! $available ? 'not_sold' : ( ! empty( $item['is_premium'] ) ? 'premium' : ( 'free' === ( $item['status'] ?? '' ) ? 'free' : 'taken' ) );
+			$status = ! $available ? 'not_sold' : ( ! empty( $item['is_premium'] ) ? 'premium' : ( 'free' === ( $item['status'] ?? '' ) ? 'free' : ( ! empty( $item['quick'] ) && 'checking' === $item['status'] ? 'checking' : 'taken' ) ) );
 			$row = array( 'domain' => $entry['domain'], 'display' => HostName::display( $entry['domain'] ), 'status' => $status, 'price' => in_array( $status, array( 'free', 'taken' ), true ) ? Prices::price( $entry['tld'] ) : null, 'transfer' => 'taken' === $status, 'note' => self::note( $entry['tld'] ) );
 			// Only a free transfer carries the key, so the shape the API and MCP return is unchanged for every other result.
 			if ( 'taken' === $status && Prices::free_transfer( $entry['domain'] ) ) { $row['free_transfer'] = true; }

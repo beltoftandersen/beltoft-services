@@ -116,8 +116,12 @@ final class DomainSearchMarkupTest extends TestCase {
 		$this->assertStringContainsString( 'if (offer) offer.hidden = !free;', $js );
 		// One search is two lookups at once: the quick part is drawn first, the rest is added below it.
 		$this->assertStringContainsString( "check(root, typed, 'rest')", $js );
-		$this->assertStringContainsString( "await check(root, typed, 'first')", $js );
-		$this->assertStringContainsString( 'append(rest.data.results);', $js );
+		$this->assertStringContainsString( "settle(check(root, typed, 'first'))", $js );
+		$this->assertStringContainsString( "check(root, typed, 'quick')", $js );
+		$this->assertStringContainsString( 'place(part.data.results);', $js );
+		$this->assertStringContainsString( "old.replaceWith(result(item, old.dataset.primary === '1'))", $js );
+		// A row never answered by the registrar is not left as checking.
+		$this->assertStringContainsString( ".beltoft-domain-result--checking').forEach", $js );
 		$this->assertStringContainsString( 'remember(typed, data);', $js );
 		$this->assertStringContainsString( '[data-beltoft-domain-ext]', $js );
 		$this->assertStringContainsString( 'root.beltoftSearch = search;', $js );

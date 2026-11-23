@@ -119,6 +119,8 @@
       const row = document.createElement('div');
       // A taken domain is never highlighted, even when it is the one typed: only what can be registered stands out.
       row.className = 'beltoft-domain-result beltoft-domain-result--' + item.status + (primary && item.status !== 'taken' ? ' beltoft-domain-result--primary' : '');
+      row.dataset.domain = item.domain;
+      if (primary) row.dataset.primary = '1';
       const information = document.createElement('div');
       information.className = 'beltoft-domain-result__information';
       information.appendChild(element('strong', 'beltoft-domain-result__name', item.display || item.domain));
@@ -127,7 +129,8 @@
         free: __('Available to register', 'beltoft-services'),
         taken: __('Taken', 'beltoft-services'),
         premium: __('Premium domain. Online ordering is unavailable.', 'beltoft-services'),
-        not_sold: __('This domain extension is not available to order here.', 'beltoft-services')
+        not_sold: __('This domain extension is not available to order here.', 'beltoft-services'),
+        checking: __('Checking availability…', 'beltoft-services')
       };
       information.appendChild(element('span', 'beltoft-domain-result__status', descriptions[item.status] || __('Availability could not be confirmed.', 'beltoft-services')));
       if (item.note && item.status === 'free') information.appendChild(element('span', 'beltoft-domain-result__note', item.note));
@@ -178,9 +181,13 @@
       noteAndOffer();
     }
 
-    // The rows of the second part of a search go under the first part's rows; the rows already shown are left alone.
-    function append(items) {
-      items.filter(function (item) { return item.status !== 'not_sold'; }).forEach(function (item) { results.appendChild(result(item, false)); });
+    // The registrar's rows: each replaces the quick row of its domain, or goes under the rows already shown.
+    function place(items) {
+      items.forEach(function (item) {
+        const old = Array.prototype.find.call(results.querySelectorAll('.beltoft-domain-result'), function (row) { return row.dataset.domain === item.domain; });
+        if (old) { old.replaceWith(result(item, old.dataset.primary === '1')); return; }
+        if (item.status !== 'not_sold') results.insertBefore(result(item, false), waiting && waiting.parentNode === results ? waiting : null);
+      });
       noteAndOffer();
     }
 
@@ -208,6 +215,7 @@
       return true;
     }
 
+    let waiting = null;
     async function search() {
       if (handOff()) return;
       if (offer) offer.hidden = true;
@@ -215,34 +223,49 @@
       results.setAttribute('aria-busy', 'true');
       searchButton.disabled = true;
       const typed = input.value.trim();
-      // Two lookups at once: the quick extensions show as soon as they are answered, the others are added when theirs is.
-      const later = check(root, typed, 'rest').then(function (data) { return { data: data }; }, function (error) { return { error: error }; });
-      let data;
-      try {
-        data = await check(root, typed, 'first');
-      } catch (error) {
-        results.textContent = error.message;
-        results.removeAttribute('aria-busy');
-        searchButton.disabled = false;
-        return;
-      }
-      render(data, typed);
-      if (!data.results.length) results.replaceChildren();
-      const waiting = loader(__('Searching for domains…', 'beltoft-services'));
-      results.appendChild(waiting);
-      const rest = await later;
+      // Three lookups at once. The quick answer (public DNS and the registries) draws the list within a second; the
+      // registrar's two parts (the quick extensions, then the others) replace each row with the answer a domain is sold on.
+      const settle = function (promise) { return promise.then(function (data) { return { data: data }; }, function (error) { return { error: error }; }); };
+      const parts = [settle(check(root, typed, 'first')), settle(check(root, typed, 'rest'))];
+      let drawn = false;
+      const errors = [];
+      let data = null;
+      waiting = loader(__('Searching for domains…', 'beltoft-services'));
+      settle(check(root, typed, 'quick')).then(function (quick) {
+        if (drawn || !quick.data || !quick.data.results.length) return;
+        drawn = true;
+        render(quick.data, typed);
+        results.appendChild(waiting);
+      });
+      // Each part is drawn as it arrives. Without the quick list on the page, the others wait for the first part, so the typed
+      // extension still leads.
+      let firstDone = false;
+      let held = null;
+      const take = function (part, isFirst) {
+        if (part.error) { errors.push(part.error.message); } else {
+          data = !data ? part.data : Object.assign({}, data, { results: isFirst ? part.data.results.concat(data.results) : data.results.concat(part.data.results) });
+        }
+        if (isFirst) firstDone = true;
+        if (!drawn && !isFirst && !firstDone) { held = part; return; }
+        if (!part.error) {
+          if (!drawn) { drawn = true; render(part.data, typed); results.appendChild(waiting); } else { place(part.data.results); }
+        }
+        if (isFirst && held) { const later = held; held = null; take(later, false); }
+      };
+      await Promise.all([parts[0].then(function (part) { take(part, true); }), parts[1].then(function (part) { take(part, false); })]);
       waiting.remove();
-      if (rest.data && rest.data.results.length) {
-        data = Object.assign({}, data, { results: data.results.concat(rest.data.results) });
-        append(rest.data.results);
-      } else if (rest.error) {
-        results.appendChild(element('p', 'beltoft-domain-error', rest.error.message));
+      waiting = null;
+      // A row the registrar never answered (its lookup failed) is not left as checking.
+      results.querySelectorAll('.beltoft-domain-result--checking').forEach(function (row) { row.replaceWith(result({ domain: row.dataset.domain, display: row.querySelector('.beltoft-domain-result__name').textContent, status: 'unknown' }, false)); });
+      if (errors.length) {
+        if (!data) results.replaceChildren();
+        results.appendChild(element('p', 'beltoft-domain-error', errors[0]));
+      } else if (!results.querySelector('.beltoft-domain-result')) {
+        results.textContent = __('No results found.', 'beltoft-services');
       }
-      if (!data.results.length) results.textContent = __('No results found.', 'beltoft-services');
       results.removeAttribute('aria-busy');
       searchButton.disabled = false;
-      remember(typed, data);
-      keepInAddress(typed);
+      if (data) { remember(typed, data); keepInAddress(typed); }
     }
 
     // The last search is kept for this tab (30 minutes), so going back from checkout shows it again without a new lookup.
