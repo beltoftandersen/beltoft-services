@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.60.0
+Stable tag: 0.60.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.60.1 =
+* The domain search page asks the registrar in two parts at once: the typed extension and the extensions in the new setting "TLDs shown first" (default com,dk) show as soon as they are answered, and the other featured extensions are added below them. Each part has its own per-visitor limit, so one search still counts once. The check route takes an optional part (first or rest); without it the answer is unchanged.
 
 = 0.60.0 =
 * Internal: the remaining MCP tools (servers, ordering and prices) moved into their feature folders. No change in behaviour.

@@ -39,6 +39,8 @@ final class Search {
 				'name' => array( 'type' => 'string', 'required' => true ),
 				// The tax display the page prints its prices in (the checkout shows the cart's display, which a REST call cannot know).
 				'tax'  => array( 'type' => 'string', 'required' => false, 'enum' => array( 'incl', 'excl' ) ),
+				// The search page asks in two parts at once, so the quick extensions show before the slow registries answer. Without it: everything in one answer.
+				'part' => array( 'type' => 'string', 'required' => false, 'enum' => array( 'first', 'rest' ) ),
 			),
 		) );
 	}
@@ -48,7 +50,8 @@ final class Search {
 		$name   = (string) $request['name'];
 		$decor  = null === Tokens::current();
 		$tax    = (string) $request->get_param( 'tax' );
-		$result = $decor && in_array( $tax, array( 'incl', 'excl' ), true ) ? TaxNote::in( $tax, static fn() => self::visitor_search( $name, true ) ) : self::visitor_search( $name, $decor );
+		$part   = (string) $request->get_param( 'part' );
+		$result = $decor && in_array( $tax, array( 'incl', 'excl' ), true ) ? TaxNote::in( $tax, static fn() => self::visitor_search( $name, true, $part ) ) : self::visitor_search( $name, $decor, $part );
 		if ( is_wp_error( $result ) ) { return $result; }
 		// A token holder's prices are excluding tax and carry their currency.
 		if ( null !== Tokens::current() ) { $result['currency'] = (string) get_woocommerce_currency(); }
@@ -62,18 +65,20 @@ final class Search {
 	 * A search made for the visitor of this request: the per-visitor limits, the length check and find().
 	 * The REST route and the Bricks query type both come through here, so they cannot differ.
 	 */
-	public static function visitor_search( string $name, bool $decorate = true ): array|\WP_Error {
+	public static function visitor_search( string $name, bool $decorate = true, string $part = '' ): array|\WP_Error {
 		$id = RateLimit::visitor();
+		// The second part of a search counts in a bucket of its own, so one search in two parts costs the visitor one search.
+		$bucket     = 'rest' === $part ? '-rest' : '';
 		/** Searches allowed per visitor: per minute and per hour. */
 		$per_minute = (int) apply_filters( 'beltoft_services_domain_search_limit', 20 );
 		$per_hour   = 200;
-		if ( RateLimit::exceeded( $id, 'domain-search', $per_minute ) || RateLimit::exceeded( $id, 'domain-search-hour', $per_hour, HOUR_IN_SECONDS ) ) {
+		if ( RateLimit::exceeded( $id, 'domain-search' . $bucket, $per_minute ) || RateLimit::exceeded( $id, 'domain-search-hour' . $bucket, $per_hour, HOUR_IN_SECONDS ) ) {
 			return new \WP_Error( 'rate_limited', __( 'Too many searches. Please wait a minute.', 'beltoft-services' ), array( 'status' => 429 ) );
 		}
 		if ( strlen( $name ) > 253 ) {
 			return new \WP_Error( 'bad_domain', __( 'A valid domain name is required.', 'beltoft-services' ), array( 'status' => 400 ) );
 		}
-		$found = self::find( $name );
+		$found = self::find( $name, false, $part );
 		return $decorate && ! is_wp_error( $found ) ? self::decorate( $found ) : $found;
 	}
 
@@ -162,7 +167,7 @@ final class Search {
 	}
 
 	/** @return array|\WP_Error */
-	public static function find( string $input, bool $fresh = false ): array|\WP_Error {
+	public static function find( string $input, bool $fresh = false, string $part = '' ): array|\WP_Error {
 		$input = trim( $input );
 		$featured = Settings::get( 'domain_featured_tlds' );
 		$featured = is_string( $featured ) ? $featured : 'com,net,org,eu';
@@ -179,8 +184,10 @@ final class Search {
 			$label = false === $ascii ? '' : strtolower( $ascii );
 			if ( ! HostName::label( $label ) ) { return new \WP_Error( 'bad_domain', __( 'A valid domain label is required.', 'beltoft-services' ) ); }
 		}
+		$tlds = self::part_of( $tlds, str_contains( $input, '.' ), $part );
 		$domains = array();
 		$check = array();
+		if ( ! $tlds ) { return array( 'results' => array() ); }
 		foreach ( $tlds as $tld ) {
 			$full = self::normalise( $label . '.' . $tld );
 			if ( is_wp_error( $full ) ) { continue; }
@@ -207,6 +214,25 @@ final class Search {
 			$results[] = $row;
 		}
 		return array( 'results' => $results );
+	}
+
+	/**
+	 * The extensions of one part of a search. 'first': the typed one and the quick ones (setting domain_quick_tlds), in the
+	 * order of the list; 'rest': the others. No quick extensions: 'first' is all of them and 'rest' is none. '': all.
+	 *
+	 * @param list<string> $tlds  Typed extension first (when typed), then the featured ones.
+	 * @param bool         $typed Whether the first entry is the typed extension.
+	 * @return list<string>
+	 */
+	private static function part_of( array $tlds, bool $typed, string $part ): array {
+		if ( 'first' !== $part && 'rest' !== $part ) { return $tlds; }
+		$quick = Settings::get( 'domain_quick_tlds' );
+		$quick = array_filter( array_map( static fn( $s ) => strtolower( trim( $s, ". \t\r\n" ) ), explode( ',', is_string( $quick ) ? $quick : '' ) ) );
+		$first = array();
+		foreach ( $tlds as $i => $tld ) {
+			if ( ! $quick || ( $typed && 0 === $i ) || in_array( $tld, $quick, true ) ) { $first[] = $tld; }
+		}
+		return 'first' === $part ? $first : array_values( array_diff( $tlds, $first ) );
 	}
 
 	/** A yearly price (whole units, excluding tax) as the catalogue shows it: whole amounts without decimals, the shop's tax display, plain text. Empty for none. */

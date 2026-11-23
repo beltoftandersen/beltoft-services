@@ -111,7 +111,14 @@ final class DomainSearchMarkupTest extends TestCase {
 
 	public function test_the_script_shows_the_offer_only_with_a_free_domain_and_handles_extension_links(): void {
 		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/domain-search.js' );
-		$this->assertStringContainsString( "offer.hidden = !shown.some(function (item) { return item.status === 'free'; });", $js );
+		// Counted from the rows on the page, so a free domain in either part of the search shows it.
+		$this->assertStringContainsString( "const free = !!results.querySelector('.beltoft-domain-result--free');", $js );
+		$this->assertStringContainsString( 'if (offer) offer.hidden = !free;', $js );
+		// One search is two lookups at once: the quick part is drawn first, the rest is added below it.
+		$this->assertStringContainsString( "check(root, typed, 'rest')", $js );
+		$this->assertStringContainsString( "await check(root, typed, 'first')", $js );
+		$this->assertStringContainsString( 'append(rest.data.results);', $js );
+		$this->assertStringContainsString( 'remember(typed, data);', $js );
 		$this->assertStringContainsString( '[data-beltoft-domain-ext]', $js );
 		$this->assertStringContainsString( 'root.beltoftSearch = search;', $js );
 	}

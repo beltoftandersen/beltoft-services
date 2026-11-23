@@ -72,8 +72,8 @@
   }
 
   // One availability lookup through the public check route.
-  async function check(root, name) {
-    const response = await fetch(root.dataset.check + '?name=' + encodeURIComponent(name), { credentials: 'same-origin' });
+  async function check(root, name, part) {
+    const response = await fetch(root.dataset.check + '?name=' + encodeURIComponent(name) + (part ? '&part=' + part : ''), { credentials: 'same-origin' });
     // An error page that is not JSON (a 502, maintenance) gives the translated message below, not a parse error.
     const data = await response.json().catch(function () { return {}; });
     if (!response.ok) throw new Error(data.message || __('The search could not be completed.', 'beltoft-services'));
@@ -173,13 +173,24 @@
       // An extension we do not sell is noise, unless the customer typed that exact extension.
       const typedExtension = typed.indexOf('.') > 0;
       const shown = data.results.filter(function (item, index) { return item.status !== 'not_sold' || (typedExtension && index === 0); });
-      if (shown.some(function (item) { return item.status === 'free'; })) {
-        results.appendChild(element('p', 'beltoft-domain-note', taxMode === 'incl' ? __('Prices are per year, including VAT. The renewal price is the same as the first year. DNS hosting and the transfer lock are included.', 'beltoft-services') : __('Prices are per year, excluding VAT. The renewal price is the same as the first year. DNS hosting and the transfer lock are included.', 'beltoft-services')));
-      }
       // The first result is what the customer typed (or the first extension): it leads, the rest are alternatives.
       shown.forEach(function (item, index) { results.appendChild(result(item, index === 0)); });
-      // The offer under the results (for example hosting for the new domain) only makes sense once something can be registered.
-      if (offer) offer.hidden = !shown.some(function (item) { return item.status === 'free'; });
+      noteAndOffer();
+    }
+
+    // The rows of the second part of a search go under the first part's rows; the rows already shown are left alone.
+    function append(items) {
+      items.filter(function (item) { return item.status !== 'not_sold'; }).forEach(function (item) { results.appendChild(result(item, false)); });
+      noteAndOffer();
+    }
+
+    // The price note on top and the offer under the results, once something can be registered.
+    function noteAndOffer() {
+      const free = !!results.querySelector('.beltoft-domain-result--free');
+      if (free && !results.querySelector(':scope > .beltoft-domain-note')) {
+        results.insertBefore(element('p', 'beltoft-domain-note', taxMode === 'incl' ? __('Prices are per year, including VAT. The renewal price is the same as the first year. DNS hosting and the transfer lock are included.', 'beltoft-services') : __('Prices are per year, excluding VAT. The renewal price is the same as the first year. DNS hosting and the transfer lock are included.', 'beltoft-services')), results.firstChild);
+      }
+      if (offer) offer.hidden = !free;
     }
 
     const param = root.dataset.param || 'domain';
@@ -203,17 +214,35 @@
       results.replaceChildren(loader(__('Searching for domains…', 'beltoft-services')));
       results.setAttribute('aria-busy', 'true');
       searchButton.disabled = true;
+      const typed = input.value.trim();
+      // Two lookups at once: the quick extensions show as soon as they are answered, the others are added when theirs is.
+      const later = check(root, typed, 'rest').then(function (data) { return { data: data }; }, function (error) { return { error: error }; });
+      let data;
       try {
-        const data = await check(root, input.value.trim());
-        render(data, input.value.trim());
-        remember(input.value.trim(), data);
-        keepInAddress(input.value.trim());
+        data = await check(root, typed, 'first');
       } catch (error) {
         results.textContent = error.message;
-      } finally {
         results.removeAttribute('aria-busy');
         searchButton.disabled = false;
+        return;
       }
+      render(data, typed);
+      if (!data.results.length) results.replaceChildren();
+      const waiting = loader(__('Searching for domains…', 'beltoft-services'));
+      results.appendChild(waiting);
+      const rest = await later;
+      waiting.remove();
+      if (rest.data && rest.data.results.length) {
+        data = Object.assign({}, data, { results: data.results.concat(rest.data.results) });
+        append(rest.data.results);
+      } else if (rest.error) {
+        results.appendChild(element('p', 'beltoft-domain-error', rest.error.message));
+      }
+      if (!data.results.length) results.textContent = __('No results found.', 'beltoft-services');
+      results.removeAttribute('aria-busy');
+      searchButton.disabled = false;
+      remember(typed, data);
+      keepInAddress(typed);
     }
 
     // The last search is kept for this tab (30 minutes), so going back from checkout shows it again without a new lookup.

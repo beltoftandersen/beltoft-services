@@ -884,6 +884,14 @@
         "default": "com,net,org,eu",
         "label": "Featured TLDs"
     },
+    "domain_quick_tlds": {
+        "tab": "domains",
+        "section": "domains",
+        "type": "text",
+        "default": "com,dk",
+        "label": "TLDs shown first",
+        "desc": "Comma separated, from the featured TLDs. The search page shows these and the TLD typed as soon as the registrar answers, then adds the other featured TLDs from a second lookup. Empty: one lookup for all."
+    },
     "domain_renew_days_before": {
         "tab": "domains",
         "section": "domains",
