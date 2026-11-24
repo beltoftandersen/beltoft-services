@@ -303,7 +303,9 @@ final class Plugin {
 		Proxmox\Ipv4\Ipv4Cart::register();
 		Proxmox\Ipv4\Ipv4Panels::register();
 		Proxmox\Ipv4\Ipv4Field::register();
+		Proxmox\Managed\ManagedField::register();
 		Support\Priority::register();
+		Support\PriorityField::register();
 		Proxmox\Disk\DiskField::register();
 		Proxmox\Vm\Actions::register();
 		Proxmox\Db\DbActions::register();

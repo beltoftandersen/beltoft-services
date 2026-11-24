@@ -31,6 +31,15 @@ final class ManagedMeta {
 	public static function server_of( Resource $managed ): ?Resource {
 		$id = (int) $managed->get( 'server_license' );
 
+		// Bought with its server at checkout: the one server of the same order. Kept, so the server page finds the service.
+		if ( $id < 1 && (int) $managed->get( 'server_order_id' ) > 0 ) {
+			$id = (int) \BeltoftServices\Proxmox\Disk\DiskMeta::server_in_order( (int) $managed->get( 'server_order_id' ), (int) ( $managed->license()['user_id'] ?? 0 ) );
+
+			if ( $id > 0 ) {
+				$managed->set( array( 'server_license' => $id ) );
+			}
+		}
+
 		if ( $id < 1 ) {
 			return null;
 		}

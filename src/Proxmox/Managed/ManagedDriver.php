@@ -46,9 +46,9 @@ final class ManagedDriver implements Driver, \BeltoftServices\Drivers\UsageItems
 
 	public function provision( Resource $r ): StepResult {
 		$license = $r->license();
-		$id      = (int) $r->get( 'server_license' );
+		$server  = ManagedMeta::server_of( $r ); // First: a service bought with its server stores the server's licence here.
+		$id      = (int) Resource::find( $r->id() )->get( 'server_license' );
 		$owner   = $id > 0 ? \BeltoftLicenses\Licenses::find( $id ) : null;
-		$server  = ManagedMeta::server_of( $r );
 		$why     = '';
 
 		if ( null === $server || ! $owner ) {

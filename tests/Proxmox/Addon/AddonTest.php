@@ -17,7 +17,7 @@ class AddonTest extends \WP_UnitTestCase {
 			'disk'     => array( DiskDriver::ID, 'beltoft_services_disk_for', 'beltoft_services_disk_uid', '_beltoft_services_disk_uid', '_beltoft_services_disk_server', '_disk_', 'beltoft-services-disk', true, false, 'ASC' ),
 			'snapshot' => array( SnapshotDriver::ID, 'beltoft_services_snapshot_for', 'beltoft_services_snapshot_uid', '_beltoft_services_snapshot_uid', '_beltoft_services_snapshot_server', '_snapshots_', 'beltoft-services-snapshots', false, true, 'ASC' ),
 			'applic'   => array( AppLicenceDriver::ID, AppLicence::CART_FOR, AppLicence::CART_UID, AppLicence::ITEM_UID, AppLicence::ITEM_SERVER, '_applic_', AppLicenceCart::NONCE, true, false, 'DESC' ),
-			'managed'  => array( \BeltoftServices\Proxmox\Managed\ManagedDriver::ID, 'beltoft_services_managed_for', 'beltoft_services_managed_uid', '_beltoft_services_managed_uid', '_beltoft_services_managed_server', '_managed_', 'beltoft-services-managed', false, true, 'ASC' ),
+			'managed'  => array( \BeltoftServices\Proxmox\Managed\ManagedDriver::ID, 'beltoft_services_managed_for', 'beltoft_services_managed_uid', '_beltoft_services_managed_uid', '_beltoft_services_managed_server', '_managed_', 'beltoft-services-managed', true, true, 'ASC' ),
 			'ipv4'     => array( \BeltoftServices\Proxmox\Ipv4\Ipv4Driver::ID, 'beltoft_services_ipv4_for', 'beltoft_services_ipv4_uid', '_beltoft_services_ipv4_uid', '_beltoft_services_ipv4_server', '_ipv4_', 'beltoft-services-ipv4', true, true, 'ASC' ),
 		);
 		$seen   = array();

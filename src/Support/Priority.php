@@ -32,6 +32,7 @@ final class Priority {
 		add_action( 'beltoft_services_state_changed', array( __CLASS__, 'changed' ), 20, 3 );
 		add_filter( 'beltoft_services_has_priority_support', array( __CLASS__, 'filter' ), 10, 2 );
 		add_filter( 'woocommerce_add_to_cart_validation', array( __CLASS__, 'validate' ), 20, 3 );
+		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'checkout_validation' ), 10, 2 );
 		add_action( 'show_user_profile', array( __CLASS__, 'profile' ) );
 		add_action( 'edit_user_profile', array( __CLASS__, 'profile' ) );
 	}
@@ -172,17 +173,36 @@ final class Priority {
 			return (bool) $valid;
 		}
 
-		if ( ! is_user_logged_in() ) {
-			wc_add_notice( __( 'Log in to add priority support to your account.', 'beltoft-services' ), 'error' );
-			return false;
-		}
-
+		// A visitor may add it: the account is made at checkout (checkout_validation checks a signed-in customer again).
 		if ( 1 !== (int) $quantity || self::has( get_current_user_id() ) ) {
 			wc_add_notice( __( 'Your account has priority support already.', 'beltoft-services' ), 'error' );
 			return false;
 		}
 
 		return true;
+	}
+
+	/**
+	 * At checkout: one line at most, and none for a customer who has the service already.
+	 *
+	 * @param mixed $data   Posted data.
+	 * @param mixed $errors Errors.
+	 */
+	public static function checkout_validation( $data, $errors ): void {
+		if ( ! $errors instanceof \WP_Error || ! function_exists( 'WC' ) || ! WC()->cart ) {
+			return;
+		}
+
+		$lines = 0;
+
+		foreach ( WC()->cart->get_cart() as $item ) {
+			$driver = Product::driver_for( (int) ( $item['product_id'] ?? 0 ) );
+			$lines += $driver && PriorityDriver::ID === $driver->id() ? (int) ( $item['quantity'] ?? 1 ) : 0;
+		}
+
+		if ( $lines > 1 || ( $lines > 0 && self::has( get_current_user_id() ) ) ) {
+			$errors->add( 'priority_support_twice', __( 'Your account has priority support already.', 'beltoft-services' ) );
+		}
 	}
 
 	/**

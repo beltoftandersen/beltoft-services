@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.60.2
+Stable tag: 0.61.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.61.0 =
+* The checkout offers Managed server and Priority support as tick boxes. Managed server shows when the order has a new server and is bought together with it (the service finds its server in the same order once it is made); Priority support shows with any new service when the customer does not have it. Both work for a visitor, whose account is made at checkout. Priority support no longer asks the customer to log in first; a signed-in customer who has it already is refused at checkout. One shared checkout script (assets/check-box.js) for both boxes.
 
 = 0.60.2 =
 * The domain search page shows a quick answer within about a second, before the registrar answers: a name with name servers in public DNS is taken, and the registry's own RDAP says free or taken where the extension has one (not .dk). Rows the quick answer cannot settle say "Checking availability". The registrar's answers then replace each row, so premium names and the final status still come from the registrar, and adding a domain to the cart asks the registrar again as before. The check route takes part=quick, with its own per-visitor limit and no registrar lookup.

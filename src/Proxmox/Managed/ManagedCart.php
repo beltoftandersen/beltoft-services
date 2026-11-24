@@ -97,6 +97,17 @@ final class ManagedCart {
 		return $n;
 	}
 
+	/** Lines of the service in the cart for the new server of the cart. */
+	private static function in_cart_server(): int {
+		$n = 0;
+
+		foreach ( WC()->cart ? WC()->cart->get_cart() : array() as $item ) {
+			$n += 'cart_server' === ( $item['beltoft_services_managed_for'] ?? null ) ? 1 : 0;
+		}
+
+		return $n;
+	}
+
 	public static function validate( $valid, $product_id, $quantity = 1, $variation_id = 0, $variation = array(), $data = array() ): bool {
 		if ( ! $valid || ! self::managed_product( (int) $product_id ) ) {
 			return (bool) $valid;
@@ -118,6 +129,16 @@ final class ManagedCart {
 		if ( null === $link || 1 !== (int) $quantity ) {
 			wc_add_notice( __( 'Choose the managed server service for a server in your account.', 'beltoft-services' ), 'error' );
 			return false;
+		}
+
+		if ( 'cart_server' === $link ) {
+			// Bought with the new server of the cart (the checkout box): one line for it.
+			if ( self::in_cart_server() > 0 ) {
+				wc_add_notice( __( 'This server is managed already.', 'beltoft-services' ), 'error' );
+				return false;
+			}
+
+			return true;
 		}
 
 		if ( ! self::room( Resource::for_license( $link ), self::in_cart( $link ) ) ) {
@@ -158,6 +179,15 @@ final class ManagedCart {
 			}
 
 			$link = $item['beltoft_services_managed_for'] ?? null;
+
+			if ( 'cart_server' === $link ) {
+				if ( ! AddonCart::cart_has_parent( self::addon() ) ) {
+					$errors->add( 'managed_server_unavailable', __( 'The server for the managed service is no longer in the order.', 'beltoft-services' ) );
+				} elseif ( self::in_cart_server() > 1 ) {
+					$errors->add( 'managed_limit', __( 'This server is managed already.', 'beltoft-services' ) );
+				}
+				continue;
+			}
 
 			if ( ! is_int( $link ) || ! self::owned( $link ) ) {
 				$errors->add( 'managed_server_unavailable', __( 'The server for the managed service is no longer available.', 'beltoft-services' ) );
