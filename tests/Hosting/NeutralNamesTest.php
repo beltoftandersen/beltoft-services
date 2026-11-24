@@ -40,6 +40,7 @@ class NeutralNamesTest extends HostingCase {
 		'src/Hosting/Actions/StagingActions.php',
 		'src/Hosting/Actions/Steps.php',
 		'src/Hosting/ActivitySentence.php',
+		'src/Hosting/EmailRegistry.php',
 		'templates/account/hosting/add-site.php',
 		'templates/account/hosting/site.php',
 		'templates/account/hosting/site-cron.php',
