@@ -117,7 +117,8 @@ class BootRegistryTest extends TestCase {
 		$booted  = array();
 		$pending = $this->calls_in( $plugin );
 
-		// A booted class may register others from its own register().
+		// A booted class may register others from its own register(). That covers a feature's Boot class (Hosting\Boot):
+		// Plugin::boot() registers it and it names the register() calls of its stages.
 		while ( $pending ) {
 			$class = array_shift( $pending );
 
@@ -153,5 +154,15 @@ class BootRegistryTest extends TestCase {
 		foreach ( array_keys( self::ALLOWED ) as $class ) {
 			$this->assertArrayHasKey( $class, $classes, "$class is on the allowlist but has no register()" );
 		}
+	}
+
+	public function test_feature_boot_class_registers_are_followed(): void {
+		$classes = $this->classes_with_register();
+		$this->assertArrayHasKey( 'BeltoftServices\\Hosting\\Boot', $classes );
+
+		$called = $this->calls_in( $classes['BeltoftServices\\Hosting\\Boot'] );
+		$this->assertContains( 'BeltoftServices\\Hosting\\HostingSettings', $called );
+		$this->assertContains( 'BeltoftServices\\Hosting\\Actions\\Steps', $called );
+		$this->assertContains( 'BeltoftServices\\Hosting\\Boot', $this->calls_in( dirname( __DIR__, 2 ) . '/src/Plugin.php' ) );
 	}
 }

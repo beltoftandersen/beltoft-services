@@ -42,6 +42,10 @@ final class Plugin {
 	public static function boot(): void {
 		self::$booted = false;
 
+		// Answers the beltoft_services_boot stages below and the deactivation action; added before the requirements check so
+		// a deactivation still stops the jobs when a dependency is missing.
+		Hosting\Boot::register();
+
 		if ( ! self::requirements_met() ) {
 			add_action( 'admin_notices', array( __CLASS__, 'notice_missing' ) );
 			return;
@@ -54,7 +58,7 @@ final class Plugin {
 		// settings and connections, then the feature parts. Features add to core filters and actions; core
 		// never names a feature.
 		Proxmox\Vm\Schema::maybe_upgrade();
-		Hosting\Schema::maybe_upgrade();
+		do_action( 'beltoft_services_boot', 'schema' );
 		Domains\DnsSchema::maybe_upgrade();
 		Oauth\Schema::maybe_upgrade();
 
@@ -71,18 +75,7 @@ final class Plugin {
 		Http\ConnectionsScreen::register();
 		Proxmox\Pve\ProxmoxSettings::register();
 		Proxmox\Pve\ResetStepUp::register();
-		Hosting\HostingSettings::register();
-		Hosting\NodesScreen::register();
-		Hosting\Stock::register();
-		Hosting\HostingCapacity::register();
-		Hosting\SiteField::register();
-		Hosting\SiteNewDomain::register();
-		Hosting\SiteDomainStep::register();
-		Hosting\CartRule::register();
-		Hosting\Languages::register();
-		Hosting\HostingSwitch::register();
-		Hosting\Addons::register();
-		Hosting\HostingAccount::register();
+		do_action( 'beltoft_services_boot', 'features' );
 		Children::register();
 		Domains\DomainSettings::register();
 		Ssl\SslSettings::register();
@@ -106,24 +99,11 @@ final class Plugin {
 		Mail\MailDns::register();
 		Mail\MailHold::register();
 		Mail\EmailValues::register();
-		Hosting\EmailValues::register();
+		do_action( 'beltoft_services_boot', 'email_values' );
 		Ssl\EmailValues::register();
 		Mail\MailJobs::register();
 		Mail\MailRoutes::register();
-		Hosting\HostingRoutes::register();
-		Hosting\HostingUsage::register();
-		Hosting\HostingGuest::register();
-		Hosting\HostingBackups::register();
-		Hosting\HostingRestore::register();
-		Hosting\NodeHealth::register();
-		Hosting\ParkedEdge::register();
-		Hosting\HostingRefresh::register();
-		Hosting\DomainSweep::register();
-		Hosting\SiteFacts::register();
-		Hosting\SiteCron::register();
-		Hosting\Actions\Steps::register();
-		Hosting\MalwareScan::register();
-		Hosting\RestoreTest::register();
+		do_action( 'beltoft_services_boot', 'routes' );
 		Mail\MailField::register();
 		Mail\MailSwitch::register();
 		Mail\MailAccess::register();
@@ -131,7 +111,7 @@ final class Plugin {
 		Mail\MailDomains::register();
 		Mail\MailWake::register();
 		add_action( 'beltoft_services_account_assets', array( Mail\MailCard::class, 'early' ), 20, 2 );
-		add_action( 'beltoft_services_account_assets', array( Hosting\HostingAccount::class, 'style' ), 20, 0 );
+		do_action( 'beltoft_services_boot', 'account_assets' );
 		Domains\Search::register();
 		Bricks\Integration::register();
 		Domains\BricksElements::register();
@@ -167,7 +147,7 @@ final class Plugin {
 		Apps\AppProgress::register();
 		Licences\KeyPanel::register();
 		Domains\HostName::register();
-		Hosting\ActivitySentence::register();
+		do_action( 'beltoft_services_boot', 'activity' );
 		Status::register();
 		Checkout::register();
 		IntroCoupon::register();
@@ -184,7 +164,7 @@ final class Plugin {
 		Account\ServiceArea::register();
 		Domains\Domains::register();
 		Proxmox\Db\Databases::register();
-		Hosting\Hosting::register();
+		do_action( 'beltoft_services_boot', 'areas' );
 		Http\AccountApps::register();
 		Mail\Email::register();
 		Ssl\Ssl::register();
@@ -196,7 +176,7 @@ final class Plugin {
 		Proxmox\Db\DbPicker::register();
 		Account\Overview::register();
 		Account\OrderTarget::register();
-		Hosting\OrderTarget::register();
+		do_action( 'beltoft_services_boot', 'order_target' );
 		Proxmox\Addon\OrderTarget::register();
 		Account\OverviewOrder::register();
 		Account\Billing::register();
@@ -213,7 +193,7 @@ final class Plugin {
 		Apps\PleskProductCommand::register();
 		Ssl\SslCommand::register();
 		Licences\LicenceProductCommand::register();
-		Hosting\HostingCommand::register();
+		do_action( 'beltoft_services_boot', 'cli' );
 		ManualServer\DedicatedCommand::register();
 		Domains\ParkingCommand::register();
 		Usage\PaygCommand::register();
@@ -244,7 +224,7 @@ final class Plugin {
 		Proxmox\Network\McpTools::register();
 		Proxmox\Vm\McpTools::register();
 		Domains\McpTools::register();
-		Hosting\McpTools::register();
+		do_action( 'beltoft_services_boot', 'mcp' );
 		Mail\McpTools::register();
 		ManualServer\McpTools::register();
 		Mcp\Endpoint::register();
@@ -351,6 +331,7 @@ final class Plugin {
 
 		// Later tasks register their parts here.
 		self::$booted = true;
+		do_action( 'beltoft_services_boot', 'booted' );
 	}
 
 	/**

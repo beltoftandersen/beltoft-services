@@ -384,7 +384,7 @@ final class Settings {
 	}
 
 	/**
-	 * Sanitises the whole option. Unknown keys are dropped. A field that was not submitted
+	 * Sanitises the whole option. Stored keys that no field declares are kept as they are (the feature that owns them may be off). A field that was not submitted
 	 * (it sits on another tab) keeps its saved value.
 	 *
 	 * @param mixed $input Raw input.
@@ -490,6 +490,17 @@ final class Settings {
 					break;
 				default:
 					$clean[ $key ] = sanitize_text_field( (string) $raw );
+			}
+		}
+
+		// A feature that is switched off declares no fields, and a save must not wipe what it stored.
+		$stored = get_option( self::OPTION, array() );
+
+		if ( is_array( $stored ) ) {
+			foreach ( $stored as $key => $value ) {
+				if ( ! array_key_exists( $key, $clean ) ) {
+					$clean[ $key ] = $value;
+				}
 			}
 		}
 

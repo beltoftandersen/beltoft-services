@@ -215,4 +215,25 @@ class SettingsTest extends TestCase {
 		$html = ob_get_clean();
 		$this->assertStringNotContainsString( 'Services stop up to a day late', $html );
 	}
+
+	/**
+	 * A key that no registered field declares (its feature is off) survives a save; declared fields behave as before.
+	 */
+	public function test_sanitize_keeps_stored_keys_no_field_declares(): void {
+		update_option(
+			Settings::OPTION,
+			array(
+				'feature_off_key' => 'kept',
+				'feature_off_num' => 7,
+			)
+		);
+
+		$clean = Settings::sanitize( array( 'deletion_mode' => 'nonsense' ) );
+
+		$this->assertSame( 'kept', $clean['feature_off_key'] );
+		$this->assertSame( 7, $clean['feature_off_num'] );
+		$this->assertSame( Settings::fields()['deletion_mode']['default'], $clean['deletion_mode'] );
+		$this->assertArrayHasKey( 'deletion_mode', $clean );
+		$this->assertArrayNotHasKey( 'not_stored_and_not_declared', Settings::sanitize( array( 'not_stored_and_not_declared' => 'x' ) ) );
+	}
 }
