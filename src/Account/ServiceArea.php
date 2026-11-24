@@ -125,6 +125,21 @@ abstract class ServiceArea {
 	}
 
 	/**
+	 * The area with a key, or null when its feature is not loaded (hosting may be a separate plugin).
+	 *
+	 * @param string $key Area key (key_name()).
+	 */
+	public static function find( string $key ): ?ServiceArea {
+		foreach ( self::all() as $area ) {
+			if ( $area->key_name() === $key ) {
+				return $area;
+			}
+		}
+
+		return null;
+	}
+
+	/**
 	 * Does the area lead the tab list (before the VPS tab)? Domains does.
 	 */
 	public function leads(): bool {

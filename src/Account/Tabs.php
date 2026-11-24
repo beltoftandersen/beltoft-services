@@ -49,7 +49,7 @@ final class Tabs {
 
 		$missing = array();
 
-		foreach ( array_merge( array( ServerLinks::slug() ), array_map( static fn( string $key ): string => ServiceArea::by_key( $key )->slug(), array( 'databases', 'hosting', 'domains', 'email', 'apps', 'ssl', 'licences' ) ) ) as $slug ) {
+		foreach ( array_merge( array( ServerLinks::slug() ), array_map( static fn( ServiceArea $area ): string => $area->slug(), array_filter( array_map( array( ServiceArea::class, 'find' ), array( 'databases', 'hosting', 'domains', 'email', 'apps', 'ssl', 'licences' ) ) ) ) ) as $slug ) {
 			if ( ! isset( $items[ $slug ] ) && isset( $labels[ $slug ] ) ) {
 				$missing[ $slug ] = $labels[ $slug ];
 			}

@@ -144,7 +144,13 @@ final class OverviewData {
 		$area_views = array( 'databases' => array(), 'hosting' => array(), 'apps' => array(), 'mail' => array() );
 
 		foreach ( Overview::AREAS as $key => $area_key ) {
-			foreach ( array_slice( (array) ( $groups[ ServiceArea::by_key( $area_key )->slug() ] ?? array() ), 0, 50 ) as $license ) {
+			$area = ServiceArea::find( $area_key );
+
+			if ( ! $area ) {
+				continue;
+			}
+
+			foreach ( array_slice( (array) ( $groups[ $area->slug() ] ?? array() ), 0, 50 ) as $license ) {
 				$view                          = View::license( $license );
 				$area_views[ $key ][]          = $view;
 				$names[ (int) $license['id'] ] = (string) $view['product'];
@@ -190,7 +196,11 @@ final class OverviewData {
 		$area_resources = array();
 
 		foreach ( Overview::AREAS as $key => $area_key ) {
-			$area = ServiceArea::by_key( $area_key );
+			$area = ServiceArea::find( $area_key );
+
+			if ( ! $area ) {
+				continue;
+			}
 
 			foreach ( $area_views[ $key ] as $view ) {
 				$resource = Resource::for_license( (int) $view['license']['id'] );
