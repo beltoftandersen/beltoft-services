@@ -55,7 +55,7 @@ final class ManagedField {
 		$product = ManagedCart::product();
 		$price   = wp_strip_all_tags( wc_price( (float) wc_get_price_to_display( $product ) ) ) . Panels::per( $product );
 
-		echo CheckBox::html( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in CheckBox::html().
+		$html = CheckBox::html(
 			'beltoft_services_managed',
 			self::AJAX,
 			self::NONCE,
@@ -64,6 +64,8 @@ final class ManagedField {
 			sprintf( __( 'Managed server, %s', 'beltoft-services' ), $price ),
 			__( 'We install operating system updates, act on the server\'s alerts and check that the backups run. Help with your own software is billed per started 15 minutes.', 'beltoft-services' )
 		);
+
+		echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in CheckBox::html().
 	}
 
 	public static function assets(): void {

@@ -68,7 +68,7 @@ final class PriorityField {
 		$product = Priority::product();
 		$price   = wp_strip_all_tags( wc_price( (float) wc_get_price_to_display( $product ) ) );
 
-		echo CheckBox::html( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in CheckBox::html().
+		$html = CheckBox::html(
 			'beltoft_services_priority',
 			self::AJAX,
 			self::NONCE,
@@ -77,6 +77,8 @@ final class PriorityField {
 			sprintf( __( 'Priority support, %s a month', 'beltoft-services' ), $price ),
 			__( 'An answer within 4 hours, from 8 to 22 every day, weekends included. Covers every service on your account.', 'beltoft-services' )
 		);
+
+		echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in CheckBox::html().
 	}
 
 	public static function assets(): void {
