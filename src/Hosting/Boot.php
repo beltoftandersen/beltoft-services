@@ -64,6 +64,7 @@ final class Boot {
 		HostingSwitch::register();
 		Addons::register();
 		HostingAccount::register();
+		AdminBridge::register();
 	}
 
 	/**
