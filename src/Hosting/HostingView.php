@@ -65,7 +65,7 @@ final class HostingView {
 	public static function render( string $name, array $v = array() ): void {
 		( static function ( string $file, array $v ): void {
 			include $file;
-		} )( BELTOFT_SERVICES_PATH . 'templates/account/hosting/' . $name . '.php', $v );
+		} )( Paths::dir( 'templates/account/hosting/' ) . $name . '.php', $v );
 	}
 
 	/**

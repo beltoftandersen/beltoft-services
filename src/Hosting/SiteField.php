@@ -428,8 +428,8 @@ final class SiteField {
 			return;
 		}
 
-		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/site-field.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/site-field.css' ) );
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/site-field.js', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/site-field.js' ), true );
+		wp_enqueue_style( self::HANDLE, Paths::url( 'assets/site-field.css' ), array(), Paths::version( 'assets/site-field.css' ) );
+		wp_enqueue_script( self::HANDLE, Paths::url( 'assets/site-field.js' ), array(), Paths::version( 'assets/site-field.js' ), true );
 		OrderDomain::enqueue();
 	}
 

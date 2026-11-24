@@ -68,7 +68,7 @@ final class HostingAccount {
 	 * The hosting panel's stylesheet.
 	 */
 	public static function style(): void {
-		wp_enqueue_style( self::HANDLE, plugins_url( 'assets/hosting.css', BELTOFT_SERVICES_FILE ), array(), \BeltoftServices\Assets::version( 'assets/hosting.css' ) );
+		wp_enqueue_style( self::HANDLE, Paths::url( 'assets/hosting.css' ), array(), Paths::version( 'assets/hosting.css' ) );
 	}
 
 	/**
@@ -80,7 +80,7 @@ final class HostingAccount {
 		$handle = \BeltoftServices\Account\Panel::HANDLE;
 
 		self::style();
-		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/hosting.js', BELTOFT_SERVICES_FILE ), array( $handle, \BeltoftServices\Status::HANDLE, \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/hosting.js' ), true );
+		wp_enqueue_script( self::HANDLE, Paths::url( 'assets/hosting.js' ), array( $handle, \BeltoftServices\Status::HANDLE, \BeltoftServices\Status::API_HANDLE ), Paths::version( 'assets/hosting.js' ), true );
 		wp_localize_script(
 			self::HANDLE,
 			'beltoftHosting',
