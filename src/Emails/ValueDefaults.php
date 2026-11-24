@@ -23,7 +23,7 @@ final class ValueDefaults {
 	 * @return array<string, mixed>
 	 */
 	public static function all(): array {
-		return array(
+		$defaults = array(
 			'extra_disks'           => array(),
 			'disk_server_url'       => '',
 			'disk_guide_url'        => '',
@@ -72,11 +72,16 @@ final class ValueDefaults {
 			'nameservers_shown'     => array(),
 			'dns_only'              => false,
 			'nameservers'           => array(),
-			'hosting'               => array( 'site_name' => '', 'site_url' => '', 'admin_url' => '', 'admin_user' => '', 'admin_email' => '', 'sftp_host' => '', 'sftp_port' => 0, 'sftp_user' => 'web', 'ssh' => false, 'domains' => array(), 'dns_records' => array(), 'has_email' => false ),
-			'hosting_notice'        => array( 'kind' => 'storage_warning', 'percent' => 0, 'used' => 0, 'limit' => 0, 'days' => 0, 'php' => '', 'php_default' => '', 'php_end' => '', 'site' => '' ),
-			'hosting_restore'       => array( 'kind' => 'account', 'ok' => true, 'until' => '', 'site' => '' ),
-			'hosting_malware'       => array( 'before' => '', 'sites' => array() ),
 			'ssl'                   => array( 'name' => '', 'smime' => false, 'reason' => 'dns', 'rows' => array(), 'approver' => '', 'valid_to' => '', 'by_customer' => false, 'pull_url' => '', 'key_waiting' => false ),
 		);
+
+		/**
+		 * The empty values of a feature's own template keys, laid after the core ones.
+		 *
+		 * @param array<string, mixed> $defaults Defaults so far.
+		 */
+		$defaults = apply_filters( 'beltoft_services_email_value_defaults', $defaults );
+
+		return is_array( $defaults ) ? $defaults : array();
 	}
 }

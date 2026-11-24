@@ -1,6 +1,8 @@
 <?php
 /** Customer email: the hosting account is ready. @package BeltoftServices */
-namespace BeltoftServices\Emails;
+namespace BeltoftServices\Hosting\Emails;
+
+use BeltoftServices\Emails\ServiceEmail;
 
 defined( 'ABSPATH' ) || exit;
 

@@ -113,7 +113,7 @@ class OpsTest extends HostingCase {
 		$r = $this->with_backup();
 
 		foreach ( array( 'html', 'plain' ) as $type ) {
-			foreach ( \BeltoftServices\Emails\HostingRestoreDone::KINDS as $kind ) {
+			foreach ( \BeltoftServices\Hosting\Emails\HostingRestoreDone::KINDS as $kind ) {
 				foreach ( array( true, false ) as $ok ) {
 					$this->mails       = array();
 					$email             = Emails::get( 'beltoft_services_hosting_restore_done' );

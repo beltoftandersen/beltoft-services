@@ -8,8 +8,8 @@
 namespace BeltoftServices\Hosting;
 
 use BeltoftServices\Domains\HostName;
-use BeltoftServices\Emails\HostingNotice;
-use BeltoftServices\Emails\HostingRestoreDone;
+use BeltoftServices\Hosting\Emails\HostingNotice;
+use BeltoftServices\Hosting\Emails\HostingRestoreDone;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
