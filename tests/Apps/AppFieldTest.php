@@ -23,6 +23,7 @@ use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\FakeClient;
 use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Vm\OsField;
+use BeltoftServices\Proxmox\Vm\Picked;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Proxmox\Vm\VmRecords;
 use BeltoftServices\Resource;
@@ -743,6 +744,32 @@ class AppFieldTest extends TestCase {
 		\BeltoftServices\Proxmox\Vm\Tiles::checkout_assets();
 		$this->assertFalse( wp_script_is( \BeltoftServices\Proxmox\Vm\Tiles::HANDLE, 'enqueued' ), 'No server in the cart, no tiles.' );
 		remove_filter( 'woocommerce_is_checkout', '__return_true' );
+	}
+
+	public function test_checkout_choices_are_kept_on_the_server_line_so_a_reload_shows_them(): void {
+		WC()->cart->add_to_cart( $this->vm()->get_id() );
+
+		do_action( 'woocommerce_checkout_update_order_review', http_build_query( array( AppField::POST_APP => 'docker', AppField::POST_VERSION => '29', OsField::POST_KEY => '9001', 'beltoft_services_server_name' => 'web1' ) ) );
+
+		$picked = Picked::for_cart();
+		$this->assertSame( 'docker', $picked['app'], 'A reload (such as removing a line) starts the field from the choice.' );
+		$this->assertSame( '29', $picked['version'] );
+		$this->assertSame( '9001', $picked['os'] );
+		$this->assertSame( 'web1', $picked['name'] );
+		$this->assertMatchesRegularExpression( '#<input[^>]*value="docker"[^>]*checked#', $this->html() );
+
+		WC()->cart->set_session();
+		WC()->cart->get_cart_from_session();
+		$this->assertSame( 'docker', Picked::for_cart()['app'], 'Kept in the cart session.' );
+
+		do_action( 'woocommerce_checkout_update_order_review', http_build_query( array( AppField::POST_APP => '', OsField::POST_KEY => '9000' ) ) );
+		$this->assertSame( '', Picked::for_cart()['app'], 'No app chosen: none kept.' );
+		$this->assertSame( '', Picked::for_cart()['version'] );
+		$this->assertSame( '9000', Picked::for_cart()['os'] );
+		$this->assertSame( 'web1', Picked::for_cart()['name'], 'A field the form did not post keeps its value.' );
+
+		do_action( 'woocommerce_checkout_update_order_review', http_build_query( array( 'billing_email' => 'x@example.com' ) ) );
+		$this->assertSame( '9000', Picked::for_cart()['os'], 'A form without the server step changes nothing.' );
 	}
 
 	public function test_the_checkout_markup_has_the_tiles_the_version_row_and_the_forced_system(): void {

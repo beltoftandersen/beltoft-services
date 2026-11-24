@@ -62,6 +62,7 @@ final class AppField {
 	 */
 	public static function register(): void {
 		add_action( 'woocommerce_after_order_notes', array( __CLASS__, 'render_classic' ), 15 );
+		add_action( 'woocommerce_checkout_update_order_review', array( __CLASS__, 'keep_posted' ), 5 );
 		add_action( 'woocommerce_after_checkout_validation', array( __CLASS__, 'validate_classic' ), 10, 2 );
 		// After OsField (10): the app has the last word on the operating system.
 		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'save_on_item' ), 20, 4 );
@@ -325,6 +326,35 @@ final class AppField {
 			'sub'       => $get( self::POST_SUB ),
 			'own_on'    => self::MODE_OWN === $mode,
 			'own'       => $get( self::POST_OWN ),
+		);
+	}
+
+	/**
+	 * Action woocommerce_checkout_update_order_review: the app choices go onto the new server's line (Picked), so a reload
+	 * prints them as chosen. Only a form that carries the app field; a field it does not post (a hidden edition) is empty.
+	 *
+	 * @param mixed $post_data The checkout form, query-string encoded (WooCommerce unslashed it).
+	 */
+	public static function keep_posted( $post_data ): void {
+		parse_str( is_string( $post_data ) ? $post_data : '', $data );
+
+		if ( ! array_key_exists( self::POST_APP, $data ) ) {
+			return;
+		}
+
+		$get  = static fn( string $key ): string => isset( $data[ $key ] ) && is_scalar( $data[ $key ] ) ? (string) $data[ $key ] : '';
+		$mode = $get( self::POST_DOMAIN );
+
+		Picked::keep(
+			array(
+				'app'       => $get( self::POST_APP ),
+				'version'   => $get( self::POST_VERSION ),
+				'tier'      => $get( self::POST_TIER ),
+				'domain_on' => '' !== $mode && self::MODE_OWN !== $mode ? '1' : '',
+				'zone'      => $get( self::POST_ZONE ),
+				'sub'       => $get( self::POST_SUB ),
+				'own'       => self::MODE_OWN === $mode ? $get( self::POST_OWN ) : '',
+			)
 		);
 	}
 

@@ -276,6 +276,7 @@ final class Plugin {
 		Proxmox\Vm\ServerName::register();
 		Proxmox\Vm\SshKeyField::register();
 		Proxmox\Vm\OsField::register();
+		Proxmox\Vm\Picked::register();
 		Proxmox\Db\DbTermsField::register();
 		Proxmox\Vm\Tiles::register();
 		Apps\AppField::register();
