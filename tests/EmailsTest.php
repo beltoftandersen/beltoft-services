@@ -566,6 +566,47 @@ final class EmailsTest extends TestCase {
 		$this->assertStringContainsString( 'reached the end of its keeping time', (string) preg_replace( '/\s+/', ' ', (string) $this->customer_mails()[0]['message'] ) );
 	}
 
+	public function test_without_the_hosting_registry_no_hosting_email_exists_and_nothing_is_sent_or_thrown(): void {
+		$this->fake_driver( 'hosting' );
+		$product  = $this->service_product( 'hosting' );
+		$license  = $this->service_license( $product, array( 'fire' => false ) );
+		$resource = Resource::find( Resource::create( $license, Registry::get( 'hosting' ), array(), array( 'state' => 'ready' ) )->id() );
+
+		$with = Emails::ids();
+		$this->assertContains( 'beltoft_services_hosting_ready', $with );
+		$this->assertSame( 'beltoft_services_hosting_malware_found', end( $with ), 'The hosting emails come after the core ones.' );
+
+		$registry = \BeltoftServices\Hosting\EmailRegistry::class;
+		remove_filter( 'beltoft_services_email_classes', array( $registry, 'classes' ) );
+		remove_filter( 'beltoft_services_email_definitions', array( $registry, 'definitions' ) );
+		remove_filter( 'beltoft_services_email_value_defaults', array( $registry, 'value_defaults' ) );
+		// A new mailer, as a request without hosting would have: the old one keeps the instances it built.
+		$instance = new \ReflectionProperty( \WC_Emails::class, 'instance' );
+		$old      = $instance->getValue();
+		$instance->setValue( null, null );
+
+		$this->assertNotContains( 'beltoft_services_hosting_ready', Emails::ids() );
+		$this->assertArrayNotHasKey( 'BeltoftServices_HostingReady', WC()->mailer()->get_emails() );
+		$this->assertArrayNotHasKey( 'hosting_notice', \BeltoftServices\Emails\ValueDefaults::all() );
+		$this->assertNull( Emails::get( 'beltoft_services_hosting_ready' ) );
+
+		$this->mails = array();
+		$this->assertFalse( Emails::send( 'beltoft_services_hosting_ready', $resource ) );
+		$resource->set( array( 'notified' => '' ) );
+		Emails::on_state_changed( $resource, 'provisioning', 'ready' );
+		$this->assertCount( 0, $this->customer_mails(), 'Nothing is sent.' );
+
+		try {
+			\BeltoftServices\Emails\Definitions::get( 'beltoft_services_hosting_ready' );
+			$this->fail( 'An unknown id still throws.' );
+		} catch ( \InvalidArgumentException $e ) {
+			$this->assertStringContainsString( 'beltoft_services_hosting_ready', $e->getMessage() );
+		} finally {
+			$instance->setValue( null, $old );
+			\BeltoftServices\Hosting\EmailRegistry::register();
+		}
+	}
+
 	public function test_the_definitions_match_the_fixture_word_for_word(): void {
 		$fixture = require BELTOFT_SERVICES_PATH . 'tests/fixtures/email-definitions.php';
 
@@ -577,7 +618,7 @@ final class EmailsTest extends TestCase {
 	}
 
 	public function test_every_class_in_the_registry_has_a_definition_and_the_templates_follow_the_id(): void {
-		$classes = ( new \ReflectionClassConstant( Emails::class, 'CLASSES' ) )->getValue();
+		$classes = Emails::classes();
 		$seen    = array();
 
 		foreach ( $classes as $class ) {

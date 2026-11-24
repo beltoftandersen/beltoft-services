@@ -56,7 +56,7 @@ final class Definitions {
 	 * @return array<string, array<string, string>>
 	 */
 	private static function table(): array {
-		return array(
+		$rows = array(
 			'beltoft_services_ready' => array(
 				'title'       => __( 'Service ready', 'beltoft-services' ),
 				'description' => __( 'Sent to the customer when their service is ready to use.', 'beltoft-services' ),
@@ -171,30 +171,6 @@ final class Definitions {
 				'subject'     => __( 'DNS records are still missing for {domain_name}', 'beltoft-services' ),
 				'heading'     => __( 'DNS records are still missing', 'beltoft-services' ),
 			),
-			'beltoft_services_hosting_ready' => array(
-				'title'       => __( 'Hosting ready', 'beltoft-services' ),
-				'description' => __( 'Sent when a hosting account is set up. It has the address of the site, the WordPress admin link (for a website with WordPress), the SFTP details and the DNS records an external domain needs. It never holds a password.', 'beltoft-services' ),
-				'subject'     => __( 'Your hosting {product_name} is ready', 'beltoft-services' ),
-				'heading'     => __( 'Your hosting is ready', 'beltoft-services' ),
-			),
-			'beltoft_services_hosting_notice' => array(
-				'title'       => __( 'Hosting notice', 'beltoft-services' ),
-				'description' => __( 'Sent when a hosting account is close to or over its storage, and before and when a PHP version loses security support.', 'beltoft-services' ),
-				'subject'     => __( 'About your hosting {product_name}', 'beltoft-services' ),
-				'heading'     => __( 'About your hosting', 'beltoft-services' ),
-			),
-			'beltoft_services_hosting_restore_done' => array(
-				'title'       => __( 'Hosting restore finished', 'beltoft-services' ),
-				'description' => __( 'Sent when a restore or an undo of a hosting account has finished or has failed. It says what was restored and until when it can be undone.', 'beltoft-services' ),
-				'subject'     => __( 'Your hosting restore has finished', 'beltoft-services' ),
-				'heading'     => __( 'Your restore has finished', 'beltoft-services' ),
-			),
-			'beltoft_services_hosting_malware_found' => array(
-				'title'       => __( 'Hosting malware found', 'beltoft-services' ),
-				'description' => __( 'Sent when the nightly scan of a hosting account finds files that match known malware. It names the websites and the files and says what to do. Nothing is removed or changed, and the websites stay online.', 'beltoft-services' ),
-				'subject'     => __( 'Malware found on your hosting {product_name}', 'beltoft-services' ),
-				'heading'     => __( 'Malware found on your website', 'beltoft-services' ),
-			),
 			'beltoft_services_renewal_reminder' => array(
 				'title'       => __( 'Renewal reminder', 'beltoft-services' ),
 				'description' => __( 'Sent a product-set number of days before a long renewal (for example 30 days before a yearly hosting renewal): the plan, the date, the full price and how to cancel.', 'beltoft-services' ),
@@ -232,5 +208,15 @@ final class Definitions {
 				'heading'     => __( 'Your domain must be renewed', 'beltoft-services' ),
 			),
 		);
+
+		/**
+		 * The rows of emails a feature owns, after the core ones: id => title, description, subject and heading (the same
+		 * keys as the rows above; the templates follow the id).
+		 *
+		 * @param array<string, array<string, string>> $rows The rows so far.
+		 */
+		$rows = apply_filters( 'beltoft_services_email_definitions', $rows );
+
+		return is_array( $rows ) ? $rows : array();
 	}
 }

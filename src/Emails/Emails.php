@@ -40,7 +40,7 @@ final class Emails {
 	public const BATCH      = 50;
 
 	/**
-	 * The email classes, keyed as WooCommerce keys them.
+	 * The core email classes, keyed as WooCommerce keys them. A feature adds its own through beltoft_services_email_classes.
 	 */
 	private const CLASSES = array(
 		'BeltoftServices_Ready'           => Ready::class,
@@ -62,10 +62,6 @@ final class Emails {
 		'BeltoftServices_Notice' => Notice::class,
 		'BeltoftServices_MailReady' => MailReady::class,
 		'BeltoftServices_MailDnsReminder' => MailDnsReminder::class,
-		'BeltoftServices_HostingReady' => HostingReady::class,
-		'BeltoftServices_HostingNotice' => HostingNotice::class,
-		'BeltoftServices_HostingRestoreDone' => HostingRestoreDone::class,
-		'BeltoftServices_HostingMalwareFound' => HostingMalwareFound::class,
 		'BeltoftServices_RenewalReminder' => RenewalReminder::class,
 		'BeltoftServices_StepUpCode' => StepUpCode::class,
 		'BeltoftServices_SslIssued' => SslIssued::class,
@@ -74,6 +70,23 @@ final class Emails {
 		'BeltoftServices_SslExpiring' => SslExpiring::class,
 		'BeltoftServices_DomainUnpaid' => DomainUnpaid::class,
 	);
+
+	/**
+	 * The email classes: the core ones and the features'.
+	 *
+	 * @return array<string, class-string<ServiceEmail>>
+	 */
+	public static function classes(): array {
+		/**
+		 * Email classes a feature adds, keyed as WooCommerce keys them (BeltoftServices_<Name>). Each needs a definition
+		 * (beltoft_services_email_definitions); one whose class is missing is skipped.
+		 *
+		 * @param array<string, string> $classes Core classes so far.
+		 */
+		$classes = apply_filters( 'beltoft_services_email_classes', self::CLASSES );
+
+		return is_array( $classes ) ? $classes : self::CLASSES;
+	}
 
 	/**
 	 * The ids of the emails, from the definitions.
@@ -106,8 +119,10 @@ final class Emails {
 			return $emails;
 		}
 
-		foreach ( self::CLASSES as $key => $class ) {
-			$emails[ $key ] = new $class();
+		foreach ( self::classes() as $key => $class ) {
+			if ( is_string( $class ) && class_exists( $class ) ) {
+				$emails[ $key ] = new $class();
+			}
 		}
 
 		return $emails;

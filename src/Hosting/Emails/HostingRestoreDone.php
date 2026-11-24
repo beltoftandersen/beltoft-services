@@ -1,6 +1,8 @@
 <?php
 /** Customer email: a restore of a hosting account has ended. @package BeltoftServices */
-namespace BeltoftServices\Emails;
+namespace BeltoftServices\Hosting\Emails;
+
+use BeltoftServices\Emails\ServiceEmail;
 
 defined( 'ABSPATH' ) || exit;
 

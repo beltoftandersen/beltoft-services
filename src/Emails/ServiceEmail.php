@@ -62,7 +62,7 @@ abstract class ServiceEmail extends \WC_Email {
 		}
 
 		$this->customer_email = true;
-		$this->template_base  = BELTOFT_SERVICES_PATH . 'templates/';
+		$this->template_base  = $this->templates_base();
 		$this->placeholders   = array(
 			'{product_name}'  => '',
 			'{deletion_date}' => '',
@@ -70,6 +70,14 @@ abstract class ServiceEmail extends \WC_Email {
 		);
 
 		parent::__construct();
+	}
+
+	/**
+	 * The folder the templates are looked up in (WooCommerce's template_base). A feature's email overrides this when its
+	 * templates live in its own folder; the template paths stay the definition's.
+	 */
+	protected function templates_base(): string {
+		return BELTOFT_SERVICES_PATH . 'templates/';
 	}
 
 	/**

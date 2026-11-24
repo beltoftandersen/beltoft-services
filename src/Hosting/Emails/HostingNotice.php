@@ -1,6 +1,8 @@
 <?php
 /** Customer email: a notice about a hosting account (storage, PHP version). @package BeltoftServices */
-namespace BeltoftServices\Emails;
+namespace BeltoftServices\Hosting\Emails;
+
+use BeltoftServices\Emails\ServiceEmail;
 
 defined( 'ABSPATH' ) || exit;
 
