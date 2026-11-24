@@ -92,6 +92,8 @@ class PriorityFieldTest extends BackupTestCase {
 		$this->assertSame( 1, $this->lines( $product->get_id() ) );
 		$this->assertStringContainsString( 'checked', $this->html() );
 
+		$this->assertTrue( \BeltoftServices\CartCompanion::keeps( array( 'product_id' => 1 ), array( PriorityField::WITH => 'cart', 'product_id' => $product->get_id() ) ), 'The site rule of one purchase per cart keeps the server.' );
+
 		$this->assertTrue( PriorityField::choose( false )['ok'] );
 		$this->assertSame( 0, $this->lines( $product->get_id() ) );
 	}

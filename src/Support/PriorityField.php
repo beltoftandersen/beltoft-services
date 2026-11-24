@@ -21,10 +21,30 @@ final class PriorityField {
 	public const AJAX  = 'beltoft_services_priority_field';
 	public const NONCE = 'beltoft-services-priority-field';
 
+	/** Cart item key of a line added by the box: it sits beside the other purchase of the cart (CartCompanion). */
+	public const WITH = 'beltoft_services_priority_with';
+
 	public static function register(): void {
 		add_action( 'woocommerce_after_order_notes', array( __CLASS__, 'render' ) );
 		add_action( 'wc_ajax_' . self::AJAX, array( __CLASS__, 'ajax' ) );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
+		add_filter( 'beltoft_services_cart_companion', array( __CLASS__, 'companion' ), 10, 3 );
+	}
+
+	/**
+	 * Filter beltoft_services_cart_companion: a line added by the box keeps the cart as it is, and stays when the customer
+	 * changes the other purchase (another plan, for example).
+	 *
+	 * @param mixed $keep Answer so far.
+	 * @param mixed $line Existing line.
+	 * @param mixed $new  Line being added.
+	 */
+	public static function companion( $keep, $line = array(), $new = array() ) {
+		if ( true === $keep ) {
+			return true;
+		}
+
+		return ( is_array( $new ) && isset( $new[ self::WITH ] ) ) || ( is_array( $line ) && isset( $line[ self::WITH ] ) );
 	}
 
 	/** Is there a box: the product is sold, the customer has none, and the cart holds another service. */
@@ -112,7 +132,7 @@ final class PriorityField {
 			$cart->remove_cart_item( $key );
 		}
 
-		if ( $on && array() === self::keys() && ! $cart->add_to_cart( Priority::product()->get_id() ) ) {
+		if ( $on && array() === self::keys() && ! $cart->add_to_cart( Priority::product()->get_id(), 1, 0, array(), array( self::WITH => 'cart' ) ) ) {
 			return array( 'ok' => false, 'on' => false );
 		}
 
