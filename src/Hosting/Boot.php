@@ -91,6 +91,7 @@ final class Boot {
 		Actions\Steps::register();
 		MalwareScan::register();
 		RestoreTest::register();
+		ParkingBridge::register();
 	}
 
 	/**

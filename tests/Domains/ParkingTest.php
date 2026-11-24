@@ -317,4 +317,18 @@ class ParkingTest extends TestCase {
 		$this->expectException( \Throwable::class );
 		$cli->add( array(), array() );
 	}
+
+	public function test_the_push_command_says_so_when_nothing_answers_and_reports_when_hosting_does(): void {
+		$cli = new ParkingCommand();
+		\WP_CLI::reset();
+		$cli->push( array(), array() );
+		$this->assertStringContainsString( 'names sent to', wp_json_encode( \WP_CLI::$lines ) );
+
+		remove_filter( 'beltoft_services_parked_edge_hosts', array( \BeltoftServices\Hosting\ParkingBridge::class, 'hosts' ), 10 );
+		remove_filter( 'beltoft_services_parked_edge_push', array( \BeltoftServices\Hosting\ParkingBridge::class, 'push' ), 10 );
+		\WP_CLI::reset();
+		$cli->push( array(), array() );
+		$this->assertStringContainsString( 'Nothing pushes parked names', wp_json_encode( \WP_CLI::$lines ) );
+		$this->assertStringNotContainsString( 'names sent to', wp_json_encode( \WP_CLI::$lines ) );
+	}
 }
