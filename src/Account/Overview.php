@@ -251,8 +251,14 @@ final class Overview {
 			case 'apps':
 			case 'mail':
 				// Every area shows, with its empty line and create button when the customer has nothing in it.
+				$area = ServiceArea::find( self::AREAS[ $section ] );
+
+				// The feature that owns the area is not loaded: no section, not an empty one.
+				if ( ! $area ) {
+					return '';
+				}
+
 				if ( ! $data[ $section ] ) {
-					$area = ServiceArea::by_key( self::AREAS[ $section ] );
 
 					return self::empty_section( $section, $area->label(), $area->empty_line(), $area->buttons() );
 				}
@@ -261,8 +267,8 @@ final class Overview {
 					'overview/rows.php',
 					array(
 						'class'   => $section,
-						'heading' => ServiceArea::by_key( self::AREAS[ $section ] )->label(),
-						'more'    => ServiceArea::by_key( self::AREAS[ $section ] )->all_label(),
+						'heading' => $area->label(),
+						'more'    => $area->all_label(),
 						'url'     => $data[ $section . '_url' ],
 						'rows'    => array_slice( $data[ $section ], 0, self::limit() ),
 					)
