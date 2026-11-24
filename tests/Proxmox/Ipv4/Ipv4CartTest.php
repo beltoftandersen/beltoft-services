@@ -184,7 +184,8 @@ class Ipv4CartTest extends BackupTestCase {
 		$this->assertFalse( $target['box'] );
 		$html = $this->html();
 		$this->assertStringContainsString( 'type="number"', $html );
-		$this->assertStringContainsString( 'IPv4 address, ', $html );
+		$this->assertStringContainsString( 'Extra IPv4 addresses, ', $html, 'The server already has one address: the number counts extra ones.' );
+		$this->assertStringContainsString( 'Your server includes one IPv4 address.', $html );
 		$this->assertStringContainsString( '19', $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
 
@@ -261,6 +262,7 @@ class Ipv4CartTest extends BackupTestCase {
 		$this->assertTrue( $target['box'] );
 		$this->assertSame( 1, $target['max'] );
 		$this->assertStringContainsString( 'type="checkbox"', $this->html() );
+		$this->assertStringNotContainsString( 'Extra IPv4', $this->html(), 'A basic server has no address yet: the box is its first.' );
 		$this->assertTrue( Ipv4Field::choose( 5 )['ok'] );
 		$this->assertSame( 1, $this->lines(), 'A box is one address.' );
 

@@ -94,8 +94,14 @@ final class Ipv4Field {
 		$price   = $product instanceof \WC_Product_Variation && Rates::is_usage( $product ) ? Rates::addon_terms( $product ) : ( $product instanceof \WC_Product_Variation ? Panels::price_text( $product ) : ( $product ? wp_strip_all_tags( wc_price( (float) wc_get_price_to_display( $product ) ) ) . Panels::per( $product ) : '' ) );
 		$chosen  = self::chosen();
 		$free    = IpPool::available_for_addon() > 0 || $chosen > 0;
-		/* translators: %s: the price, such as 19 kr. a month */
-		$label = '' === $price ? __( 'IPv4 address', 'beltoft-services' ) : sprintf( __( 'IPv4 address, %s', 'beltoft-services' ), $price );
+		if ( $target['box'] ) {
+			/* translators: %s: the price, such as 19 kr. a month */
+			$label = '' === $price ? __( 'IPv4 address', 'beltoft-services' ) : sprintf( __( 'IPv4 address, %s', 'beltoft-services' ), $price );
+		} else {
+			// A dedicated server already has one address in its plan: the number counts extra ones.
+			/* translators: %s: the price of one address, such as 19 kr. a month */
+			$label = '' === $price ? __( 'Extra IPv4 addresses', 'beltoft-services' ) : sprintf( __( 'Extra IPv4 addresses, %s each', 'beltoft-services' ), $price );
+		}
 
 		if ( ! $free ) {
 			Ipv4Alerts::sold_out();
@@ -128,7 +134,7 @@ final class Ipv4Field {
 		} elseif ( $target['box'] ) {
 			echo '<p class="description">' . esc_html__( 'A server with an IPv6 address only can be reached over IPv6. An IPv4 address makes it reachable over IPv4 too. The first IPv4 address becomes the main address of the server.', 'beltoft-services' ) . '</p>';
 		} else {
-			echo '<p class="description">' . esc_html__( 'Your server has one IPv4 address. Extra addresses are set up in the server itself, which the dashboard explains.', 'beltoft-services' ) . '</p>';
+			echo '<p class="description">' . esc_html__( 'Your server includes one IPv4 address. Enter how many extra addresses you want. They are set up in the server itself, which the dashboard explains.', 'beltoft-services' ) . '</p>';
 		}
 
 		if ( ! $free ) {

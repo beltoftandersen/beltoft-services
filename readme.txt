@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.61.0
+Stable tag: 0.61.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.61.1 =
+* Checkout: for a dedicated server the IPv4 number is labelled as extra addresses ("Extra IPv4 addresses, 19 kr. a month each"), since the plan already includes one. The VPS Basic box is unchanged.
 
 = 0.61.0 =
 * The checkout offers Managed server and Priority support as tick boxes. Managed server shows when the order has a new server and is bought together with it (the service finds its server in the same order once it is made); Priority support shows with any new service when the customer does not have it. Both work for a visitor, whose account is made at checkout. Priority support no longer asks the customer to log in first; a signed-in customer who has it already is refused at checkout. One shared checkout script (assets/check-box.js) for both boxes.
