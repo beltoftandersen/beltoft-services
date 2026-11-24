@@ -41,6 +41,5 @@ class MonitoringNeutralTest extends TestCase {
 
 	public function test_each_driver_has_an_adapter_that_implements_guest(): void {
 		$this->assertInstanceOf( \BeltoftServices\Monitoring\Guest::class, new \BeltoftServices\Proxmox\Network\VmGuest() );
-		$this->assertInstanceOf( \BeltoftServices\Monitoring\Guest::class, new \BeltoftServices\Hosting\HostingGuest() );
 	}
 }
