@@ -10,7 +10,6 @@ namespace BeltoftServices\Proxmox\Managed;
 use BeltoftServices\Checkout\CheckBox;
 use BeltoftServices\Proxmox\Backup\CartSwap;
 use BeltoftServices\Proxmox\Disk\DiskField;
-use BeltoftServices\Proxmox\Vm\Panels;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -53,15 +52,15 @@ final class ManagedField {
 		}
 
 		$product = ManagedCart::product();
-		$price   = wp_strip_all_tags( wc_price( (float) wc_get_price_to_display( $product ) ) ) . Panels::per( $product );
+		$price   = CheckBox::price( $product );
 
 		$html = CheckBox::html(
 			'beltoft_services_managed',
 			self::AJAX,
 			self::NONCE,
 			self::chosen() > 0,
-			/* translators: %s: the price, such as 299 kr. a month */
-			sprintf( __( 'Managed server, %s', 'beltoft-services' ), $price ),
+			/* translators: %s: the monthly price, such as 299 kr. */
+			sprintf( __( 'Managed server, %s a month', 'beltoft-services' ), $price ),
 			__( 'We install operating system updates, act on the server\'s alerts and check that the backups run. Help with your own software is billed per started 15 minutes.', 'beltoft-services' )
 		);
 

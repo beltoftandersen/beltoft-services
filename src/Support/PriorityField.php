@@ -66,7 +66,7 @@ final class PriorityField {
 		}
 
 		$product = Priority::product();
-		$price   = wp_strip_all_tags( wc_price( (float) wc_get_price_to_display( $product ) ) );
+		$price   = CheckBox::price( $product );
 
 		$html = CheckBox::html(
 			'beltoft_services_priority',

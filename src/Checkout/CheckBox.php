@@ -41,6 +41,17 @@ final class CheckBox {
 	}
 
 	/**
+	 * A product's price as the box shows it: whole amounts without decimals ("299 kr.").
+	 *
+	 * @param \WC_Product $product Product.
+	 */
+	public static function price( \WC_Product $product ): string {
+		$amount = (float) wc_get_price_to_display( $product );
+
+		return html_entity_decode( wp_strip_all_tags( wc_price( $amount, array( 'decimals' => abs( $amount - round( $amount ) ) < 0.005 ? 0 : wc_get_price_decimals() ) ) ), ENT_QUOTES, 'UTF-8' );
+	}
+
+	/**
 	 * The script, once, on the checkout page.
 	 */
 	public static function enqueue(): void {
