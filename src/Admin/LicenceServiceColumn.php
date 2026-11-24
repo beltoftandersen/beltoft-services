@@ -9,8 +9,6 @@ namespace BeltoftServices\Admin;
 
 use BeltoftLicenses\Admin\Screen as LicenceScreen;
 use BeltoftServices\Apps\Apps;
-use BeltoftServices\Hosting\HostingDriver;
-use BeltoftServices\Hosting\SiteDomains;
 use BeltoftServices\ManualServer\ManualServerDriver;
 use BeltoftServices\Proxmox\Db\DbEngines;
 use BeltoftServices\Proxmox\Vm\Provision;
@@ -131,20 +129,19 @@ final class LicenceServiceColumn {
 			self::load( array_values( $servers ) );
 		}
 
-		$accounts = array();
+		$resources = array();
 
 		foreach ( self::$live as $list ) {
 			foreach ( $list as $r ) {
-				if ( HostingDriver::KIND === $r->kind() ) {
-					$accounts[] = $r->id();
-				}
+				$resources[] = $r;
 			}
 		}
 
-		foreach ( SiteDomains::for_resources( $accounts ) as $resource_id => $names ) {
-			$non_preview = array_filter( $names, static fn( $n ) => 'preview' !== $n['kind'] );
-			$use         = $non_preview ? $non_preview : $names;
-			self::$hosts[ $resource_id ] = array_values( array_unique( array_map( static fn( $n ) => (string) $n['host'], $use ) ) );
+		// A feature that names its services from its own tables answers here: resource id => names.
+		$names = apply_filters( 'beltoft_services_licence_column_names', array(), $resources );
+
+		if ( is_array( $names ) ) {
+			self::$hosts = $names;
 		}
 	}
 
@@ -249,9 +246,6 @@ final class LicenceServiceColumn {
 				$name  = '' !== $label ? sprintf( __( '%s database', 'beltoft-services' ), $label ) : __( 'Database', 'beltoft-services' );
 				$out[] = '' !== $ip ? $name . ' (' . $ip . ')' : $name;
 				break;
-			case HostingDriver::KIND:
-				$out = self::$hosts[ $r->id() ] ?? array();
-				break;
 			case 'mail':
 				$out[] = $meta( 'mail_domain' );
 				break;
@@ -282,6 +276,9 @@ final class LicenceServiceColumn {
 				break;
 			case 'storage':
 				$out[] = $meta( 'storage_name' );
+				break;
+			default:
+				$out = self::$hosts[ $r->id() ] ?? array();
 				break;
 		}
 

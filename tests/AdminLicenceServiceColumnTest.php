@@ -124,6 +124,25 @@ final class AdminLicenceServiceColumnTest extends TestCase {
 		$this->assertSame( array( 'shop.example' ), array_column( $entries, 0 ) );
 	}
 
+	public function test_without_an_answer_hosting_shows_no_names_and_no_error(): void {
+		$license = $this->holding( 'hosting', array() );
+
+		remove_all_filters( 'beltoft_services_licence_column_names' );
+
+		$entries = $this->cells( array( $license ) )[ (int) $license['id'] ];
+
+		$this->assertSame( array(), $entries );
+	}
+
+	public function test_the_bridge_adds_the_container_version_row_only_for_hosting(): void {
+		$license = $this->holding( 'hosting', array() );
+		$r       = \BeltoftServices\Resource::find( (int) Licenses::resources( (int) $license['id'] )[0]['id'] );
+
+		$rows = \BeltoftServices\Hosting\AdminBridge::detail_rows( array(), $r );
+		$this->assertArrayHasKey( 'Container files version', $rows );
+		$this->assertSame( array(), \BeltoftServices\Hosting\AdminBridge::detail_rows( array(), 'nope' ) );
+	}
+
 	public function test_a_license_without_a_service_has_an_empty_cell(): void {
 		$license = $this->service_license( $this->service_product(), array( 'fire' => false ) );
 

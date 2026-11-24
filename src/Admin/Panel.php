@@ -444,8 +444,11 @@ final class Panel {
 			__( 'Deletion warned', 'beltoft-services' ) => $warned ? wp_date( $format, $warned ) : '',
 		);
 
-		if ( \BeltoftServices\Hosting\HostingDriver::ID === $r->get( 'driver' ) ) {
-			$rows[ __( 'Container files version', 'beltoft-services' ) ] = '' === (string) $r->get( 'runner_version' ) ? '' : sprintf( /* translators: 1: version, 2: template id. */ __( '%1$s (template %2$d)', 'beltoft-services' ), (string) $r->get( 'runner_version' ), (int) $r->get( 'runner_for' ) );
+		// Features add their own rows for a resource: label => value, for this resource.
+		$extra = apply_filters( 'beltoft_services_panel_detail_rows', array(), $r );
+
+		if ( is_array( $extra ) ) {
+			$rows = array_merge( $rows, $extra );
 		}
 
 		if ( '' !== (string) $r->get( 'app_error' ) ) {
