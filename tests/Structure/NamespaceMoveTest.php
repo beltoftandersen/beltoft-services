@@ -11,7 +11,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Pins the C8 moves: the old names of moved classes are gone from every folder that holds code, the hooks in the
- * plugin file name classes that exist, and Hosting reaches into Proxmox only through the Pve platform layer.
+ * plugin file name classes that exist,.
  */
 class NamespaceMoveTest extends TestCase {
 
@@ -232,28 +232,5 @@ class NamespaceMoveTest extends TestCase {
 		foreach ( array_unique( $m[1] ) as $name ) {
 			$this->assertTrue( class_exists( $name ) || interface_exists( $name ) || trait_exists( $name ), $name );
 		}
-	}
-
-	public function test_hosting_reaches_into_proxmox_only_through_pve(): void {
-		$bad = array();
-		$it  = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( dirname( __DIR__, 2 ) . '/src/Hosting', \FilesystemIterator::SKIP_DOTS ) );
-
-		foreach ( $it as $file ) {
-			if ( 'php' !== $file->getExtension() ) {
-				continue;
-			}
-
-			foreach ( token_get_all( (string) file_get_contents( $file->getPathname() ) ) as $token ) {
-				if ( is_array( $token ) && in_array( $token[0], array( T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED ), true ) ) {
-					$name = ltrim( $token[1], '\\' );
-
-					if ( 0 === strpos( $name, 'BeltoftServices\\Proxmox\\' ) && 0 !== strpos( $name, 'BeltoftServices\\Proxmox\\Pve\\' ) ) {
-						$bad[] = $file->getFilename() . ' -> ' . $name;
-					}
-				}
-			}
-		}
-
-		$this->assertSame( array(), $bad );
 	}
 }

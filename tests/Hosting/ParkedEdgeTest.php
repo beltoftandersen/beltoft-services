@@ -6,7 +6,7 @@ use BeltoftServices\Domains\ParkingCommand;
 use BeltoftServices\Hosting\ParkedEdge;
 use BeltoftServices\Jobs;
 
-require_once dirname( __DIR__ ) . '/Support/WpCliStub.php';
+require_once BELTOFT_SERVICES_TESTS_DIR . '/Support/WpCliStub.php';
 
 class ParkedEdgeTest extends HostingCase {
 

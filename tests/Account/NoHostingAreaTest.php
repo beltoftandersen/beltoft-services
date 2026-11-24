@@ -1,11 +1,10 @@
 <?php
-/** My Account, the overview and the order pages when the hosting area is not offered (Hosting not loaded). @package BeltoftServices */
+/** My Account, the overview and the order pages when the hosting area is not offered (Hosting not loaded; with Hosting loaded the test takes its area out of the list). @package BeltoftServices */
 namespace BeltoftServices\Tests\Account;
 
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Drivers\Registry;
-use BeltoftServices\Hosting\Hosting;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
 
@@ -22,7 +21,9 @@ class NoHostingAreaTest extends TestCase {
 		Overview::reset();
 		$this->fake_driver();
 		// The offer is a closure, so the test takes the class out of the list after every feature added its own.
-		$this->without_hosting = static fn( $classes ) => array_values( array_diff( (array) $classes, array( Hosting::class ) ) );
+		$this->without_hosting = ( function ( array $skip ) {
+			return static fn( $classes ) => array_values( array_diff( (array) $classes, $skip ) );
+		} )( $this->optional( 'account_area_classes' ) );
 		add_filter( 'beltoft_services_account_areas', $this->without_hosting, 99 );
 	}
 

@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Tests\Structure;
 
+use BeltoftServices\Tests\Support\Scan;
+
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -26,7 +28,7 @@ class DriverIdLiteralTest extends TestCase {
 	);
 
 	public function test_the_literal_proxmox_is_not_used_as_a_driver_id(): void {
-		$root = dirname( __DIR__, 2 );
+		$root = Scan::root();
 		$bad  = array();
 		$it   = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $root . '/src', \FilesystemIterator::SKIP_DOTS ) );
 

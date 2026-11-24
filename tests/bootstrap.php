@@ -16,6 +16,12 @@ if ( 'cli' !== PHP_SAPI ) {
 	exit;
 }
 
+// The folder of the shared test code (TestCase, Support, Usage and Mcp helpers). Tests that sit in another plugin's tests
+// folder (hosting) require these helpers through it; that plugin's bootstrap defines it before it loads this one.
+if ( ! defined( 'BELTOFT_SERVICES_TESTS_DIR' ) ) {
+	define( 'BELTOFT_SERVICES_TESTS_DIR', __DIR__ );
+}
+
 $beltoft_services_tests_dir = getenv( 'WP_TESTS_DIR' ) ? getenv( 'WP_TESTS_DIR' ) : '/tmp/wordpress-tests-lib';
 $beltoft_services_site      = getenv( 'SITE_PLUGINS' );
 $beltoft_services_licenses  = getenv( 'BELTOFT_LICENSES_DIR' ) ? getenv( 'BELTOFT_LICENSES_DIR' ) : dirname( __DIR__, 2 ) . '/beltoft-licenses';
@@ -90,7 +96,8 @@ tests_add_filter(
 			\Bgcw\Support\Installer::create_tables();
 		}
 		\BeltoftServices\Proxmox\Vm\Schema::create_tables();
-		\BeltoftServices\Hosting\Schema::create_tables();
+		// A feature that has its own tables creates them here (hosting: tests/Hosting/bootstrap-hosting.php).
+		do_action( 'beltoft_services_tests_install' );
 
 		// The WordPress test installer empties the posts table on every run (so order ids start low again) but not
 		// WooCommerce's order item tables. Lines that a test committed (wcs_create_renewal_order() commits) outlive
@@ -115,7 +122,24 @@ tests_add_filter(
 	20
 );
 
+// Test support of the hosting feature (its tables, its per-test reset). BELTOFT_TEST_WITHOUT_HOSTING=1 proves the rest of
+// the suite does not need it: the hosting test bootstrap is not loaded and Hosting\Boot's listeners are removed before the
+// first boot stage runs (Plugin::boot() registers them and fires the stages straight away).
+if ( getenv( 'BELTOFT_TEST_WITHOUT_HOSTING' ) ) {
+	tests_add_filter(
+		'beltoft_services_boot',
+		static function () {
+			remove_action( 'beltoft_services_boot', array( 'BeltoftServices\\Hosting\\Boot', 'stage' ) );
+			remove_action( 'beltoft_services_deactivate', array( 'BeltoftServices\\Hosting\\Addons', 'unschedule' ) );
+		},
+		0
+	);
+} elseif ( file_exists( __DIR__ . '/Hosting/bootstrap-hosting.php' ) ) {
+	require __DIR__ . '/Hosting/bootstrap-hosting.php';
+}
+
 require $beltoft_services_tests_dir . '/includes/bootstrap.php';
+require __DIR__ . '/Support/Scan.php';
 require __DIR__ . '/Support/FakeDriver.php';
 require __DIR__ . '/Support/DnsPackets.php';
 require __DIR__ . '/Support/CannedChannel.php';

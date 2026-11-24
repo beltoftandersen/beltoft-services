@@ -5,7 +5,7 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Tests\Mcp;
+namespace BeltoftServices\Tests\Hosting;
 
 use BeltoftServices\Api\OpenApi;
 use BeltoftServices\Api\Tokens;
@@ -14,13 +14,14 @@ use BeltoftServices\Mcp\Definitions;
 use BeltoftServices\Mcp\MoneyTools;
 use BeltoftServices\Mcp\Told;
 use BeltoftServices\Mcp\ToolSets;
+use BeltoftServices\Tests\Mcp\McpTestCase;
 
-require_once __DIR__ . '/McpTestCase.php';
+require_once BELTOFT_SERVICES_TESTS_DIR . '/Mcp/McpTestCase.php';
 
 /**
  * The central lists (order, money, told) name hosting tools by id and tolerate them being absent.
  */
-final class HostingAbsentTest extends McpTestCase {
+final class McpAbsentTest extends McpTestCase {
 
 	private const IDS = array( 'hosting_info', 'hosting_usage', 'list_hosting_backups', 'add_site_domain', 'set_php_version', 'clear_site_cache', 'create_hosting_backup', 'restore_hosting_backup', 'delete_site' );
 

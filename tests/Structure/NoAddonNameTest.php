@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Tests\Structure;
 
+use BeltoftServices\Tests\Support\Scan;
+
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -16,7 +18,7 @@ use PHPUnit\Framework\TestCase;
 class NoAddonNameTest extends TestCase {
 
 	public function test_no_file_names_the_currency_add_on(): void {
-		$root  = dirname( __DIR__, 2 );
+		$root  = Scan::root();
 		$found = array();
 
 		foreach ( array( 'src', 'templates', 'assets', 'apps' ) as $dir ) {

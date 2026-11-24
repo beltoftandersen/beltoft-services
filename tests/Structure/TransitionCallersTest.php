@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Tests\Structure;
 
+use BeltoftServices\Tests\Support\Scan;
+
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -43,7 +45,7 @@ class TransitionCallersTest extends TestCase {
 	);
 
 	public function test_transition_is_called_only_where_listed(): void {
-		$root  = dirname( __DIR__, 2 ) . '/src/';
+		$root  = Scan::root() . '/src/';
 		$found = array();
 		$it    = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $root, \FilesystemIterator::SKIP_DOTS ) );
 

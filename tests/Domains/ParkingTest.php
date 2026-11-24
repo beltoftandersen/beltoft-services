@@ -153,8 +153,6 @@ class ParkingTest extends TestCase {
 		$this->assertSame( array(), Parking::addresses() );
 		$this->assertSame( array(), Parking::sweep( true ) );
 		$this->assertSame( 'off', Parking::park( 'unconfigured.example' ) );
-		$this->assertFalse( get_option( \BeltoftServices\Hosting\ParkedEdge::PENDING, false ) );
-		$this->assertCount( 0, as_get_scheduled_actions( array( 'hook' => \BeltoftServices\Hosting\ParkedEdge::HOOK, 'status' => 'pending', 'per_page' => 10 ) ) );
 	}
 
 	public function test_only_one_family_is_written_when_only_one_address_is_set(): void {
@@ -246,23 +244,6 @@ class ParkingTest extends TestCase {
 		$this->assertNull( Parking::state( 'app-a.example' ) );
 	}
 
-	public function test_adding_a_hosting_site_on_the_domain_replaces_parking_with_the_edge_addresses(): void {
-		$this->parked_service( 'site-a.example' );
-		$node = array( 'edge_ip' => '203.0.113.10', 'edge_ipv6' => '' );
-		$this->assertTrue( \BeltoftServices\Hosting\SiteDns::publish_ours( $this->user, 'site-a.example', $node ) );
-		$this->assertNull( Parking::state( 'site-a.example' ) );
-		$this->assertSame( array( 'site-a.example|A' => array( '203.0.113.10' ) ), $this->addresses( 'site-a.example' ) );
-		$this->assertTrue( \BeltoftServices\Hosting\SiteDns::publish_ours( $this->user, 'www.site-a.example', $node ) );
-		$this->assertSame( array( 'site-a.example|A', 'www.site-a.example|A' ), array_keys( $this->addresses( 'site-a.example' ) ) );
-	}
-
-	public function test_a_hosting_site_on_a_subdomain_leaves_parking_alone(): void {
-		$this->parked_service( 'site-b.example' );
-		$this->assertTrue( \BeltoftServices\Hosting\SiteDns::publish_ours( $this->user, 'blog.site-b.example', array( 'edge_ip' => '203.0.113.10', 'edge_ipv6' => '' ) ) );
-		$this->assertNotNull( Parking::state( 'site-b.example' ) );
-		$this->assertSame( 5, count( $this->addresses( 'site-b.example' ) ) );
-	}
-
 	public function test_a_service_that_writes_a_subdomain_leaves_parking_alone(): void {
 		$this->parked_service( 'app-b.example' );
 		$wrote = false;
@@ -318,14 +299,10 @@ class ParkingTest extends TestCase {
 		$cli->add( array(), array() );
 	}
 
-	public function test_the_push_command_says_so_when_nothing_answers_and_reports_when_hosting_does(): void {
+	public function test_the_push_command_says_so_when_nothing_answers(): void {
 		$cli = new ParkingCommand();
-		\WP_CLI::reset();
-		$cli->push( array(), array() );
-		$this->assertStringContainsString( 'names sent to', wp_json_encode( \WP_CLI::$lines ) );
-
-		remove_filter( 'beltoft_services_parked_edge_hosts', array( \BeltoftServices\Hosting\ParkingBridge::class, 'hosts' ), 10 );
-		remove_filter( 'beltoft_services_parked_edge_push', array( \BeltoftServices\Hosting\ParkingBridge::class, 'push' ), 10 );
+		remove_all_filters( 'beltoft_services_parked_edge_hosts' );
+		remove_all_filters( 'beltoft_services_parked_edge_push' );
 		\WP_CLI::reset();
 		$cli->push( array(), array() );
 		$this->assertStringContainsString( 'Nothing pushes parked names', wp_json_encode( \WP_CLI::$lines ) );

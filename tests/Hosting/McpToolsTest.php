@@ -5,10 +5,10 @@
  * @package BeltoftServices
  */
 
-namespace BeltoftServices\Tests\Mcp;
+namespace BeltoftServices\Tests\Hosting;
 
-require_once dirname( __DIR__ ) . '/Hosting/HostingCase.php';
-require_once __DIR__ . '/CallsTools.php';
+require_once __DIR__ . '/HostingCase.php';
+require_once BELTOFT_SERVICES_TESTS_DIR . '/Mcp/CallsTools.php';
 
 use BeltoftServices\Api\Tokens;
 use BeltoftServices\Hosting\HostingActions;
@@ -18,12 +18,12 @@ use BeltoftServices\Hosting\SiteDomains;
 use BeltoftServices\Hosting\Sites;
 use BeltoftServices\Mcp\Tools;
 use BeltoftServices\Resource;
-use BeltoftServices\Tests\Hosting\HostingCase;
+use BeltoftServices\Tests\Mcp\CallsTools;
 
 /**
  * Hosting tools: the levels, the dashboard's own checks, the confirmation and what they run.
  */
-final class HostingToolsTest extends HostingCase {
+final class McpToolsTest extends HostingCase {
 
 	use CallsTools;
 

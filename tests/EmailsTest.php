@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Tests;
 
+require_once __DIR__ . '/Support/EmailValuesGolden.php';
+
 use BeltoftLicenses\Licenses;
 use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Emails\Emails;
@@ -16,11 +18,14 @@ use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Resource;
 use BeltoftServices\Retention;
+use BeltoftServices\Tests\Support\EmailValuesGolden;
 
 /**
  * Email tests. Mails are caught by pre_wp_mail; no request leaves the recorder.
  */
 final class EmailsTest extends TestCase {
+
+	use EmailValuesGolden;
 
 	private const SECRET = 'S3cret-Value-Never-Shown';
 
@@ -566,51 +571,12 @@ final class EmailsTest extends TestCase {
 		$this->assertStringContainsString( 'reached the end of its keeping time', (string) preg_replace( '/\s+/', ' ', (string) $this->customer_mails()[0]['message'] ) );
 	}
 
-	public function test_without_the_hosting_registry_no_hosting_email_exists_and_nothing_is_sent_or_thrown(): void {
-		$this->fake_driver( 'hosting' );
-		$product  = $this->service_product( 'hosting' );
-		$license  = $this->service_license( $product, array( 'fire' => false ) );
-		$resource = Resource::find( Resource::create( $license, Registry::get( 'hosting' ), array(), array( 'state' => 'ready' ) )->id() );
-
-		$with = Emails::ids();
-		$this->assertContains( 'beltoft_services_hosting_ready', $with );
-		$this->assertSame( 'beltoft_services_hosting_malware_found', end( $with ), 'The hosting emails come after the core ones.' );
-
-		$registry = \BeltoftServices\Hosting\EmailRegistry::class;
-		remove_filter( 'beltoft_services_email_classes', array( $registry, 'classes' ) );
-		remove_filter( 'beltoft_services_email_definitions', array( $registry, 'definitions' ) );
-		remove_filter( 'beltoft_services_email_value_defaults', array( $registry, 'value_defaults' ) );
-		// A new mailer, as a request without hosting would have: the old one keeps the instances it built.
-		$instance = new \ReflectionProperty( \WC_Emails::class, 'instance' );
-		$old      = $instance->getValue();
-		$instance->setValue( null, null );
-
-		$this->assertNotContains( 'beltoft_services_hosting_ready', Emails::ids() );
-		$this->assertArrayNotHasKey( 'BeltoftServices_HostingReady', WC()->mailer()->get_emails() );
-		$this->assertArrayNotHasKey( 'hosting_notice', \BeltoftServices\Emails\ValueDefaults::all() );
-		$this->assertNull( Emails::get( 'beltoft_services_hosting_ready' ) );
-
-		$this->mails = array();
-		$this->assertFalse( Emails::send( 'beltoft_services_hosting_ready', $resource ) );
-		$resource->set( array( 'notified' => '' ) );
-		Emails::on_state_changed( $resource, 'provisioning', 'ready' );
-		$this->assertCount( 0, $this->customer_mails(), 'Nothing is sent.' );
-
-		try {
-			\BeltoftServices\Emails\Definitions::get( 'beltoft_services_hosting_ready' );
-			$this->fail( 'An unknown id still throws.' );
-		} catch ( \InvalidArgumentException $e ) {
-			$this->assertStringContainsString( 'beltoft_services_hosting_ready', $e->getMessage() );
-		} finally {
-			$instance->setValue( null, $old );
-			\BeltoftServices\Hosting\EmailRegistry::register();
-		}
-	}
-
 	public function test_the_definitions_match_the_fixture_word_for_word(): void {
 		$fixture = require BELTOFT_SERVICES_PATH . 'tests/fixtures/email-definitions.php';
 
-		$this->assertSame( array_keys( $fixture ), \BeltoftServices\Emails\Definitions::ids() );
+		// The emails of an optional feature (hosting) are pinned by that feature's own tests.
+		$optional = $this->optional( 'email_ids' );
+		$this->assertSame( array_keys( $fixture ), array_values( array_diff( \BeltoftServices\Emails\Definitions::ids(), $optional ) ) );
 
 		foreach ( $fixture as $id => $expected ) {
 			$this->assertSame( $expected, \BeltoftServices\Emails\Definitions::get( $id ), $id );
@@ -640,28 +606,6 @@ final class EmailsTest extends TestCase {
 		}
 
 		$this->assertEqualsCanonicalizing( \BeltoftServices\Emails\Definitions::ids(), $seen );
-	}
-
-	/**
-	 * The template values of an email sent about a resource of the given driver id.
-	 *
-	 * @param string $driver Driver id of the resource.
-	 * @param string $id     Email id.
-	 * @return array<string, mixed>
-	 */
-	private function values_for( string $driver, string $id = 'beltoft_services_ready' ): array {
-		$this->fake_driver( $driver );
-		$product  = $this->service_product( $driver );
-		$license  = $this->service_license( $product, array( 'fire' => false ) );
-		$resource = Resource::find( Resource::create( $license, Registry::get( $driver ), array(), array( 'state' => 'ready' ) )->id() );
-		$email    = Emails::get( $id );
-
-		$email->trigger( $resource, array() );
-
-		$property = new \ReflectionProperty( ServiceEmail::class, 'values' );
-		$property->setAccessible( true );
-
-		return $property->getValue( $email );
 	}
 
 	public function test_service_email_names_no_feature(): void {
@@ -694,51 +638,17 @@ final class EmailsTest extends TestCase {
 		}
 	}
 
-	/**
-	 * The values array of a "ready" email for one resource of each of five drivers, with the ids that come from the
-	 * test database swapped for tokens. The fixture was made by running this same code on the plugin at 6d95431
-	 * (before the values moved into the feature filters), so it holds the old values, not today's.
-	 *
-	 * @return array<string, array<string, mixed>>
-	 */
-	private function normalised_values(): array {
-		$out = array();
-
-		foreach ( array( 'proxmox', 'domain', 'mail', 'hosting', 'ssl' ) as $driver ) {
-			$this->fake_driver( $driver );
-			$product = $this->service_product( $driver, array(), array( 'slug' => 'values-' . $driver ) );
-			$product->set_name( 'Fixture product' );
-			$product->save();
-			$license = $this->service_license( $product, array( 'fire' => false ) );
-			wp_update_user( array( 'ID' => $license['user_id'], 'display_name' => 'Fixture Customer' ) );
-			$resource = Resource::find( Resource::create( $license, Registry::get( $driver ), array(), array( 'state' => 'ready' ) )->id() );
-			$email    = Emails::get( 'beltoft_services_ready' );
-
-			// The date comes from the data, so the run does not depend on the day it is made.
-			$email->trigger( $resource, array( 'deletes_at' => 1900000000 ) );
-
-			$property = new \ReflectionProperty( ServiceEmail::class, 'values' );
-			$property->setAccessible( true );
-			$values = $property->getValue( $email );
-			ksort( $values );
-
-			$json = (string) wp_json_encode( $values, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
-			$json = (string) preg_replace( '/(?<!\d)' . (int) $resource->id() . '(?!\d)/', '{resource}', $json );
-			$json = (string) preg_replace( '/(?<!\d)' . (int) $license['id'] . '(?!\d)/', '{license}', $json );
-
-			$out[ $driver ] = json_decode( $json, true );
-		}
-
-		return $out;
-	}
-
 	public function test_the_values_are_the_ones_the_old_code_gave(): void {
 		$expected = json_decode( (string) file_get_contents( BELTOFT_SERVICES_PATH . 'tests/fixtures/email-values.json' ), true );
 
-		$this->assertSame( $expected, $this->normalised_values() );
+		// What an optional feature (hosting) adds is pinned by that feature's own tests: its driver kind and its value keys.
+		$drivers = array( 'proxmox', 'domain', 'mail', 'ssl' );
+		$now     = array_map( fn( $values ) => $this->without_optional( $values, 'email_value_keys' ), $this->normalised_values( $drivers ) );
+
+		$this->assertSame( $expected, $now );
 	}
 
-	public function test_the_values_array_has_the_same_keys_for_a_vm_a_domain_a_mail_a_hosting_and_an_ssl_resource(): void {
+	public function test_the_values_array_has_the_same_keys_for_a_vm_a_domain_a_mail_and_an_ssl_resource(): void {
 		$golden = array(
 			'account_url',
 			'app_domain',
@@ -763,10 +673,6 @@ final class EmailsTest extends TestCase {
 			'domains_url',
 			'extra_disks',
 			'held',
-			'hosting',
-			'hosting_malware',
-			'hosting_notice',
-			'hosting_restore',
 			'limit',
 			'mail_domain',
 			'mail_external',
@@ -784,7 +690,6 @@ final class EmailsTest extends TestCase {
 			'monitor_disk_used',
 			'monitor_disks_url',
 			'monitor_grow_url',
-			'monitor_hosting',
 			'monitor_mem_minutes',
 			'monitor_mem_percent',
 			'monitor_mem_total_mb',
@@ -812,8 +717,9 @@ final class EmailsTest extends TestCase {
 			'used',
 		);
 
-		foreach ( array( 'proxmox', 'domain', 'mail', 'hosting', 'ssl' ) as $driver ) {
-			$keys = array_keys( $this->values_for( $driver ) );
+		// The keys an optional feature (hosting) adds are pinned by that feature's own tests.
+		foreach ( array( 'proxmox', 'domain', 'mail', 'ssl' ) as $driver ) {
+			$keys = array_values( array_diff( array_keys( $this->values_for( $driver ) ), $this->optional( 'email_value_keys' ) ) );
 			sort( $keys );
 
 			$this->assertSame( $golden, $keys, $driver );

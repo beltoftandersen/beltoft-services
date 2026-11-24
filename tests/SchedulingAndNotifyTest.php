@@ -8,7 +8,6 @@
 namespace BeltoftServices\Tests;
 
 use BeltoftServices\Alerts;
-use BeltoftServices\Hosting\Addons;
 use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 
@@ -77,24 +76,6 @@ final class SchedulingAndNotifyTest extends TestCase {
 		$this->assertGreaterThan( time() + HOUR_IN_SECONDS - 60, (int) as_next_scheduled_action( $hook, array(), Jobs::GROUP ) );
 
 		as_unschedule_all_actions( $hook );
-	}
-
-	public function test_addons_sweep_runs_in_action_scheduler_and_the_old_wp_cron_event_is_removed(): void {
-		as_unschedule_all_actions( Addons::SWEEP_HOOK );
-		wp_schedule_event( time() + 3600, 'daily', Addons::SWEEP_HOOK );
-		$this->assertNotFalse( wp_next_scheduled( Addons::SWEEP_HOOK ) );
-
-		Addons::schedule();
-
-		$this->assertFalse( wp_next_scheduled( Addons::SWEEP_HOOK ), 'The WP-Cron event is gone.' );
-		$ids = as_get_scheduled_actions( array( 'hook' => Addons::SWEEP_HOOK, 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => -1 ), 'ids' );
-		$this->assertCount( 1, $ids, 'The sweep is in group beltoft-services.' );
-
-		Addons::schedule();
-		$this->assertCount( 1, as_get_scheduled_actions( array( 'hook' => Addons::SWEEP_HOOK, 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => -1 ), 'ids' ) );
-
-		Addons::unschedule();
-		$this->assertFalse( as_has_scheduled_action( Addons::SWEEP_HOOK, array(), Jobs::GROUP ) );
 	}
 
 	public function test_notify_builds_the_prefixed_subject_and_the_body(): void {

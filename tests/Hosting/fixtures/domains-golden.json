@@ -1,0 +1,4 @@
+{
+    "i|hosting|list": "<p class=\"beltoft-licenses__empty\">You have no hosting yet.</p>",
+    "i|hosting|unknown": "<p class=\"beltoft-services-notice\" role=\"status\">That hosting account was not found. Here is your hosting.</p><p class=\"beltoft-licenses__empty\">You have no hosting yet.</p>"
+}

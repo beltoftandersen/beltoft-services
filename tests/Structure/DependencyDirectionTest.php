@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Tests\Structure;
 
+use BeltoftServices\Tests\Support\Scan;
+
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -118,7 +120,7 @@ class DependencyDirectionTest extends TestCase {
 			return self::$scan;
 		}
 
-		$root     = dirname( __DIR__, 2 ) . '/src';
+		$root     = Scan::root() . '/src';
 		$out      = array();
 		$platform = array();
 		$it   = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $root, \FilesystemIterator::SKIP_DOTS ) );

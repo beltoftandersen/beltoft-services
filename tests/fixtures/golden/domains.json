@@ -66,8 +66,6 @@
     "i|databases|unknown": "<p class=\"beltoft-services-notice\" role=\"status\">That database was not found. Here are your databases.</p><p class=\"beltoft-licenses__empty\">You have no databases yet.</p>",
     "i|email|list": "<p class=\"beltoft-licenses__empty\">You have no email domains yet.</p>",
     "i|email|unknown": "<p class=\"beltoft-services-notice\" role=\"status\">That email domain was not found. Here are your email domains.</p><p class=\"beltoft-licenses__empty\">You have no email domains yet.</p>",
-    "i|hosting|list": "<p class=\"beltoft-licenses__empty\">You have no hosting yet.</p>",
-    "i|hosting|unknown": "<p class=\"beltoft-services-notice\" role=\"status\">That hosting account was not found. Here is your hosting.</p><p class=\"beltoft-licenses__empty\">You have no hosting yet.</p>",
     "i|licences|list": "<p class=\"beltoft-licenses__empty\">You have no server licences yet.</p>",
     "i|licences|unknown": "<p class=\"beltoft-services-notice\" role=\"status\">That licence was not found. Here are your licences.</p><p class=\"beltoft-licenses__empty\">You have no server licences yet.</p>",
     "i|ssl-certificates|list": "<p class=\"beltoft-licenses__empty\">You have no SSL certificates yet.</p>",

@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Tests\Structure;
 
+use BeltoftServices\Tests\Support\Scan;
+
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -32,7 +34,7 @@ class BootRegistryTest extends TestCase {
 		$found  = array();
 		$files  = array();
 		$traits = array();
-		$it     = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( dirname( __DIR__, 2 ) . '/src', \FilesystemIterator::SKIP_DOTS ) );
+		$it     = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( Scan::root() . '/src', \FilesystemIterator::SKIP_DOTS ) );
 
 		foreach ( $it as $file ) {
 			if ( 'php' !== $file->getExtension() ) {
@@ -113,7 +115,7 @@ class BootRegistryTest extends TestCase {
 		$classes = $this->classes_with_register();
 		$this->assertGreaterThan( 100, count( $classes ), 'the scan finds the classes' );
 
-		$plugin  = dirname( __DIR__, 2 ) . '/src/Plugin.php';
+		$plugin  = Scan::boot_file();
 		$booted  = array();
 		$pending = $this->calls_in( $plugin );
 
@@ -156,13 +158,14 @@ class BootRegistryTest extends TestCase {
 		}
 	}
 
-	public function test_feature_boot_class_registers_are_followed(): void {
+	public function test_feature_boot_classes_are_called_from_the_boot_file_and_their_registers_are_followed(): void {
 		$classes = $this->classes_with_register();
-		$this->assertArrayHasKey( 'BeltoftServices\\Hosting\\Boot', $classes );
+		$boots   = array_filter( array_keys( $classes ), static fn( $class ) => 1 === preg_match( '/^BeltoftServices\\\\\w+\\\\Boot$/', $class ) );
+		$plugin  = $this->calls_in( Scan::boot_file() );
 
-		$called = $this->calls_in( $classes['BeltoftServices\\Hosting\\Boot'] );
-		$this->assertContains( 'BeltoftServices\\Hosting\\HostingSettings', $called );
-		$this->assertContains( 'BeltoftServices\\Hosting\\Actions\\Steps', $called );
-		$this->assertContains( 'BeltoftServices\\Hosting\\Boot', $this->calls_in( dirname( __DIR__, 2 ) . '/src/Plugin.php' ) );
+		foreach ( $boots as $boot ) {
+			$this->assertContains( $boot, $plugin, $boot . ' is a feature Boot class that the boot file does not register.' );
+			$this->assertNotEmpty( $this->calls_in( $classes[ $boot ] ), $boot . ' names no register() of its stages.' );
+		}
 	}
 }

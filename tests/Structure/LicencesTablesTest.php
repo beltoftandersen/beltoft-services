@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Tests\Structure;
 
+use BeltoftServices\Tests\Support\Scan;
+
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -28,7 +30,7 @@ class LicencesTablesTest extends TestCase {
 	}
 
 	public function test_licences_tables_are_named_in_resource_only(): void {
-		$root  = dirname( __DIR__, 2 ) . '/src';
+		$root  = Scan::root() . '/src';
 		$found = array();
 		$it    = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $root, \FilesystemIterator::SKIP_DOTS ) );
 

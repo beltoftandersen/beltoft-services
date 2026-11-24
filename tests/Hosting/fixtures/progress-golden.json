@@ -1,0 +1,950 @@
+{
+    "hosting / queued": {
+        "kind": "build",
+        "phase": "queued",
+        "active": true,
+        "title": "Setting up your service",
+        "steps": [
+            {
+                "key": "place",
+                "label": "Reserving resources",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "ip",
+                "label": "Reserving an address",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "vmid",
+                "label": "Preparing your container",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "clone",
+                "label": "Creating your container",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "configure",
+                "label": "Applying your plan",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "start",
+                "label": "Starting your container",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "prepare",
+                "label": "Preparing the system",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "db",
+                "label": "Creating the database",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "site",
+                "label": "Installing WordPress",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "edge",
+                "label": "Connecting the web server",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "dns",
+                "label": "Publishing the address",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "verify",
+                "label": "Checking your website",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "mail",
+                "label": "Setting up website mail",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "ready",
+                "label": "Final checks",
+                "status": "todo",
+                "status_label": "Waiting"
+            }
+        ],
+        "current": "",
+        "minutes": 3,
+        "eta": "Usually about 3 minutes.",
+        "text": "Waiting to start. It begins in a moment.",
+        "leave": "You can leave this site. The work goes on, and the same progress is in your account.",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / building": {
+        "kind": "build",
+        "phase": "running",
+        "active": true,
+        "title": "Setting up your service",
+        "steps": [
+            {
+                "key": "place",
+                "label": "Reserving resources",
+                "status": "current",
+                "status_label": "In progress"
+            },
+            {
+                "key": "ip",
+                "label": "Reserving an address",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "vmid",
+                "label": "Preparing your container",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "clone",
+                "label": "Creating your container",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "configure",
+                "label": "Applying your plan",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "start",
+                "label": "Starting your container",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "prepare",
+                "label": "Preparing the system",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "db",
+                "label": "Creating the database",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "site",
+                "label": "Installing WordPress",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "edge",
+                "label": "Connecting the web server",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "dns",
+                "label": "Publishing the address",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "verify",
+                "label": "Checking your website",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "mail",
+                "label": "Setting up website mail",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "ready",
+                "label": "Final checks",
+                "status": "todo",
+                "status_label": "Waiting"
+            }
+        ],
+        "current": "place",
+        "minutes": 3,
+        "eta": "Usually about 3 minutes.",
+        "text": "Setting up your service. Usually about 3 minutes.",
+        "leave": "You can leave this site. The work goes on, and the same progress is in your account.",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / building-some": {
+        "kind": "build",
+        "phase": "running",
+        "active": true,
+        "title": "Setting up your service",
+        "steps": [
+            {
+                "key": "place",
+                "label": "Reserving resources",
+                "status": "done",
+                "status_label": "Done"
+            },
+            {
+                "key": "ip",
+                "label": "Reserving an address",
+                "status": "done",
+                "status_label": "Done"
+            },
+            {
+                "key": "vmid",
+                "label": "Preparing your container",
+                "status": "done",
+                "status_label": "Done"
+            },
+            {
+                "key": "clone",
+                "label": "Creating your container",
+                "status": "done",
+                "status_label": "Done"
+            },
+            {
+                "key": "configure",
+                "label": "Applying your plan",
+                "status": "current",
+                "status_label": "In progress"
+            },
+            {
+                "key": "start",
+                "label": "Starting your container",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "prepare",
+                "label": "Preparing the system",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "db",
+                "label": "Creating the database",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "site",
+                "label": "Installing WordPress",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "edge",
+                "label": "Connecting the web server",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "dns",
+                "label": "Publishing the address",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "verify",
+                "label": "Checking your website",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "mail",
+                "label": "Setting up website mail",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "ready",
+                "label": "Final checks",
+                "status": "todo",
+                "status_label": "Waiting"
+            }
+        ],
+        "current": "configure",
+        "minutes": 3,
+        "eta": "Usually about 3 minutes.",
+        "text": "Setting up your service. Usually about 3 minutes.",
+        "leave": "You can leave this site. The work goes on, and the same progress is in your account.",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / failed-build": {
+        "kind": "build",
+        "phase": "failed",
+        "active": false,
+        "title": "Setting up your service",
+        "steps": [
+            {
+                "key": "ip",
+                "label": "Reserving an address",
+                "status": "done",
+                "status_label": "Done"
+            },
+            {
+                "key": "vmid",
+                "label": "Preparing your container",
+                "status": "failed",
+                "status_label": "Failed"
+            },
+            {
+                "key": "clone",
+                "label": "Creating your container",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "configure",
+                "label": "Applying your plan",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "start",
+                "label": "Starting your container",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "prepare",
+                "label": "Preparing the system",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "db",
+                "label": "Creating the database",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "site",
+                "label": "Installing WordPress",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "edge",
+                "label": "Connecting the web server",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "dns",
+                "label": "Publishing the address",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "verify",
+                "label": "Checking your website",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "mail",
+                "label": "Setting up website mail",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "ready",
+                "label": "Final checks",
+                "status": "todo",
+                "status_label": "Waiting"
+            }
+        ],
+        "current": "vmid",
+        "minutes": 3,
+        "eta": "Usually about 3 minutes.",
+        "text": "This stopped before it was finished.",
+        "leave": "",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / failed-update": {
+        "kind": "update",
+        "phase": "failed",
+        "active": false,
+        "title": "Applying your change",
+        "steps": [],
+        "current": "",
+        "minutes": 2,
+        "eta": "Usually about 2 minutes.",
+        "text": "This stopped before it was finished.",
+        "leave": "",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / reinstall": {
+        "kind": "reinstall",
+        "phase": "running",
+        "active": true,
+        "title": "Reinstalling your server",
+        "steps": [],
+        "current": "",
+        "minutes": 3,
+        "eta": "Usually about 3 minutes.",
+        "text": "Reinstalling your server. Usually about 3 minutes.",
+        "leave": "You can leave this site. The work goes on, and the same progress is in your account.",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / reinstall-wiped": {
+        "kind": "reinstall",
+        "phase": "running",
+        "active": true,
+        "title": "Reinstalling your server",
+        "steps": [],
+        "current": "",
+        "minutes": 3,
+        "eta": "Usually about 3 minutes.",
+        "text": "Reinstalling your server. Usually about 3 minutes.",
+        "leave": "You can leave this site. The work goes on, and the same progress is in your account.",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / restore-start": {
+        "kind": "restore",
+        "phase": "running",
+        "active": true,
+        "title": "Restoring your server from a backup",
+        "steps": [],
+        "current": "",
+        "minutes": 10,
+        "eta": "Usually about 10 minutes.",
+        "text": "Restoring your server from a backup. Usually about 10 minutes.",
+        "leave": "You can leave this site. The work goes on, and the same progress is in your account.",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / restore-done": {
+        "kind": "restore",
+        "phase": "running",
+        "active": true,
+        "title": "Restoring your server from a backup",
+        "steps": [],
+        "current": "",
+        "minutes": 10,
+        "eta": "Usually about 10 minutes.",
+        "text": "Restoring your server from a backup. Usually about 10 minutes.",
+        "leave": "You can leave this site. The work goes on, and the same progress is in your account.",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / rollback-start": {
+        "kind": "rollback",
+        "phase": "running",
+        "active": true,
+        "title": "Going back to your snapshot",
+        "steps": [],
+        "current": "",
+        "minutes": 5,
+        "eta": "Usually about 5 minutes.",
+        "text": "Going back to your snapshot. Usually about 5 minutes.",
+        "leave": "You can leave this site. The work goes on, and the same progress is in your account.",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / rollback-after": {
+        "kind": "rollback",
+        "phase": "running",
+        "active": true,
+        "title": "Going back to your snapshot",
+        "steps": [],
+        "current": "",
+        "minutes": 5,
+        "eta": "Usually about 5 minutes.",
+        "text": "Going back to your snapshot. Usually about 5 minutes.",
+        "leave": "You can leave this site. The work goes on, and the same progress is in your account.",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / update": {
+        "kind": "update",
+        "phase": "running",
+        "active": true,
+        "title": "Applying your change",
+        "steps": [],
+        "current": "",
+        "minutes": 2,
+        "eta": "Usually about 2 minutes.",
+        "text": "Applying your change. Usually about 2 minutes.",
+        "leave": "You can leave this site. The work goes on, and the same progress is in your account.",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / delete": {
+        "kind": "delete",
+        "phase": "running",
+        "active": true,
+        "title": "Removing your service",
+        "steps": [],
+        "current": "",
+        "minutes": 1,
+        "eta": "Usually about 1 minute.",
+        "text": "Removing your service. Usually about 1 minute.",
+        "leave": "You can leave this site. The work goes on, and the same progress is in your account.",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / pause": {
+        "kind": "pause",
+        "phase": "running",
+        "active": true,
+        "title": "Pausing your service",
+        "steps": [],
+        "current": "",
+        "minutes": 1,
+        "eta": "Usually about 1 minute.",
+        "text": "Pausing your service. Usually about 1 minute.",
+        "leave": "You can leave this site. The work goes on, and the same progress is in your account.",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / resume": {
+        "kind": "resume",
+        "phase": "running",
+        "active": true,
+        "title": "Starting your service again",
+        "steps": [],
+        "current": "",
+        "minutes": 1,
+        "eta": "Usually about 1 minute.",
+        "text": "Starting your service again. Usually about 1 minute.",
+        "leave": "You can leave this site. The work goes on, and the same progress is in your account.",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / marker-label": {
+        "kind": "action",
+        "phase": "queued",
+        "active": true,
+        "title": "Apply firewall changes",
+        "steps": [],
+        "current": "",
+        "minutes": 1,
+        "eta": "Usually about 1 minute.",
+        "text": "Apply firewall changes requested. It starts in a moment.",
+        "leave": "You can leave this site. The work goes on, and the same progress is in your account.",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / marker-plain": {
+        "kind": "action",
+        "phase": "queued",
+        "active": true,
+        "title": "Working on your request",
+        "steps": [],
+        "current": "",
+        "minutes": 1,
+        "eta": "Usually about 1 minute.",
+        "text": "Your request is on its way. This can take a minute.",
+        "leave": "You can leave this site. The work goes on, and the same progress is in your account.",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / marker-restore": {
+        "kind": "restore",
+        "phase": "queued",
+        "active": true,
+        "title": "Restoring your server from a backup",
+        "steps": [],
+        "current": "",
+        "minutes": 10,
+        "eta": "Usually about 10 minutes.",
+        "text": "Restore requested. It starts in a moment.",
+        "leave": "You can leave this site. The work goes on, and the same progress is in your account.",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / marker-rollback": {
+        "kind": "rollback",
+        "phase": "queued",
+        "active": true,
+        "title": "Going back to your snapshot",
+        "steps": [],
+        "current": "",
+        "minutes": 5,
+        "eta": "Usually about 5 minutes.",
+        "text": "Going back to the snapshot was requested. It starts in a moment.",
+        "leave": "You can leave this site. The work goes on, and the same progress is in your account.",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / restore-failed": {
+        "kind": "update",
+        "phase": "failed",
+        "active": false,
+        "title": "Applying your change",
+        "steps": [],
+        "current": "",
+        "minutes": 2,
+        "eta": "Usually about 2 minutes.",
+        "text": "This stopped before it was finished.",
+        "leave": "",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / marker-reinstall": {
+        "kind": "reinstall",
+        "phase": "queued",
+        "active": true,
+        "title": "Reinstalling your server",
+        "steps": [],
+        "current": "",
+        "minutes": 3,
+        "eta": "Usually about 3 minutes.",
+        "text": "Reinstall requested. It starts in a moment.",
+        "leave": "You can leave this site. The work goes on, and the same progress is in your account.",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / idle": {
+        "kind": "",
+        "phase": "idle",
+        "active": false,
+        "title": "",
+        "steps": [],
+        "current": "",
+        "minutes": 0,
+        "eta": "",
+        "text": "",
+        "leave": "",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / app-installing": {
+        "kind": "",
+        "phase": "idle",
+        "active": false,
+        "title": "",
+        "steps": [],
+        "current": "",
+        "minutes": 0,
+        "eta": "",
+        "text": "",
+        "leave": "",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / app-pending": {
+        "kind": "",
+        "phase": "idle",
+        "active": false,
+        "title": "",
+        "steps": [],
+        "current": "",
+        "minutes": 0,
+        "eta": "",
+        "text": "",
+        "leave": "",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / app-slow": {
+        "kind": "",
+        "phase": "idle",
+        "active": false,
+        "title": "",
+        "steps": [],
+        "current": "",
+        "minutes": 0,
+        "eta": "",
+        "text": "",
+        "leave": "",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / app-failed": {
+        "kind": "",
+        "phase": "idle",
+        "active": false,
+        "title": "",
+        "steps": [],
+        "current": "",
+        "minutes": 0,
+        "eta": "",
+        "text": "",
+        "leave": "",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / app-ready": {
+        "kind": "",
+        "phase": "idle",
+        "active": false,
+        "title": "",
+        "steps": [],
+        "current": "",
+        "minutes": 0,
+        "eta": "",
+        "text": "",
+        "leave": "",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / build-with-app": {
+        "kind": "build",
+        "phase": "running",
+        "active": true,
+        "title": "Setting up your service",
+        "steps": [
+            {
+                "key": "ip",
+                "label": "Reserving an address",
+                "status": "done",
+                "status_label": "Done"
+            },
+            {
+                "key": "vmid",
+                "label": "Preparing your container",
+                "status": "done",
+                "status_label": "Done"
+            },
+            {
+                "key": "clone",
+                "label": "Creating your container",
+                "status": "current",
+                "status_label": "In progress"
+            },
+            {
+                "key": "configure",
+                "label": "Applying your plan",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "start",
+                "label": "Starting your container",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "prepare",
+                "label": "Preparing the system",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "db",
+                "label": "Creating the database",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "site",
+                "label": "Installing WordPress",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "edge",
+                "label": "Connecting the web server",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "dns",
+                "label": "Publishing the address",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "verify",
+                "label": "Checking your website",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "mail",
+                "label": "Setting up website mail",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "ready",
+                "label": "Final checks",
+                "status": "todo",
+                "status_label": "Waiting"
+            }
+        ],
+        "current": "clone",
+        "minutes": 3,
+        "eta": "Usually about 3 minutes.",
+        "text": "Setting up your service. Usually about 3 minutes.",
+        "leave": "You can leave this site. The work goes on, and the same progress is in your account.",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / reinstall-app": {
+        "kind": "reinstall",
+        "phase": "running",
+        "active": true,
+        "title": "Reinstalling your server",
+        "steps": [],
+        "current": "",
+        "minutes": 3,
+        "eta": "Usually about 3 minutes.",
+        "text": "Reinstalling your server. Usually about 3 minutes.",
+        "leave": "You can leave this site. The work goes on, and the same progress is in your account.",
+        "note": "",
+        "hosts": [],
+        "link": []
+    },
+    "hosting / queued-app": {
+        "kind": "build",
+        "phase": "queued",
+        "active": true,
+        "title": "Setting up your service",
+        "steps": [
+            {
+                "key": "place",
+                "label": "Reserving resources",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "ip",
+                "label": "Reserving an address",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "vmid",
+                "label": "Preparing your container",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "clone",
+                "label": "Creating your container",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "configure",
+                "label": "Applying your plan",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "start",
+                "label": "Starting your container",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "prepare",
+                "label": "Preparing the system",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "db",
+                "label": "Creating the database",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "site",
+                "label": "Installing WordPress",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "edge",
+                "label": "Connecting the web server",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "dns",
+                "label": "Publishing the address",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "verify",
+                "label": "Checking your website",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "mail",
+                "label": "Setting up website mail",
+                "status": "todo",
+                "status_label": "Waiting"
+            },
+            {
+                "key": "ready",
+                "label": "Final checks",
+                "status": "todo",
+                "status_label": "Waiting"
+            }
+        ],
+        "current": "",
+        "minutes": 3,
+        "eta": "Usually about 3 minutes.",
+        "text": "Waiting to start. It begins in a moment.",
+        "leave": "You can leave this site. The work goes on, and the same progress is in your account.",
+        "note": "",
+        "hosts": [],
+        "link": []
+    }
+}

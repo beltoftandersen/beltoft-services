@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Tests\Structure;
 
+use BeltoftServices\Tests\Support\Scan;
+
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -18,7 +20,7 @@ class CssSelectorsTest extends TestCase {
 	public function test_every_stylesheet_has_balanced_round_brackets_in_each_rule(): void {
 		$bad = array();
 
-		foreach ( glob( dirname( __DIR__, 2 ) . '/assets/*.css' ) as $file ) {
+		foreach ( glob( Scan::root() . '/assets/*.css' ) as $file ) {
 			$css = preg_replace( '~/\*.*?\*/~s', '', (string) file_get_contents( $file ) );
 
 			foreach ( preg_split( '/[{}]/', (string) $css ) as $part ) {

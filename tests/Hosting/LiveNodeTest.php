@@ -85,7 +85,7 @@ class LiveNodeTest extends HostingCase {
 	}
 
 	public function test_node_check_goes_through_the_read_only_client(): void {
-		require_once dirname( __DIR__ ) . '/Support/WpCliStub.php';
+		require_once BELTOFT_SERVICES_TESTS_DIR . '/Support/WpCliStub.php';
 		\WP_CLI::reset();
 
 		( new HostingCommand() )->node( array( 'check', 'n1' ), array() );

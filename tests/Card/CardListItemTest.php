@@ -8,7 +8,6 @@
 namespace BeltoftServices\Tests\Card;
 
 use BeltoftServices\Card\Card;
-use BeltoftServices\Hosting\Config;
 use BeltoftServices\Tests\TestCase;
 
 /**
@@ -33,11 +32,5 @@ class CardListItemTest extends TestCase {
 		ob_start();
 		Card::expires_cell( array( 'expires' => '08 / 2028' ) );
 		$this->assertSame( '08 / 2028', ob_get_clean() );
-	}
-
-	public function test_hosting_label_has_a_filter(): void {
-		$this->settings( array( 'hosting_label' => 'Webhotel' ) );
-		add_filter( 'beltoft_services_hosting_label', static fn() => 'Web hosting' );
-		$this->assertSame( 'Web hosting', Config::label() );
 	}
 }

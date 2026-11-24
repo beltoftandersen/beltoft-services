@@ -7,7 +7,7 @@
 
 namespace BeltoftServices\Tests\Hosting;
 
-require_once dirname( __DIR__ ) . '/Usage/UsageTestCase.php';
+require_once BELTOFT_SERVICES_TESTS_DIR . '/Usage/UsageTestCase.php';
 
 use BeltoftServices\Tests\Usage\UsageTestCase;
 

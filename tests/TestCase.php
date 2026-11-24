@@ -52,12 +52,35 @@ abstract class TestCase extends \WP_UnitTestCase {
 		$this->markTestSkipped( 'MISSING ENVIRONMENT: ' . $why );
 	}
 
+	/**
+	 * Ids of one kind that belong to an optional feature, which the tests of the shared code leave out of exact lists.
+	 * The feature's test bootstrap answers beltoft_services_tests_optional_<kind> (hosting: tests/Hosting/bootstrap-hosting.php);
+	 * its own tests assert its part.
+	 *
+	 * @param string $kind For example driver_ids, mcp_tools, email_ids.
+	 * @return string[]
+	 */
+	protected function optional( string $kind ): array {
+		return array_values( (array) apply_filters( 'beltoft_services_tests_optional_' . $kind, array() ) );
+	}
+
+	/**
+	 * A map without the entries (by key) of an optional feature; see optional().
+	 *
+	 * @param array<string, mixed> $map  Map.
+	 * @param string               $kind Kind of optional keys.
+	 * @return array<string, mixed>
+	 */
+	protected function without_optional( array $map, string $kind ): array {
+		return array_diff_key( $map, array_flip( $this->optional( $kind ) ) );
+	}
+
 	public function set_up(): void {
 		parent::set_up();
 		// The IPv4 pool mails (running low, empty) are the subject of their own test; elsewhere an emptied pool must not add a mail.
 		add_filter( 'beltoft_services_ipv4_alerts', '__return_false' );
-		// The hosting usage memo outlives a test; the tables and options behind it are reset around each one.
-		\BeltoftServices\Hosting\HostingCapacity::forget();
+		// A feature with static memos of its own resets them here (hosting: tests/Hosting/bootstrap-hosting.php).
+		do_action( 'beltoft_services_tests_reset' );
 		// The per-request read memo is a static: a test that opened an account page or switched it on must not leave it on.
 		\BeltoftServices\Resource::memo_end();
 		\BeltoftServices\Usage\Catalog::forget();
@@ -75,7 +98,8 @@ abstract class TestCase extends \WP_UnitTestCase {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Isolated PHPUnit fixture reset, fixed names.
 		$wpdb->query( $wpdb->prepare( "DELETE a FROM {$wpdb->prefix}actionscheduler_actions a JOIN {$wpdb->prefix}actionscheduler_groups g ON g.group_id = a.group_id WHERE g.slug = %s AND a.status = %s", 'beltoft-services', 'pending' ) );
 
-		foreach ( array( \BeltoftServices\Domains\Sync::HOOK, \BeltoftServices\Domains\Sync::DELEGATION_HOOK, \BeltoftServices\Domains\Sync::HEALTH_HOOK, 'beltoft_services_domain_prices', \BeltoftServices\Domains\Security::HOOK, \BeltoftServices\Hosting\Addons::SWEEP_HOOK ) as $hook ) {
+		// A feature adds the recurring hooks of its own through the filter (hosting: tests/Hosting/bootstrap-hosting.php).
+		foreach ( apply_filters( 'beltoft_services_tests_clear_hooks', array( \BeltoftServices\Domains\Sync::HOOK, \BeltoftServices\Domains\Sync::DELEGATION_HOOK, \BeltoftServices\Domains\Sync::HEALTH_HOOK, 'beltoft_services_domain_prices', \BeltoftServices\Domains\Security::HOOK ) ) as $hook ) {
 			as_unschedule_all_actions( $hook, array(), 'beltoft-services' );
 		}
 

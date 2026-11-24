@@ -7,6 +7,8 @@
 
 namespace BeltoftServices\Tests\Structure;
 
+use BeltoftServices\Tests\Support\Scan;
+
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -31,7 +33,7 @@ class WcsInternalsTest extends TestCase {
 	 * @dataProvider names
 	 */
 	public function test_name_is_in_one_file( string $needle, string $owner ): void {
-		$root  = dirname( __DIR__, 2 ) . '/src/';
+		$root  = Scan::root() . '/src/';
 		$found = array();
 		$it    = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $root, \FilesystemIterator::SKIP_DOTS ) );
 

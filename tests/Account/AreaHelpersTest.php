@@ -4,7 +4,6 @@ namespace BeltoftServices\Tests\Account;
 
 use BeltoftServices\Domains\Domains;
 use BeltoftServices\Mail\Email;
-use BeltoftServices\Hosting\Hosting;
 use BeltoftServices\Licences\Licences;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Ssl\Ssl;
@@ -31,7 +30,7 @@ class AreaHelpersTest extends TestCase {
 	}
 
 	public function test_the_setting_rule_for_a_page_address_is_the_same_for_every_area(): void {
-		foreach ( array( 'hosting_order_url', 'mail_order_url', 'domain_search_url' ) as $key ) {
+		foreach ( array_merge( array( 'mail_order_url', 'domain_search_url' ), $this->optional( 'order_url_settings' ) ) as $key ) {
 			$this->settings( array( $key => '/some/path/' ) );
 			$this->assertSame( home_url( '/some/path/' ), ServiceArea::setting_url( $key ), $key );
 			$this->settings( array( $key => ' https://shop.example.org/x ' ) );

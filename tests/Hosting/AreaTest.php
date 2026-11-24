@@ -1,13 +1,13 @@
 <?php
 /** My Account: the hosting tab is there for every customer, with an empty state and an order button. @package BeltoftServices */
-namespace BeltoftServices\Tests\Account;
+namespace BeltoftServices\Tests\Hosting;
 
 use BeltoftServices\Hosting\Hosting;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Tests\TestCase;
 
-class HostingAreaTest extends TestCase {
+class AreaTest extends TestCase {
 	public function set_up(): void {
 		parent::set_up();
 		wp_set_current_user( self::factory()->user->create() );

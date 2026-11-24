@@ -48,7 +48,6 @@ class RegistryTest extends TestCase {
 			'mail'              => \BeltoftServices\Mail\MailDriver::class,
 			'ssl'               => \BeltoftServices\Ssl\SslDriver::class,
 			'licence-key'       => \BeltoftServices\Licences\KeyDriver::class,
-			'hosting'           => \BeltoftServices\Hosting\HostingDriver::class,
 			'storage'           => \BeltoftServices\Storage\StorageDriver::class,
 			'manual-server'     => \BeltoftServices\ManualServer\ManualServerDriver::class,
 			'support-priority'  => \BeltoftServices\Support\PriorityDriver::class,
@@ -58,6 +57,8 @@ class RegistryTest extends TestCase {
 		foreach ( Registry::all() as $id => $driver ) {
 			$actual[ $id ] = get_class( $driver );
 		}
+		// A driver of an optional feature (hosting, when its plugin is active) is checked by that feature's own tests.
+		$actual = array_diff_key( $actual, array_flip( $this->optional( 'driver_ids' ) ) );
 		$this->assertSame( $golden, $actual );
 
 		// A plugin adding a driver late, at the default priority, still comes after the shipped ones.

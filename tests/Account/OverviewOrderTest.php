@@ -10,7 +10,6 @@ namespace BeltoftServices\Tests\Account;
 use BeltoftServices\Account\Overview;
 use BeltoftServices\Account\OverviewOrder;
 use BeltoftServices\Drivers\Registry;
-use BeltoftServices\Hosting\Addons;
 use BeltoftServices\OrderHandoff;
 use BeltoftServices\Resource;
 use BeltoftServices\Tests\TestCase;
@@ -317,26 +316,6 @@ final class OverviewOrderTest extends TestCase {
 	}
 
 	// -- Where an order from the dashboard returns ---------------------------------------------
-
-	public function test_a_hosting_add_on_order_returns_to_the_page_of_its_account(): void {
-		$this->settings( array( OrderHandoff::SETTING => 1 ) );
-		$order = wc_create_order( array( 'customer_id' => $this->user ) );
-		$order->set_status( 'processing' );
-		$order->save();
-
-		$product  = $this->service_product( 'fake', array(), array( 'slug' => 'oo-' . wp_generate_password( 6, false ) ) );
-		$license  = $this->service_license( $product, array( 'fire' => false, 'user_id' => $this->user ) );
-		$resource = Resource::create( $license, Registry::get( 'fake' ), array(), array( 'state' => 'ready' ) );
-		$order->update_meta_data( Addons::ORDER_META, array( 'resource' => $resource->id(), 'sub' => 1, 'kind' => 'domain', 'target' => '' ) );
-		$order->save();
-		$order = wc_get_order( $order->get_id() );
-
-		$url = OrderHandoff::target( $order );
-
-		$this->assertNotSame( '', $url );
-		$this->assertStringNotContainsString( 'order=', $url );
-		$this->assertTrue( OrderHandoff::applies( $order ) );
-	}
 
 	public function test_a_disk_for_a_server_returns_to_the_server_and_a_mix_does_not(): void {
 		$server_product = $this->service_product( 'fake', array(), array( 'slug' => 'oo-' . wp_generate_password( 6, false ) ) );

@@ -177,12 +177,6 @@ class PriceDisplayInclTest extends UsageTestCase {
 		$this->assertStringContainsString( '0.0226', html_entity_decode( \BeltoftServices\Usage\Summary::order_subtotal( '', $item ) ) );
 	}
 
-	public function test_the_hosting_add_on_prices_follow_the_display(): void {
-		$this->assertSame( '€10.00', \BeltoftServices\Hosting\Addons::shown( 8.0, 'EUR' ) );
-		$this->display( 'excl' );
-		$this->assertSame( '€8.00', \BeltoftServices\Hosting\Addons::shown( 8.0, 'EUR' ) );
-	}
-
 	public function test_a_cart_row_that_is_a_price_difference_uses_the_cart_display(): void {
 		$v = $this->monthly_vps();
 		update_option( 'woocommerce_tax_display_cart', 'excl' );

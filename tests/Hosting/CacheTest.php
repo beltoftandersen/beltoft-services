@@ -9,7 +9,7 @@
 namespace BeltoftServices\Tests\Hosting;
 
 require_once __DIR__ . '/HostingCase.php';
-require_once dirname( __DIR__ ) . '/Support/WpCliStub.php';
+require_once BELTOFT_SERVICES_TESTS_DIR . '/Support/WpCliStub.php';
 
 use BeltoftServices\Api\Routes;
 use BeltoftServices\Hosting\HostingCommand;

@@ -8,7 +8,6 @@
 namespace BeltoftServices\Tests;
 
 use BeltoftServices\CartCompanion;
-use BeltoftServices\Hosting\HostingDriver;
 use BeltoftServices\Mail\MailDriver;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Addon\Addon;
@@ -89,7 +88,7 @@ class CartCompanionTest extends TestCase {
 
 	public function test_a_domain_and_a_mail_or_hosting_plan_sit_together_in_both_directions(): void {
 		$domain = array( 'beltoft_services_domain' => array( 'domain' => 'example.com', 'mode' => 'register' ) );
-		foreach ( array( MailDriver::ID, HostingDriver::ID ) as $driver ) {
+		foreach ( array_merge( array( MailDriver::ID ), $this->optional( 'companion_driver_ids' ) ) as $driver ) {
 			$service = $this->line( $this->product_id( $driver ) );
 			$d       = $this->line( $this->product_id(), $domain );
 			$this->assertTrue( CartCompanion::keeps( $service, $d ), $driver . ': new domain keeps the service' );

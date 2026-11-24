@@ -57,7 +57,8 @@ class SettingsTest extends TestCase {
 	 */
 	public function test_the_field_keys_and_defaults_are_unchanged_and_in_todays_order(): void {
 		$golden = json_decode( (string) file_get_contents( __DIR__ . '/fixtures/settings/fields.json' ), true );
-		$fields = Settings::fields();
+		// The fields of an optional feature (hosting) are pinned by that feature's own tests.
+		$fields = $this->without_optional( Settings::fields(), 'settings_keys' );
 
 		$fields['admin_email']['default'] = '(site admin email)';
 
