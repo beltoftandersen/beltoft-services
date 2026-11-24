@@ -7,8 +7,6 @@
 
 namespace BeltoftServices\Domains;
 
-use BeltoftServices\Hosting\ParkedEdge;
-
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -78,10 +76,29 @@ final class ParkingCommand {
 	 * @param array<string, mixed> $assoc_args Flags.
 	 */
 	public function push( array $args, array $assoc_args ): void {
-		$names = ParkedEdge::hosts();
-		$rows  = array();
+		/**
+		 * The names the edge would serve as parked, or null when nothing answers (no hosting feature).
+		 *
+		 * @param array<int, string>|null $names Null until something answers.
+		 */
+		$names = apply_filters( 'beltoft_services_parked_edge_hosts', null );
 
-		foreach ( ParkedEdge::run() as $node => $state ) {
+		/**
+		 * Sends the parked names to the edge now. Answer: node id => done, running or the reason it failed; null when nothing answers.
+		 *
+		 * @param array<string, string>|null $result Null until something answers.
+		 */
+		$result = apply_filters( 'beltoft_services_parked_edge_push', null );
+
+		if ( ! is_array( $names ) || ! is_array( $result ) ) {
+			\WP_CLI::log( 'Nothing pushes parked names on this site.' );
+
+			return;
+		}
+
+		$rows = array();
+
+		foreach ( $result as $node => $state ) {
 			$rows[] = array( 'node' => $node, 'result' => $state );
 		}
 
