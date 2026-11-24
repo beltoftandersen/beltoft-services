@@ -287,8 +287,11 @@ final class ToolsMapTest extends McpTestCase {
 			'set_default_card', 'set_subscription_payment_method', 'delete_saved_card', 'add_card',
 			'reveal_server_password', 'reveal_database_password', 'reveal_app_login', 'database_ca_certificate', 'delete_mailbox', 'reset_mailbox_password', 'reveal_mailbox_password',
 			'domain_transfer_code', 'domain_unlock', 'console_ticket', 'account_password_and_email', 'connected_apps_and_limits',
-			'order_server', 'order_database', 'delete_server', 'delete_database', 'restore_hosting_backup', 'delete_site', 'dedicated_hard_reset', 'dedicated_firewall', 'dedicated_reinstall', 'dedicated_rescue_password', 'delete_hosting_backup', 'reveal_hosting_database_password', 'hosting_scheduled_jobs', 'domain_dnssec',
+			'order_server', 'order_database', 'delete_server', 'delete_database', 'dedicated_hard_reset', 'dedicated_firewall', 'dedicated_reinstall', 'dedicated_rescue_password', 'domain_dnssec',
 		);
+
+		// The capabilities of an optional feature (hosting) are pinned by that feature's own tests; with it there they are checked here too.
+		$known = array_merge( $known, $this->optional( 'mcp_capabilities' ) );
 
 		foreach ( $known as $capability ) {
 			$tool   = ActionMap::capabilities()[ $capability ] ?? null;
@@ -326,8 +329,6 @@ final class ToolsMapTest extends McpTestCase {
 	public function test_deleting_a_backup_has_no_tool_anywhere_and_says_why(): void {
 		$this->assertArrayNotHasKey( 'backup_delete', ActionMap::actions() );
 		$this->assertStringStartsWith( 'never', ActionMap::excluded()['backup_delete'] );
-		$this->assertArrayNotHasKey( 'delete_hosting_backup', ActionMap::capabilities() );
-		$this->assertStringStartsWith( 'never', ActionMap::capabilities_excluded()['delete_hosting_backup'] );
 		$this->assertStringContainsString( 'last copy', ActionMap::excluded()['backup_delete'] );
 
 		foreach ( array_keys( Tools::definitions() ) as $name ) {

@@ -44,7 +44,9 @@ $beltoft_hosting_fixture = static function ( string $file ) {
 
 $beltoft_hosting_optional = array(
 	'driver_ids'           => array( 'hosting' ),
+	'driver_kinds'         => array( 'hosting' ),
 	'companion_driver_ids' => array( 'hosting' ),
+	'mcp_capabilities'     => array( 'restore_hosting_backup', 'delete_site', 'delete_hosting_backup', 'reveal_hosting_database_password', 'hosting_scheduled_jobs' ),
 	'account_area_classes' => array( \BeltoftServices\Hosting\Hosting::class ),
 	'area_slugs'           => array( 'hosting' ),
 	'order_url_settings'   => array( 'hosting_order_url' ),

@@ -13,7 +13,8 @@ class AreaSeamsTest extends TestCase {
 	public function test_the_areas_come_from_the_filter_in_tab_order(): void {
 		$keys = array_map( static fn( ServiceArea $a ): string => $a->key_name(), ServiceArea::all() );
 
-		$this->assertSame( array( 'domains', 'databases', 'hosting', 'apps', 'email', 'ssl', 'licences', 'storage', 'dedicated' ), $keys );
+		// The area of an optional feature (hosting) is placed by that feature's own tests.
+		$this->assertSame( array( 'domains', 'databases', 'apps', 'email', 'ssl', 'licences', 'storage', 'dedicated' ), array_values( array_diff( $keys, $this->optional( 'area_slugs' ) ) ) );
 	}
 
 	public function test_an_area_offered_with_a_lower_priority_comes_first_and_a_bad_name_is_ignored(): void {
@@ -31,7 +32,7 @@ class AreaSeamsTest extends TestCase {
 		$keys = array_map( static fn( ServiceArea $a ): string => $a->key_name(), ServiceArea::all() );
 
 		$this->assertSame( 'domains', $keys[0] );
-		$this->assertCount( 9, $keys );
+		$this->assertCount( 8 + count( $this->optional( 'area_slugs' ) ), $keys );
 	}
 
 	public function test_by_key_finds_an_area_and_an_unknown_key_throws(): void {
@@ -64,16 +65,6 @@ class AreaSeamsTest extends TestCase {
 
 		$this->assertSame( 'getting-ready', Panel::group( 'ready' ) );
 		$this->assertSame( 'failed', Panel::group( 'failed' ) );
-	}
-
-	public function test_hosting_answers_the_activity_sentence_and_the_other_messages_stay_as_they_were(): void {
-		$this->assertSame( 'Cache cleared', ActivityMap::sentence( 'Hosting change "purge_cache" done' )['text'] ?? '' );
-		$this->assertNull( ActivityMap::sentence( 'Hosting change "bogus" done' ) );
-		$this->assertNull( ActivityMap::sentence( 'Something else' ) );
-
-		add_filter( 'beltoft_services_activity_sentence', static fn( $s, $message ) => 'Another feature said so' === $message ? 'Said' : $s, 20, 2 );
-
-		$this->assertSame( 'Said', ActivityMap::sentence( 'Another feature said so' )['text'] ?? '' );
 	}
 
 	public function test_a_server_and_a_licence_name_their_own_address_and_a_host_keeps_its_dots(): void {

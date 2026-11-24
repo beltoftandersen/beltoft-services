@@ -8,6 +8,7 @@
 namespace BeltoftServices\Tests;
 
 use BeltoftServices\Jobs;
+use BeltoftServices\Tests\Support\Scan;
 
 /**
  * Jobs::recurring() and Jobs::ensure_recurring().
@@ -89,11 +90,15 @@ final class RecurringJobsTest extends TestCase {
 	public function test_every_recurring_callback_in_the_source_is_in_the_registry(): void {
 		$count = 0;
 		$stray = array();
-		$it    = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( dirname( __DIR__ ) . '/src', \FilesystemIterator::SKIP_DOTS ) );
+		$it    = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( Scan::root() . '/src', \FilesystemIterator::SKIP_DOTS ) );
 		foreach ( $it as $file ) {
 			if ( 'php' !== $file->getExtension() ) {
 				continue;
 			}
+			if ( in_array( explode( '/', substr( $file->getPathname(), strlen( Scan::root() . '/src/' ) ) )[0], Scan::unbooted(), true ) ) {
+				continue;
+			}
+
 			$code   = (string) file_get_contents( $file->getPathname() );
 			$count += substr_count( $code, 'Jobs::recurring(' );
 			// Jobs owns the hook; CapacityJobs queues cluster runs once, on activation.

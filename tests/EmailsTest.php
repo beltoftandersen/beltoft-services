@@ -729,8 +729,11 @@ final class EmailsTest extends TestCase {
 	public function test_the_value_defaults_cover_exactly_the_keys_the_features_add(): void {
 		$all   = array_keys( $this->values_for( 'fake' ) );
 		$bare  = array( 'product_name', 'customer_name', 'account_url', 'deletion_date', 'reason', 'held', 'retention_days', 'deletes_on', 'details', 'used', 'limit', 'usage', 'domain_name', 'notice_kind', 'notice_what', 'notice_app', 'renewal' );
-		$added = array_values( array_diff( $all, $bare ) );
-		$have  = array_keys( \BeltoftServices\Emails\ValueDefaults::all() );
+		// The keys of an optional feature (hosting) are pinned by that feature's own tests (tests/Hosting/EmailValuesGoldenTest.php);
+		// ValueDefaults::all() holds a default for monitor_hosting whether the feature is there or not.
+		$skip  = array_merge( $this->optional( 'email_value_keys' ), array( 'monitor_hosting' ) );
+		$added = array_values( array_diff( $all, $bare, $skip ) );
+		$have  = array_values( array_diff( array_keys( \BeltoftServices\Emails\ValueDefaults::all() ), $skip ) );
 
 		sort( $added );
 		sort( $have );

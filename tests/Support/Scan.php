@@ -25,6 +25,16 @@ final class Scan {
 	}
 
 	/**
+	 * Folders of src/ that are not booted in this run (BELTOFT_TEST_WITHOUT_HOSTING proves the rest does not need hosting).
+	 * Tests that compare the source with what registered at boot leave them out.
+	 *
+	 * @return string[]
+	 */
+	public static function unbooted(): array {
+		return getenv( 'BELTOFT_TEST_WITHOUT_HOSTING' ) ? array( 'Hosting' ) : array();
+	}
+
+	/**
 	 * The file whose boot method calls every register() (Plugin::boot()).
 	 *
 	 * @return string

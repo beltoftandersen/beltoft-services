@@ -22,5 +22,8 @@ final class DriverOrderTest extends TestCase {
 		$this->assertSame( 'hosting', $ids[ array_search( 'licence-key', $ids, true ) + 1 ] );
 		$this->assertInstanceOf( HostingDriver::class, Registry::get( 'hosting' ) );
 		$this->assertSame( 'hosting', HostingDriver::ID );
+
+		$kinds = Registry::kinds();
+		$this->assertSame( 'hosting', $kinds[ array_search( 'lickey', $kinds, true ) + 1 ] );
 	}
 }

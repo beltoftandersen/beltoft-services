@@ -59,7 +59,10 @@ final class ToolSetsTest extends McpTestCase {
 		$names = array_keys( Definitions::all() );
 
 		$this->assertSame( array_values( array_unique( Definitions::ORDER ) ), Definitions::ORDER, 'No name twice.' );
-		$this->assertSame( Definitions::ORDER, $names, 'tools/list shows the tools in the order of the list, and every tool is in it.' );
+		// The order list also names the tools of an optional feature (hosting), which exist only when it is there: what is
+		// registered is in the list, in its order. That the list names nothing else is checked by tests/Hosting/McpListsTest.php.
+		$this->assertSame( array(), array_values( array_diff( $names, Definitions::ORDER ) ), 'Every tool is in the order list.' );
+		$this->assertSame( $names, array_values( array_intersect( Definitions::ORDER, $names ) ), 'tools/list shows the tools in the order of the list.' );
 	}
 
 	public function test_the_secret_tools_are_the_platform_list(): void {

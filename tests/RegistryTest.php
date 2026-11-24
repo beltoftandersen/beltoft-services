@@ -17,16 +17,19 @@ use BeltoftServices\Http\HttpDriver;
 class RegistryTest extends TestCase {
 
 	public function test_registry_uses_the_filter(): void {
-		$this->assertSame( array( 'http', 'proxmox', 'proxmox-db', 'proxmox-disk', 'proxmox-snapshots', 'proxmox-ipv4', 'proxmox-managed', 'proxmox-app', 'domain', 'dns', 'mail', 'ssl', 'licence-key', 'hosting', 'storage', 'manual-server', 'support-priority' ), array_keys( Registry::all() ) );
+		$optional = $this->optional( 'driver_ids' );
+
+		// The driver of an optional feature (hosting) is pinned by that feature's own tests.
+		$this->assertSame( array( 'http', 'proxmox', 'proxmox-db', 'proxmox-disk', 'proxmox-snapshots', 'proxmox-ipv4', 'proxmox-managed', 'proxmox-app', 'domain', 'dns', 'mail', 'ssl', 'licence-key', 'storage', 'manual-server', 'support-priority' ), array_values( array_diff( array_keys( Registry::all() ), $optional ) ) );
 		$this->assertInstanceOf( HttpDriver::class, Registry::get( 'http' ) );
 		$this->assertSame( 'vm', Registry::get( 'proxmox' )->kind() );
 		$this->assertSame( 'disk', Registry::get( 'proxmox-disk' )->kind() );
 
 		$fake = $this->fake_driver();
 
-		$this->assertSame( array( 'http', 'proxmox', 'proxmox-db', 'proxmox-disk', 'proxmox-snapshots', 'proxmox-ipv4', 'proxmox-managed', 'proxmox-app', 'domain', 'dns', 'mail', 'ssl', 'licence-key', 'hosting', 'storage', 'manual-server', 'support-priority', 'fake' ), array_keys( Registry::all() ) );
+		$this->assertSame( array( 'http', 'proxmox', 'proxmox-db', 'proxmox-disk', 'proxmox-snapshots', 'proxmox-ipv4', 'proxmox-managed', 'proxmox-app', 'domain', 'dns', 'mail', 'ssl', 'licence-key', 'storage', 'manual-server', 'support-priority', 'fake' ), array_values( array_diff( array_keys( Registry::all() ), $optional ) ) );
 		$this->assertSame( $fake, Registry::get( 'fake' ) );
-		$this->assertSame( array( 'http', 'vm', 'db', 'disk', 'snapshot', 'ipv4', 'managed', 'applic', 'domain', 'dns', 'mail', 'ssl', 'lickey', 'hosting', 'storage', 'dedicated', 'support', 'fake' ), Registry::kinds() );
+		$this->assertSame( array( 'http', 'vm', 'db', 'disk', 'snapshot', 'ipv4', 'managed', 'applic', 'domain', 'dns', 'mail', 'ssl', 'lickey', 'storage', 'dedicated', 'support', 'fake' ), array_values( array_diff( Registry::kinds(), $this->optional( 'driver_kinds' ) ) ) );
 	}
 
 	/**

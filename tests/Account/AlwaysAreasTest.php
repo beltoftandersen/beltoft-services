@@ -147,7 +147,8 @@ class AlwaysAreasTest extends TestCase {
 
 		$all = Overview::all();
 
-		$this->assertSame( 6, substr_count( $all, ' is-empty' ), 'Hosting and apps show empty too.' );
+		// Servers, databases, mail, domains and apps, and the hosting area when it is offered.
+		$this->assertSame( 5 + count( $this->optional( 'area_slugs' ) ), substr_count( $all, ' is-empty' ), 'Hosting and apps show empty too.' );
 		$this->assertStringContainsString( 'ov__apps is-empty', Overview::section( 'apps' ) );
 	}
 

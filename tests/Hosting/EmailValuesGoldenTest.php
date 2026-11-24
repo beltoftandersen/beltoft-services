@@ -47,6 +47,12 @@ final class EmailValuesGoldenTest extends TestCase {
 		}
 	}
 
+	public function test_every_hosting_value_key_has_a_default(): void {
+		$expected = json_decode( (string) file_get_contents( __DIR__ . '/fixtures/email-values.json' ), true );
+
+		$this->assertSame( array(), array_values( array_diff( array_keys( $expected['proxmox'] ), array_keys( \BeltoftServices\Emails\ValueDefaults::all() ) ) ) );
+	}
+
 	public function test_the_hosting_definitions_match_the_fixture_word_for_word_and_come_last(): void {
 		$fixture = require __DIR__ . '/fixtures/email-definitions.php';
 		$core    = require BELTOFT_SERVICES_TESTS_DIR . '/fixtures/email-definitions.php';

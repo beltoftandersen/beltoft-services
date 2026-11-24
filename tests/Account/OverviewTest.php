@@ -96,25 +96,11 @@ class OverviewTest extends MonitoringTestCase {
 			$this->assertSame( '', $this->html( $section ), $section );
 		}
 
-		foreach ( array( 'servers', 'databases', 'hosting', 'domains', 'mail', 'apps' ) as $section ) {
+		// The section of an optional feature (hosting) is pinned by that feature's own tests.
+		foreach ( array( 'servers', 'databases', 'domains', 'mail', 'apps' ) as $section ) {
 			$this->assertStringContainsString( 'ov__' . $section . ' is-empty', $this->html( $section ), $section );
 			$this->assertStringNotContainsString( 'list-btn', $this->html( $section ), 'No product, no button: ' . $section );
 		}
-	}
-
-	public function test_a_hosting_account_has_its_own_overview_section(): void {
-		$user = self::factory()->user->create();
-		$this->as_user( $user );
-		$this->dns( $user, 'hosted-example.dk', 'hosting' );
-		Overview::reset();
-
-		$data = Overview::data();
-
-		$this->assertCount( 1, $data['hosting'] );
-		$this->assertNotSame( '', $data['hosting_url'] );
-		$this->assertStringContainsString( 'ov__hosting', $this->html( 'hosting' ) );
-		$this->assertStringNotContainsString( 'is-empty', $this->html( 'hosting' ) );
-		$this->assertArrayHasKey( 'hosting', Overview::SECTIONS );
 	}
 
 	public function test_one_set_of_words_for_a_service_that_is_being_set_up(): void {

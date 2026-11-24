@@ -99,10 +99,6 @@ class OverviewActivityTest extends MonitoringTestCase {
 			'Customer action "backup_now" done'                      => 'Backup taken',
 			'Customer action "mailbox_password" done'                => 'Mailbox password changed',
 			'Customer action "mailbox_create" done'                  => 'Mailbox made',
-			'Hosting change "add_site" done'                         => 'Website added',
-			'Hosting change "remove_site" done'                      => 'Website removed',
-			'Hosting change "set_php" done'                          => 'PHP version changed',
-			'Hosting change "purge_cache" done'                      => 'Cache cleared',
 			'Email domain ready'                                     => 'Email domain ready',
 			'Customer took the snapshot "deploy"'                    => 'Snapshot "deploy" taken',
 			'Snapshot "deploy" deleted'                              => 'Snapshot "deploy" deleted',
@@ -460,7 +456,10 @@ class OverviewActivityTest extends MonitoringTestCase {
 			$this->assertStringNotContainsString( 'Customer started the server', $out );
 			$this->assertStringNotContainsString( 'Hosting change', $out );
 			$this->assertStringContainsString( 'Server started', $out );
-			$this->assertStringContainsString( 'PHP version changed', $out );
+			// The sentence of an optional feature (hosting) shows when that feature is there.
+			if ( $this->optional( 'area_slugs' ) ) {
+				$this->assertStringContainsString( 'PHP version changed', $out );
+			}
 		}
 	}
 
