@@ -283,6 +283,7 @@ class TransferDnsPageTest extends TestCase {
 		$this->assertSame( 'wait', $p['current'] );
 		$this->assertSame( array( 'done', 'done', 'done', 'current', 'todo' ), array_column( $p['steps'], 'status' ) );
 		$this->assertSame( 'Waiting for your current registrar to release your domain', array_column( $p['steps'], 'label', 'key' )['wait'] );
+		$this->assertSame( 'Transfer complete', array_column( $p['steps'], 'label', 'key' )['done'], 'The last step is named for what it is, not Done, so a waiting step does not read as finished.' );
 		$this->assertSame( 'This takes up to 5 days. To finish sooner, approve the transfer in your current registrar or in the email they sent you. Your website and email keep working.', $p['note'] );
 		$this->assertSame( 'Nothing to do. We email you when it is done.', $p['text'] );
 		$this->assertSame( 'A transfer usually takes up to 5 days.', $p['eta'] );

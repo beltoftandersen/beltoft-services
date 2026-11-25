@@ -228,7 +228,7 @@
 			// The word typed in the danger block (the server checks it too).
 			var block = target.closest( '.beltoft-services-ssl-cancel' );
 			var input = block ? block.querySelector( '[data-ssl-confirm]' ) : null;
-			var typed = input ? input.value : '';
+			var typed = input ? S.phrase( input ) : '';
 
 			guarded( box, target, strings.working, function ( h ) {
 				return act( box, 'ssl_cancel', { confirm: typed.trim() }, h );

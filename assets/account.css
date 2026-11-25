@@ -1951,8 +1951,8 @@ body.woocommerce-account .woocommerce-MyAccount-content ul.beltoft-services-db__
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db > .beltoft-services-vm__more { margin: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db > .beltoft-services-vm__more > :last-child { margin-bottom: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db > .beltoft-services-vm__more + .beltoft-services-vm__more { margin-top: var(--bs-space-5); }
-/* A placeholder reads as a hint, not as typed text (the page's own rules for inputs have an id in them). */
-body.woocommerce-account #brx-content .beltoft-services-db__form input::placeholder { color: var(--bs-muted); opacity: 1; }
+/* A placeholder reads as a hint, not as typed text: the muted tone at 75% (still above 4.5:1; the page's own rules for inputs have an id in them). */
+body.woocommerce-account #brx-content .beltoft-services-db__form input::placeholder { color: var(--bs-muted); opacity: .75; }
 /* The connection URL and the fingerprint: one line high as the Copy button beside it (32px); on a phone the text wraps inside its box (nothing is cut off) and Copy sits under it. */
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db .beltoft-services-db__block code.beltoft-services-db__conn { padding: var(--bs-space-1) var(--bs-space-3); line-height: 24px; white-space: normal; }
 @media (max-width: 600px) {
@@ -1972,6 +1972,15 @@ body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-db
 body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-db details.beltoft-services-vm__more, .beltoft-services-vm__backups details.beltoft-services-vm__more, .beltoft-services-vm__ipv4 details.beltoft-services-vm__ipv4-setup, details.beltoft-services-disk__guide)[open] > summary::after { transform: rotate(225deg) translate(-2px, -2px); }
 body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-db details.beltoft-services-vm__more, .beltoft-services-vm__backups details.beltoft-services-vm__more, .beltoft-services-vm__ipv4 details.beltoft-services-vm__ipv4-setup, details.beltoft-services-disk__guide) > :not(summary) { margin-left: var(--bs-space-5); margin-right: var(--bs-space-5); }
 body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-db details.beltoft-services-vm__more, .beltoft-services-vm__backups details.beltoft-services-vm__more, .beltoft-services-vm__ipv4 details.beltoft-services-vm__ipv4-setup, details.beltoft-services-disk__guide) > :last-child { margin-bottom: var(--bs-space-5); }
+
+/* On a phone the opened disclosure keeps 16px inside its frame (the page edge), not 24px. */
+@media (max-width: 700px) {
+	body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-db details.beltoft-services-vm__more, .beltoft-services-vm__backups details.beltoft-services-vm__more, .beltoft-services-vm__ipv4 details.beltoft-services-vm__ipv4-setup, details.beltoft-services-disk__guide) > summary { padding-right: var(--bs-space-4); padding-left: var(--bs-space-4); }
+	body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-db details.beltoft-services-vm__more, .beltoft-services-vm__backups details.beltoft-services-vm__more, .beltoft-services-vm__ipv4 details.beltoft-services-vm__ipv4-setup, details.beltoft-services-disk__guide) > :not(summary) { margin-right: var(--bs-space-4); margin-left: var(--bs-space-4); }
+	body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-db details.beltoft-services-vm__more, .beltoft-services-vm__backups details.beltoft-services-vm__more, .beltoft-services-vm__ipv4 details.beltoft-services-vm__ipv4-setup, details.beltoft-services-disk__guide) > :last-child { margin-bottom: var(--bs-space-4); }
+	/* The Delete button of a backup row is as tall as Remove in the access list (40px). */
+	body.woocommerce-account .woocommerce-MyAccount-content table.beltoft-services-vm__backup-list td:last-child .bs-btn--sm { min-height: var(--bs-btn-h); }
+}
 
 /* Plan and engine cards: the chosen one has the line of the tiles (assets/picker.css, assets/tiles.css), no glow. */
 .beltoft-services-plan__specs, .beltoft-services-plan__stock { font-weight: var(--bs-fw-regular); }
@@ -2083,6 +2092,10 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-area-p
 	.beltoft-services-ov__rows a.beltoft-services-ov__row .beltoft-services-ov__end { flex: 1 1 100%; justify-items: start; text-align: left; }
 }
 
+/* Rows of the domain list: a row without a sub line (an order that never got a name) is as high as the others. */
+.beltoft-services-servers--domains a.beltoft-services-srv { min-height: 65px; }
+.beltoft-services-servers--domains a.beltoft-services-srv:first-child { min-height: 64px; }
+
 /* Facts of a domain: six tiles in three even columns (two on a tablet, one on a phone), 8px apart, no hairlines. */
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domain--page .beltoft-services-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--bs-space-2); overflow: visible; background: none; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domain--page .beltoft-services-facts > div { min-width: 0; padding: var(--bs-space-3) var(--bs-space-4); border-radius: var(--bs-radius); background: var(--bs-surface); }
@@ -2151,7 +2164,7 @@ body.woocommerce-account div.beltoft-services-domain button.beltoft-services-dom
 	.beltoft-dnse__table tr:not([data-edit-row]) td:nth-child(2) { grid-column: 1; grid-row: 2; align-self: center; justify-self: start; padding: 2px var(--bs-space-2); border-radius: var(--bs-radius); background: var(--bs-warm); color: var(--bs-ink); font-size: var(--bs-fs-small); line-height: var(--bs-lh-title); }
 	.beltoft-dnse__table tr:not([data-edit-row]) td:nth-child(3) { grid-column: 2; grid-row: 2; align-self: center; color: var(--bs-muted); font-size: var(--bs-fs-small); line-height: var(--bs-lh-title); white-space: normal; }
 	.beltoft-dnse__table tr:not([data-edit-row]) td:nth-child(3)::before { content: attr(data-label) ": "; }
-	.beltoft-dnse__table tr:not([data-edit-row]) td:nth-child(4) { grid-column: 1 / -1; grid-row: 3; max-height: 12em; overflow: auto; padding-top: var(--bs-space-1); overflow-wrap: anywhere; }
+	.beltoft-dnse__table tr:not([data-edit-row]) td:nth-child(4) { grid-column: 1 / -1; grid-row: 3; max-height: calc(8 * 24px + var(--bs-space-1)); overflow: auto; scrollbar-width: thin; scrollbar-color: var(--bs-muted) transparent; padding-top: var(--bs-space-1); overflow-wrap: anywhere; }
 	.beltoft-dnse__table tr:not([data-edit-row]) td:nth-child(5):not(.beltoft-dnse__actions) { grid-column: 1 / -1; grid-row: 4; }
 	.beltoft-dnse__table td.beltoft-dnse__actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--bs-space-2); padding-top: var(--bs-space-2); }
 	body.woocommerce-account div.beltoft-services-domain .beltoft-dnse__table td.beltoft-dnse__actions > button + button { margin-left: 0; }
@@ -2164,14 +2177,18 @@ body.woocommerce-account div.beltoft-services-domain button.beltoft-services-dom
 	.beltoft-dnse__table tr[data-edit-row] td:nth-child(2) { grid-column: 1; grid-row: 2; }
 	.beltoft-dnse__table tr[data-edit-row] td:nth-child(3) { grid-column: 2; grid-row: 2; }
 	.beltoft-dnse__table tr[data-edit-row] td:nth-child(4) { grid-row: 3; }
-	.beltoft-dnse__table tr[data-edit-row] td.beltoft-dnse__actions { grid-row: 4; }
+	.beltoft-dnse__table tr[data-edit-row] { padding-bottom: var(--bs-space-4); }
+	.beltoft-dnse__table tr[data-edit-row] td.beltoft-dnse__actions { grid-row: 4; margin-top: var(--bs-space-3); }
 	.beltoft-dnse__table tr[data-edit-row] td.beltoft-dnse__actions::before { content: none; }
 	div.beltoft-services-domain .beltoft-dnse__bar .beltoft-dnse__add.button { width: 100%; margin-left: 0; }
 }
 
 /* Transfer or registration in progress: the hint line and the steps use the same 8px dot (the dot of a step is centred on its first line), steps 12px apart, 16px to the tab bar. */
 .beltoft-services-domain-page .beltoft-services-progress { margin-bottom: 0; }
-.beltoft-services-domain-page .beltoft-services-progress__steps { gap: var(--bs-space-3); }
+.beltoft-services-domain-page .beltoft-services-progress__steps { gap: var(--bs-space-3); margin-top: var(--bs-space-3); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domain-page .beltoft-services-panel--page .beltoft-services-progress p.beltoft-services-progress__leave { margin-top: var(--bs-space-4); }
+/* A step that has not started: a ring in the muted tone (3:1 on the ground), not the faint line colour. */
+.beltoft-services-progress .beltoft-services-progress__steps li.is-todo::before { background: none; box-shadow: inset 0 0 0 1px var(--bs-muted); }
 .beltoft-services-domain-page .beltoft-services-progress__steps li { padding-left: var(--bs-space-4); }
 .beltoft-services-domain-page .beltoft-services-progress__steps li::before { top: calc((1.4em - 8px) / 2); width: 8px; height: 8px; }
 

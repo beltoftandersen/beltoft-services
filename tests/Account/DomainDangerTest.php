@@ -89,6 +89,7 @@ class DomainDangerTest extends TestCase {
 
 		$this->assertMatchesRegularExpression( '#data-tab-link="danger"#', $html );
 		$this->assertStringContainsString( 'Turn off auto-renew', $html );
+		$this->assertMatchesRegularExpression( '#class="button bs-btn bs-btn--danger">Turn off auto-renew#', $html );
 		$this->assertStringContainsString( 'If you turn it off, you get an invoice by email instead of an automatic charge. The domain stays registered until', $html );
 		$this->assertStringContainsString( 'beltoft_domain_danger', $html );
 		$this->assertStringNotContainsString( '<dialog', $html, 'A registered domain has no stop dialog.' );
@@ -102,7 +103,9 @@ class DomainDangerTest extends TestCase {
 		$this->assertTrue( $off['ok'] );
 		$fresh = wcs_get_subscription( $sub->get_id() );
 		$this->assertTrue( (bool) $fresh->is_manual() );
-		$this->assertStringContainsString( 'Turn auto-renew back on', $this->page( $r ) );
+		$html = $this->page( $r );
+		$this->assertStringContainsString( 'Turn auto-renew back on', $html );
+		$this->assertMatchesRegularExpression( '#class="button bs-btn bs-btn--secondary">Turn auto-renew back on#', $html, 'A positive action is not a danger button.' );
 		$notes = implode( ' ', array_map( static fn( $n ) => $n->content, wc_get_order_notes( array( 'order_id' => $sub->get_id() ) ) ) );
 		$this->assertStringContainsString( 'turned off automatic renewals', $notes );
 

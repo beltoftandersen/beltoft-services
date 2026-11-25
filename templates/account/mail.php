@@ -225,8 +225,8 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 											<p class="bs-item__meta"><?php esc_html_e( 'Every message in the mailbox is deleted for good. This cannot be undone.', 'beltoft-services' ); ?></p>
 											<div class="beltoft-services-db__form">
 												<p>
-													<label for="beltoft-mail-del-<?php echo esc_attr( md5( $beltoft_services_box['email'] ) ); ?>"><?php echo esc_html( sprintf( /* translators: %s: the word to type */ __( 'Type %s to confirm', 'beltoft-services' ), (string) $view['delete_word'] ) ); ?></label>
-													<input type="text" id="beltoft-mail-del-<?php echo esc_attr( md5( $beltoft_services_box['email'] ) ); ?>" autocomplete="off" data-mail-delete-confirm>
+													<label for="beltoft-mail-del-<?php echo esc_attr( md5( $beltoft_services_box['email'] ) ); ?>"><?php echo esc_html( sprintf( /* translators: %s: the word to type */ __( 'Type %s to confirm', 'beltoft-services' ), \BeltoftServices\Phrases::shown( (string) $view['delete_word'] ) ) ); ?></label>
+													<input type="text" id="beltoft-mail-del-<?php echo esc_attr( md5( $beltoft_services_box['email'] ) ); ?>" autocomplete="off" data-mail-delete-confirm<?php echo \BeltoftServices\Phrases::attrs( (string) $view['delete_word'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in Phrases::attrs(). ?>>
 												</p>
 												<p><button type="button" class="button woocommerce-button bs-btn bs-btn--danger-solid beltoft-services-mail__danger" data-mail-delete="<?php echo esc_attr( $beltoft_services_box['email'] ); ?>"><?php esc_html_e( 'Delete mailbox', 'beltoft-services' ); ?></button></p>
 											</div>

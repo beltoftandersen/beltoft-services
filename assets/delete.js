@@ -55,7 +55,7 @@
 		var id = box.getAttribute( 'data-resource-id' );
 		var h = window.beltoftStatus.busy( text.strings.working, id, button );
 
-		window.beltoftApi.call( account.root + id + '/delete', { method: 'POST', body: { confirm: input ? input.value : '' }, holder: account } ).then( function ( reply ) {
+		window.beltoftApi.call( account.root + id + '/delete', { method: 'POST', body: { confirm: input ? window.beltoftStatus.phrase( input ) : '' }, holder: account } ).then( function ( reply ) {
 			if ( 202 === reply.status ) {
 				// The service stays locked until the page changes: nothing can be pressed twice.
 				if ( input ) {
@@ -92,9 +92,9 @@
 		}
 
 		// The typed word first, inline: a wrong or empty word never opens the question.
-		if ( ! input || input.value.trim() !== word ) {
+		if ( ! input || S.phrase( input ).trim() !== word ) {
 			S.fail( null, text.strings.type.replace( '%s', function () {
-				return word;
+				return box.getAttribute( 'data-delete-shown' ) || word;
 			} ), input );
 
 			return;

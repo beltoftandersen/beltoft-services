@@ -536,12 +536,12 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 										sprintf(
 											/* translators: %s: the word to type, RESTORE */
 											__( 'Type %s to confirm', 'beltoft-services' ),
-											'RESTORE'
+											\BeltoftServices\Phrases::shown( 'RESTORE' )
 										)
 									);
 									?>
 								</label>
-								<input type="text" id="beltoft-vm-restore-confirm" name="confirm" autocomplete="off" required>
+								<input type="text" id="beltoft-vm-restore-confirm" name="confirm" autocomplete="off" required<?php echo \BeltoftServices\Phrases::attrs( 'RESTORE' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in Phrases::attrs(). ?>>
 							</p>
 							<div hidden data-confirm-source data-confirm-title="<?php esc_attr_e( 'Restore this backup?', 'beltoft-services' ); ?>" data-confirm-yes="<?php esc_attr_e( 'Restore now', 'beltoft-services' ); ?>">
 								<p><?php esc_html_e( 'Everything on the server is replaced with the backup. The server is off while it is restored.', 'beltoft-services' ); ?></p>
@@ -773,12 +773,12 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 							sprintf(
 								/* translators: %s: the word to type, REINSTALL */
 								__( 'Type %s to confirm', 'beltoft-services' ),
-								'REINSTALL'
+								\BeltoftServices\Phrases::shown( 'REINSTALL' )
 							)
 						);
 						?>
 					</label>
-					<input type="text" id="beltoft-vm-confirm" name="confirm" autocomplete="off" required>
+					<input type="text" id="beltoft-vm-confirm" name="confirm" autocomplete="off" required<?php echo \BeltoftServices\Phrases::attrs( 'REINSTALL' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in Phrases::attrs(). ?>>
 				</p>
 				<div hidden data-confirm-source data-confirm-title="<?php esc_attr_e( 'Reinstall your server?', 'beltoft-services' ); ?>" data-confirm-yes="<?php esc_attr_e( 'Reinstall now', 'beltoft-services' ); ?>">
 					<?php $beltoft_services_lost = is_array( $snapshots ) ? (int) $snapshots['used'] : 0; ?>
@@ -828,12 +828,12 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 						sprintf(
 							/* translators: %s: the word to type, ROLLBACK */
 							__( 'Type %s to confirm', 'beltoft-services' ),
-							'ROLLBACK'
+							\BeltoftServices\Phrases::shown( 'ROLLBACK' )
 						)
 					);
 					?>
 				</label>
-				<input type="text" id="beltoft-vm-rollback-confirm-<?php echo (int) $resource_id; ?>" name="confirm" autocomplete="off" required>
+				<input type="text" id="beltoft-vm-rollback-confirm-<?php echo (int) $resource_id; ?>" name="confirm" autocomplete="off" required<?php echo \BeltoftServices\Phrases::attrs( 'ROLLBACK' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in Phrases::attrs(). ?>>
 			</p>
 			<p class="beltoft-services-vm__buttons">
 				<button type="submit" class="button woocommerce-button bs-btn"><?php esc_html_e( 'Go back now', 'beltoft-services' ); ?></button>

@@ -341,8 +341,8 @@ $beltoft_services_db_wait = array(
 							</select>
 						</p>
 						<p>
-							<label for="beltoft-db-restore-confirm"><?php echo esc_html( sprintf( /* translators: %s: the word to type */ __( 'Type %s to confirm', 'beltoft-services' ), (string) $beltoft_services_backups['confirm'] ) ); ?></label>
-							<input type="text" id="beltoft-db-restore-confirm" autocomplete="off" placeholder="<?php echo esc_attr( (string) $beltoft_services_backups['confirm'] ); ?>" data-db-restore-confirm>
+							<label for="beltoft-db-restore-confirm"><?php echo esc_html( sprintf( /* translators: %s: the word to type */ __( 'Type %s to confirm', 'beltoft-services' ), \BeltoftServices\Phrases::shown( (string) $beltoft_services_backups['confirm'] ) ) ); ?></label>
+							<input type="text" id="beltoft-db-restore-confirm" autocomplete="off" placeholder="<?php echo esc_attr( \BeltoftServices\Phrases::shown( (string) $beltoft_services_backups['confirm'] ) ); ?>" data-db-restore-confirm<?php echo \BeltoftServices\Phrases::attrs( (string) $beltoft_services_backups['confirm'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in Phrases::attrs(). ?>>
 						</p>
 						<p><button type="button" class="button woocommerce-button" data-db-restore><?php esc_html_e( 'Restore now', 'beltoft-services' ); ?></button></p>
 						</div>

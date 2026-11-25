@@ -921,7 +921,16 @@
 		init();
 	}
 
+	// What to send for a confirm word: the English word of the route when the word shown on the page was typed (data-phrase-*), else what was typed.
+	function phrase( input ) {
+		var value = input ? input.value : '';
+		var send = input ? input.getAttribute( 'data-phrase-send' ) : null;
+
+		return send && value.trim() === input.getAttribute( 'data-phrase-shown' ) ? send : value;
+	}
+
 	window.beltoftStatus = {
+		phrase: phrase,
 		busy: busy,
 		done: done,
 		fail: fail,

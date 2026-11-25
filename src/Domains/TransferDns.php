@@ -757,7 +757,7 @@ final class TransferDns {
 		$list['send'] = array( __( 'Sending the transfer', 'beltoft-services' ), $ordered );
 		/* translators: %s: the current registrar. */
 		$list['wait'] = array( sprintf( __( 'Waiting for %s to release your domain', 'beltoft-services' ), $who ), $active );
-		$list['done'] = array( __( 'Done', 'beltoft-services' ), $active && in_array( 'dates', $done, true ) );
+		$list['done'] = array( __( 'Transfer complete', 'beltoft-services' ), $active && in_array( 'dates', $done, true ) );
 
 		$steps = array();
 		$open  = false;

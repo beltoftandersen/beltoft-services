@@ -201,7 +201,7 @@
 			return;
 		}
 
-		run( panel, button, db.strings.restoring, '/actions/restore', JSON.stringify( { args: { confirm: input ? input.value : '', volid: choice.value } } ), 'restore', undefined, input );
+		run( panel, button, db.strings.restoring, '/actions/restore', JSON.stringify( { args: { confirm: S.phrase( input ), volid: choice.value } } ), 'restore', undefined, input );
 	}
 
 	// One backup at a time: a question first (the only backup says so), then the server's own action; the page is read again when the job has run.

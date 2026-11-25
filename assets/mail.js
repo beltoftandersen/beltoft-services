@@ -338,7 +338,7 @@
 			var input = target.closest( 'details' ).querySelector( '[data-mail-delete-confirm]' );
 
 			guarded( box, target, strings.deleting, function ( h ) {
-				return call( box, 'DELETE', '/mail/mailboxes/' + encodeURIComponent( gone ) + '?confirm=' + encodeURIComponent( input.value.trim() ) ).then( function ( result ) {
+				return call( box, 'DELETE', '/mail/mailboxes/' + encodeURIComponent( gone ) + '?confirm=' + encodeURIComponent( S.phrase( input ).trim() ) ).then( function ( result ) {
 					if ( result.ok ) {
 						fresh( box );
 					} else {
