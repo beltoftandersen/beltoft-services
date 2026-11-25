@@ -35,10 +35,14 @@ defined( 'ABSPATH' ) || exit;
 final class AppDomainChange {
 
 	public const ACTION = 'app_domain';
+	public const CANCEL = 'app_domain_cancel';
 	public const HOOK   = 'beltoft_services_app_domain_change';
 
 	/** Seconds the guest has to answer for a run before the change is called failed. */
 	public const APPLY_WAIT = 900;
+
+	/** Seconds a failed change is shown on the App tab. */
+	public const FAILED_SHOWN = 7 * DAY_IN_SECONDS;
 
 	/** Seconds between two looks at the guest's status file. */
 	public const POLL = 15;
@@ -47,7 +51,7 @@ final class AppDomainChange {
 	public const PUSH_TRIES = 3;
 
 	/** The reasons a failed change can show; the guest's own words are mapped onto these. */
-	private const REASONS = array( 'none', 'other', 'aaaa', 'unreachable', 'timeout', 'certificate', 'caddy', 'app', 'probe', 'agent', 'busy' );
+	private const REASONS = array( 'none', 'other', 'aaaa', 'unreachable', 'timeout', 'certificate', 'caddy', 'app', 'probe', 'agent', 'busy', 'late' );
 
 	/**
 	 * A stand-in for the guest side (AppRename) in tests: an object with supported( $r ), push( $r, $want ) and read( $r, $run, $domain ). The integration tests run the real chain (AppRename and FakeClient) with this left null.
@@ -99,7 +103,43 @@ final class AppDomainChange {
 		if ( 'ready' !== $r->get( 'state' ) || null === $def || empty( $def['domain'] ) || 'ready' !== (string) $r->get( 'app_state' ) ) {
 			return array();
 		}
-		return array( self::ACTION => __( 'Change domain', 'beltoft-services' ) );
+		$out = array( self::ACTION => __( 'Change domain', 'beltoft-services' ) );
+		// A change that waits for the customer's own DNS record can be called off; one that is applying cannot.
+		if ( 'waiting' === (string) $r->get( 'app_chg_state' ) ) {
+			$out[ self::CANCEL ] = __( 'Cancel the change', 'beltoft-services' );
+		}
+		return $out;
+	}
+
+	/** Why the change cannot be called off, in words for the customer; null when it can. */
+	public static function check_cancel( Resource $r ): ?string {
+		if ( 'waiting' !== (string) $r->get( 'app_chg_state' ) ) {
+			return __( 'There is no change waiting that can be cancelled.', 'beltoft-services' );
+		}
+		return null;
+	}
+
+	/**
+	 * Runs inside the action job under the resource lock: forgets a change that waits for the customer's DNS record. Nothing was
+	 * written for it (start() writes no record for an own domain, and the made flags are set only when the guest phase is
+	 * reached through a name of ours), so there is nothing to remove; the old name is untouched.
+	 */
+	public static function cancel( Resource $r ): StepResult {
+		$why = self::check_cancel( $r );
+		if ( null !== $why ) {
+			return StepResult::refused( array( Jobs::TEXT => $why ), 'Cancel of the domain change refused: ' . $why );
+		}
+		if ( array() !== self::pending_records( $r ) ) {
+			// Never expected in this state: records of ours are never left behind, they go to the removal queue like after a failure.
+			return StepResult::refused( array( Jobs::TEXT => __( 'There is no change waiting that can be cancelled.', 'beltoft-services' ) ), 'Cancel refused: records are pending' );
+		}
+		if ( ! $r->set( self::cleared() ) ) {
+			return StepResult::retry( 30, 'The change could not be cancelled just now' );
+		}
+		if ( function_exists( 'as_unschedule_all_actions' ) ) {
+			as_unschedule_all_actions( self::HOOK, array( $r->id() ), Jobs::GROUP );
+		}
+		return StepResult::done( array(), 'Change of domain cancelled' );
 	}
 
 	/**
@@ -322,7 +362,7 @@ final class AppDomainChange {
 			return;
 		}
 		if ( $since > 0 && $now >= $since + AppOwnDomain::WAIT_DAYS * DAY_IN_SECONDS ) {
-			self::store( $id, array( 'app_chg_state' => 'failed', 'app_chg_reason' => 'timeout', 'app_chg_checked' => $now ), 'waiting' );
+			self::store( $id, array( 'app_chg_state' => 'failed', 'app_chg_reason' => 'timeout', 'app_chg_checked' => $now, 'app_chg_at' => $now ), 'waiting' );
 			AppAlerts::domain_change_failed( $r, (string) $r->get( 'app_chg_name' ), 'timeout' );
 			return;
 		}
@@ -394,7 +434,7 @@ final class AppDomainChange {
 		$status = self::guest_read( $r, $run );
 		if ( null === $status || 'running' === ( $status['state'] ?? '' ) ) {
 			if ( $now - (int) $r->get( 'app_chg_at' ) > self::APPLY_WAIT ) {
-				self::fail( $r, 'agent' );
+				self::fail( $r, 'late' );
 				return;
 			}
 			self::schedule( $id, self::POLL );
@@ -506,7 +546,7 @@ final class AppDomainChange {
 	/** The change failed: the old name and its meta stay; the records we wrote for the new name go to the removal queue. */
 	private static function fail( Resource $r, string $reason ): void {
 		$name   = (string) $r->get( 'app_chg_name' );
-		$meta   = array( 'app_chg_state' => 'failed', 'app_chg_reason' => $reason, 'app_chg_made' => null, 'app_chg_www_made' => null, 'app_chg_run' => null, 'app_chg_tries' => null );
+		$meta   = array( 'app_chg_state' => 'failed', 'app_chg_reason' => $reason, 'app_chg_at' => time(), 'app_chg_made' => null, 'app_chg_www_made' => null, 'app_chg_run' => null, 'app_chg_tries' => null );
 		$queued = self::pending_records( $r );
 		if ( $queued ) {
 			$old = array_values( array_filter( (array) $r->get( 'app_domain_old' ), 'is_array' ) );
@@ -540,6 +580,11 @@ final class AppDomainChange {
 		$since     = (int) $r->get( 'app_chg_since' );
 		$mode      = (string) $r->get( 'app_chg_mode' );
 		$name      = (string) $r->get( 'app_chg_name' );
+		// A failure is shown for a week from the time it happened (app_chg_at), then the block is quiet again; computed here, nothing is stored.
+		$failed_at = (int) $r->get( 'app_chg_at' ) ?: $since;
+		if ( 'failed' === $state && $failed_at > 0 && time() - $failed_at >= self::FAILED_SHOWN ) {
+			$state = '';
+		}
 		return array(
 			'offered'   => $offered,
 			'supported' => $offered && null === $why,

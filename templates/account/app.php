@@ -172,10 +172,15 @@ $beltoft_services_status_text = array(
 			$beltoft_services_zones = array_values( (array) $beltoft_services_chg['zones'] );
 			$beltoft_services_id    = 'beltoft-app-chg-' . (int) $view['resource_id'];
 			$beltoft_services_open  = $beltoft_services_chg['supported'] && ( '' === $beltoft_services_cst || 'failed' === $beltoft_services_cst );
-			// A name wraps only after a dot, never inside a label.
+			// A name wraps only after a dot, never inside a label (a hyphen is no break either): each label is one unbreakable piece.
 			$beltoft_services_wrap  = static function ( string $name ): string {
-				return str_replace( '.', '.<wbr>', esc_html( $name ) );
+				$labels = array_map(
+					static fn( string $label ): string => '<span class="beltoft-services-app-domain__label">' . esc_html( $label ) . '</span>',
+					explode( '.', $name )
+				);
+				return implode( '.<wbr>', $labels );
 			};
+			$beltoft_services_kses  = array( 'wbr' => array(), 'span' => array( 'class' => true ) );
 			?>
 			<div class="beltoft-services-vm__more beltoft-services-app-domain" data-app-domain-block data-app-domain-state="<?php echo esc_attr( '' === $beltoft_services_cst ? 'idle' : $beltoft_services_cst ); ?>">
 				<h4><?php esc_html_e( 'Domain', 'beltoft-services' ); ?></h4>
@@ -184,7 +189,7 @@ $beltoft_services_status_text = array(
 					<?php if ( 'applying' === $beltoft_services_cst ) : ?>
 						<p class="beltoft-services-app-domain__state is-busy" role="status" data-app-domain-status><?php
 						/* translators: %s: a domain name */
-						echo wp_kses( sprintf( esc_html__( 'Changing the address to %s', 'beltoft-services' ), $beltoft_services_wrap( $beltoft_services_new ) ), array( 'wbr' => array() ) );
+						echo wp_kses( sprintf( esc_html__( 'Changing the address to %s', 'beltoft-services' ), $beltoft_services_wrap( $beltoft_services_new ) ), $beltoft_services_kses );
 						?></p>
 						<p class="beltoft-services-app-domain__hint description"><?php esc_html_e( 'The app keeps answering on the current address until the new one works. This takes a few minutes.', 'beltoft-services' ); ?></p>
 					<?php elseif ( 'waiting' === $beltoft_services_cst ) : ?>
@@ -195,15 +200,15 @@ $beltoft_services_status_text = array(
 								printf(
 									/* translators: 1: domain name, 2: www name, 3: server IPv4 address */
 									esc_html__( 'Point A records for %1$s and %2$s to %3$s.', 'beltoft-services' ),
-									'<strong>' . esc_html( $beltoft_services_new ) . '</strong>',
-									'<strong>' . esc_html( (string) $beltoft_services_chg['www'] ) . '</strong>',
+									'<strong>' . $beltoft_services_wrap( $beltoft_services_new ) . '</strong>', // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in the closure.
+									'<strong>' . $beltoft_services_wrap( (string) $beltoft_services_chg['www'] ) . '</strong>', // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in the closure.
 									'<strong>' . esc_html( $beltoft_services_ip ) . '</strong>'
 								);
 							} elseif ( '' !== $beltoft_services_ip ) {
 								printf(
 									/* translators: 1: domain name, 2: server IPv4 address */
 									esc_html__( 'Point an A record for %1$s to %2$s.', 'beltoft-services' ),
-									'<strong>' . esc_html( $beltoft_services_new ) . '</strong>',
+									'<strong>' . $beltoft_services_wrap( $beltoft_services_new ) . '</strong>', // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in the closure.
 									'<strong>' . esc_html( $beltoft_services_ip ) . '</strong>'
 								);
 							}
@@ -232,21 +237,27 @@ $beltoft_services_status_text = array(
 					<?php elseif ( 'failed' === $beltoft_services_cst ) : ?>
 						<p class="beltoft-services-app-domain__state is-bad" role="status" data-app-domain-status><?php
 						/* translators: %s: a domain name */
-						echo wp_kses( sprintf( esc_html__( 'The address was not changed to %s', 'beltoft-services' ), $beltoft_services_wrap( $beltoft_services_new ) ), array( 'wbr' => array() ) );
+						echo wp_kses( sprintf( esc_html__( 'The address was not changed to %s', 'beltoft-services' ), $beltoft_services_wrap( $beltoft_services_new ) ), $beltoft_services_kses );
 						?></p>
 						<p class="beltoft-services-app-domain__hint description" data-app-domain-failure>
 							<?php
 							echo esc_html(
 								match ( (string) $beltoft_services_chg['reason'] ) {
-									'certificate' => __( 'A certificate could not be issued for the name. Check that its A record points to this server and that no CAA record blocks it.', 'beltoft-services' ),
+									// A name in one of our zones got its A record from us: only an own domain can have a wrong record or a CAA record.
+									'certificate' => 'change' === (string) $beltoft_services_chg['mode']
+										? __( 'A certificate could not be issued for the name. Try again in a few minutes. If it fails again, contact support.', 'beltoft-services' )
+										: __( 'A certificate could not be issued for the name. Check that its A record points to this server and that no CAA record blocks it.', 'beltoft-services' ),
 									'timeout'     => __( 'The name did not point to this server in time.', 'beltoft-services' ),
 									'agent'       => __( 'The server did not answer. Check that it is running.', 'beltoft-services' ),
+									'late'        => __( 'The change did not finish in time, so everything was put back.', 'beltoft-services' ),
 									'busy'        => __( 'Another change was still running. Try again in a few minutes.', 'beltoft-services' ),
 									'caddy', 'app', 'probe' => __( 'The app did not answer on the new address, so everything was put back.', 'beltoft-services' ),
 									default       => __( 'The change could not be finished.', 'beltoft-services' ),
 								}
 							);
-							echo ' ' . esc_html__( 'The app still answers on the current address. You can try again. If it fails again, contact support.', 'beltoft-services' );
+							echo ' ' . ( 'certificate' === (string) $beltoft_services_chg['reason'] && 'change' === (string) $beltoft_services_chg['mode']
+								? esc_html__( 'The app still answers on the current address.', 'beltoft-services' )
+								: esc_html__( 'The app still answers on the current address. You can try again. If it fails again, contact support.', 'beltoft-services' ) );
 							?>
 						</p>
 					<?php elseif ( '' !== (string) $beltoft_services_chg['changed'] ) : ?>
@@ -263,6 +274,11 @@ $beltoft_services_status_text = array(
 						</p>
 					<?php elseif ( '' !== (string) $beltoft_services_chg['why'] ) : ?>
 						<p class="beltoft-services-app-domain__hint description" data-app-domain-why><?php echo esc_html( (string) $beltoft_services_chg['why'] ); ?></p>
+					<?php endif; ?>
+					<?php if ( 'waiting' === $beltoft_services_cst ) : ?>
+						<form class="beltoft-services-vm-form beltoft-services-app-domain__cancel" data-action="app_domain_cancel" data-app-domain-cancel>
+							<p><button type="submit" class="button woocommerce-button bs-btn bs-btn--sm bs-btn--secondary"><?php esc_html_e( 'Cancel the change', 'beltoft-services' ); ?></button></p>
+						</form>
 					<?php endif; ?>
 					<?php if ( $beltoft_services_open ) : ?>
 						<p class="beltoft-services-app-domain__action"><button type="button" class="button woocommerce-button bs-btn bs-btn--sm bs-btn--secondary" data-app-domain-open aria-controls="<?php echo esc_attr( $beltoft_services_id ); ?>" aria-expanded="false"><?php echo '' !== $beltoft_services_cur ? esc_html__( 'Change domain', 'beltoft-services' ) : esc_html__( 'Add a domain', 'beltoft-services' ); ?></button></p>
@@ -295,7 +311,8 @@ $beltoft_services_status_text = array(
 							</div>
 						</fieldset>
 						<div hidden data-confirm-source data-confirm-title="<?php echo '' !== $beltoft_services_cur ? esc_attr__( 'Change domain', 'beltoft-services' ) : esc_attr__( 'Add a domain', 'beltoft-services' ); ?>" data-confirm-yes="<?php echo '' !== $beltoft_services_cur ? esc_attr__( 'Change domain', 'beltoft-services' ) : esc_attr__( 'Add a domain', 'beltoft-services' ); ?>">
-							<p><?php esc_html_e( 'The app keeps answering on the current address until the new one works. Then the app switches to the new address. This can take up to a minute, and the current address stops working.', 'beltoft-services' ); ?></p>
+							<p data-for="change"><?php esc_html_e( 'The app keeps answering on the current address until the new one works. Then the app switches to the new address. This can take up to a minute, and the current address stops working.', 'beltoft-services' ); ?></p>
+							<p data-for="own"><?php esc_html_e( 'The app keeps answering on the current address until the new one works. Then the app switches to the new address, and the current address stops working.', 'beltoft-services' ); ?></p>
 							<p data-for="change"><?php esc_html_e( 'We add an A record for the new name to your domain on our name servers. Your other records are not changed.', 'beltoft-services' ); ?></p>
 							<p data-for="own">
 								<?php

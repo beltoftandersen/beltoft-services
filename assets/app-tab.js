@@ -159,6 +159,13 @@
 
 		form.hidden = ! open;
 
+		// The message of a failed change is cleared when the customer opens the form again (the page shows it again until a new change is sent or a week has passed).
+		if ( open && 'failed' === block.getAttribute( 'data-app-domain-state' ) ) {
+			Array.prototype.forEach.call( block.querySelectorAll( '[data-app-domain-status], [data-app-domain-failure]' ), function ( node ) {
+				node.hidden = true;
+			} );
+		}
+
 		if ( button ) {
 			button.setAttribute( 'aria-expanded', open ? 'true' : 'false' );
 			button.hidden = open;

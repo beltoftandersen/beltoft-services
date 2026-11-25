@@ -89,6 +89,7 @@ final class Actions {
 		'rename'         => array( 10, HOUR_IN_SECONDS ),
 		'app_retry'      => array( 3, HOUR_IN_SECONDS ),
 		'app_domain'     => array( 5, HOUR_IN_SECONDS ),
+		'app_domain_cancel' => array( 10, HOUR_IN_SECONDS ),
 		'snapshot_take'     => array( 5, HOUR_IN_SECONDS ),
 		'snapshot_delete'   => array( 10, HOUR_IN_SECONDS ),
 		'snapshot_rollback' => array( 3, HOUR_IN_SECONDS ),
@@ -230,7 +231,7 @@ final class Actions {
 	 */
 	public static function buttons( $actions, $resource, $context = 'card' ) {
 		if ( is_array( $actions ) && $resource instanceof Resource && ProxmoxDriver::ID === $resource->get( 'driver' ) ) {
-			unset( $actions[ AppInstall::RETRY ], $actions[ AppDomainChange::ACTION ], $actions[ ServerName::ACTION ], $actions['replace_ssh_key'], $actions['reinstall'], $actions['restore'], $actions['backup_delete'], $actions['snapshot_take'], $actions['snapshot_delete'], $actions['snapshot_rollback'], $actions['fw_apply'], $actions['fw_reset'], $actions[ PrivateAttach::ATTACH ], $actions[ PrivateAttach::DETACH ], $actions[ Ipv6Switch::ADD ], $actions[ Ipv6Switch::REMOVE ], $actions[ \BeltoftServices\Proxmox\Ipv4\Ipv4Guest::ACTION ] );
+			unset( $actions[ AppInstall::RETRY ], $actions[ AppDomainChange::ACTION ], $actions[ AppDomainChange::CANCEL ], $actions[ ServerName::ACTION ], $actions['replace_ssh_key'], $actions['reinstall'], $actions['restore'], $actions['backup_delete'], $actions['snapshot_take'], $actions['snapshot_delete'], $actions['snapshot_rollback'], $actions['fw_apply'], $actions['fw_reset'], $actions[ PrivateAttach::ATTACH ], $actions[ PrivateAttach::DETACH ], $actions[ Ipv6Switch::ADD ], $actions[ Ipv6Switch::REMOVE ], $actions[ \BeltoftServices\Proxmox\Ipv4\Ipv4Guest::ACTION ] );
 
 			if ( 'page' === $context ) {
 				unset( $actions['start'], $actions['shutdown'], $actions['reboot'], $actions['reset_password'] );
@@ -349,6 +350,9 @@ final class Actions {
 		}
 		if ( AppDomainChange::ACTION === $action ) {
 			return AppDomainChange::check( $r, $args );
+		}
+		if ( AppDomainChange::CANCEL === $action ) {
+			return AppDomainChange::check_cancel( $r );
 		}
 
 		if ( 'restore' === $action ) {
@@ -578,6 +582,9 @@ final class Actions {
 		// A DNS write and a request file for the guest: no Proxmox task and no reinstall, so REINSTALL_GAP does not apply (the floor does).
 		if ( AppDomainChange::ACTION === $action ) {
 			return AppDomainChange::start( $this->r, $args );
+		}
+		if ( AppDomainChange::CANCEL === $action ) {
+			return AppDomainChange::cancel( $this->r );
 		}
 
 		$early = $this->prepare( $record );

@@ -381,7 +381,7 @@ final class AppDomainChangeTest extends MonitoringTestCase {
 		$this->job( $r );
 		$fresh = $this->fresh( $r );
 		$this->assertSame( 'failed', $fresh->get( 'app_chg_state' ) );
-		$this->assertSame( 'agent', $fresh->get( 'app_chg_reason' ) );
+		$this->assertSame( 'late', $fresh->get( 'app_chg_reason' ), 'The wait limit has its own reason, not the one of a server that did not answer.' );
 		$this->assertSame( 'old.mine.example', $fresh->get( 'app_domain' ) );
 
 	}
@@ -826,7 +826,7 @@ final class AppDomainChangeTest extends MonitoringTestCase {
 	}
 
 	/** @dataProvider silent_modes */
-	public function test_chain_a_guest_that_never_answers_ends_by_the_wait_limit_as_agent( string $mode ): void {
+	public function test_chain_a_guest_that_never_answers_ends_by_the_wait_limit_as_late( string $mode ): void {
 		$r = $this->chain_server();
 		$this->fake->set_guest_rename( 5000, $mode );
 		$this->assertTrue( $this->started( $r, $this->change( 'shop' ) )->is_done(), $mode );
@@ -836,7 +836,7 @@ final class AppDomainChangeTest extends MonitoringTestCase {
 		$this->assertTrue( $this->fresh( $r )->set( array( 'app_chg_at' => time() - AppDomainChange::APPLY_WAIT - 5 ) ) );
 		$this->job( $r );
 		$this->assertSame( 'failed', $this->fresh( $r )->get( 'app_chg_state' ), $mode );
-		$this->assertSame( 'agent', $this->fresh( $r )->get( 'app_chg_reason' ), $mode );
+		$this->assertSame( 'late', $this->fresh( $r )->get( 'app_chg_reason' ), $mode );
 		$this->assertSame( 'old.mine.example', $this->fresh( $r )->get( 'app_domain' ), $mode );
 	}
 
@@ -887,5 +887,92 @@ final class AppDomainChangeTest extends MonitoringTestCase {
 		$this->job( $r );
 		$this->assertSame( 'shop.mine.example', $this->fresh( $r )->get( 'app_domain' ) );
 		$this->assertCount( 1, $this->fake->guest_execs( 5000 ) );
+	}
+
+	// -- Cancel a change that waits for the customer's DNS record ---------------------------------
+
+	private function waiting_change( array $meta = array() ): Resource {
+		$r = $this->server( array( 'app_domain' => 'old.mine.example', 'app_zone' => self::ZONE, 'app_domain_made' => true ) );
+		$this->assertTrue( $this->started( $r, array( 'app_domain_mode' => 'own', 'app_own' => self::OWN ) )->is_done() );
+		$this->assertSame( 'waiting', $this->fresh( $r )->get( 'app_chg_state' ) );
+		if ( $meta ) {
+			$this->assertTrue( $this->fresh( $r )->set( $meta ) );
+		}
+		return $this->fresh( $r );
+	}
+
+	public function test_cancel_is_offered_only_while_waiting(): void {
+		$r = $this->waiting_change();
+		$this->assertArrayHasKey( 'app_domain_cancel', Actions::offered( $r ) );
+		$this->assertSame( 'Cancel the change', Actions::offered( $r )['app_domain_cancel'] );
+		$this->assertArrayNotHasKey( 'app_domain_cancel', Actions::buttons( Actions::offered( $r ), $r ), 'Only the App tab draws it.' );
+		$this->assertNull( Actions::check( $r, 'app_domain_cancel', array() ) );
+
+		$this->assertTrue( $r->set( array( 'app_chg_state' => 'applying' ) ) );
+		$applying = $this->fresh( $r );
+		$this->assertArrayNotHasKey( 'app_domain_cancel', Actions::offered( $applying ) );
+		$this->assertNotNull( Actions::check( $applying, 'app_domain_cancel', array() ), 'Not while applying.' );
+
+		$idle = $this->server( array(), 'wordpress', 5001, false );
+		$this->assertArrayNotHasKey( 'app_domain_cancel', Actions::offered( $idle ) );
+		$this->assertNotNull( Actions::check( $idle, 'app_domain_cancel', array() ) );
+	}
+
+	public function test_cancel_forgets_the_change_writes_no_dns_and_keeps_the_old_name(): void {
+		$r = $this->waiting_change();
+		$this->assertSame( array(), AppDomainChange::pending_records( $r ), 'Nothing was written for a name at another DNS host.' );
+		$before = get_option( FakeDns::OPTION );
+		$this->assertTrue( as_has_scheduled_action( AppDomainChange::HOOK, array( $r->id() ), Jobs::GROUP ), 'The wait is scheduled before.' );
+
+		$result = ( new Actions( $r ) )->run( 'app_domain_cancel', array() );
+		$this->assertTrue( $result->is_done() );
+
+		$fresh = $this->fresh( $r );
+		foreach ( array( 'state', 'mode', 'name', 'since', 'checked', 'reason' ) as $key ) {
+			$this->assertNull( $fresh->get( 'app_chg_' . $key ), $key );
+		}
+		$this->assertSame( 'old.mine.example', $fresh->get( 'app_domain' ) );
+		$this->assertSame( $before, get_option( FakeDns::OPTION ), 'No DNS was touched.' );
+		$this->assertSame( array(), (array) $fresh->get( 'app_domain_old' ), 'Nothing to remove.' );
+		$this->assertArrayNotHasKey( 'app_domain_cancel', Actions::offered( $fresh ) );
+		$this->assertArrayHasKey( 'app_domain', Actions::offered( $fresh ), 'A new change can be made.' );
+		$this->assertFalse( as_has_scheduled_action( AppDomainChange::HOOK, array( $r->id() ), Jobs::GROUP ), 'The wait is unscheduled.' );
+	}
+
+	public function test_cancel_is_refused_while_applying_and_changes_nothing(): void {
+		$r = $this->waiting_change( array( 'app_chg_state' => 'applying' ) );
+		$result = ( new Actions( $r ) )->run( 'app_domain_cancel', array() );
+		$this->assertTrue( $result->is_refusal() );
+		$this->assertSame( 'applying', $this->fresh( $r )->get( 'app_chg_state' ) );
+		$this->assertSame( self::OWN, $this->fresh( $r )->get( 'app_chg_name' ) );
+	}
+
+	public function test_cancel_goes_through_the_action_route_with_ownership_and_a_floor(): void {
+		$r = $this->waiting_change();
+		$this->assertFalse( Actions::floor_exceeded( $r, 'app_domain_cancel' ) );
+		$this->assertInstanceOf( \WP_Error::class, Actions::refusal( null, $this->server( array(), 'wordpress', 5002, false ), 'app_domain_cancel', array() ) );
+		$this->assertNull( Actions::refusal( null, $r, 'app_domain_cancel', array() ) );
+		$this->assertArrayHasKey( 'app_domain_cancel', \BeltoftServices\Mcp\ActionMap::excluded() );
+	}
+
+	// -- A failed change is shown for a week ------------------------------------------------------
+
+	public function test_a_failed_change_is_shown_for_seven_days_from_the_failure(): void {
+		$r = $this->waiting_change();
+		$this->assertTrue( $r->set( array( 'app_chg_state' => 'failed', 'app_chg_reason' => 'late', 'app_chg_at' => time() - 6 * DAY_IN_SECONDS ) ) );
+		$this->assertSame( 'failed', AppDomainChange::view( $this->fresh( $r ) )['state'] );
+		$this->assertSame( 'late', AppDomainChange::view( $this->fresh( $r ) )['reason'] );
+		$this->assertTrue( $this->fresh( $r )->set( array( 'app_chg_at' => time() - 7 * DAY_IN_SECONDS - 10 ) ) );
+		$this->assertSame( '', AppDomainChange::view( $this->fresh( $r ) )['state'], 'After a week the block is quiet again.' );
+		$this->assertNull( Actions::check( $this->fresh( $r ), 'app_domain', array( 'app_domain_mode' => 'own', 'app_own' => 'another.test' ) ), 'A new change is still possible.' );
+	}
+
+	public function test_a_failure_stamps_the_time_it_happened(): void {
+		$r = $this->server( array( 'app_domain' => 'old.mine.example', 'app_zone' => self::ZONE ) );
+		$this->assertTrue( $this->started( $r, $this->change( 'shop' ) )->is_done() );
+		$this->job( $r );
+		$this->assertTrue( $this->fresh( $r )->set( array( 'app_chg_at' => time() - AppDomainChange::APPLY_WAIT - 5 ) ) );
+		$this->job( $r );
+		$this->assertGreaterThan( time() - 60, (int) $this->fresh( $r )->get( 'app_chg_at' ) );
 	}
 }

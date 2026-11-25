@@ -90,7 +90,11 @@ class AppDomainTabTest extends MonitoringTestCase {
 
 		$with = $this->block( array( 'supported' => true, 'current' => 'shop.mine.example', 'zones' => array( 'mine.example' ) ), array( 'app_domain' => 'shop.mine.example' ) );
 		$this->assertStringContainsString( 'Change domain', $with );
-		$this->assertStringContainsString( 'shop.<wbr>mine.<wbr>example', $with, 'A name wraps only after a dot.' );
+		$this->assertStringContainsString( '<span class="beltoft-services-app-domain__label">shop</span>.<wbr><span class="beltoft-services-app-domain__label">mine</span>.<wbr><span class="beltoft-services-app-domain__label">example</span>', $with, 'A name wraps only after a dot.' );
+		$hyphen = $this->block( array( 'supported' => true, 'current' => 'my-shop.mine.example', 'zones' => array() ), array( 'app_domain' => 'my-shop.mine.example' ) );
+		$this->assertStringContainsString( '<span class="beltoft-services-app-domain__label">my-shop</span>.<wbr>', $hyphen, 'A hyphen stays inside one unbreakable label.' );
+		$evil = $this->block( array( 'supported' => true, 'current' => '"><b>x</b>.example', 'zones' => array() ), array( 'app_domain' => 'x.example' ) );
+		$this->assertStringNotContainsString( '<b>x</b>', $evil, 'The name is escaped.' );
 
 		$not = $this->block( array( 'supported' => false, 'why' => 'The server is not running.' ) );
 		$this->assertStringContainsString( 'The server is not running.', $not );
@@ -118,6 +122,10 @@ class AppDomainTabTest extends MonitoringTestCase {
 		$this->assertStringContainsString( 'data-confirm-source', $html );
 		$this->assertStringContainsString( 'data-for="own"', $html );
 		$this->assertStringContainsString( 'data-for="change"', $html );
+
+		$own_first = 'The app keeps answering on the current address until the new one works. Then the app switches to the new address, and the current address stops working.';
+		$this->assertMatchesRegularExpression( '#<p data-for="own">' . preg_quote( $own_first, '#' ) . '</p>#', $html, 'An own domain: no minute in the first paragraph.' );
+		$this->assertMatchesRegularExpression( '#<p data-for="change">[^<]*This can take up to a minute#', $html );
 
 		$text = $this->text( $html );
 		$this->assertStringContainsString( 'keeps answering on the current address until the new one works', $text );
@@ -172,8 +180,16 @@ class AppDomainTabTest extends MonitoringTestCase {
 		$this->assertStringContainsString( 'is-bad', $html );
 		$this->assertStringContainsString( 'The address was not changed to app.mine.example', $text );
 		$this->assertStringContainsString( 'A certificate could not be issued for the name.', $text );
-		$this->assertStringContainsString( 'The app still answers on the current address. You can try again.', $text );
+		$this->assertStringContainsString( 'A certificate could not be issued for the name. Try again in a few minutes. If it fails again, contact support.', $text, 'A name in one of our zones: we wrote the A record, so no advice about records.' );
+		$this->assertStringNotContainsString( 'CAA', $text );
+		$this->assertStringContainsString( 'The app still answers on the current address.', $text );
 		$this->assertStringContainsString( 'data-app-domain-open', $html, 'The customer can try again.' );
+		$own = $this->text( $this->block( array( 'supported' => true, 'state' => 'failed', 'mode' => 'own', 'name' => 'shop.example.org', 'reason' => 'certificate', 'current' => 'old.mine.example', 'zones' => array() ), array( 'app_domain' => 'old.mine.example' ) ) );
+		$this->assertStringContainsString( 'Check that its A record points to this server and that no CAA record blocks it.', $own );
+		$this->assertStringContainsString( 'The app still answers on the current address. You can try again.', $own );
+		$late = $this->text( $this->block( array( 'supported' => true, 'state' => 'failed', 'mode' => 'own', 'name' => 'shop.example.org', 'reason' => 'late', 'current' => 'old.mine.example', 'zones' => array() ), array( 'app_domain' => 'old.mine.example' ) ) );
+		$this->assertStringContainsString( 'The change did not finish in time, so everything was put back.', $late );
+		$this->assertStringNotContainsString( 'The server did not answer', $late );
 		$this->assertDoesNotMatchRegularExpression( '/\b(guest|agent|caddy|recipe)\b/i', $text );
 
 		foreach ( array( 'timeout', 'agent', 'busy', 'caddy', 'app', 'probe', 'other' ) as $reason ) {
@@ -225,5 +241,81 @@ class AppDomainTabTest extends MonitoringTestCase {
 		$this->assertSame( array( 'id', 'mode' ), $tools['change_app_domain']['schema']['required'] );
 		$this->assertSame( 'change_app_domain', McpTools::actions()['app_domain'] );
 		$this->assertStringNotContainsString( "\u{2014}", $tools['change_app_domain']['description'] );
+	}
+
+	// -- Cancel button, style rules and the script ---------------------------------------------------
+
+	public function test_a_waiting_change_offers_cancel_the_change_as_a_form_of_the_action_plumbing(): void {
+		$html = $this->block( array( 'state' => 'waiting', 'mode' => 'own', 'name' => 'shop.example.org', 'ip' => '192.0.2.10', 'deadline' => 'December 9, 2026' ) );
+		$this->assertMatchesRegularExpression( '#<form class="beltoft-services-vm-form beltoft-services-app-domain__cancel" data-action="app_domain_cancel"#', $html );
+		$this->assertStringContainsString( 'Cancel the change', $html );
+
+		foreach ( array( 'applying', 'failed', '' ) as $state ) {
+			$other = $this->block( array( 'supported' => true, 'state' => $state, 'mode' => 'change', 'name' => 'app.mine.example' ) );
+			$this->assertStringNotContainsString( 'app_domain_cancel', $other, 'state ' . $state );
+		}
+	}
+
+	public function test_the_script_knows_the_cancel_action_and_builds_the_name_from_nodes(): void {
+		$vm  = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/vm.js' );
+		$tab = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/app-tab.js' );
+		$this->assertStringContainsString( "case 'app_domain_cancel':", $vm );
+		$this->assertStringContainsString( 'function appendDomain( parent, name )', $vm );
+		$this->assertStringContainsString( "document.createElement( 'wbr' )", $vm );
+		$this->assertStringContainsString( "piece.className = 'beltoft-services-app-domain__label';", $vm );
+		$this->assertStringContainsString( 'piece.textContent = label;', $vm );
+		$this->assertStringContainsString( 'domain: true,', $vm );
+		$this->assertStringNotContainsString( 'innerHTML', substr( $vm, (int) strpos( $vm, 'function appendDomain' ), 700 ) );
+		$this->assertStringContainsString( "'failed' === block.getAttribute( 'data-app-domain-state' )", $tab, 'Opening the form clears the failure message.' );
+	}
+
+	/** The selector blocks of account.css that carry a Domain block rule. @return array<int, array{0: string, 1: string}> selector, declarations */
+	private function css_rules(): array {
+		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/account.css' );
+		$css = (string) preg_replace( '#/\*.*?\*/#s', '', $css );
+		preg_match_all( '#([^{}]+)\{([^{}]*)\}#', $css, $m, PREG_SET_ORDER );
+		$out = array();
+		foreach ( $m as $one ) {
+			$out[] = array( trim( (string) preg_replace( '#\s+#', ' ', $one[1] ) ), trim( $one[2] ) );
+		}
+		return $out;
+	}
+
+	private function rule( string $needle, string $must = '' ): string {
+		foreach ( $this->css_rules() as list( $selector, $body ) ) {
+			if ( substr( $selector, -strlen( $needle ) ) === $needle && ( '' === $must || false !== strpos( $body, $must ) ) ) {
+				return $selector . ' { ' . $body . ' }';
+			}
+		}
+		return '';
+	}
+
+	public function test_the_hidden_form_and_button_of_the_domain_block_are_not_displayed(): void {
+		// The flat form of the tab sets display grid at 0,4,3; the hidden rule of the block has to be stronger.
+		$this->assertNotSame( '', $this->rule( 'section.beltoft-services-tab form.beltoft-services-vm-form', 'display: grid' ) );
+		$hidden = $this->rule( 'form.beltoft-services-vm-form.beltoft-services-app-domain__form[hidden]', 'display: none' );
+		$this->assertNotSame( '', $hidden, 'The hidden form has a rule that beats the flat form.' );
+		$this->assertStringContainsString( 'section.beltoft-services-tab', $hidden );
+		$this->assertNotSame( '', $this->rule( '.beltoft-services-app-domain [hidden]', 'display: none' ), 'The hidden row button is not displayed (.bs-btn sets inline-flex).' );
+		$this->assertNotSame( '', $this->rule( 'section.beltoft-services-tab form.beltoft-services-vm-form.beltoft-services-app-domain__form', 'margin: var(--bs-space-4) 0 0' ), 'The shown form keeps its top margin.' );
+		$this->assertStringNotContainsString( '!important', $hidden );
+	}
+
+	public function test_the_action_paragraph_of_the_domain_row_has_no_extra_margin(): void {
+		$this->assertNotSame( '', $this->rule( ':not(.beltoft-services-app-domain__action)', 'margin-top: var(--bs-space-3)' ), 'The price-line rule leaves the action paragraph of the Domain row alone.' );
+		$this->assertNotSame( '', $this->rule( '.beltoft-services-app-domain__row > p', 'margin: 0' ) );
+		$this->assertNotSame( '', $this->rule( '.beltoft-services-app-domain__row', 'row-gap: var(--bs-space-2)' ), 'On a phone the stacked parts are 8px apart.' );
+	}
+
+	public function test_a_domain_label_never_breaks(): void {
+		$this->assertNotSame( '', $this->rule( '.beltoft-services-app-domain__label', 'white-space: nowrap' ) );
+	}
+
+	public function test_the_buttons_of_the_domain_block_are_32px_on_desktop_and_40px_on_phones(): void {
+		$this->assertNotSame( '', $this->rule( 'section.beltoft-services-tab .beltoft-services-app-domain .bs-btn--sm', 'min-height: var(--bs-btn-h-sm)' ) );
+		$css   = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/account.css' );
+		$media = (string) substr( $css, (int) strpos( $css, '@media (max-width: 600px) {', (int) strpos( $css, '.beltoft-services-app-domain__buttons {' ) ) );
+		$media = substr( $media, 0, (int) strpos( $media, "\n}\n" ) );
+		$this->assertStringContainsString( '.beltoft-services-app-domain .bs-btn--sm { min-height: var(--bs-btn-h); }', $media );
 	}
 }

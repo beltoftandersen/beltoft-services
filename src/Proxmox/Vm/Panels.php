@@ -156,6 +156,8 @@ final class Panels {
 					'reinstallStart' => __( 'Reinstalling your server. The old system is erased first.', 'beltoft-services' ),
 					'reinstallDone'  => __( 'Your server is reinstalled.', 'beltoft-services' ),
 					'domainStart'    => __( 'Starting the change of the domain.', 'beltoft-services' ),
+					'domainCancelStart' => __( 'Cancelling the change of the domain.', 'beltoft-services' ),
+					'domainCancelDone'  => __( 'The change of the domain is cancelled. The app still answers on the current address.', 'beltoft-services' ),
 					'domainDone'     => __( 'The change is started. The app keeps answering on the current address until the new one works.', 'beltoft-services' ),
 					'rollbackDoneAnon' => __( 'Your server went back to the snapshot.', 'beltoft-services' ),
 					'deleteDoneAnon' => __( 'The snapshot is deleted.', 'beltoft-services' ),

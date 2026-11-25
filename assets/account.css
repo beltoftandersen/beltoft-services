@@ -1773,7 +1773,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts 
 	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts > div:last-child:nth-child(n) { grid-column: auto; }
 }
 /* A price line and the button under it (the template wraps the button in a paragraph). */
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-tab :is(p, .description) + p:has(> :is(a, button).bs-btn:only-child) { margin-top: var(--bs-space-3); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-tab :is(p, .description) + p:has(> :is(a, button).bs-btn:only-child):not(.beltoft-services-app-domain__action) { margin-top: var(--bs-space-3); }
 /* The IPv4 list is a plain list of rows. */
 body.woocommerce-account .woocommerce-MyAccount-content ul.beltoft-services-vm__ipv4-list { margin: 0 0 var(--bs-space-3); padding: 0; list-style: none; }
 body.woocommerce-account .woocommerce-MyAccount-content ul.beltoft-services-vm__ipv4-list > li { margin: 0; padding: var(--bs-space-1) 0; }
@@ -1951,8 +1951,13 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-do
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__state.is-busy { color: var(--bs-status-warn); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__state.is-bad { color: var(--bs-status-fail); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__row > p.beltoft-services-app-domain__action { grid-column: 2; grid-row: 1; align-self: start; }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__form { margin: var(--bs-space-4) 0 0; }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__form[hidden], body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__fields[hidden] { display: none; }
+/* The form is also the tab's flat form (display grid, margin 0, specificity 0,4,3): the block's rules name the section and the form so they win by specificity alone, and [hidden] wins over every display set here. */
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab form.beltoft-services-vm-form.beltoft-services-app-domain__form { margin: var(--bs-space-4) 0 0; }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab form.beltoft-services-vm-form.beltoft-services-app-domain__form[hidden] { display: none; }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab .beltoft-services-app-domain [hidden] { display: none; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__label { white-space: nowrap; }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab .beltoft-services-app-domain .bs-btn--sm { min-height: var(--bs-btn-h-sm); }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab .beltoft-services-app-domain__row > form.beltoft-services-vm-form.beltoft-services-app-domain__cancel { grid-column: 2; grid-row: 1; align-self: start; margin: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__choices { min-width: 0; margin: 0; padding: 0; border: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__choices legend { margin: 0 0 var(--bs-space-2); padding: 0; font-weight: var(--bs-fw-medium); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__choice { display: block; margin: 0 0 var(--bs-space-3); }
@@ -1964,7 +1969,8 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-do
 @media (max-width: 600px) {
 	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__row { grid-template-columns: minmax(0, 1fr); }
 	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__row > p.beltoft-services-app-domain__action { grid-column: 1; grid-row: auto; }
-	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain :is(.bs-btn--sm) { min-height: var(--bs-btn-h); }
+	body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab .beltoft-services-app-domain__row > form.beltoft-services-vm-form.beltoft-services-app-domain__cancel { grid-column: 1; grid-row: auto; }
+	body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab .beltoft-services-app-domain .bs-btn--sm { min-height: var(--bs-btn-h); }
 }
 
 /* ==== Design pass 2026-11-25: databases, SSL, licences, apps, storage ============================================== */

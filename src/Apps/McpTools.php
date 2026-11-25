@@ -74,6 +74,15 @@ final class McpTools implements ToolSet {
 	/**
 	 * @return array<string, string>
 	 */
+	public static function excluded(): array {
+		return array(
+			'app_domain_cancel' => 'dashboard: calling off a change that waits for the customer\'s DNS record is done in the dashboard; a new change can be requested after it',
+		);
+	}
+
+	/**
+	 * @return array<string, string>
+	 */
 	public static function capabilities(): array {
 		return array(
 			'reveal_app_login'         => 'reveal_app_login',

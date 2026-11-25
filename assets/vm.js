@@ -187,6 +187,8 @@
 				return { action: action, start: fill( s.deleteStart, name ), done: name ? fill( s.deleteDone, name ) : s.deleteDoneAnon };
 			case 'app_domain':
 				return { action: action, start: s.domainStart, done: s.domainDone };
+			case 'app_domain_cancel':
+				return { action: action, start: s.domainCancelStart, done: s.domainCancelDone };
 			case 'backup_delete':
 				return { action: action, start: s.backupDeleteStart, done: s.backupDeleteDone };
 			case 'rename':
@@ -295,6 +297,22 @@
 		}
 	}
 
+	// A domain name as DOM nodes: every label is one unbreakable piece (a hyphen is no break either) and the line may break only after a dot.
+	function appendDomain( parent, name ) {
+		String( name ).split( '.' ).forEach( function ( label, index ) {
+			var piece = document.createElement( 'span' );
+
+			if ( index > 0 ) {
+				parent.appendChild( document.createTextNode( '.' ) );
+				parent.appendChild( document.createElement( 'wbr' ) );
+			}
+
+			piece.className = 'beltoft-services-app-domain__label';
+			piece.textContent = label;
+			parent.appendChild( piece );
+		} );
+	}
+
 	// A dialog that asks first. source: an element with the paragraphs (hidden, in the card), or text; name: the thing it is about.
 	function confirmFirst( panel, options ) {
 		var dialog = panel.querySelector( '[data-confirm-dialog]' );
@@ -324,7 +342,13 @@
 
 		if ( options.name ) {
 			line = document.createElement( 'p' );
-			line.appendChild( document.createElement( 'strong' ) ).textContent = options.name;
+
+			if ( options.domain ) {
+				appendDomain( line.appendChild( document.createElement( 'strong' ) ), options.name );
+			} else {
+				line.appendChild( document.createElement( 'strong' ) ).textContent = options.name;
+			}
+
 			body.appendChild( line );
 		}
 
@@ -539,6 +563,7 @@
 				title: source.getAttribute( 'data-confirm-title' ),
 				label: source.getAttribute( 'data-confirm-yes' ),
 				name: domainName( args ),
+				domain: true,
 				source: domainSource( source, args.app_domain_mode ),
 				run: function ( yes, box ) {
 					send( panel, action, args, yes, box, describe( action, '' ), field );
