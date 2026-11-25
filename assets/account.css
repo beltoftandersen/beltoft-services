@@ -2092,3 +2092,42 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail p
 	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-mail__table th { padding: var(--bs-space-3) var(--bs-space-4); }
 	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-mail__table td { height: 48px; padding: var(--bs-space-2) var(--bs-space-4); }
 }
+
+/* Mailbox rows (third round): address and meter on the first line, the actions on a second line at the row's left edge; an opened form fills that line and the meter keeps its place. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list > .bs-item { grid-template-columns: minmax(0, 1fr) minmax(160px, 220px); gap: var(--bs-space-3) var(--bs-space-5); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list .bs-item__name { overflow-wrap: break-word; word-break: normal; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list > .bs-item > .bs-item__actions, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list > .bs-item:has(.bs-confirm[open]) > .bs-item__actions { grid-column: 1 / -1; grid-row: 2; justify-content: flex-start; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list .bs-item__actions > details.bs-confirm[open] { flex: 0 0 100%; order: 2; max-width: var(--bs-page-width); margin: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list .bs-item__actions > details.bs-confirm > .bs-confirm__body { box-sizing: border-box; width: 100%; margin: var(--bs-space-3) 0 0; padding: var(--bs-space-4); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list .bs-item__actions > details.bs-confirm > summary { margin: 0; }
+@media (max-width: 767px) {
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list > .bs-item { grid-template-columns: minmax(0, 1fr); gap: var(--bs-space-3); }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list > .bs-item > .bs-item__usage { grid-column: 1; grid-row: 2; }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list > .bs-item > .bs-item__actions, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list > .bs-item:has(.bs-confirm[open]) > .bs-item__actions { grid-column: 1; grid-row: 3; display: grid; grid-template-columns: 1fr 1fr; gap: var(--bs-space-2); }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list .bs-item__actions > [data-mail-reveal] { grid-column: 1 / -1; }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list .bs-item__actions > :is(.button, details.bs-confirm) { width: 100%; min-width: 0; margin: 0; }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list .bs-item__actions > details.bs-confirm[open] { grid-column: 1 / -1; }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list .bs-item__actions > details.bs-confirm > summary { box-sizing: border-box; width: 100%; min-height: 40px; justify-content: center; }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list .bs-item__actions > .button { min-height: 40px; justify-content: center; }
+}
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list .bs-item__actions > details.bs-confirm > summary { padding: 0 var(--bs-space-3); min-height: var(--bs-btn-h-sm); }
+@media (max-width: 767px) {
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list .bs-item__actions > details.bs-confirm > summary { min-height: 40px; }
+}
+/* The waiting message under the page head: one status line (8px amber dot, 8px gap, 14px/500), the hint muted 8px under it, 16px to the tab bar. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-panel--page .beltoft-services-progress { margin: var(--bs-space-2) 0 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-panel--page .beltoft-services-progress .beltoft-services-progress__text { display: flex; align-items: center; gap: var(--bs-space-2); margin: 0; color: var(--bs-ink); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); line-height: 20px; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-panel--page .beltoft-services-progress:is(.is-queued, .is-running) .beltoft-services-progress__text::before { flex: none; width: 8px; height: 8px; margin: 0; border-radius: 50%; background: var(--bs-status-warn); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-panel--page .beltoft-services-progress .beltoft-services-progress__leave { margin: var(--bs-space-2) 0 0; color: var(--bs-muted); font-size: var(--bs-fs-small); line-height: 20px; }
+@media (min-width: 768px) {
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list .bs-item__actions > details.bs-confirm > summary { width: fit-content; }
+}
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-panel--page .beltoft-services-progress p.beltoft-services-progress__text { margin: 0; line-height: 20px; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-panel--page .beltoft-services-progress p.beltoft-services-progress__leave { margin: var(--bs-space-2) 0 0; line-height: 20px; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-panel--page .beltoft-services-progress .beltoft-services-progress__note:empty { display: none; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-panel--page .beltoft-services-progress .beltoft-services-progress__note { margin: 0; }
+/* Alias targets: the checkbox sits on the first line, the name follows the address on the same line. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-mail__target { align-items: flex-start; gap: var(--bs-space-2); padding: var(--bs-space-2) var(--bs-space-4); line-height: 24px; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-mail__target input { margin: 3px 0 0; accent-color: var(--bs-dark); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-mail__target .description { display: inline; margin: 0 0 0 var(--bs-space-2); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list .bs-item__actions > details.bs-confirm { padding: 0; border: 0; background: none; }
