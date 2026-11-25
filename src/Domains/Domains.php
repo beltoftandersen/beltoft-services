@@ -207,8 +207,7 @@ final class Domains extends ServiceArea {
 			'title'        => HostName::display( (string) $resource->get( 'domain' ) ),
 			'group'        => $group,
 			'badge'        => Panel::label( $state, $resource ),
-			'message'      => Panel::message( $state, $resource ),
-			'show_message' => 'ready' !== $group,
+			// 'message' and 'show_message' stay as the head made them: the progress block says the same sentence once.
 			'kind'         => '',
 			'renews'       => '',
 		) + $vars;

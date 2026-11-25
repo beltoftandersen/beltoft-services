@@ -78,6 +78,16 @@ class TransferDnsPageTest extends TestCase {
 		return rest_get_server()->dispatch( $request );
 	}
 
+	public function test_a_delayed_transfer_says_the_delay_once(): void {
+		$r = $this->transfer( 'after' );
+		$r->set( array( 'op' => 'provision', 'attempts' => 99 ) );
+		$r = Resource::find( $r->id() );
+		$this->assertTrue( \BeltoftServices\Emails\Emails::delay_running( $r ) );
+
+		$html = $this->page( $r );
+		$this->assertSame( 1, substr_count( wp_strip_all_tags( (string) preg_replace( '#<p class="beltoft-services-panel__message"[^>]*hidden[^>]*>.*?</p>#s', '', $html ) ), 'a delay setting up your service' ) );
+	}
+
 	public function test_the_dns_tab_shows_the_copied_records_and_says_they_are_not_in_use_yet(): void {
 		$r    = $this->transfer( 'first' );
 		$html = $this->page( $r, 'dns' );
