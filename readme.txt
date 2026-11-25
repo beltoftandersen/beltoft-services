@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.64.1
+Stable tag: 0.65.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,11 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.65.0 =
+* Servers with an app: the domain of a running app can be added or changed from the App tab, without a reinstall (Domain block). A name on one of the customer's domains with our name servers gets its A record written; a name at another DNS host waits up to 14 days for the customer's A record. The app keeps answering on the old address until the new one works, and everything is put back when the change fails. Content inside the app is not touched.
+* A change that waits for the customer's DNS record can be cancelled ("Cancel the change").
+* For WordPress, Odoo, Nextcloud, n8n and Easy!Appointments installed with the current set-up; an older install is told to reinstall to choose a domain.
 
 = 0.64.1 =
 * App versions: the name of a version can be translated ("Odoo 20, Danish accounting"), and a version made for the language of the page leads the version list, so the Danish accounting edition of Odoo is the one chosen first on Danish pages (`languages` on a version in app.json).
