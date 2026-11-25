@@ -17,6 +17,6 @@
   "docs_url": "https://www.odoo.com/documentation/20.0/administration/on_premise/deploy.html",
   "versions": [
     {"id": "20", "label": "Odoo 20", "upstream": "20.0", "recipe": 2, "status": "current", "min_plan": "starter", "os": ["ubuntu-24.04"], "install": "install.script", "sha256": "24f05b7fd967533dab82b1724b7aca1d091c216c361bb9c1cc45653eaf6c3205", "eol": ""},
-    {"id": "20-dk", "label": "Odoo 20, Danish accounting", "upstream": "20.0", "recipe": 2, "status": "available", "min_plan": "starter", "os": ["ubuntu-24.04"], "install": "install.script", "sha256": "d503aaffb365c8e05380702a0d16da45d3ca66f0ef3c2dd8ce6f09879bb426e1", "eol": ""}
+    {"id": "20-dk", "label": "Odoo 20, Danish accounting", "languages": ["da"], "upstream": "20.0", "recipe": 2, "status": "available", "min_plan": "starter", "os": ["ubuntu-24.04"], "install": "install.script", "sha256": "d503aaffb365c8e05380702a0d16da45d3ca66f0ef3c2dd8ce6f09879bb426e1", "eol": ""}
   ]
 }

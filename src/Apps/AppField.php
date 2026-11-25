@@ -390,7 +390,7 @@ final class AppField {
 		foreach ( $offer['apps'] as $id => $app ) {
 			$versions = array();
 
-			foreach ( $app['choices'] as $vid => $version ) {
+			foreach ( Apps::language_first( (array) $app['choices'] ) as $vid => $version ) {
 				$versions[] = array( 'id' => (string) $vid, 'label' => Apps::version_label( $version ), 'families' => array_values( (array) $version['os'] ) );
 			}
 
@@ -424,7 +424,7 @@ final class AppField {
 			$why      = Apps::plan_refusal( $current, (array) $offer['plan'] );
 			$versions = array();
 
-			foreach ( $app['choices'] as $vid => $version ) {
+			foreach ( Apps::language_first( (array) $app['choices'] ) as $vid => $version ) {
 				$versions[] = array( 'value' => (string) $vid, 'label' => Apps::version_label( $version ), 'families' => array_values( (array) $version['os'] ) );
 			}
 
@@ -559,7 +559,7 @@ final class AppField {
 	}
 
 	/**
-	 * The short line on a tile that the plan is too small for: "Needs Performance".
+	 * The line on a tile that the plan is too small for: "Cannot be chosen: needs the Performance plan or larger".
 	 *
 	 * @param array<string, mixed> $version Version.
 	 */
@@ -567,7 +567,7 @@ final class AppField {
 		$name = Apps::plan_name( $version );
 
 		/* translators: %s: plan name such as Performance */
-		return '' !== $name ? sprintf( __( 'Needs %s', 'beltoft-services' ), $name ) : __( 'Needs a larger plan', 'beltoft-services' );
+		return '' !== $name ? sprintf( __( 'Cannot be chosen: needs the %s plan or larger', 'beltoft-services' ), $name ) : __( 'Cannot be chosen: needs a larger plan', 'beltoft-services' );
 	}
 
 	/**

@@ -43,6 +43,10 @@ class AppTextsTest extends TestCase {
 					$have[ $data[ $field ] ] = true;
 				}
 			}
+			// A version label is in the list only when it has words to translate.
+			foreach ( (array) ( $data['versions'] ?? array() ) as $version ) {
+				$have[ (string) ( $version['label'] ?? '' ) ] = true;
+			}
 		}
 
 		$this->assertSame( array(), array_values( array_diff( array_keys( AppTexts::all() ), array_keys( $have ) ) ), 'A stale text in the list.' );
@@ -68,6 +72,26 @@ class AppTextsTest extends TestCase {
 
 		$this->assertSame( 'X ' . $summary, $def['summary'] );
 		$this->assertContains( array( 'docker', 'getting_started' ), $seen );
+	}
+
+	public function test_a_version_label_is_translated_and_the_version_of_the_page_language_leads_the_list(): void {
+		$odoo = Apps::definition( 'odoo' );
+		$dk   = Apps::version( 'odoo', '20-dk' );
+		$this->assertSame( 'Odoo 20, Danish accounting', Apps::version_label( $dk ) );
+
+		$translate = static fn( $t, $text, $domain ) => 'beltoft-services' === $domain && 'Odoo 20, Danish accounting' === $text ? 'Odoo 20, dansk regnskab' : $t;
+		add_filter( 'gettext', $translate, 10, 3 );
+		$this->assertSame( 'Odoo 20, dansk regnskab', Apps::version_label( $dk ) );
+		remove_filter( 'gettext', $translate, 10 );
+
+		$choices = array( '20' => Apps::version( 'odoo', '20' ), '20-dk' => $dk );
+		$this->assertSame( array( '20', '20-dk' ), array_map( 'strval', array_keys( Apps::language_first( $choices ) ) ), 'English: the order of app.json.' );
+
+		$da = static fn() => 'da_DK';
+		add_filter( 'pre_determine_locale', $da );
+		$this->assertSame( array( '20-dk', '20' ), array_map( 'strval', array_keys( Apps::language_first( $choices ) ) ), 'Danish: the Danish edition leads.' );
+		remove_filter( 'pre_determine_locale', $da );
+		$this->assertNotEmpty( $odoo );
 	}
 
 	public function test_a_billing_period_word_is_a_plugin_string(): void {

@@ -13,4 +13,4 @@
 .beltoft-services-app .beltoft-services-app__domain label.beltoft-services-app__domain-choice { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 8px; row-gap: 2px; align-items: start; margin: 0; font-weight: 400; }
 .beltoft-services-app .beltoft-services-app__domain-choice input { margin: 4px 0 0; }
 .beltoft-services-app .beltoft-services-app__domain-choice > span { font-weight: 400; }
-.beltoft-services-app .beltoft-services-app__domain-choice > .description { grid-column: 2; margin: 0; }
+.beltoft-services-app .beltoft-services-app__domain-choice > .description { grid-column: 1 / -1; margin: 0; }

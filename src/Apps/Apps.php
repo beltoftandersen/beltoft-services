@@ -308,9 +308,23 @@ final class Apps {
 		return null;
 	}
 
+	/**
+	 * The versions of an app in the order a list shows them: a version made for the language of the page (its `languages` in app.json, such as
+	 * the Danish accounting edition of Odoo on a Danish page) comes first, so it is the one a list starts on. The rest keep their order.
+	 *
+	 * @param array<int|string, array<string, mixed>> $choices Versions by id.
+	 * @return array<int|string, array<string, mixed>>
+	 */
+	public static function language_first( array $choices ): array {
+		$lang  = strtolower( substr( (string) determine_locale(), 0, 2 ) );
+		$first = array_filter( $choices, static fn( $v ) => is_array( $v ) && in_array( $lang, array_map( 'strval', (array) ( $v['languages'] ?? array() ) ), true ) );
+
+		return $first + $choices;
+	}
+
 	/** One line for a version in a list: its label, and the end of support when it has a date. */
 	public static function version_label( array $version ): string {
-		$label = (string) ( $version['label'] ?? $version['version_id'] ?? '' );
+		$label = AppTexts::translate( (string) ( $version['label'] ?? $version['version_id'] ?? '' ) );
 		$eol   = (string) ( $version['eol'] ?? '' );
 		if ( '' === $eol ) {
 			return $label;

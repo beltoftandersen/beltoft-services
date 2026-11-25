@@ -383,7 +383,7 @@ class ServerPickerTest extends BackupTestCase {
 
 	public function test_a_plan_the_app_does_not_fit_is_greyed_and_a_sold_out_plan_is_plain_text(): void {
 		$html = $this->page();
-		$this->assertMatchesRegularExpression( '#<input[^>]*value="coolify"[^>]*disabled[^>]*>.*?>Needs Performance</span>#s', $html, 'Coolify is not for the small plan.' );
+		$this->assertMatchesRegularExpression( '#<input[^>]*value="coolify"[^>]*disabled[^>]*>.*?>Cannot be chosen: needs the Performance plan or larger</span>#s', $html, 'Coolify is not for the small plan.' );
 		$this->assertStringNotContainsString( 'Out of stock', $html );
 
 		$this->v['b-None']->set_stock_status( 'outofstock' );

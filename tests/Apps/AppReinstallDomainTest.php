@@ -605,4 +605,13 @@ final class AppReinstallDomainTest extends MonitoringTestCase {
 		$this->assertSame( 'A', $dns->calls()[0][2][0]['type'] );
 		remove_filter( 'beltoft_services_domains_dns', $filter, 20 );
 	}
+
+	public function test_the_explanation_and_the_fields_of_a_choice_are_not_pushed_in(): void {
+		$tab   = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/app-tab.css' );
+		$field = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/app-field.css' );
+
+		$this->assertStringContainsString( '.beltoft-services-app-reinstall__choice .description { display: block; margin: 4px 0 0; }', $tab );
+		$this->assertStringContainsString( '.beltoft-services-app-reinstall__domain-fields { display: grid; gap: 8px; margin: 0 0 16px; }', $tab, 'The fields start where the explanation above them starts.' );
+		$this->assertStringContainsString( '.beltoft-services-app__domain-choice > .description { grid-column: 1 / -1; margin: 0; }', $field, 'Checkout: the explanation starts where the fields below it start.' );
+	}
 }
