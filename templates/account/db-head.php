@@ -43,7 +43,7 @@ $beltoft_services_back       = \BeltoftServices\Account\ServerLinks::take_back()
 		</p>
 		<p class="beltoft-services-panel__message" data-message<?php echo ! empty( $show_message ) ? '' : ' hidden'; ?>><?php echo esc_html( $message ); ?></p>
 	</div>
-	<?php if ( $actions && 'stopped' === $power && ! $busy && '' !== (string) $note ) : ?>
+	<?php if ( $actions && 'stopped' === $power && ! $busy && '' !== (string) $note ) : // The billing line is about a stopped database: not shown while it runs or is busy. ?>
 		<p class="description beltoft-services-page__billing" data-db-power-note><?php echo esc_html( $note ); ?></p>
 	<?php endif; ?>
 </header>

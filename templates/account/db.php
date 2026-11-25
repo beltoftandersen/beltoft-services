@@ -39,7 +39,7 @@ $beltoft_services_db_wait = array(
 	<?php endif; ?>
 	<?php if ( $beltoft_services_all || 'overview' === $active ) : ?>
 	<dl class="beltoft-services-facts">
-		<div><dt><?php esc_html_e( 'Status', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( $beltoft_services_db_status[ $view['kind'] ] ); ?></dd></div>
+		<div><dt><?php esc_html_e( 'Status', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( 'ready' === $view['kind'] && 'stopped' === $view['power']['state'] ? __( 'Stopped', 'beltoft-services' ) : $beltoft_services_db_status[ $view['kind'] ] ); ?></dd></div>
 		<div><dt><?php esc_html_e( 'Engine', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( (string) $view['engine'] ); ?></dd></div>
 		<div><dt><?php esc_html_e( 'Size', 'beltoft-services' ); ?></dt><dd><?php echo esc_html( (string) $view['size'] ); ?></dd></div>
 		<?php if ( $view['backups']['enabled'] ) : ?>
@@ -70,7 +70,9 @@ $beltoft_services_db_wait = array(
 					<button type="button" class="button woocommerce-button" data-db-power="<?php echo esc_attr( (string) $beltoft_services_power_action ); ?>"><?php echo esc_html( (string) $beltoft_services_power_label ); ?></button>
 				<?php endforeach; ?>
 			</p>
-			<p class="description" data-db-power-note><?php echo esc_html( (string) $view['power']['note'] ); ?></p>
+			<?php if ( 'stopped' === $view['power']['state'] ) : ?>
+				<p class="description" data-db-power-note><?php echo esc_html( (string) $view['power']['note'] ); ?></p>
+			<?php endif; ?>
 		</div>
 	<?php elseif ( 'ready' === $view['kind'] && $view['power']['busy'] ) : ?>
 		<p class="description" data-db-power-note><?php esc_html_e( 'The database is busy. Please try again when it is ready.', 'beltoft-services' ); ?></p>
@@ -228,7 +230,7 @@ $beltoft_services_db_wait = array(
 				<?php if ( array() === $beltoft_services_access['entries'] ) : ?>
 					<p><?php esc_html_e( 'No address is allowed yet.', 'beltoft-services' ); ?></p>
 				<?php else : ?>
-					<table class="beltoft-services-vm__backup-list">
+					<table class="beltoft-services-vm__backup-list beltoft-services-db__access-list">
 						<thead>
 							<tr><th scope="col"><?php esc_html_e( 'Address', 'beltoft-services' ); ?></th><th scope="col"><?php esc_html_e( 'Label', 'beltoft-services' ); ?></th><th scope="col"><?php esc_html_e( 'Added', 'beltoft-services' ); ?></th><th scope="col"></th></tr>
 						</thead>
@@ -238,7 +240,7 @@ $beltoft_services_db_wait = array(
 									<td><code><?php echo esc_html( $beltoft_services_entry['cidr'] ); ?></code></td>
 									<td><?php echo esc_html( $beltoft_services_entry['label'] ); ?></td>
 									<td><?php echo esc_html( $beltoft_services_entry['added'] ); ?></td>
-									<td><?php if ( $beltoft_services_access['editable'] ) : ?><button type="button" class="button woocommerce-button" data-db-access-remove="<?php echo esc_attr( $beltoft_services_entry['cidr'] ); ?>"><?php esc_html_e( 'Remove', 'beltoft-services' ); ?></button><?php endif; ?></td>
+									<td><?php if ( $beltoft_services_access['editable'] ) : ?><button type="button" class="button woocommerce-button bs-btn bs-btn--sm bs-btn--danger" data-db-access-remove="<?php echo esc_attr( $beltoft_services_entry['cidr'] ); ?>"><?php esc_html_e( 'Remove', 'beltoft-services' ); ?></button><?php endif; ?></td>
 								</tr>
 							<?php endforeach; ?>
 						</tbody>
@@ -262,7 +264,7 @@ $beltoft_services_db_wait = array(
 					</div>
 
 					<?php if ( $beltoft_services_access['world'] ) : ?>
-						<p><button type="button" class="button woocommerce-button" data-db-access-world="world_off"><?php esc_html_e( 'Limit access to the list', 'beltoft-services' ); ?></button></p>
+						<p><button type="button" class="button woocommerce-button bs-btn bs-btn--secondary" data-db-access-world="world_off"><?php esc_html_e( 'Limit access to the list', 'beltoft-services' ); ?></button></p>
 					<?php else : ?>
 						<details class="beltoft-services-vm__more">
 							<summary><?php esc_html_e( 'Open to everyone', 'beltoft-services' ); ?></summary>
@@ -272,7 +274,7 @@ $beltoft_services_db_wait = array(
 									<label for="beltoft-db-world-confirm"><?php echo esc_html( sprintf( /* translators: %s: the words to type */ __( 'Type %s to confirm', 'beltoft-services' ), (string) $beltoft_services_access['confirm'] ) ); ?></label>
 									<input type="text" id="beltoft-db-world-confirm" autocomplete="off" placeholder="<?php echo esc_attr( (string) $beltoft_services_access['confirm'] ); ?>" data-db-access-confirm>
 								</p>
-								<p><button type="button" class="button woocommerce-button" data-db-access-world="world_on"><?php esc_html_e( 'Open to everyone', 'beltoft-services' ); ?></button></p>
+								<p><button type="button" class="button woocommerce-button bs-btn bs-btn--danger" data-db-access-world="world_on"><?php esc_html_e( 'Open to everyone', 'beltoft-services' ); ?></button></p>
 							</div>
 						</details>
 					<?php endif; ?>
@@ -340,7 +342,7 @@ $beltoft_services_db_wait = array(
 						</p>
 						<p>
 							<label for="beltoft-db-restore-confirm"><?php echo esc_html( sprintf( /* translators: %s: the word to type */ __( 'Type %s to confirm', 'beltoft-services' ), (string) $beltoft_services_backups['confirm'] ) ); ?></label>
-							<input type="text" id="beltoft-db-restore-confirm" autocomplete="off" data-db-restore-confirm>
+							<input type="text" id="beltoft-db-restore-confirm" autocomplete="off" placeholder="<?php echo esc_attr( (string) $beltoft_services_backups['confirm'] ); ?>" data-db-restore-confirm>
 						</p>
 						<p><button type="button" class="button woocommerce-button" data-db-restore><?php esc_html_e( 'Restore now', 'beltoft-services' ); ?></button></p>
 						</div>

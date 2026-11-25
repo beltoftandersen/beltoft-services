@@ -1025,6 +1025,9 @@ class DbPhase4Test extends TestCase {
 		$this->assertStringNotContainsString( '<script>alert(1)', $html );
 		$this->assertStringContainsString( 'data-db-access-mine="203.0.113.50"', $html, 'Use my current IP.' );
 		$this->assertStringContainsString( 'data-db-access-remove="203.0.113.7"', $html );
+		$this->assertMatchesRegularExpression( '#class="[^"]*bs-btn--danger[^"]*" data-db-access-remove="203.0.113.7"#', $html, 'Remove is a compact danger button like Delete in the backups.' );
+		$this->assertStringContainsString( 'beltoft-services-db__access-list', $html );
+		$this->assertMatchesRegularExpression( '#bs-btn--danger" data-db-access-world="world_on"#', $html );
 		$this->assertStringContainsString( 'Open to everyone', $html );
 		$this->assertStringContainsString( DbAccess::CONFIRM_WORLD, $html );
 		$this->assertStringNotContainsString( 'Abcdefghijklmnopqrstuvwxyz012345', $html );
@@ -1043,7 +1046,7 @@ class DbPhase4Test extends TestCase {
 
 		$html = $this->card( $r );
 		$this->assertStringContainsString( 'The database is open to everyone', $html );
-		$this->assertStringContainsString( 'data-db-access-world="world_off"', $html );
+		$this->assertMatchesRegularExpression( '#bs-btn--secondary" data-db-access-world="world_off"#', $html );
 	}
 
 	public function test_a_database_without_an_address_shows_only_the_private_connection(): void {
