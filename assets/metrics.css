@@ -54,3 +54,7 @@ body.woocommerce-account .beltoft-vm-usage p.beltoft-vm-usage__switch-note:empty
 .beltoft-vm-usage__chart { border-radius: var(--bs-radius-lg, 12px); }
 .beltoft-vm-usage__ranges { border-radius: var(--bs-radius, 8px); overflow: hidden; }
 .beltoft-vm-usage__ranges button { border-radius: 0; }
+
+/* Monitoring inside a hosting panel: the panel's own 24px is the space above the heading, and every chart (storage too) sits on the content edge. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting-panel .beltoft-vm-usage { margin-top: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting-panel .beltoft-vm-usage__chart { padding-right: 0; padding-left: 0; }
