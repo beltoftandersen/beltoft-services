@@ -348,7 +348,7 @@ final class Progress {
 
 	/**
 	 * How far along a payload is, in whole percent: the finished steps of all steps (assets/handoff-flow in thankyou.js
-	 * counts the same way in the browser). A ready service is 100; no steps and not ready is 0 (the line then moves).
+	 * counts the same way in the browser). A ready service is 100 unless it is busy; no steps is 0 (the line then moves).
 	 *
 	 * @param array<string, mixed> $payload Result of build().
 	 * @param bool                 $ready   Whether the service is ready.
@@ -360,8 +360,9 @@ final class Progress {
 			return 100;
 		}
 
+		// No steps: a ready service that is busy (a reboot) has no measure, so the bar moves instead of claiming 100.
 		if ( ! $steps ) {
-			return $ready ? 100 : 0;
+			return 0;
 		}
 
 		$done = 0;

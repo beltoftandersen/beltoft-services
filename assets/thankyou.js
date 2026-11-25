@@ -45,8 +45,9 @@
 			return 100;
 		}
 
+		// No steps: a ready service that is busy (a reboot) has no measure, so the bar moves instead of claiming 100.
 		if ( ! steps.length ) {
-			return ready ? 100 : 0;
+			return 0;
 		}
 
 		counted = countSteps( [ { progress: progress } ] );
@@ -205,7 +206,7 @@
 
 			rows.forEach( function ( row ) {
 				var item = root.querySelector( '[data-service="' + row.id + '"]' );
-				var source = item ? item.querySelector( 'failed' === row.group ? '.beltoft-service__name' : '[data-service-open] a' ) : null;
+				var source = item ? item.querySelector( '[data-service-open] a' ) : null;
 				var li;
 				var a;
 

@@ -195,6 +195,13 @@ final class OverviewOrderTest extends TestCase {
 		) ) );
 	}
 
+	public function test_a_failed_service_gets_an_action_button_not_its_product_name(): void {
+		$this->order( array( 'failed' ) );
+		$html = $this->section();
+
+		$this->assertMatchesRegularExpression( '#data-order-closing-list>\s*<li><a[^>]*>Open [^<]+</a></li>#', $html, 'The button says what it does.' );
+	}
+
 	public function test_the_state_rule(): void {
 		$ready  = array( 'group' => 'ready', 'ready' => true, 'progress' => array( 'active' => false ) );
 		$busy   = array( 'group' => 'ready', 'ready' => true, 'progress' => array( 'active' => true ) );

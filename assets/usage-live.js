@@ -17,6 +17,24 @@
 		return list;
 	}
 
+	// A hint's technical term (qemu-guest-agent) stays whole: the hint wraps at spaces only, so the term is a nowrap span.
+	function hint( el, text ) {
+		var re = /[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+/g;
+		var at = 0;
+		var found;
+		var span;
+		while ( el.firstChild ) { el.removeChild( el.firstChild ); }
+		while ( ( found = re.exec( text ) ) ) {
+			if ( found.index > at ) { el.appendChild( document.createTextNode( text.slice( at, found.index ) ) ); }
+			span = document.createElement( 'span' );
+			span.className = 'bs-term';
+			span.textContent = found[ 0 ];
+			el.appendChild( span );
+			at = found.index + found[ 0 ].length;
+		}
+		if ( at < text.length ) { el.appendChild( document.createTextNode( text.slice( at ) ) ); }
+	}
+
 	function memory( bar, info ) {
 		var fillNode = bar.querySelector( '[data-usage-fill]' );
 		var text = bar.querySelector( '[data-usage-text]' );
@@ -27,12 +45,12 @@
 		if ( 'ok' === state && 'number' === typeof info.percent ) {
 			if ( fillNode ) { fillNode.style.width = Math.max( 0, Math.min( 100, Math.round( info.percent ) ) ) + '%'; }
 			if ( text ) { text.textContent = Math.round( info.percent ) + '%'; }
-			if ( sub ) { sub.textContent = ''; }
+			if ( sub ) { hint( sub, '' ); }
 			return;
 		}
 		if ( fillNode ) { fillNode.style.width = '0%'; }
 		if ( text ) { text.textContent = 'no_agent' === state ? '–' : ( 'waiting' === state ? '…' : '' ); }
-		if ( sub ) { sub.textContent = 'no_agent' === state ? ( strings.hint || '' ) : ''; }
+		if ( sub ) { hint( sub, 'no_agent' === state ? ( strings.hint || '' ) : '' ); }
 	}
 
 	function apply( resources ) {

@@ -53,10 +53,16 @@ final class Panel {
 		}
 
 		$group = self::group( $state, $r );
+		$label = self::label( $state, $r );
+
+		// A ready service that is doing something (a reboot, a reinstall) says Working, as its list row does, not Ready.
+		if ( 'ready' === $group && Progress::build( $r )['active'] ) {
+			$label = __( 'Working', 'beltoft-services' );
+		}
 
 		return array(
 			'group'   => $group,
-			'label'   => self::label( $state, $r ),
+			'label'   => $label,
 			'message' => 'failed' === $group ? self::message( $state, $r ) : '',
 		);
 	}
