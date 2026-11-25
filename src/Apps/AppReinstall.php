@@ -155,7 +155,7 @@ final class AppReinstall {
 		$apps            = array();
 
 		foreach ( $offered as $id => $app ) {
-			foreach ( $app['choices'] as $vid => $version ) {
+			foreach ( Apps::language_first( (array) $app['choices'] ) as $vid => $version ) {
 				$why      = Apps::plan_refusal( $version, $plan );
 				$name     = Apps::plan_name( $version );
 				$label    = Apps::version_label( $version );

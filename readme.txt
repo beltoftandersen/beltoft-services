@@ -260,6 +260,7 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 = 0.64.1 =
 * App versions: the name of a version can be translated ("Odoo 20, Danish accounting"), and a version made for the language of the page leads the version list, so the Danish accounting edition of Odoo is the one chosen first on Danish pages (`languages` on a version in app.json).
+* Reinstall tab and checkout: the explanation and the fields under a domain choice start on the same left edge (the fields were pushed in 24px on the Reinstall tab, the explanation at checkout).
 
 = 0.64.0 =
 * New one-click app for servers: Easy!Appointments 1.6 (appointment booking), installed with Caddy, PHP and MariaDB, private files outside the web root, and helpers on the server for update and roll back that never touch the customer's data.
