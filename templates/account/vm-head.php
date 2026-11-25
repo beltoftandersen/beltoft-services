@@ -67,7 +67,7 @@ $beltoft_services_power_text = $busy ? __( 'Busy', 'beltoft-services' ) : ( 'run
 		<p class="beltoft-services-panel__message" data-message<?php echo ! empty( $show_message ) ? '' : ' hidden'; ?>><?php echo esc_html( $message ); ?></p>
 	</div>
 	<?php if ( '' !== $ip || $actions ) : ?>
-		<?php if ( '' !== (string) ( $billing_note ?? '' ) && ( isset( $actions['shutdown'] ) || isset( $actions['start'] ) ) ) : ?>
+		<?php if ( '' !== (string) ( $billing_note ?? '' ) && 'stopped' === $power && ! $busy && isset( $actions['start'] ) ) : /* Only a stopped server is billed without running. */ ?>
 			<p class="description beltoft-services-page__billing" data-billing-note><?php echo esc_html( $billing_note ); ?></p>
 		<?php endif; ?>
 	<?php endif; ?>

@@ -15,34 +15,35 @@ defined( 'ABSPATH' ) || exit;
 		<ul class="beltoft-services-vm__ipv4-list">
 			<?php foreach ( $ipv4['addresses'] as $beltoft_services_row ) : ?>
 				<li>
-					<code><?php echo esc_html( $beltoft_services_row['address'] ); ?></code>
-					<span class="description">
-						<?php
-						echo esc_html( 'main' === $beltoft_services_row['role'] ? __( 'Main address', 'beltoft-services' ) : __( 'Extra address', 'beltoft-services' ) );
+					<span class="beltoft-services-vm__ipv4-name">
+						<code><?php echo esc_html( $beltoft_services_row['address'] ); ?></code>
+						<span class="description">
+							<?php
+							echo esc_html( 'main' === $beltoft_services_row['role'] ? __( 'Main address', 'beltoft-services' ) : __( 'Extra address', 'beltoft-services' ) );
 
-						if ( ! $beltoft_services_row['live'] ) {
-							echo ', ' . esc_html__( 'being added', 'beltoft-services' );
-						} elseif ( '' !== $beltoft_services_row['ending'] ) {
-							/* translators: %s: date the address ends */
-							echo ', ' . esc_html( sprintf( __( 'ends %s', 'beltoft-services' ), $beltoft_services_row['ending'] ) );
-						}
-
-						if ( 'applied' === $beltoft_services_row['guest'] ) {
-							echo ', ' . esc_html__( 'Set up in the server', 'beltoft-services' );
-						} elseif ( 'not_set_up' === $beltoft_services_row['guest'] ) {
-							echo ', ' . esc_html__( 'Not set up', 'beltoft-services' );
-						}
-						?>
+							if ( $beltoft_services_row['live'] && '' !== $beltoft_services_row['ending'] ) {
+								/* translators: %s: date the address ends */
+								echo ', ' . esc_html( sprintf( __( 'ends %s', 'beltoft-services' ), $beltoft_services_row['ending'] ) );
+							}
+							?>
+						</span>
+						<?php if ( ! $beltoft_services_row['live'] ) : ?>
+							<span class="bs-state bs-state--warn"><span><?php esc_html_e( 'being added', 'beltoft-services' ); ?></span></span>
+						<?php elseif ( 'applied' === $beltoft_services_row['guest'] ) : ?>
+							<span class="bs-state bs-state--ok"><span><?php esc_html_e( 'Set up in the server', 'beltoft-services' ); ?></span></span>
+						<?php elseif ( 'not_set_up' === $beltoft_services_row['guest'] ) : ?>
+							<span class="bs-state bs-state--warn"><span><?php esc_html_e( 'Not set up', 'beltoft-services' ); ?></span></span>
+						<?php endif; ?>
 					</span>
 					<?php if ( '' !== $beltoft_services_row['remove_url'] ) : ?>
-						<a class="button woocommerce-button bs-btn" href="<?php echo esc_url( $beltoft_services_row['remove_url'] ); ?>"><?php esc_html_e( 'Remove', 'beltoft-services' ); ?></a>
+						<a class="button woocommerce-button bs-btn bs-btn--danger bs-btn--sm" href="<?php echo esc_url( $beltoft_services_row['remove_url'] ); ?>"><?php esc_html_e( 'Remove', 'beltoft-services' ); ?></a>
 					<?php elseif ( $beltoft_services_row['delete_id'] > 0 ) : ?>
 						<?php
 						$beltoft_services_delete_id = (int) $beltoft_services_row['delete_id'];
 						include BELTOFT_SERVICES_PATH . 'templates/account/delete.php';
 						?>
 					<?php elseif ( '' !== $beltoft_services_row['undo_url'] ) : ?>
-						<a class="button woocommerce-button bs-btn" href="<?php echo esc_url( $beltoft_services_row['undo_url'] ); ?>"><?php esc_html_e( 'Keep it', 'beltoft-services' ); ?></a>
+						<a class="button woocommerce-button bs-btn bs-btn--secondary bs-btn--sm" href="<?php echo esc_url( $beltoft_services_row['undo_url'] ); ?>"><?php esc_html_e( 'Keep it', 'beltoft-services' ); ?></a>
 					<?php endif; ?>
 				</li>
 			<?php endforeach; ?>

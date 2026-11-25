@@ -216,7 +216,16 @@ final class GuestMemory {
 	 * The text shown when the guest agent does not answer.
 	 */
 	public static function agent_hint(): string {
-		return __( 'Memory needs the guest agent (qemu-guest-agent) running in your server.', 'beltoft-services' );
+		return self::keep_term( __( 'Memory needs the guest agent (qemu-guest-agent) running in your server.', 'beltoft-services' ) );
+	}
+
+	/**
+	 * Makes the hyphens of the term qemu-guest-agent non-breaking, so a narrow line never splits it.
+	 *
+	 * @param string $text A customer text that may name the term.
+	 */
+	public static function keep_term( string $text ): string {
+		return str_replace( 'qemu-guest-agent', "qemu\u{2011}guest\u{2011}agent", $text );
 	}
 
 	/**

@@ -322,6 +322,9 @@ class Ipv4GuestTest extends Ipv4TestCase {
 		include BELTOFT_SERVICES_PATH . 'templates/account/ipv4.php';
 		$html = (string) ob_get_clean();
 		$this->assertStringContainsString( 'Set up in the server', $html );
+		$this->assertStringContainsString( 'class="bs-state bs-state--ok"', $html, 'The state is the status component, not a comma in the label.' );
+		$this->assertStringContainsString( 'beltoft-services-vm__ipv4-name', $html, 'Address, label and state share one first line.' );
+		$this->assertMatchesRegularExpression( '#<li>\s*<span class="beltoft-services-vm__ipv4-name">#', $html );
 		$this->assertStringContainsString( 'data-ipv4-guest-action="ipv4_guest"', $html );
 		$this->assertStringContainsString( 'Apply again', $html );
 	}

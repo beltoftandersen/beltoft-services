@@ -260,8 +260,14 @@ final class CustomerDeleteTest extends UsageTestCase {
 		ob_start();
 		\BeltoftServices\Proxmox\Vm\Panels::page_head( false, $r, $r->license(), array(), array() );
 		$head = (string) ob_get_clean();
+		$this->assertStringNotContainsString( 'is still billed', $head, 'A running server does not show the sentence about a stopped one.' );
+
+		\BeltoftServices\Proxmox\Vm\Operations::remember_power( $r->id(), 'stopped' );
+		ob_start();
+		\BeltoftServices\Proxmox\Vm\Panels::page_head( false, $r, $r->license(), array(), array() );
+		$head = (string) ob_get_clean();
 		$this->assertStringContainsString( 'A stopped server is still billed. Delete it to stop the charge.', $head );
-		$this->assertStringContainsString( 'data-power-action="shutdown"', $head );
+		$this->assertStringContainsString( 'data-action="start"', $head );
 		$this->assertSame( 1, substr_count( $head, 'is still billed' ), 'The note is printed once.' );
 	}
 
