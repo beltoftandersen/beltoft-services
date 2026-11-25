@@ -134,9 +134,77 @@
 		}
 	} );
 
+	// The Domain block: the button opens the form under it, Cancel closes it, and the fields follow the choice.
+	function domainFields( form ) {
+		var mode = form.querySelector( 'input[name="app_domain_mode"]:checked' );
+		var change = form.querySelector( '[data-app-domain-fields]' );
+		var own = form.querySelector( '[data-app-domain-own-fields]' );
+
+		if ( change ) {
+			change.hidden = ! mode || 'change' !== mode.value;
+		}
+
+		if ( own ) {
+			own.hidden = ! mode || 'own' !== mode.value;
+		}
+	}
+
+	function domainToggle( block, open ) {
+		var form = block.querySelector( '[data-app-domain-form]' );
+		var button = block.querySelector( '[data-app-domain-open]' );
+
+		if ( ! form ) {
+			return;
+		}
+
+		form.hidden = ! open;
+
+		if ( button ) {
+			button.setAttribute( 'aria-expanded', open ? 'true' : 'false' );
+			button.hidden = open;
+		}
+
+		if ( open ) {
+			domainFields( form );
+			form.querySelector( 'input[name="app_domain_mode"]:checked' ).focus();
+		} else if ( button ) {
+			button.focus();
+		}
+	}
+
+	document.addEventListener( 'click', function ( event ) {
+		var open = event.target.closest( '[data-app-domain-open]' );
+		var close = event.target.closest( '[data-app-domain-close]' );
+		var block = ( open || close ) ? ( open || close ).closest( '[data-app-domain-block]' ) : null;
+
+		if ( block ) {
+			domainToggle( block, !! open );
+		}
+	} );
+
+	document.addEventListener( 'change', function ( event ) {
+		var form = event.target.closest ? event.target.closest( '[data-app-domain-form]' ) : null;
+
+		if ( form ) {
+			domainFields( form );
+		}
+	} );
+
 	// An install that is running: the page asks again every twenty seconds while it is shown.
 	var pane = document.querySelector( '[data-app-pane]' );
 	var state = pane ? pane.getAttribute( 'data-app-state' ) : '';
+
+	// A change of the domain that is running or waits for the customer's DNS record is followed the same way.
+	var change = document.querySelector( '[data-app-domain-block]' );
+	var changing = change ? change.getAttribute( 'data-app-domain-state' ) : '';
+
+	if ( 'applying' === changing || 'waiting' === changing ) {
+		window.setInterval( function () {
+			if ( ! document.hidden && ! document.querySelector( 'dialog[open]' ) && ! change.closest( '[hidden]' ) ) {
+				window.location.reload();
+			}
+		}, 'waiting' === changing ? 60000 : 15000 );
+	}
 
 	if ( 'installing' === state || 'waiting' === state || 'dns' === state ) {
 		// Waiting for DNS changes state at most every few minutes, so that page asks less often.

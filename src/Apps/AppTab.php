@@ -267,6 +267,8 @@ final class AppTab {
 				'days'     => AppOwnDomain::WAIT_DAYS,
 			),
 			'www'             => AppWww::view( $r ),
+			'domain_support'  => ! empty( $app['domain'] ),
+			'change'          => self::change_view( $r, $app ),
 			'domain_wanted'   => (string) $r->get( 'app_domain_want' ),
 			'domain_failed'   => '' !== (string) $r->get( 'app_domain_error' ),
 			'domain_reason'   => $domain_reason,
@@ -281,6 +283,45 @@ final class AppTab {
 			'retired'         => $retired,
 			'support_url'     => (string) apply_filters( 'beltoft_services_support_url', home_url( '/support/' ) ),
 		);
+	}
+
+	/**
+	 * What the Domain block shows: AppDomainChange::view() with every key present, the www name of an own name, and the days of the wait.
+	 *
+	 * @param array<string, mixed> $app Definition.
+	 * @return array<string, mixed>
+	 */
+	public static function change_view( Resource $r, array $app ): array {
+		$out = array(
+			'supported' => false,
+			'why'       => '',
+			'state'     => '',
+			'mode'      => '',
+			'name'      => '',
+			'reason'    => '',
+			'ip'        => '',
+			'deadline'  => '',
+			'zones'     => array(),
+			'current'   => '',
+		);
+
+		if ( empty( $app['domain'] ) ) {
+			return $out;
+		}
+
+		// TEMPORARY until the flow (AppDomainChange, builder A) is merged: without the class the block shows the address only.
+		if ( class_exists( AppDomainChange::class ) ) {
+			$out = array_merge( $out, array_intersect_key( (array) AppDomainChange::view( $r ), $out ) );
+		}
+
+		// The date the wait ends: a time stamp from the flow, or already a date.
+		$out['deadline'] = is_numeric( $out['deadline'] ) ? ( (int) $out['deadline'] > 0 ? wp_date( get_option( 'date_format' ), (int) $out['deadline'] ) : '' ) : (string) $out['deadline'];
+		$out['www']      = 'own' === $out['mode'] && '' !== (string) $out['name'] ? AppWww::name_for( $r, (string) $out['name'] ) : '';
+		$out['days']     = AppOwnDomain::WAIT_DAYS;
+		$changed         = (int) $r->get( 'app_domain_changed_at' );
+		$out['changed']  = $changed > 0 && time() - $changed < 7 * DAY_IN_SECONDS && '' === (string) $out['state'] ? wp_date( get_option( 'date_format' ), $changed ) : '';
+
+		return $out;
 	}
 
 	/**

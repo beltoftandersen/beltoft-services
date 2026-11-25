@@ -185,6 +185,8 @@
 				return { action: action, start: s.reinstallStart, done: s.reinstallDone, running: true, password: true };
 			case 'snapshot_delete':
 				return { action: action, start: fill( s.deleteStart, name ), done: name ? fill( s.deleteDone, name ) : s.deleteDoneAnon };
+			case 'app_domain':
+				return { action: action, start: s.domainStart, done: s.domainDone };
 			case 'backup_delete':
 				return { action: action, start: s.backupDeleteStart, done: s.backupDeleteDone };
 			case 'rename':
@@ -462,6 +464,34 @@
 		} );
 	}
 
+	// The new name of the app's domain, as the form says it.
+	function domainName( args ) {
+		var sub;
+
+		if ( 'own' === args.app_domain_mode ) {
+			return String( args.app_own || '' ).trim().toLowerCase();
+		}
+
+		sub = String( args.app_sub || '' ).trim().toLowerCase();
+
+		return ( sub && '@' !== sub ? sub + '.' : '' ) + String( args.app_zone || '' );
+	}
+
+	// The paragraphs of the domain question that fit the choice made (data-for names the choice).
+	function domainSource( source, mode ) {
+		var copy = document.createElement( 'div' );
+
+		Array.prototype.forEach.call( source.children, function ( node ) {
+			var only = node.getAttribute( 'data-for' );
+
+			if ( ! only || only === mode ) {
+				copy.appendChild( node.cloneNode( true ) );
+			}
+		} );
+
+		return copy;
+	}
+
 	function submit( panel, form ) {
 		var args = {};
 		var action = form.getAttribute( 'data-action' );
@@ -495,6 +525,21 @@
 				label: source.getAttribute( 'data-confirm-yes' ),
 				name: backup && backup.selectedIndex >= 0 ? backup.options[ backup.selectedIndex ].text : '',
 				source: source,
+				run: function ( yes, box ) {
+					send( panel, action, args, yes, box, describe( action, '' ), field );
+				}
+			} ) ) {
+				return;
+			}
+		}
+
+		// The domain of the app: nothing is erased, but the address changes, so it says what happens first.
+		if ( 'app_domain' === action && source ) {
+			if ( confirmFirst( panel, {
+				title: source.getAttribute( 'data-confirm-title' ),
+				label: source.getAttribute( 'data-confirm-yes' ),
+				name: domainName( args ),
+				source: domainSource( source, args.app_domain_mode ),
 				run: function ( yes, box ) {
 					send( panel, action, args, yes, box, describe( action, '' ), field );
 				}

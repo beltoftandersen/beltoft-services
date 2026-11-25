@@ -17,7 +17,7 @@ use BeltoftServices\Mcp\ToolSetDefaults;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The MCP tools of the apps on a server: trying an install again, and showing the first login once. The login goes through the
+ * The MCP tools of the apps on a server: trying an install again, changing the domain of the app, and showing the first login once. The login goes through the
  * platform's reveal (Secrets), which is the one gate for a tool that shows a secret.
  */
 final class McpTools implements ToolSet {
@@ -30,6 +30,20 @@ final class McpTools implements ToolSet {
 	public static function tools(): array {
 		return array(
 			'retry_app_install' => Definitions::act( 'Tries again to install the app of a server whose installation failed or did not finish. It does not reinstall the server.', Definitions::by_id(), false ),
+			'change_app_domain' => Definitions::act(
+				'Adds a domain to the app of a server, or changes the one it has. It does not reinstall anything and nothing is erased. mode change: a name below one of the customer\'s domains that use our name servers (zone, and sub for a subdomain; leave sub out for the domain itself). mode own: a domain at another DNS host (own); the customer must add the A record we show in the dashboard, and we switch when it points at the server, for up to 14 days. The app keeps answering on the old address until the new one works, then restarts for up to a minute and the old address stops working. Links saved elsewhere or inside the app are not changed. The dashboard shows the state. A server can do this five times an hour.',
+				Definitions::obj(
+					array(
+						'id'   => Definitions::id(),
+						'mode' => array( 'type' => 'string', 'enum' => array( 'change', 'own' ), 'description' => 'change: a domain on our name servers. own: a domain at another DNS host.' ),
+						'zone' => array( 'type' => 'string', 'maxLength' => 253, 'description' => 'For mode change: one of the customer\'s domains that use our name servers.' ),
+						'sub'  => array( 'type' => 'string', 'maxLength' => 120, 'description' => 'For mode change: the subdomain. Leave out for the domain itself.' ),
+						'own'  => array( 'type' => 'string', 'maxLength' => 253, 'description' => 'For mode own: the full domain name.' ),
+					),
+					array( 'id', 'mode' )
+				),
+				true
+			),
 			'reveal_app_login' => Definitions::full(
 				'Shows the first login of the app on a server once. The value then is in this conversation and we no longer have it.',
 				Definitions::obj( array( 'id' => Definitions::id() ), array( 'id' ), true ),
@@ -53,6 +67,7 @@ final class McpTools implements ToolSet {
 	public static function actions(): array {
 		return array(
 			'app_retry'          => 'retry_app_install',
+			'app_domain'         => 'change_app_domain',
 		);
 	}
 
@@ -77,6 +92,18 @@ final class McpTools implements ToolSet {
 	public static function run( string $name, array $args, int $user_id ) {
 		if ( 'reveal_app_login' === $name ) {
 			return Secrets::run( $name, $args );
+		}
+
+		if ( 'change_app_domain' === $name ) {
+			$send = array();
+
+			foreach ( array( 'mode' => 'app_domain_mode', 'zone' => 'app_zone', 'sub' => 'app_sub', 'own' => 'app_own' ) as $from => $to ) {
+				if ( isset( $args[ $from ] ) && '' !== (string) $args[ $from ] ) {
+					$send[ $to ] = (string) $args[ $from ];
+				}
+			}
+
+			return Tools::action( (int) $args['id'], 'app_domain', $send, 'app domain change requested' );
 		}
 
 		return Tools::action( (int) $args['id'], 'app_retry', array(), 'app install retry requested' );
