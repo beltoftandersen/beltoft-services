@@ -44,4 +44,4 @@
 .beltoft-services-mail .beltoft-services-mail__target .description { margin-left: 6px; color: var(--bs-muted); }
 .beltoft-services-mail .beltoft-services-mail__goto label[for="beltoft-mail-goto"] { display: block; margin: 0 0 4px; }
 .beltoft-services-mail .beltoft-services-mail__goto textarea { width: 100%; }
-.beltoft-services-mail .beltoft-services-mail__goto > .description { display: block; margin-top: 4px; }
+.beltoft-services-mail .beltoft-services-mail__goto > .description { display: block; margin-top: 8px; color: var(--bs-muted); font-size: var(--bs-fs-small); }

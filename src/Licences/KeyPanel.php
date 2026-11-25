@@ -103,6 +103,7 @@ final class KeyPanel {
 			echo '<h3>' . esc_html__( 'Licence key', 'beltoft-services' ) . '</h3>';
 			echo '<p>' . esc_html( self::how( $r, $edition ) ) . '</p>';
 			echo '<p><textarea readonly rows="3" onclick="this.select()" aria-label="' . esc_attr__( 'Licence key', 'beltoft-services' ) . '">' . esc_textarea( $text ) . '</textarea></p>';
+			echo '<p><button type="button" class="button bs-btn bs-btn--secondary bs-btn--sm" data-lickey-copy data-copied="' . esc_attr__( 'Copied', 'beltoft-services' ) . '">' . esc_html__( 'Copy', 'beltoft-services' ) . '</button></p>';
 			echo '<p>' . esc_html__( 'The licence works for the server address above. You can change the address below.', 'beltoft-services' ) . '</p>';
 			KeyMove::form( $r );
 		}

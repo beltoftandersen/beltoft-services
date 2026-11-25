@@ -19,24 +19,24 @@ $beltoft_emailed = 'emailed' === $beltoft_ask['kind'];
 ?>
 <form class="beltoft-services-domain-stepup" hidden novalidate data-sending="<?php esc_attr_e( 'Sending the code…', 'beltoft-services' ); ?>" data-checking="<?php esc_attr_e( 'Checking the code…', 'beltoft-services' ); ?>" data-empty="<?php esc_attr_e( 'Enter the code.', 'beltoft-services' ); ?>" data-shown="<?php esc_attr_e( 'Your transfer code is shown below.', 'beltoft-services' ); ?>">
 	<?php if ( $beltoft_emailed ) : ?>
-		<span class="beltoft-services-domain-stepup__ask">
+		<div class="beltoft-services-domain-stepup__ask">
 			<?php /* translators: %s: the account email with part of the name hidden. */ ?>
-			<span class="beltoft-services-domain__note"><?php echo esc_html( sprintf( __( 'To show the transfer code we email a code to %s.', 'beltoft-services' ), $beltoft_ask['email'] ) ); ?></span>
-			<button type="button" class="button beltoft-services-domain-send"><?php esc_html_e( 'Send code', 'beltoft-services' ); ?></button>
-		</span>
+			<p class="beltoft-services-domain__note"><?php echo esc_html( sprintf( __( 'To show the transfer code we email a code to %s.', 'beltoft-services' ), $beltoft_ask['email'] ) ); ?></p>
+			<button type="button" class="button bs-btn bs-btn--secondary beltoft-services-domain-send"><?php esc_html_e( 'Send code', 'beltoft-services' ); ?></button>
+		</div>
 	<?php endif; ?>
-	<span class="beltoft-services-domain-stepup__enter"<?php echo $beltoft_emailed ? ' hidden' : ''; ?>>
+	<div class="beltoft-services-domain-stepup__enter"<?php echo $beltoft_emailed ? ' hidden' : ''; ?>>
 		<?php if ( $beltoft_emailed ) : ?>
 			<?php /* translators: %s: the account email with part of the name hidden. */ ?>
-			<span class="beltoft-services-domain__note beltoft-services-domain-stepup__sent"><?php echo esc_html( sprintf( __( 'We sent a code to %s.', 'beltoft-services' ), $beltoft_ask['email'] ) ); ?></span>
+			<p class="beltoft-services-domain__note beltoft-services-domain-stepup__sent"><?php echo esc_html( sprintf( __( 'We sent a code to %s.', 'beltoft-services' ), $beltoft_ask['email'] ) ); ?></p>
 		<?php endif; ?>
 		<label for="<?php echo esc_attr( $beltoft_id ); ?>"><?php echo esc_html( $beltoft_ask['label'] ); ?></label>
 		<span class="beltoft-services-domain-stepup__row">
 			<span class="beltoft-services-domain-stepup__field"><input id="<?php echo esc_attr( $beltoft_id ); ?>" name="secret" type="text" inputmode="numeric" maxlength="12" required autocomplete="<?php echo esc_attr( $beltoft_ask['autocomplete'] ); ?>" spellcheck="false"></span>
-			<button type="submit" class="button"><?php esc_html_e( 'Show code', 'beltoft-services' ); ?></button>
+			<button type="submit" class="button bs-btn bs-btn--secondary"><?php esc_html_e( 'Show code', 'beltoft-services' ); ?></button>
 		</span>
 		<?php if ( $beltoft_emailed ) : ?>
-			<button type="button" class="button beltoft-services-domain-send beltoft-services-domain-send--again"><?php esc_html_e( 'Send a new code', 'beltoft-services' ); ?></button>
+			<button type="button" class="button bs-btn bs-btn--secondary beltoft-services-domain-send beltoft-services-domain-send--again"><?php esc_html_e( 'Send a new code', 'beltoft-services' ); ?></button>
 		<?php endif; ?>
-	</span>
+	</div>
 </form>
