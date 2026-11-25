@@ -473,7 +473,7 @@ class AppTabTest extends MonitoringTestCase {
 		$this->assertMatchesRegularExpression( '#<input[^>]*name="app_version" value="wordpress/7.1.4"(?![^>]*disabled=)#', $html );
 		$this->assertMatchesRegularExpression( '#<input[^>]*name="app_version" value="docker/29"(?![^>]*disabled=)#', $html );
 		$this->assertMatchesRegularExpression( '#<input[^>]*name="app_version" value="coolify/4.5.1" disabled#', $html );
-		$this->assertStringContainsString( '>Needs Performance</span>', $html );
+		$this->assertStringContainsString( '>Cannot be chosen: needs the Performance plan or larger</span>', $html );
 		$this->assertStringContainsString( 'name="app_version"', $html );
 		$this->assertStringContainsString( 'data-os="9001"', $html );
 		$this->assertStringContainsString( 'Ubuntu 24.04', $html, 'The forced system is said plainly.' );

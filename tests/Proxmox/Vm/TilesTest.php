@@ -353,4 +353,12 @@ class TilesTest extends TestCase {
 		$this->assertStringContainsString( 'data-tiles-os-version', $js );
 		$this->assertSame( 3, substr_count( $js, 'refresh();' ), 'A version change refreshes the order summary through the existing listeners.' );
 	}
+
+	public function test_a_tile_that_cannot_be_chosen_is_faded_with_a_dashed_edge_and_its_reason_at_full_strength(): void {
+		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/tiles.css' );
+
+		$this->assertStringContainsString( '.beltoft-services-tile.is-disabled .beltoft-services-tile__face { border-style: dashed; }', $css );
+		$this->assertStringContainsString( '.beltoft-services-tile.is-disabled :is(.beltoft-services-tile__name, .beltoft-services-tile__line) { opacity: 0.55; }', $css );
+		$this->assertStringNotContainsString( 'is-disabled .beltoft-services-tile__why { opacity', $css, 'The reason is never faded.' );
+	}
 }

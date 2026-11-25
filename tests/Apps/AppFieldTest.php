@@ -252,7 +252,7 @@ class AppFieldTest extends TestCase {
 		$this->assertMatchesRegularExpression( '#type="radio" name="' . AppField::POST_APP . '" value="" checked=\'checked\' data-none="1".*?>No app</span>.*?value="docker"#s', $html, 'No app is the first tile and is checked.' );
 		$this->assertStringContainsString( '>Docker</span>', $html );
 		$this->assertStringContainsString( '>WordPress</span>', $html );
-		$this->assertMatchesRegularExpression( '#<input[^>]*value="coolify"[^>]*disabled[^>]*>.*?>Coolify</span>.*?>Needs Performance</span>#s', $html, 'Below its minimum the app is listed but cannot be chosen.' );
+		$this->assertMatchesRegularExpression( '#<input[^>]*value="coolify"[^>]*disabled[^>]*>.*?>Coolify</span>.*?>Cannot be chosen: needs the Performance plan or larger</span>#s', $html, 'Below its minimum the app is listed but cannot be chosen.' );
 		$this->assertStringNotContainsString( '<select name="' . AppField::POST_APP . '"', $html );
 		$this->assertStringContainsString( '<svg', $html, 'The apps have logos.' );
 		$this->assertStringContainsString( 'App (optional)', $html );

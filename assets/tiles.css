@@ -17,7 +17,9 @@
 .beltoft-services-tiles .beltoft-services-tile.is-disabled { cursor: not-allowed; }
 .beltoft-services-tiles .beltoft-services-tile.is-disabled .beltoft-services-tile__face, .beltoft-services-tiles .beltoft-services-tile.is-disabled:hover .beltoft-services-tile__face { background: var(--bs-warm, #eeebe3); color: var(--bs-ink, #17201b); }
 .beltoft-services-tiles .beltoft-services-tile.is-disabled .beltoft-services-tile__logo { opacity: 0.45; }
-.beltoft-services-tiles .beltoft-services-tile.is-disabled .beltoft-services-tile__line { opacity: 1; }
+/* A tile that cannot be chosen: its name and texts are faded and its edge is dashed; only the line that says why is at full strength. */
+.beltoft-services-tiles .beltoft-services-tile.is-disabled .beltoft-services-tile__face { border-style: dashed; }
+.beltoft-services-tiles .beltoft-services-tile.is-disabled :is(.beltoft-services-tile__name, .beltoft-services-tile__line) { opacity: 0.55; }
 .beltoft-services-tiles .beltoft-services-tile.is-disabled .beltoft-services-tile__why { color: var(--bs-ink, #17201b); }
 .beltoft-services-tiles__note { margin: 8px 0 0; color: var(--bs-muted, #5a635d); font-size: 14px; line-height: 1.5; }
 .beltoft-services-tiles [hidden] { display: none !important; }

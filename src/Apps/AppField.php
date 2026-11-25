@@ -559,7 +559,7 @@ final class AppField {
 	}
 
 	/**
-	 * The short line on a tile that the plan is too small for: "Needs Performance".
+	 * The line on a tile that the plan is too small for: "Cannot be chosen: needs the Performance plan or larger".
 	 *
 	 * @param array<string, mixed> $version Version.
 	 */
@@ -567,7 +567,7 @@ final class AppField {
 		$name = Apps::plan_name( $version );
 
 		/* translators: %s: plan name such as Performance */
-		return '' !== $name ? sprintf( __( 'Needs %s', 'beltoft-services' ), $name ) : __( 'Needs a larger plan', 'beltoft-services' );
+		return '' !== $name ? sprintf( __( 'Cannot be chosen: needs the %s plan or larger', 'beltoft-services' ), $name ) : __( 'Cannot be chosen: needs a larger plan', 'beltoft-services' );
 	}
 
 	/**
