@@ -191,6 +191,18 @@ final class ProgressTest extends TestCase {
 		}
 	}
 
+	public function test_a_busy_ready_service_has_no_percent_to_claim_and_says_working(): void {
+		list( $r ) = $this->resource( 'proxmox', array( 'state' => 'ready', 'restore' => array( 'volid' => 'v', 'phase' => '' ) ) );
+		$p         = Progress::build( $r );
+
+		$this->assertTrue( $p['active'] );
+		$this->assertSame( 'Working', \BeltoftServices\Account\Panel::thankyou_state( array(), 'ready', $r )['label'], 'Not "Ready" while it works.' );
+		$this->assertSame( 100, Progress::percent( array( 'active' => false, 'steps' => array() ), true ) );
+		$this->assertSame( 0, Progress::percent( array( 'active' => true, 'steps' => array() ), true ), 'A reboot has no steps: the bar moves, it does not claim 100.' );
+		$this->assertSame( 0, Progress::percent( array( 'active' => true, 'steps' => array() ), false ) );
+		$this->assertSame( 50, Progress::percent( array( 'active' => true, 'steps' => array( array( 'status' => 'done' ), array( 'status' => 'current' ) ) ), true ) );
+	}
+
 	public function test_a_snapshot_rollback_follows_its_phase_while_the_server_stays_ready(): void {
 		list( $r ) = $this->resource( 'proxmox', array( 'state' => 'ready', 'snapshot_rollback' => array( 'id' => 'a', 'phase' => 'stopping' ) ) );
 

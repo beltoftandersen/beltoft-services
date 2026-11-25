@@ -112,6 +112,14 @@ class PageAndUsageTest extends GiftCreditTestCase {
 		$this->assertNull( $data['reserve'] );
 	}
 
+	public function test_each_history_row_carries_its_date_for_a_phone(): void {
+		$user = $this->new_user();
+		wp_set_current_user( $user );
+		$this->card( $user, 1000, Source::ORDER, 'EUR', 100 );
+
+		$this->assertStringContainsString( 'class="beltoft-services-credit__when"', Page::html(), 'The date column is hidden on a phone; the What cell shows the date.' );
+	}
+
 	// Usage invoices.
 
 	public function test_a_usage_invoice_is_paid_by_cards_the_vat_stays_and_a_covered_one_completes(): void {

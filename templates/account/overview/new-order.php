@@ -34,9 +34,8 @@ foreach ( $views as $beltoft_view ) :
 		<p class="bs-order__closing-text" data-order-closing-text><?php echo esc_html( (string) $beltoft_view['closing'] ); ?></p>
 		<ul class="bs-order__closing-list" data-order-closing-list>
 			<?php foreach ( $beltoft_done ? $beltoft_view['rows'] : array() as $beltoft_row ) : ?>
-				<?php if ( 'failed' === $beltoft_row['group'] ) : ?>
-					<li><a href="<?php echo esc_url( $beltoft_row['url'] ); ?>"><?php echo esc_html( $beltoft_row['name'] ); ?></a></li>
-				<?php elseif ( $beltoft_row['ready'] ) : ?>
+				<?php // A button says what it does (the same open label for a service that failed); the name is on the card below. ?>
+				<?php if ( 'failed' === $beltoft_row['group'] || $beltoft_row['ready'] ) : ?>
 					<li><a href="<?php echo esc_url( $beltoft_row['url'] ); ?>"><?php echo esc_html( BeltoftServices\ThankYou::open_label( $beltoft_row['kind'] ) ); ?></a></li>
 				<?php endif; ?>
 			<?php endforeach; ?>

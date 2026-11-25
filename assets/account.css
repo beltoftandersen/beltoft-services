@@ -1580,10 +1580,11 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-ov__fe
 }
 
 /* Lists of rows (servers, databases, apps, subscriptions): the state sits after the name on its first line, not above it. */
-.beltoft-services-srv__id { grid-template-columns: auto minmax(0, 1fr); column-gap: var(--bs-space-3); align-items: baseline; }
-.beltoft-services-srv__id > .beltoft-services-srv__name { grid-column: 1; grid-row: 1; }
-.beltoft-services-srv__id > .beltoft-services-state { grid-column: 2; grid-row: 1; justify-self: start; }
-.beltoft-services-srv__id > .beltoft-services-srv__sub { grid-column: 1 / -1; grid-row: 2; }
+/* A flex line, not a grid: a state that does not fit beside the name (a long Danish state on a phone) drops to the line under the name, whole. */
+.beltoft-services-srv__id { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--bs-space-3); }
+.beltoft-services-srv__id > .beltoft-services-srv__name { order: 1; flex: 0 1 auto; min-width: 0; }
+.beltoft-services-srv__id > .beltoft-services-state { order: 2; flex: 0 1 auto; max-width: 100%; white-space: normal; }
+.beltoft-services-srv__id > .beltoft-services-srv__sub { order: 3; flex: 0 0 100%; }
 .beltoft-services-servers a.beltoft-services-srv, .beltoft-services-servers--area div.beltoft-services-srv { border-top-color: var(--bs-line); }
 .beltoft-services-servers a.beltoft-services-srv:first-child, .beltoft-services-servers--area div.beltoft-services-srv:first-child { border-top-width: 0; }
 
@@ -1705,6 +1706,48 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit
 /* Security API card: a heading is 24px under the block above and 12px over its own content (the card's grid gap is the other 12px). */
 body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-api.beltoft-services-api > :is(h3, h4) { margin-bottom: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-api.beltoft-services-api > :is(h3, h4):not(:first-child) { margin-top: var(--bs-space-3); }
+
+/* ---- Third round, shared parts ------------------------------------------------------------------------------------- */
+/* A price line of a disk (Danish "højst +€5 ...") starts with a capital, like every line. */
+/* (::first-letter needs a block box: the phone rule that makes the disk's paragraphs flex rows does not apply to a text-only line.) */
+.beltoft-services-vm__disk > p.description { display: block; }
+.beltoft-services-vm__disk > p.description::first-letter, .beltoft-services-add__price::first-letter { text-transform: uppercase; }
+
+/* A technical term in a hint (qemu-guest-agent) stays whole: the hint wraps at spaces only. */
+.bs-term { white-space: nowrap; }
+
+/* Credit history: on a phone the date sits under the text of the row (12px muted) and the text starts at the 16px row edge. */
+.beltoft-services-credit__when { display: none; }
+@media (max-width: 520px) {
+	.beltoft-services-credit__when { display: block; margin-top: var(--bs-space-1); color: var(--bs-muted); font-size: var(--bs-fs-caption); }
+	.beltoft-services-credit__history th:nth-child(2), .beltoft-services-credit__history td:nth-child(2) { padding-left: var(--bs-space-4); }
+}
+
+/* Recent activity: the text of every row starts at the same x (a fixed middle column; a long name wraps at spaces inside it). */
+@container (min-width: 521px) {
+	.beltoft-services-ov__feed li { grid-template-columns: 48px minmax(0, 24rem) minmax(0, 1fr); }
+}
+.beltoft-services-ov__who { overflow-wrap: break-word; }
+
+/* A ready service that is busy (a reboot, a reinstall): the state says Working in the warn colour, the bar moves instead of claiming 0 or 100. */
+.bs-flow.is-ready:has(.beltoft-services-progress:is(.is-queued, .is-running)) .beltoft-service__state { color: var(--bs-status-warn); }
+.bs-flow.is-ready .bs-flow__track[aria-valuenow="0"]::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; border-radius: inherit; background: var(--bs-status-warn); animation: bs-loader-run 1.3s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+	.bs-flow.is-ready .bs-flow__track[aria-valuenow="0"]::after { width: 100%; animation: none; opacity: .4; }
+}
+
+/* The head of an order panel: title and "See the order" stack at the same width in every language on a phone. */
+@media (max-width: 520px) {
+	.bs-order__head { flex-direction: column; align-items: flex-start; gap: var(--bs-space-2); }
+	body.woocommerce-account .woocommerce-MyAccount-content .bs-order__head h2.bs-order__title { margin-bottom: 0; }
+}
+
+/* A failed service in an order panel: the card says it once (name, state, the message); no empty bar, no second sentence. The closing box has the card's padding. */
+.bs-flow.is-failed .bs-flow__track, .bs-flow.is-failed .beltoft-services-progress { display: none; }
+.bs-order__closing { padding: var(--bs-space-4); }
+@media (max-width: 600px) {
+	.bs-order__closing { padding: var(--bs-space-3); }
+}
 
 /* ==== Design pass 2026-11-25: servers ===============================================================================
    Server list, server page tabs, New server. Same rules as the shared block: 24px between blocks of a tab, 12px heading to content,

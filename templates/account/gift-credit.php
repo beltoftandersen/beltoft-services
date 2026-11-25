@@ -163,6 +163,8 @@ $beltoft_services_first   = $credit['topup']['amounts'][0] ?? 0;
 							<?php else : ?>
 								<?php echo esc_html( $beltoft_services_row['note'] ); ?>
 							<?php endif; ?>
+							<?php // The date column is hidden on a phone; this line carries the date there. ?>
+							<span class="beltoft-services-credit__when"><?php echo esc_html( wp_date( (string) get_option( 'date_format' ), (int) strtotime( $beltoft_services_row['created'] . ' UTC' ) ) ); ?></span>
 						</td>
 						<td><?php echo esc_html( $beltoft_services_money( (int) $beltoft_services_row['cents'], true ) ); ?></td>
 						<td><?php echo esc_html( $beltoft_services_money( (int) $beltoft_services_row['balance'] ) ); ?></td>

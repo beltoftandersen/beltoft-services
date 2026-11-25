@@ -30,7 +30,7 @@ defined( 'ABSPATH' ) || exit;
 						<span><?php echo esc_html( $beltoft_services_bar['label'] ); ?></span>
 						<span class="beltoft-services-bar__track"><i data-usage-fill style="width:<?php echo (int) $beltoft_services_bar['percent']; ?>%"></i></span>
 						<span data-usage-text><?php echo esc_html( $beltoft_services_text ); ?></span>
-						<?php if ( isset( $beltoft_services_bar['sub'] ) ) : ?><small class="beltoft-services-bar__sub" data-usage-sub><?php echo esc_html( $beltoft_services_bar['sub'] ); ?></small><?php endif; ?>
+						<?php if ( isset( $beltoft_services_bar['sub'] ) ) : ?><small class="beltoft-services-bar__sub" data-usage-sub><?php echo wp_kses( preg_replace( '/[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+/', '<span class="bs-term">$0</span>', esc_html( $beltoft_services_bar['sub'] ) ), array( 'span' => array( 'class' => array() ) ) ); ?></small><?php endif; ?>
 					</span>
 				<?php endforeach; ?>
 			</span>
