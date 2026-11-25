@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Same pattern as the extra IPv4 addresses (Ipv4Guest): the plugin writes a script and a request into /var/lib/beltoft-app/ (agent
  * file-write), starts the script detached (agent exec of systemd-run, so no call waits for the certificate) and later reads a status
- * file with the run token. The script is `apps/rename-common.sh` (Caddyfile, certificate probe, rollback, status, lock) followed by
+ * file with the run token. The script is `apps/rename-common.script` (Caddyfile, certificate probe, rollback, status, lock) followed by
  * the app's own `rename.script` (where the app keeps its host setting), see the header of the common file for the order. The status
  * file is guest content and is never trusted: it is accepted only with the fixed schema of read().
  *
@@ -81,7 +81,7 @@ final class AppRename {
 	 * @param string $id App id.
 	 */
 	public static function script( string $id ): string {
-		$common = self::file( BELTOFT_SERVICES_PATH . 'apps/rename-common.sh' );
+		$common = self::file( BELTOFT_SERVICES_PATH . 'apps/rename-common.script' );
 		$app    = self::app_script( $id );
 
 		return '' === $common || '' === $app ? '' : rtrim( $common ) . "\n\n" . rtrim( $app ) . "\n\nbeltoft_rename_main\n";

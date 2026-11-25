@@ -76,7 +76,7 @@ final class AppRenameTest extends MonitoringTestCase {
 		}
 
 		$this->assertSame( array( 'easyappointments', 'n8n', 'nextcloud', 'odoo', 'wordpress' ), $with );
-		$this->assertFileExists( BELTOFT_SERVICES_PATH . 'apps/rename-common.sh' );
+		$this->assertFileExists( BELTOFT_SERVICES_PATH . 'apps/rename-common.script' );
 	}
 
 	public function test_the_install_scripts_and_their_checksums_are_not_changed_by_the_gate(): void {

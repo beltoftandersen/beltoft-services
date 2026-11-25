@@ -1,6 +1,6 @@
 <?php
 /**
- * The scripts that run inside the guest when the domain of a running app is changed (apps/rename-common.sh and the app's
+ * The scripts that run inside the guest when the domain of a running app is changed (apps/rename-common.script and the app's
  * rename.script), run here against stub commands (tests/fixtures/guest-stubs) and temporary Caddy, state and app folders. Nothing
  * touches this machine's web server, Docker or network.
  *
