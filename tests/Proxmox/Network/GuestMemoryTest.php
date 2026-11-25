@@ -206,7 +206,7 @@ class GuestMemoryTest extends MonitoringTestCase {
 		$failed = $bar( $r );
 		$this->assertSame( 'no_agent', $failed['state'] );
 		$this->assertSame( "\u{2013}", $failed['text'] );
-		$this->assertSame( 'Memory needs the guest agent (qemu-guest-agent) running in your server.', $failed['sub'] );
+		$this->assertSame( "Memory needs the guest agent (qemu\u{2011}guest\u{2011}agent) running in your server.", $failed['sub'] );
 
 		GuestMemory::store( $r->id(), array( 'used_mb' => 410, 'total_mb' => 1946 ) );
 		$ok = $bar( $r );

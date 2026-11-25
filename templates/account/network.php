@@ -28,7 +28,7 @@ $beltoft_services_net_words = array(
 	<?php if ( ! empty( $view['is_db'] ) ) : ?>
 		<p class="description"><?php esc_html_e( 'A network that only your own servers share. Traffic on it never goes over the internet. The database is always on one private network: your servers on it reach the database on its private address.', 'beltoft-services' ); ?></p>
 	<?php else : ?>
-		<p class="description"><?php esc_html_e( 'A network that only your own servers share. Traffic on it never goes over the internet. It needs the guest agent (qemu-guest-agent) running in your server.', 'beltoft-services' ); ?></p>
+		<p class="description"><?php echo esc_html( \BeltoftServices\Monitoring\GuestMemory::keep_term( __( 'A network that only your own servers share. Traffic on it never goes over the internet. It needs the guest agent (qemu-guest-agent) running in your server.', 'beltoft-services' ) ) ); ?></p>
 	<?php endif; ?>
 
 	<dl class="beltoft-services-facts">
