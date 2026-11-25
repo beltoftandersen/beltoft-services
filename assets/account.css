@@ -1860,9 +1860,11 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db > .
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db > .beltoft-services-vm__more + .beltoft-services-vm__more { margin-top: var(--bs-space-5); }
 /* A placeholder reads as a hint, not as typed text (the page's own rules for inputs have an id in them). */
 body.woocommerce-account #brx-content .beltoft-services-db__form input::placeholder { color: var(--bs-muted); opacity: 1; }
-/* The connection URL and the fingerprint keep their characters together and scroll inside their box on a phone. */
+/* The connection URL and the fingerprint: one line high as the Copy button beside it (32px); on a phone the text wraps inside its box (nothing is cut off) and Copy sits under it. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db .beltoft-services-db__block code.beltoft-services-db__conn { padding: var(--bs-space-1) var(--bs-space-3); line-height: 24px; white-space: normal; }
 @media (max-width: 600px) {
-	.beltoft-services-db .beltoft-services-db__block code.beltoft-services-db__conn { overflow-x: auto; overflow-wrap: normal; white-space: nowrap; }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db .beltoft-services-db__block { flex-direction: column; align-items: flex-start; gap: var(--bs-space-2); }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db .beltoft-services-db__block code.beltoft-services-db__conn { flex: none; width: 100%; padding: var(--bs-space-2) var(--bs-space-3); overflow-wrap: anywhere; }
 }
 /* Access: the address field, its helper button 8px under it, the next field 16px on. */
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db__form > p:has(> [data-db-access-mine]) { display: grid; justify-items: start; gap: var(--bs-space-1); }
@@ -1947,6 +1949,34 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-lickey
 .beltoft-services-lickey-move > p > label { display: block; margin: 0 0 var(--bs-space-1); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); }
 .beltoft-services-lickey-move > p > label br { display: none; }
 .beltoft-services-lickey-move > p > label > :is(input, select) { display: block; margin-top: var(--bs-space-1); }
+
+/* Cost line: 12px above, 24px to the block after it (a hint line after it is its own block). */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db > .beltoft-services-cost { margin: var(--bs-space-3) 0 var(--bs-space-5); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db > .beltoft-services-cost:last-child { margin-bottom: 0; }
+/* Access: the second action under the add form has its own row, 16px under it; Remove and Open to everyone are outlined danger buttons. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db__access > p:has(> [data-db-access-world]) { margin: var(--bs-space-4) 0 0; }
+body.woocommerce-account .woocommerce-MyAccount-content table.beltoft-services-db__access-list { margin-top: var(--bs-space-3); }
+/* The allowed addresses on a phone: the address on its own line (never split), the label and the date under it, Remove on the right. */
+@media (max-width: 700px) {
+	body.woocommerce-account .woocommerce-MyAccount-content table.beltoft-services-db__access-list thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+	body.woocommerce-account .woocommerce-MyAccount-content table.beltoft-services-db__access-list, body.woocommerce-account .woocommerce-MyAccount-content table.beltoft-services-db__access-list tbody { display: block; }
+	body.woocommerce-account .woocommerce-MyAccount-content table.beltoft-services-db__access-list tr { position: relative; display: block; padding: var(--bs-space-2) 0; padding-right: 100px; border-bottom: 1px solid var(--bs-line); }
+	body.woocommerce-account .woocommerce-MyAccount-content table.beltoft-services-db__access-list tbody tr:last-child { border-bottom: 0; }
+	body.woocommerce-account .woocommerce-MyAccount-content table.beltoft-services-vm__backup-list.beltoft-services-db__access-list:not(.beltoft-services-mail__table) td { display: inline; padding: 0; border: 0; }
+	body.woocommerce-account .woocommerce-MyAccount-content table.beltoft-services-vm__backup-list.beltoft-services-db__access-list:not(.beltoft-services-mail__table) td:first-child { display: block; }
+	body.woocommerce-account .woocommerce-MyAccount-content table.beltoft-services-vm__backup-list.beltoft-services-db__access-list:not(.beltoft-services-mail__table) td:first-child code { overflow-wrap: normal; white-space: nowrap; }
+	body.woocommerce-account .woocommerce-MyAccount-content table.beltoft-services-vm__backup-list.beltoft-services-db__access-list:not(.beltoft-services-mail__table) td:is(:nth-child(2), :nth-child(3)) { margin-right: var(--bs-space-3); color: var(--bs-muted); font-size: var(--bs-fs-small); overflow-wrap: break-word; }
+	body.woocommerce-account .woocommerce-MyAccount-content table.beltoft-services-vm__backup-list.beltoft-services-db__access-list:not(.beltoft-services-mail__table) td:last-child { position: absolute; top: 50%; right: 0; transform: translateY(-50%); }
+}
+/* The Network tab of a database: the other servers are rows, the sub-heading is a section heading. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net h5 { margin: var(--bs-space-5) 0 var(--bs-space-3); color: var(--bs-ink); font-family: inherit; font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net ul.beltoft-services-net__others { margin: 0 0 var(--bs-space-5); padding: 0; list-style: none; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net ul.beltoft-services-net__others li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--bs-space-3); margin: 0; padding: var(--bs-space-2) var(--bs-space-4); border-bottom: 1px solid var(--bs-line); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-net ul.beltoft-services-net__others li:last-child { border-bottom: 0; }
+/* A database being set up: the steps 12px apart, the leave note 16px under them, no second dot before the text above the steps. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-area-page--databases .beltoft-services-progress__steps { gap: var(--bs-space-3); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-area-page--databases .beltoft-services-progress__leave { margin-top: var(--bs-space-4); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-area-page--databases .beltoft-services-progress:has(.beltoft-services-progress__steps > li) .beltoft-services-progress__text::before { display: none; }
 
 /* ==== Design pass 2026-11-25: domains ==============================================================================
    Domain list, add page, a domain's tabs, the DNS records editor and the DNS guide. Only selectors of that markup. */

@@ -382,6 +382,7 @@ class DbPhase5Test extends TestCase {
 		$this->assertStringContainsString( 'The password goes back to the one the backup had.', $tab );
 		$this->assertStringContainsString( 'data-db-restore-confirm', $tab );
 		$this->assertStringContainsString( 'RESTORE', $tab );
+		$this->assertStringContainsString( 'placeholder="RESTORE" data-db-restore-confirm', $tab );
 		$this->assertStringNotContainsString( '—', $tab );
 		$this->assertStringNotContainsString( 'data-db-reset', $tab );
 		$this->assertStringNotContainsString( 'Reachable from your servers', $tab );
@@ -1127,7 +1128,18 @@ class DbPhase5Test extends TestCase {
 		$this->assertMatchesRegularExpression( '#beltoft-services-page__bar.*All databases.*beltoft-services-page__actions.*data-db-power="shutdown".*beltoft-services-page__name#s', $html );
 		$this->assertMatchesRegularExpression( '#data-power-line>Running</span>\s*<span class="bs-inline" data-bs-inline#', $html );
 		$this->assertSame( 1, substr_count( $html, 'data-db-power="' ), 'The buttons are in the head only.' );
-		$this->assertStringContainsString( 'data-db-power-note>A stopped database is still billed', $html );
+		$this->assertStringNotContainsString( 'A stopped database is still billed', $html, 'The billing line is about a stopped database.' );
+		$this->assertStringContainsString( '<dt>Status</dt><dd>Ready</dd>', $html );
+
+		Operations::remember_power( $r->id(), 'stopped' );
+		$GLOBALS['wp']->query_vars['databases'] = (string) $fresh->license()['id'];
+		ob_start();
+		\BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Proxmox\Db\Databases::class )->render( array( \BeltoftLicenses\Account\View::license( \BeltoftLicenses\Licenses::find( (int) $fresh->license()['id'] ) ) ) );
+		$stopped = (string) ob_get_clean();
+		unset( $GLOBALS['wp']->query_vars['databases'] );
+
+		$this->assertStringContainsString( 'data-db-power-note>A stopped database is still billed', $stopped );
+		$this->assertStringContainsString( '<dt>Status</dt><dd>Stopped</dd>', $stopped, 'The Status tile does not say Ready while the database is stopped.' );
 	}
 
 	public function test_the_page_shows_power_buttons_the_billing_note_and_a_stopped_line(): void {
@@ -1140,7 +1152,7 @@ class DbPhase5Test extends TestCase {
 		$this->assertStringNotContainsString( 'data-db-power="start"', $running );
 		$this->assertStringContainsString( 'Shut down', $running );
 		$this->assertStringContainsString( '<dt>Power</dt><dd data-db-power-line>Running</dd>', $running );
-		$this->assertStringContainsString( 'A stopped database is still billed. Delete it to stop the charge.', $running );
+		$this->assertStringNotContainsString( 'A stopped database is still billed', $running );
 		$this->assertStringNotContainsString( 'data-db-stopped', $running );
 		$this->assertStringContainsString( 'data-db-reset', $this->page( $fresh, 'password' ) );
 
@@ -1181,6 +1193,22 @@ class DbPhase5Test extends TestCase {
 		$html = $this->page( Resource::find( $r->id() ), 'overview' );
 		$this->assertStringNotContainsString( 'data-db-power', $html );
 		$this->assertStringNotContainsString( 'A stopped database is still billed', $html );
+	}
+
+	public function test_a_database_being_set_up_has_no_message_line_above_its_progress(): void {
+		$r = $this->running_db();
+		$r->set( array( 'state' => 'provisioning' ) );
+		wp_set_current_user( $this->owner_of( $r ) );
+		$fresh = Resource::find( $r->id() );
+		$GLOBALS['wp']->query_vars['databases'] = (string) $fresh->license()['id'];
+
+		ob_start();
+		\BeltoftServices\Account\ServiceArea::get( \BeltoftServices\Proxmox\Db\Databases::class )->render( array( \BeltoftLicenses\Account\View::license( \BeltoftLicenses\Licenses::find( (int) $fresh->license()['id'] ) ) ) );
+		$html = (string) ob_get_clean();
+		unset( $GLOBALS['wp']->query_vars['databases'] );
+
+		$this->assertStringContainsString( 'data-progress-text', $html );
+		$this->assertMatchesRegularExpression( '#data-message hidden>#', $html );
 	}
 
 	private function route_with_code( Resource $r, ?string $code ): \WP_REST_Response {

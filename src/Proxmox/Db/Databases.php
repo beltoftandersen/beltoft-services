@@ -60,6 +60,11 @@ final class Databases extends ServiceArea {
 		$vars['note']       = $view['power']['note'];
 		$vars['show_power'] = 'ready' === $view['kind'] && ( $view['power']['busy'] || in_array( $view['power']['state'], array( 'running', 'stopped' ), true ) );
 
+		// The progress block under the head already says what is going on: no second sentence above it.
+		if ( ! empty( \BeltoftServices\Progress::build( $resource )['active'] ) ) {
+			$vars['show_message'] = false;
+		}
+
 		return array( 'file' => 'db-head.php', 'vars' => $vars );
 	}
 
