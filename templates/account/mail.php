@@ -158,7 +158,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 		<?php endif; ?>
 
 		<?php if ( isset( $beltoft_services_wait[ $view['kind'] ] ) ) : ?>
-			<?php if ( '' !== $beltoft_services_wait[ $view['kind'] ] ) : ?><p><?php echo esc_html( $beltoft_services_wait[ $view['kind'] ] ); ?></p><?php endif; ?>
+			<?php if ( '' !== $beltoft_services_wait[ $view['kind'] ] ) : ?><p class="beltoft-services-panel__notice" role="status"><?php echo esc_html( $beltoft_services_wait[ $view['kind'] ] ); ?></p><?php endif; ?>
 			<?php if ( 'building' === $view['kind'] && null !== $view['dns']['proof'] ) : ?>
 				<p><button type="button" class="button woocommerce-button" data-mail-proof-check><?php esc_html_e( 'Check now', 'beltoft-services' ); ?></button></p>
 			<?php endif; ?>
@@ -294,7 +294,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 
 	<?php if ( $beltoft_services_all || 'aliases' === $active ) : ?>
 		<?php if ( isset( $beltoft_services_wait[ $view['kind'] ] ) ) : ?>
-			<?php if ( '' !== $beltoft_services_wait[ $view['kind'] ] ) : ?><p><?php echo esc_html( $beltoft_services_wait[ $view['kind'] ] ); ?></p><?php endif; ?>
+			<p class="beltoft-services-panel__notice" role="status"><?php echo esc_html( '' !== $beltoft_services_wait[ $view['kind'] ] ? $beltoft_services_wait[ $view['kind'] ] : __( 'You can make aliases when your email domain is ready.', 'beltoft-services' ) ); ?></p>
 		<?php else : ?>
 			<div class="beltoft-services-vm__more" data-mail-aliases data-confirm="<?php esc_attr_e( 'Delete this alias?', 'beltoft-services' ); ?>">
 				<h4><?php esc_html_e( 'Aliases', 'beltoft-services' ); ?></h4>

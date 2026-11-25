@@ -6,6 +6,16 @@
 ( function () {
 	'use strict';
 
+	// Copy button under the key: copies the text of the key field (works without the panel script).
+	document.addEventListener( 'click', function ( event ) {
+		var button = event.target.closest( '[data-lickey-copy]' );
+		var field = button ? button.closest( '.beltoft-services-lickey' ).querySelector( 'textarea' ) : null;
+
+		if ( field && window.beltoftApi ) {
+			window.beltoftApi.copy( field.value, button );
+		}
+	} );
+
 	var account = window.beltoftServicesAccount;
 	var own = window.beltoftServicesLickey;
 	var S = window.beltoftStatus;

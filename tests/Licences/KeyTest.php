@@ -488,6 +488,7 @@ final class KeyTest extends TestCase {
 		$this->assertStringContainsString( '203.0.113.10', $html );
 		$this->assertStringContainsString( 'A virtual server (VPS)', $html );
 		$this->assertStringContainsString( htmlspecialchars( KeyOrder::key_text( $r ), ENT_QUOTES ), $html );
+		$this->assertStringContainsString( 'data-lickey-copy', $html );
 
 		wp_set_current_user( (int) self::factory()->user->create() );
 		ob_start();

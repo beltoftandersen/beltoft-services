@@ -325,6 +325,10 @@ class SecurityTest extends TestCase {
 		$this->assertStringContainsString( 'We sent a code to c***@gmail.com.', $html );
 		$this->assertStringNotContainsString( 'type="password"', $html );
 		$this->assertStringNotContainsStringIgnoringCase( 'password', $html );
+		// The notes are block paragraphs and no step-up button is a second filled primary button.
+		$this->assertStringContainsString( '<p class="beltoft-services-domain__note">', $html );
+		$this->assertStringNotContainsString( '<span class="beltoft-services-domain__note', $html );
+		$this->assertSame( 3, substr_count( $html, 'bs-btn--secondary' ) );
 	}
 
 	public function test_a_site_can_ask_for_an_app_code_instead_and_without_a_check_for_it_nothing_is_shown(): void {

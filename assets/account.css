@@ -167,19 +167,19 @@ div.beltoft-services-domain .beltoft-dns-note { margin: 12px 0 0; color: var(--b
 	.beltoft-dns-editor td:last-child::before { content: none; }
 }
 /* The card around a domain: its name is the heading, and the status reads as plain text. */
-.beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-licenses__product { color: var(--bs-ink); font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); letter-spacing: -.01em; overflow-wrap: anywhere; }
-.beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-licenses__status { display: inline-flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; color: var(--bs-status-ok); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); }
-.beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-licenses__status::before { content: ""; width: 8px; height: 8px; background: currentColor; }
-.beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-licenses__facts dt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-licenses__facts { display: inline-block; margin: 0 24px 0 0; }
-.beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-licenses__facts dd { margin-left: 0; }
-.beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-licenses__actions { display: inline-block; margin: 0; }
-.beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-services-panel__head:has(.beltoft-services-badge--ready), .beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-services-panel__actions:empty { display: none; }
+.beltoft-licenses__license:has(.beltoft-services-panel) .beltoft-licenses__product { color: var(--bs-ink); font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); letter-spacing: -.01em; overflow-wrap: anywhere; }
+.beltoft-licenses__license:has(.beltoft-services-panel) .beltoft-licenses__status { display: inline-flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; color: var(--bs-status-ok); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); }
+.beltoft-licenses__license:has(.beltoft-services-panel) .beltoft-licenses__status::before { content: ""; width: 8px; height: 8px; background: currentColor; }
+.beltoft-licenses__license:has(.beltoft-services-panel) .beltoft-licenses__facts dt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.beltoft-licenses__license:has(.beltoft-services-panel) .beltoft-licenses__facts { display: inline-block; margin: 0 24px 0 0; }
+.beltoft-licenses__license:has(.beltoft-services-panel) .beltoft-licenses__facts dd { margin-left: 0; }
+.beltoft-licenses__license:has(.beltoft-services-panel) .beltoft-licenses__actions { display: inline-block; margin: 0; }
+.beltoft-licenses__license:has(.beltoft-services-panel) .beltoft-services-panel__head:has(.beltoft-services-badge--ready), .beltoft-licenses__license:has(.beltoft-services-panel) .beltoft-services-panel__actions:empty { display: none; }
 /* The state label on these cards (Getting ready, Paused) is plain status text like "Active": no box, no border. */
-.beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-services-badge { display: inline-flex; align-items: center; gap: 8px; width: auto; padding: 0; border: 0; background: none; color: var(--bs-muted); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); opacity: 1; }
-.beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-services-badge::before { content: ""; width: 8px; height: 8px; background: currentColor; }
-.beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-services-badge--ready { color: var(--bs-status-ok); }
-.beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-services-badge--failed { color: var(--bs-status-fail); }
+.beltoft-licenses__license:has(.beltoft-services-panel) .beltoft-services-badge { display: inline-flex; align-items: center; gap: 8px; width: auto; padding: 0; border: 0; background: none; color: var(--bs-muted); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); opacity: 1; }
+.beltoft-licenses__license:has(.beltoft-services-panel) .beltoft-services-badge::before { content: ""; width: 8px; height: 8px; background: currentColor; }
+.beltoft-licenses__license:has(.beltoft-services-panel) .beltoft-services-badge--ready { color: var(--bs-status-ok); }
+.beltoft-licenses__license:has(.beltoft-services-panel) .beltoft-services-badge--failed { color: var(--bs-status-fail); }
 div.beltoft-services-domain [hidden] { display: none; }
 .beltoft-services-vm h4 { margin: 0 0 var(--bs-space-3); color: var(--bs-ink); font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); }
 @keyframes beltoft-services-wait { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
@@ -1592,7 +1592,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-ov__fe
 
 /* A checkbox is as big as a radio and its label is body text; the whole row is the tap target. */
 div.beltoft-services-domain input[type="checkbox"] { flex: none; width: 18px; height: 18px; margin: 0; padding: 0; accent-color: var(--bs-dark); }
-.beltoft-services-domain__choice { min-height: var(--bs-btn-h); font-size: var(--bs-fs-body); font-weight: var(--bs-fw-regular); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domain__choice { min-height: var(--bs-btn-h); font-size: var(--bs-fs-body); font-weight: var(--bs-fw-regular); }
 
 /* The step-up block of a domain page: one 16px rhythm between the steps. */
 .beltoft-services-domain-stepup { margin-top: var(--bs-space-4); }
@@ -1882,6 +1882,15 @@ body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-db
 .beltoft-services-plan__specs, .beltoft-services-plan__stock { font-weight: var(--bs-fw-regular); }
 .beltoft-services-plan__hourly { color: var(--bs-muted); opacity: 1; font-weight: var(--bs-fw-regular); }
 
+/* The licences list: cards as wide as the page column, one status per card, values in the text colour, "Manage subscription" an outlined button. */
+.beltoft-licenses { max-width: var(--bs-page-width); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-licenses:not(:has(.beltoft-services-domain, .beltoft-services-vm)) { grid-template-columns: minmax(0, 1fr); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-licenses__license { box-sizing: border-box; width: 100%; padding: var(--bs-space-5); border-radius: var(--bs-radius-lg); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-licenses__facts dd { color: var(--bs-ink); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-licenses__facts dt { color: var(--bs-muted); }
+body.woocommerce-account .woocommerce-MyAccount-content a.beltoft-licenses__subscription:not(.btn):not(.button) { box-sizing: border-box; display: inline-flex; align-items: center; min-height: var(--bs-btn-h); padding: 0 var(--bs-space-4); border: 1px solid var(--bs-input-border); border-radius: var(--bs-radius); background: var(--bs-surface); color: var(--bs-ink); font-weight: var(--bs-fw-medium); text-decoration: none; }
+body.woocommerce-account .woocommerce-MyAccount-content a.beltoft-licenses__subscription:not(.btn):not(.button):hover { border-color: var(--bs-dark); background: var(--bs-warm); }
+
 /* Detail pages of SSL, licences and online backup: sections 24px apart, the heading 12px over its content, paragraphs 12px apart. */
 .beltoft-services-storage, .beltoft-services-storage__section, .beltoft-services-lickey, .beltoft-services-ssl { display: block; }
 .beltoft-services-storage > *, .beltoft-services-storage__section > *, .beltoft-services-lickey > *, .beltoft-services-ssl > * { margin: 0; }
@@ -1916,10 +1925,17 @@ body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-st
 body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-storage, .beltoft-services-lickey) table.shop_table td { vertical-align: middle; padding: var(--bs-space-3) var(--bs-space-4); border: 0; border-bottom: 1px solid var(--bs-line); background: none; color: var(--bs-ink); overflow-wrap: anywhere; }
 body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-storage, .beltoft-services-lickey) table.shop_table tr:last-child :is(th, td) { border-bottom: 0; }
 /* The licence key: a monospace field as wide as the column, sized to its content. */
-.beltoft-services-lickey textarea { box-sizing: border-box; display: block; width: 100%; max-width: 100%; min-height: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: var(--bs-fs-small); resize: vertical; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-lickey textarea { box-sizing: border-box; display: block; width: 100%; max-width: 100%; min-height: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: var(--bs-fs-small); resize: vertical; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-lickey p:has(> textarea) { max-width: none; }
+/* The detail pages start 16px under the page head (the meta row); the facts of mail, SSL and online backup fill the row without empty cells. */
+.beltoft-services-storage, .beltoft-services-lickey, .beltoft-services-ssl { margin-top: var(--bs-space-4); }
+@media (min-width: 761px) {
+	body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-mail, .beltoft-services-ssl, .beltoft-services-storage) .beltoft-services-facts { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-ssl .beltoft-services-facts > div:first-child { grid-column: span 2; }
+}
 @media (max-width: 600px) {
 	.beltoft-services-storage form[data-storage-plan] > p { display: grid; }
-	.beltoft-services-storage__command .button { min-height: var(--bs-btn-h); }
+	body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-storage__command, .beltoft-services-lickey) .button { min-height: var(--bs-btn-h); }
 }
 body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-storage, .beltoft-services-storage__section, .beltoft-services-lickey, .beltoft-services-ssl) > * + h3:not(:empty) { margin-top: var(--bs-space-5); }
 body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-storage__section, .beltoft-services-lickey, .beltoft-services-ssl) > h3:not(:empty) + * { margin-top: var(--bs-space-3); }
@@ -1962,7 +1978,20 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domain
 
 /* Add a domain: the field and its button share one height and centre line. */
 .beltoft-dns-claim__field { align-items: center; }
+@media (max-width: 520px) {
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dns-claim__field { flex-direction: column; align-items: stretch; gap: var(--bs-space-2); }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dns-claim__field input { flex: none; width: 100%; }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dns-claim__field button { width: 100%; }
+}
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dns-claim__field button { min-height: var(--bs-btn-h); height: var(--bs-btn-h); }
+
+/* Transfer code step: the first step is the filled button, "Send a new code" the outlined one; the notes are block paragraphs in muted text; the code field and its button are one height. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domain-stepup .beltoft-services-domain__note { margin: 0; color: var(--bs-muted); font-size: var(--bs-fs-body); font-weight: var(--bs-fw-regular); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domain-stepup__row { align-items: flex-start; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domain-stepup button[type="submit"].bs-btn--secondary { background: var(--bs-surface); color: var(--bs-ink); border-color: var(--bs-input-border); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domain-stepup button[type="submit"].bs-btn--secondary:hover { background: var(--bs-warm); color: var(--bs-ink); border-color: var(--bs-dark); }
+body.woocommerce-account .woocommerce-MyAccount-content div.beltoft-services-domain .beltoft-services-domain-stepup__field input { margin: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domain-stepup__row .button { min-height: var(--bs-input-h); height: var(--bs-input-h); }
 
 /* DNSSEC: the status line, its button and the note under it are 8px apart. */
 .beltoft-services-domain__dnssec p.beltoft-services-domain__note + form { margin-top: var(--bs-space-2); }
@@ -1976,6 +2005,13 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dns-claim__fiel
 	.beltoft-dnse__table td.beltoft-dnse__actions, .beltoft-dnse__table th:nth-child(5) { width: 11em; }
 	.beltoft-dnse__table td.beltoft-dnse__actions { white-space: nowrap; }
 }
+/* The table follows the shared table recipe: header cells 12px 16px, rows at least 48px with a line under each. Delete is in the fail colour and both actions are 14px at every width. */
+@media (min-width: 641px) {
+	.beltoft-dnse__table th { padding: var(--bs-space-3) var(--bs-space-4); }
+	.beltoft-dnse__table td, .beltoft-dnse__table tr[data-edit-row] td { height: 48px; padding: var(--bs-space-2) var(--bs-space-4); }
+}
+body.woocommerce-account .woocommerce-MyAccount-content div.beltoft-services-domain .beltoft-dnse__table td.beltoft-dnse__actions > button { font-size: var(--bs-fs-small); }
+body.woocommerce-account .woocommerce-MyAccount-content div.beltoft-services-domain .beltoft-dnse__table td.beltoft-dnse__actions > button:is([data-act="delete"], .beltoft-dnse__danger) { color: var(--bs-status-fail); }
 @media (min-width: 768px) {
 	body.woocommerce-account .woocommerce-MyAccount-content div.beltoft-services-domain .beltoft-dnse__table td.beltoft-dnse__actions > button { min-height: var(--bs-btn-h-sm); padding: 0 var(--bs-space-3); font-size: var(--bs-fs-small); }
 	body.woocommerce-account div.beltoft-services-domain .beltoft-dnse__table td.beltoft-dnse__actions > button + button { margin-left: var(--bs-space-1); }
@@ -1985,6 +2021,9 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dns-claim__fiel
 	.beltoft-dnse__table tr { grid-template-columns: minmax(0, 1fr) auto auto; gap: 0 var(--bs-space-4); }
 	.beltoft-dnse__table tr[data-edit-row] { grid-template-columns: minmax(0, 1fr) 6em 7.5em; gap: 0 var(--bs-space-2); }
 	.beltoft-dnse__table td:nth-child(1) { overflow-wrap: break-word; }
+	/* Type and TTL are muted 14px with their labels (the table head is hidden on a phone). */
+	.beltoft-dnse__table tr:not([data-edit-row]) td:is(:nth-child(2), :nth-child(3)) { color: var(--bs-muted); font-size: var(--bs-fs-small); line-height: var(--bs-lh-title); white-space: nowrap; align-self: center; }
+	.beltoft-dnse__table tr:not([data-edit-row]) td:is(:nth-child(2), :nth-child(3))::before { content: attr(data-label) ": "; }
 	div.beltoft-services-domain .beltoft-dnse__bar .beltoft-dnse__add.button { width: 100%; margin-left: 0; }
 }
 
@@ -2011,15 +2050,15 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dnsg button.bel
 	.beltoft-dnsg__fields dt { line-height: 1.5; }
 	.beltoft-dnsg__fields dd { grid-template-columns: minmax(0, 1fr); justify-items: start; }
 	.beltoft-dnsg code, .beltoft-dnsg code.beltoft-dnsg__value { justify-self: stretch; }
+}
 
 /* Design pass 2026-11-25: email */
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-facts > div { flex: 1 1 150px; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-facts dt { font-size: var(--bs-fs-small); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-db__form :is(input[type="text"], input[type="password"], input[type="email"], input[type="number"], textarea) { box-sizing: border-box; width: 100%; max-width: 100%; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-db__form p:has(> .beltoft-services-mail__at) { flex-wrap: wrap; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-db__form p:has(> .beltoft-services-mail__at) > input { flex: 1 1 0; min-width: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-mail__at { flex: none; margin: 0; max-width: 100%; }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-db__form .description { display: block; margin: var(--bs-space-1) 0 0; color: var(--bs-muted); font-size: var(--bs-fs-small); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-db__form .description { display: block; margin: var(--bs-space-2) 0 0; color: var(--bs-muted); font-size: var(--bs-fs-small); line-height: var(--bs-lh-text); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-mail__goto legend { margin: 0 0 var(--bs-space-1); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); color: var(--bs-ink); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-mail__goto { margin: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-mail__connect :is(th, td) { text-align: left; }
@@ -2038,4 +2077,18 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-dnsg__rec { border: 0; border-radius: var(--bs-radius); }
 @media (max-width: 767px) {
 	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-dnsg { padding: var(--bs-space-4); }
+}
+/* A form hint is 14px muted, 8px under its field, on every width; a field and its hint do not touch. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-mail__goto > .description { margin-top: var(--bs-space-2); }
+/* The facts grid of the mail page is the shared grid; five cells fit one row from 761px. */
+/* The waiting message of a tab and the DNS guide title: a panel title inside a section is 16px, weight 600. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dnsg .beltoft-dnsg__title { font-size: var(--bs-fs-body); font-weight: var(--bs-fw-strong); }
+/* Setup guide link and the webmail button share one row. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-mail__links { margin: var(--bs-space-4) 0 0; }
+/* A notice inside the mail page (the waiting message of a tab) looks like the account notices. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail p.beltoft-services-panel__notice { box-sizing: border-box; max-width: var(--bs-page-width); margin: 0; padding: var(--bs-space-3) var(--bs-space-4); border-left: 3px solid var(--bs-dark); background: var(--bs-surface); color: var(--bs-ink); }
+/* The mailbox table follows the shared table recipe (header cells 12px 16px, rows at least 48px with a line under each). */
+@media (min-width: 701px) {
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-mail__table th { padding: var(--bs-space-3) var(--bs-space-4); }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-mail__table td { height: 48px; padding: var(--bs-space-2) var(--bs-space-4); }
 }
