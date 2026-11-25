@@ -318,4 +318,10 @@ class AppDomainTabTest extends MonitoringTestCase {
 		$media = substr( $media, 0, (int) strpos( $media, "\n}\n" ) );
 		$this->assertStringContainsString( '.beltoft-services-app-domain .bs-btn--sm { min-height: var(--bs-btn-h); }', $media );
 	}
+
+	public function test_the_form_buttons_have_no_block_padding_and_the_fields_start_on_the_edge_of_the_choice(): void {
+		$this->assertNotSame( '', $this->rule( 'section.beltoft-services-tab .beltoft-services-app-domain .bs-btn--sm', 'padding-block: 0' ), 'Block padding made the 32px buttons 40px.' );
+		$this->assertNotSame( '', $this->rule( '.beltoft-services-app-domain__fields', 'margin: 0 0 var(--bs-space-4);' ), 'The fields are not pushed in.' );
+		$this->assertNotSame( '', $this->rule( '.beltoft-services-app-domain__choice .description', 'margin: var(--bs-space-1) 0 0;' ) );
+	}
 }
