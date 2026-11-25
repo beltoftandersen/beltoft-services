@@ -1,0 +1,335 @@
+#!/bin/bash
+set -Eeuo pipefail
+umask 077
+export DEBIAN_FRONTEND=noninteractive
+state=/var/lib/beltoft-app
+secrets=/root/.beltoft-app
+app=/opt/odoo
+job="$state/job.running"
+request=${BELTOFT_APP_REQUEST:?}
+step=os
+status() {
+  printf '{"request":"%s","state":"%s","step":"%s","updated":"%s"}\n' "$request" "$1" "$step" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$state/status.tmp"
+  mv "$state/status.tmp" "$state/status.json"
+}
+trap 'status failed' ERR
+status installing
+grep -qx 'ID=ubuntu' /etc/os-release
+grep -qx 'VERSION_ID="24.04"' /etc/os-release
+domain=$(jq -er '.domain // ""' "$job")
+ip=$(jq -er '.ip' "$job")
+email=$(jq -er '.email' "$job")
+www=$(jq -er '.www // ""' "$job")
+[[ "$ip" =~ ^[0-9.]+$ ]]
+[[ "$email" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]]
+if [ -n "$domain" ]; then
+  [[ "$domain" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]]
+  [[ "$domain" == *.* ]]
+fi
+# A www name is only ever served together with its domain.
+[ -z "$www" ] || [ "$www" = "www.$domain" ]
+
+# --- Downloads placed on the addons path --------------------------------------------------------------------------
+# Every archive is fetched over https only, checked against a pinned sha256 and placed as root, readable by the
+# image's Odoo user. A failed download or a wrong checksum stops the install (set -e, fail closed).
+helper_url=https://github.com/beltoftandersen/odoo-helper-module/archive/9192788d308630f319e838f45bf236d9cdc8ed85.tar.gz
+helper_sha256=a349cfab915e2b7980decd78e91aa1acdc267b887fba22f815c6af075ca2d364
+fetch_archive() {
+  local url=$1 sha=$2 out=$3
+  timeout 300 curl --proto '=https' --tlsv1.2 --proto-redir '=https' --max-time 280 -fsSL "$url" -o "$out"
+  [ "$(sha256sum "$out" | awk '{ print $1 }')" = "$sha" ]
+}
+# The OdooWoo helper module is the whole archive; its folder must be called odoowoo_helper. Its quality checks and tests stay out.
+place_helper() {
+  local tmp
+  tmp=$(mktemp -d)
+  fetch_archive "$helper_url" "$helper_sha256" "$tmp/helper.tar.gz"
+  install -m 0755 -d "$app/extra-addons/odoowoo_helper"
+  tar -xzf "$tmp/helper.tar.gz" -C "$app/extra-addons/odoowoo_helper" --strip-components=1 --no-same-owner --exclude='*/qa' --exclude='*/tests' --exclude='*/.git*'
+  [ -f "$app/extra-addons/odoowoo_helper/__manifest__.py" ]
+  rm -rf "$tmp"
+}
+
+# >>> EDITION BLOCK: the only part that differs between apps/odoo/20/install.script and apps/odoo/20-dk/install.script
+# tests/Apps/AppOdooTest.php fails when anything outside this block differs.
+# Danish accounting edition: Danish language, company in Denmark with DKK, Odoo's Danish package l10n_dk, Invoicing,
+# the OdooWoo helper module and the accounting modules of github.com/beltoftandersen/odoo-dk-accounting.
+bundle_url=https://github.com/beltoftandersen/odoo-dk-accounting/archive/refs/tags/20.0.1.0.0.tar.gz
+bundle_sha256=47532a727308665894bc9af4afb04716a4093047c30dd80165391e2f2d8d49b4
+bundle_modules='account_usability account_statement_base account_statement_import_base account_statement_import_file account_statement_import_sheet_file account_reconcile_oca account_statement_import_file_reconcile_oca account_in_payment date_range report_xlsx account_financial_report account_tax_balance mis_builder l10n_dk_mis_reports l10n_dk_saft_header'
+modules="account,l10n_dk,odoowoo_helper,${bundle_modules// /,}"
+language_args=(--load-language=da_DK)
+edition_fetch() {
+  local tmp m
+  tmp=$(mktemp -d)
+  fetch_archive "$bundle_url" "$bundle_sha256" "$tmp/bundle.tar.gz"
+  mkdir "$tmp/src"
+  tar -xzf "$tmp/bundle.tar.gz" -C "$tmp/src" --strip-components=1 --no-same-owner
+  for m in $bundle_modules; do
+    [ -f "$tmp/src/$m/__manifest__.py" ]
+    cp -R "$tmp/src/$m" "$app/extra-addons/$m"
+  done
+  rm -rf "$tmp"
+}
+# Run in the Odoo shell after the database exists and before the modules are installed: Danish accounts and taxes are
+# loaded for a company that is already in Denmark with DKK, and the administrator reads Danish. English is switched on again: loading the Danish language on a new database leaves it off.
+edition_python='dk = env.ref("base.dk")
+dkk = env.ref("base.DKK")
+dkk.active = True
+env.ref("base.main_company").write({"country_id": dk.id, "currency_id": dkk.id})
+english = env["res.lang"].with_context(active_test=False).search([("code", "=", "en_US")])
+english.active = True
+env.ref("base.user_admin").lang = "da_DK"
+env.cr.commit()
+assert env.ref("base.main_company").currency_id == dkk
+assert env["res.lang"].search_count([("code", "in", ["da_DK", "en_US"]), ("active", "=", True)]) == 2
+'
+# <<< EDITION BLOCK
+step=packages
+status installing
+if [ ! -e "$state/stage.1" ]; then
+  timeout 300 apt-get update
+  timeout 600 apt-get install -y ca-certificates curl gnupg jq openssl ufw unattended-upgrades
+  install -m 0755 -d /etc/apt/keyrings
+  timeout 60 curl --proto '=https' --tlsv1.2 -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key -o /etc/apt/keyrings/caddy.asc
+  [ "$(gpg --show-keys --with-colons /etc/apt/keyrings/caddy.asc 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }')" = '65760C51EDEA2017CEA2CA15155B6D79CA56EA34' ]
+  chmod a+r /etc/apt/keyrings/caddy.asc
+  printf 'deb [signed-by=/etc/apt/keyrings/caddy.asc] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main\n' > /etc/apt/sources.list.d/caddy.list
+  timeout 300 apt-get update
+  timeout 600 apt-get install -y 'caddy=2.11.7'
+  systemctl enable --now unattended-upgrades
+  touch "$state/stage.1"
+fi
+step=docker
+status installing
+if [ ! -e "$state/stage.2" ]; then
+  timeout 60 curl --proto '=https' --tlsv1.2 -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  [ "$(gpg --show-keys --with-colons /etc/apt/keyrings/docker.asc 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }')" = '9DC858229FC7DD38854AE2D88D81803C0EBFCD88' ]
+  chmod a+r /etc/apt/keyrings/docker.asc
+  printf 'Types: deb\nURIs: https://download.docker.com/linux/ubuntu\nSuites: noble\nComponents: stable\nArchitectures: %s\nSigned-By: /etc/apt/keyrings/docker.asc\n' "$(dpkg --print-architecture)" > /etc/apt/sources.list.d/docker.sources
+  timeout 300 apt-get update
+  timeout 600 apt-get install -y \
+    'docker-ce=5:29.9.2-1~ubuntu.24.04~noble' \
+    'docker-ce-cli=5:29.9.2-1~ubuntu.24.04~noble' \
+    'containerd.io=2.4.2-3~ubuntu.24.04~noble' \
+    'docker-buildx-plugin=0.38.1-1~ubuntu.24.04~noble' \
+    'docker-compose-plugin=5.6.1-1~ubuntu.24.04~noble'
+  install -m 0755 -d /etc/docker
+  printf '{"log-driver":"json-file","log-opts":{"max-size":"10m","max-file":"3"}}\n' > /etc/docker/daemon.json
+  systemctl enable --now docker
+  systemctl restart docker
+  touch "$state/stage.2"
+fi
+step=credentials
+status installing
+install -m 0700 -d "$secrets"
+if [ ! -e "$secrets/odoo.json" ]; then
+  # The generated values contain only letters and digits.
+  jq -n --arg email "$email" --arg password "$(openssl rand -hex 16)Aa1" --arg master "$(openssl rand -hex 24)" --arg db "$(openssl rand -hex 24)" '{root_email:$email,root_password:$password,master_password:$master,db_password:$db}' > "$secrets/odoo.json"
+  chmod 0600 "$secrets/odoo.json"
+fi
+step=odoo
+status installing
+if [ ! -e "$state/stage.3" ]; then
+  install -m 0700 -d "$app" "$app/postgres"
+  install -m 0755 -d "$app/config"
+  cat > "$app/compose.yaml" <<'YAML'
+name: odoo
+services:
+  postgres:
+    image: postgres:16.15-alpine@sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab
+    restart: always
+    env_file: postgres.env
+    volumes:
+      - /opt/odoo/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  odoo:
+    image: odoo:20.0@sha256:d5e3a26baa044867c826dddc09058f10e2582706bf83c146ea04fea889720c76
+    restart: always
+    env_file: odoo.env
+    ports:
+      - "127.0.0.1:8069:8069"
+    volumes:
+      - odoo-data:/var/lib/odoo
+      - /opt/odoo/config:/etc/odoo:ro
+      - /opt/odoo/extra-addons:/mnt/extra-addons:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+volumes:
+  odoo-data:
+YAML
+  dbpass=$(jq -er '.db_password' "$secrets/odoo.json")
+  printf 'POSTGRES_USER=odoo\nPOSTGRES_DB=postgres\nPOSTGRES_PASSWORD=%s\n' "$dbpass" > "$app/postgres.env"
+  printf 'HOST=postgres\nPORT=5432\nUSER=odoo\nPASSWORD=%s\n' "$dbpass" > "$app/odoo.env"
+  unset dbpass
+  chmod 0600 "$app/compose.yaml" "$app/postgres.env" "$app/odoo.env"
+  step=download
+  status installing
+  install -m 0755 -d "$app/extra-addons"
+  place_helper
+  edition_fetch
+  chown -R root:root "$app/extra-addons"
+  chmod -R u=rwX,go=rX "$app/extra-addons"
+  (cd "$app" && timeout 1200 docker compose pull)
+  step=odoo
+  status installing
+  # The configuration file is owned by the user the image runs Odoo as, so Odoo can read it and nobody else can.
+  uid=$(cd "$app" && docker compose run --rm --no-deps -T --entrypoint id odoo -u)
+  gid=$(cd "$app" && docker compose run --rm --no-deps -T --entrypoint id odoo -g)
+  [[ "$uid" =~ ^[0-9]+$ ]]
+  [[ "$gid" =~ ^[0-9]+$ ]]
+  printf '[options]\nadmin_passwd = %s\ndb_name = odoo\ndbfilter = ^odoo$\nlist_db = False\nproxy_mode = True\nworkers = 0\nhttp_interface = 0.0.0.0\naddons_path = /mnt/extra-addons\n' "$(jq -er '.master_password' "$secrets/odoo.json")" > "$app/config/odoo.conf"
+  chown "$uid:$gid" "$app/config/odoo.conf"
+  chmod 0400 "$app/config/odoo.conf"
+  (cd "$app" && timeout 300 docker compose up -d postgres)
+  touch "$state/stage.3"
+fi
+# Swap before the first heavy start, so the smallest plans do not run out of memory while the app installs.
+if ! swapon --show=NAME --noheadings | grep -q . && [ ! -e /swapfile ]; then
+  fallocate -l 2G /swapfile
+  chmod 0600 /swapfile
+  mkswap /swapfile >/dev/null
+  printf '/swapfile none swap sw 0 0\n' >> /etc/fstab
+  swapon /swapfile
+fi
+if [ ! -e "$state/stage.4" ]; then
+  # Create the database and its first user on this server before Odoo is reachable from anywhere.
+  # Odoo 20 has no database creation call over the network, so the command line is used: install the base module
+  # without demo data, then give the administrator the customer's email as login and the generated password.
+  (cd "$app" && timeout 300 docker compose up -d --wait postgres)
+  (cd "$app" && docker compose exec -T postgres dropdb -U odoo --if-exists odoo)
+  (cd "$app" && timeout 1800 docker compose run --rm --no-deps -T odoo odoo -d odoo -i base --without-demo=all "${language_args[@]}" --stop-after-init --no-http)
+  # The values reach the container on stdin, never in process arguments. The edition adds its own lines to the same shell input.
+  {
+    jq -rn --arg email "$(jq -er '.root_email' "$secrets/odoo.json")" --arg password "$(jq -er '.root_password' "$secrets/odoo.json")" \
+      '"import json\nvalues = json.loads(" + ({login:$email,email:$email,password:$password} | tojson | @json) + ")\nadmin = env.ref(\"base.user_admin\")\nadmin.write(values)\nenv.cr.commit()\nassert env[\"res.users\"].search_count([(\"login\", \"=\", values[\"login\"])]) == 1\n"'
+    printf '%s' "$edition_python"
+  } | (cd "$app" && timeout 300 docker compose run --rm --no-deps -T odoo odoo shell -d odoo --no-http)
+  # The modules of the edition, installed with the company and language already set.
+  (cd "$app" && timeout 3000 docker compose run --rm --no-deps -T odoo odoo -d odoo -i "$modules" --stop-after-init --no-http </dev/null)
+  touch "$state/stage.4"
+fi
+if [ ! -e "$state/stage.5" ]; then
+  (cd "$app" && timeout 300 docker compose up -d)
+  # Odoo answers /web/health on localhost when it is ready. The web server and the firewall ports stay closed until it does.
+  ready=0
+  for _ in $(seq 1 150); do
+    # /web/health where Odoo has it; the login page answers on every version.
+    if curl --fail --silent --max-time 5 http://127.0.0.1:8069/web/health -o /dev/null \
+      || curl --fail --silent --max-time 5 http://127.0.0.1:8069/web/login -o /dev/null; then
+      ready=1
+      break
+    fi
+    sleep 2
+  done
+  if [ "$ready" != 1 ]; then
+    # Leave what went wrong in the install log, where the plugin can read it.
+    {
+      echo "Odoo did not answer on 127.0.0.1:8069."
+      curl -s -o /dev/null -w 'health %{http_code}\n' --max-time 5 http://127.0.0.1:8069/web/health || true
+      curl -s -o /dev/null -w 'login %{http_code}\n' --max-time 5 http://127.0.0.1:8069/web/login || true
+      (cd "$app" && docker compose ps) || true
+      (cd "$app" && docker compose logs --tail 60 odoo) || true
+      free -m || true
+    } 2>&1 | sed -E 's/(admin_passwd|password)[ =:]+[^ ]+/\1=***/Ig' >&2
+    false
+  fi
+  touch "$state/stage.5"
+fi
+step=web
+status installing
+if [ ! -e "$state/stage.6" ]; then
+  # One generator writes the Caddyfile: the site, and with a www name a certified www site that redirects to the domain.
+  # The same generator is run again when the www name starts to point at this server (the plugin writes www.json).
+  install -m 0755 /dev/stdin /usr/local/sbin/beltoft-caddy <<'CADDY'
+#!/bin/bash
+set -Eeuo pipefail
+domain=${1:?}
+www=${2:-}
+[[ "$domain" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]]
+[[ "$domain" == *.* ]]
+[ -z "$www" ] || [ "$www" = "www.$domain" ]
+tmp=$(mktemp /etc/caddy/Caddyfile.XXXXXX)
+{
+  printf '%s {\n' "$domain"
+  cat /etc/caddy/beltoft-site.body
+  printf '}\n'
+  if [ -n "$www" ]; then
+    printf '%s {\n  redir https://%s{uri} permanent\n}\n' "$www" "$domain"
+  fi
+} > "$tmp"
+caddy validate --config "$tmp" --adapter caddyfile >/dev/null 2>&1
+chmod 0644 "$tmp"
+mv -f "$tmp" /etc/caddy/Caddyfile
+CADDY
+  install -m 0755 /dev/stdin /usr/local/sbin/beltoft-www-apply <<'APPLY'
+#!/bin/bash
+set -Eeuo pipefail
+state=/var/lib/beltoft-app
+f="$state/www.json"
+www=
+report() {
+  printf '{"www":"%s","state":"%s","updated":"%s"}\n' "$www" "$1" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$state/www.status.tmp"
+  mv -f "$state/www.status.tmp" "$state/www.status.json"
+}
+[ -f "$f" ] || exit 0
+trap 'report failed; mv -f "$f" "$state/www.failed" 2>/dev/null || true' ERR
+# The guest agent creates the file before it writes the content: wait until it is complete JSON.
+for _ in $(seq 1 30); do jq -e '.domain and .www' "$f" >/dev/null 2>&1 && break; sleep 1; done
+domain=$(jq -er '.domain' "$f")
+www=$(jq -er '.www' "$f")
+/usr/local/sbin/beltoft-caddy "$domain" "$www"
+systemctl reload caddy
+report ready
+mv -f "$f" "$state/www.done"
+APPLY
+  cat > /etc/systemd/system/beltoft-www.service <<'UNIT'
+[Unit]
+Description=Serve the www name of the app domain
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/beltoft-www-apply
+UNIT
+  cat > /etc/systemd/system/beltoft-www.path <<'UNIT'
+[Unit]
+Description=Watch for a www name to add
+[Path]
+PathExists=/var/lib/beltoft-app/www.json
+Unit=beltoft-www.service
+[Install]
+WantedBy=multi-user.target
+UNIT
+  systemctl daemon-reload
+  systemctl enable --now beltoft-www.path
+  printf '  encode zstd gzip\n  reverse_proxy 127.0.0.1:8069\n' > /etc/caddy/beltoft-site.body
+  if [ -n "$domain" ]; then
+    /usr/local/sbin/beltoft-caddy "$domain" "$www"
+  else
+    { printf 'http://%s {\n' "$ip"; cat /etc/caddy/beltoft-site.body; printf '}\n'; } > /etc/caddy/Caddyfile
+  fi
+  systemctl enable --now caddy
+  systemctl restart caddy
+  touch "$state/stage.6"
+fi
+step=firewall
+status installing
+if [ ! -e "$state/stage.7" ]; then
+  ufw default deny incoming
+  ufw default allow outgoing
+  ufw allow 22/tcp
+  ufw allow 80/tcp
+  ufw allow 443/tcp
+  ufw --force enable
+  touch "$state/stage.7"
+fi
+step=verify
+status installing
+curl --fail --silent --show-error --max-time 15 --resolve "${domain:-$ip}:80:$ip" "http://${domain:-$ip}/web/login" -o /dev/null
+[ "$(docker inspect --format '{{.State.Health.Status}}' "$(cd "$app" && docker compose ps -q postgres)")" = healthy ]
+jq '{root_email,root_password,master_password}' "$secrets/odoo.json" > "$secrets/credentials.json"
+chmod 0600 "$secrets/credentials.json"

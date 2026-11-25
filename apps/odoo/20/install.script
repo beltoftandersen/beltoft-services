@@ -28,6 +28,36 @@ if [ -n "$domain" ]; then
 fi
 # A www name is only ever served together with its domain.
 [ -z "$www" ] || [ "$www" = "www.$domain" ]
+
+# --- Downloads placed on the addons path --------------------------------------------------------------------------
+# Every archive is fetched over https only, checked against a pinned sha256 and placed as root, readable by the
+# image's Odoo user. A failed download or a wrong checksum stops the install (set -e, fail closed).
+helper_url=https://github.com/beltoftandersen/odoo-helper-module/archive/9192788d308630f319e838f45bf236d9cdc8ed85.tar.gz
+helper_sha256=a349cfab915e2b7980decd78e91aa1acdc267b887fba22f815c6af075ca2d364
+fetch_archive() {
+  local url=$1 sha=$2 out=$3
+  timeout 300 curl --proto '=https' --tlsv1.2 --proto-redir '=https' --max-time 280 -fsSL "$url" -o "$out"
+  [ "$(sha256sum "$out" | awk '{ print $1 }')" = "$sha" ]
+}
+# The OdooWoo helper module is the whole archive; its folder must be called odoowoo_helper. Its quality checks and tests stay out.
+place_helper() {
+  local tmp
+  tmp=$(mktemp -d)
+  fetch_archive "$helper_url" "$helper_sha256" "$tmp/helper.tar.gz"
+  install -m 0755 -d "$app/extra-addons/odoowoo_helper"
+  tar -xzf "$tmp/helper.tar.gz" -C "$app/extra-addons/odoowoo_helper" --strip-components=1 --no-same-owner --exclude='*/qa' --exclude='*/tests' --exclude='*/.git*'
+  [ -f "$app/extra-addons/odoowoo_helper/__manifest__.py" ]
+  rm -rf "$tmp"
+}
+
+# >>> EDITION BLOCK: the only part that differs between apps/odoo/20/install.script and apps/odoo/20-dk/install.script
+# tests/Apps/AppOdooTest.php fails when anything outside this block differs.
+# Standard edition: Odoo as it comes, plus the OdooWoo helper module.
+modules=odoowoo_helper
+language_args=()
+edition_fetch() { :; }
+edition_python=''
+# <<< EDITION BLOCK
 step=packages
 status installing
 if [ ! -e "$state/stage.1" ]; then
@@ -99,6 +129,7 @@ services:
     volumes:
       - odoo-data:/var/lib/odoo
       - /opt/odoo/config:/etc/odoo:ro
+      - /opt/odoo/extra-addons:/mnt/extra-addons:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -112,6 +143,11 @@ YAML
   chmod 0600 "$app/compose.yaml" "$app/postgres.env" "$app/odoo.env"
   step=download
   status installing
+  install -m 0755 -d "$app/extra-addons"
+  place_helper
+  edition_fetch
+  chown -R root:root "$app/extra-addons"
+  chmod -R u=rwX,go=rX "$app/extra-addons"
   (cd "$app" && timeout 1200 docker compose pull)
   step=odoo
   status installing
@@ -120,7 +156,7 @@ YAML
   gid=$(cd "$app" && docker compose run --rm --no-deps -T --entrypoint id odoo -g)
   [[ "$uid" =~ ^[0-9]+$ ]]
   [[ "$gid" =~ ^[0-9]+$ ]]
-  printf '[options]\nadmin_passwd = %s\ndb_name = odoo\ndbfilter = ^odoo$\nlist_db = False\nproxy_mode = True\nworkers = 0\nhttp_interface = 0.0.0.0\n' "$(jq -er '.master_password' "$secrets/odoo.json")" > "$app/config/odoo.conf"
+  printf '[options]\nadmin_passwd = %s\ndb_name = odoo\ndbfilter = ^odoo$\nlist_db = False\nproxy_mode = True\nworkers = 0\nhttp_interface = 0.0.0.0\naddons_path = /mnt/extra-addons\n' "$(jq -er '.master_password' "$secrets/odoo.json")" > "$app/config/odoo.conf"
   chown "$uid:$gid" "$app/config/odoo.conf"
   chmod 0400 "$app/config/odoo.conf"
   (cd "$app" && timeout 300 docker compose up -d postgres)
@@ -140,11 +176,15 @@ if [ ! -e "$state/stage.4" ]; then
   # without demo data, then give the administrator the customer's email as login and the generated password.
   (cd "$app" && timeout 300 docker compose up -d --wait postgres)
   (cd "$app" && docker compose exec -T postgres dropdb -U odoo --if-exists odoo)
-  (cd "$app" && timeout 1800 docker compose run --rm --no-deps -T odoo odoo -d odoo -i base --without-demo=all --stop-after-init --no-http)
-  # The values reach the container on stdin, never in process arguments.
-  jq -rn --arg email "$(jq -er '.root_email' "$secrets/odoo.json")" --arg password "$(jq -er '.root_password' "$secrets/odoo.json")" \
-    '"import json\nvalues = json.loads(" + ({login:$email,email:$email,password:$password} | tojson | @json) + ")\nadmin = env.ref(\"base.user_admin\")\nadmin.write(values)\nenv.cr.commit()\nassert env[\"res.users\"].search_count([(\"login\", \"=\", values[\"login\"])]) == 1\n"' \
-    | (cd "$app" && timeout 300 docker compose run --rm --no-deps -T odoo odoo shell -d odoo --no-http)
+  (cd "$app" && timeout 1800 docker compose run --rm --no-deps -T odoo odoo -d odoo -i base --without-demo=all "${language_args[@]}" --stop-after-init --no-http)
+  # The values reach the container on stdin, never in process arguments. The edition adds its own lines to the same shell input.
+  {
+    jq -rn --arg email "$(jq -er '.root_email' "$secrets/odoo.json")" --arg password "$(jq -er '.root_password' "$secrets/odoo.json")" \
+      '"import json\nvalues = json.loads(" + ({login:$email,email:$email,password:$password} | tojson | @json) + ")\nadmin = env.ref(\"base.user_admin\")\nadmin.write(values)\nenv.cr.commit()\nassert env[\"res.users\"].search_count([(\"login\", \"=\", values[\"login\"])]) == 1\n"'
+    printf '%s' "$edition_python"
+  } | (cd "$app" && timeout 300 docker compose run --rm --no-deps -T odoo odoo shell -d odoo --no-http)
+  # The modules of the edition, installed with the company and language already set.
+  (cd "$app" && timeout 3000 docker compose run --rm --no-deps -T odoo odoo -d odoo -i "$modules" --stop-after-init --no-http </dev/null)
   touch "$state/stage.4"
 fi
 if [ ! -e "$state/stage.5" ]; then

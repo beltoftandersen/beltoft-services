@@ -35,6 +35,9 @@ final class AppOdooTest extends TestCase {
 		$raw = json_decode( (string) file_get_contents( BELTOFT_SERVICES_PATH . 'apps/odoo/app.json' ), true );
 		$this->assertTrue( $raw['domain'] );
 		$this->assertSame( array( 'since_recipe' => 1 ), $raw['www'] );
+		// The helper module made the script a new recipe (2). www support is older than that: servers of recipe 1 keep it.
+		$this->assertSame( 2, $raw['versions'][0]['recipe'] );
+		$this->assertSame( 2, $raw['versions'][1]['recipe'] );
 		$this->assertTrue( $raw['needs_email'] );
 		$this->assertSame( array( 'root_email', 'root_password', 'master_password' ), $app['credentials'] );
 		$labels = AppTab::step_labels();
