@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.62.1
+Stable tag: 0.62.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.62.2 =
+* My Account design pass, second round after a check of every fix on the site: values in fact tiles no longer break mid-word, hints wrap instead of being cut, the extra IPv4 address rows, tables and forms on phones, the transfer and password tabs. The phrases typed to confirm a new database password or to open a database to everyone can be translated (the API keeps the English phrase). Two broken rules in the account stylesheet are repaired and a test guards the brackets.
 
 = 0.62.1 =
 * My Account design pass: one spacing rhythm for headings, sections, cards and forms; one page head, status and panel style for every service; list and table alignment; plain text colours; outlined buttons for actions that ask for confirmation; phone layouts of the server, database, domain, DNS, email, SSL, licence and online backup pages.
