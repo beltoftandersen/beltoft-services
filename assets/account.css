@@ -662,7 +662,7 @@ a.beltoft-services-ov__who:hover { text-decoration: underline; }
 .beltoft-licenses__empty { max-width: 70ch; margin: 0; padding: 8px 0; color: var(--bs-muted); }
 
 /* Billing: the tab bar over the subscriptions, orders, payment methods and addresses pages. One rule, no chips. */
-.beltoft-services-billing-tabs { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; margin: var(--bs-space-4) 0; border-bottom: 1px solid var(--bs-line); font-family: var(--font, "Onest", ui-sans-serif, system-ui, sans-serif); }
+.beltoft-services-billing-tabs { box-sizing: border-box; width: 100%; max-width: var(--bs-page-width); min-width: 0; margin: var(--bs-space-4) 0; border-bottom: 1px solid var(--bs-line); font-family: var(--font, "Onest", ui-sans-serif, system-ui, sans-serif); }
 .beltoft-services-billing-tabs ul { display: flex; flex-wrap: wrap; gap: 0; margin: 0; padding: 0; list-style: none; }
 .beltoft-services-billing-tabs li { margin: 0; padding: 0; }
 .beltoft-services-billing-tabs a { display: block; box-sizing: border-box; min-height: var(--bs-input-h); padding: 10px 14px; color: var(--bs-muted) !important; font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); line-height: 24px; white-space: nowrap; text-decoration: none !important; }
@@ -978,7 +978,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit
 button.is-busy, input.is-busy, [data-bs-action].is-busy { cursor: progress; }
 button.is-busy::before, [data-bs-action].is-busy::before { content: ""; display: inline-block; width: 1.5em; height: 0.44em; margin-right: 0.6em; vertical-align: 0.02em; background: linear-gradient(currentColor, currentColor) 0 50% / 0.44em 0.44em no-repeat, linear-gradient(currentColor, currentColor) 50% 50% / 0.18em 0.18em no-repeat, linear-gradient(currentColor, currentColor) 100% 50% / 0.18em 0.18em no-repeat; animation: beltoft-services-dots 1.2s ease-in-out infinite; }
 [data-bs-locked] { opacity: .5; cursor: not-allowed; }
-.bs-dialog { box-sizing: border-box; width: calc(100% - 32px); max-width: 480px; padding: 0; border: 0; color: var(--bs-ink); background: var(--bs-surface); }
+.bs-dialog { box-sizing: border-box; width: calc(100% - 32px); max-width: 480px; padding: 0; border: 0; color: var(--bs-ink); background: var(--bs-warm); }
 .bs-dialog::backdrop { background: color-mix(in srgb, var(--bs-dark) 50%, transparent); }
 .bs-dialog__form { margin: 0; padding: 24px; }
 .bs-dialog h5 { margin: 0 0 var(--bs-space-3); font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); }
@@ -1005,9 +1005,9 @@ body.woocommerce-account .woocommerce-MyAccount-content :is(a.beltoft-services-l
 
 /* Secondary */
 body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-btn, .beltoft-services-vm__copy, .beltoft-services-console__action, .beltoft-services-mail__outline, .beltoft-services-domain__copy, a.beltoft-services-list-btn.is-ghost, a.beltoft-services-ov__btn.is-ghost, [data-db-power], [data-power-action], [data-snapshot-cancel], [data-confirm-cancel], .beltoft-services-oauth__cancel),
-.bs-dialog .bs-dialog__no { background: transparent; border: 1px solid var(--bs-dark); box-shadow: none; color: var(--bs-ink) !important; }
+.bs-dialog .bs-dialog__no { background: transparent; border: 1px solid var(--bs-input-border); box-shadow: none; color: var(--bs-ink) !important; }
 body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-btn, .beltoft-services-vm__copy, .beltoft-services-console__action, .beltoft-services-mail__outline, .beltoft-services-domain__copy, a.beltoft-services-list-btn.is-ghost, a.beltoft-services-ov__btn.is-ghost, [data-db-power], [data-power-action], [data-snapshot-cancel], [data-confirm-cancel], .beltoft-services-oauth__cancel):hover,
-.bs-dialog .bs-dialog__no:hover { background: var(--bs-warm); border-color: var(--bs-dark); color: var(--bs-ink) !important; }
+.bs-dialog .bs-dialog__no:hover { background: var(--bs-warm); border-color: var(--bs-input-border); color: var(--bs-ink) !important; }
 
 /* Danger: Delete server, Delete database, and the other destructive confirmations */
 body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-delete__go, .beltoft-services-danger__open, .beltoft-services-danger__confirm, .beltoft-services-mail__danger),
@@ -1535,6 +1535,8 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-disk__
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__disk :is(a, button.beltoft-services-vm__link) + :is(a, button.beltoft-services-vm__link) { margin-left: var(--bs-space-4); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__disk button.beltoft-services-vm__link:is([data-delete-disk], [data-cancel-url]) { color: var(--bs-status-fail); }
 .beltoft-services-bar__sub { margin-top: var(--bs-space-1); }
+/* The hint under a bar (memory needs the guest agent ...) wraps; it is never cut. A list row with a two-line hint keeps its columns (the hint spans the grid). */
+body.woocommerce-account .beltoft-services-bar__sub, body.woocommerce-account .beltoft-services-srv__bars .beltoft-services-bar__sub { overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: break-word; line-height: var(--bs-lh-text); }
 
 /* Page head: the renewal date is a meta item like the state and the type. */
 .beltoft-services-page__renews { color: var(--bs-muted); font-size: var(--bs-fs-small); line-height: 20px; }
@@ -1656,6 +1658,54 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit
 .beltoft-services-credit__code > .beltoft-services-credit__coderow { margin-top: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit .beltoft-services-ov__head :is(h2, h3) { margin: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit__code > .beltoft-services-credit__note { margin-top: var(--bs-space-3); }
+
+/* ---- Round two: shared fixes ---- */
+/* Overview section heads: the height is the heading's, so 12px under it is 12px under the text; on a phone the 40px tap area of the link
+   overflows the head with a negative margin instead of making the head taller (all heads are equally high). */
+.beltoft-services-ov__head { min-height: 0; }
+@media (max-width: 767px) {
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-ov__head a { margin-block: calc((var(--bs-lh-heading) * var(--bs-fs-heading) - var(--bs-btn-h)) / 2); }
+}
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-ov__head.beltoft-services-ov__head :is(h2, h3) { margin-bottom: 0; } /* the head's own margin is the 12px to the content */
+/* Priority support: the price block joins the text block above it and the button below it (the shorthand radius of the card-with-button rule set its top corners). */
+body.woocommerce-account .woocommerce-MyAccount-content p.beltoft-licenses__empty + p.beltoft-licenses__empty.beltoft-licenses__empty { border-top-left-radius: 0; border-top-right-radius: 0; }
+/* Priority support: its state is a line inside the card, not part of the head. */
+body.woocommerce-account .woocommerce-MyAccount-content p.beltoft-licenses__empty > .beltoft-services-state { display: flex; margin-bottom: var(--bs-space-1); }
+
+/* Order panels (the overview's "Your new order"): the grid of the overview has the 24px gap, so the panel adds none; 32px to the columns. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-overview > .beltoft-services-ov__order { margin: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-overview > .beltoft-services-ov__order:has(+ .beltoft-services-ov__cols) { margin-bottom: var(--bs-space-2); }
+/* Progress inside an order panel: thankyou.css repeats .beltoft-service .beltoft-services-progress (later in the page), so these carry the account prefix. */
+body.woocommerce-account .bs-order .beltoft-services-progress, body.woocommerce-account .bs-order .beltoft-services-progress__text, body.woocommerce-account .bs-order .beltoft-service p.beltoft-services-progress__text { margin: 0; font-weight: var(--bs-fw-regular); }
+body.woocommerce-account .bs-order .beltoft-services-progress__leave, body.woocommerce-account .bs-order .beltoft-services-progress__note { margin: var(--bs-space-2) 0 0; }
+body.woocommerce-account .beltoft-services-progress.is-queued .beltoft-services-progress__text::before, body.woocommerce-account .beltoft-services-progress.is-running .beltoft-services-progress__text::before { display: inline-block; width: 8px; height: 8px; margin: 0 var(--bs-space-2) 0 0; vertical-align: baseline; border-radius: 50%; background: var(--bs-status-warn); background-size: auto; animation: beltoft-services-pulse 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+	body.woocommerce-account .beltoft-services-progress.is-queued .beltoft-services-progress__text::before, body.woocommerce-account .beltoft-services-progress.is-running .beltoft-services-progress__text::before { animation: none; background-size: auto; }
+}
+
+/* Facts (server, network, database, domain, SSL, mail, storage, hosting): tiles that size to their value, wrap onto the next line and share
+   the row, so there are no empty cells and a value breaks only at its spaces (an address or domain breaks only when it is longer than the row). */
+body.woocommerce-account .woocommerce-MyAccount-content dl.beltoft-services-facts { display: flex; flex-wrap: wrap; gap: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content dl.beltoft-services-facts > div { flex: 1 1 auto; min-width: min(100%, 11rem); }
+body.woocommerce-account .woocommerce-MyAccount-content dl.beltoft-services-facts dd { overflow-wrap: break-word; word-break: normal; }
+/* A facts box directly after a paragraph is 12px under it. */
+html body.woocommerce-account .woocommerce-MyAccount-content :is(p, .description) + dl.beltoft-services-facts.beltoft-services-facts { margin-top: var(--bs-space-3); }
+
+/* Credit: the "Top up" legend is a plain block (its float left 16px of clearance under it), so it is 12px over the amounts like the other headings. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit .beltoft-services-credit__amounts legend.beltoft-services-credit__legend { float: none; display: block; margin: 0 0 var(--bs-space-3); }
+
+/* Subscription rows on a phone: the name and the payment line take the full width (no wrapped "Visa ending in 4242"), the price and the next payment sit on one line under it. */
+@media (max-width: 600px) {
+	.beltoft-services-servers--area.beltoft-services-servers--subs :is(a, div).beltoft-services-srv { grid-template-columns: minmax(0, 1fr); row-gap: var(--bs-space-2); }
+	.beltoft-services-servers--subs .beltoft-services-srv__state { grid-auto-flow: column; justify-content: space-between; justify-items: start; align-items: baseline; gap: var(--bs-space-3); text-align: left; }
+	.beltoft-services-servers--subs .beltoft-services-srv__state > :last-child { justify-self: end; text-align: right; }
+	.beltoft-services-usage--card .beltoft-services-servers--subs .beltoft-services-srv__state { grid-auto-flow: row; justify-content: stretch; align-items: start; }
+	.beltoft-services-usage--card .beltoft-services-servers--subs .beltoft-services-srv__state > :last-child { justify-self: start; text-align: left; }
+}
+
+/* Security API card: a heading is 24px under the block above and 12px over its own content (the card's grid gap is the other 12px). */
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-api.beltoft-services-api > :is(h3, h4) { margin-bottom: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-api.beltoft-services-api > :is(h3, h4):not(:first-child) { margin-top: var(--bs-space-3); }
 
 /* ==== Design pass 2026-11-25: servers ===============================================================================
    Server list, server page tabs, New server. Same rules as the shared block: 24px between blocks of a tab, 12px heading to content,
