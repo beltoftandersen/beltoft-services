@@ -21,8 +21,8 @@ final class AppOdooEditionTest extends PaidAppCase {
 
 	private const HELPER_URL    = 'https://github.com/beltoftandersen/odoo-helper-module/archive/9192788d308630f319e838f45bf236d9cdc8ed85.tar.gz';
 	private const HELPER_SHA256 = 'a349cfab915e2b7980decd78e91aa1acdc267b887fba22f815c6af075ca2d364';
-	private const BUNDLE_URL    = 'https://github.com/beltoftandersen/odoo-dk-accounting/archive/refs/tags/20.0.1.0.0.tar.gz';
-	private const BUNDLE_SHA256 = '47532a727308665894bc9af4afb04716a4093047c30dd80165391e2f2d8d49b4';
+	private const BUNDLE_URL    = 'https://github.com/beltoftandersen/odoo-dk-accounting/archive/refs/tags/20.0.1.0.1.tar.gz';
+	private const BUNDLE_SHA256 = '2a66517d87452705a77ec7d6c56b29c9772aae8343078ed88ef667dab330bacf';
 
 	private const BUNDLE_MODULES = array(
 		'account_usability', 'account_statement_base', 'account_statement_import_base', 'account_statement_import_file',

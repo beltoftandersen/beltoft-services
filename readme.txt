@@ -260,6 +260,7 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 = 0.64.0 =
 * New one-click app for servers: Easy!Appointments 1.6 (appointment booking), installed with Caddy, PHP and MariaDB, private files outside the web root, and helpers on the server for update and roll back that never touch the customer's data.
+* Odoo, Danish accounting edition: the accounting modules now come with Danish translations (release 20.0.1.0.1 of the module bundle).
 
 = 0.63.0 =
 * Odoo app: two editions under the Odoo tile. Odoo 20 (standard) and Odoo 20, Danish accounting (Danish language, company in Denmark with DKK, the Danish chart of accounts and moms, bank import and reconciliation, financial reports and the SAF-T header file, from github.com/beltoftandersen/odoo-dk-accounting). Both install the OdooWoo helper module. A server can be reinstalled from one edition to the other.
