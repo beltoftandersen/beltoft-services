@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.62.4
+Stable tag: 0.63.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.63.0 =
+* Odoo app: two editions under the Odoo tile. Odoo 20 (standard) and Odoo 20, Danish accounting (Danish language, company in Denmark with DKK, the Danish chart of accounts and moms, bank import and reconciliation, financial reports and the SAF-T header file, from github.com/beltoftandersen/odoo-dk-accounting). Both install the OdooWoo helper module. A server can be reinstalled from one edition to the other.
 
 = 0.62.4 =
 * My Account: the word typed to confirm a restore, deletion, reinstall, rollback or certificate cancellation follows the page language (the routes keep the English word). Small spacing fixes on phones (DNS row editor, long TXT values, backup Delete button, database access panel), the transfer page's last step is named Transfer complete, and turning auto-renew back on is a normal button.
