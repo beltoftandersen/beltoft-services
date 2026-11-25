@@ -189,6 +189,16 @@ class DomainsTest extends TestCase {
 		$this->assertSame( 'Expires ' . wp_date( get_option( 'date_format' ), strtotime( '2027-11-02 00:00:00 UTC' ) ), DomainRows::row( $views[0], $domain )['renews'] );
 	}
 
+	public function test_a_row_without_a_domain_name_shows_what_was_ordered_and_no_registration_line(): void {
+		$domain = $this->service( $this->user, 'placeholder.example', 'domain', array( 'state' => 'paused' ) );
+		$views  = $this->views( $domain );
+		$views[0]['product'] = 'Domain name';
+		$row = DomainRows::row( $views[0], $domain );
+
+		$this->assertSame( 'Domain registration', $row['name'] );
+		$this->assertSame( '', $row['sub'] );
+	}
+
 	public function test_a_folded_dns_service_and_a_foreign_license_are_not_listed(): void {
 		$mine   = $this->service( $this->user, 'mine.example' );
 		$folded = $this->service( $this->user, 'folded.example', 'dns', array( 'folded_into' => 99 ) );

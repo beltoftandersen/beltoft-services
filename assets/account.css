@@ -715,7 +715,7 @@ div.beltoft-services-domain .beltoft-dnse__empty { margin: 0 0 12px; color: var(
 .beltoft-dnse__table th { padding: 0 8px 8px; border: 0; border-bottom: 1px solid var(--bs-line); background: none; color: var(--bs-muted); font-size: 14px; font-weight: 500; text-align: left; }
 .beltoft-dnse__table td { padding: 8px 8px; border: 0; border-bottom: 1px solid var(--bs-line); background: none; vertical-align: middle; font-variant-numeric: tabular-nums; }
 .beltoft-dnse__table tr:last-child td { border-bottom: 0; }
-.beltoft-dnse__table td:nth-child(1) { width: 20%; overflow-wrap: anywhere; }
+.beltoft-dnse__table td:nth-child(1) { width: 20%; overflow-wrap: break-word; }
 .beltoft-dnse__table td:nth-child(2) { width: 5.5em; }
 .beltoft-dnse__table td:nth-child(3) { width: 8em; }
 .beltoft-dnse__table td.beltoft-dnse__value { overflow-wrap: anywhere; word-break: break-word; }
@@ -733,7 +733,7 @@ div.beltoft-services-domain .beltoft-dnse__table input:disabled, div.beltoft-ser
 .beltoft-dnse__fields > .beltoft-dnse__extra { flex: 0 0 6em; }
 .beltoft-dnse__fields > [hidden] { display: none; }
 .beltoft-dnse__form { display: none; }
-.beltoft-dnse__more { margin-top: 12px; }
+.beltoft-dnse__more { margin-top: 24px; }
 @media (max-width: 640px) {
 	.beltoft-dnse__table thead { display: none; }
 	.beltoft-dnse__table, .beltoft-dnse__table tbody { display: block; }
@@ -1996,36 +1996,61 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domain
 /* DNSSEC: the status line, its button and the note under it are 8px apart. */
 .beltoft-services-domain__dnssec p.beltoft-services-domain__note + form { margin-top: var(--bs-space-2); }
 
-/* DNS records: fixed columns so the value column does not move when the editor opens; row actions are 32px targets. */
+/* DNS records. Wide: fixed columns (the value column does not move when the editor opens). The name column fits a name such as selector1._domainkey on one line or wraps it at its dots; the value is never narrower than an IPv6 address. */
 @media (min-width: 641px) {
 	.beltoft-dnse__table { table-layout: fixed; }
-	.beltoft-dnse__table td:nth-child(1), .beltoft-dnse__table th:nth-child(1) { width: 20%; }
-	.beltoft-dnse__table td:nth-child(2), .beltoft-dnse__table th:nth-child(2) { width: 5.5em; }
-	.beltoft-dnse__table td:nth-child(3), .beltoft-dnse__table th:nth-child(3) { width: 7em; }
+	.beltoft-dnse__table td:nth-child(1), .beltoft-dnse__table th:nth-child(1) { width: 10.5em; }
+	.beltoft-dnse__table td:nth-child(2), .beltoft-dnse__table th:nth-child(2) { width: 6em; }
+	.beltoft-dnse__table td:nth-child(3), .beltoft-dnse__table th:nth-child(3) { width: 8em; }
 	.beltoft-dnse__table td.beltoft-dnse__actions, .beltoft-dnse__table th:nth-child(5) { width: 11em; }
 	.beltoft-dnse__table td.beltoft-dnse__actions { white-space: nowrap; }
-}
-/* The table follows the shared table recipe: header cells 12px 16px, rows at least 48px with a line under each. Delete is in the fail colour and both actions are 14px at every width. */
-@media (min-width: 641px) {
+	.beltoft-dnse__table td.beltoft-dnse__actions:has(.beltoft-dnse__ask) { white-space: normal; }
+	.beltoft-dnse__ask { display: block; margin-bottom: var(--bs-space-1); }
+	/* Header cells 12px 16px, rows at least 48px with a line under each; the open row keeps that height (44px fields, 2px above and below). */
 	.beltoft-dnse__table th { padding: var(--bs-space-3) var(--bs-space-4); }
-	.beltoft-dnse__table td, .beltoft-dnse__table tr[data-edit-row] td { height: 48px; padding: var(--bs-space-2) var(--bs-space-4); }
+	.beltoft-dnse__table td { height: 48px; padding: var(--bs-space-2) var(--bs-space-4); }
+	.beltoft-dnse__table tr[data-edit-row] td { padding: 2px var(--bs-space-4); }
+	.beltoft-dnse__table tr[data-edit-row] td.beltoft-dnse__actions { padding-right: var(--bs-space-2); padding-left: var(--bs-space-2); }
+	/* In the open row the fields keep their text at the same left edge as the rows (16px: 8px cell + 8px field) and the selects are 14px, so "1 hour" and "AAAA" fit their columns. */
+	div.beltoft-services-domain .beltoft-dnse__table tr[data-edit-row] td:not(.beltoft-dnse__actions) { padding-left: var(--bs-space-2); padding-right: var(--bs-space-2); }
+	div.beltoft-services-domain .beltoft-dnse__table tr[data-edit-row] select { padding-left: 6px; padding-right: 20px; font-size: var(--bs-fs-small); background-position: right 6px center; }
 }
-body.woocommerce-account .woocommerce-MyAccount-content div.beltoft-services-domain .beltoft-dnse__table td.beltoft-dnse__actions > button { font-size: var(--bs-fs-small); }
-body.woocommerce-account .woocommerce-MyAccount-content div.beltoft-services-domain .beltoft-dnse__table td.beltoft-dnse__actions > button:is([data-act="delete"], .beltoft-dnse__danger) { color: var(--bs-status-fail); }
-@media (min-width: 768px) {
-	body.woocommerce-account .woocommerce-MyAccount-content div.beltoft-services-domain .beltoft-dnse__table td.beltoft-dnse__actions > button { min-height: var(--bs-btn-h-sm); padding: 0 var(--bs-space-3); font-size: var(--bs-fs-small); }
-	body.woocommerce-account div.beltoft-services-domain .beltoft-dnse__table td.beltoft-dnse__actions > button + button { margin-left: var(--bs-space-1); }
-}
+div.beltoft-services-domain .beltoft-dnse__table td.beltoft-dnse__actions > button { font-size: var(--bs-fs-small); }
+/* Row actions are compact buttons: Edit outlined, Delete in the danger outline, 4px apart (8px and 40px high on a phone). */
+body.woocommerce-account .woocommerce-MyAccount-content div.beltoft-services-domain .beltoft-dnse__table td.beltoft-dnse__actions > button { min-height: var(--bs-btn-h-sm); padding: 0 var(--bs-space-3); }
+body.woocommerce-account div.beltoft-services-domain .beltoft-dnse__table td.beltoft-dnse__actions > button + button { margin-left: var(--bs-space-1); }
+/* "Show all N records" sits 24px under the table (the generic link reset of the domain page wins over a plain class). */
+body.woocommerce-account div.beltoft-services-domain button.beltoft-services-domain__link.beltoft-dnse__more { display: inline-flex; margin-top: var(--bs-space-5); }
+/* Phone: a record is one block. Name on its own line, then type (a small pill) and TTL, then the value in a box that scrolls when it is long, then the actions. */
 @media (max-width: 640px) {
-	/* Name, type and TTL fit their content; the name takes the rest and breaks only at dots when it must. */
-	.beltoft-dnse__table tr { grid-template-columns: minmax(0, 1fr) auto auto; gap: 0 var(--bs-space-4); }
-	.beltoft-dnse__table tr[data-edit-row] { grid-template-columns: minmax(0, 1fr) 6em 7.5em; gap: 0 var(--bs-space-2); }
-	.beltoft-dnse__table td:nth-child(1) { overflow-wrap: break-word; }
-	/* Type and TTL are muted 14px with their labels (the table head is hidden on a phone). */
-	.beltoft-dnse__table tr:not([data-edit-row]) td:is(:nth-child(2), :nth-child(3)) { color: var(--bs-muted); font-size: var(--bs-fs-small); line-height: var(--bs-lh-title); white-space: nowrap; align-self: center; }
-	.beltoft-dnse__table tr:not([data-edit-row]) td:is(:nth-child(2), :nth-child(3))::before { content: attr(data-label) ": "; }
+	.beltoft-dnse__table tr { grid-template-columns: auto minmax(0, 1fr); gap: var(--bs-space-1) var(--bs-space-2); padding: var(--bs-space-3) 0; }
+	.beltoft-dnse__table tr:not([data-edit-row]) td:nth-child(1) { grid-column: 1 / -1; grid-row: 1; overflow-wrap: break-word; font-weight: var(--bs-fw-medium); }
+	.beltoft-dnse__table tr:not([data-edit-row]) td:nth-child(2) { grid-column: 1; grid-row: 2; align-self: center; justify-self: start; padding: 2px var(--bs-space-2); border-radius: var(--bs-radius); background: var(--bs-warm); color: var(--bs-ink); font-size: var(--bs-fs-small); line-height: var(--bs-lh-title); }
+	.beltoft-dnse__table tr:not([data-edit-row]) td:nth-child(3) { grid-column: 2; grid-row: 2; align-self: center; color: var(--bs-muted); font-size: var(--bs-fs-small); line-height: var(--bs-lh-title); white-space: normal; }
+	.beltoft-dnse__table tr:not([data-edit-row]) td:nth-child(3)::before { content: attr(data-label) ": "; }
+	.beltoft-dnse__table tr:not([data-edit-row]) td:nth-child(4) { grid-column: 1 / -1; grid-row: 3; max-height: 12em; overflow: auto; padding-top: var(--bs-space-1); overflow-wrap: anywhere; }
+	.beltoft-dnse__table tr:not([data-edit-row]) td:nth-child(5):not(.beltoft-dnse__actions) { grid-column: 1 / -1; grid-row: 4; }
+	.beltoft-dnse__table td.beltoft-dnse__actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--bs-space-2); padding-top: var(--bs-space-2); }
+	body.woocommerce-account div.beltoft-services-domain .beltoft-dnse__table td.beltoft-dnse__actions > button + button { margin-left: 0; }
+	body.woocommerce-account .woocommerce-MyAccount-content div.beltoft-services-domain .beltoft-dnse__table td.beltoft-dnse__actions > button { min-height: var(--bs-btn-h); min-width: 0; padding: 0 var(--bs-space-4); }
+	.beltoft-dnse__ask { flex: 1 1 100%; margin: 0; }
+	/* The open row: name across, type and TTL half and half, the value across, the buttons last; a line under it like the other records. */
+	.beltoft-dnse__table tr[data-edit-row] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 var(--bs-space-2); }
+	.beltoft-dnse__table tr[data-edit-row] td:nth-child(1), .beltoft-dnse__table tr[data-edit-row] td:nth-child(4), .beltoft-dnse__table tr[data-edit-row] td.beltoft-dnse__actions { grid-column: 1 / -1; }
+	.beltoft-dnse__table tr[data-edit-row] td:nth-child(1) { grid-row: 1; }
+	.beltoft-dnse__table tr[data-edit-row] td:nth-child(2) { grid-column: 1; grid-row: 2; }
+	.beltoft-dnse__table tr[data-edit-row] td:nth-child(3) { grid-column: 2; grid-row: 2; }
+	.beltoft-dnse__table tr[data-edit-row] td:nth-child(4) { grid-row: 3; }
+	.beltoft-dnse__table tr[data-edit-row] td.beltoft-dnse__actions { grid-row: 4; }
+	.beltoft-dnse__table tr[data-edit-row] td.beltoft-dnse__actions::before { content: none; }
 	div.beltoft-services-domain .beltoft-dnse__bar .beltoft-dnse__add.button { width: 100%; margin-left: 0; }
 }
+
+/* Transfer or registration in progress: the hint line and the steps use the same 8px dot (the dot of a step is centred on its first line), steps 12px apart, 16px to the tab bar. */
+.beltoft-services-domain-page .beltoft-services-progress { margin-bottom: 0; }
+.beltoft-services-domain-page .beltoft-services-progress__steps { gap: var(--bs-space-3); }
+.beltoft-services-domain-page .beltoft-services-progress__steps li { padding-left: var(--bs-space-4); }
+.beltoft-services-domain-page .beltoft-services-progress__steps li::before { top: calc((1.4em - 8px) / 2); width: 8px; height: 8px; }
 
 /* The DNS guide: one card with plain records inside, no nested frame; the group label is a normal 14px label. */
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dnsg { margin-top: var(--bs-space-4); padding: var(--bs-space-5); border: 0; border-radius: var(--bs-radius-lg); font-size: var(--bs-fs-body); }
