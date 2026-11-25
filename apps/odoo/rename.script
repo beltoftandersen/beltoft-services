@@ -1,10 +1,12 @@
 # Odoo (both editions): the address is the system parameter web.base.url (nothing in the recipe sets it; proxy_mode is on).
-# It is set through Odoo's own shell (the ORM, so the running server sees it; no restart). Only this parameter changes.
+# It is set through Odoo's own shell in a one-off container (the ORM: the running server drops its cached value at its next request; no restart). Only this parameter changes.
 APP_PATH=/web/login
 odoo_dir=${BELTOFT_REN_APP:-/opt/odoo}
 
+# "compose run", as the recipe does: the image entrypoint gives the shell the database settings (HOST, USER, PASSWORD of odoo.env).
+# "compose exec" skips the entrypoint, and the shell then looks for a local database socket that is not there.
 odoo_shell() {
-  (cd "$odoo_dir" && timeout 300 docker compose exec -T odoo odoo shell -d odoo --no-http 2>/dev/null)
+  (cd "$odoo_dir" && timeout 300 docker compose run --rm --no-deps -T odoo odoo shell -d odoo --no-http 2>/dev/null)
 }
 
 # Prints the old value as BELTOFT_HAS=0|1 and BELTOFT_VAL=<value>.

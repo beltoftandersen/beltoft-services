@@ -50,6 +50,12 @@ case "$*" in
 		esac
 		exit 0
 		;;
+	exec*"odoo shell"*)
+		# As on a real server: "exec" skips the image entrypoint, so the shell has no database settings and cannot connect.
+		cat >/dev/null
+		echo "psycopg2.OperationalError: connection to server on socket failed" >&2
+		exit 1
+		;;
 	*"odoo shell"*)
 		cat >"$D/odoo_stdin"
 		if grep -q BELTOFT_HAS "$D/odoo_stdin"; then
