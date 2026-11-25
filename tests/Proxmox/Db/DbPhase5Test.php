@@ -1254,6 +1254,48 @@ class DbPhase5Test extends TestCase {
 		$this->assertNull( DbActions::refusal( null, Resource::find( $r->id() ), 'db_reset_password', array( 'confirm' => 'NEW PASSWORD' ) ) );
 	}
 
+	private function danish_phrase(): callable {
+		$filter = static fn( $translated, $text, $domain ) => 'beltoft-services' === $domain && 'NEW PASSWORD' === $text ? 'NY ADGANGSKODE' : $translated;
+		add_filter( 'gettext', $filter, 10, 3 );
+		return $filter;
+	}
+
+	public function test_the_page_shows_the_translated_confirmation_phrase_and_the_constant_stays_english(): void {
+		$filter = $this->danish_phrase();
+		$r      = $this->running_db();
+		$view   = DbCard::view( $r );
+		remove_filter( 'gettext', $filter, 10 );
+
+		$this->assertSame( 'NY ADGANGSKODE', $view['confirm'] );
+		$this->assertSame( 'NEW PASSWORD', DbActions::CONFIRM );
+		$this->assertSame( 'NEW PASSWORD', DbCard::view( $r )['confirm'] );
+	}
+
+	public function test_a_new_password_accepts_the_translated_phrase_or_the_english_one_and_refuses_anything_else(): void {
+		$r      = Resource::find( $this->running_db()->id() );
+		$filter = $this->danish_phrase();
+
+		$this->assertNull( DbActions::refusal( null, $r, 'db_reset_password', array( 'confirm' => 'NY ADGANGSKODE' ) ) );
+		$this->assertNull( DbActions::refusal( null, $r, 'db_reset_password', array( 'confirm' => 'NEW PASSWORD' ) ) );
+		$wrong = DbActions::refusal( null, $r, 'db_reset_password', array( 'confirm' => 'ny adgangskode' ) );
+		$this->assertInstanceOf( \WP_Error::class, $wrong );
+		$this->assertSame( 'beltoft_services_confirm', $wrong->get_error_code() );
+		$this->assertSame( 422, $wrong->get_error_data()['status'] );
+		$this->assertStringContainsString( 'NY ADGANGSKODE', $wrong->get_error_message() );
+		remove_filter( 'gettext', $filter, 10 );
+
+		// English page: the translated phrase is not accepted.
+		$this->assertSame( 'beltoft_services_confirm', DbActions::refusal( null, $r, 'db_reset_password', array( 'confirm' => 'NY ADGANGSKODE' ) )->get_error_code() );
+		$this->assertSame( 'Type NEW PASSWORD to confirm. The old password stops working.', DbActions::refusal( null, $r, 'db_reset_password', array( 'confirm' => 'x' ) )->get_error_message() );
+	}
+
+	public function test_the_database_mcp_tools_never_offer_a_new_password_and_never_use_the_page_phrase(): void {
+		$source = (string) file_get_contents( dirname( __DIR__, 3 ) . '/src/Proxmox/Db/McpTools.php' );
+		$this->assertStringContainsString( "'db_reset_password' => 'never:", $source );
+		$this->assertStringNotContainsString( 'phrase()', $source );
+		$this->assertStringNotContainsString( 'DbActions', $source );
+	}
+
 	public function test_a_new_password_job_that_finds_the_database_stopped_ends_at_once_without_retrying(): void {
 		$r = $this->running_db();
 		$this->fake->request( 'POST', '/nodes/node-a/qemu/5000/status/stop' );

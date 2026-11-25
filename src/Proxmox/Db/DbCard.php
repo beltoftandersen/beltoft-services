@@ -115,7 +115,7 @@ final class DbCard {
 				'note'    => \BeltoftServices\Usage\CustomerDelete::stopped_note( 'database' ),
 			),
 			'resetting'   => '' !== (string) $r->get( 'db_reset_request' ),
-			'confirm'     => DbActions::CONFIRM,
+			'confirm'     => DbActions::phrase(),
 			'policy'      => DbPolicy::view( $r, $ready && ! $stopped && $r->accepts_actions() && array_key_exists( DbPolicy::ACTION, $offered ) ),
 			'backups'     => $backups,
 			'access'      => $access,

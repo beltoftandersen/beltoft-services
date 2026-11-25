@@ -32,6 +32,15 @@ final class DbActions {
 	public const RESET   = 'db_reset_password';
 	public const CONFIRM = 'NEW PASSWORD';
 
+	/**
+	 * The words the account page asks for, in the page language. The English CONFIRM is always accepted too,
+	 * and the API and MCP keep documenting that one.
+	 */
+	public static function phrase(): string {
+		/* translators: The phrase the customer types to confirm a new database password. It must stay in capitals. */
+		return __( 'NEW PASSWORD', 'beltoft-services' );
+	}
+
 	/** The restore is the server's own action (Actions::run), with a database's wording. */
 	public const RESTORE = 'restore';
 
@@ -153,9 +162,11 @@ final class DbActions {
 			return $stopped;
 		}
 
-		if ( self::CONFIRM !== ( is_array( $args ) ? ( $args['confirm'] ?? '' ) : '' ) ) {
+		$typed = is_array( $args ) ? ( $args['confirm'] ?? '' ) : '';
+
+		if ( self::CONFIRM !== $typed && self::phrase() !== $typed ) {
 			/* translators: %s: the words to type, NEW PASSWORD. */
-			return new \WP_Error( 'beltoft_services_confirm', sprintf( __( 'Type %s to confirm. The old password stops working.', 'beltoft-services' ), self::CONFIRM ), array( 'status' => 422 ) );
+			return new \WP_Error( 'beltoft_services_confirm', sprintf( __( 'Type %s to confirm. The old password stops working.', 'beltoft-services' ), self::phrase() ), array( 'status' => 422 ) );
 		}
 
 		if ( '' !== (string) $r->get( 'db_reset_request' ) ) {
