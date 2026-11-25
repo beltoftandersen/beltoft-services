@@ -260,6 +260,7 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 = 0.62.4 =
 * My Account: the word typed to confirm a restore, deletion, reinstall, rollback or certificate cancellation follows the page language (the routes keep the English word). Small spacing fixes on phones (DNS row editor, long TXT values, backup Delete button, database access panel), the transfer page's last step is named Transfer complete, and turning auto-renew back on is a normal button.
+* A server build that finds no stored cluster capacity (the cache was flushed) asks for a capacity run at once and no longer waits for the hourly one. A delayed domain setup says so once.
 
 = 0.62.3 =
 * My Account design pass on real page states (lists with content, busy and failed services): the extra IPv4 address rows of a server, mailbox and alias rows, DNS record rows, database address and backup lists, order progress on the overview. The note that a stopped server or database is still billed only shows for a stopped one, and a stopped database's status says so.

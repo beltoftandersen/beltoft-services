@@ -22,6 +22,7 @@ use BeltoftServices\Proxmox\Network\Ipv6;
 use BeltoftServices\Proxmox\Network\NetConfig;
 use BeltoftServices\Proxmox\Network\PrivateAttach;
 use BeltoftServices\Proxmox\Pve\Capacity;
+use BeltoftServices\Proxmox\Pve\CapacityJobs;
 use BeltoftServices\Proxmox\Pve\Clients;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\Ownership;
@@ -1067,6 +1068,9 @@ final class Provision {
 
 			if ( null === $node ) {
 				if ( null === Capacity::rows( $this->cluster_id ) ) {
+					// The cache is a transient: a flush of the object cache loses it. Ask for it now, not at the next hourly run.
+					CapacityJobs::queue_capacity( $this->cluster_id );
+
 					return StepResult::retry( 0, 'clone: the capacity of the cluster is not known yet' );
 				}
 

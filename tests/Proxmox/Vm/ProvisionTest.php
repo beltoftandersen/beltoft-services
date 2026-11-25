@@ -888,6 +888,15 @@ class ProvisionTest extends TestCase {
 		$this->assertSame( '', VmRecords::for_resource( $resource->id() )['node'], 'Nothing was placed.' );
 	}
 
+	public function test_a_build_without_a_capacity_cache_asks_for_a_capacity_run_at_once(): void {
+		delete_transient( \BeltoftServices\Proxmox\Pve\Placement::CAPACITY_PREFIX . 'lab' );
+		as_unschedule_all_actions( \BeltoftServices\Proxmox\Vm\ProxmoxJobs::CAPACITY_NOW, array( 'lab' ), \BeltoftServices\Jobs::GROUP );
+		$resource = $this->resource();
+
+		$this->assertTrue( $this->run_provision( $resource )->is_retry() );
+		$this->assertTrue( as_has_scheduled_action( \BeltoftServices\Proxmox\Vm\ProxmoxJobs::CAPACITY_NOW, array( 'lab' ), \BeltoftServices\Jobs::GROUP ), 'The cache was lost (an object cache flush): the build does not wait for the hourly run.' );
+	}
+
 	public function test_a_single_node_without_a_cache_waits_too(): void {
 		delete_transient( \BeltoftServices\Proxmox\Pve\Placement::CAPACITY_PREFIX . 'lab' );
 		$resource = $this->resource();
