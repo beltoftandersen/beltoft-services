@@ -63,6 +63,14 @@ final class StorageRoutesTest extends StorageTestCase {
 		return (string) ob_get_clean();
 	}
 
+	public function test_the_page_is_made_of_sections_with_balanced_tags(): void {
+		$r    = $this->ready_storage();
+		$html = $this->page( $r, (int) $r->license()['user_id'] );
+		$this->assertSame( substr_count( $html, '<section' ), substr_count( $html, '</section>' ) );
+		$this->assertGreaterThanOrEqual( 5, substr_count( $html, 'class="beltoft-services-storage__section"' ) );
+		$this->assertSame( substr_count( $html, '<div' ), substr_count( $html, '</div>' ) );
+	}
+
 	public function test_only_the_owner_reads_the_facts_and_they_hold_no_password(): void {
 		$r    = $this->ready_storage();
 		$user = (int) $r->license()['user_id'];

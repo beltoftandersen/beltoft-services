@@ -178,11 +178,11 @@ final class StoragePanel {
 	 * @param array<string, mixed> $c Connection facts.
 	 */
 	private static function usage( array $c ): void {
-		echo '<h3>' . esc_html__( 'Space used', 'beltoft-services' ) . '</h3>';
+		echo '<section class="beltoft-services-storage__section"><h3>' . esc_html__( 'Space used', 'beltoft-services' ) . '</h3>';
 		echo '<span class="bs-meter' . ( (int) $c['percent'] >= 90 ? ' bs-meter--high' : '' ) . '" aria-hidden="true"><span class="bs-meter__fill" style="width: ' . (int) $c['percent'] . '%"></span></span>';
 		/* translators: 1: space used, 2: size of the storage, 3: percent. */
 		echo '<p>' . esc_html( sprintf( __( '%1$s of %2$s used (%3$d%%).', 'beltoft-services' ), Boxes::size_text( (int) $c['used_bytes'] + (int) $c['snapshot_bytes'] ), Boxes::size_text( (int) $c['size_bytes'] ), (int) $c['percent'] ) ) . '</p>';
-		echo '<p class="bs-note">' . esc_html__( 'Snapshots use space from your storage.', 'beltoft-services' ) . '</p>';
+		echo '<p class="bs-note">' . esc_html__( 'Snapshots use space from your storage.', 'beltoft-services' ) . '</p></section>';
 	}
 
 	/**
@@ -193,7 +193,7 @@ final class StoragePanel {
 	 * @param bool                 $off Whether access is off.
 	 */
 	private static function connection( Resource $r, array $c, bool $off ): void {
-		echo '<h3>' . esc_html__( 'Connection', 'beltoft-services' ) . '</h3>';
+		echo '<section class="beltoft-services-storage__section"><h3>' . esc_html__( 'Connection', 'beltoft-services' ) . '</h3>';
 		echo '<table class="woocommerce-table shop_table"><tbody>';
 		self::row( __( 'Host', 'beltoft-services' ), (string) $c['host'] );
 		self::row( __( 'User', 'beltoft-services' ), (string) $c['user'] );
@@ -212,13 +212,15 @@ final class StoragePanel {
 		echo '</tbody></table>';
 
 		if ( $off ) {
+			echo '</section>';
+
 			return;
 		}
 
 		echo '<p><button type="button" class="button bs-btn" data-storage-reveal>' . esc_html__( 'Show password', 'beltoft-services' ) . '</button> ';
 		echo '<button type="button" class="button bs-btn" data-storage-reset>' . esc_html__( 'Change password', 'beltoft-services' ) . '</button></p>';
 		echo '<p class="bs-note">' . esc_html__( 'We email you a code before the password is shown or changed. You can also log in with an SSH key: log in once with the password and add your public key to the file .ssh/authorized_keys on the storage.', 'beltoft-services' ) . '</p>';
-		echo '<p data-storage-password hidden><input type="text" readonly size="40" data-storage-password-field aria-label="' . esc_attr__( 'Password', 'beltoft-services' ) . '"> <button type="button" class="button bs-btn bs-btn--sm" data-copy-field data-copied="' . esc_attr__( 'Copied', 'beltoft-services' ) . '">' . esc_html__( 'Copy', 'beltoft-services' ) . '</button></p>';
+		echo '<p data-storage-password hidden><input type="text" readonly size="40" data-storage-password-field aria-label="' . esc_attr__( 'Password', 'beltoft-services' ) . '"> <button type="button" class="button bs-btn bs-btn--sm" data-copy-field data-copied="' . esc_attr__( 'Copied', 'beltoft-services' ) . '">' . esc_html__( 'Copy', 'beltoft-services' ) . '</button></p></section>';
 		unset( $r );
 	}
 
@@ -228,7 +230,7 @@ final class StoragePanel {
 	 * @param array<string, mixed> $c Connection facts.
 	 */
 	private static function protocols( array $c ): void {
-		echo '<h3>' . esc_html__( 'Access', 'beltoft-services' ) . '</h3>';
+		echo '<section class="beltoft-services-storage__section"><h3>' . esc_html__( 'Access', 'beltoft-services' ) . '</h3>';
 		echo '<p class="bs-note">' . esc_html__( 'SFTP and SCP are always on and cannot be switched off.', 'beltoft-services' ) . '</p>';
 		echo '<form data-storage-access><p><label><input type="checkbox" name="ssh" value="1"' . checked( $c['ssh'], true, false ) . '> ' . esc_html__( 'rsync, borg and SFTP over SSH (port 23)', 'beltoft-services' ) . '</label></p>';
 
@@ -237,7 +239,7 @@ final class StoragePanel {
 			echo '<p><label><input type="checkbox" name="webdav" value="1"' . checked( $c['webdav'], true, false ) . '> ' . esc_html__( 'WebDAV', 'beltoft-services' ) . '</label></p>';
 		}
 
-		echo '<p><button type="submit" class="button bs-btn">' . esc_html__( 'Save access', 'beltoft-services' ) . '</button></p></form>';
+		echo '<p><button type="submit" class="button bs-btn">' . esc_html__( 'Save access', 'beltoft-services' ) . '</button></p></form></section>';
 	}
 
 	/**
@@ -249,7 +251,7 @@ final class StoragePanel {
 		$list = Boxes::snapshots( $r );
 		$plan = (array) $r->get( 'storage_snapshot_plan' );
 
-		echo '<h3>' . esc_html__( 'Snapshots', 'beltoft-services' ) . '</h3>';
+		echo '<section class="beltoft-services-storage__section"><h3>' . esc_html__( 'Snapshots', 'beltoft-services' ) . '</h3>';
 		echo '<p class="bs-note">' . esc_html__( 'A snapshot is a copy of the storage as it is now. Restoring one puts everything back as it was and removes newer snapshots.', 'beltoft-services' ) . '</p>';
 
 		if ( is_array( $list ) && array() !== $list ) {
@@ -277,7 +279,7 @@ final class StoragePanel {
 		}
 
 		echo '</select></label> <label>' . esc_html__( 'at hour (UTC)', 'beltoft-services' ) . ' <input type="number" name="hour" min="0" max="23" value="' . (int) ( $plan['hour'] ?? SnapshotPlan::HOUR ) . '"></label> ';
-		echo '<button type="submit" class="button bs-btn">' . esc_html__( 'Save', 'beltoft-services' ) . '</button></p></form>';
+		echo '<button type="submit" class="button bs-btn">' . esc_html__( 'Save', 'beltoft-services' ) . '</button></p></form></section>';
 	}
 
 	/**
@@ -292,22 +294,24 @@ final class StoragePanel {
 			return;
 		}
 
-		echo '<h3>' . esc_html__( 'Commands', 'beltoft-services' ) . '</h3>';
+		echo '<section class="beltoft-services-storage__section"><h3>' . esc_html__( 'Commands', 'beltoft-services' ) . '</h3>';
 		echo '<p class="bs-note">' . esc_html__( 'Replace /path/to/data with the folder you want to back up. The tools ask for the password, or use your SSH key.', 'beltoft-services' ) . '</p>';
 
 		foreach ( $commands as $tool => $lines ) {
 			$text = implode( "\n", array_map( 'strval', (array) $lines ) );
-			echo '<p><strong>' . esc_html( (string) $tool ) . '</strong></p><pre>' . esc_html( $text ) . '</pre>';
-			echo '<p><button type="button" class="button bs-btn bs-btn--sm" data-storage-copy="' . esc_attr( $text ) . '" data-copied="' . esc_attr__( 'Copied', 'beltoft-services' ) . '">' . esc_html__( 'Copy', 'beltoft-services' ) . '</button></p>';
+			echo '<div class="beltoft-services-storage__command"><p><strong>' . esc_html( (string) $tool ) . '</strong></p><pre>' . esc_html( $text ) . '</pre>';
+			echo '<p><button type="button" class="button bs-btn bs-btn--sm" data-storage-copy="' . esc_attr( $text ) . '" data-copied="' . esc_attr__( 'Copied', 'beltoft-services' ) . '">' . esc_html__( 'Copy', 'beltoft-services' ) . '</button></p></div>';
 		}
+
+		echo '</section>';
 	}
 
 	/**
 	 * Plain advice on encryption.
 	 */
 	private static function advice(): void {
-		echo '<h3>' . esc_html__( 'Encrypt your backups', 'beltoft-services' ) . '</h3>';
-		echo '<p>' . esc_html__( 'Encrypt your backups before they leave your server. borg with repokey-blake2 and restic encrypt by default. We cannot read your files and we do not hold your key. If you lose the key, the backup cannot be opened.', 'beltoft-services' ) . '</p>';
+		echo '<section class="beltoft-services-storage__section"><h3>' . esc_html__( 'Encrypt your backups', 'beltoft-services' ) . '</h3>';
+		echo '<p>' . esc_html__( 'Encrypt your backups before they leave your server. borg with repokey-blake2 and restic encrypt by default. We cannot read your files and we do not hold your key. If you lose the key, the backup cannot be opened.', 'beltoft-services' ) . '</p></section>';
 	}
 
 	/**
