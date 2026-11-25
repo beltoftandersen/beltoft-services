@@ -282,11 +282,21 @@
 		return td;
 	};
 
+	// A record name: the text is one piece, with a break allowed after each dot, so a name wraps at its dots and never inside a label.
+	Editor.prototype.nameNode = function ( name ) {
+		var holder = document.createDocumentFragment();
+		String( name ).split( '.' ).forEach( function ( part, i, all ) {
+			holder.appendChild( document.createTextNode( i < all.length - 1 ? part + '.' : part ) );
+			if ( i < all.length - 1 ) { holder.appendChild( document.createElement( 'wbr' ) ); }
+		} );
+		return holder;
+	};
+
 	Editor.prototype.readRow = function ( body, row, anyOff ) {
 		var self = this;
 		var tr = el( 'tr', { 'data-row': String( row.id ) } );
 		var locked = this.readonly || row.disabled;
-		this.cell( tr, this.t.name, row.name );
+		this.cell( tr, this.t.name, this.nameNode( row.name ) );
 		this.cell( tr, this.t.type, row.type );
 		this.cell( tr, this.t.ttl, this.ttlLabel( row.ttl ) );
 		this.cell( tr, this.t.value, this.display( row ) ).className = 'beltoft-dnse__value';
@@ -295,15 +305,15 @@
 
 		if ( ! locked && row.id === this.confirm ) {
 			actions.appendChild( el( 'span', { 'class': 'beltoft-dnse__ask', text: this.t.delete_q } ) );
-			var yes = el( 'button', { type: 'button', 'class': 'beltoft-services-domain__link beltoft-dnse__danger', 'data-act': 'delete-yes', text: this.t.delete, disabled: this.busy } );
-			var no = el( 'button', { type: 'button', 'class': 'beltoft-services-domain__link', 'data-act': 'delete-no', text: this.t.keep, disabled: this.busy } );
+			var yes = el( 'button', { type: 'button', 'class': 'bs-btn bs-btn--danger-solid bs-btn--sm beltoft-dnse__danger', 'data-act': 'delete-yes', text: this.t.delete, disabled: this.busy } );
+			var no = el( 'button', { type: 'button', 'class': 'bs-btn bs-btn--secondary bs-btn--sm', 'data-act': 'delete-no', text: this.t.keep, disabled: this.busy } );
 			yes.addEventListener( 'click', function () { self.remove( row ); } );
 			no.addEventListener( 'click', function () { self.confirm = null; self.focusAfter = { id: row.id, role: 'delete' }; self.render(); } );
 			actions.appendChild( yes );
 			actions.appendChild( no );
 		} else if ( ! locked ) {
-			var edit = el( 'button', { type: 'button', 'class': 'beltoft-services-domain__link', 'data-act': 'edit', 'aria-label': fmt( this.t.edit_label, row.type, row.name ), text: this.t.edit, disabled: this.busy } );
-			var del = el( 'button', { type: 'button', 'class': 'beltoft-services-domain__link', 'data-act': 'delete', 'aria-label': fmt( this.t.delete_label, row.type, row.name ), text: this.t.delete, disabled: this.busy } );
+			var edit = el( 'button', { type: 'button', 'class': 'bs-btn bs-btn--secondary bs-btn--sm', 'data-act': 'edit', 'aria-label': fmt( this.t.edit_label, row.type, row.name ), text: this.t.edit, disabled: this.busy } );
+			var del = el( 'button', { type: 'button', 'class': 'bs-btn bs-btn--danger bs-btn--sm', 'data-act': 'delete', 'aria-label': fmt( this.t.delete_label, row.type, row.name ), text: this.t.delete, disabled: this.busy } );
 			edit.addEventListener( 'click', function () { self.begin( row.id ); } );
 			del.addEventListener( 'click', function () {
 				if ( self.busy ) { return; }
@@ -390,8 +400,8 @@
 		if ( anyOff ) { this.cell( tr, this.t.status, '' ); }
 
 		var actions = el( 'td', { 'class': 'beltoft-dnse__actions' } );
-		var save = el( 'button', { type: 'submit', form: formId, 'class': 'beltoft-dnse__save button', text: this.busy ? this.t.saving : this.t.save, disabled: this.busy } );
-		var cancel = el( 'button', { type: 'button', 'class': 'beltoft-services-domain__link', text: this.t.cancel, disabled: this.busy } );
+		var save = el( 'button', { type: 'submit', form: formId, 'class': 'bs-btn bs-btn--sm beltoft-dnse__save', text: this.busy ? this.t.saving : this.t.save, disabled: this.busy } );
+		var cancel = el( 'button', { type: 'button', 'class': 'bs-btn bs-btn--secondary bs-btn--sm', text: this.t.cancel, disabled: this.busy } );
 		cancel.addEventListener( 'click', function () {
 			self.editing = null;
 			self.draft = null;

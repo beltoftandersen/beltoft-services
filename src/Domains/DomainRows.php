@@ -39,11 +39,20 @@ final class DomainRows {
 			$tone = 'bad';
 		}
 
+		$name = (string) $view['product'];
+		$sub  = self::kind( $resource );
+
+		// An order that never got a domain name carries the product's placeholder name: show what was ordered and no claim about a registration.
+		if ( __( 'Domain name', 'beltoft-services' ) === $name && 'dns' !== $resource->get( 'driver' ) ) {
+			$name = 'transfer' === $resource->get( 'mode' ) ? __( 'Domain transfer', 'beltoft-services' ) : __( 'Domain registration', 'beltoft-services' );
+			$sub  = '';
+		}
+
 		return array(
 			'id'     => (string) $resource->id(),
 			'url'    => ServiceArea::get( Domains::class )->url( $view['license'] ),
-			'name'   => (string) $view['product'],
-			'sub'    => self::kind( $resource ),
+			'name'   => $name,
+			'sub'    => $sub,
 			'state'  => Panel::label( $state, $resource ),
 			'tone'   => $tone,
 			'renews' => self::renews( $view, $resource, $group ),
