@@ -1656,3 +1656,84 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit
 .beltoft-services-credit__code > .beltoft-services-credit__coderow { margin-top: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit .beltoft-services-ov__head :is(h2, h3) { margin: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit__code > .beltoft-services-credit__note { margin-top: var(--bs-space-3); }
+
+/* ==== Design pass 2026-11-25: domains ==============================================================================
+   Domain list, add page, a domain's tabs, the DNS records editor and the DNS guide. Only selectors of that markup. */
+
+/* The overview rows of the home page (domain, mail ...): a name breaks at its dots and dashes, not inside a word; the state block goes under the name on a phone. */
+.beltoft-services-ov__id b { overflow-wrap: break-word; }
+.beltoft-services-ov__id b, .beltoft-services-ov__id span { min-width: 0; }
+@media (max-width: 520px) {
+	.beltoft-services-ov__rows a.beltoft-services-ov__row { flex-wrap: wrap; row-gap: var(--bs-space-1); }
+	.beltoft-services-ov__rows a.beltoft-services-ov__row .beltoft-services-ov__id { flex: 1 1 100%; }
+	.beltoft-services-ov__rows a.beltoft-services-ov__row .beltoft-services-ov__end { flex: 1 1 100%; justify-items: start; text-align: left; }
+}
+
+/* Facts of a domain: six tiles in three even columns (two on a tablet, one on a phone), 8px apart, no hairlines. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domain--page .beltoft-services-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--bs-space-2); overflow: visible; background: none; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domain--page .beltoft-services-facts > div { min-width: 0; padding: var(--bs-space-3) var(--bs-space-4); border-radius: var(--bs-radius); background: var(--bs-surface); }
+@media (max-width: 760px) {
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domain--page .beltoft-services-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domain--page .beltoft-services-facts { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* List buttons on a phone: one column, both as wide as the page. */
+@media (max-width: 520px) {
+	.beltoft-services-list-actions { flex-direction: column; align-items: stretch; }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-list-actions a.beltoft-services-list-btn { box-sizing: border-box; width: 100%; justify-content: center; text-align: center; }
+}
+
+/* Add a domain: the field and its button share one height and centre line. */
+.beltoft-dns-claim__field { align-items: center; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dns-claim__field button { min-height: var(--bs-btn-h); height: var(--bs-btn-h); }
+
+/* DNSSEC: the status line, its button and the note under it are 8px apart. */
+.beltoft-services-domain__dnssec p.beltoft-services-domain__note + form { margin-top: var(--bs-space-2); }
+
+/* DNS records: fixed columns so the value column does not move when the editor opens; row actions are 32px targets. */
+@media (min-width: 641px) {
+	.beltoft-dnse__table { table-layout: fixed; }
+	.beltoft-dnse__table td:nth-child(1), .beltoft-dnse__table th:nth-child(1) { width: 20%; }
+	.beltoft-dnse__table td:nth-child(2), .beltoft-dnse__table th:nth-child(2) { width: 5.5em; }
+	.beltoft-dnse__table td:nth-child(3), .beltoft-dnse__table th:nth-child(3) { width: 7em; }
+	.beltoft-dnse__table td.beltoft-dnse__actions, .beltoft-dnse__table th:nth-child(5) { width: 11em; }
+	.beltoft-dnse__table td.beltoft-dnse__actions { white-space: nowrap; }
+}
+@media (min-width: 768px) {
+	body.woocommerce-account .woocommerce-MyAccount-content div.beltoft-services-domain .beltoft-dnse__table td.beltoft-dnse__actions > button { min-height: var(--bs-btn-h-sm); padding: 0 var(--bs-space-3); font-size: var(--bs-fs-small); }
+	body.woocommerce-account div.beltoft-services-domain .beltoft-dnse__table td.beltoft-dnse__actions > button + button { margin-left: var(--bs-space-1); }
+}
+@media (max-width: 640px) {
+	/* Name, type and TTL fit their content; the name takes the rest and breaks only at dots when it must. */
+	.beltoft-dnse__table tr { grid-template-columns: minmax(0, 1fr) auto auto; gap: 0 var(--bs-space-4); }
+	.beltoft-dnse__table tr[data-edit-row] { grid-template-columns: minmax(0, 1fr) 6em 7.5em; gap: 0 var(--bs-space-2); }
+	.beltoft-dnse__table td:nth-child(1) { overflow-wrap: break-word; }
+	div.beltoft-services-domain .beltoft-dnse__bar .beltoft-dnse__add.button { width: 100%; margin-left: 0; }
+}
+
+/* The DNS guide: one card with plain records inside, no nested frame; the group label is a normal 14px label. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dnsg { margin-top: var(--bs-space-4); padding: var(--bs-space-5); border: 0; border-radius: var(--bs-radius-lg); font-size: var(--bs-fs-body); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dnsg h6.beltoft-dnsg__group { margin: var(--bs-space-4) 0 var(--bs-space-2); font-family: inherit; font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); letter-spacing: 0; text-transform: none; color: var(--bs-muted); }
+.beltoft-dnsg__rec { padding: var(--bs-space-4); border: 0; border-radius: var(--bs-radius); background: var(--bs-warm); }
+.beltoft-dnsg__head { display: grid; grid-template-columns: 3.5em minmax(0, 1fr) auto; align-items: baseline; gap: var(--bs-space-1) var(--bs-space-3); }
+.beltoft-dnsg__purpose { flex: none; }
+.beltoft-dnsg__state { font-size: var(--bs-fs-small); white-space: nowrap; }
+.beltoft-dnsg__fields > div { grid-template-columns: 5.5em minmax(0, 1fr); gap: var(--bs-space-1) var(--bs-space-3); margin: 0 0 var(--bs-space-2); }
+.beltoft-dnsg__fields > div:last-child { margin-bottom: 0; }
+.beltoft-dnsg__fields dt { font-size: var(--bs-fs-small); line-height: var(--bs-btn-h-sm); }
+.beltoft-dnsg__fields dd { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--bs-space-1) var(--bs-space-2); }
+.beltoft-dnsg code, .beltoft-dnsg code.beltoft-dnsg__value { display: block; margin: 0; padding: var(--bs-space-1) var(--bs-space-2); background: var(--bs-surface); font-size: var(--bs-fs-small); }
+.beltoft-dnsg__full { grid-column: 1 / -1; margin: 0; font-size: var(--bs-fs-small); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dnsg button.beltoft-dnsg__copy { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: var(--bs-btn-h-sm); padding: 0 var(--bs-space-3); border: 1px solid var(--bs-input-border); border-radius: var(--bs-radius); background: var(--bs-surface); color: var(--bs-ink); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); text-decoration: none; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dnsg button.beltoft-dnsg__copy:hover { border-color: var(--bs-dark); background: var(--bs-warm); }
+@media (max-width: 767px) {
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-dnsg { padding: var(--bs-space-4); }
+	.beltoft-dnsg__head { grid-template-columns: 3.5em minmax(0, 1fr); }
+	.beltoft-dnsg__state { grid-column: 2; }
+	.beltoft-dnsg__fields > div { grid-template-columns: minmax(0, 1fr); }
+	.beltoft-dnsg__fields dt { line-height: 1.5; }
+	.beltoft-dnsg__fields dd { grid-template-columns: minmax(0, 1fr); justify-items: start; }
+	.beltoft-dnsg code, .beltoft-dnsg code.beltoft-dnsg__value { justify-self: stretch; }
+}
