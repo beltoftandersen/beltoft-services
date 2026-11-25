@@ -1656,3 +1656,91 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit
 .beltoft-services-credit__code > .beltoft-services-credit__coderow { margin-top: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit .beltoft-services-ov__head :is(h2, h3) { margin: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit__code > .beltoft-services-credit__note { margin-top: var(--bs-space-3); }
+
+/* ==== Design pass 2026-11-25: servers ===============================================================================
+   Server list, server page tabs, New server. Same rules as the shared block: 24px between blocks of a tab, 12px heading to content,
+   8px between an action and its hint. */
+/* List row: the hint of a bar that has no reading takes one line; the row keeps the height of its name block. */
+.beltoft-services-srv__bars .beltoft-services-bar__sub { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* Overview: facts are four equal columns, the second row lines up with the first; values are body size text. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; background: var(--bs-surface); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts > div { flex: none; box-shadow: inset 0 0 0 .5px var(--bs-line); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts :is(dd code, code) { padding: 0; background: none; font-family: inherit; font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts dd .beltoft-services-copy { margin-left: var(--bs-space-2); }
+@media (max-width: 900px) {
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts { grid-template-columns: minmax(0, 1fr); }
+}
+/* A price line and the button under it (the template wraps the button in a paragraph). */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-tab :is(p, .description) + p:has(> :is(a, button).bs-btn:only-child) { margin-top: var(--bs-space-3); }
+/* The IPv4 list is a plain list of rows. */
+body.woocommerce-account .woocommerce-MyAccount-content ul.beltoft-services-vm__ipv4-list { margin: 0 0 var(--bs-space-3); padding: 0; list-style: none; }
+body.woocommerce-account .woocommerce-MyAccount-content ul.beltoft-services-vm__ipv4-list > li { margin: 0; padding: var(--bs-space-1) 0; }
+body.woocommerce-account .woocommerce-MyAccount-content ul.beltoft-services-vm__ipv4-list code { padding: 0; background: none; font-family: inherit; font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); }
+/* Copy is a tap target on a phone; the usage range buttons are 40px there. */
+@media (max-width: 767px) {
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts .beltoft-services-copy { min-height: var(--bs-btn-h); padding: 0 var(--bs-space-3); }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-vm-usage__ranges button { min-height: var(--bs-btn-h); }
+}
+/* Dialogs: an edge against the page. */
+body.woocommerce-account .beltoft-services-vm__dialog, .beltoft-services-vm__dialog { border: 1px solid var(--bs-line); }
+
+/* Console: the intro and the button are 12px apart. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-console__open { margin-top: var(--bs-space-3); }
+
+/* Snapshots and the other tab blocks: one flow, 24px between blocks, text paragraphs without the browser margin. */
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-vm__backups, .beltoft-services-vm__disks, .beltoft-services-vm__reset) > * { margin-top: 0; margin-bottom: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-vm__backups, .beltoft-services-vm__disks) > * + * { margin-top: var(--bs-space-5); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__backups > :is(h4, .beltoft-services-slotrow) + * { margin-top: var(--bs-space-3); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-slotrow { margin: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__backups .beltoft-services-snapshot p { margin: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__backups > p.description { margin-top: var(--bs-space-2); }
+/* The track and the add tiles are a step lighter than the panel. */
+.beltoft-services-usebar { background: var(--bs-line); border-radius: 3px; overflow: hidden; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-add a.beltoft-services-add__tile { background: var(--bs-line); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-add a.beltoft-services-add__tile:hover { background: var(--bs-dark); }
+@media (max-width: 480px) {
+	.beltoft-services-add__grid { grid-template-columns: minmax(0, 1fr); }
+}
+/* Typed text in a form is body size, not heading size. */
+body.woocommerce-account .woocommerce-MyAccount-content form.beltoft-services-vm-form :is(input[type="text"], input[type="password"], input[type="email"], input[type="number"], input:not([type]), textarea, select) { font-size: var(--bs-fs-body); }
+
+/* Access: an action, its hint 8px under it, blocks 24px apart. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__reset > p { margin: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-vm__reveal, .beltoft-services-vm__reset > p:first-child) + p.description, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__reset > p + p.description { margin-top: var(--bs-space-2); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-tab form.beltoft-services-vm-form > p { margin: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-tab form.beltoft-services-vm-form > p.description { margin-top: calc(-1 * var(--bs-space-2)); }
+
+/* Tab bar: all tabs fit the column (tighter padding) and the row scrolls with its scrollbar hidden if they do not. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-tabs a { padding-left: 10px; padding-right: 10px; }
+
+/* New server: four plans in a row at desktop width, the price lines up across the tiles, hints are one size. */
+@media (min-width: 1000px) {
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-picker__grid { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+}
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-plan__note { min-height: calc(3 * 1.4em); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-picker .beltoft-services-tiles > p, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-picker .beltoft-services-tiles p.description { margin: var(--bs-space-2) 0 0; max-width: none; color: var(--bs-muted); font-size: var(--bs-fs-small); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-tile select { font-size: var(--bs-fs-body); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-picker :is(.beltoft-services-app__note, .beltoft-services-tiles__note) { max-width: none; color: var(--bs-muted); font-size: var(--bs-fs-small); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-picker .beltoft-services-picker__product { color: var(--bs-ink); font-weight: var(--bs-fw-strong); }
+/* The disk tile of the monitoring block reads like the glance tiles: label over value. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-vm-usage__chart--disk { display: grid; gap: var(--bs-space-1); align-content: start; padding: var(--bs-space-2) var(--bs-space-4); border-radius: var(--bs-radius-lg); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-vm-usage__chart--disk .beltoft-vm-usage__top { color: var(--bs-muted); font-size: var(--bs-fs-caption); font-weight: var(--bs-fw-medium); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-vm-usage__chart--disk .beltoft-vm-usage__top * { color: inherit; font: inherit; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-vm-usage p.beltoft-vm-usage__disk { color: var(--bs-ink); font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); }
+/* Backups table (also the database backups): the panel width, a line between rows, the action at the right edge. */
+body.woocommerce-account .woocommerce-MyAccount-content table.beltoft-services-vm__backup-list:not(.beltoft-services-mail__table) { width: 100%; max-width: none; border-collapse: collapse; }
+body.woocommerce-account .woocommerce-MyAccount-content table.beltoft-services-vm__backup-list:not(.beltoft-services-mail__table) :is(th, td) { padding: var(--bs-space-2) var(--bs-space-4) var(--bs-space-2) 0; border: 0; border-bottom: 1px solid var(--bs-line); vertical-align: middle; text-align: left; }
+body.woocommerce-account .woocommerce-MyAccount-content table.beltoft-services-vm__backup-list:not(.beltoft-services-mail__table) :is(th:last-child, td:last-child) { padding-right: 0; text-align: right; }
+body.woocommerce-account .woocommerce-MyAccount-content table.beltoft-services-vm__backup-list:not(.beltoft-services-mail__table) tbody tr:last-child td { border-bottom: 0; }
+/* Facts inside a tab card (Network, App): 12px under the text above. */
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab > :is(p, .description) + dl.beltoft-services-facts { margin-top: var(--bs-space-3); }
+/* App tab: one paragraph rhythm (8px between lines of one block, 24px between blocks), the facts as wide as the blocks. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-pane > .beltoft-services-vm__more { margin-top: var(--bs-space-5); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-pane .beltoft-services-vm__more > :is(p, ul) { margin: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-pane .beltoft-services-vm__more > :is(p, ul) + :is(p, ul, .button, a.button) { margin-top: var(--bs-space-2); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-pane .beltoft-services-vm__more > :is(.button, button) + :is(p, ul) { margin-top: var(--bs-space-2); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-pane ul { padding-left: var(--bs-space-5); }
