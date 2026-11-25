@@ -30,6 +30,55 @@ final class AppDomainRelease {
 		);
 	}
 
+	/**
+	 * The meta that moves a server away from the name it has: the A and www records we wrote for it go into the removal queue
+	 * (removed later only while they still are what we wrote), a name that sat in our zone without a record of ours is noted
+	 * as left, and the www marks are cleared. The same for a reinstall and for a change of domain; nothing is written here.
+	 *
+	 * @return array<string, mixed> Meta to merge.
+	 */
+	public static function queue_old( Resource $r ): array {
+		$meta      = array();
+		$published = (string) $r->get( 'app_domain' );
+		$own       = (string) $r->get( 'app_domain_own' );
+
+		// A name on the customer's own DNS never had a record of ours, so there is nothing to say was left behind.
+		if ( '' !== $published && '' === $own && true !== $r->get( 'app_domain_made' ) ) {
+			$meta['app_domain_left'] = array( 'zone' => (string) $r->get( 'app_zone' ), 'name' => $published );
+		} else {
+			$meta['app_domain_left'] = null;
+		}
+		$old    = (array) $r->get( 'app_domain_old' );
+		$queued = false;
+		if ( '' !== $published && true === $r->get( 'app_domain_made' ) && '' !== (string) $r->get( 'app_zone' ) ) {
+			$ip    = \BeltoftServices\Proxmox\Network\IpPool::for_resource( $r->id() );
+			$old[] = array(
+				'zone'  => (string) $r->get( 'app_zone' ),
+				'name'  => $published,
+				'ip'    => (string) ( $ip['address'] ?? $r->get( 'ip' ) ),
+				'tries' => 0,
+			);
+			$queued = true;
+		}
+		// The www record we wrote next to the domain's goes the same way: removed only while it is still the record we wrote.
+		$www_ip = (string) $r->get( 'app_www_ip' );
+		if ( true === $r->get( 'app_www_made' ) && '' !== (string) $r->get( 'app_zone' ) && '' !== $www_ip ) {
+			$old[] = array(
+				'zone'  => (string) $r->get( 'app_zone' ),
+				'name'  => 'www.' . (string) $r->get( 'app_zone' ),
+				'ip'    => $www_ip,
+				'tries' => 0,
+			);
+			$queued = true;
+		}
+		$meta['app_www_made'] = null;
+		$meta['app_www_ip']   = null;
+		if ( $queued ) {
+			$meta['app_domain_old'] = array_slice( $old, 0, 4 );
+		}
+		return $meta;
+	}
+
 	/** The action fires after reinstall metadata is stored. No DNS work runs inside the server job. */
 	public static function started( Resource $r, array $args = array() ): void {
 		if ( (array) $r->get( 'app_domain_old' ) ) {
@@ -56,16 +105,17 @@ final class AppDomainRelease {
 		$old  = array_values( array_filter( (array) $r->get( 'app_domain_old' ), 'is_array' ) );
 		$new  = array();
 
-		if ( '' === $zone ) {
-			return;
-		}
-
-		if ( true === $r->get( 'app_domain_made' ) && '' !== (string) $r->get( 'app_domain' ) ) {
+		if ( '' !== $zone && true === $r->get( 'app_domain_made' ) && '' !== (string) $r->get( 'app_domain' ) ) {
 			$new[] = array( 'zone' => $zone, 'name' => (string) $r->get( 'app_domain' ), 'ip' => $ip, 'tries' => 0, 'final' => true );
 		}
 
-		if ( true === $r->get( 'app_www_made' ) && '' !== (string) $r->get( 'app_www_ip' ) ) {
+		if ( '' !== $zone && true === $r->get( 'app_www_made' ) && '' !== (string) $r->get( 'app_www_ip' ) ) {
 			$new[] = array( 'zone' => $zone, 'name' => 'www.' . $zone, 'ip' => (string) $r->get( 'app_www_ip' ), 'tries' => 0, 'final' => true );
+		}
+
+		// Records written for a new name of a change of domain that was not finished (AppDomainChange): still ours, still pointing here.
+		foreach ( AppDomainChange::pending_records( $r ) as $pending ) {
+			$new[] = $pending + array( 'tries' => 0, 'final' => true );
 		}
 
 		if ( ! $new ) {
@@ -87,10 +137,11 @@ final class AppDomainRelease {
 	 * @param mixed $r    Resource.
 	 */
 	public static function hold_ip( $hold, $r ) {
-		if ( ! $r instanceof Resource || '' === (string) $r->get( 'app_zone' ) ) {
+		if ( ! $r instanceof Resource ) {
 			return $hold;
 		}
-		$ours = ( true === $r->get( 'app_domain_made' ) && '' !== (string) $r->get( 'app_domain' ) ) || ( true === $r->get( 'app_www_made' ) && '' !== (string) $r->get( 'app_www_ip' ) );
+		$zone = '' !== (string) $r->get( 'app_zone' );
+		$ours = ( $zone && true === $r->get( 'app_domain_made' ) && '' !== (string) $r->get( 'app_domain' ) ) || ( $zone && true === $r->get( 'app_www_made' ) && '' !== (string) $r->get( 'app_www_ip' ) ) || array() !== AppDomainChange::pending_records( $r );
 		if ( ! $ours || ! $r->set( array( 'app_ip_hold' => true ) ) ) {
 			return $hold;
 		}
@@ -233,7 +284,7 @@ final class AppDomainRelease {
 		$ip = (string) ( $entry['ip'] ?? '' );
 		$user = (int) ( $r->license()['user_id'] ?? 0 );
 		$final = ! empty( $entry['final'] );
-		if ( '' === $zone || '' === $name || ( ! $final && ( $name === (string) $r->get( 'app_domain' ) || $name === (string) $r->get( 'app_domain_want' ) ) ) || false === filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) || ! self::editable( $zone, $user ) ) {
+		if ( '' === $zone || '' === $name || ( ! $final && ( $name === (string) $r->get( 'app_domain' ) || $name === (string) $r->get( 'app_domain_want' ) || ( $name === (string) $r->get( 'app_chg_name' ) && in_array( (string) $r->get( 'app_chg_state' ), array( 'waiting', 'applying' ), true ) ) ) ) || false === filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) || ! self::editable( $zone, $user ) ) {
 			return true;
 		}
 		$existing = AppDomains::existing( $zone, $name );

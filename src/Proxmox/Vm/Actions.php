@@ -9,6 +9,7 @@ namespace BeltoftServices\Proxmox\Vm;
 
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
+use BeltoftServices\Apps\AppDomainChange;
 use BeltoftServices\Apps\AppInstall;
 use BeltoftServices\Proxmox\Backup\BackupDelete;
 use BeltoftServices\Proxmox\Backup\Backups;
@@ -87,6 +88,7 @@ final class Actions {
 		'backup_delete'  => array( 10, HOUR_IN_SECONDS ),
 		'rename'         => array( 10, HOUR_IN_SECONDS ),
 		'app_retry'      => array( 3, HOUR_IN_SECONDS ),
+		'app_domain'     => array( 5, HOUR_IN_SECONDS ),
 		'snapshot_take'     => array( 5, HOUR_IN_SECONDS ),
 		'snapshot_delete'   => array( 10, HOUR_IN_SECONDS ),
 		'snapshot_rollback' => array( 3, HOUR_IN_SECONDS ),
@@ -167,6 +169,9 @@ final class Actions {
 			$out[ AppInstall::RETRY ] = __( 'Try again', 'beltoft-services' );
 		}
 
+		// Only the App tab draws this one (see buttons()): add or change the domain of a running app.
+		$out = array_merge( $out, AppDomainChange::offered( $r ) );
+
 		if ( self::agent_ok( $r ) ) {
 			$out['reset_password'] = __( 'Reset password', 'beltoft-services' );
 		}
@@ -225,7 +230,7 @@ final class Actions {
 	 */
 	public static function buttons( $actions, $resource, $context = 'card' ) {
 		if ( is_array( $actions ) && $resource instanceof Resource && ProxmoxDriver::ID === $resource->get( 'driver' ) ) {
-			unset( $actions[ AppInstall::RETRY ], $actions[ ServerName::ACTION ], $actions['replace_ssh_key'], $actions['reinstall'], $actions['restore'], $actions['backup_delete'], $actions['snapshot_take'], $actions['snapshot_delete'], $actions['snapshot_rollback'], $actions['fw_apply'], $actions['fw_reset'], $actions[ PrivateAttach::ATTACH ], $actions[ PrivateAttach::DETACH ], $actions[ Ipv6Switch::ADD ], $actions[ Ipv6Switch::REMOVE ], $actions[ \BeltoftServices\Proxmox\Ipv4\Ipv4Guest::ACTION ] );
+			unset( $actions[ AppInstall::RETRY ], $actions[ AppDomainChange::ACTION ], $actions[ ServerName::ACTION ], $actions['replace_ssh_key'], $actions['reinstall'], $actions['restore'], $actions['backup_delete'], $actions['snapshot_take'], $actions['snapshot_delete'], $actions['snapshot_rollback'], $actions['fw_apply'], $actions['fw_reset'], $actions[ PrivateAttach::ATTACH ], $actions[ PrivateAttach::DETACH ], $actions[ Ipv6Switch::ADD ], $actions[ Ipv6Switch::REMOVE ], $actions[ \BeltoftServices\Proxmox\Ipv4\Ipv4Guest::ACTION ] );
 
 			if ( 'page' === $context ) {
 				unset( $actions['start'], $actions['shutdown'], $actions['reboot'], $actions['reset_password'] );
@@ -341,6 +346,9 @@ final class Actions {
 		}
 		if ( AppInstall::RETRY === $action && ! AppInstall::can_retry( $r ) ) {
 			return __( 'The app cannot be tried again now.', 'beltoft-services' );
+		}
+		if ( AppDomainChange::ACTION === $action ) {
+			return AppDomainChange::check( $r, $args );
 		}
 
 		if ( 'restore' === $action ) {
@@ -565,6 +573,11 @@ final class Actions {
 		// No Proxmox call and no reinstall: the install job is queued again, so REINSTALL_GAP does not apply.
 		if ( AppInstall::RETRY === $action ) {
 			return AppInstall::retry( $this->r );
+		}
+
+		// A DNS write and a request file for the guest: no Proxmox task and no reinstall, so REINSTALL_GAP does not apply (the floor does).
+		if ( AppDomainChange::ACTION === $action ) {
+			return AppDomainChange::start( $this->r, $args );
 		}
 
 		$early = $this->prepare( $record );

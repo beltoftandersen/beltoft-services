@@ -70,8 +70,12 @@ final class AppWww {
 		return $apex;
 	}
 
-	/** The name an app serves for a domain: 'www.' plus the domain, '' when it does not apply. */
-	public static function name_for( Resource $r, string $domain ): string {
+	/**
+	 * The name an app serves for a domain: 'www.' plus the domain, '' when it does not apply.
+	 *
+	 * @param string|null $zone The zone of the domain when it is not stored yet: null reads the stored zone, '' is a name on the customer's own DNS.
+	 */
+	public static function name_for( Resource $r, string $domain, ?string $zone = null ): string {
 		$domain = strtolower( $domain );
 		$id     = (string) $r->get( 'app_id' );
 		$app    = '' === $id ? null : Apps::version( $id, (string) $r->get( 'app_version' ), true );
@@ -83,7 +87,8 @@ final class AppWww {
 		if ( $since <= 0 || $recipe < $since ) {
 			return '';
 		}
-		$zone = strtolower( (string) $r->get( 'app_zone' ) );
+		// A zone given for a name that is not stored yet (a change of domain); '' means a name on the customer's own DNS.
+		$zone = strtolower( null === $zone ? (string) $r->get( 'app_zone' ) : $zone );
 		$apex = '' !== $zone ? $domain === $zone : self::is_apex( $domain );
 		return $apex ? 'www.' . $domain : '';
 	}
@@ -178,6 +183,11 @@ final class AppWww {
 	public static function run( int $id ): void {
 		$r = Resource::find( $id );
 		if ( ! $r || ! $r->is_live() || 'ready' !== $r->get( 'state' ) || 'ready' !== $r->get( 'app_state' ) || ! in_array( (string) $r->get( 'app_www' ), array( 'waiting', 'applying' ), true ) ) {
+			return;
+		}
+		// A change of domain owns the Caddyfile while it runs: two writers would rewrite it. The look is made again once the change is over.
+		if ( in_array( (string) $r->get( 'app_chg_state' ), array( 'waiting', 'applying' ), true ) ) {
+			self::schedule( $id, self::INTERVAL );
 			return;
 		}
 		$domain = strtolower( (string) $r->get( 'app_domain' ) );

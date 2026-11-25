@@ -6,7 +6,6 @@ namespace BeltoftServices\Apps;
 use BeltoftServices\Account\ServerLinks;
 use BeltoftServices\Domains\ZoneAccess;
 use BeltoftServices\Proxmox\Ipv4\Ipv4Meta;
-use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Vm\OsField;
 use BeltoftServices\Proxmox\Vm\Panels;
@@ -535,9 +534,7 @@ final class AppReinstall {
 
 	/** A published name takes precedence over a requested name. */
 	private static function current_domain( Resource $r ): string {
-		$published = (string) $r->get( 'app_domain' );
-		$wanted    = '' !== $published ? $published : (string) $r->get( 'app_domain_want' );
-		return '' !== $wanted ? $wanted : (string) $r->get( 'app_domain_own' );
+		return AppDomainChoice::current( $r );
 	}
 
 	/**
@@ -560,58 +557,14 @@ final class AppReinstall {
 		return self::KEEP === $raw ? (string) $r->get( 'app_version' ) : $raw;
 	}
 
-	/** The effective domain choice, including a same-name change that is really a keep. */
+	/** The effective domain choice, including a same-name change that is really a keep (AppDomainChoice). */
 	private static function domain_choice( Resource $r, array $args, array $app, bool $check_dns = true ) {
-		$current = self::current_domain( $r );
-		$raw = $args['app_domain_mode'] ?? '';
-		$mode = '' === $raw ? ( '' === $current ? 'none' : 'keep' ) : $raw;
-
-		if ( ! $app ) {
-			return array( 'mode' => 'none', 'zone' => '', 'fqdn' => '' );
-		}
-		if ( empty( $app['domain'] ) ) {
-			if ( in_array( $raw, array( 'change', 'keep', 'own' ), true ) ) {
-				return __( 'This app does not use a domain at install. You can add one later.', 'beltoft-services' );
-			}
-			return array( 'mode' => 'none', 'zone' => '', 'fqdn' => '' );
-		}
-		if ( 'none' === $mode ) {
-			return array( 'mode' => 'none', 'zone' => '', 'fqdn' => '' );
-		}
-		if ( 'keep' === $mode ) {
-			return '' === $current ? __( 'This server has no domain to keep.', 'beltoft-services' ) : array( 'mode' => 'keep', 'zone' => (string) $r->get( 'app_zone' ), 'fqdn' => $current );
-		}
-		if ( 'own' === $mode ) {
-			$own = AppOwnDomain::choose( $app, $args['app_own'] ?? '' );
-			if ( is_string( $own ) ) {
-				return $own;
-			}
-			return $current === $own['fqdn'] ? array( 'mode' => 'keep', 'zone' => (string) $r->get( 'app_zone' ), 'fqdn' => $current ) : array( 'mode' => 'own', 'zone' => '', 'fqdn' => $own['fqdn'] );
-		}
-		if ( 'change' !== $mode ) {
-			return __( 'Choose a domain option.', 'beltoft-services' );
-		}
-
-		$ip = IpPool::for_resource( $r->id() );
-		$choice = AppDomains::choose( $app, (string) ( $args['app_zone'] ?? '' ), $args['app_sub'] ?? '', (int) ( $r->license()['user_id'] ?? 0 ), $check_dns, (string) ( $ip['address'] ?? '' ) );
-		if ( is_string( $choice ) ) {
-			return $choice;
-		}
-		return $current === $choice['fqdn'] ? array( 'mode' => 'keep', 'zone' => (string) $r->get( 'app_zone' ), 'fqdn' => $current ) : array( 'mode' => 'change', 'zone' => $choice['zone'], 'fqdn' => $choice['fqdn'] );
+		return AppDomainChoice::resolve( $r, $args, $app, $check_dns );
 	}
 
 	/** Refuse a removal that cannot safely remember the old record. */
 	private static function domain_release_refusal( Resource $r, array $choice ): ?string {
-		$published = (string) $r->get( 'app_domain' );
-		if ( '' === $published || true !== $r->get( 'app_domain_made' ) || '' === (string) $r->get( 'app_zone' ) || 'keep' === $choice['mode'] ) {
-			return null;
-		}
-		$ip = IpPool::for_resource( $r->id() );
-		if ( '' === (string) ( $ip['address'] ?? $r->get( 'ip' ) ) ) {
-			return __( 'The old domain record cannot be checked right now. Try again later.', 'beltoft-services' );
-		}
-		$pending = (array) $r->get( 'app_domain_old' );
-		return count( $pending ) >= 3 ? __( 'The old domain records are still being checked. Try again later.', 'beltoft-services' ) : null;
+		return AppDomainChoice::release_refusal( $r, $choice );
 	}
 
 	/**
@@ -623,6 +576,10 @@ final class AppReinstall {
 	 * @return mixed
 	 */
 	public static function check( $why, $r, $args ) {
+		// The guest is changing the app's address: a reinstall now would wipe the server under it. A change that only waits for DNS does not stop one.
+		if ( null === $why && $r instanceof Resource && 'applying' === (string) $r->get( 'app_chg_state' ) ) {
+			return __( 'The domain of the app is being changed. Try again in a few minutes.', 'beltoft-services' );
+		}
 		if ( $r instanceof Resource && ( '' === (string) $r->get( 'app_id' ) || self::is_switch( $r, (array) $args ) ) ) {
 			$why = self::plain_check( $why, $r, $args );
 			if ( null !== $why ) {
@@ -820,40 +777,8 @@ final class AppReinstall {
 		$meta['app_zone'] = 'change' === $choice['mode'] ? $choice['zone'] : null;
 		$meta = array_merge( $meta, 'own' === $choice['mode'] ? AppOwnDomain::fresh_wait( $choice['fqdn'] ) : AppOwnDomain::cleared() );
 
-		// A name on the customer's own DNS never had a record of ours, so there is nothing to say was left behind.
-		if ( '' !== $published && '' === $own && true !== $r->get( 'app_domain_made' ) ) {
-			$meta['app_domain_left'] = array( 'zone' => (string) $r->get( 'app_zone' ), 'name' => $published );
-		} else {
-			$meta['app_domain_left'] = null;
-		}
-		$old    = (array) $r->get( 'app_domain_old' );
-		$queued = false;
-		if ( '' !== $published && true === $r->get( 'app_domain_made' ) && '' !== (string) $r->get( 'app_zone' ) ) {
-			$ip = IpPool::for_resource( $r->id() );
-			$old[] = array(
-				'zone' => (string) $r->get( 'app_zone' ),
-				'name' => $published,
-				'ip' => (string) ( $ip['address'] ?? $r->get( 'ip' ) ),
-				'tries' => 0,
-			);
-			$queued = true;
-		}
-		// The www record we wrote next to the domain's goes the same way: removed only while it is still the record we wrote.
-		$www_ip = (string) $r->get( 'app_www_ip' );
-		if ( true === $r->get( 'app_www_made' ) && '' !== (string) $r->get( 'app_zone' ) && '' !== $www_ip ) {
-			$old[] = array(
-				'zone' => (string) $r->get( 'app_zone' ),
-				'name' => 'www.' . (string) $r->get( 'app_zone' ),
-				'ip' => $www_ip,
-				'tries' => 0,
-			);
-			$queued = true;
-		}
-		$meta['app_www_made'] = null;
-		$meta['app_www_ip']   = null;
-		if ( $queued ) {
-			$meta['app_domain_old'] = array_slice( $old, 0, 4 );
-		}
+		// The old name's records we wrote go to the removal queue; a name that was ours to leave is noted (AppDomainRelease::queue_old).
+		$meta = array_merge( $meta, AppDomainRelease::queue_old( $r ) );
 		return $meta;
 	}
 
@@ -866,6 +791,20 @@ final class AppReinstall {
 	 * @return mixed
 	 */
 	public static function meta( $meta, $r, $args ) {
+		$out = self::meta_for( $meta, $r, $args );
+		// A change of domain that still waits belonged to the app that is wiped now.
+		return is_array( $out ) && $r instanceof Resource && '' !== (string) $r->get( 'app_chg_state' ) ? array_merge( $out, AppDomainChange::cleared() ) : $out;
+	}
+
+	/**
+	 * The meta of the choice itself.
+	 *
+	 * @param mixed                $meta Meta so far.
+	 * @param mixed                $r    Resource.
+	 * @param array<string, mixed> $args Arguments.
+	 * @return mixed
+	 */
+	private static function meta_for( $meta, $r, $args ) {
 		if ( is_array( $meta ) && $r instanceof Resource && ( '' === (string) $r->get( 'app_id' ) || self::is_switch( $r, (array) $args ) ) ) {
 			$pick   = self::plain_pick( $r, $args['app_version'] ?? '' );
 			$record = VmRecords::for_resource( $r->id() );

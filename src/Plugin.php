@@ -237,6 +237,7 @@ final class Plugin {
 		Apps\AppDomainRelease::register();
 		Apps\AppOwnDomain::register();
 		Apps\AppWww::register();
+		Apps\AppDomainChange::register();
 		Apps\AppStatus::register();
 		Monitoring\MetricsRoute::register();
 		Proxmox\Network\VmGuest::register();

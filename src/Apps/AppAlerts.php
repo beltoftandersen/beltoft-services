@@ -73,4 +73,21 @@ final class AppAlerts {
 			array( 'prefix' => false )
 		);
 	}
+
+	/** A change of domain on a running app failed: the old address still works. Tell an admin. */
+	public static function domain_change_failed( Resource $r, string $domain, string $reason ): void {
+		Alerts::notify(
+			sprintf( 'App domain change failed for server %d', $r->id() ),
+			array(
+				sprintf( 'Server resource: %d', $r->id() ),
+				sprintf( 'App: %s', (string) $r->get( 'app_id' ) ),
+				sprintf( 'New domain: %s', $domain ),
+				sprintf( 'Reason: %s', $reason ),
+				'The app still answers on its old address.',
+			),
+			$r,
+			'',
+			array( 'prefix' => false )
+		);
+	}
 }
