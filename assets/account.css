@@ -1656,3 +1656,31 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit
 .beltoft-services-credit__code > .beltoft-services-credit__coderow { margin-top: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit .beltoft-services-ov__head :is(h2, h3) { margin: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit__code > .beltoft-services-credit__note { margin-top: var(--bs-space-3); }
+
+/* Design pass 2026-11-25: email */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-facts > div { flex: 1 1 150px; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-facts dt { font-size: var(--bs-fs-small); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-db__form :is(input[type="text"], input[type="password"], input[type="email"], input[type="number"], textarea) { box-sizing: border-box; width: 100%; max-width: 100%; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-db__form p:has(> .beltoft-services-mail__at) { flex-wrap: wrap; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-db__form p:has(> .beltoft-services-mail__at) > input { flex: 1 1 0; min-width: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-mail__at { flex: none; margin: 0; max-width: 100%; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-db__form .description { display: block; margin: var(--bs-space-1) 0 0; color: var(--bs-muted); font-size: var(--bs-fs-small); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-mail__goto legend { margin: 0 0 var(--bs-space-1); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); color: var(--bs-ink); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-mail__goto { margin: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-mail__connect :is(th, td) { text-align: left; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-mail__links { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bs-space-3) var(--bs-space-4); margin: var(--bs-space-4) 0 var(--bs-space-5); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-mail__links p { margin: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-db__form > :is(p, fieldset) { max-width: 560px; }
+@media (max-width: 700px) {
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-mail__connect tr { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--bs-space-1) var(--bs-space-4); padding: var(--bs-space-3) 0; }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-mail__connect td { padding: 0; }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-mail__connect td:first-child { grid-column: 1 / -1; font-weight: var(--bs-fw-medium); }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-mail__connect td[data-label]::before { content: attr(data-label) ": "; color: var(--bs-muted); }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-services-mail__connect td[data-label] { grid-column: 1 / -1; }
+}
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-dnsg { margin-top: 0; padding: var(--bs-space-5); border: 0; border-radius: var(--bs-radius-lg); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-dnsg__group { margin: var(--bs-space-4) 0 var(--bs-space-2); color: var(--bs-muted); font-size: var(--bs-fs-small); letter-spacing: 0; text-transform: none; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-dnsg__rec { border: 0; border-radius: var(--bs-radius); }
+@media (max-width: 767px) {
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail .beltoft-dnsg { padding: var(--bs-space-4); }
+}
