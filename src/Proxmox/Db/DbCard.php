@@ -32,6 +32,9 @@ final class DbCard {
 		\BeltoftServices\Proxmox\Network\NetworkTab::enqueue( $parent );
 		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/db.js', BELTOFT_SERVICES_FILE ), array( $parent, \BeltoftServices\Status::HANDLE, \BeltoftServices\Status::API_HANDLE ), \BeltoftServices\Assets::version( 'assets/db.js' ), true );
 		wp_localize_script( self::HANDLE, 'beltoftServicesDb', array(
+			// The phrase to type, as this page shows it, and the one the route knows in every language: the route answers in its own
+			// language, which need not be the page's, so the script sends the second when the first was typed.
+			'phrase'  => array( DbActions::phrase(), DbActions::CONFIRM ),
 			'strings' => array(
 				'revealing' => __( 'Showing the password…', 'beltoft-services' ),
 				'gone'    => __( 'The password has already been shown or is no longer available.', 'beltoft-services' ),

@@ -1439,4 +1439,16 @@ class DbPhase5Test extends TestCase {
 		$this->assertStringContainsString( 'backupdeleteonly', $js );
 		$this->assertStringContainsString( 'danger: true', $js );
 	}
+
+	public function test_the_page_script_sends_the_phrase_the_route_knows_when_the_pages_own_phrase_was_typed() {
+		$root = dirname( __DIR__, 3 );
+		$js   = (string) file_get_contents( $root . '/assets/db.js' );
+		$php  = (string) file_get_contents( $root . '/src/Proxmox/Db/DbCard.php' );
+
+		// The route answers in its own language, which need not be the page's: the page hands over both phrases and the script maps.
+		$this->assertStringContainsString( "'phrase'  => array( DbActions::phrase(), DbActions::CONFIRM )", $php );
+		$this->assertStringContainsString( 'typed === db.phrase[0]', $js );
+		$this->assertStringContainsString( 'typed = db.phrase[1]', $js );
+		$this->assertStringContainsString( 'args: { confirm: typed }', $js );
+	}
 }

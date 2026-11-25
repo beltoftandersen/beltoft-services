@@ -141,6 +141,12 @@
 
 	function reset( box, panel, button ) {
 		var input = box.querySelector( '[data-db-confirm]' );
+		var typed = input ? input.value : '';
+
+		// The page's own phrase (Danish on the Danish page) is sent as the phrase the route knows in every language.
+		if ( db.phrase && typed === db.phrase[0] ) {
+			typed = db.phrase[1];
+		}
 
 		if ( S.locked( scopeOf( panel ) ) ) {
 			return;
@@ -149,7 +155,7 @@
 		// A new password needs the code we email the customer: asked first, sent as step_code, used up when the job is queued.
 		window.beltoftApi.stepUp( 'password_reset', { holder: account } ).then( function ( code ) {
 			if ( code ) {
-				run( panel, button, db.strings.working, '/actions/db_reset_password', JSON.stringify( { args: { confirm: input ? input.value : '' }, step_code: code } ), 'db_reset_password', button.getAttribute( 'data-db-after' ), input );
+				run( panel, button, db.strings.working, '/actions/db_reset_password', JSON.stringify( { args: { confirm: typed }, step_code: code } ), 'db_reset_password', button.getAttribute( 'data-db-after' ), input );
 			}
 		} );
 	}
