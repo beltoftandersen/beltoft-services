@@ -1,0 +1,39 @@
+# WordPress: the address lives in two options of the database (wp-config.php has no WP_HOME or WP_SITEURL). Only these two change.
+APP_PATH=/
+wp_site=${BELTOFT_REN_WP_PATH:-/var/www/wordpress}
+wp_bin=${BELTOFT_REN_WP_BIN:-/usr/local/bin/wp}
+
+wp_run() {
+  runuser -u www-data -- "$wp_bin" --path="$wp_site" "$@"
+}
+
+# A server of recipe 1 wrote the site block inline and has no body file: this is the body it had.
+app_legacy_body() {
+  printf '  root * /var/www/wordpress\n  encode zstd gzip\n  php_fastcgi unix//run/php/php8.3-fpm.sock\n  file_server\n'
+}
+
+app_save() {
+  local opt value
+  for opt in siteurl home; do
+    value=$(wp_run option get "$opt") || return 1
+    [ -n "$value" ] || return 1
+    printf '%s\n' "$value" > "$1/$opt"
+  done
+}
+
+app_apply() {
+  local opt
+  for opt in siteurl home; do
+    wp_run option update "$opt" "https://$domain" >/dev/null || return 1
+    [ "$(wp_run option get "$opt")" = "https://$domain" ] || return 1
+  done
+}
+
+app_restore() {
+  local opt code=0
+  for opt in siteurl home; do
+    [ -s "$1/$opt" ] || { code=1; continue; }
+    wp_run option update "$opt" "$(cat "$1/$opt")" >/dev/null || code=1
+  done
+  return "$code"
+}

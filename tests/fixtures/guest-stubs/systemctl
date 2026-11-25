@@ -1,0 +1,14 @@
+#!/bin/sh
+# Test stub of systemctl: logs; "reload caddy" fails when $STUB_DIR/systemctl_caddy_fail exists.
+D=${STUB_DIR:?}
+echo "systemctl $*" >>"$D/calls.log"
+case "$*" in
+	"reload caddy")
+		[ -f "$D/systemctl_caddy_fail" ] && exit 1
+		;;
+	*php*)
+		[ -f "$D/snap_app" ] || cp "$BELTOFT_REN_ETC/Caddyfile" "$D/snap_app"
+		[ -f "$D/php_reload_fail" ] && exit 1
+		;;
+esac
+exit 0

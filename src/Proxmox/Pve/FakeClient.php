@@ -1967,6 +1967,17 @@ class FakeClient extends FakePve {
 		if ( 'running' !== $vm['status'] ) {
 			return $this->error( 500, 'VM ' . $a[1] . ' is not running' );
 		}
+		// The rename script's status reads `running` for the first `polls` reads, then the final answer (see set_guest_rename()).
+		if ( \BeltoftServices\Apps\AppRename::STATUS === (string) $p['file'] && isset( $vm['rename_pending'] ) ) {
+			$vmid = (int) $a[1];
+			if ( (int) $vm['rename_pending']['reads'] > 0 ) {
+				--$this->state['vms'][ $vmid ]['rename_pending']['reads'];
+			} else {
+				$this->state['vms'][ $vmid ]['guest_files'][ \BeltoftServices\Apps\AppRename::STATUS ] = (string) $vm['rename_pending']['final'];
+				unset( $this->state['vms'][ $vmid ]['rename_pending'] );
+				$vm = $this->state['vms'][ $vmid ];
+			}
+		}
 		$file = $vm['guest_files'][ (string) $p['file'] ] ?? null;
 		if ( ! is_string( $file ) ) {
 			return $this->error( 500, 'No such file' );
@@ -2048,6 +2059,12 @@ class FakeClient extends FakePve {
 			return $this->error( 500, 'Call to guest-exec is not allowed on this guest' );
 		}
 
+		$command = array_values( (array) $p['command'] );
+
+		if ( 'systemd-run' === ( $command[0] ?? '' ) && in_array( \BeltoftServices\Apps\AppRename::SCRIPT, $command, true ) ) {
+			return $this->rename_exec( $vmid, $vm, $command );
+		}
+
 		$pid  = 1000 + count( (array) ( $vm['exec_log'] ?? array() ) );
 		$out  = array( 'exited' => 1, 'exitcode' => 0, 'out-data' => '', 'err-data' => '' );
 		$want = json_decode( (string) ( $vm['guest_files'][ \BeltoftServices\Proxmox\Ipv4\Ipv4Guest::WANT ] ?? '' ), true );
@@ -2088,6 +2105,86 @@ class FakeClient extends FakePve {
 
 			$this->state['vms'][ $vmid ]['guest_files'][ \BeltoftServices\Proxmox\Ipv4\Ipv4Guest::STATUS ] = wp_json_encode( $status );
 			$this->state['vms'][ $vmid ]['guest_extra_ips']                                                = $applied;
+		}
+
+		$this->state['vms'][ $vmid ]['exec_results'][ $pid ] = $out;
+
+		return array( 'pid' => $pid );
+	}
+
+	/**
+	 * How the guest answers the start of the app rename script (AppRename, run detached with systemd-run, so the exec itself ends at
+	 * once and the outcome is in the status file). Modes: `ok` (default: the status ends `ready`), `blocked` (the agent refuses exec),
+	 * `error` (the start command exits 1, no status file), `no_status` (exit 0, no status file), `other_run` (a status of another run),
+	 * `hang` (the status stays `running`), `certificate`, `caddy`, `app` and `probe` (failed after a rollback, that reason), `busy`
+	 * (failed, another run holds the lock), `rollback_failed` (failed at the rollback step). The option `polls` makes the first N reads
+	 * of the status file answer `running` before the final answer.
+	 *
+	 * @param int                  $vmid VMID.
+	 * @param string               $mode Mode.
+	 * @param array<string, mixed> $opts polls.
+	 */
+	public function set_guest_rename( int $vmid, string $mode, array $opts = array() ): void {
+		$this->load();
+		if ( isset( $this->state['vms'][ $vmid ] ) ) {
+			$this->state['vms'][ $vmid ]['rename_mode'] = array_merge( array( 'polls' => 0 ), $opts, array( 'mode' => $mode ) );
+			$this->save();
+		}
+	}
+
+	/**
+	 * The start of the rename script: logs the command, writes the status the mode says.
+	 *
+	 * @param int                  $vmid    VMID.
+	 * @param array<string, mixed> $vm      VM.
+	 * @param string[]             $command Command.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private function rename_exec( int $vmid, array $vm, array $command ) {
+		$model = (array) ( $vm['rename_mode'] ?? array( 'mode' => 'ok', 'polls' => 0 ) );
+		$mode  = (string) $model['mode'];
+
+		if ( 'blocked' === $mode ) {
+			return $this->error( 500, 'Call to guest-exec is not allowed on this guest' );
+		}
+
+		$pid = 1000 + count( (array) ( $vm['exec_log'] ?? array() ) );
+		$out = array( 'exited' => 1, 'exitcode' => 'error' === $mode ? 1 : 0, 'out-data' => '', 'err-data' => 'error' === $mode ? 'boom' : '' );
+		$this->state['vms'][ $vmid ]['exec_log'][] = $command;
+
+		if ( ! in_array( $mode, array( 'error', 'no_status' ), true ) ) {
+			$want  = json_decode( (string) ( $vm['guest_files'][ \BeltoftServices\Apps\AppRename::WANT ] ?? '' ), true );
+			$want  = is_array( $want ) ? $want : array();
+			$final = array(
+				'ok'              => array( 'ready', 'done', 'none' ),
+				'other_run'       => array( 'ready', 'done', 'none' ),
+				'hang'            => array( 'running', 'certificate', 'none' ),
+				'certificate'     => array( 'failed', 'done', 'certificate' ),
+				'caddy'           => array( 'failed', 'done', 'caddy' ),
+				'app'             => array( 'failed', 'done', 'app' ),
+				'probe'           => array( 'failed', 'done', 'probe' ),
+				'busy'            => array( 'failed', 'caddy', 'busy' ),
+				'rollback_failed' => array( 'failed', 'rollback', 'app' ),
+			)[ $mode ] ?? array( 'ready', 'done', 'none' );
+			$make  = static fn( array $s ): string => (string) wp_json_encode(
+				array(
+					'v'       => 1,
+					'run'     => 'other_run' === $mode ? 'someone-else' : (string) ( $want['run'] ?? '' ),
+					'state'   => $s[0],
+					'step'    => $s[1],
+					'reason'  => $s[2],
+					'domain'  => (string) ( $want['domain'] ?? '' ),
+					'updated' => gmdate( 'Y-m-d\TH:i:s\Z' ),
+				)
+			);
+
+			if ( (int) ( $model['polls'] ?? 0 ) > 0 ) {
+				$this->state['vms'][ $vmid ]['guest_files'][ \BeltoftServices\Apps\AppRename::STATUS ] = $make( array( 'running', 'caddy', 'none' ) );
+				$this->state['vms'][ $vmid ]['rename_pending']                                         = array( 'reads' => (int) $model['polls'], 'final' => $make( $final ) );
+			} else {
+				$this->state['vms'][ $vmid ]['guest_files'][ \BeltoftServices\Apps\AppRename::STATUS ] = $make( $final );
+				unset( $this->state['vms'][ $vmid ]['rename_pending'] );
+			}
 		}
 
 		$this->state['vms'][ $vmid ]['exec_results'][ $pid ] = $out;

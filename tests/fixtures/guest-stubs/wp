@@ -1,0 +1,27 @@
+#!/bin/sh
+# Test stub of WP-CLI: options in $STUB_DIR/wp/<name>; "wp_fail" makes every call fail; wp_update_fail holds N: the first N "option update" calls fail.
+# The first "option update" keeps the Caddyfile it saw in snap_app.
+D=${STUB_DIR:?}
+mkdir -p "$D/wp"
+[ -f "$D/wp_fail" ] && exit 1
+sub=
+for a in "$@"; do
+	case "$a" in --*) ;; *) sub="$sub $a" ;; esac
+done
+set -- $sub
+echo "wp $*" >>"$D/calls.log"
+case "$1 $2" in
+	"option get")
+		[ -f "$D/wp/$3" ] || exit 1
+		cat "$D/wp/$3"
+		;;
+	"option update")
+		[ -f "$D/snap_app" ] || cp "$BELTOFT_REN_ETC/Caddyfile" "$D/snap_app"
+		if [ -f "$D/wp_update_fail" ] && [ "$(cat "$D/wp_update_fail")" -gt 0 ]; then
+			echo $(($(cat "$D/wp_update_fail") - 1)) >"$D/wp_update_fail"
+			exit 1
+		fi
+		printf '%s\n' "$4" >"$D/wp/$3"
+		;;
+	*) exit 1 ;;
+esac

@@ -1,0 +1,65 @@
+# Odoo (both editions): the address is the system parameter web.base.url (nothing in the recipe sets it; proxy_mode is on).
+# It is set through Odoo's own shell (the ORM, so the running server sees it; no restart). Only this parameter changes.
+APP_PATH=/web/login
+odoo_dir=${BELTOFT_REN_APP:-/opt/odoo}
+
+odoo_shell() {
+  (cd "$odoo_dir" && timeout 300 docker compose exec -T odoo odoo shell -d odoo --no-http 2>/dev/null)
+}
+
+# Prints the old value as BELTOFT_HAS=0|1 and BELTOFT_VAL=<value>.
+odoo_get() {
+  odoo_shell <<'PY'
+p = env['ir.config_parameter'].sudo().search([('key', '=', 'web.base.url')], limit=1)
+print('BELTOFT_HAS=%d' % (1 if p else 0))
+print('BELTOFT_VAL=%s' % (p.value if p else ''))
+PY
+}
+
+odoo_set() {
+  # The value goes into Python source: only the characters of an address are allowed (fail closed).
+  [[ "$1" =~ ^https?://[A-Za-z0-9._:/-]+$ ]] || return 1
+  odoo_shell <<PY
+env['ir.config_parameter'].sudo().set_param('web.base.url', '$1')
+env.cr.commit()
+print('BELTOFT_SET=1')
+PY
+}
+
+odoo_unset() {
+  odoo_shell <<'PY'
+env['ir.config_parameter'].sudo().search([('key', '=', 'web.base.url')]).unlink()
+env.cr.commit()
+print('BELTOFT_SET=1')
+PY
+}
+
+app_save() {
+  local out has val
+  out=$(odoo_get) || return 1
+  has=$(printf '%s\n' "$out" | sed -n 's/^BELTOFT_HAS=\([01]\)$/\1/p' | head -n 1)
+  [ -n "$has" ] || return 1
+  printf '%s\n' "$has" > "$1/has"
+  val=$(printf '%s\n' "$out" | sed -n 's/^BELTOFT_VAL=//p' | head -n 1)
+  [ -z "$val" ] || [[ "$val" =~ ^https?://[A-Za-z0-9._:/-]+$ ]] || return 1
+  printf '%s\n' "$val" > "$1/base_url"
+}
+
+app_apply() {
+  local out
+  out=$(odoo_set "https://$domain") || return 1
+  printf '%s\n' "$out" | grep -qx 'BELTOFT_SET=1' || return 1
+  out=$(odoo_get) || return 1
+  printf '%s\n' "$out" | grep -qxF "BELTOFT_VAL=https://$domain"
+}
+
+app_restore() {
+  local out
+  [ -f "$1/has" ] || return 1
+  if [ "$(cat "$1/has")" = 1 ]; then
+    out=$(odoo_set "$(cat "$1/base_url")") || return 1
+  else
+    out=$(odoo_unset) || return 1
+  fi
+  printf '%s\n' "$out" | grep -qx 'BELTOFT_SET=1'
+}

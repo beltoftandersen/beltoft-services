@@ -1,0 +1,89 @@
+# Nextcloud: OVERWRITEPROTOCOL, OVERWRITEHOST and OVERWRITECLIURL in /opt/nextcloud/nextcloud.env (the image reads them at each start),
+# the trusted domains (the env list is read only at the first install, so the names are added with occ at the next free index)
+# and overwrite.cli.url. The old names stay trusted. The service is recreated to read the env.
+APP_PATH=/status.php
+nc_dir=${BELTOFT_REN_APP:-/opt/nextcloud}
+nc_env=$nc_dir/nextcloud.env
+
+occ() {
+  (cd "$nc_dir" && timeout 300 docker compose exec -T -u www-data app php occ "$@")
+}
+
+# The trusted domains in index order, one per line; the count is the next free index.
+nc_trusted() {
+  local n=0 value
+  while value=$(occ config:system:get trusted_domains "$n" 2>/dev/null); do
+    printf '%s\n' "$value"
+    n=$((n + 1))
+  done
+}
+
+nc_trust() {
+  local name=$1 list n
+  list=$(nc_trusted)
+  if printf '%s\n' "$list" | grep -qxF "$name"; then
+    return 0
+  fi
+  n=$(printf '%s' "$list" | grep -c '')
+  occ config:system:set trusted_domains "$n" --value="$name" >/dev/null
+}
+
+nc_wait() {
+  local n=0
+  while [ "$n" -lt "$tries" ]; do
+    if curl --fail --silent --max-time 5 http://127.0.0.1:8080/status.php 2>/dev/null | jq -e '.installed == true' >/dev/null 2>&1; then
+      return 0
+    fi
+    n=$((n + 1))
+    [ "$n" -ge "$tries" ] || sleep "$pause"
+  done
+  return 1
+}
+
+nc_recreate() {
+  (cd "$nc_dir" && timeout 300 docker compose up -d --no-deps --force-recreate app) >/dev/null 2>&1 || return 1
+  nc_wait
+}
+
+app_save() {
+  [ -f "$nc_env" ] || return 1
+  cp -p "$nc_env" "$1/nextcloud.env"
+  nc_trusted | grep -c '' > "$1/trusted_count"
+  if value=$(occ config:system:get overwrite.cli.url 2>/dev/null); then
+    printf '%s\n' "$value" > "$1/cli_url"
+  fi
+}
+
+app_apply() {
+  env_set "$nc_env" OVERWRITEPROTOCOL https || return 1
+  env_set "$nc_env" OVERWRITEHOST "$domain" || return 1
+  env_set "$nc_env" OVERWRITECLIURL "https://$domain" || return 1
+  nc_recreate || return 1
+  nc_trust "$domain" || return 1
+  [ -z "$www" ] || nc_trust "$www" || return 1
+  occ config:system:set overwrite.cli.url --value="https://$domain" >/dev/null || return 1
+}
+
+app_restore() {
+  local code=0 count total n
+  [ -f "$1/nextcloud.env" ] || return 1
+  cat "$1/nextcloud.env" > "$nc_env" || return 1
+  count=$(cat "$1/trusted_count" 2>/dev/null || echo -1)
+  if [ "$count" -ge 0 ] 2>/dev/null; then
+    total=$(nc_trusted | grep -c '')
+    n=$count
+    while [ "$n" -lt "$total" ]; do
+      occ config:system:delete trusted_domains "$n" >/dev/null || code=1
+      n=$((n + 1))
+    done
+  else
+    code=1
+  fi
+  if [ -f "$1/cli_url" ]; then
+    occ config:system:set overwrite.cli.url --value="$(cat "$1/cli_url")" >/dev/null || code=1
+  else
+    occ config:system:delete overwrite.cli.url >/dev/null || true
+  fi
+  nc_recreate || code=1
+  return "$code"
+}

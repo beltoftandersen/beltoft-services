@@ -1,0 +1,40 @@
+# n8n: the address is in five keys of /opt/n8n/n8n.env (the secure cookie follows the protocol); the service is recreated to read them.
+APP_PATH=/healthz
+n8n_dir=${BELTOFT_REN_APP:-/opt/n8n}
+n8n_env=$n8n_dir/n8n.env
+
+# A server of recipe 1 or 2 wrote the site block inline and has no body file: this is the body it had.
+app_legacy_body() {
+  printf '  encode zstd gzip\n  reverse_proxy 127.0.0.1:5678\n'
+}
+
+n8n_recreate() {
+  (cd "$n8n_dir" && timeout 300 docker compose up -d --no-deps --force-recreate n8n) >/dev/null 2>&1 || return 1
+  local n=0
+  while [ "$n" -lt "$tries" ]; do
+    curl --fail --silent --max-time 5 http://127.0.0.1:5678/healthz/readiness -o /dev/null && return 0
+    n=$((n + 1))
+    [ "$n" -ge "$tries" ] || sleep "$pause"
+  done
+  return 1
+}
+
+app_save() {
+  [ -f "$n8n_env" ] || return 1
+  cp -p "$n8n_env" "$1/n8n.env"
+}
+
+app_apply() {
+  env_set "$n8n_env" N8N_HOST "$domain" || return 1
+  env_set "$n8n_env" N8N_PROTOCOL https || return 1
+  env_set "$n8n_env" N8N_WEBHOOK_URL "https://$domain/" || return 1
+  env_set "$n8n_env" N8N_EDITOR_BASE_URL "https://$domain/" || return 1
+  env_set "$n8n_env" N8N_SECURE_COOKIE true || return 1
+  n8n_recreate
+}
+
+app_restore() {
+  [ -f "$1/n8n.env" ] || return 1
+  cat "$1/n8n.env" > "$n8n_env" || return 1
+  n8n_recreate
+}
