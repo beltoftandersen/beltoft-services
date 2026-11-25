@@ -1,0 +1,9 @@
+#!/bin/sh
+# Test stub of caddy: "validate" passes unless $STUB_DIR/caddy_validate_fail exists.
+D=${STUB_DIR:?}
+echo "caddy $*" >>"$D/calls.log"
+if [ "$1" = validate ]; then
+	[ -f "$D/caddy_validate_fail" ] && exit 1
+	exit 0
+fi
+exit 0

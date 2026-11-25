@@ -1,0 +1,4 @@
+#!/bin/sh
+# Test stub of runuser -u USER -- COMMAND...: runs the command as it is.
+shift 3
+exec "$@"

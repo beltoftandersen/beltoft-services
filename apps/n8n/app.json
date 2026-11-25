@@ -11,6 +11,7 @@
   "credentials": ["root_email", "root_password", "encryption_key"],
   "steps": ["download", "os", "packages", "docker", "credentials", "n8n", "web", "firewall", "verify", "install", "complete"],
   "domain": true,
+  "rename": {"since_recipe": 1, "script": "rename.script"},
   "www": {"since_recipe": 3},
   "open": {"path": "/"},
   "docs_url": "https://docs.n8n.io/hosting/",

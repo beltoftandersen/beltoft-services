@@ -11,6 +11,7 @@
   "credentials": ["root_email", "root_password", "master_password"],
   "steps": ["download", "os", "packages", "docker", "credentials", "odoo", "web", "firewall", "verify", "install", "complete"],
   "domain": true,
+  "rename": {"since_recipe": 1, "script": "rename.script"},
   "www": {"since_recipe": 1},
   "open": {"path": "/"},
   "docs_url": "https://www.odoo.com/documentation/20.0/administration/on_premise/deploy.html",

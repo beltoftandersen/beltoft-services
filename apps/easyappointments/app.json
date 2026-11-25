@@ -11,6 +11,7 @@
   "credentials": ["admin_user", "admin_password"],
   "steps": ["download", "os", "packages", "database", "easyappointments", "web", "firewall", "verify", "install", "complete"],
   "domain": true,
+  "rename": {"since_recipe": 1, "script": "rename.script"},
   "www": {"since_recipe": 1},
   "open": {"path": "/index.php/login"},
   "docs_url": "https://easyappointments.org/docs.html",

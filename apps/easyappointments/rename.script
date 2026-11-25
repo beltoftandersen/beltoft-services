@@ -1,0 +1,30 @@
+# Easy!Appointments: the address is const BASE_URL in /opt/easyappointments/config.php. The line must be found exactly once,
+# before and after the change; otherwise nothing is written (fail closed). PHP-FPM is reloaded to read the file again.
+APP_PATH=/index.php/booking
+ea_config=${BELTOFT_REN_APP:-/opt/easyappointments}/config.php
+
+ea_count() {
+  grep -cE "^[[:space:]]*const BASE_URL[[:space:]]*=" "$ea_config"
+}
+
+app_save() {
+  [ -f "$ea_config" ] || return 1
+  [ "$(ea_count)" = 1 ] || return 1
+  cp -p "$ea_config" "$1/config.php"
+}
+
+app_apply() {
+  [ "$(ea_count)" = 1 ] || return 1
+  sed -E -i "s|^([[:space:]]*const BASE_URL[[:space:]]*=[[:space:]]*)[^;]*;|\1'https://$domain';|" "$ea_config" || return 1
+  [ "$(ea_count)" = 1 ] || return 1
+  line=$(grep -E "^[[:space:]]*const BASE_URL[[:space:]]*=" "$ea_config")
+  [[ "$line" == *"= 'https://$domain';" ]] || return 1
+  php -l "$ea_config" >/dev/null || return 1
+  systemctl reload php8.3-fpm
+}
+
+app_restore() {
+  [ -f "$1/config.php" ] || return 1
+  cat "$1/config.php" > "$ea_config" || return 1
+  systemctl reload php8.3-fpm
+}

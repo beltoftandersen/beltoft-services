@@ -1,0 +1,80 @@
+#!/bin/sh
+# Test stub of docker compose. "up" fails for the first N calls when $STUB_DIR/docker_up_fail holds N; any call whose arguments contain
+# the text in docker_fail_match fails; odoo_set_fail holds N: the first N Odoo parameter writes answer failure. occ keeps its settings in $STUB_DIR/nc; Odoo's shell keeps web.base.url in odoo_base_url.
+D=${STUB_DIR:?}
+# Only writes keep the Caddyfile they saw in snap_app.
+case "$*" in
+	*" up "* | *config:system:set* | *config:system:delete*) [ -f "$D/snap_app" ] || cp "$BELTOFT_REN_ETC/Caddyfile" "$D/snap_app" ;;
+esac
+echo "docker $*" >>"$D/calls.log"
+if [ -f "$D/docker_fail_match" ] && case " $* " in *"$(cat "$D/docker_fail_match")"*) true ;; *) false ;; esac; then
+	exit 1
+fi
+shift
+case "$*" in
+	up*)
+		if [ -f "$D/docker_up_fail" ]; then
+			n=$(cat "$D/docker_up_fail")
+			if [ "$n" -gt 0 ]; then
+				echo $((n - 1)) >"$D/docker_up_fail"
+				exit 1
+			fi
+		fi
+		exit 0
+		;;
+	*"php occ "*)
+		mkdir -p "$D/nc"
+		rest=${*#*php occ }
+		set -- $rest
+		cmd=$1
+		key=$2
+		shift 2
+		case "$cmd" in
+			config:system:get)
+				name=$key
+				[ "$key" = trusted_domains ] && name=trusted.$1
+				[ -f "$D/nc/$name" ] || exit 1
+				cat "$D/nc/$name"
+				;;
+			config:system:set)
+				name=$key
+				[ "$key" = trusted_domains ] && { name=trusted.$1; shift; }
+				printf '%s\n' "${1#--value=}" >"$D/nc/$name"
+				;;
+			config:system:delete)
+				name=$key
+				[ "$key" = trusted_domains ] && name=trusted.$1
+				rm -f "$D/nc/$name"
+				;;
+			*) exit 1 ;;
+		esac
+		exit 0
+		;;
+	*"odoo shell"*)
+		cat >"$D/odoo_stdin"
+		if grep -q BELTOFT_HAS "$D/odoo_stdin"; then
+			if [ -f "$D/odoo_base_url" ]; then
+				echo BELTOFT_HAS=1
+				echo "BELTOFT_VAL=$(cat "$D/odoo_base_url")"
+			else
+				echo BELTOFT_HAS=0
+				echo BELTOFT_VAL=
+			fi
+		elif grep -q unlink "$D/odoo_stdin"; then
+			rm -f "$D/odoo_base_url"
+			echo BELTOFT_SET=1
+		else
+			[ -f "$D/snap_app" ] || cp "$BELTOFT_REN_ETC/Caddyfile" "$D/snap_app"
+			if [ -f "$D/odoo_set_fail" ] && [ "$(cat "$D/odoo_set_fail")" -gt 0 ]; then
+				echo $(($(cat "$D/odoo_set_fail") - 1)) >"$D/odoo_set_fail"
+				echo BELTOFT_SET=0
+				exit 0
+			fi
+			sed -n "s/.*set_param('web.base.url', '\(.*\)').*/\1/p" "$D/odoo_stdin" >"$D/odoo_base_url"
+			cat "$D/odoo_base_url" >>"$D/odoo_sets"
+			echo BELTOFT_SET=1
+		fi
+		exit 0
+		;;
+esac
+exit 0

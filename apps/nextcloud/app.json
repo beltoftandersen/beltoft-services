@@ -46,6 +46,7 @@
     "complete"
   ],
   "domain": true,
+  "rename": {"since_recipe": 1, "script": "rename.script"},
   "www": {
     "since_recipe": 1
   },

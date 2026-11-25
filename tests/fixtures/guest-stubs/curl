@@ -1,0 +1,36 @@
+#!/bin/sh
+# Test stub of curl. A TLS probe has --resolve and no --fail; a web probe has --resolve and --fail; anything else is a local URL.
+# Switches in $STUB_DIR: curl_tls_fail (all TLS probes fail), tls_ok_limit (this many TLS probes pass, then they fail),
+# curl_web_fail, curl_local_fail. The first TLS probe keeps the Caddyfile it saw in snap_tls.
+D=${STUB_DIR:?}
+echo "curl $*" >>"$D/calls.log"
+resolve=0
+fail=0
+out=
+url=
+for a in "$@"; do
+	[ "$a" = --resolve ] && resolve=1
+	[ "$a" = --fail ] && fail=1
+	case "$a" in http*) url=$a ;; esac
+done
+if [ "$resolve" = 1 ] && [ "$fail" = 0 ]; then
+	[ -f "$D/snap_tls" ] || cp "$BELTOFT_REN_ETC/Caddyfile" "$D/snap_tls"
+	[ -f "$D/curl_tls_fail" ] && exit 60
+	if [ -f "$D/tls_ok_limit" ]; then
+		n=$(cat "$D/tls_count" 2>/dev/null || echo 0)
+		n=$((n + 1))
+		echo "$n" >"$D/tls_count"
+		[ "$n" -le "$(cat "$D/tls_ok_limit")" ] || exit 60
+	fi
+	exit 0
+fi
+if [ "$resolve" = 1 ]; then
+	[ -f "$D/curl_web_fail" ] && exit 22
+	exit 0
+fi
+[ -f "$D/curl_local_fail" ] && exit 7
+case " $* " in
+	*" -o "*) ;;
+	*) printf '{"installed":true,"maintenance":false}\n' ;;
+esac
+exit 0

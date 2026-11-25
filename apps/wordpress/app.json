@@ -11,6 +11,7 @@
   "credentials": ["admin_user", "admin_password"],
   "steps": ["download", "os", "packages", "database", "wordpress", "web", "firewall", "verify", "install", "complete"],
   "domain": true,
+  "rename": {"since_recipe": 1, "script": "rename.script"},
   "www": {"since_recipe": 2},
   "open": {"path": "/wp-admin/"},
   "docs_url": "https://wordpress.org/documentation/article/how-to-install-wordpress/",
