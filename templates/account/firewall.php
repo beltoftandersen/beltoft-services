@@ -35,7 +35,7 @@ $beltoft_services_fw_id = (int) $r->id();
 	<div class="beltoft-services-fw__main" data-fw-main hidden>
 		<p class="beltoft-services-fw__switch">
 			<strong data-fw-switch-label></strong>
-			<button type="button" class="button woocommerce-button" data-fw-switch></button>
+			<button type="button" class="button woocommerce-button bs-btn" data-fw-switch></button>
 		</p>
 		<p class="beltoft-services-fw__warning" data-fw-off-warning hidden><?php esc_html_e( 'Every port on your server can be reached from the internet.', 'beltoft-services' ); ?></p>
 

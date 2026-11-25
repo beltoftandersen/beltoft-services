@@ -171,6 +171,7 @@
 
 		q( '[data-fw-switch-label]' ).textContent = draft.on ? S.on : S.off;
 		q( '[data-fw-switch]' ).textContent = draft.on ? S.turnOff : S.turnOn;
+		q( '[data-fw-switch]' ).classList.toggle( 'bs-btn--danger', draft.on );
 		q( '[data-fw-off-warning]' ).hidden = draft.on;
 		renderRows();
 		renderSsh();

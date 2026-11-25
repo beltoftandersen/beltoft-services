@@ -91,7 +91,7 @@ $beltoft_form  = static function ( string $what ) use ( $action, $nonce, $licens
 		<?php if ( $offer['manual'] && ! $offer['can_enable'] ) : ?>
 			<p class="beltoft-services-domain__note"><?php esc_html_e( 'To turn auto-renew back on, add a payment method to your account first.', 'beltoft-services' ); ?></p>
 		<?php else : ?>
-			<button type="submit" class="button"><?php echo esc_html( $offer['manual'] ? __( 'Turn auto-renew back on', 'beltoft-services' ) : __( 'Turn off auto-renew', 'beltoft-services' ) ); ?></button>
+			<button type="submit" class="button bs-btn bs-btn--danger"><?php echo esc_html( $offer['manual'] ? __( 'Turn auto-renew back on', 'beltoft-services' ) : __( 'Turn off auto-renew', 'beltoft-services' ) ); ?></button>
 		<?php endif; ?>
 	</form>
 <?php else : ?>

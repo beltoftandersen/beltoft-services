@@ -791,7 +791,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 					<p><?php esc_html_e( 'The IP address stays.', 'beltoft-services' ); ?></p>
 					<?php do_action( 'beltoft_services_reinstall_confirm', (int) $resource_id ); ?>
 				</div>
-				<p><button type="submit" class="button woocommerce-button bs-btn"><?php esc_html_e( 'Reinstall now', 'beltoft-services' ); ?></button></p>
+				<p><button type="submit" class="button woocommerce-button bs-btn bs-btn--danger"><?php esc_html_e( 'Reinstall now', 'beltoft-services' ); ?></button></p>
 			</form>
 		<?php $beltoft_services_more_close(); ?>
 		<?php endif; ?>

@@ -614,9 +614,10 @@ class OverviewTest extends MonitoringTestCase {
 		$this->as_user( $user );
 		$html = Overview::all();
 
-		// A license and the empty service sections: two columns, the domains on the right.
+		// A license and the empty service sections: one list in the order of the numbers (CSS columns balance it), domains before licenses.
 		$this->assertStringContainsString( 'beltoft-services-ov__licenses', $html );
-		$this->assertSame( 2, substr_count( $html, 'class="beltoft-services-ov__col"' ) );
+		$this->assertSame( 1, substr_count( $html, 'class="beltoft-services-ov__col"' ) );
+		$this->assertLessThan( strpos( $html, 'beltoft-services-ov__licenses' ), strpos( $html, 'beltoft-services-ov__domains' ) );
 
 		$this->subscription( $user, 'active', 10, 'Server', '15.00' );
 		Overview::reset();

@@ -38,7 +38,7 @@ $beltoft_services_ipv6_remove = Ipv6Switch::words( Ipv6Switch::REMOVE );
 			<button type="button" class="button woocommerce-button" data-ipv6-action="<?php echo esc_attr( Ipv6Switch::ADD ); ?>" data-title="<?php echo esc_attr( $beltoft_services_ipv6_add['title'] ); ?>" data-text="<?php echo esc_attr( $beltoft_services_ipv6_add['text'] ); ?>" data-confirm="<?php echo esc_attr( $beltoft_services_ipv6_add['confirm'] ); ?>"><?php esc_html_e( 'Add IPv6', 'beltoft-services' ); ?></button>
 		<?php endif; ?>
 		<?php if ( $view['can_remove'] ) : ?>
-			<button type="button" class="button woocommerce-button" data-ipv6-action="<?php echo esc_attr( Ipv6Switch::REMOVE ); ?>" data-title="<?php echo esc_attr( $beltoft_services_ipv6_remove['title'] ); ?>" data-text="<?php echo esc_attr( $beltoft_services_ipv6_remove['text'] ); ?>" data-confirm="<?php echo esc_attr( $beltoft_services_ipv6_remove['confirm'] ); ?>"><?php esc_html_e( 'Remove IPv6', 'beltoft-services' ); ?></button>
+			<button type="button" class="button woocommerce-button bs-btn bs-btn--danger" data-ipv6-action="<?php echo esc_attr( Ipv6Switch::REMOVE ); ?>" data-title="<?php echo esc_attr( $beltoft_services_ipv6_remove['title'] ); ?>" data-text="<?php echo esc_attr( $beltoft_services_ipv6_remove['text'] ); ?>" data-confirm="<?php echo esc_attr( $beltoft_services_ipv6_remove['confirm'] ); ?>"><?php esc_html_e( 'Remove IPv6', 'beltoft-services' ); ?></button>
 		<?php endif; ?>
 	</p>
 </div>

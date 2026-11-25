@@ -181,7 +181,7 @@ div.beltoft-services-domain .beltoft-dns-note { margin: 12px 0 0; color: var(--b
 .beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-services-badge--ready { color: var(--bs-status-ok); }
 .beltoft-licenses__license:has(.beltoft-services-domain, .beltoft-services-vm) .beltoft-services-badge--failed { color: var(--bs-status-fail); }
 div.beltoft-services-domain [hidden] { display: none; }
-.beltoft-services-vm h4 { margin: 0 0 var(--bs-space-2); color: var(--bs-ink); font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); }
+.beltoft-services-vm h4 { margin: 0 0 var(--bs-space-3); color: var(--bs-ink); font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); }
 @keyframes beltoft-services-wait { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
 .beltoft-services-domain__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin-top: 16px; }
 .beltoft-services-domain__actions form { margin: 0; }
@@ -321,15 +321,15 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 /* Live progress of a service being set up, reinstalled, restored or removed (assets/progress.js). */
 .beltoft-services-progress { margin: 0 0 1em; }
 .beltoft-services-progress.is-idle { display: none; }
-.beltoft-services-progress__text { margin: 0 0 0.75em; color: var(--bs-dark); font-weight: 600; }
+.beltoft-services-progress__text { margin: 0 0 0.75em; color: var(--bs-ink); font-weight: var(--bs-fw-regular); }
 .beltoft-services-progress__text:empty { display: none; }
 .beltoft-services-progress__steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.5em; }
 .beltoft-services-progress__steps[hidden] { display: none; }
 .beltoft-services-progress__steps li { position: relative; margin: 0; padding-left: 1.75em; color: var(--bs-muted); line-height: 1.4; }
 .beltoft-services-progress__steps li::before { content: ""; position: absolute; left: 0; top: 0.3em; width: 0.8em; height: 0.8em; background: var(--bs-line); }
-.beltoft-services-progress__steps li.is-done { color: var(--bs-dark); }
+.beltoft-services-progress__steps li.is-done { color: var(--bs-ink); }
 .beltoft-services-progress__steps li.is-done::before { background: var(--bs-status-ok); }
-.beltoft-services-progress__steps li.is-current { color: var(--bs-dark); font-weight: 600; }
+.beltoft-services-progress__steps li.is-current { color: var(--bs-ink); font-weight: var(--bs-fw-strong); }
 .beltoft-services-progress__steps li.is-current::before { background: var(--bs-status-warn); animation: beltoft-services-pulse 1.2s ease-in-out infinite; }
 .beltoft-services-progress__steps li.is-failed { color: var(--bs-status-fail); font-weight: 600; }
 .beltoft-services-progress__steps li.is-failed::before { background: var(--bs-status-fail); }
@@ -594,7 +594,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-server
 }
 .beltoft-services-overview > * { min-width: 0; }
 .beltoft-services-ov__section { min-width: 0; }
-.beltoft-services-ov__head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+.beltoft-services-ov__head { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: var(--bs-btn-h-sm); margin-bottom: var(--bs-space-3); }
 .beltoft-services-ov__head a { color: var(--bs-muted) !important; font-size: 14px; text-decoration: none !important; }
 .beltoft-services-ov__head a:hover { color: var(--bs-ink) !important; text-decoration: underline !important; }
 .beltoft-services-ov__attention { display: grid; gap: 8px; padding: 8px 16px; background: var(--bs-warm); }
@@ -619,7 +619,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-server
 .woocommerce-MyAccount-content .beltoft-services-ov__section .beltoft-services-ov__money p { max-width: none; margin: 0; font-size: 14px; line-height: 1.5; }
 .beltoft-services-ov__money + .beltoft-services-ov__usage { padding-top: 0; }
 .beltoft-services-usage { max-width: var(--bs-page-width); margin: 0 0 24px; color: var(--bs-ink); font-size: var(--bs-fs-body); font-weight: var(--bs-fw-regular); line-height: var(--bs-lh-text); }
-.beltoft-services-usage .beltoft-services-ov__head { margin: 0 0 8px; }
+.beltoft-services-usage .beltoft-services-ov__head { margin: 0 0 var(--bs-space-3); }
 .beltoft-services-usage__table { width: 100%; margin: 24px 0 0; border-collapse: collapse; font-size: var(--bs-fs-body); font-variant-numeric: tabular-nums; }
 .beltoft-services-usage__table th, .beltoft-services-usage__table td { padding: 8px 8px; border: 0; border-bottom: 1px solid var(--bs-line); background: none; text-align: left; vertical-align: top; }
 .beltoft-services-usage__table th { padding-top: 0; color: var(--bs-muted); font-size: var(--bs-fs-caption); font-weight: var(--bs-fw-medium); }
@@ -634,7 +634,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-server
 .beltoft-services-ov__feed ul { margin: 0; padding: 0; list-style: none; }
 .beltoft-services-ov__day { margin: 0; padding: 12px 16px 4px; color: var(--bs-muted); font-size: var(--bs-fs-caption); font-weight: var(--bs-fw-medium); line-height: 1.3; }
 .beltoft-services-ov__day:first-child { padding-top: 8px; }
-.beltoft-services-ov__feed li { display: grid; grid-template-columns: 48px minmax(0, 11rem) minmax(0, 1fr); gap: 12px; margin: 0; padding: 4px 16px; font-size: 14px; list-style: none; overflow-wrap: anywhere; }
+.beltoft-services-ov__feed li { display: grid; grid-template-columns: 48px fit-content(16rem) minmax(0, 1fr); gap: 12px; margin: 0; padding: 4px 16px; font-size: 14px; list-style: none; overflow-wrap: break-word; }
 .beltoft-services-ov__feed time { color: var(--bs-muted); font-size: var(--bs-fs-caption); font-variant-numeric: tabular-nums; }
 .beltoft-services-ov__who { font-weight: var(--bs-fw-medium); color: var(--bs-ink); text-decoration: none; }
 a.beltoft-services-ov__who:hover { text-decoration: underline; }
@@ -755,7 +755,7 @@ div.beltoft-services-domain .beltoft-dnse__table input:disabled, div.beltoft-ser
 
 /* Import from a zone file: its own block under the records, one rule above, one 12px rhythm inside. Square. */
 div.beltoft-services-domain .beltoft-services-domain__import { margin: var(--bs-space-6) 0 0; padding: var(--bs-space-5) 0 0; border-top: 1px solid var(--bs-line); }
-div.beltoft-services-domain .beltoft-services-domain__import > .beltoft-services-domain__title { margin: 0 0 var(--bs-space-2); }
+div.beltoft-services-domain .beltoft-services-domain__import > .beltoft-services-domain__title { margin: 0 0 var(--bs-space-3); }
 div.beltoft-services-domain .beltoft-services-domain__import > .beltoft-services-domain__note { max-width: 62ch; margin: 0; }
 .beltoft-services-domain__import-file { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bs-space-2) var(--bs-space-3); margin: var(--bs-space-4) 0 0; }
 div.beltoft-services-domain .beltoft-services-domain__import-actions .button.beltoft-services-domain__import-preview,
@@ -799,7 +799,7 @@ div.beltoft-services-domain ul.beltoft-services-domain__import-list > li { displ
 
 /* Add a disk, more snapshots: square tiles to pick from, the size or count over its price. */
 .beltoft-services-add { margin: 16px 0; }
-.beltoft-services-add__title { margin: 0 0 var(--bs-space-2); color: var(--bs-ink); font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); }
+.beltoft-services-add__title { margin: 0 0 var(--bs-space-3); color: var(--bs-ink); font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); }
 .beltoft-services-add__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; max-width: 720px; }
 .beltoft-services-add a.beltoft-services-add__tile { display: flex; flex-direction: column; gap: 4px; padding: 16px; border: 0; background: var(--bs-warm); color: var(--bs-ink) !important; text-decoration: none !important; transition: background-color 0.12s ease, color 0.12s ease; }
 .beltoft-services-add a.beltoft-services-add__tile:hover { background: var(--bs-dark); color: var(--bs-surface) !important; }
@@ -905,14 +905,14 @@ div.beltoft-services-domain ul.beltoft-services-domain__import-list > li { displ
 
 /* Credit page (prepaid balance). Square corners, few borders, the dashboard palette variables. */
 .beltoft-services-credit { max-width: var(--bs-page-width); margin: 0 0 24px; color: var(--bs-ink); font-size: 16px; font-weight: 400; line-height: 1.5; }
-.beltoft-services-credit .beltoft-services-ov__head { margin: 0 0 8px; }
+.beltoft-services-credit .beltoft-services-ov__head { margin: 0 0 var(--bs-space-3); }
 .beltoft-services-credit .beltoft-services-credit__historyhead { margin-top: 24px; }
 .beltoft-services-credit__balance { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 0; padding: 12px 16px; background: var(--bs-surface); }
 .beltoft-services-credit__label { color: var(--bs-muted); font-size: var(--bs-fs-body); font-weight: var(--bs-fw-regular); }
 .beltoft-services-credit__amount { font-size: var(--bs-fs-body); font-weight: var(--bs-fw-strong); font-variant-numeric: tabular-nums; }
 .beltoft-services-credit__form { display: grid; gap: 12px; margin: 24px 0 0; }
 .beltoft-services-credit .beltoft-services-credit__amounts { display: block; min-width: 0; margin: 0; padding: 0; border: 0; }
-.beltoft-services-credit .beltoft-services-credit__amounts legend.beltoft-services-credit__legend, .woocommerce-account .woocommerce .beltoft-services-credit legend.beltoft-services-credit__legend { float: left; width: 100%; margin: 0 0 8px; padding: 0; font-size: 20px; font-weight: 600; line-height: 1.3; }
+.beltoft-services-credit .beltoft-services-credit__amounts legend.beltoft-services-credit__legend, .woocommerce-account .woocommerce .beltoft-services-credit legend.beltoft-services-credit__legend { float: left; width: 100%; margin: 0 0 var(--bs-space-3); padding: 0; font-size: 20px; font-weight: 600; line-height: 1.3; }
 .beltoft-services-credit__legend + * { clear: both; }
 .beltoft-services-credit__grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1px; padding: 1px; background: var(--bs-line); }
 .beltoft-services-credit__tile { position: relative; display: block; margin: 0; padding: 0; cursor: pointer; }
@@ -1509,3 +1509,150 @@ body.woocommerce-account .woocommerce-MyAccount-content .bs-sub-head .bs-note { 
 	.beltoft-services-usage--card .beltoft-services-servers--subs.beltoft-services-servers--area :is(a, div).beltoft-services-srv { grid-template-columns: minmax(0, 1fr); }
 	.beltoft-services-usage--card .beltoft-services-servers--subs .beltoft-services-srv__state { justify-items: start; text-align: left; }
 }
+
+/* ==== Design pass 2026-11-25: the shared parts ====================================================================
+   The rules every page follows (a page adds none of its own):
+   - heading to the content under it: --bs-space-3 (12px); a heading is never closer than that.
+   - blocks inside one card or one tab: --bs-space-5 (24px); sections on the page itself, outside a card: --bs-space-6 (32px).
+   - card padding: --bs-space-5 (24px), --bs-space-4 (16px) on a phone; rows of a list card: 8px 16px (12px 24px for .bs-item).
+   - text colour comes from --bs-ink / --bs-muted only (--bs-dark is the fill of buttons and meters, never a text colour).
+   - a card that is built from several blocks is one card: the blocks have square joins and no seam. */
+
+/* The overview tab of a server: the same 24px between blocks as every other tab (the facts, the managed note, the IPv4 block). */
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab[data-tab="overview"] > * + * { margin-top: var(--bs-space-5); }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab[data-tab="overview"] > .beltoft-services-cost { margin-top: var(--bs-space-3); }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab[data-tab="overview"] > .beltoft-services-vm__managed > h4:first-child, body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab[data-tab="overview"] > .beltoft-services-vm__ipv4 > h4:first-child { margin-top: 0; }
+/* A short line and the button that acts on it sit 12px apart (the price line and "Add an IPv4 address"). */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-tab :is(p, .description) + :is(.button, button.button) { margin-top: var(--bs-space-3); }
+
+/* Text colours: bold text and the disk guide follow the text colour, not the theme's accent. */
+body.woocommerce-account .woocommerce-MyAccount-content :is(b, strong) { color: inherit; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-disk__guide { margin: var(--bs-space-3) 0; padding: 0; background: none; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-disk__guide > summary { color: var(--bs-ink); font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); text-decoration: underline; text-underline-offset: 3px; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-disk__guide[open] > summary { margin-bottom: var(--bs-space-3); }
+
+/* Make larger / Remove: 16px apart (the link style above resets the margin); Remove ends billing, so it reads as a danger link. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__disk :is(a, button.beltoft-services-vm__link) + :is(a, button.beltoft-services-vm__link) { margin-left: var(--bs-space-4); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__disk button.beltoft-services-vm__link:is([data-delete-disk], [data-cancel-url]) { color: var(--bs-status-fail); }
+.beltoft-services-bar__sub { margin-top: var(--bs-space-1); }
+
+/* Page head: the renewal date is a meta item like the state and the type. */
+.beltoft-services-page__renews { color: var(--bs-muted); font-size: var(--bs-fs-small); line-height: 20px; }
+
+/* Notices: as wide as the page (the overview is wider), and their button is the compact 32px one. */
+body.woocommerce-account .woocommerce-MyAccount-content > :is(.woocommerce-message, .woocommerce-info, .woocommerce-error, .woocommerce-notices-wrapper) { box-sizing: border-box; max-width: var(--bs-page-width); }
+body.woocommerce-account .woocommerce-MyAccount-content:has(.beltoft-services-overview) > :is(.woocommerce-message, .woocommerce-info, .woocommerce-error, .woocommerce-notices-wrapper) { max-width: none; }
+body.woocommerce-account :is(.woocommerce-message, .woocommerce-info, .woocommerce-error):has(> a.button) { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bs-space-2) var(--bs-space-4); }
+body.woocommerce-account :is(.woocommerce-message, .woocommerce-info, .woocommerce-error) > a.button { float: none; order: 2; flex: none; margin: 0 0 0 auto; box-sizing: border-box; display: inline-flex; align-items: center; min-height: var(--bs-btn-h-sm); padding: 0 var(--bs-space-3); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); line-height: 1.2; }
+@media (max-width: 600px) {
+	body.woocommerce-account :is(.woocommerce-message, .woocommerce-info, .woocommerce-error) > a.button { min-height: var(--bs-btn-h); margin-left: 0; }
+}
+
+/* Overview: the sections flow in columns that balance by height (no empty half), in the order of the list. */
+@media (min-width: 1000px) {
+	.beltoft-services-ov__cols { display: block; column-count: 2; column-gap: var(--bs-space-5); }
+	.beltoft-services-ov__cols.is-single { column-count: 1; }
+	.beltoft-services-ov__col { display: contents; }
+	.beltoft-services-ov__slot { break-inside: avoid; margin-bottom: var(--bs-space-5); }
+	.beltoft-services-ov__slot:last-child { margin-bottom: 0; }
+}
+/* Overview: stacked blocks of one card (money + usage, the support text + price + button) join without a seam. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-ov__money:has(+ .beltoft-services-ov__usage) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-ov__money + .beltoft-services-ov__usage { border-top-left-radius: 0; border-top-right-radius: 0; }
+.woocommerce-MyAccount-content .beltoft-services-ov__section .beltoft-services-ov__money p { color: var(--bs-ink); }
+body.woocommerce-account .woocommerce-MyAccount-content p.beltoft-licenses__empty:has(+ p.beltoft-licenses__empty) { padding-bottom: var(--bs-space-2); border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content p.beltoft-licenses__empty + p.beltoft-licenses__empty { padding-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content p.beltoft-licenses__empty:has(+ p.beltoft-licenses__empty + .beltoft-services-list-actions) + p.beltoft-licenses__empty { padding-bottom: var(--bs-space-3); }
+/* Recent activity: a day is a small heading inside the list, under the section heading in weight; the filter has the section gap. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-ov__feed .beltoft-services-ov__day { margin: 0; padding: var(--bs-space-3) var(--bs-space-4) var(--bs-space-1); color: var(--bs-muted); font-family: inherit; font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); line-height: var(--bs-lh-text); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-ov__feed .beltoft-services-ov__day:first-child { padding-top: var(--bs-space-2); }
+.beltoft-services-ov__head:has(.beltoft-services-ov__filter) { row-gap: var(--bs-space-3); }
+
+/* Order progress panel: the process line fills the panel, no extra margins inside it, regular text. */
+.bs-order .beltoft-services-progress { margin: 0; }
+.bs-order .beltoft-services-progress__text { margin: 0; }
+.bs-order .beltoft-services-progress__leave, .bs-order .beltoft-services-progress__note { margin: var(--bs-space-2) 0 0; }
+/* A running line shows one pulsing dot before its text, like every other state (the three squares stay for button labels). */
+.beltoft-services-progress.is-queued .beltoft-services-progress__text::before, .beltoft-services-progress.is-running .beltoft-services-progress__text::before { width: 8px; height: 8px; margin-right: var(--bs-space-2); vertical-align: baseline; border-radius: 50%; background: var(--bs-status-warn); animation: beltoft-services-pulse 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+	.beltoft-services-progress.is-queued .beltoft-services-progress__text::before, .beltoft-services-progress.is-running .beltoft-services-progress__text::before { animation: none; background-size: auto; }
+}
+
+/* Lists of rows (servers, databases, apps, subscriptions): the state sits after the name on its first line, not above it. */
+.beltoft-services-srv__id { grid-template-columns: auto minmax(0, 1fr); column-gap: var(--bs-space-3); align-items: baseline; }
+.beltoft-services-srv__id > .beltoft-services-srv__name { grid-column: 1; grid-row: 1; }
+.beltoft-services-srv__id > .beltoft-services-state { grid-column: 2; grid-row: 1; justify-self: start; }
+.beltoft-services-srv__id > .beltoft-services-srv__sub { grid-column: 1 / -1; grid-row: 2; }
+.beltoft-services-servers a.beltoft-services-srv, .beltoft-services-servers--area div.beltoft-services-srv { border-top-color: var(--bs-line); }
+.beltoft-services-servers a.beltoft-services-srv:first-child, .beltoft-services-servers--area div.beltoft-services-srv:first-child { border-top-width: 0; }
+
+/* Payment methods: the note under the table is 16px away from it. */
+.beltoft-services-card__needed { margin: var(--bs-space-4) 0 0; color: var(--bs-muted); font-size: var(--bs-fs-small); }
+
+/* A checkbox is as big as a radio and its label is body text; the whole row is the tap target. */
+div.beltoft-services-domain input[type="checkbox"] { flex: none; width: 18px; height: 18px; margin: 0; padding: 0; accent-color: var(--bs-dark); }
+.beltoft-services-domain__choice { min-height: var(--bs-btn-h); font-size: var(--bs-fs-body); font-weight: var(--bs-fw-regular); }
+
+/* The step-up block of a domain page: one 16px rhythm between the steps. */
+.beltoft-services-domain-stepup { margin-top: var(--bs-space-4); }
+.beltoft-services-domain-stepup__ask, .beltoft-services-domain-stepup__enter { gap: var(--bs-space-4); }
+.beltoft-services-domain-stepup__ask > .beltoft-services-domain__note, .beltoft-services-domain-stepup > .beltoft-services-domain__note { margin: 0; }
+
+/* Dialogs: fields, errors and the button row look like the page's. */
+.bs-dialog__form > p { margin: 0 0 var(--bs-space-3); }
+.bs-dialog__form > p.beltoft-services-vm__buttons { margin: 0; }
+.bs-dialog label { display: block; margin: 0 0 var(--bs-space-4); color: var(--bs-muted); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); }
+.bs-dialog label br { display: none; }
+.bs-dialog.bs-dialog :is(input[type="text"], input[type="password"], input[type="email"], input[type="number"], input[type="search"], input:not([type])) { box-sizing: border-box; display: block; width: 100%; max-width: 100%; height: var(--bs-input-h); margin: var(--bs-space-1) 0 0; padding: 0 var(--bs-space-3); border: 1px solid var(--bs-input-border); border-radius: var(--bs-radius); background: var(--bs-surface); box-shadow: none; color: var(--bs-ink); font: inherit; font-size: var(--bs-fs-body); }
+.bs-dialog :is(input, select, textarea):focus-visible { outline: 2px solid var(--bs-focus); outline-offset: 2px; }
+.bs-dialog p[role="alert"] { margin: 0 0 var(--bs-space-4); color: var(--bs-status-fail); font-weight: var(--bs-fw-medium); }
+.bs-dialog p[role="alert"]:empty { display: none; }
+.bs-dialog { border-radius: var(--bs-radius-lg); }
+
+/* Secondary buttons: one look (Copy, Reboot, Cancel). Command text in a copy row breaks at its spaces first (not after every character). */
+.woocommerce-MyAccount-content .beltoft-services-api .beltoft-services-api__claude code.beltoft-services-api__secret { overflow-wrap: anywhere; word-break: normal; }
+
+/* Danger buttons that are not the last step (a confirmation follows): the fail colour as an outline. */
+body.woocommerce-account .woocommerce-MyAccount-content .bs-btn.bs-btn--danger { background: var(--bs-surface); color: var(--bs-status-fail); border-color: var(--bs-status-fail); }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-btn.bs-btn--danger:hover { background: var(--bs-fail-tint); color: var(--bs-status-fail); border-color: var(--bs-status-fail); }
+
+/* Credit: one heading rhythm for Credit, Top up, Have a code and History. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit :is(h2, h3) { margin-bottom: var(--bs-space-3); }
+.beltoft-services-credit__form, .beltoft-services-credit__code { margin-top: var(--bs-space-6); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit__code > :is(h2, h3, label) { margin: 0; }
+
+/* Headings: one recipe for every section heading of the account (20px, 600, 12px to the content). The theme sets h2-h4 with more
+   specificity than a plugin class, so the component headings repeat the account prefix. Spacing above comes from the block, not the heading. */
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-ov__head :is(h2, h3), .beltoft-services-vm h4, .beltoft-services-add__title, .beltoft-services-domain__title, .beltoft-services-credit__historyhead h2, .beltoft-services-usage .beltoft-services-ov__head h2, .beltoft-services-api :is(h3, h4), .beltoft-services-ssl h3, .bs-subscriptions__title, .bs-order__title) { margin-top: 0; margin-bottom: var(--bs-space-3); color: var(--bs-ink); font-size: var(--bs-fs-heading); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-heading); letter-spacing: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-ov__head :is(h2, h3) { margin-bottom: 0; }
+/* Page head of every service kind (servers, databases, domains, hosting, mail ...): back link row, then the name (20px, 600), the state
+   line 4px under it, a message 8px under that, the tab bar 16px under the head and 24px above the first block. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-page__name { margin: 0; color: var(--bs-ink); font-size: var(--bs-fs-title); font-weight: var(--bs-fw-strong); line-height: var(--bs-lh-title); letter-spacing: -0.01em; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-page__title { margin-top: var(--bs-space-2); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-page__meta { margin-top: var(--bs-space-1); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-tabs { margin: var(--bs-space-4) 0 var(--bs-space-5); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-ov__feed h3.beltoft-services-ov__day { font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); }
+
+/* One panel recipe: surface ground, --bs-radius-lg, 24px inside (16px on a phone). Tab cards, the API tokens box, create forms, app panels. */
+body.woocommerce-account .woocommerce-MyAccount-content :is(section.beltoft-services-tab:not([data-tab="overview"]), section.beltoft-services-api) { box-sizing: border-box; padding: var(--bs-space-5); border-radius: var(--bs-radius-lg); background: var(--bs-surface); }
+@media (max-width: 700px) {
+	body.woocommerce-account .woocommerce-MyAccount-content :is(section.beltoft-services-tab:not([data-tab="overview"]), section.beltoft-services-api) { padding: var(--bs-space-4); }
+}
+
+/* One status component: dot 8px, 8px to the text, 14px, weight 500 (services badge, list state, licence status, hosting status). */
+.bs-state { gap: var(--bs-space-2); }
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-hosting-status, .bs-state, .beltoft-services-state, .beltoft-services-badge) { display: inline-flex; align-items: center; gap: var(--bs-space-2); font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); }
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-hosting-status, .beltoft-services-badge)::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: currentcolor; }
+
+/* Forms: label 4px over its field, a hint 8px under it, fields 16px apart. */
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-db__form, .beltoft-services-credit__form) { gap: var(--bs-space-4); }
+
+/* The theme's shop.css paints parts of these components with its --navy (the accent on the dark account): text stays the text colour. */
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-vm__facts dd, .beltoft-services-http__facts dd, .beltoft-services-vm code, .beltoft-services-vm__backup-list td, .beltoft-services-vm__backups > p a, .beltoft-services-vm__more summary, .beltoft-services-vm-form label, .beltoft-services-disk__guide .beltoft-services-disk__warning, .beltoft-services-disk__guide code) { color: var(--bs-ink); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm-form label { color: var(--bs-ink); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit__historyhead h2 { margin-bottom: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .bs-subscriptions__title { margin-top: var(--bs-space-5); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit__code { gap: 0; }
+.beltoft-services-credit__code > .beltoft-services-credit__coderow { margin-top: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit .beltoft-services-ov__head :is(h2, h3) { margin: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-credit__code > .beltoft-services-credit__note { margin-top: var(--bs-space-3); }
