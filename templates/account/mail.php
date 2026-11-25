@@ -342,7 +342,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 								<p class="description"><?php esc_html_e( 'Make a mailbox first. An alias passes mail on to mailboxes in this domain.', 'beltoft-services' ); ?></p>
 							<?php endif; ?>
 							<?php if ( $view['forward_external'] ) : ?>
-								<label for="beltoft-mail-goto"><?php echo esc_html( array() !== $beltoft_services_targets ? __( 'Other addresses', 'beltoft-services' ) : __( 'Addresses', 'beltoft-services' ) ); ?></label>
+								<label for="beltoft-mail-goto"<?php echo array() !== $beltoft_services_targets ? '' : ' class="screen-reader-text"'; ?>><?php echo esc_html( array() !== $beltoft_services_targets ? __( 'Other addresses', 'beltoft-services' ) : __( 'Addresses', 'beltoft-services' ) ); ?></label>
 								<textarea id="beltoft-mail-goto" rows="2" autocomplete="off" placeholder="name@example.com" data-mail-alias-goto></textarea>
 								<span class="description"><?php esc_html_e( 'One address per line, also outside this domain. Up to ten addresses in all.', 'beltoft-services' ); ?></span>
 							<?php else : ?>
@@ -376,27 +376,29 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 				<p><?php esc_html_e( 'The settings appear here when email is set up.', 'beltoft-services' ); ?></p>
 			<?php else : ?>
 				<p class="description"><?php esc_html_e( 'The user name is the whole address, for example info@your-domain, and the password is the one you showed when you made the mailbox. Use an encrypted connection.', 'beltoft-services' ); ?></p>
-				<table class="beltoft-services-vm__backup-list beltoft-services-mail__table">
+				<table class="beltoft-services-vm__backup-list beltoft-services-mail__table beltoft-services-mail__connect">
 					<thead>
 						<tr><th scope="col"><?php esc_html_e( 'Use', 'beltoft-services' ); ?></th><th scope="col"><?php esc_html_e( 'Server', 'beltoft-services' ); ?></th><th scope="col"><?php esc_html_e( 'Port', 'beltoft-services' ); ?></th><th scope="col"><?php esc_html_e( 'Security', 'beltoft-services' ); ?></th></tr>
 					</thead>
 					<tbody>
-						<tr><td><?php esc_html_e( 'Incoming, IMAP', 'beltoft-services' ); ?></td><td><code><?php echo esc_html( $beltoft_services_connect['host'] ); ?></code></td><td><?php echo (int) $beltoft_services_connect['imap']; ?></td><td><?php esc_html_e( 'SSL/TLS', 'beltoft-services' ); ?></td></tr>
-						<tr><td><?php esc_html_e( 'Incoming, POP3', 'beltoft-services' ); ?></td><td><code><?php echo esc_html( $beltoft_services_connect['host'] ); ?></code></td><td><?php echo (int) $beltoft_services_connect['pop']; ?></td><td><?php esc_html_e( 'SSL/TLS', 'beltoft-services' ); ?></td></tr>
-						<tr><td><?php esc_html_e( 'Outgoing, SMTP', 'beltoft-services' ); ?></td><td><code><?php echo esc_html( $beltoft_services_connect['host'] ); ?></code></td><td><?php echo (int) $beltoft_services_connect['smtp'][0]; ?></td><td><?php esc_html_e( 'SSL/TLS', 'beltoft-services' ); ?></td></tr>
-						<tr><td><?php esc_html_e( 'Outgoing, SMTP', 'beltoft-services' ); ?></td><td><code><?php echo esc_html( $beltoft_services_connect['host'] ); ?></code></td><td><?php echo (int) $beltoft_services_connect['smtp'][1]; ?></td><td><?php esc_html_e( 'STARTTLS', 'beltoft-services' ); ?></td></tr>
+						<tr><td><?php esc_html_e( 'Incoming, IMAP', 'beltoft-services' ); ?></td><td data-label="<?php echo esc_attr__( 'Server', 'beltoft-services' ); ?>"><code><?php echo esc_html( $beltoft_services_connect['host'] ); ?></code></td><td data-label="<?php echo esc_attr__( 'Port', 'beltoft-services' ); ?>"><?php echo (int) $beltoft_services_connect['imap']; ?></td><td data-label="<?php echo esc_attr__( 'Security', 'beltoft-services' ); ?>"><?php esc_html_e( 'SSL/TLS', 'beltoft-services' ); ?></td></tr>
+						<tr><td><?php esc_html_e( 'Incoming, POP3', 'beltoft-services' ); ?></td><td data-label="<?php echo esc_attr__( 'Server', 'beltoft-services' ); ?>"><code><?php echo esc_html( $beltoft_services_connect['host'] ); ?></code></td><td data-label="<?php echo esc_attr__( 'Port', 'beltoft-services' ); ?>"><?php echo (int) $beltoft_services_connect['pop']; ?></td><td data-label="<?php echo esc_attr__( 'Security', 'beltoft-services' ); ?>"><?php esc_html_e( 'SSL/TLS', 'beltoft-services' ); ?></td></tr>
+						<tr><td><?php esc_html_e( 'Outgoing, SMTP', 'beltoft-services' ); ?></td><td data-label="<?php echo esc_attr__( 'Server', 'beltoft-services' ); ?>"><code><?php echo esc_html( $beltoft_services_connect['host'] ); ?></code></td><td data-label="<?php echo esc_attr__( 'Port', 'beltoft-services' ); ?>"><?php echo (int) $beltoft_services_connect['smtp'][0]; ?></td><td data-label="<?php echo esc_attr__( 'Security', 'beltoft-services' ); ?>"><?php esc_html_e( 'SSL/TLS', 'beltoft-services' ); ?></td></tr>
+						<tr><td><?php esc_html_e( 'Outgoing, SMTP', 'beltoft-services' ); ?></td><td data-label="<?php echo esc_attr__( 'Server', 'beltoft-services' ); ?>"><code><?php echo esc_html( $beltoft_services_connect['host'] ); ?></code></td><td data-label="<?php echo esc_attr__( 'Port', 'beltoft-services' ); ?>"><?php echo (int) $beltoft_services_connect['smtp'][1]; ?></td><td data-label="<?php echo esc_attr__( 'Security', 'beltoft-services' ); ?>"><?php esc_html_e( 'STARTTLS', 'beltoft-services' ); ?></td></tr>
 					</tbody>
 				</table>
 			<?php endif; ?>
 			<?php if ( '' !== (string) ( $beltoft_services_connect['dav'] ?? '' ) ) : ?>
 				<p><?php echo esc_html( sprintf( /* translators: %s: calendar and contacts address */ __( 'Calendar and contacts (CalDAV and CardDAV): %s, with your full email address and the mailbox password.', 'beltoft-services' ), (string) $beltoft_services_connect['dav'] ) ); ?></p>
 			<?php endif; ?>
+			<div class="beltoft-services-mail__links">
 			<?php if ( '' !== $beltoft_services_connect['guide'] ) : ?>
 				<p><a href="<?php echo esc_url( $beltoft_services_connect['guide'] ); ?>"><?php esc_html_e( 'Setup guide for your mail app', 'beltoft-services' ); ?></a></p>
 			<?php endif; ?>
 			<?php if ( '' !== $beltoft_services_connect['webmail'] ) : ?>
 				<p><a class="button woocommerce-button" href="<?php echo esc_url( $beltoft_services_connect['webmail'] ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Open webmail', 'beltoft-services' ); ?></a></p>
 			<?php endif; ?>
+			</div>
 		</div>
 		<div class="beltoft-services-vm__more">
 			<h4><?php esc_html_e( 'Your plan', 'beltoft-services' ); ?></h4>

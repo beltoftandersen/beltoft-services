@@ -426,6 +426,9 @@ final class MailAccountTest extends MailTestCase {
 			$this->assertStringContainsString( $needle, $html, $needle );
 		}
 		$this->assertStringContainsString( 'href="https://webmail.example.net/"', $html );
+		$this->assertStringContainsString( 'beltoft-services-mail__connect', $html, 'The connect table is its own table on a phone.' );
+		$this->assertStringContainsString( 'data-label="Security"', $html );
+		$this->assertStringContainsString( 'class="beltoft-services-mail__links"', $html, 'The guide link and the webmail button share one row.' );
 		$this->assertStringContainsString( 'Each mailbox can send 500 messages a day.', $html );
 		$this->assertStringContainsString( 'together can send 30 messages a minute.', $html );
 		$this->assertStringContainsString( '10 GB', $html );
