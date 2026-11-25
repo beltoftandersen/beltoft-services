@@ -151,13 +151,4 @@ final class ApiScriptTest extends TestCase {
 		$this->assertNull( $out['out'], 'A timeout resolves to null, never to success.' );
 		$this->assertGreaterThan( 2, $out['reads'] );
 	}
-
-	public function test_the_hosting_page_follows_with_the_shared_helper_and_asks_the_cache_facts_again_once_on_a_409(): void {
-		$hosting = (string) file_get_contents( dirname( __DIR__ ) . '/assets/hosting.js' );
-
-		$this->assertStringContainsString( "until: 'idle'", $hosting );
-		$this->assertStringNotContainsString( 'Retry-After', $hosting, 'The back-off lives in api.js.' );
-		$this->assertStringContainsString( '409 !== first.status', $hosting );
-		$this->assertSame( 1, substr_count( $hosting, 'factsPath )' ) - 1, 'The facts are asked once, and once more after a 409.' );
-	}
 }

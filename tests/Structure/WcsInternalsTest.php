@@ -43,7 +43,8 @@ class WcsInternalsTest extends TestCase {
 			}
 		}
 
-		$this->assertSame( array( $owner ), $found, $needle );
+		// The owner file of a plugin that is not under the scan root (this test runs over Beltoft Hosting too) holds nothing.
+		$this->assertSame( file_exists( $root . $owner ) ? array( $owner ) : array(), $found, $needle );
 	}
 
 	/**

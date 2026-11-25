@@ -52,7 +52,7 @@ class LicencesTablesTest extends TestCase {
 
 		sort( $found );
 
-		$allowed = array_keys( self::allowed() );
+		$allowed = array_keys( array_filter( self::allowed(), static fn( $file ) => file_exists( $root . '/' . $file ), ARRAY_FILTER_USE_KEY ) );
 		sort( $allowed );
 
 		$this->assertSame( array(), array_values( array_diff( $found, $allowed ) ), 'New direct use of the licences tables: add a Resource method instead.' );

@@ -95,9 +95,6 @@ final class RecurringJobsTest extends TestCase {
 			if ( 'php' !== $file->getExtension() ) {
 				continue;
 			}
-			if ( in_array( explode( '/', substr( $file->getPathname(), strlen( Scan::root() . '/src/' ) ) )[0], Scan::unbooted(), true ) ) {
-				continue;
-			}
 
 			$code   = (string) file_get_contents( $file->getPathname() );
 			$count += substr_count( $code, 'Jobs::recurring(' );

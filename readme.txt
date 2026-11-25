@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.61.2
+Stable tag: 0.62.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.62.0 =
+* Hosting is its own plugin, Beltoft Hosting, which needs this version. New: boot stages (beltoft_services_boot), email registry filters, account pages work without an area's plugin, a settings save keeps settings of a plugin that is switched off.
 
 = 0.61.2 =
 * Checkout: the server step's choices (system, app, version, edition, domain, name, SSH key) are kept on the server's cart line at every checkout refresh, so after a reload (such as removing a line from the order summary) the fields show what was chosen. Before, the fields fell back to the defaults and the browser put the choices back one by one; that could drop the app licence line (such as Plesk Web Admin).

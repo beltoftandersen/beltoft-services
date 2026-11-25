@@ -42,10 +42,6 @@ final class Plugin {
 	public static function boot(): void {
 		self::$booted = false;
 
-		// Answers the beltoft_services_boot stages below and the deactivation action; added before the requirements check so
-		// a deactivation still stops the jobs when a dependency is missing.
-		Hosting\Boot::register();
-
 		if ( ! self::requirements_met() ) {
 			add_action( 'admin_notices', array( __CLASS__, 'notice_missing' ) );
 			return;

@@ -96,12 +96,6 @@ class SingleMessageTest extends TestCase {
 		}
 	}
 
-	public function test_the_hosting_panel_keeps_no_message_line_of_its_own(): void {
-		$this->assertStringNotContainsString( 'beltoft-hosting-message', (string) file_get_contents( BELTOFT_SERVICES_PATH . 'src/Hosting/HostingAccount.php' ) );
-		$this->assertStringNotContainsString( 'line.textContent', $this->js( 'hosting.js' ) );
-		$this->assertStringContainsString( 'S.fail( null, message )', $this->js( 'hosting.js' ) );
-	}
-
 	public function test_a_picker_error_line_is_taken_out_of_the_page_and_told_in_the_bar(): void {
 		$source = $this->js( 'picker.js' );
 

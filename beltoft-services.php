@@ -3,7 +3,7 @@
  * Plugin Name:          Beltoft Services for WooCommerce
  * Plugin URI:           https://beltoft.net/
  * Description:          Sell services with WooCommerce Subscriptions: a license is the entitlement, and a driver provisions, pauses, resumes and removes the service, driven by Beltoft Licenses.
- * Version:              0.61.2
+ * Version:              0.62.0
  * Requires at least:    6.5
  * Requires PHP:         8.1
  * Requires Plugins:     woocommerce, woocommerce-subscriptions, beltoft-licenses
@@ -22,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
 
 define( 'BELTOFT_SERVICES_FILE', __FILE__ );
 define( 'BELTOFT_SERVICES_PATH', plugin_dir_path( __FILE__ ) );
-define( 'BELTOFT_SERVICES_VERSION', '0.61.2' );
+define( 'BELTOFT_SERVICES_VERSION', '0.62.0' );
 
 /*
  * Old class names that outside code still calls (the site theme, the OdooWoo portal and system scripts; see tests/fixtures/external-api.php)
@@ -94,13 +94,6 @@ register_activation_hook( __FILE__, array( \BeltoftServices\Jobs::class, 'activa
 // The sweep, the retention run and the usage check stop with the plugin; pending reconcile jobs keep their place.
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Jobs::class, 'unschedule' ) );
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Retention::class, 'unschedule' ) );
-// Features stop their own recurring jobs on this action (a feature plugin cannot be named here).
-register_deactivation_hook(
-	__FILE__,
-	static function (): void {
-		do_action( 'beltoft_services_deactivate' );
-	}
-);
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Domains\Renewals::class, 'unschedule' ) );
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Proxmox\Vm\ProxmoxJobs::class, 'unschedule' ) );
 register_deactivation_hook( __FILE__, array( \BeltoftServices\Ssl\SslJobs::class, 'unschedule' ) );

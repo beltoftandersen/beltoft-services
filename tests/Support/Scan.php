@@ -25,21 +25,32 @@ final class Scan {
 	}
 
 	/**
-	 * Folders of src/ that are not booted in this run (BELTOFT_TEST_WITHOUT_HOSTING proves the rest does not need hosting).
-	 * Tests that compare the source with what registered at boot leave them out.
-	 *
-	 * @return string[]
-	 */
-	public static function unbooted(): array {
-		return getenv( 'BELTOFT_TEST_WITHOUT_HOSTING' ) ? array( 'Hosting' ) : array();
-	}
-
-	/**
 	 * The file whose boot method calls every register() (Plugin::boot()).
 	 *
 	 * @return string
 	 */
 	public static function boot_file(): string {
 		return defined( 'BELTOFT_TESTS_BOOT_FILE' ) ? (string) constant( 'BELTOFT_TESTS_BOOT_FILE' ) : self::root() . '/src/Plugin.php';
+	}
+
+	/**
+	 * Extra allowlist entries a plugin that runs these guard tests over its own code adds (BELTOFT_TESTS_ALLOW, test name => entries).
+	 *
+	 * @param string $test Key the guard test asks for.
+	 * @return string[]
+	 */
+	public static function allowed( string $test ): array {
+		$all = defined( 'BELTOFT_TESTS_ALLOW' ) ? (array) constant( 'BELTOFT_TESTS_ALLOW' ) : array();
+
+		return isset( $all[ $test ] ) ? (array) $all[ $test ] : array();
+	}
+
+	/**
+	 * Fewest classes with a register() the boot registry test must find (the services plugin has many more than a feature plugin).
+	 *
+	 * @return int
+	 */
+	public static function min_register_classes(): int {
+		return defined( 'BELTOFT_TESTS_MIN_REGISTER_CLASSES' ) ? (int) constant( 'BELTOFT_TESTS_MIN_REGISTER_CLASSES' ) : 100;
 	}
 }

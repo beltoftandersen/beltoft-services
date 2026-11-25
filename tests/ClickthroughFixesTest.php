@@ -41,22 +41,7 @@ final class ClickthroughFixesTest extends TestCase {
 		}
 
 		$this->assertGreaterThanOrEqual( 2, $seen );
-		$this->assertStringContainsString( 'account.stepUpUrl', $this->js( 'hosting.js' ) );
 		$this->assertStringContainsString( 'config.stepUpUrl', $this->js( 'domain.js' ) );
-	}
-
-	public function test_the_hosting_watcher_polls_slowly_backs_off_and_clears_the_rows_when_the_task_is_gone(): void {
-		$js = $this->js( 'hosting.js' );
-
-		$api = $this->js( 'api.js' );
-
-		// The pace and the back-off live in the shared follow() (until: 'idle'), which the watcher uses.
-		$this->assertStringContainsString( "until: 'idle'", $js );
-		$this->assertStringContainsString( '5000', $api );
-		$this->assertStringContainsString( '429 === reply.status', $api );
-		$this->assertStringContainsString( 'Retry-After', $api );
-		$this->assertStringContainsString( 'data-idle-text', $js, 'A row goes back to what it said before the task.' );
-		$this->assertStringContainsString( 'cacheFacts();', $js );
 	}
 
 	public function test_a_claim_carries_its_dates_in_the_site_format(): void {

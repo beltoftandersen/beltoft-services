@@ -113,7 +113,7 @@ class BootRegistryTest extends TestCase {
 
 	public function test_every_register_is_called_from_boot(): void {
 		$classes = $this->classes_with_register();
-		$this->assertGreaterThan( 100, count( $classes ), 'the scan finds the classes' );
+		$this->assertGreaterThan( Scan::min_register_classes(), count( $classes ), 'the scan finds the classes' );
 
 		$plugin  = Scan::boot_file();
 		$booted  = array();
@@ -162,6 +162,9 @@ class BootRegistryTest extends TestCase {
 		$classes = $this->classes_with_register();
 		$boots   = array_filter( array_keys( $classes ), static fn( $class ) => 1 === preg_match( '/^BeltoftServices\\\\\w+\\\\Boot$/', $class ) );
 		$plugin  = $this->calls_in( Scan::boot_file() );
+
+		// Beltoft Services itself has no feature Boot class (Beltoft Hosting runs this test over its own code); none is fine.
+		$this->assertIsArray( $boots );
 
 		foreach ( $boots as $boot ) {
 			$this->assertContains( $boot, $plugin, $boot . ' is a feature Boot class that the boot file does not register.' );

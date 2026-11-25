@@ -18,7 +18,7 @@ final class HostNameRegexTest extends TestCase {
 
 	public function test_the_label_regex_lives_in_host_name_only(): void {
 		$root    = Scan::root() . '/src/';
-		$allowed = array( 'Domains/HostName.php', 'Domains/Records.php', 'Hosting/FakeAgent.php' );
+		$allowed = array_merge( array( 'Domains/HostName.php', 'Domains/Records.php' ), Scan::allowed( 'host_name_regex' ) );
 		// A listed file of a feature that is not installed cannot hold the regex.
 		$allowed = array_values( array_filter( $allowed, static fn( $file ) => file_exists( $root . $file ) ) );
 		$found   = array();

@@ -64,6 +64,9 @@ tests_add_filter(
 			require $beltoft_services_account . '/beltoft-gift-cards-account.php';
 		}
 		require dirname( __DIR__ ) . '/beltoft-services.php';
+		foreach ( defined( 'BELTOFT_TESTS_EXTRA_PLUGINS' ) ? (array) constant( 'BELTOFT_TESTS_EXTRA_PLUGINS' ) : array() as $beltoft_services_extra_plugin ) {
+			require $beltoft_services_extra_plugin;
+		}
 	}
 );
 
@@ -122,21 +125,13 @@ tests_add_filter(
 	20
 );
 
-// Test support of the hosting feature (its tables, its per-test reset). BELTOFT_TEST_WITHOUT_HOSTING=1 proves the rest of
-// the suite does not need it: the hosting test bootstrap is not loaded and Hosting\Boot's listeners are removed before the
-// first boot stage runs (Plugin::boot() registers them and fires the stages straight away).
-if ( getenv( 'BELTOFT_TEST_WITHOUT_HOSTING' ) ) {
-	tests_add_filter(
-		'beltoft_services_boot',
-		static function () {
-			remove_action( 'beltoft_services_boot', array( 'BeltoftServices\\Hosting\\Boot', 'stage' ) );
-			remove_action( 'beltoft_services_deactivate', array( 'BeltoftServices\\Hosting\\Addons', 'unschedule' ) );
-		},
-		0
-	);
-} elseif ( file_exists( __DIR__ . '/Hosting/bootstrap-hosting.php' ) ) {
-	require __DIR__ . '/Hosting/bootstrap-hosting.php';
+// A plugin that runs its own tests on top of this one (beltoft-hosting) defines these before it requires this file:
+// BELTOFT_TESTS_EXTRA_BOOTSTRAP, test bootstrap files to include here (they add test hooks while WordPress is not loaded yet),
+// and BELTOFT_TESTS_EXTRA_PLUGINS, main files of plugins to load right after this one.
+foreach ( defined( 'BELTOFT_TESTS_EXTRA_BOOTSTRAP' ) ? (array) constant( 'BELTOFT_TESTS_EXTRA_BOOTSTRAP' ) : array() as $beltoft_services_extra ) {
+	require $beltoft_services_extra;
 }
+unset( $beltoft_services_extra );
 
 require $beltoft_services_tests_dir . '/includes/bootstrap.php';
 require __DIR__ . '/Support/Scan.php';

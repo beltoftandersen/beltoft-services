@@ -51,12 +51,6 @@ class StatusTest extends TestCase {
 		$this->assertStringNotContainsString( 'bs-note', $js );
 		$this->assertStringNotContainsString( "classList.add( 'is-busy' )", $js );
 		$this->assertMatchesRegularExpression( '/show\( \'busy\', message, handle \);/', $js );
-
-		// Hosting: clearing the cache keeps its done line (no reload); other actions show it again after the reload.
-		$hosting = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/hosting.js' );
-		$this->assertMatchesRegularExpression( "/if \\( 'cache' === action \\) \\{\\s*return;\\s*\\}/", $hosting );
-		$this->assertStringContainsString( 'remember( action,', $hosting );
-		$this->assertStringContainsString( 'recall();', $hosting );
 	}
 
 	public function test_the_progress_line_has_one_place_a_phone_breakpoint_and_a_progress_api(): void {

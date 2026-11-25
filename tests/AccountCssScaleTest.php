@@ -5,7 +5,7 @@ namespace BeltoftServices\Tests;
 
 final class AccountCssScaleTest extends TestCase {
 	/** Sheets that only My Account pages load. */
-	private const FILES = array( 'account', 'hosting', 'app-tab', 'console', 'db', 'dns-claim', 'firewall', 'mail', 'metrics', 'network-tab', 'ssl' );
+	private const FILES = array( 'account', 'app-tab', 'console', 'db', 'dns-claim', 'firewall', 'mail', 'metrics', 'network-tab', 'ssl' );
 
 	/** @return array<string,string> */
 	private function sheets(): array {
@@ -71,7 +71,7 @@ final class AccountCssScaleTest extends TestCase {
 	}
 
 	/** Sheets of public order forms and pages: they may load without account.css, so colours carry a fallback. */
-	private const PUBLIC_FILES = array( 'picker', 'tiles', 'mail-setup', 'order-domain', 'site-field', 'app-field', 'dk-agreement', 'payg-breakdown', 'thankyou' );
+	private const PUBLIC_FILES = array( 'picker', 'tiles', 'mail-setup', 'order-domain', 'app-field', 'dk-agreement', 'payg-breakdown', 'thankyou' );
 
 	/** @return array<string,string> token => value of the account.css token block */
 	private function tokens(): array {

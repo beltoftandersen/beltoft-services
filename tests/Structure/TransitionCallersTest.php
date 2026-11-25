@@ -62,12 +62,14 @@ class TransitionCallersTest extends TestCase {
 		}
 
 		ksort( $found );
-		$allowed = array_keys( self::ALLOWED );
+		// A listed file of a plugin that is not under the scan root (this test runs over Beltoft Hosting too) cannot hold a call.
+		$present = static fn( array $list ): array => array_filter( $list, static fn( $name ) => file_exists( $root . $name ), ARRAY_FILTER_USE_KEY );
+		$allowed = array_keys( $present( self::ALLOWED ) );
 		sort( $allowed );
 
 		$this->assertSame( $allowed, array_keys( $found ), 'Resource::transition() fires nothing: new callers must use Reconciler::move() or list their reason here.' );
 
-		$counts = self::COUNTS;
+		$counts = $present( self::COUNTS );
 		ksort( $counts );
 		$this->assertSame( $counts, $found, 'The number of ->transition( calls in a listed file changed: a new call needs its reason checked, then the count here updated.' );
 	}
