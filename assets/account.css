@@ -1942,6 +1942,31 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__ip
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__ipv4 details.beltoft-services-vm__ipv4-setup > pre code { white-space: pre; overflow-wrap: normal; word-break: normal; }
 
 
+/* The Domain block of the App tab: one row. The name, the state and the hint share the first column and the button sits at the right edge of the same row; on a phone
+   they stack 8px apart and the button is 40px. A name wraps only after a dot (the template puts a break opportunity there), never inside a label. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--bs-space-4); row-gap: var(--bs-space-2); align-items: start; margin-top: var(--bs-space-3); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__row > p { grid-column: 1; margin: 0; overflow-wrap: normal; word-break: normal; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__value { font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__state { font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__state.is-busy { color: var(--bs-status-warn); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__state.is-bad { color: var(--bs-status-fail); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__row > p.beltoft-services-app-domain__action { grid-column: 2; grid-row: 1; align-self: start; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__form { margin: var(--bs-space-4) 0 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__form[hidden], body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__fields[hidden] { display: none; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__choices { min-width: 0; margin: 0; padding: 0; border: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__choices legend { margin: 0 0 var(--bs-space-2); padding: 0; font-weight: var(--bs-fw-medium); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__choice { display: block; margin: 0 0 var(--bs-space-3); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__choice input { margin-right: var(--bs-space-2); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__choice .description { display: block; margin: var(--bs-space-1) 0 0 var(--bs-space-5); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__fields { display: grid; gap: var(--bs-space-2); margin: 0 0 var(--bs-space-4) var(--bs-space-5); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__fields :is(input[type="text"], select) { width: 100%; box-sizing: border-box; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__buttons { display: flex; flex-wrap: wrap; gap: var(--bs-space-2); margin: var(--bs-space-4) 0 0; }
+@media (max-width: 600px) {
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__row { grid-template-columns: minmax(0, 1fr); }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain__row > p.beltoft-services-app-domain__action { grid-column: 1; grid-row: auto; }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-domain :is(.bs-btn--sm) { min-height: var(--bs-btn-h); }
+}
+
 /* ==== Design pass 2026-11-25: databases, SSL, licences, apps, storage ============================================== */
 
 /* Database page: facts values line up with the plain ones (the code chip had its own padding), the list of policies is plain rows. */

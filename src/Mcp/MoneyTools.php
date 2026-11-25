@@ -40,7 +40,7 @@ final class MoneyTools {
 		'get_database_access', 'list_payment_methods', 'get_account', 'list_dns_claims', 'console_link', 'hosting_usage', 'list_hosting_backups',
 		'email_domain_info', 'ssl_info', 'get_ssl_certificate', 'list_licenses', 'get_license_key', 'reboot', 'start', 'shutdown', 'create_snapshot',
 		'dns_upsert_record', 'dns_delete_record', 'rename_server', 'set_firewall', 'set_database_access', 'private_network', 'set_usage_alerts',
-		'retry_app_install', 'domain_settings', 'add_site_domain', 'set_php_version', 'clear_site_cache', 'create_hosting_backup', 'create_mailbox',
+		'retry_app_install', 'change_app_domain', 'domain_settings', 'add_site_domain', 'set_php_version', 'clear_site_cache', 'create_hosting_backup', 'create_mailbox',
 		'add_email_alias', 'remove_email_alias', 'ssl_resend_email', 'email_dns_check', 'set_auto_renew', 'free_license_site', 'cancel_unpaid_order',
 		'update_billing_address', 'delete_snapshot', 'rollback_snapshot', 'restore_backup', 'reinstall_server', 'replace_ssh_key', 'reset_firewall',
 		'set_database_eviction_policy', 'delete_mailbox',

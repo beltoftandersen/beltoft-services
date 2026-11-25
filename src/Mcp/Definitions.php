@@ -47,7 +47,7 @@ final class Definitions {
 		'catalog', 'price_quote', 'list_server_plans', 'list_dns_claims', 'console_link', 'dedicated_info', 'hosting_info',
 		'hosting_usage', 'list_hosting_backups', 'email_domain_info', 'ssl_info', 'get_ssl_certificate', 'list_licenses',
 		'get_license_key', 'reboot', 'start', 'shutdown', 'create_snapshot', 'dns_upsert_record', 'dns_delete_record',
-		'rename_server', 'set_firewall', 'set_database_access', 'private_network', 'set_usage_alerts', 'retry_app_install',
+		'rename_server', 'set_firewall', 'set_database_access', 'private_network', 'set_usage_alerts', 'retry_app_install', 'change_app_domain',
 		'domain_settings', 'dedicated_restart', 'dedicated_power_on', 'dedicated_set_rdns', 'dedicated_rescue',
 		'add_site_domain', 'set_php_version', 'clear_site_cache', 'create_hosting_backup', 'create_mailbox',
 		'add_email_alias', 'remove_email_alias', 'ssl_resend_email', 'email_dns_check', 'set_auto_renew',
