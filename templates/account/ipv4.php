@@ -54,7 +54,7 @@ defined( 'ABSPATH' ) || exit;
 				<p class="description"><?php esc_html_e( 'We could not set the extra addresses up in your server. Press Apply again once the server runs and its guest agent is on, or use the lines below.', 'beltoft-services' ); ?></p>
 			<?php endif; ?>
 			<?php if ( $ipv4['guest']['can_apply'] ) : ?>
-				<p><button type="button" class="button woocommerce-button bs-btn" data-ipv4-guest-action="<?php echo esc_attr( \BeltoftServices\Proxmox\Ipv4\Ipv4Guest::ACTION ); ?>"><?php esc_html_e( 'Apply again', 'beltoft-services' ); ?></button></p>
+				<p><button type="button" class="button woocommerce-button bs-btn bs-btn--secondary bs-btn--sm" data-ipv4-guest-action="<?php echo esc_attr( \BeltoftServices\Proxmox\Ipv4\Ipv4Guest::ACTION ); ?>"><?php esc_html_e( 'Apply again', 'beltoft-services' ); ?></button></p>
 			<?php endif; ?>
 		<?php endif; ?>
 		<?php if ( array() !== $ipv4['setup'] ) : ?>

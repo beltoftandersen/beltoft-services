@@ -878,6 +878,50 @@ class DbPhase4Test extends TestCase {
 		remove_all_filters( 'beltoft_services_rest_rate_limit' );
 	}
 
+	public function test_the_page_shows_the_translated_open_to_everyone_phrase_and_the_constant_stays_english(): void {
+		$filter = static fn( $translated, $text, $domain ) => 'beltoft-services' === $domain && 'OPEN TO EVERYONE' === $text ? 'ÅBEN FOR ALLE' : $translated;
+		add_filter( 'gettext', $filter, 10, 3 );
+		$r    = $this->db_with_ip();
+		$view = DbAccess::view( Resource::find( $r->id() ) );
+		remove_filter( 'gettext', $filter, 10 );
+
+		$this->assertSame( 'ÅBEN FOR ALLE', $view['confirm'] );
+		$this->assertSame( 'OPEN TO EVERYONE', DbAccess::CONFIRM_WORLD );
+		$this->assertSame( 'OPEN TO EVERYONE', DbAccess::view( Resource::find( $r->id() ) )['confirm'] );
+	}
+
+	public function test_open_to_everyone_accepts_the_translated_phrase_or_the_english_one_and_refuses_anything_else(): void {
+		$r = $this->db_with_ip();
+
+		// English page: the translated phrase is not accepted.
+		$this->assertSame( 422, $this->post( $r, array( 'op' => 'world_on', 'confirm' => 'ÅBEN FOR ALLE' ) )->get_status() );
+
+		$filter = static fn( $translated, $text, $domain ) => 'beltoft-services' === $domain && 'OPEN TO EVERYONE' === $text ? 'ÅBEN FOR ALLE' : $translated;
+		add_filter( 'gettext', $filter, 10, 3 );
+
+		$wrong = $this->post( $r, array( 'op' => 'world_on', 'confirm' => 'åben for alle' ) );
+		$this->assertSame( 422, $wrong->get_status() );
+		$this->assertStringContainsString( 'ÅBEN FOR ALLE', $wrong->get_data()['message'] ?? wp_json_encode( $wrong->get_data() ) );
+		$this->assertFalse( DbAccess::world( Resource::find( $r->id() ) ) );
+		$this->assertSame( 202, $this->post( $r, array( 'op' => 'world_on', 'confirm' => 'ÅBEN FOR ALLE' ) )->get_status() );
+		$this->assertTrue( DbAccess::world( Resource::find( $r->id() ) ) );
+		remove_filter( 'gettext', $filter, 10 );
+	}
+
+	public function test_the_page_script_sends_the_open_to_everyone_phrase_the_route_knows(): void {
+		$root = dirname( __DIR__, 3 );
+		$js   = (string) file_get_contents( $root . '/assets/db.js' );
+		$php  = (string) file_get_contents( $root . '/src/Proxmox/Db/DbCard.php' );
+		$mcp  = (string) file_get_contents( $root . '/src/Proxmox/Db/McpTools.php' );
+
+		$this->assertStringContainsString( "'world'   => array( DbAccess::phrase_world(), DbAccess::CONFIRM_WORLD )", $php );
+		$this->assertStringContainsString( 'typed === db.world[0]', $js );
+		$this->assertStringContainsString( 'typed = db.world[1]', $js );
+		$this->assertStringContainsString( 'confirm: typed }, confirm )', $js );
+		$this->assertStringContainsString( '$body[\'confirm\'] = DbAccess::CONFIRM_WORLD;', $mcp );
+		$this->assertStringNotContainsString( 'phrase_world', $mcp );
+	}
+
 	public function test_open_to_everyone_needs_the_typed_words_one_rule_and_an_email(): void {
 		$r = $this->db_with_ip();
 
