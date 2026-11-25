@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.63.0
+Stable tag: 0.64.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.64.0 =
+* New one-click app for servers: Easy!Appointments 1.6 (appointment booking), installed with Caddy, PHP and MariaDB, private files outside the web root, and helpers on the server for update and roll back that never touch the customer's data.
 
 = 0.63.0 =
 * Odoo app: two editions under the Odoo tile. Odoo 20 (standard) and Odoo 20, Danish accounting (Danish language, company in Denmark with DKK, the Danish chart of accounts and moms, bank import and reconciliation, financial reports and the SAF-T header file, from github.com/beltoftandersen/odoo-dk-accounting). Both install the OdooWoo helper module. A server can be reinstalled from one edition to the other.
