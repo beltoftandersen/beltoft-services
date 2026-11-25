@@ -390,7 +390,7 @@ final class AppField {
 		foreach ( $offer['apps'] as $id => $app ) {
 			$versions = array();
 
-			foreach ( $app['choices'] as $vid => $version ) {
+			foreach ( Apps::language_first( (array) $app['choices'] ) as $vid => $version ) {
 				$versions[] = array( 'id' => (string) $vid, 'label' => Apps::version_label( $version ), 'families' => array_values( (array) $version['os'] ) );
 			}
 
@@ -424,7 +424,7 @@ final class AppField {
 			$why      = Apps::plan_refusal( $current, (array) $offer['plan'] );
 			$versions = array();
 
-			foreach ( $app['choices'] as $vid => $version ) {
+			foreach ( Apps::language_first( (array) $app['choices'] ) as $vid => $version ) {
 				$versions[] = array( 'value' => (string) $vid, 'label' => Apps::version_label( $version ), 'families' => array_values( (array) $version['os'] ) );
 			}
 
