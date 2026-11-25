@@ -46,6 +46,15 @@ final class DbAccess {
 	/** The word that opens the database to everyone. */
 	public const CONFIRM_WORLD = 'OPEN TO EVERYONE';
 
+	/**
+	 * The words the account page asks for, in the page language. The English CONFIRM_WORLD is always accepted too,
+	 * and the API and MCP keep documenting that one.
+	 */
+	public static function phrase_world(): string {
+		/* translators: The phrase the customer types to open a database to every address. It must stay in capitals. */
+		return __( 'OPEN TO EVERYONE', 'beltoft-services' );
+	}
+
 	/** The guest takes at most 20 entries. */
 	public const MAX_ENTRIES = 20;
 
@@ -332,9 +341,11 @@ final class DbAccess {
 
 			$entries = $left;
 		} elseif ( 'world_on' === $op ) {
-			if ( self::CONFIRM_WORLD !== ( is_string( $body['confirm'] ?? null ) ? $body['confirm'] : '' ) ) {
+			$typed = is_string( $body['confirm'] ?? null ) ? $body['confirm'] : '';
+
+			if ( self::CONFIRM_WORLD !== $typed && self::phrase_world() !== $typed ) {
 				/* translators: %s: the words to type, OPEN TO EVERYONE */
-				return new \WP_Error( 'beltoft_services_confirm', sprintf( __( 'Type %s to confirm. Anyone on the internet can then try to log in to your database.', 'beltoft-services' ), self::CONFIRM_WORLD ), array( 'status' => 422 ) );
+				return new \WP_Error( 'beltoft_services_confirm', sprintf( __( 'Type %s to confirm. Anyone on the internet can then try to log in to your database.', 'beltoft-services' ), self::phrase_world() ), array( 'status' => 422 ) );
 			}
 
 			$world = true;
@@ -415,7 +426,7 @@ final class DbAccess {
 			'editable'  => self::editable( $r ),
 			'max'       => self::MAX_ENTRIES,
 			'my_ip'     => self::my_ip(),
-			'confirm'   => self::CONFIRM_WORLD,
+			'confirm'   => self::phrase_world(),
 			'add_url'   => $ipv4['add_url'],
 			'add_price' => $ipv4['add_price'],
 			'sold_out'  => $ipv4['sold_out'],

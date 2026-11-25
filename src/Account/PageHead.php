@@ -35,14 +35,8 @@ final class PageHead {
 	public static function description(): string {
 		$endpoint = function_exists( 'WC' ) && WC()->query ? (string) WC()->query->get_current_endpoint() : '';
 
-		// A page says nothing more than its title, except a "new" page, which says what to do there.
+		// A page says nothing more than its title: the new server and new database pages have their own plan and engine headings.
 		$text = '';
-
-		if ( ServerLinks::slug() === $endpoint && ServerLinks::is_new() ) {
-			$text = __( 'Choose a plan and set up a new server', 'beltoft-services' );
-		} elseif ( ServiceArea::by_key( 'databases' )->slug() === $endpoint && ServiceArea::by_key( 'databases' )->is_new() ) {
-			$text = __( 'Choose an engine and set up a new database', 'beltoft-services' );
-		}
 
 		/**
 		 * Filters the one-line description under the title of a My Account page.

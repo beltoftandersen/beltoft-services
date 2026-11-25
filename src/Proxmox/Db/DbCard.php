@@ -35,6 +35,7 @@ final class DbCard {
 			// The phrase to type, as this page shows it, and the one the route knows in every language: the route answers in its own
 			// language, which need not be the page's, so the script sends the second when the first was typed.
 			'phrase'  => array( DbActions::phrase(), DbActions::CONFIRM ),
+			'world'   => array( DbAccess::phrase_world(), DbAccess::CONFIRM_WORLD ),
 			'strings' => array(
 				'revealing' => __( 'Showing the password…', 'beltoft-services' ),
 				'gone'    => __( 'The password has already been shown or is no longer available.', 'beltoft-services' ),

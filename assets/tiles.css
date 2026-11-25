@@ -32,3 +32,6 @@
 }
 /* The theme makes account fieldsets a grid with a 16px gap: the legend sits 12px over its tiles, like every heading. */
 .woocommerce-account .woocommerce fieldset.beltoft-services-tiles { gap: 0; }
+@media (max-width: 480px) {
+	.beltoft-services-tiles__grid { grid-template-columns: minmax(0, 1fr); }
+}

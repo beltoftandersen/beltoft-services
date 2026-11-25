@@ -1532,7 +1532,6 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-disk__
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-disk__guide[open] > summary { margin-bottom: var(--bs-space-3); }
 
 /* Make larger / Remove: 16px apart (the link style above resets the margin); Remove ends billing, so it reads as a danger link. */
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__disk :is(a, button.beltoft-services-vm__link) + :is(a, button.beltoft-services-vm__link) { margin-left: var(--bs-space-4); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__disk button.beltoft-services-vm__link:is([data-delete-disk], [data-cancel-url]) { color: var(--bs-status-fail); }
 .beltoft-services-bar__sub { margin-top: var(--bs-space-1); }
 /* The hint under a bar (memory needs the guest agent ...) wraps; it is never cut. A list row with a two-line hint keeps its columns (the hint spans the grid). */
@@ -1710,19 +1709,25 @@ body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services
 /* ==== Design pass 2026-11-25: servers ===============================================================================
    Server list, server page tabs, New server. Same rules as the shared block: 24px between blocks of a tab, 12px heading to content,
    8px between an action and its hint. */
-/* List row: the hint of a bar that has no reading takes one line; the row keeps the height of its name block. */
-.beltoft-services-srv__bars .beltoft-services-bar__sub { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* List row: the hint of a bar that has no reading wraps; no customer text is cut. */
+.beltoft-services-srv__bars .beltoft-services-bar__sub { overflow: visible; white-space: normal; text-overflow: clip; }
 
-/* Overview: facts are four equal columns, the second row lines up with the first; values are body size text. */
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; background: var(--bs-surface); }
+/* Facts: three equal columns; the last cell(s) of a row that is not full span the rest, so no row has a blank end. Values are body size text in the
+   page font (the v9 page sets code to monospace with an id selector, so the id is repeated here). */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; background: var(--bs-surface); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts > div { flex: none; box-shadow: inset 0 0 0 .5px var(--bs-line); }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts :is(dd code, code) { padding: 0; background: none; font-family: inherit; font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts > div:last-child:nth-child(3n+1) { grid-column: span 3; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts > div:last-child:nth-child(3n+2) { grid-column: span 2; }
+body.woocommerce-account #brx-content .beltoft-services-facts :is(dd code, code), body.woocommerce-account #brx-content ul.beltoft-services-vm__ipv4-list code { padding: 0; background: none; font-family: inherit; font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts dd .beltoft-services-copy { margin-left: var(--bs-space-2); }
 @media (max-width: 900px) {
 	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts > div:last-child:nth-child(n) { grid-column: auto; }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts > div:last-child:nth-child(odd) { grid-column: span 2; }
 }
 @media (max-width: 480px) {
 	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts { grid-template-columns: minmax(0, 1fr); }
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts > div:last-child:nth-child(n) { grid-column: auto; }
 }
 /* A price line and the button under it (the template wraps the button in a paragraph). */
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-tab :is(p, .description) + p:has(> :is(a, button).bs-btn:only-child) { margin-top: var(--bs-space-3); }
@@ -1742,11 +1747,13 @@ body.woocommerce-account .beltoft-services-vm__dialog, .beltoft-services-vm__dia
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-console__open { margin-top: var(--bs-space-3); }
 
 /* Snapshots and the other tab blocks: one flow, 24px between blocks, text paragraphs without the browser margin. */
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-vm__backups, .beltoft-services-vm__disks, .beltoft-services-vm__reset) { display: block; }
 body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-vm__backups, .beltoft-services-vm__disks, .beltoft-services-vm__reset) > * { margin-top: 0; margin-bottom: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-vm__backups, .beltoft-services-vm__disks) > * + * { margin-top: var(--bs-space-5); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__backups > :is(h4, .beltoft-services-slotrow) + * { margin-top: var(--bs-space-3); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-slotrow { margin: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__backups .beltoft-services-snapshot p { margin: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__backups .beltoft-services-snapshot p + p { margin-top: var(--bs-space-2); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__backups > p.description { margin-top: var(--bs-space-2); }
 /* The track and the add tiles are a step lighter than the panel. */
 .beltoft-services-usebar { background: var(--bs-line); border-radius: 3px; overflow: hidden; }
@@ -1787,7 +1794,9 @@ body.woocommerce-account .woocommerce-MyAccount-content table.beltoft-services-v
 body.woocommerce-account .woocommerce-MyAccount-content table.beltoft-services-vm__backup-list:not(.beltoft-services-mail__table) :is(th:last-child, td:last-child) { padding-right: 0; text-align: right; }
 body.woocommerce-account .woocommerce-MyAccount-content table.beltoft-services-vm__backup-list:not(.beltoft-services-mail__table) tbody tr:last-child td { border-bottom: 0; }
 /* Facts inside a tab card (Network, App): 12px under the text above. */
-body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab > :is(p, .description) + dl.beltoft-services-facts { margin-top: var(--bs-space-3); }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab :is(p, .description) + dl.beltoft-services-facts { margin-top: var(--bs-space-5); }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab dl.beltoft-services-facts { margin-bottom: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab dl.beltoft-services-facts + :is(p, div) { margin-top: var(--bs-space-5); }
 /* App tab: one paragraph rhythm (8px between lines of one block, 24px between blocks), the facts as wide as the blocks. */
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-pane > .beltoft-services-vm__more { margin-top: var(--bs-space-5); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-pane .beltoft-services-vm__more > :is(p, ul) { margin: 0; }
@@ -1795,29 +1804,81 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-pa
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-pane .beltoft-services-vm__more > :is(.button, button) + :is(p, ul) { margin-top: var(--bs-space-2); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-pane ul { padding-left: var(--bs-space-5); }
 
+/* Disks: the action links are compact buttons (32px, 40px on a phone) 8px under the price line, about 16px apart; no extra space under the row. */
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab .beltoft-services-vm__disk { padding-bottom: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm .beltoft-services-vm__disk > :is(a, button.beltoft-services-vm__link) { margin: var(--bs-space-2) 0 0 calc(-1 * var(--bs-space-3)); padding: 0 var(--bs-space-3); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm .beltoft-services-vm__disk > :is(a, button.beltoft-services-vm__link) ~ :is(a, button.beltoft-services-vm__link) { margin-left: var(--bs-space-3); }
+@media (min-width: 768px) {
+	body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-vm__disk > :is(a, button.beltoft-services-vm__link), .beltoft-services-fw__link) { min-height: var(--bs-btn-h-sm); }
+}
+/* Firewall: presets and row actions are compact link buttons with the same padding. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-fw .beltoft-services-fw__link { padding: 0 var(--bs-space-3); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-fw .beltoft-services-fw__presets { gap: var(--bs-space-1); margin-left: calc(-1 * var(--bs-space-3)); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-fw .beltoft-services-fw__row > span:last-child { gap: var(--bs-space-1); margin-right: calc(-1 * var(--bs-space-3)); }
+/* Reinstall: the text under the heading is 12px under it (the form tucks a hint under its label only), blocks are 24px apart. */
+body.woocommerce-account .woocommerce-MyAccount-content form.beltoft-services-vm-form > p.description:first-child { margin-top: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab form.beltoft-services-vm-form:has(> .beltoft-services-vm-os) { gap: var(--bs-space-5); }
+/* The disk tile of the monitoring block stands in the same two columns as the glance cards under it. */
+@media (min-width: 641px) {
+	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-vm-usage.is-empty .beltoft-vm-usage__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* App tab: the paragraph rhythm of the licence block everywhere; the list of tiers is plain; the card gives its padding to the page on a phone. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-pane > .beltoft-services-vm__more + p.description { margin-top: var(--bs-space-3); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-pane ul.beltoft-services-add { padding: 0; list-style: none; }
+@media (max-width: 600px) {
+	body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services-tab[data-tab="app"] { padding: 0; background: none; }
+}
+
+/* IPv4 addresses of a server: a plain list (address, then its label and state, wrapping under the label); the remove disclosure under the
+   row on the row's own left edge; then blocks 24px apart, a hint 8px over its button, a price line 12px over its button. */
+body.woocommerce-account #brx-content .beltoft-services-vm__ipv4 ul.beltoft-services-vm__ipv4-list { margin: 0; padding: 0; list-style: none; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__ipv4 ul.beltoft-services-vm__ipv4-list > li { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0 var(--bs-space-2); align-items: baseline; margin: 0; padding: var(--bs-space-1) 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__ipv4 ul.beltoft-services-vm__ipv4-list > li + li { margin-top: var(--bs-space-2); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__ipv4 ul.beltoft-services-vm__ipv4-list > li > .description { margin: 0; min-width: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__ipv4 ul.beltoft-services-vm__ipv4-list > li > :is(a.button, details) { grid-column: 1 / -1; justify-self: stretch; margin: var(--bs-space-2) 0 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__ipv4 ul.beltoft-services-vm__ipv4-list > li > a.button { justify-self: start; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__managed > .description + .description { margin-top: var(--bs-space-2); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__ipv4 > * { margin-top: 0; margin-bottom: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__ipv4 > * + * { margin-top: var(--bs-space-5); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__ipv4 > h4 + * { margin-top: var(--bs-space-3); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__ipv4 > ul + * { margin-top: var(--bs-space-5); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__ipv4 > .description + .description { margin-top: var(--bs-space-2); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__ipv4 > .description + p:has(> :is(a, button).bs-btn:only-child) { margin-top: var(--bs-space-3); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__ipv4 > .description + p:has(> button[data-ipv4-guest-action]) { margin-top: var(--bs-space-2); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__ipv4 > p:has(> button[data-ipv4-guest-action]) + * { margin-top: var(--bs-space-5); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__ipv4 details.beltoft-services-vm__ipv4-setup > summary { font-size: var(--bs-fs-body); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-vm__ipv4 details.beltoft-services-vm__ipv4-setup pre { margin-bottom: 0; overflow-x: auto; }
+
 /* ==== Design pass 2026-11-25: databases, SSL, licences, apps, storage ============================================== */
 
 /* Database page: facts values line up with the plain ones (the code chip had its own padding), the list of policies is plain rows. */
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts code { padding: 0; background: none; border-radius: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content ul.beltoft-services-db__policies { display: grid; gap: var(--bs-space-3); margin: var(--bs-space-5) 0 0; padding: 0; list-style: none; }
-.beltoft-services-db__form input::placeholder { color: var(--bs-muted); opacity: .7; }
+/* Blocks of a database tab (show password, new password): 24px apart, nothing extra under the last line of one. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db > .beltoft-services-vm__more { margin: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db > .beltoft-services-vm__more > :last-child { margin-bottom: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db > .beltoft-services-vm__more + .beltoft-services-vm__more { margin-top: var(--bs-space-5); }
+/* A placeholder reads as a hint, not as typed text (the page's own rules for inputs have an id in them). */
+body.woocommerce-account #brx-content .beltoft-services-db__form input::placeholder { color: var(--bs-muted); opacity: 1; }
+/* The connection URL and the fingerprint keep their characters together and scroll inside their box on a phone. */
+@media (max-width: 600px) {
+	.beltoft-services-db .beltoft-services-db__block code.beltoft-services-db__conn { overflow-x: auto; overflow-wrap: normal; white-space: nowrap; }
+}
 /* Access: the address field, its helper button 8px under it, the next field 16px on. */
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db__form > p:has(> [data-db-access-mine]) { display: grid; justify-items: start; gap: var(--bs-space-1); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db__form > p:has(> [data-db-access-mine]) > label { margin: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db__form > p:has(> [data-db-access-mine]) > [data-db-access-mine] { margin-top: var(--bs-space-1); }
-/* "Open to everyone" is the same disclosure as the danger row: a framed row, 16px 24px, chevron after the text. */
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db details.beltoft-services-vm__more { border: 1px solid var(--bs-line); border-radius: var(--bs-radius-lg); background: var(--bs-surface); }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db details.beltoft-services-vm__more > summary { display: flex; align-items: center; justify-content: space-between; gap: var(--bs-space-4); padding: var(--bs-space-4) var(--bs-space-5); font-weight: var(--bs-fw-medium); list-style: none; cursor: pointer; }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db details.beltoft-services-vm__more > summary::-webkit-details-marker { display: none; }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db details.beltoft-services-vm__more > summary::before { content: none; }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db details.beltoft-services-vm__more > summary::after { content: ""; flex: none; width: 9px; height: 9px; border-right: 2px solid currentcolor; border-bottom: 2px solid currentcolor; transform: rotate(45deg) translate(-2px, -2px); }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db details.beltoft-services-vm__more[open] > summary::after { transform: rotate(225deg) translate(-2px, -2px); }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db details.beltoft-services-vm__more > :not(summary) { margin-left: var(--bs-space-5); margin-right: var(--bs-space-5); }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db details.beltoft-services-vm__more > :last-child { margin-bottom: var(--bs-space-5); }
+/* "Open to everyone" and "Restore from a backup" are the same disclosure as the danger row: a framed row, 16px 24px, chevron after the text. */
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-db details.beltoft-services-vm__more, .beltoft-services-vm__backups details.beltoft-services-vm__more, .beltoft-services-vm__ipv4 details.beltoft-services-vm__ipv4-setup) { border: 1px solid var(--bs-line); border-radius: var(--bs-radius-lg); background: var(--bs-surface); }
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-db details.beltoft-services-vm__more, .beltoft-services-vm__backups details.beltoft-services-vm__more, .beltoft-services-vm__ipv4 details.beltoft-services-vm__ipv4-setup) > summary { display: flex; align-items: center; justify-content: space-between; gap: var(--bs-space-4); padding: var(--bs-space-4) var(--bs-space-5); font-weight: var(--bs-fw-medium); list-style: none; cursor: pointer; }
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-db details.beltoft-services-vm__more, .beltoft-services-vm__backups details.beltoft-services-vm__more, .beltoft-services-vm__ipv4 details.beltoft-services-vm__ipv4-setup) > summary::-webkit-details-marker { display: none; }
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-db details.beltoft-services-vm__more, .beltoft-services-vm__backups details.beltoft-services-vm__more, .beltoft-services-vm__ipv4 details.beltoft-services-vm__ipv4-setup) > summary::before { content: none; }
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-db details.beltoft-services-vm__more, .beltoft-services-vm__backups details.beltoft-services-vm__more, .beltoft-services-vm__ipv4 details.beltoft-services-vm__ipv4-setup) > summary::after { content: ""; flex: none; width: 9px; height: 9px; border-right: 2px solid currentcolor; border-bottom: 2px solid currentcolor; transform: rotate(45deg) translate(-2px, -2px); }
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-db details.beltoft-services-vm__more, .beltoft-services-vm__backups details.beltoft-services-vm__more, .beltoft-services-vm__ipv4 details.beltoft-services-vm__ipv4-setup)[open] > summary::after { transform: rotate(225deg) translate(-2px, -2px); }
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-db details.beltoft-services-vm__more, .beltoft-services-vm__backups details.beltoft-services-vm__more, .beltoft-services-vm__ipv4 details.beltoft-services-vm__ipv4-setup) > :not(summary) { margin-left: var(--bs-space-5); margin-right: var(--bs-space-5); }
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-db details.beltoft-services-vm__more, .beltoft-services-vm__backups details.beltoft-services-vm__more, .beltoft-services-vm__ipv4 details.beltoft-services-vm__ipv4-setup) > :last-child { margin-bottom: var(--bs-space-5); }
 
-/* Plan and engine cards: the chosen one has a 2px line in the accent, no glow. */
-.beltoft-services-plan__face { box-shadow: inset 0 0 0 1px var(--bs-line); }
-.beltoft-services-plan .beltoft-services-plan__input:checked + .beltoft-services-plan__face, .beltoft-services-plan:hover .beltoft-services-plan__input:checked + .beltoft-services-plan__face { box-shadow: inset 0 0 0 2px var(--bs-dark); }
+/* Plan and engine cards: the chosen one has the line of the tiles (assets/picker.css, assets/tiles.css), no glow. */
 .beltoft-services-plan__specs, .beltoft-services-plan__stock { font-weight: var(--bs-fw-regular); }
 .beltoft-services-plan__hourly { color: var(--bs-muted); opacity: 1; font-weight: var(--bs-fw-regular); }
 

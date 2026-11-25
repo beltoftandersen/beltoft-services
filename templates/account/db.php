@@ -270,7 +270,7 @@ $beltoft_services_db_wait = array(
 							<div class="beltoft-services-db__form">
 								<p>
 									<label for="beltoft-db-world-confirm"><?php echo esc_html( sprintf( /* translators: %s: the words to type */ __( 'Type %s to confirm', 'beltoft-services' ), (string) $beltoft_services_access['confirm'] ) ); ?></label>
-									<input type="text" id="beltoft-db-world-confirm" autocomplete="off" data-db-access-confirm>
+									<input type="text" id="beltoft-db-world-confirm" autocomplete="off" placeholder="<?php echo esc_attr( (string) $beltoft_services_access['confirm'] ); ?>" data-db-access-confirm>
 								</p>
 								<p><button type="button" class="button woocommerce-button" data-db-access-world="world_on"><?php esc_html_e( 'Open to everyone', 'beltoft-services' ); ?></button></p>
 							</div>
@@ -361,7 +361,7 @@ $beltoft_services_db_wait = array(
 	<?php if ( 'ready' === $view['kind'] && ( $beltoft_services_all || 'password' === $active ) ) : ?>
 		<?php if ( $view['can_reveal'] && ! $beltoft_services_all ) : ?>
 			<div class="beltoft-services-vm__more" data-db-reveal-box>
-				<h4><?php esc_html_e( 'Show password once', 'beltoft-services' ); ?></h4>
+				<h4><?php esc_html_e( 'Password', 'beltoft-services' ); ?></h4>
 				<p class="beltoft-services-vm__reveal"><button type="button" class="button woocommerce-button" data-db-reveal><?php esc_html_e( 'Show password once', 'beltoft-services' ); ?></button></p>
 				<div data-db-password hidden>
 					<p><?php esc_html_e( 'Password', 'beltoft-services' ); ?></p>
@@ -371,7 +371,7 @@ $beltoft_services_db_wait = array(
 		<?php endif; ?>
 		<?php if ( $view['can_reset'] ) : ?>
 			<div class="beltoft-services-vm__more">
-				<h4><?php esc_html_e( 'New password', 'beltoft-services' ); ?></h4>
+				<h4><?php esc_html_e( 'Replace the password', 'beltoft-services' ); ?></h4>
 				<p><?php esc_html_e( 'We make a new random password and show it to you once. You do not choose it. The old password stops working at once, so applications that use it must be changed.', 'beltoft-services' ); ?></p>
 				<div class="beltoft-services-db__form">
 				<p>
@@ -383,7 +383,7 @@ $beltoft_services_db_wait = array(
 			</div>
 		<?php elseif ( $view['stopped'] ) : ?>
 			<div class="beltoft-services-vm__more">
-				<h4><?php esc_html_e( 'New password', 'beltoft-services' ); ?></h4>
+				<h4><?php esc_html_e( 'Replace the password', 'beltoft-services' ); ?></h4>
 				<p class="beltoft-services-panel__notice" data-db-stopped><?php echo esc_html( \BeltoftServices\Proxmox\Db\DbPower::start_first() ); ?></p>
 			</div>
 		<?php elseif ( $view['resetting'] ) : ?>

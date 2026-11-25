@@ -7,12 +7,12 @@ use BeltoftServices\Tests\TestCase;
 
 class PageHeadTest extends TestCase {
 	public function tear_down(): void {
-		unset( $GLOBALS['wp']->query_vars['domains'], $GLOBALS['wp']->query_vars['subscriptions'], $GLOBALS['wp']->query_vars['security'] );
+		unset( $GLOBALS['wp']->query_vars['domains'], $GLOBALS['wp']->query_vars['subscriptions'], $GLOBALS['wp']->query_vars['security'], $GLOBALS['wp']->query_vars['vps'], $GLOBALS['wp']->query_vars['databases'] );
 		parent::tear_down();
 	}
 
 	public function test_a_page_repeats_nothing_its_title_says(): void {
-		foreach ( array( 'domains', 'subscriptions', 'orders', 'edit-account', 'security', 'licenses', 'tickets', '' ) as $endpoint ) {
+		foreach ( array( 'domains', 'subscriptions', 'orders', 'edit-account', 'security', 'licenses', 'tickets', 'vps', 'databases', '' ) as $endpoint ) {
 			$GLOBALS['wp']->query_vars = '' === $endpoint ? array() : array( $endpoint => '' );
 			$this->assertSame( '', PageHead::description(), $endpoint );
 		}

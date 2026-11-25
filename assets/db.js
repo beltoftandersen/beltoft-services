@@ -298,6 +298,12 @@
 		var cidr = box.querySelector( '[data-db-access-cidr]' );
 		var label = box.querySelector( '[data-db-access-label]' );
 		var confirm = box.querySelector( '[data-db-access-confirm]' );
+		var typed = confirm ? confirm.value : '';
+
+		// The page's own phrase (Danish on the Danish page) is sent as the phrase the route knows in every language.
+		if ( db.world && typed === db.world[0] ) {
+			typed = db.world[1];
+		}
 
 		if ( button.hasAttribute( 'data-db-access-mine' ) ) {
 			if ( cidr ) {
@@ -314,7 +320,7 @@
 				}
 			} );
 		} else {
-			access( panel, button, { op: button.getAttribute( 'data-db-access-world' ), confirm: confirm ? confirm.value : '' }, confirm );
+			access( panel, button, { op: button.getAttribute( 'data-db-access-world' ), confirm: typed }, confirm );
 		}
 	}
 
