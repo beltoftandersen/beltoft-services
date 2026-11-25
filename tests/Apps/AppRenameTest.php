@@ -143,7 +143,7 @@ final class AppRenameTest extends MonitoringTestCase {
 		$token = AppRename::push( $r, $this->want( 'wordpress', array( 'www' => 'www.' . self::NEW ) ) );
 
 		$this->assertIsString( $token );
-		$this->assertMatchesRegularExpression( '/^[A-Za-z0-9]{16}$/', $token );
+		$this->assertMatchesRegularExpression( '/^[0-9a-f]{24}$/', $token );
 		$this->assertSame( AppRename::script( 'wordpress' ), $this->file( AppRename::SCRIPT ) );
 
 		$want = json_decode( (string) $this->file( AppRename::WANT ), true );
@@ -173,7 +173,6 @@ final class AppRenameTest extends MonitoringTestCase {
 			array( 'old_www' => 'www.old.example.com', 'old_domain' => '' ),
 			array( 'ip' => 'not-an-ip' ),
 			array( 'app' => 'n8n' ),
-			array( 'mode' => 'address' ),
 		) as $over ) {
 			$out = AppRename::push( $r, $this->want( 'wordpress', $over ) );
 			$this->assertWPError( $out, wp_json_encode( $over ) );

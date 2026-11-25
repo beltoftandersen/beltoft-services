@@ -123,7 +123,7 @@ class AppDomainTabTest extends MonitoringTestCase {
 		$this->assertStringContainsString( 'keeps answering on the current address until the new one works', $text );
 		$this->assertStringContainsString( 'the current address stops working', $text );
 		$this->assertStringContainsString( 'Links saved elsewhere or inside the app', $text );
-		$this->assertStringContainsString( 'You must update them yourself', $text );
+		$this->assertStringContainsString( 'Update them yourself', $text );
 		$this->assertStringContainsString( 'We change no DNS records. Add an A record that points the name to 192.0.2.10.', $text );
 		$this->assertStringContainsString( 'up to 14 days', $text );
 
@@ -197,7 +197,7 @@ class AppDomainTabTest extends MonitoringTestCase {
 		} )( $view );
 		$done = $this->text( (string) ob_get_clean() );
 		$this->assertStringContainsString( 'The address was changed on', $done );
-		$this->assertStringContainsString( 'still name the old address. You must update them yourself.', $done );
+		$this->assertStringContainsString( 'still name the old address. Update them yourself.', $done );
 	}
 
 	// -- Scripts and the tool -------------------------------------------------------------------

@@ -92,7 +92,7 @@ final class AppRename {
 	 * on its own and the answer is read with read().
 	 *
 	 * @param Resource             $r    Server.
-	 * @param array<string, mixed> $want domain, www, old_domain, old_www, ip, app, recipe (every value is checked here).
+	 * @param array<string, mixed> $want domain, www, old_domain, old_www, ip, app, recipe (every value is checked here). The request itself (version, run token, mode, script checksum) is made here, never by the caller.
 	 * @return string|\WP_Error The run token.
 	 */
 	public static function push( Resource $r, array $want ) {
@@ -109,8 +109,7 @@ final class AppRename {
 			|| ( '' !== $old_w && ( '' === $old || $old_w !== 'www.' . $old ) )
 			|| $domain === $old
 			|| false === filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 )
-			|| $app !== (string) $r->get( 'app_id' )
-			|| ( isset( $want['mode'] ) && 'domain' !== $want['mode'] );
+			|| $app !== (string) $r->get( 'app_id' );
 
 		if ( $bad ) {
 			return new \WP_Error( 'beltoft_rename_invalid', 'The request to change the domain is not valid.' );
@@ -123,7 +122,7 @@ final class AppRename {
 			return new \WP_Error( 'beltoft_rename_unavailable', 'The set-up for the change is not available.' );
 		}
 
-		$token   = wp_generate_password( 16, false );
+		$token   = bin2hex( random_bytes( 12 ) ); // The one run token: 24 lowercase hex characters.
 		$request = wp_json_encode(
 			array(
 				'v'          => 1,

@@ -63,6 +63,7 @@ final class ToolsMapTest extends McpTestCase {
 	public function test_every_action_the_dashboard_offers_has_a_tool_or_a_reason(): void {
 		$classes = array(
 			'BeltoftServices\Proxmox\Vm\Actions',
+			'BeltoftServices\Apps\AppDomainChange',
 			'BeltoftServices\Proxmox\Snapshot\Policy',
 			'BeltoftServices\Proxmox\Network\FirewallRules',
 			'BeltoftServices\Proxmox\Network\PrivateAttach',
@@ -84,7 +85,7 @@ final class ToolsMapTest extends McpTestCase {
 		}
 
 		// The reader finds what it should: names we know are there.
-		foreach ( array( 'start', 'reboot', 'rename', 'snapshot_take', 'fw_apply', 'private_attach', 'db_reset_password', 'restore', 'lock', 'unlock', 'set_records', 'app_retry' ) as $known ) {
+		foreach ( array( 'start', 'reboot', 'rename', 'snapshot_take', 'fw_apply', 'private_attach', 'db_reset_password', 'restore', 'lock', 'unlock', 'set_records', 'app_retry', 'app_domain' ) as $known ) {
 			$this->assertContains( $known, $seen, $known . ' was not read from the offered() lists.' );
 		}
 

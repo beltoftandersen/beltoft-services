@@ -309,10 +309,7 @@ final class AppTab {
 			return $out;
 		}
 
-		// TEMPORARY until the flow (AppDomainChange, builder A) is merged: without the class the block shows the address only.
-		if ( class_exists( AppDomainChange::class ) ) {
-			$out = array_merge( $out, array_intersect_key( (array) AppDomainChange::view( $r ), $out ) );
-		}
+		$out = array_merge( $out, array_intersect_key( AppDomainChange::view( $r ), $out ) );
 
 		// The date the wait ends: a time stamp from the flow, or already a date.
 		$out['deadline'] = is_numeric( $out['deadline'] ) ? ( (int) $out['deadline'] > 0 ? wp_date( get_option( 'date_format' ), (int) $out['deadline'] ) : '' ) : (string) $out['deadline'];

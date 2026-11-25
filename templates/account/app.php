@@ -241,12 +241,12 @@ $beltoft_services_status_text = array(
 									'certificate' => __( 'A certificate could not be issued for the name. Check that its A record points to this server and that no CAA record blocks it.', 'beltoft-services' ),
 									'timeout'     => __( 'The name did not point to this server in time.', 'beltoft-services' ),
 									'agent'       => __( 'The server did not answer. Check that it is running.', 'beltoft-services' ),
-									'busy'        => __( 'Another change was still running.', 'beltoft-services' ),
+									'busy'        => __( 'Another change was still running. Try again in a few minutes.', 'beltoft-services' ),
 									'caddy', 'app', 'probe' => __( 'The app did not answer on the new address, so everything was put back.', 'beltoft-services' ),
 									default       => __( 'The change could not be finished.', 'beltoft-services' ),
 								}
 							);
-							echo ' ' . esc_html__( 'The app still answers on the current address. You can try again.', 'beltoft-services' );
+							echo ' ' . esc_html__( 'The app still answers on the current address. You can try again. If it fails again, contact support.', 'beltoft-services' );
 							?>
 						</p>
 					<?php elseif ( '' !== (string) $beltoft_services_chg['changed'] ) : ?>
@@ -255,7 +255,7 @@ $beltoft_services_status_text = array(
 							echo esc_html(
 								sprintf(
 									/* translators: %s: a date */
-									__( 'The address was changed on %s. Links saved elsewhere or inside the app, such as posts, webhook addresses or emails already sent, still name the old address. You must update them yourself.', 'beltoft-services' ),
+									__( 'The address was changed on %s. Links saved elsewhere or inside the app, such as posts, webhook addresses or emails already sent, still name the old address. Update them yourself.', 'beltoft-services' ),
 									(string) $beltoft_services_chg['changed']
 								)
 							);
@@ -294,8 +294,8 @@ $beltoft_services_status_text = array(
 								<input type="text" id="<?php echo esc_attr( $beltoft_services_id . '-own' ); ?>" name="app_own" maxlength="253" placeholder="<?php echo esc_attr( /* translators: example shop address shown in an empty field. */ __( 'shop.example.com', 'beltoft-services' ) ); ?>" autocomplete="off" spellcheck="false">
 							</div>
 						</fieldset>
-						<div hidden data-confirm-source data-confirm-title="<?php echo '' !== $beltoft_services_cur ? esc_attr__( 'Change the domain of the app?', 'beltoft-services' ) : esc_attr__( 'Add a domain to the app?', 'beltoft-services' ); ?>" data-confirm-yes="<?php echo '' !== $beltoft_services_cur ? esc_attr__( 'Change domain', 'beltoft-services' ) : esc_attr__( 'Add domain', 'beltoft-services' ); ?>">
-							<p><?php esc_html_e( 'The app keeps answering on the current address until the new one works. Then the app restarts, which can take up to a minute, and the current address stops working.', 'beltoft-services' ); ?></p>
+						<div hidden data-confirm-source data-confirm-title="<?php echo '' !== $beltoft_services_cur ? esc_attr__( 'Change domain', 'beltoft-services' ) : esc_attr__( 'Add a domain', 'beltoft-services' ); ?>" data-confirm-yes="<?php echo '' !== $beltoft_services_cur ? esc_attr__( 'Change domain', 'beltoft-services' ) : esc_attr__( 'Add a domain', 'beltoft-services' ); ?>">
+							<p><?php esc_html_e( 'The app keeps answering on the current address until the new one works. Then the app switches to the new address. This can take up to a minute, and the current address stops working.', 'beltoft-services' ); ?></p>
 							<p data-for="change"><?php esc_html_e( 'We add an A record for the new name to your domain on our name servers. Your other records are not changed.', 'beltoft-services' ); ?></p>
 							<p data-for="own">
 								<?php
@@ -315,7 +315,7 @@ $beltoft_services_status_text = array(
 								);
 								?>
 							</p>
-							<p><?php esc_html_e( 'Links saved elsewhere or inside the app, such as posts, webhook addresses or emails already sent, still name the old address. We do not change them. You must update them yourself.', 'beltoft-services' ); ?></p>
+							<p><?php esc_html_e( 'Links saved elsewhere or inside the app, such as posts, webhook addresses or emails already sent, still name the old address. We do not change them. Update them yourself.', 'beltoft-services' ); ?></p>
 						</div>
 						<p class="beltoft-services-app-domain__buttons">
 							<button type="submit" class="button woocommerce-button bs-btn bs-btn--sm"><?php esc_html_e( 'Continue', 'beltoft-services' ); ?></button>

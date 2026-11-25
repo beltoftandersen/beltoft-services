@@ -50,7 +50,7 @@ final class AppDomainChange {
 	private const REASONS = array( 'none', 'other', 'aaaa', 'unreachable', 'timeout', 'certificate', 'caddy', 'app', 'probe', 'agent', 'busy' );
 
 	/**
-	 * A stand-in for the guest side (AppRename) in tests: an object with supported( $r ), push( $r, $want ) and read( $r, $run ).
+	 * A stand-in for the guest side (AppRename) in tests: an object with supported( $r ), push( $r, $want ) and read( $r, $run, $domain ). The integration tests run the real chain (AppRename and FakeClient) with this left null.
 	 *
 	 * @internal
 	 * @var object|null
@@ -82,7 +82,9 @@ final class AppDomainChange {
 	}
 
 	private static function guest_read( Resource $r, string $run ): ?array {
-		return null !== self::$guest ? self::$guest->read( $r, $run ) : AppRename::read( $r, $run );
+		$domain = (string) $r->get( 'app_chg_name' );
+
+		return null !== self::$guest ? self::$guest->read( $r, $run, $domain ) : AppRename::read( $r, $run, $domain );
 	}
 
 	// -- What is offered ---------------------------------------------------------------------------
@@ -114,7 +116,7 @@ final class AppDomainChange {
 			return __( 'The app is not ready yet. Try again when it is.', 'beltoft-services' );
 		}
 		if ( ! Actions::agent_ok( $r ) ) {
-			return __( 'The domain cannot be changed on this server now.', 'beltoft-services' );
+			return __( 'The domain cannot be changed on this server right now. Try again later or contact support.', 'beltoft-services' );
 		}
 		$why = self::guest_supported( $r );
 		if ( null !== $why ) {
@@ -150,7 +152,7 @@ final class AppDomainChange {
 	public static function start( Resource $r, array $args ): StepResult {
 		$refuse = static fn( string $why ) => StepResult::refused( array( Jobs::TEXT => $why ), 'Change of domain refused: ' . $why );
 		if ( ! AppInstall::installable( $r ) ) {
-			return $refuse( __( 'The domain cannot be changed on this server now.', 'beltoft-services' ) );
+			return $refuse( __( 'The domain cannot be changed on this server right now. Try again later or contact support.', 'beltoft-services' ) );
 		}
 		if ( Settings::get( 'pause_all' ) ) {
 			return StepResult::retry( Jobs::PAUSED_DELAY, 'Paused' );
@@ -166,7 +168,7 @@ final class AppDomainChange {
 		}
 		$ip = AppOwnDomain::address( $r );
 		if ( '' === $ip ) {
-			return $refuse( __( 'The server address is not known yet.', 'beltoft-services' ) );
+			return $refuse( __( 'The server address is not known yet. Try again in a few minutes.', 'beltoft-services' ) );
 		}
 		$user  = (int) ( $r->license()['user_id'] ?? 0 );
 		$fqdn  = $choice['fqdn'];
@@ -416,9 +418,6 @@ final class AppDomainChange {
 		$old_www = '' !== $old && 'live' === (string) $r->get( 'app_www' ) ? AppWww::name_for( $r, $old ) : '';
 		$app     = (array) Apps::version( (string) $r->get( 'app_id' ), (string) $r->get( 'app_version' ), true );
 		return array(
-			'v'          => 1,
-			'run'        => bin2hex( random_bytes( 12 ) ),
-			'mode'       => 'domain',
 			'domain'     => (string) $r->get( 'app_chg_name' ),
 			'www'        => (string) $r->get( 'app_chg_www' ),
 			'old_domain' => $old,
@@ -551,7 +550,7 @@ final class AppDomainChange {
 			'www'       => '' === $name || 'own' !== $mode ? '' : AppWww::name_for( $r, $name, '' ),
 			'reason'    => in_array( (string) $r->get( 'app_chg_reason' ), self::REASONS, true ) ? (string) $r->get( 'app_chg_reason' ) : '',
 			'ip'        => AppOwnDomain::address( $r ),
-			'deadline'  => 'waiting' === $state && $since > 0 ? $since + AppOwnDomain::WAIT_DAYS * DAY_IN_SECONDS : 0,
+			'deadline'  => 'waiting' === $state ? ( $since > 0 ? $since : time() ) + AppOwnDomain::WAIT_DAYS * DAY_IN_SECONDS : 0,
 			'zones'     => null === $def || empty( $def['domain'] ) ? array() : ZoneAccess::zones( (int) ( $r->license()['user_id'] ?? 0 ) ),
 			'current'   => AppDomainChoice::current( $r ),
 		);
