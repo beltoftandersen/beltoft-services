@@ -1,0 +1,497 @@
+#!/bin/bash
+set -Eeuo pipefail
+umask 077
+export DEBIAN_FRONTEND=noninteractive
+state=/var/lib/beltoft-app
+secrets=/root/.beltoft-app
+web=/var/www/easyappointments
+app=/opt/easyappointments
+lib=/usr/local/lib/easyappointments
+job="$state/job.running"
+request=${BELTOFT_APP_REQUEST:?}
+step=os
+status() {
+  printf '{"request":"%s","state":"%s","step":"%s","updated":"%s"}\n' "$request" "$1" "$step" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$state/status.tmp"
+  mv "$state/status.tmp" "$state/status.json"
+}
+trap 'status failed' ERR
+status installing
+grep -qx 'ID=ubuntu' /etc/os-release
+grep -qx 'VERSION_ID="24.04"' /etc/os-release
+step=packages
+status installing
+if [ ! -e "$state/stage.1" ]; then
+  timeout 300 apt-get update
+  timeout 600 apt-get install -y ca-certificates cron curl gnupg jq openssl ufw unzip unattended-upgrades libfcgi-bin mariadb-server php8.3-cli php8.3-fpm php8.3-mysql php8.3-curl php8.3-gd php8.3-mbstring php8.3-xml
+  install -m 0755 -d /etc/apt/keyrings
+  timeout 60 curl --proto '=https' --tlsv1.2 -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key -o /etc/apt/keyrings/caddy.asc
+  [ "$(gpg --show-keys --with-colons /etc/apt/keyrings/caddy.asc 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }')" = '65760C51EDEA2017CEA2CA15155B6D79CA56EA34' ]
+  chmod a+r /etc/apt/keyrings/caddy.asc
+  printf 'deb [signed-by=/etc/apt/keyrings/caddy.asc] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main\n' > /etc/apt/sources.list.d/caddy.list
+  timeout 300 apt-get update
+  timeout 600 apt-get install -y 'caddy=2.11.7'
+  # The PHP-FPM socket belongs to www-data with mode 0660: Caddy, which runs as its own user, needs that group to reach it.
+  usermod -aG www-data caddy
+  systemctl enable --now mariadb php8.3-fpm unattended-upgrades cron
+  touch "$state/stage.1"
+fi
+domain=$(jq -er '.domain // ""' "$job")
+ip=$(jq -er '.ip' "$job")
+email=$(jq -er '.email' "$job")
+www=$(jq -er '.www // ""' "$job")
+[[ "$ip" =~ ^[0-9.]+$ ]]
+[[ "$email" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]]
+if [ -n "$domain" ]; then
+  [[ "$domain" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]]
+  [[ "$domain" == *.* ]]
+fi
+# A www name is only ever served together with its domain.
+[ -z "$www" ] || [ "$www" = "www.$domain" ]
+step=download
+status installing
+if [ ! -e "$state/stage.2" ]; then
+  # The release zip of the upstream project: no wrapper folder, vendor/ complete.
+  timeout 300 curl --proto '=https' --tlsv1.2 -fsSL https://github.com/alextselegidis/easyappointments/releases/download/1.6.1/easyappointments-1.6.1.zip -o "$state/easyappointments.zip"
+  echo '1671014c371519fa26e0a0a0dbdaa31047f5dda3156329faaea0662f095042f2  /var/lib/beltoft-app/easyappointments.zip' | sha256sum -c -
+  touch "$state/stage.2"
+fi
+step=database
+status installing
+if [ ! -e "$state/stage.3" ]; then
+  install -m 0700 -d "$secrets"
+  if [ ! -e "$secrets/easyappointments.json" ]; then
+    # The generated values contain only hex digits and letters. The administrator's user name is fixed; the customer's email is set on the account.
+    jq -n --arg email "$email" --arg db "$(openssl rand -hex 24)" --arg password "$(openssl rand -hex 16)Aa1" '{admin_user:"admin",admin_password:$password,admin_email:$email,db_password:$db}' > "$secrets/easyappointments.json"
+    chmod 0600 "$secrets/easyappointments.json"
+  fi
+  # MariaDB listens on the loopback address only.
+  printf '[mysqld]\nbind-address = 127.0.0.1\n' > /etc/mysql/mariadb.conf.d/99-beltoft.cnf
+  chmod 0644 /etc/mysql/mariadb.conf.d/99-beltoft.cnf
+  systemctl restart mariadb
+  # All SQL identifiers are constants; the generated password contains only hex digits.
+  dbpass=$(jq -er '.db_password' "$secrets/easyappointments.json")
+  mariadb -e 'CREATE DATABASE IF NOT EXISTS easyappointments CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;'
+  mariadb <<SQL
+CREATE USER IF NOT EXISTS 'easyappointments'@'localhost' IDENTIFIED BY '$dbpass';
+ALTER USER 'easyappointments'@'localhost' IDENTIFIED BY '$dbpass';
+GRANT ALL ON easyappointments.* TO 'easyappointments'@'localhost';
+FLUSH PRIVILEGES;
+SQL
+  unset dbpass
+  touch "$state/stage.3"
+fi
+step=easyappointments
+status installing
+# The helper files: shared by the installer, the update helper and the rollback helper.
+# Layout: only index.php and assets/ are in the web root ($web). application/, system/, vendor/, storage/ and config.php are in $app,
+# outside the web root, because upstream protects its folders with Apache .htaccess files only and this server does not run Apache.
+install -m 0755 -d "$lib"
+install -m 0644 /dev/stdin "$lib/patch-index.php" <<'PATCH'
+<?php
+// Usage: php patch-index.php IN OUT. The four edits that point index.php at the folder outside the web root.
+// Every edit must find exactly the expected number of lines; if it does not, nothing is written and the exit code is 1.
+$edits = array(
+	array( "\$system_path = 'system';", "\$system_path = '/opt/easyappointments/system';", 1 ),
+	array( "\$application_folder = 'application';", "\$application_folder = '/opt/easyappointments/application';", 1 ),
+	array( "__DIR__ . '/config.php'", "'/opt/easyappointments/config.php'", 2 ),
+	array( "__DIR__ . '/vendor/autoload.php'", "'/opt/easyappointments/vendor/autoload.php'", 2 ),
+);
+$s = is_file( $argv[1] ?? '' ) ? file_get_contents( $argv[1] ) : false;
+if ( false === $s ) {
+	fwrite( STDERR, "index.php not found\n" );
+	exit( 1 );
+}
+foreach ( $edits as $e ) {
+	if ( substr_count( $s, $e[0] ) !== $e[2] ) {
+		fwrite( STDERR, 'index.php: expected ' . $e[2] . ' x ' . $e[0] . ' but found ' . substr_count( $s, $e[0] ) . "\n" );
+		exit( 1 );
+	}
+	$s = str_replace( $e[0], $e[1], $s );
+}
+if ( false === file_put_contents( $argv[2], $s ) ) {
+	exit( 1 );
+}
+exec( 'php -l ' . escapeshellarg( $argv[2] ), $out, $code );
+exit( $code );
+PATCH
+install -m 0644 /dev/stdin "$lib/lib.sh" <<'LIB'
+# Shared by the installer, easyappointments-update and easyappointments-rollback. Sourced, not run.
+web=/var/www/easyappointments
+app=/opt/easyappointments
+lib=/usr/local/lib/easyappointments
+backups=/var/backups/easyappointments
+# Held by an update or a rollback; the cron jobs skip their run while it is held. A file of its own, because a file that www-data created in /run/lock cannot be opened by root.
+lock=/opt/easyappointments/.lock
+dbname=easyappointments
+say() { printf '%s\n' "$*"; }
+die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+
+# Place the program files of an unpacked release ($1: the folder holding index.php, application/, system/, vendor/, assets/).
+# config.php, storage/ and the customer's application/config/email.php are never replaced.
+ea_place() {
+  local src=$1 need work old d
+  for need in index.php application system vendor assets; do [ -e "$src/$need" ] || die "the release has no $need"; done
+  work=$(mktemp -d /opt/.easyappointments-new.XXXXXX)
+  old=$(mktemp -d /opt/.easyappointments-old.XXXXXX)
+  cp -a "$src/application" "$src/system" "$src/vendor" "$work/"
+  cp -a "$src/assets" "$work/assets"
+  php "$lib/patch-index.php" "$src/index.php" "$work/index.php"
+  if [ -f "$app/application/config/email.php" ]; then
+    cp -p "$app/application/config/email.php" "$work/application/config/email.php"
+  fi
+  chown -R root:root "$work"
+  chmod -R u=rwX,go=rX "$work"
+  for d in application system vendor; do
+    [ ! -e "$app/$d" ] || mv "$app/$d" "$old/$d"
+    mv "$work/$d" "$app/$d"
+  done
+  [ ! -e "$web/assets" ] || mv "$web/assets" "$old/assets"
+  [ ! -e "$web/index.php" ] || mv "$web/index.php" "$old/index.php"
+  mv "$work/assets" "$web/assets"
+  mv "$work/index.php" "$web/index.php"
+  ln -sfn "$web/assets" "$app/assets"
+  rm -rf "$work" "$old"
+}
+
+# Run the web server rules on a throw-away listener on 127.0.0.1:8098 and check the booking page and the folders that must stay private.
+ea_web_check() {
+  local dir pid code url fails=0 body
+  body=/etc/caddy/beltoft-site.body
+  [ -f "$body" ] || die "$body is missing"
+  dir=$(mktemp -d)
+  { printf '{\n  admin off\n  auto_https off\n}\nhttp://127.0.0.1:8098 {\n  bind 127.0.0.1\n'; cat "$body"; printf '}\n'; } > "$dir/Caddyfile"
+  caddy run --config "$dir/Caddyfile" --adapter caddyfile > "$dir/caddy.log" 2>&1 &
+  pid=$!
+  for _ in $(seq 1 30); do curl -s -o /dev/null --max-time 2 http://127.0.0.1:8098/ && break; sleep 1; done
+  code=$(curl -s -o "$dir/booking.html" -w '%{http_code}' --max-time 30 http://127.0.0.1:8098/index.php/booking || true)
+  if [ "$code" != 200 ]; then say "booking page answered $code, expected 200"; fails=1; fi
+  grep -q 'Easy!Appointments' "$dir/booking.html" || { say 'the booking page has no content'; fails=1; }
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 http://127.0.0.1:8098/assets/img/logo.png || true)
+  if [ "$code" != 200 ]; then say "/assets/img/logo.png answered $code, expected 200"; fails=1; fi
+  for url in /storage/backups/ /application/config/config.php /config.php /vendor/composer/installed.json /composer.json /CHANGELOG.md /storage/sessions/ /system/; do
+    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "http://127.0.0.1:8098$url" || true)
+    case "$code" in 404|403) ;; *) say "$url answered $code, expected 404 or 403"; fails=1 ;; esac
+  done
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  rm -rf "$dir"
+  [ "$fails" = 0 ]
+}
+
+# Database dump and program files of the current state into the backup folder $1 (root only).
+ea_backup() {
+  local dir=$1
+  install -m 0700 -d "$backups" "$dir"
+  mariadb-dump --single-transaction --routines --add-drop-database --databases "$dbname" | gzip > "$dir/db.sql.gz"
+  gzip -t "$dir/db.sql.gz"
+  [ "$(stat -c %s "$dir/db.sql.gz")" -gt 1000 ] || die "the database dump is too small"
+  # Program files and config; the customer's data in storage/ is not part of it and is never touched.
+  tar -czpf "$dir/program.tar.gz" -C / --exclude='opt/easyappointments/storage' var/www/easyappointments opt/easyappointments
+  gzip -t "$dir/program.tar.gz"
+  cp -p "$app/VERSION" "$dir/version" 2>/dev/null || true
+  ln -sfn "$dir" "$backups/last"
+}
+
+# Put back the program files and the database of the backup folder $1.
+ea_restore() {
+  local dir=$1 d
+  [ -f "$dir/db.sql.gz" ] && [ -f "$dir/program.tar.gz" ] || die "$dir is not a backup of this helper"
+  # Callers may run this inside an if: every step is chained, so a failed step stops the restore and reports.
+  systemctl stop php8.3-fpm || true
+  for d in application system vendor; do rm -rf "${app:?}/$d" || return 1; done
+  rm -rf "${web:?}/assets" "${web:?}/index.php" || return 1
+  tar -xzpf "$dir/program.tar.gz" -C / || return 1
+  gzip -dc "$dir/db.sql.gz" | mariadb || return 1
+  systemctl start php8.3-fpm || return 1
+}
+LIB
+install -m 0755 /dev/stdin /usr/local/sbin/easyappointments-update <<'UPDATE'
+#!/bin/bash
+# Update Easy!Appointments to a release of the upstream project. Usage: easyappointments-update VERSION [SHA256]
+# Without SHA256 the checksum that GitHub publishes for the release file is used. Program files only: config.php, storage/ and
+# application/config/email.php are kept. A database dump and a copy of the program files are made first; if any step fails, both are put back.
+set -Eeuo pipefail
+umask 077
+[ "$(id -u)" = 0 ] || { echo 'Run as root.' >&2; exit 1; }
+. /usr/local/lib/easyappointments/lib.sh
+version=${1:-}
+given=${2:-}
+[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die 'Usage: easyappointments-update VERSION [SHA256], for example 1.6.2'
+[ -z "$given" ] || [[ "$given" =~ ^[a-f0-9]{64}$ ]] || die 'The checksum must be 64 lowercase hex digits.'
+exec 9>"$lock"
+flock -w 300 9 || die 'Another update or the cron job holds the lock; try again in a minute.'
+file="easyappointments-$version.zip"
+url="https://github.com/alextselegidis/easyappointments/releases/download/$version/$file"
+install -m 0700 -d "$backups"
+work=$(mktemp -d "$backups/.work.XXXXXX")
+armed=
+ok=
+dir=
+cleanup() { rm -rf "$work"; }
+# Runs on every exit: a failed step, die, Ctrl-C. After the backup is made it puts the old state back.
+fail() {
+  local code=$?
+  trap - EXIT
+  [ -z "$ok" ] || { cleanup; return 0; }
+  echo "ERROR: the update stopped (exit $code)." >&2
+  if [ -n "$armed" ]; then
+    echo 'Putting back the program files and the database from the backup.' >&2
+    if ea_restore "$dir"; then
+      echo "Rolled back to $(cat "$app/VERSION" 2>/dev/null || echo 'the previous version'). The backup is kept in $dir." >&2
+    else
+      echo "ROLLBACK FAILED. The backup is in $dir (db.sql.gz and program.tar.gz); restore it by hand." >&2
+    fi
+  fi
+  cleanup
+  exit 1
+}
+trap fail EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+current=$(cat "$app/VERSION")
+say "Installed: $current. Target: $version."
+if [ -n "$given" ]; then
+  sum=$given
+else
+  sum=$(curl --proto '=https' --tlsv1.2 -fsSL --max-time 60 "https://api.github.com/repos/alextselegidis/easyappointments/releases/tags/$version" | jq -er --arg f "$file" '.assets[] | select(.name == $f) | .digest | select(startswith("sha256:")) | ltrimstr("sha256:")')
+  [[ "$sum" =~ ^[a-f0-9]{64}$ ]] || die 'GitHub publishes no sha256 for this release file; pass it as the second argument.'
+fi
+curl --proto '=https' --tlsv1.2 -fsSL --max-time 600 "$url" -o "$work/release.zip"
+echo "$sum  $work/release.zip" | sha256sum -c - >/dev/null || die 'The checksum of the download does not match.'
+say 'Checksum ok.'
+mkdir "$work/src"
+unzip -q "$work/release.zip" -d "$work/src"
+chmod -R u=rwX,go=rX "$work/src"
+for need in index.php application system vendor assets storage config-sample.php; do [ -e "$work/src/$need" ] || die "the release has no $need"; done
+# A new setting that the release needs in config.php must be added by hand first.
+for c in $(grep -oE '^[[:space:]]*const [A-Z_]+' "$work/src/config-sample.php" | awk '{print $2}'); do
+  grep -qE "^[[:space:]]*const $c\b" "$app/config.php" || die "config.php has no $c, which this release needs. Add it from config-sample.php of the release, then run this again."
+done
+php "$lib/patch-index.php" "$work/src/index.php" "$work/index.test.php"
+systemctl stop php8.3-fpm
+dir="$backups/$(date -u +%Y%m%dT%H%M%SZ)"
+ea_backup "$dir"
+armed=1
+say "Backup: $dir"
+ea_place "$work/src"
+runuser -u www-data -- php "$web/index.php" console migrate
+printf '%s\n' "$version" > "$app/VERSION"
+chmod 0644 "$app/VERSION"
+systemctl start php8.3-fpm
+ea_web_check
+armed=
+ok=1
+# Keep the three newest backups.
+ls -1d "$backups"/[0-9]*T*Z 2>/dev/null | sort | head -n -3 | xargs -r rm -rf
+cleanup
+say "Updated to $version. Backup of the previous state: $dir"
+say 'Undo with: easyappointments-rollback'
+UPDATE
+install -m 0755 /dev/stdin /usr/local/sbin/easyappointments-rollback <<'ROLLBACK'
+#!/bin/bash
+# Put back the program files and the database of the last backup made by easyappointments-update (or of the backup folder given).
+# Usage: easyappointments-rollback [--yes] [BACKUP-FOLDER]. Appointments made after that backup are lost with the database; storage/ is not touched.
+set -Eeuo pipefail
+umask 077
+[ "$(id -u)" = 0 ] || { echo 'Run as root.' >&2; exit 1; }
+. /usr/local/lib/easyappointments/lib.sh
+yes=
+if [ "${1:-}" = --yes ]; then yes=1; shift; fi
+dir=${1:-$backups/last}
+dir=$(readlink -f "$dir")
+case "$dir" in "$backups"/[0-9]*T*Z) ;; *) die "No backup to restore: $dir" ;; esac
+[ -f "$dir/db.sql.gz" ] || die "No backup to restore: $dir"
+say "Backup: $dir (program version $(cat "$dir/version" 2>/dev/null || echo unknown))."
+say 'The database goes back to the state of the backup: appointments and settings made after it are lost.'
+if [ -z "$yes" ]; then
+  read -r -p 'Type yes to continue: ' answer
+  [ "$answer" = yes ] || die 'Stopped.'
+fi
+exec 9>"$lock"
+flock -w 300 9 || die 'Another update or the cron job holds the lock; try again in a minute.'
+ea_restore "$dir"
+ea_web_check
+say "Restored version $(cat "$app/VERSION")."
+ROLLBACK
+if [ ! -e "$state/stage.4" ]; then
+  rm -rf "$state/src"
+  mkdir "$state/src"
+  unzip -q "$state/easyappointments.zip" -d "$state/src"
+  chmod -R u=rwX,go=rX "$state/src"
+  install -m 0755 -d "$web" "$app" "$web/storage"
+  mv "$state/src/storage" "$app/storage"
+  mv "$state/src/config-sample.php" "$app/config-sample.php"
+  . "$lib/lib.sh"
+  ea_place "$state/src"
+  rm -rf "$state/src"
+  # storage_path() in the application builds the path from the web root: only the HTMLPurifier cache is read there, and it is a link.
+  ln -sfn "$app/storage/cache" "$web/storage/cache"
+  install -m 0644 /dev/stdin "$app/VERSION" <<< '1.6.1'
+  install -m 0660 -o root -g www-data /dev/null "$app/.lock"
+  # config.php: a copy of config-sample.php with the constants set. Every constant must be found exactly once.
+  install -m 0600 /dev/stdin "$state/write-config.php" <<'CONFIG'
+<?php
+$s = json_decode( file_get_contents( '/root/.beltoft-app/easyappointments.json' ), true, 512, JSON_THROW_ON_ERROR );
+$job = json_decode( file_get_contents( '/var/lib/beltoft-app/job.running' ), true, 512, JSON_THROW_ON_ERROR );
+$address = '' !== (string) ( $job['domain'] ?? '' ) ? 'https://' . $job['domain'] : 'http://' . $job['ip'];
+$values = array(
+	'BASE_URL'    => $address,
+	'LANGUAGE'    => 'english',
+	'DB_HOST'     => 'localhost',
+	'DB_NAME'     => 'easyappointments',
+	'DB_USERNAME' => 'easyappointments',
+	'DB_PASSWORD' => $s['db_password'],
+);
+$c = file_get_contents( '/opt/easyappointments/config-sample.php' );
+foreach ( $values as $k => $v ) {
+	$c = preg_replace_callback( '/^(\s*const ' . $k . ' = )[^;]*;/m', static fn( $m ) => $m[1] . var_export( $v, true ) . ';', $c, 1, $n );
+	if ( 1 !== $n ) {
+		fwrite( STDERR, "config-sample.php has no $k\n" );
+		exit( 1 );
+	}
+}
+file_put_contents( '/opt/easyappointments/config.php', $c, LOCK_EX );
+CONFIG
+  php "$state/write-config.php"
+  rm -f "$state/write-config.php" "$app/config-sample.php"
+  php -l "$app/config.php" >/dev/null
+  chown root:www-data "$app/config.php"
+  chmod 0640 "$app/config.php"
+  chown -R www-data:www-data "$app/storage"
+  find "$app/storage" -type d -exec chmod 0750 {} +
+  find "$app/storage" -type f -exec chmod 0640 {} +
+  touch "$state/stage.4"
+fi
+if [ ! -e "$state/stage.5" ]; then
+  # The first administrator comes from the install page that the upstream project provides (never "console install", which seeds administrator/administrator).
+  # The page refuses to run once the tables exist, and it creates them itself (it runs the migrations): so no "console migrate" before it.
+  # The install page runs once on a loopback listener of PHP that exists only for this call; the password is not put on a command line.
+  runuser -u www-data -- php -S 127.0.0.1:8099 -t "$web" >/dev/null 2>&1 &
+  phpserver=$!
+  trap 'pkill -f "php -S 127.0.0.1:8099" || true; status failed' ERR
+  jar=$(mktemp)
+  for _ in $(seq 1 30); do curl -s -o /dev/null --max-time 2 http://127.0.0.1:8099/assets/img/logo.png && break; sleep 1; done
+  curl --fail --silent --show-error --max-time 60 -c "$jar" http://127.0.0.1:8099/index.php/installation -o /dev/null
+  token=$(awk '$6 == "csrf_cookie" { print $7 }' "$jar")
+  [ -n "$token" ]
+  company=$(hostname)
+  {
+    printf 'data-urlencode = "csrf_token=%s"\n' "$token"
+    printf 'data-urlencode = "admin[first_name]=Admin"\ndata-urlencode = "admin[last_name]=Administrator"\n'
+    printf 'data-urlencode = "admin[email]=%s"\n' "$email"
+    printf 'data-urlencode = "admin[username]=%s"\n' "$(jq -er '.admin_user' "$secrets/easyappointments.json")"
+    printf 'data-urlencode = "admin[password]=%s"\n' "$(jq -er '.admin_password' "$secrets/easyappointments.json")"
+    printf 'data-urlencode = "admin[phone_number]="\ndata-urlencode = "admin[language]=english"\n'
+    printf 'data-urlencode = "company[company_name]=%s"\n' "$company"
+    printf 'data-urlencode = "company[company_email]=%s"\n' "$email"
+    printf 'data-urlencode = "company[company_link]="\n'
+  } | curl --fail --silent --show-error --max-time 120 -b "$jar" -K - http://127.0.0.1:8099/index.php/installation/perform | jq -e '.success == true' >/dev/null
+  pkill -f 'php -S 127.0.0.1:8099' || true
+  wait "$phpserver" 2>/dev/null || true
+  rm -f "$jar"
+  trap 'status failed' ERR
+  # The install page adds example rows with made-up addresses: remove the provider and the customer, keep the service (rename it in the admin).
+  mariadb easyappointments -e "DELETE FROM ea_users WHERE email IN ('jane@example.org', 'james@example.org');"
+  [ "$(mariadb -N easyappointments -e "SELECT COUNT(*) FROM ea_users WHERE email LIKE '%@example.org';")" = 0 ]
+  touch "$state/stage.5"
+fi
+step=web
+status installing
+if [ ! -e "$state/stage.6" ]; then
+  printf 'memory_limit = 256M\nupload_max_filesize = 16M\npost_max_size = 16M\nexpose_php = Off\nopcache.enable = 1\n' > /etc/php/8.3/fpm/conf.d/99-beltoft-easyappointments.ini
+  # One generator writes the Caddyfile: the site, and with a www name a certified www site that redirects to the domain.
+  # The same generator is run again when the www name starts to point at this server (the plugin writes www.json).
+  install -m 0755 /dev/stdin /usr/local/sbin/beltoft-caddy <<'CADDY'
+#!/bin/bash
+set -Eeuo pipefail
+domain=${1:?}
+www=${2:-}
+[[ "$domain" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]]
+[[ "$domain" == *.* ]]
+[ -z "$www" ] || [ "$www" = "www.$domain" ]
+tmp=$(mktemp /etc/caddy/Caddyfile.XXXXXX)
+{
+  printf '%s {\n' "$domain"
+  cat /etc/caddy/beltoft-site.body
+  printf '}\n'
+  if [ -n "$www" ]; then
+    printf '%s {\n  redir https://%s{uri} permanent\n}\n' "$www" "$domain"
+  fi
+} > "$tmp"
+caddy validate --config "$tmp" --adapter caddyfile >/dev/null 2>&1
+chmod 0644 "$tmp"
+mv -f "$tmp" /etc/caddy/Caddyfile
+CADDY
+  install -m 0755 /dev/stdin /usr/local/sbin/beltoft-www-apply <<'APPLY'
+#!/bin/bash
+set -Eeuo pipefail
+state=/var/lib/beltoft-app
+f="$state/www.json"
+www=
+report() {
+  printf '{"www":"%s","state":"%s","updated":"%s"}\n' "$www" "$1" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$state/www.status.tmp"
+  mv -f "$state/www.status.tmp" "$state/www.status.json"
+}
+[ -f "$f" ] || exit 0
+trap 'report failed; mv -f "$f" "$state/www.failed" 2>/dev/null || true' ERR
+# The guest agent creates the file before it writes the content: wait until it is complete JSON.
+for _ in $(seq 1 30); do jq -e '.domain and .www' "$f" >/dev/null 2>&1 && break; sleep 1; done
+domain=$(jq -er '.domain' "$f")
+www=$(jq -er '.www' "$f")
+/usr/local/sbin/beltoft-caddy "$domain" "$www"
+systemctl reload caddy
+report ready
+mv -f "$f" "$state/www.done"
+APPLY
+  cat > /etc/systemd/system/beltoft-www.service <<'UNIT'
+[Unit]
+Description=Serve the www name of the app domain
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/beltoft-www-apply
+UNIT
+  cat > /etc/systemd/system/beltoft-www.path <<'UNIT'
+[Unit]
+Description=Watch for a www name to add
+[Path]
+PathExists=/var/lib/beltoft-app/www.json
+Unit=beltoft-www.service
+[Install]
+WantedBy=multi-user.target
+UNIT
+  systemctl daemon-reload
+  systemctl enable --now beltoft-www.path
+  # Everything that is private is refused by name as well, although none of it is in the web root.
+  printf '  root * /var/www/easyappointments\n  encode zstd gzip\n  @private path /storage /storage/* /application /application/* /system /system/* /vendor /vendor/* /config.php /config-sample.php /composer.json /composer.lock /CHANGELOG.md /README.md /LICENSE\n  respond @private 404\n  php_fastcgi unix//run/php/php8.3-fpm.sock\n  file_server\n' > /etc/caddy/beltoft-site.body
+  if [ -n "$domain" ]; then
+    /usr/local/sbin/beltoft-caddy "$domain" "$www"
+  else
+    { printf 'http://%s {\n' "$ip"; cat /etc/caddy/beltoft-site.body; printf '}\n'; } > /etc/caddy/Caddyfile
+  fi
+  # Calendar sync every hour and clean-up every night, as the web user. flock keeps them away from an update in progress.
+  printf 'MAILTO=""\n17 * * * * www-data /usr/bin/flock -n /opt/easyappointments/.lock /usr/bin/php /var/www/easyappointments/index.php console sync\n43 3 * * * www-data /usr/bin/flock -n /opt/easyappointments/.lock /usr/bin/php /var/www/easyappointments/index.php console cleanup\n' > /etc/cron.d/beltoft-easyappointments
+  chmod 0644 /etc/cron.d/beltoft-easyappointments
+  systemctl enable --now cron
+  systemctl restart php8.3-fpm caddy
+  touch "$state/stage.6"
+fi
+step=firewall
+status installing
+if [ ! -e "$state/stage.7" ]; then
+  ufw default deny incoming
+  ufw default allow outgoing
+  ufw allow 22/tcp
+  ufw allow 80/tcp
+  ufw allow 443/tcp
+  ufw --force enable
+  touch "$state/stage.7"
+fi
+step=verify
+status installing
+curl --fail --silent --show-error --max-time 15 --resolve "${domain:-$ip}:80:$ip" "http://${domain:-$ip}/index.php/booking" -o /dev/null
+# The booking page answers 200 and the private folders answer 404 (or 403): fails the install otherwise.
+. "$lib/lib.sh"
+ea_web_check
+[ "$(mariadb -N easyappointments -e 'SELECT version FROM ea_migrations')" = 69 ]
+jq '{admin_user,admin_password}' "$secrets/easyappointments.json" > "$secrets/credentials.json"
+chmod 0600 "$secrets/credentials.json"

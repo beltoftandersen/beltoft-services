@@ -60,7 +60,7 @@ class TilesTest extends TestCase {
 
 	public function test_every_shipped_logo_is_accepted_and_carries_its_own_colour(): void {
 		$files = glob( BELTOFT_SERVICES_PATH . 'assets/logos/*.svg' );
-		$this->assertCount( 16, $files );
+		$this->assertCount( 17, $files );
 		$read = new \ReflectionMethod( Tiles::class, 'svg' );
 		$read->setAccessible( true );
 
@@ -109,7 +109,7 @@ class TilesTest extends TestCase {
 	}
 
 	public function test_the_apps_name_their_logo_in_app_json_and_the_shipped_ones_exist(): void {
-		foreach ( array( 'docker', 'wordpress', 'coolify', 'n8n', 'nextcloud', 'odoo', 'plesk' ) as $id ) {
+		foreach ( array( 'docker', 'wordpress', 'coolify', 'n8n', 'nextcloud', 'odoo', 'plesk', 'easyappointments' ) as $id ) {
 			$data = json_decode( (string) file_get_contents( BELTOFT_SERVICES_PATH . 'apps/' . $id . '/app.json' ), true );
 			$this->assertSame( $id, $data['logo'], 'The slug of the file in assets/logos.' );
 			$this->assertFileExists( BELTOFT_SERVICES_PATH . 'assets/logos/' . $data['logo'] . '.svg' );
