@@ -29,7 +29,8 @@ defined( 'ABSPATH' ) || exit;
  * 3. The usage account (the subscription), the card and the credit are not touched, so the other services keep running.
  *
  * The customer must type the name of the server, or DELETE when it has none and for a database. A service that is protected,
- * held for a breach, being worked on, or a server with an extra disk is refused with a message.
+ * held for a breach, being worked on, or a server with an extra disk is refused with a message. When the service stays busy
+ * (its lock is held) nothing is stored, the license is not revoked and the customer is asked to try again.
  */
 final class CustomerDelete {
 
@@ -233,10 +234,12 @@ final class CustomerDelete {
 			return new \WP_Error( 'beltoft_services_delete_refused', $refused, array( 'status' => 422 ) );
 		}
 
-		// The lock stayed busy: desire() keeps the request and the next step applies it.
+		// The lock stayed busy: nothing is stored and the license stays, so the customer tries again (a queued request would skip the checks above).
 		if ( null === $stored ) {
-			$r->desire( 'deleted', self::EVENT, false );
-		} elseif ( false === $stored ) {
+			return new \WP_Error( 'beltoft_services_delete_busy', __( 'The service is busy right now. Please try again in a minute.', 'beltoft-services' ), array( 'status' => 409 ) );
+		}
+
+		if ( false === $stored ) {
 			return new \WP_Error( 'beltoft_services_delete_failed', __( 'The service could not be deleted now. Please try again.', 'beltoft-services' ), array( 'status' => 500 ) );
 		}
 

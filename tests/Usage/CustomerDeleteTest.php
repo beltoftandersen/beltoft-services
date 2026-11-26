@@ -182,6 +182,37 @@ final class CustomerDeleteTest extends UsageTestCase {
 		$this->assertStringContainsString( 'already being deleted', $again->get_error_message() );
 	}
 
+	public function test_a_busy_lock_refuses_the_deletion_and_changes_nothing_until_it_is_free(): void {
+		global $wpdb;
+
+		$v    = $this->usage_product();
+		$user = $this->new_user();
+		$r    = $this->usage_vm( $v['u-None'], $user, 5 );
+		$name = \BeltoftServices\Locks::name( 'resource', $r->id() );
+
+		add_filter( 'beltoft_services_desire_lock_wait', '__return_zero' );
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection holds the lock.
+		$held  = $other->query( $wpdb->prepare( 'SELECT GET_LOCK( %s, 1 )', $name ) );
+		$this->assertSame( '1', $held->fetch_row()[0] );
+
+		$bad = CustomerDelete::run( Resource::find( $r->id() ), $user, CustomerDelete::word( Resource::find( $r->id() ) ) );
+		$this->assertWPError( $bad );
+		$this->assertSame( 'beltoft_services_delete_busy', $bad->get_error_code() );
+
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( 'ready', $fresh->get( 'desired' ) );
+		$this->assertNull( $fresh->pending_desire() );
+		$this->assertSame( Licenses::STATUS_ACTIVE, Licenses::find( (int) $fresh->license()['id'] )['status'] );
+
+		$other->close();
+		remove_filter( 'beltoft_services_desire_lock_wait', '__return_zero' );
+
+		$this->assertTrue( CustomerDelete::run( Resource::find( $r->id() ), $user, CustomerDelete::word( Resource::find( $r->id() ) ) ) );
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( 'deleted', $fresh->get( 'desired' ) );
+		$this->assertSame( Licenses::STATUS_REVOKED, Licenses::find( (int) $fresh->license()['id'] )['status'] );
+	}
+
 	public function test_a_monthly_service_is_not_offered_and_not_deleted(): void {
 		$v    = $this->monthly_vps();
 		$user = $this->new_user();

@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.65.7
+Stable tag: 0.65.8
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.65.8 =
+* Deleting a server or database from My Account: when the service is busy (its lock is held) the request is refused with "The service is busy right now. Please try again in a minute." Before, a request was queued without the protected, hold and busy checks and the license was revoked at once.
 
 = 0.65.7 =
 * A service is never deleted before the date its deletion warning gave, also when the notice days (warning_days) are lowered after the warning was sent. The announced date is stored with the warning (meta deletes_at) and cleared when the service is resumed or a hold restarts the retention.
