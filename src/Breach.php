@@ -189,6 +189,7 @@ final class Breach {
 				if ( ! $active ) {
 					$meta['paused_at']       = time();
 					$meta['warned_at']       = null;
+					$meta['deletes_at']      = null;
 					$meta['warn_started_at'] = null;
 					$meta['warn_alerted']    = null;
 					$meta['reported']        = '';

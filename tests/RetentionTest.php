@@ -190,7 +190,12 @@ final class RetentionTest extends TestCase {
 		$this->assertNull( Resource::for_license( (int) $due->license()['id'] ), 'No replacement on an expired license.' );
 
 		// A day after its warning, the unwarned one goes too.
-		$this->fresh( $unwarned )->set( array( 'warned_at' => time() - DAY_IN_SECONDS - 1 ) );
+		$this->fresh( $unwarned )->set(
+			array(
+				'warned_at'  => time() - DAY_IN_SECONDS - 1,
+				'deletes_at' => time() - 1,
+			)
+		);
 		Retention::run();
 		$this->assertSame( 'deleted', $this->fresh( $unwarned )->get( 'desired' ) );
 	}
@@ -248,7 +253,12 @@ final class RetentionTest extends TestCase {
 		$this->assertNotNull( $fresh->get( 'warned_at' ) );
 		$this->assertSame( 'paused', $fresh->get( 'desired' ), 'Deleted a day after the sent warning, not now.' );
 		$this->assertCount( 1, $this->warnings );
-		$fresh->set( array( 'warned_at' => time() - DAY_IN_SECONDS - 1 ) );
+		$fresh->set(
+			array(
+				'warned_at'  => time() - DAY_IN_SECONDS - 1,
+				'deletes_at' => time() - 1,
+			)
+		);
 		Retention::run();
 		$this->assertSame( 'deleted', $this->fresh( $due )->get( 'desired' ) );
 	}
@@ -478,5 +488,76 @@ final class RetentionTest extends TestCase {
 		// The next run deletes it.
 		Retention::run();
 		$this->assertSame( 'deleted', $this->fresh( $due )->get( 'desired' ) );
+	}
+
+	/**
+	 * Moves a warned service back in time by whole days (paused, warned and announced date).
+	 *
+	 * @param Resource $r    Resource.
+	 * @param int      $days Days.
+	 */
+	private function age( Resource $r, int $days ): void {
+		$f    = $this->fresh( $r );
+		$meta = array(
+			'paused_at' => (int) $f->get( 'paused_at' ) - $days * DAY_IN_SECONDS,
+			'warned_at' => (int) $f->get( 'warned_at' ) - $days * DAY_IN_SECONDS,
+		);
+
+		if ( null !== $f->get( 'deletes_at' ) ) {
+			$meta['deletes_at'] = (int) $f->get( 'deletes_at' ) - $days * DAY_IN_SECONDS;
+		}
+
+		$this->assertTrue( $f->set( $meta ) );
+	}
+
+	public function test_lowering_warning_days_never_deletes_before_the_announced_date(): void {
+		$this->settings( array( 'deletion_mode' => 'on', 'warning_days' => 14 ) );
+		$r = $this->paused( 20 );
+
+		Retention::run();
+		$this->assertCount( 1, $this->warnings );
+		$this->assertEqualsWithDelta( time() + 14 * DAY_IN_SECONDS, (int) $this->fresh( $r )->get( 'deletes_at' ), 2 );
+
+		$this->settings( array( 'warning_days' => 1 ) );
+
+		// 12 days later: past the shorter date, before the announced one.
+		$this->age( $r, 12 );
+		Retention::run();
+		$this->assertSame( 'paused', $this->fresh( $r )->get( 'desired' ), 'Not deleted before the date the customer was told.' );
+
+		$this->age( $r, 3 );
+		Retention::run();
+		$this->assertSame( 'deleted', $this->fresh( $r )->get( 'desired' ) );
+	}
+
+	public function test_lowering_retention_days_never_deletes_before_the_announced_date(): void {
+		$this->settings( array( 'deletion_mode' => 'on', 'warning_days' => 14 ) );
+		$r = $this->paused( 20 );
+
+		Retention::run();
+		$this->assertCount( 1, $this->warnings );
+
+		update_post_meta( $this->product->get_id(), '_beltoft_services_retention', 10 );
+		$this->assertSame( 10, \BeltoftServices\Product::retention_days( $this->product->get_id() ) );
+
+		Retention::run();
+		$this->assertSame( 'paused', $this->fresh( $r )->get( 'desired' ), 'Not deleted before the date the customer was told.' );
+
+		$this->age( $r, 15 );
+		Retention::run();
+		$this->assertSame( 'deleted', $this->fresh( $r )->get( 'desired' ) );
+	}
+
+	public function test_resume_clears_the_announced_date(): void {
+		$this->settings( array( 'deletion_mode' => 'on', 'warning_days' => 14 ) );
+		$r = $this->paused( 20 );
+
+		Retention::run();
+		$this->assertNotNull( $this->fresh( $r )->get( 'deletes_at' ) );
+
+		$this->assertTrue( $this->fresh( $r )->desire( 'ready', 'Renewed' ) );
+		$fresh = $this->fresh( $r );
+		$this->assertNull( $fresh->get( 'warned_at' ) );
+		$this->assertNull( $fresh->get( 'deletes_at' ) );
 	}
 }

@@ -162,7 +162,7 @@ final class Commands {
 
 		$meta = array( 'activation_id' => $resource->id() );
 
-		foreach ( array( 'uuid', 'driver', 'state', 'desired', 'remote_id', 'protected', 'plan_dirty', 'attempts', 'next_attempt_at', 'paused_at', 'warned_at', 'last_error', 'plan' ) as $key ) {
+		foreach ( array( 'uuid', 'driver', 'state', 'desired', 'remote_id', 'protected', 'plan_dirty', 'attempts', 'next_attempt_at', 'paused_at', 'warned_at', 'deletes_at', 'last_error', 'plan' ) as $key ) {
 			$meta[ $key ] = $resource->get( $key );
 		}
 

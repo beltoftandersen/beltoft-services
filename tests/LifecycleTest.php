@@ -306,7 +306,12 @@ final class LifecycleTest extends TestCase {
 		$this->assertSame( array(), $this->driver->calls( 'delete' ) );
 
 		// A day after the warning it is deleted.
-		$this->fresh( $resource )->set( array( 'warned_at' => time() - DAY_IN_SECONDS - 1 ) );
+		$this->fresh( $resource )->set(
+			array(
+				'warned_at'  => time() - DAY_IN_SECONDS - 1,
+				'deletes_at' => time() - 1,
+			)
+		);
 		Retention::run();
 		$this->run_jobs();
 		$this->assertCount( 1, $this->driver->calls( 'delete' ) );

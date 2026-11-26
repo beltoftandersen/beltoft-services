@@ -229,7 +229,8 @@ final class Retention {
 			return;
 		}
 
-		$deletes_at = max( $ends_at, $warned + $notice );
+		// Never before the date the warning gave (settings may have been lowered since); an old warning without it reads 0.
+		$deletes_at = max( $ends_at, $warned + $notice, (int) $r->get( 'deletes_at' ) );
 
 		if ( $now < $deletes_at ) {
 			return;
@@ -265,11 +266,17 @@ final class Retention {
 			return;
 		}
 
+		// Recorded with the date the customer was told, so a later change of the days never deletes earlier.
+		$given = array(
+			'warned_at'  => time(),
+			'deletes_at' => $deletes_at,
+		);
+
 		// A warning that was sent but whose record could not be written (the resource lock was busy) is only recorded now, never mailed twice.
 		$sent_key = 'beltoft_services_warn_sent_' . $r->id();
 
 		if ( (int) get_option( $sent_key, 0 ) === $paused_at ) {
-			if ( $r->record_retention( array( 'warned_at' => time() ), $paused_at ) ) {
+			if ( $r->record_retention( $given, $paused_at ) ) {
 				delete_option( $sent_key );
 				Events::add( (int) $r->license()['id'], 'service', sprintf( 'Deletion warning: the service will be deleted on %s UTC.', $date ) );
 			}
@@ -316,7 +323,9 @@ final class Retention {
 		// The mail is out: remembered apart from the resource lock, so a busy lock cannot make the next run send it again.
 		update_option( $sent_key, $paused_at, false );
 
-		if ( $r->record_retention( array( 'warned_at' => time() ), $paused_at ) ) {
+		$given['warned_at'] = time();
+
+		if ( $r->record_retention( $given, $paused_at ) ) {
 			delete_option( $sent_key );
 			Events::add( (int) $r->license()['id'], 'service', sprintf( 'Deletion warning: the service will be deleted on %s UTC.', $date ) );
 		}

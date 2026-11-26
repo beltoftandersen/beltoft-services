@@ -865,6 +865,7 @@ final class Resource {
 			case 'next_attempt_at':
 			case 'paused_at':
 			case 'warned_at':
+			case 'deletes_at':
 			case 'breach_at':
 				return null === $value || '' === $value ? null : (int) $value;
 			case 'state':
@@ -1135,6 +1136,7 @@ final class Resource {
 				$meta['paused_at']     = null;
 				$meta['paused_reason'] = '';
 				$meta['warned_at']       = null;
+				$meta['deletes_at']      = null;
 				$meta['warn_started_at'] = null;
 				$meta['warn_alerted']    = null;
 				$meta['reported']        = '';
@@ -1390,7 +1392,7 @@ final class Resource {
 	 * @return bool Whether it was stored.
 	 */
 	public function record_retention( array $meta, int $paused_at ): bool {
-		$meta = array_intersect_key( $meta, array_flip( array( 'warned_at', 'reported', 'warn_started_at', 'warn_alerted' ) ) );
+		$meta = array_intersect_key( $meta, array_flip( array( 'warned_at', 'deletes_at', 'reported', 'warn_started_at', 'warn_alerted' ) ) );
 
 		return true === $this->locked(
 			function () use ( $meta, $paused_at ): bool {
