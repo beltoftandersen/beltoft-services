@@ -576,8 +576,9 @@ final class AppReinstall {
 	 * @return mixed
 	 */
 	public static function check( $why, $r, $args ) {
-		// The guest is changing the app's address: a reinstall now would wipe the server under it. A change that only waits for DNS does not stop one.
-		if ( null === $why && $r instanceof Resource && 'applying' === (string) $r->get( 'app_chg_state' ) ) {
+		// The guest is changing the app's address: a reinstall now would wipe the server under it. A change that only waits for DNS does not stop one,
+		// and neither does one that is slow (the guest does not answer after the limit): the reinstall is the way out of a guest that never ends.
+		if ( null === $why && $r instanceof Resource && 'applying' === (string) $r->get( 'app_chg_state' ) && 'slow' !== (string) $r->get( 'app_chg_reason' ) ) {
 			return __( 'The domain of the app is being changed. Try again in a few minutes.', 'beltoft-services' );
 		}
 		if ( $r instanceof Resource && ( '' === (string) $r->get( 'app_id' ) || self::is_switch( $r, (array) $args ) ) ) {
@@ -792,8 +793,8 @@ final class AppReinstall {
 	 */
 	public static function meta( $meta, $r, $args ) {
 		$out = self::meta_for( $meta, $r, $args );
-		// A change of domain that still waits belonged to the app that is wiped now.
-		return is_array( $out ) && $r instanceof Resource && '' !== (string) $r->get( 'app_chg_state' ) ? array_merge( $out, AppDomainChange::cleared() ) : $out;
+		// A change of domain that still waits belonged to the app that is wiped now; records it wrote for a name go to the removal queue first.
+		return is_array( $out ) && $r instanceof Resource && '' !== (string) $r->get( 'app_chg_state' ) ? AppDomainChange::forget( $r, $out ) : $out;
 	}
 
 	/**

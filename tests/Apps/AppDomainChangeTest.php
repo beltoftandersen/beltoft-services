@@ -619,6 +619,80 @@ final class AppDomainChangeTest extends MonitoringTestCase {
 		$this->assertSame( 'The domain of the app is being changed. Try again in a few minutes.', Actions::check( $r, 'reinstall', array( 'confirm' => Actions::CONFIRM, 'app_version' => 'keep' ) ) );
 	}
 
+	/** A change to shop.mine.example whose guest never ends: slow (true) or reported failed at the rollback step (false). */
+	private function kept_change( bool $slow ): Resource {
+		$r = $this->server( array( 'app_domain' => 'old.mine.example', 'app_zone' => self::ZONE, 'app_domain_made' => true ) );
+		$this->assertTrue( DnsRecords::replace( self::ZONE, array( array( 'name' => 'old', 'type' => 'A', 'ttl' => 300, 'value' => self::IP ) ) ) );
+		$this->assertTrue( $this->started( $r, $this->change( 'shop' ) )->is_done() );
+		$this->job( $r );
+		if ( $slow ) {
+			$this->guest->answer = array( 'state' => 'running', 'step' => 'app', 'reason' => 'none', 'domain' => 'shop.mine.example' );
+			$this->assertTrue( $this->fresh( $r )->set( array( 'app_chg_at' => time() - AppDomainChange::APPLY_WAIT - 5 ) ) );
+		} else {
+			$this->guest->answer = array( 'state' => 'failed', 'step' => 'rollback', 'reason' => 'app', 'domain' => 'shop.mine.example' );
+		}
+		$this->job( $r );
+		$this->assertTrue( $this->fresh( $r )->get( 'app_chg_made' ) );
+		$this->assertEmpty( (array) $this->fresh( $r )->get( 'app_domain_old' ) );
+		return $this->fresh( $r );
+	}
+
+	/** @return array<string, array{0: bool}> */
+	public static function kept_states(): array {
+		return array( 'slow' => array( true ), 'failed at the rollback' => array( false ) );
+	}
+
+	/** @dataProvider kept_states */
+	public function test_a_reinstall_queues_the_record_of_a_kept_change_and_the_release_removes_it( bool $slow ): void {
+		$r    = $this->kept_change( $slow );
+		$args = array( 'app_version' => 'keep', 'app_domain_mode' => 'none' );
+		$this->assertNull( AppReinstall::check( null, $r, $args ), 'A change that is slow does not block the way out.' );
+		$meta = AppReinstall::meta( array(), $r, $args );
+		$this->assertNull( $meta['app_chg_state'] );
+		$this->assertNull( $meta['app_chg_made'] );
+		$this->assertContains( array( 'zone' => self::ZONE, 'name' => 'shop.mine.example', 'ip' => self::IP, 'tries' => 0 ), $meta['app_domain_old'] );
+		$this->assertTrue( $r->set( $meta ) );
+		AppDomainRelease::started( $this->fresh( $r ), $args );
+		$this->assertNotFalse( as_has_scheduled_action( AppDomainRelease::HOOK, array( $r->id() ), Jobs::GROUP ) );
+		for ( $i = 0; $i < 3; $i++ ) {
+			AppDomainRelease::run( $r->id() );
+		}
+		$this->assertNotContains( 'shop.mine.example A ' . self::IP, $this->records(), 'The record of the new name does not survive the reinstall.' );
+	}
+
+	public function test_a_normal_applying_change_still_blocks_a_reinstall_and_a_slow_one_does_not(): void {
+		$r = $this->server();
+		$this->assertTrue( $r->set( array( 'app_chg_state' => 'applying', 'app_chg_reason' => 'slow' ) ) );
+		$this->assertNull( AppReinstall::check( null, $this->fresh( $r ), array( 'app_version' => 'keep', 'app_domain_mode' => 'none' ) ) );
+		$this->assertTrue( $r->set( array( 'app_chg_reason' => null ) ) );
+		$this->assertIsString( AppReinstall::check( null, $this->fresh( $r ), array( 'app_version' => 'keep', 'app_domain_mode' => 'none' ) ) );
+	}
+
+	public function test_a_new_change_to_another_name_after_a_rollback_failure_queues_the_first_record(): void {
+		$r = $this->kept_change( false );
+		$this->assertTrue( $this->started( $r, $this->change( 'other' ) )->is_done() );
+		$fresh = $this->fresh( $r );
+		$this->assertContains( array( 'zone' => self::ZONE, 'name' => 'shop.mine.example', 'ip' => self::IP, 'tries' => 0 ), (array) $fresh->get( 'app_domain_old' ) );
+		$this->assertNotFalse( as_has_scheduled_action( AppDomainRelease::HOOK, array( $r->id() ), Jobs::GROUP ) );
+		AppDomainRelease::run( $r->id() );
+		$this->assertNotContains( 'shop.mine.example A ' . self::IP, $this->records() );
+		$this->assertContains( 'other.mine.example A ' . self::IP, $this->records(), 'The record of the new change is not touched.' );
+	}
+
+	public function test_a_new_change_to_the_same_name_keeps_the_record_ours_and_a_later_failure_removes_it(): void {
+		$r = $this->kept_change( false );
+		$this->assertTrue( $this->started( $r, $this->change( 'shop' ) )->is_done() );
+		$fresh = $this->fresh( $r );
+		$this->assertTrue( $fresh->get( 'app_chg_made' ), 'The record that was adopted is still ours.' );
+		$this->assertEmpty( (array) $fresh->get( 'app_domain_old' ), 'Not queued: it is in use again.' );
+		$this->job( $r );
+		$this->guest->answer = array( 'state' => 'failed', 'step' => 'done', 'reason' => 'caddy', 'domain' => 'shop.mine.example' );
+		$this->job( $r );
+		$this->assertCount( 1, (array) $this->fresh( $r )->get( 'app_domain_old' ) );
+		AppDomainRelease::run( $r->id() );
+		$this->assertNotContains( 'shop.mine.example A ' . self::IP, $this->records() );
+	}
+
 	public function test_a_second_change_and_a_running_www_add_are_refused(): void {
 		$r = $this->server();
 		$this->assertTrue( $this->started( $r, $this->change( 'shop' ) )->is_done() );

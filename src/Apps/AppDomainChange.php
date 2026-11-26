@@ -220,8 +220,15 @@ final class AppDomainChange {
 		$user  = (int) ( $r->license()['user_id'] ?? 0 );
 		$fqdn  = $choice['fqdn'];
 		$zone  = $choice['zone'];
+		// A change that was kept on purpose (slow, or failed at the rollback) still owns records: they are queued, except a name used again.
+		$kept  = array();
+		foreach ( self::pending_records( $r ) as $entry ) {
+			if ( $entry['zone'] === $zone && in_array( $entry['name'], array_filter( array( $fqdn, 'change' === $choice['mode'] ? AppWww::name_for( $r, $fqdn, $zone ) : '' ) ), true ) ) {
+				$kept[] = $entry['name'];
+			}
+		}
 		$meta  = array_merge(
-			self::cleared(),
+			self::forget( $r, array(), $kept ),
 			array(
 				'app_chg_state' => 'applying',
 				'app_chg_mode'  => $choice['mode'],
@@ -239,6 +246,9 @@ final class AppDomainChange {
 			if ( ! $r->set( $meta ) ) {
 				return StepResult::retry( 30, 'The change could not be stored' );
 			}
+			if ( isset( $meta['app_domain_old'] ) ) {
+				AppDomainRelease::schedule( $r->id() );
+			}
 			self::schedule( $r->id(), 0 );
 			return StepResult::done( array(), 'Change of domain to ' . $fqdn . ' waits for DNS' );
 		}
@@ -252,7 +262,7 @@ final class AppDomainChange {
 		if ( true !== $made ) {
 			return $refuse( (string) $made );
 		}
-		$meta['app_chg_made'] = $wrote;
+		$meta['app_chg_made'] = $wrote || in_array( $fqdn, $kept, true );
 
 		$www = AppWww::name_for( $r, $fqdn, $zone );
 		if ( '' !== $www ) {
@@ -260,7 +270,7 @@ final class AppDomainChange {
 			$www_made  = AppDomains::publish( $user, $zone, $www, $ip, $wrote_www, true );
 			if ( true === $www_made ) {
 				$meta['app_chg_www']      = $www;
-				$meta['app_chg_www_made'] = $wrote_www;
+				$meta['app_chg_www_made'] = $wrote_www || in_array( $www, $kept, true );
 			} elseif ( ! is_wp_error( $www_made ) && 'live' === AppWww::verdict( $www, $ip ) ) {
 				// A record of the customer's own that already points here: served, never touched.
 				$meta['app_chg_www'] = $www;
@@ -270,6 +280,9 @@ final class AppDomainChange {
 		if ( ! $r->set( $meta ) ) {
 			// The records written above are named in the meta that could not be stored: the action is tried again (a record that is there already is adopted, never removed).
 			return StepResult::retry( 30, 'The change could not be stored' );
+		}
+		if ( isset( $meta['app_domain_old'] ) ) {
+			AppDomainRelease::schedule( $r->id() );
 		}
 		self::schedule( $r->id(), 0 );
 		return StepResult::done( array(), 'Change of domain to ' . $fqdn . ' started' );
@@ -319,6 +332,42 @@ final class AppDomainChange {
 			$out[] = array( 'zone' => $zone, 'name' => (string) $r->get( 'app_chg_www' ), 'ip' => $ip );
 		}
 		return $out;
+	}
+
+	/**
+	 * Puts the records of a change that is not committed into the removal queue (app_domain_old, the shape AppDomainRelease reads),
+	 * except the names in $keep, which a new change uses again. The one place that queues them: fail() and every forgetting of a
+	 * pending change go through here. The caller stores the meta and schedules AppDomainRelease.
+	 *
+	 * @param array<string, mixed> $meta Meta so far; its app_domain_old, when set, is the queue to add to.
+	 * @param string[]             $keep Names whose record stays ours.
+	 * @return array<string, mixed> $meta with app_domain_old when something was queued.
+	 */
+	public static function queue_pending( Resource $r, array $meta = array(), array $keep = array() ): array {
+		$old    = array_values( array_filter( (array) ( $meta['app_domain_old'] ?? $r->get( 'app_domain_old' ) ), 'is_array' ) );
+		$queued = false;
+		foreach ( self::pending_records( $r ) as $entry ) {
+			if ( in_array( $entry['name'], $keep, true ) ) {
+				continue;
+			}
+			$old[]  = $entry + array( 'tries' => 0 );
+			$queued = true;
+		}
+		if ( $queued ) {
+			$meta['app_domain_old'] = array_slice( $old, 0, 6 );
+		}
+		return $meta;
+	}
+
+	/**
+	 * The meta that forgets a change without fail() or commit(): its records go to the removal queue first, so none is left behind.
+	 *
+	 * @param array<string, mixed> $meta Meta so far.
+	 * @param string[]             $keep Names a new change uses again.
+	 * @return array<string, mixed>
+	 */
+	public static function forget( Resource $r, array $meta = array(), array $keep = array() ): array {
+		return array_merge( self::queue_pending( $r, $meta, $keep ), self::cleared() );
 	}
 
 	// -- The background job ---------------------------------------------------------------------
@@ -624,13 +673,7 @@ final class AppDomainChange {
 		$name   = (string) $r->get( 'app_chg_name' );
 		$meta   = array( 'app_chg_state' => 'failed', 'app_chg_reason' => $reason, 'app_chg_at' => time(), 'app_chg_made' => null, 'app_chg_www_made' => null, 'app_chg_run' => null, 'app_chg_tries' => null );
 		$queued = self::pending_records( $r );
-		if ( $queued ) {
-			$old = array_values( array_filter( (array) $r->get( 'app_domain_old' ), 'is_array' ) );
-			foreach ( $queued as $entry ) {
-				$old[] = $entry + array( 'tries' => 0 );
-			}
-			$meta['app_domain_old'] = array_slice( $old, 0, 6 );
-		}
+		$meta   = self::queue_pending( $r, $meta );
 		if ( ! $r->set( $meta ) ) {
 			self::schedule( $r->id(), 30 );
 			return;
