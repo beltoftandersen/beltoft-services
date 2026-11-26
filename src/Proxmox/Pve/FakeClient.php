@@ -194,6 +194,19 @@ class FakeClient extends FakePve {
 	}
 
 	/**
+	 * Like lag_status(), but only the cluster listing (/cluster/resources) lags, as on a real cluster: pvestatd
+	 * refreshes the listing every few seconds, while status/current answers from the VM itself at once.
+	 *
+	 * @param int $vmid  VM id.
+	 * @param int $reads How many listing reads show the old status.
+	 */
+	public function lag_listing( int $vmid, int $reads ): void {
+		$this->load();
+		$this->state['lag_next_l'][ $vmid ] = max( 0, $reads );
+		$this->save();
+	}
+
+	/**
 	 * Lets virtual time pass (the pause a driver asked for).
 	 *
 	 * @param int $seconds Seconds.
@@ -215,8 +228,13 @@ class FakeClient extends FakePve {
 	 *
 	 * @param array<string, mixed> $vm VM as stored.
 	 */
-	private function shown_status( array $vm ): string {
+	private function shown_status( array $vm, bool $listing = false ): string {
 		$id = (int) $vm['vmid'];
+
+		// A listing-only lag (lag_listing) leaves status/current alone and uses up listing reads only.
+		if ( ! empty( $this->state['lag'][ $id ]['listing_only'] ) && ! $listing ) {
+			return (string) $vm['status'];
+		}
 
 		if ( ( $this->state['lag'][ $id ]['secs'] ?? 0 ) > 0 ) {
 			return (string) $this->state['lag'][ $id ]['shows'];
@@ -751,7 +769,7 @@ class FakeClient extends FakePve {
 				'vmid'     => $vm['vmid'],
 				'node'     => $vm['node'],
 				'name'     => $vm['name'],
-				'status'   => $this->shown_status( $vm ),
+				'status'   => $this->shown_status( $vm, true ),
 				'template' => (int) $vm['template'],
 				'pool'     => $vm['pool'],
 				'lock'     => $vm['lock'],
@@ -1237,6 +1255,15 @@ class FakeClient extends FakePve {
 						'shows' => $this->state['vms'][ $id ]['status'],
 					);
 					unset( $this->state['lag_next_s'][ $id ] );
+				}
+
+				if ( isset( $this->state['lag_next_l'][ $id ] ) && in_array( $action, array( 'start', 'stop', 'shutdown' ), true ) ) {
+					$this->state['lag'][ $id ] = array(
+						'reads'        => (int) $this->state['lag_next_l'][ $id ],
+						'shows'        => $this->state['vms'][ $id ]['status'],
+						'listing_only' => true,
+					);
+					unset( $this->state['lag_next_l'][ $id ] );
 				}
 
 				if ( isset( $this->state['lag_next'][ $id ] ) && in_array( $action, array( 'start', 'stop', 'shutdown' ), true ) ) {

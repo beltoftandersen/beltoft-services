@@ -233,7 +233,22 @@ trait Steps {
 		$fresh = VmRecords::for_resource( $this->r->id() );
 		$v     = Ownership::verify( $this->client, $fresh ? $fresh : $record, $this->r );
 
-		return is_wp_error( $v ) ? $this->refuse_or_retry( $v, $step ) : $v;
+		if ( is_wp_error( $v ) ) {
+			return $this->refuse_or_retry( $v, $step );
+		}
+
+		// The power state comes from the VM itself (status/current), not from the cluster listing: Proxmox refreshes
+		// /cluster/resources every few seconds, so right after a power task the listing can still show the old state.
+		// Production 2026-11-26: a private network detach shut a server down and skipped the start, because the
+		// listing still said "running". When the live read fails, the listing's answer stays.
+		$vmid = (int) ( ( $fresh ? $fresh : $record )['vmid'] ?? 0 );
+		$live = $vmid > 0 && '' !== (string) $v['node'] ? $this->client->request( 'GET', '/nodes/' . rawurlencode( (string) $v['node'] ) . '/qemu/' . $vmid . '/status/current' ) : null;
+
+		if ( is_array( $live ) && is_string( $live['status'] ?? null ) && '' !== $live['status'] ) {
+			$v['status'] = $live['status'];
+		}
+
+		return $v;
 	}
 
 	/**

@@ -119,7 +119,7 @@ class SnapshotsInteractionTest extends SnapshotsTestCase {
 		}
 
 		$after = array_slice( $this->lines(), $seen );
-		$this->assertSame( array(), array_filter( $after, static fn( $l ) => 'DELETE /nodes/node-a/qemu/5000' === $l || false !== strpos( $l, '/status/' ) || 0 === strpos( $l, 'PUT ' ) || 0 === strpos( $l, 'POST /nodes/node-a/qemu/5000/config' ) ), 'The wipe never ran.' );
+		$this->assertSame( array(), array_filter( $after, static fn( $l ) => 'DELETE /nodes/node-a/qemu/5000' === $l || ( 0 === strpos( $l, 'POST ' ) && false !== strpos( $l, '/status/' ) ) || 0 === strpos( $l, 'PUT ' ) || 0 === strpos( $l, 'POST /nodes/node-a/qemu/5000/config' ) ), 'The wipe never ran.' );
 		$this->assertCount( 1, Policy::entries( $this->fresh( $r ) ) );
 		$told = array_filter( $this->admin_mails(), static fn( $m ) => false !== strpos( (string) $m['message'], 'reinstall waits' ) );
 		$this->assertCount( 1, $told, 'Once, not every round.' );

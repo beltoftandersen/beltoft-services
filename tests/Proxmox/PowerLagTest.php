@@ -75,7 +75,8 @@ class PowerLagTest extends BackupTestCase {
 		$r = $this->ready_vm();
 		Jobs::act( $r->id(), 'shutdown', array() );
 		$this->assertSame( 'stopped', $this->fake->vm( 5000 )['status'] );
-		$this->fake->lag_status( 5000, 1 );
+		// verified() reads the listing and the live status (2026-11-26), so one lagging look uses up two reads
+		$this->fake->lag_status( 5000, 2 );
 		$this->pauses = array();
 		$before       = count( $this->calls( 'POST', '/status/start' ) );
 
@@ -91,7 +92,7 @@ class PowerLagTest extends BackupTestCase {
 		$r = $this->ready_vm();
 		Jobs::act( $r->id(), 'shutdown', array() );
 		$this->assertSame( 'stopped', $this->fake->vm( 5000 )['status'] );
-		$this->fake->lag_status( 5000, 2 );
+		$this->fake->lag_status( 5000, 3 );
 		$this->pauses = array();
 
 		Jobs::act( $r->id(), 'start', array() );
@@ -103,7 +104,7 @@ class PowerLagTest extends BackupTestCase {
 	public function test_a_shutdown_whose_status_lags_is_found_off_by_the_look_after_and_the_page_power_is_right(): void {
 		$r = $this->ready_vm();
 		\BeltoftServices\Proxmox\Vm\Operations::remember_power( $r->id(), 'running' );
-		$this->fake->lag_status( 5000, 3 );
+		$this->fake->lag_status( 5000, 2 );
 		$this->pauses = array();
 
 		Jobs::act( $r->id(), 'shutdown', array() );

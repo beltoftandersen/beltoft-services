@@ -124,7 +124,7 @@ class DiskReinstallTest extends BackupTestCase {
 
 		$this->assertSame( $before['scsi0'], $this->config()['scsi0'], 'The old boot volume is still attached.' );
 		$this->assertSame( 'running', $this->fake->vm( 5000 )['status'] );
-		$writes = array_filter( array_slice( $this->fake->calls(), $seen ), static fn( $c ) => in_array( $c['method'], array( 'PUT', 'DELETE' ), true ) || false !== strpos( $c['path'], '/status/' ) );
+		$writes = array_filter( array_slice( $this->fake->calls(), $seen ), static fn( $c ) => in_array( $c['method'], array( 'PUT', 'DELETE' ), true ) || ( 'POST' === $c['method'] && false !== strpos( $c['path'], '/status/' ) ) ); // a power action is a POST; GET status/current only reads
 		$this->assertSame( array(), array_values( $writes ), 'Nothing was changed before the template was found missing.' );
 		$this->assertSame( 'failed', Resource::find( $server->id() )->get( 'state' ) );
 	}

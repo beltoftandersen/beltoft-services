@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.65.2
+Stable tag: 0.65.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.65.3 =
+* Fix: removing a server's private network could leave the server switched off. The detach shuts the server down to take the card out and then starts it again, but the start step read the power state from Proxmox's cluster listing, which is refreshed every few seconds and still said "running", so the start was skipped (production 2026-11-26). Every Proxmox step now reads a server's power state from the server itself (status/current) and only falls back to the listing when that read fails. The same lag could refuse a private network attach right after a start.
 
 = 0.65.2 =
 Change of domain on a running app, after a code review:

@@ -298,6 +298,35 @@ class PrivateAttachTest extends TestCase {
 		$this->assertSame( array(), array_values( $writes ), 'A second detach does nothing.' );
 	}
 
+	/**
+	 * Production 2026-11-26 (vm-f3339ec0): the detach shut the server down, removed the card and never started it again,
+	 * because the start step read the power state from /cluster/resources, which Proxmox refreshes every few seconds and
+	 * still said "running". Decisions about power read the VM's live status (status/current).
+	 */
+	public function test_detach_starts_the_server_again_when_the_cluster_listing_still_says_running(): void {
+		$r    = $this->attached();
+		$vmid = (int) $r->get( 'vmid' );
+		$this->fake->lag_listing( $vmid, 20 );
+		Jobs::act( $r->id(), 'private_detach', array() );
+		$this->assertArrayNotHasKey( 'net1', $this->fake->vm( $vmid )['config'] );
+		$this->assertSame( 'running', $this->fake->vm( $vmid )['status'], 'The server runs again after the detach.' );
+		$this->assertNotEmpty( $this->calls( 'POST', '/status/start' ), 'The detach sent the start.' );
+	}
+
+	public function test_attach_right_after_a_start_is_not_refused_while_the_listing_still_says_stopped(): void {
+		$r    = $this->ready();
+		$vmid = (int) $r->get( 'vmid' );
+		$base = '/nodes/' . $this->fake->vm( $vmid )['node'] . '/qemu/' . $vmid . '/status/';
+		$this->fake->wait_task( (string) $this->fake->task( 'POST', $base . 'stop' ), 5 );
+		$this->assertSame( 'stopped', $this->fake->vm( $vmid )['status'] );
+		// started again just before the attach: the listing still says stopped for a while
+		$this->fake->lag_listing( $vmid, 20 );
+		$this->fake->wait_task( (string) $this->fake->task( 'POST', $base . 'start' ), 5 );
+		$this->assertSame( 'running', $this->fake->vm( $vmid )['status'] );
+		Jobs::act( $r->id(), 'private_attach', array() );
+		$this->assertSame( 'attached', Resource::find( $r->id() )->get( 'private_state' ), 'A running server is attached, whatever the listing still shows.' );
+	}
+
 	public function test_detach_of_a_networkmanager_guest_writes_a_disabled_profile(): void {
 		$r    = $this->attached( 'rocky' );
 		$vmid = (int) $r->get( 'vmid' );
