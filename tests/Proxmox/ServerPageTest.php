@@ -71,6 +71,8 @@ class ServerPageTest extends MonitoringTestCase {
 		$this->assertStringContainsString( 'data-copy="ssh root@192.0.2.10"', $html );
 		$this->assertStringNotContainsString( 'Copy SSH command', $html, 'The copy sits beside the Log in line, not among the power buttons.' );
 		$this->assertStringContainsString( 'class="beltoft-services-copy" data-copy="ssh root@192.0.2.10"', $html );
+		// owner 2026-11-26: the IP address has its own Copy button
+		$this->assertStringContainsString( '<code>192.0.2.10</code> <button type="button" class="beltoft-services-copy" data-copy="192.0.2.10"', $html );
 		$this->assertStringContainsString( 'data-power-action="reboot"', $html );
 		$this->assertStringContainsString( 'data-power-action="shutdown"', $html );
 		$this->assertStringNotContainsString( 'Console', $html );
@@ -246,7 +248,7 @@ class ServerPageTest extends MonitoringTestCase {
 
 		$r->set( array( 'ip6' => '2001:DB8:430c:1:1388:0:0:1' ) );
 		$html = $this->page( $r, (string) $r->license()['id'] );
-		$this->assertStringContainsString( '<dt>IPv6 address</dt><dd><code>2001:db8:430c:1:1388::1</code></dd>', $html );
+		$this->assertStringContainsString( '<dt>IPv6 address</dt><dd><code>2001:db8:430c:1:1388::1</code> <button type="button" class="beltoft-services-copy" data-copy="2001:db8:430c:1:1388::1"', $html );
 		$this->assertStringNotContainsString( 'Works after the next time', $html );
 		$this->assertStringContainsString( 'data-copy="ssh root@192.0.2.10"', $html, 'The log in line stays IPv4.' );
 	}

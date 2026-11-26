@@ -127,10 +127,10 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 			<?php $beltoft_services_host = '' !== $ip ? $ip : (string) ( $ip6 ?? '' ); ?>
 			<?php if ( '' !== $beltoft_services_host ) : ?>
 				<?php if ( '' !== $ip ) : ?>
-					<div><dt><?php esc_html_e( 'IP address', 'beltoft-services' ); ?></dt><dd><code><?php echo esc_html( $ip ); ?></code></dd></div>
+					<div><dt><?php esc_html_e( 'IP address', 'beltoft-services' ); ?></dt><dd><code><?php echo esc_html( $ip ); ?></code> <button type="button" class="beltoft-services-copy" data-copy="<?php echo esc_attr( $ip ); ?>" data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></dd></div>
 				<?php endif; ?>
 				<?php if ( '' !== ( $ip6 ?? '' ) ) : ?>
-					<div><dt><?php esc_html_e( 'IPv6 address', 'beltoft-services' ); ?></dt><dd><code><?php echo esc_html( (string) $ip6 ); ?></code></dd></div>
+					<div><dt><?php esc_html_e( 'IPv6 address', 'beltoft-services' ); ?></dt><dd><code><?php echo esc_html( (string) $ip6 ); ?></code> <button type="button" class="beltoft-services-copy" data-copy="<?php echo esc_attr( (string) $ip6 ); ?>" data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></dd></div>
 				<?php endif; ?>
 				<div><dt><?php esc_html_e( 'Log in', 'beltoft-services' ); ?></dt><dd><code>ssh <?php echo esc_html( $ssh_user ); ?>@<wbr><?php echo esc_html( $beltoft_services_host ); ?></code> <button type="button" class="beltoft-services-copy" data-copy="<?php echo esc_attr( 'ssh ' . $ssh_user . '@' . $beltoft_services_host ); ?>" data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></dd></div>
 			<?php endif; ?>
@@ -162,11 +162,11 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 			<?php $beltoft_services_host = '' !== $ip ? $ip : (string) ( $ip6 ?? '' ); ?>
 			<?php if ( '' !== $ip ) : ?>
 				<dt><?php esc_html_e( 'IP address', 'beltoft-services' ); ?></dt>
-				<dd><code><?php echo esc_html( $ip ); ?></code></dd>
+				<dd><code><?php echo esc_html( $ip ); ?></code> <button type="button" class="beltoft-services-copy" data-copy="<?php echo esc_attr( $ip ); ?>" data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></dd>
 			<?php endif; ?>
 			<?php if ( '' !== ( $ip6 ?? '' ) ) : ?>
 				<dt><?php esc_html_e( 'IPv6 address', 'beltoft-services' ); ?></dt>
-				<dd><code><?php echo esc_html( (string) $ip6 ); ?></code></dd>
+				<dd><code><?php echo esc_html( (string) $ip6 ); ?></code> <button type="button" class="beltoft-services-copy" data-copy="<?php echo esc_attr( (string) $ip6 ); ?>" data-copied="<?php esc_attr_e( 'Copied', 'beltoft-services' ); ?>" hidden><?php esc_html_e( 'Copy', 'beltoft-services' ); ?></button></dd>
 			<?php endif; ?>
 			<?php if ( '' !== $beltoft_services_host ) : ?>
 				<dt><?php esc_html_e( 'Log in', 'beltoft-services' ); ?></dt>
