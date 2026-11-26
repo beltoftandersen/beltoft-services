@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.65.4
+Stable tag: 0.65.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.65.5 =
+* My Account: no stylesheet takes the padding off a code value any more (account facts, IPv4 list, API token, mail table, SSL rows, mail setup), so the dashboard's code fields keep their room (owner 2026-11-26). The API documentation keeps its plain code.
 
 = 0.65.4 =
 * The .dk note in the domain search says that private persons and businesses can register .dk and that a business gives its VAT number at checkout. The old note ("A business needs a VAT number") read as if only businesses could register (owner 2026-11-26). The checkout is unchanged.

@@ -24,7 +24,7 @@
 .beltoft-services-mailsetup li { margin: 0 0 6px; }
 .beltoft-services-mailsetup a { color: var(--bsms-linkc); text-decoration: underline; text-underline-offset: 3px; }
 .beltoft-services-mailsetup a:focus-visible { outline: 2px solid var(--bsms-linkc); outline-offset: 2px; }
-.beltoft-services-mailsetup code { padding: 0; border: 0; background: none; color: inherit; font-size: inherit; }
+.beltoft-services-mailsetup code { border: 0; background: none; color: inherit; font-size: inherit; }
 .beltoft-services-mailsetup section { scroll-margin-top: 88px; }
 .beltoft-services-mailsetup nav p { margin-bottom: 6px; color: var(--bsms-soft); }
 

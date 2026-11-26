@@ -864,7 +864,7 @@ div.beltoft-services-domain ul.beltoft-services-domain__import-list > li { displ
 .beltoft-services-api__docs[open] { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .beltoft-services-api__docs[open] > * { max-width: 100%; margin: 0; min-width: 0; }
 .beltoft-services-api__docs pre { box-sizing: border-box; padding: 8px 16px; background: var(--bs-warm); overflow-x: auto; }
-.woocommerce-MyAccount-content .beltoft-services-api code { padding: 0; border: 0; background: none; color: var(--bs-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; }
+.woocommerce-MyAccount-content .beltoft-services-api code { border: 0; background: none; color: var(--bs-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; }
 .beltoft-services-api__scroll { overflow-x: auto; }
 .beltoft-services-api__docs table { min-width: 560px; }
 .beltoft-services-api__docs th, .beltoft-services-api__docs td { padding: 8px 12px 8px 0; text-align: left; vertical-align: top; }
@@ -1761,7 +1761,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts 
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts > div { flex: none; box-shadow: inset 0 0 0 .5px var(--bs-line); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts > div:last-child:nth-child(3n+1) { grid-column: span 3; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts > div:last-child:nth-child(3n+2) { grid-column: span 2; }
-body.woocommerce-account #brx-content .beltoft-services-facts :is(dd code, code), body.woocommerce-account #brx-content ul.beltoft-services-vm__ipv4-list code { padding: 0; background: none; font-family: inherit; font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); }
+body.woocommerce-account #brx-content .beltoft-services-facts :is(dd code, code), body.woocommerce-account #brx-content ul.beltoft-services-vm__ipv4-list code { background: none; font-family: inherit; font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts dd .beltoft-services-copy { margin-left: var(--bs-space-2); }
 @media (max-width: 900px) {
 	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1777,7 +1777,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-tab :i
 /* The IPv4 list is a plain list of rows. */
 body.woocommerce-account .woocommerce-MyAccount-content ul.beltoft-services-vm__ipv4-list { margin: 0 0 var(--bs-space-3); padding: 0; list-style: none; }
 body.woocommerce-account .woocommerce-MyAccount-content ul.beltoft-services-vm__ipv4-list > li { margin: 0; padding: var(--bs-space-1) 0; }
-body.woocommerce-account .woocommerce-MyAccount-content ul.beltoft-services-vm__ipv4-list code { padding: 0; background: none; font-family: inherit; font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); }
+body.woocommerce-account .woocommerce-MyAccount-content ul.beltoft-services-vm__ipv4-list code { background: none; font-family: inherit; font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); }
 /* Copy is a tap target on a phone; the usage range buttons are 40px there. */
 @media (max-width: 767px) {
 	body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts .beltoft-services-copy { min-height: var(--bs-btn-h); padding: 0 var(--bs-space-3); }
@@ -1976,7 +1976,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-app-do
 /* ==== Design pass 2026-11-25: databases, SSL, licences, apps, storage ============================================== */
 
 /* Database page: facts values line up with the plain ones (the code chip had its own padding), the list of policies is plain rows. */
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts code { padding: 0; background: none; border-radius: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts code { background: none; border-radius: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content ul.beltoft-services-db__policies { display: grid; gap: var(--bs-space-3); margin: var(--bs-space-5) 0 0; padding: 0; list-style: none; }
 /* Blocks of a database tab (show password, new password): 24px apart, nothing extra under the last line of one. */
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db > .beltoft-services-vm__more { margin: 0; }
