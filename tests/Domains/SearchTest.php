@@ -133,6 +133,12 @@ class SearchTest extends TestCase {
 		$this->assertNull( $result['results'][0]['price'] );
 	}
 
+	/** Owner 2026-11-26: the note read as if only a business may register .dk; private persons can (since 2026-10-27). */
+	public function test_the_dk_note_says_private_persons_and_businesses_can_register(): void {
+		$this->assertSame( 'Private persons and businesses can register .dk. A business gives its VAT number at checkout.', Search::note( 'dk' ) );
+		$this->assertSame( Search::note( 'dk' ), Search::note( '.DK' ) );
+	}
+
 	public function test_dk_is_not_offered_until_agreement_approval(): void {
 		update_option( Prices::OPTION, array( 'dk' => array( 'price' => 13, 'restricted' => true ) ) );
 		$this->settings( array( 'domain_featured_tlds' => 'dk' ) );

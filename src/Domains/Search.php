@@ -161,7 +161,8 @@ final class Search {
 			'dev' => __( 'Websites on this extension need HTTPS.', 'beltoft-services' ),
 			'app' => __( 'Websites on this extension need HTTPS.', 'beltoft-services' ),
 			'eu'  => __( 'The registrant must be in the EU.', 'beltoft-services' ),
-			'dk'  => __( 'A business needs a VAT number to register this extension.', 'beltoft-services' ),
+			// Private persons may register .dk (since 2026-10-27); only a business gives a VAT number (owner 2026-11-26: say both).
+			'dk'  => __( 'Private persons and businesses can register .dk. A business gives its VAT number at checkout.', 'beltoft-services' ),
 		) );
 		return (string) ( $notes[ strtolower( ltrim( $tld, '.' ) ) ] ?? '' );
 	}
