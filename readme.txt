@@ -259,7 +259,7 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 == Changelog ==
 
 = 0.65.7 =
-* A service is never deleted before the date its deletion warning gave, also when the retention or notice days are lowered later. The announced date is stored with the warning (meta deletes_at) and cleared when the service is resumed or a hold restarts the retention.
+* A service is never deleted before the date its deletion warning gave, also when the notice days (warning_days) are lowered after the warning was sent. The announced date is stored with the warning (meta deletes_at) and cleared when the service is resumed or a hold restarts the retention.
 
 = 0.65.6 =
 * Server page: the IP address and the IPv6 address each have a Copy button, as the Log in line has (owner 2026-11-26).
