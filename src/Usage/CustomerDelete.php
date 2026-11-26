@@ -235,8 +235,9 @@ final class CustomerDelete {
 		}
 
 		// The lock stayed busy: nothing is stored and the license stays, so the customer tries again (a queued request would skip the checks above).
+		// 422 like the other refusals, so the Delete block shows the message.
 		if ( null === $stored ) {
-			return new \WP_Error( 'beltoft_services_delete_busy', __( 'The service is busy right now. Please try again in a minute.', 'beltoft-services' ), array( 'status' => 409 ) );
+			return new \WP_Error( 'beltoft_services_delete_busy', __( 'The service is busy right now. Please try again in a minute.', 'beltoft-services' ), array( 'status' => 422 ) );
 		}
 
 		if ( false === $stored ) {

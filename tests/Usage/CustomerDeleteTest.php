@@ -198,6 +198,7 @@ final class CustomerDeleteTest extends UsageTestCase {
 		$bad = CustomerDelete::run( Resource::find( $r->id() ), $user, CustomerDelete::word( Resource::find( $r->id() ) ) );
 		$this->assertWPError( $bad );
 		$this->assertSame( 'beltoft_services_delete_busy', $bad->get_error_code() );
+		$this->assertSame( 422, $bad->get_error_data()['status'], 'The Delete block shows the message of a 422.' );
 
 		$fresh = Resource::find( $r->id() );
 		$this->assertSame( 'ready', $fresh->get( 'desired' ) );
