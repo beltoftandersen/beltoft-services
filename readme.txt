@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.65.1
+Stable tag: 0.65.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,15 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.65.2 =
+Change of domain on a running app, after a code review:
+* The script on the server has its own deadline (10 minutes) and puts everything back when it passes. The plugin never calls a change failed by time alone: a server that still reports "running" after 15 minutes keeps the new DNS record, staff are told, and the customer reads that it takes longer than expected. A reinstall is allowed in that state.
+* A change that was cut off (a reboot) is first put back by the next run, so the original state is never overwritten.
+* One script and one request file per run, and nothing is started while an earlier run is alive.
+* A put-back that failed on the server is told as such to the customer and to staff, and the new record is kept.
+* Moving between www.example.com and example.com works in both directions; a record that stays in use stays ours.
+* Records written for a new name are never dropped from tracking: a reinstall or a new change after a kept change queues them for removal.
 
 = 0.65.1 =
 * Odoo: a change of domain on a running server failed and was put back, because the address was asked of Odoo through "compose exec", which has no database settings. It now goes through "compose run", as the install does. Found by the live test.
