@@ -324,4 +324,14 @@ class AppDomainTabTest extends MonitoringTestCase {
 		$this->assertNotSame( '', $this->rule( '.beltoft-services-app-domain__fields', 'margin: 0 0 var(--bs-space-4);' ), 'The fields are not pushed in.' );
 		$this->assertNotSame( '', $this->rule( '.beltoft-services-app-domain__choice .description', 'margin: var(--bs-space-1) 0 0;' ) );
 	}
+
+	public function test_a_slow_change_and_a_change_that_could_not_be_put_back_say_so_plainly(): void {
+		$slow = $this->text( $this->block( array( 'supported' => true, 'state' => 'applying', 'mode' => 'change', 'name' => 'shop.example.org', 'reason' => 'slow', 'current' => 'old.mine.example', 'zones' => array() ), array( 'app_domain' => 'old.mine.example' ) ) );
+		$this->assertStringContainsString( 'The change is taking longer than expected. We have been told and are looking at it.', $slow );
+		$this->assertStringNotContainsString( 'put back', $slow );
+
+		$bad = $this->text( $this->block( array( 'supported' => true, 'state' => 'failed', 'mode' => 'change', 'name' => 'shop.example.org', 'reason' => 'rollback', 'current' => 'old.mine.example', 'zones' => array() ), array( 'app_domain' => 'old.mine.example' ) ) );
+		$this->assertStringContainsString( 'The change failed and could not be put back. We are looking at it.', $bad );
+		$this->assertStringNotContainsString( 'still answers on the current address', $bad );
+	}
 }

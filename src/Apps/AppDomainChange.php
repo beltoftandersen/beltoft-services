@@ -38,8 +38,15 @@ final class AppDomainChange {
 	public const CANCEL = 'app_domain_cancel';
 	public const HOOK   = 'beltoft_services_app_domain_change';
 
-	/** Seconds the guest has to answer for a run before the change is called failed. */
+	/**
+	 * Seconds the guest has to answer for a run before the change is called slow. The script ends itself well before this (its own
+	 * deadline, AppRename::GUEST_DEADLINE), so a guest that is still `running` after it is stuck or gone. Such a change is never
+	 * called failed by time alone: the guest may still switch to the new name, so the record of the new name stays and staff are told.
+	 */
 	public const APPLY_WAIT = 900;
+
+	/** Seconds between two looks at a change that is slow. */
+	public const SLOW_POLL = 120;
 
 	/** Seconds a failed change is shown on the App tab. */
 	public const FAILED_SHOWN = 7 * DAY_IN_SECONDS;
@@ -51,7 +58,7 @@ final class AppDomainChange {
 	public const PUSH_TRIES = 3;
 
 	/** The reasons a failed change can show; the guest's own words are mapped onto these. */
-	private const REASONS = array( 'none', 'other', 'aaaa', 'unreachable', 'timeout', 'certificate', 'caddy', 'app', 'probe', 'agent', 'busy', 'late' );
+	private const REASONS = array( 'none', 'other', 'aaaa', 'unreachable', 'timeout', 'certificate', 'caddy', 'app', 'probe', 'agent', 'busy', 'late', 'slow', 'rollback' );
 
 	/**
 	 * A stand-in for the guest side (AppRename) in tests: an object with supported( $r ), push( $r, $want ) and read( $r, $run, $domain ). The integration tests run the real chain (AppRename and FakeClient) with this left null.
@@ -416,9 +423,23 @@ final class AppDomainChange {
 
 		if ( '' === $run ) {
 			$token = self::guest_push( $r, self::want( $r ) );
+			if ( is_wp_error( $token ) && 'beltoft_rename_unknown' === $token->get_error_code() && is_string( ( (array) $token->get_error_data() )['run'] ?? null ) ) {
+				// The start may have worked: that run is followed, never given up on a guess.
+				$token = (string) ( (array) $token->get_error_data() )['run'];
+			}
+			if ( is_wp_error( $token ) && 'beltoft_rename_busy' === $token->get_error_code() ) {
+				// An earlier run is still alive on the guest: nothing was sent. Wait for it, which is no failed try.
+				if ( $now - (int) $r->get( 'app_chg_at' ) > self::APPLY_WAIT ) {
+					self::slow( $r );
+					return;
+				}
+				self::schedule( $id, 30 );
+				return;
+			}
 			if ( is_wp_error( $token ) || ! is_string( $token ) || '' === $token ) {
 				$tries = (int) $r->get( 'app_chg_tries' ) + 1;
 				if ( $tries >= self::PUSH_TRIES ) {
+					// The start was refused before anything ran (a start that may have worked is followed above), so nothing can switch.
 					self::fail( $r, 'agent' );
 					return;
 				}
@@ -426,17 +447,21 @@ final class AppDomainChange {
 				self::schedule( $id, 30 );
 				return;
 			}
-			$r->set( array( 'app_chg_run' => $token, 'app_chg_at' => $now, 'app_chg_tries' => null ) );
+			$r->set( array( 'app_chg_run' => $token, 'app_chg_at' => $now, 'app_chg_tries' => null, 'app_chg_reason' => null ) );
 			self::schedule( $id, self::POLL );
 			return;
 		}
 
 		$status = self::guest_read( $r, $run );
-		if ( null === $status || 'running' === ( $status['state'] ?? '' ) ) {
-			if ( $now - (int) $r->get( 'app_chg_at' ) > self::APPLY_WAIT ) {
-				self::fail( $r, 'late' );
+		if ( self::unfinished( $status ) && $now - (int) $r->get( 'app_chg_at' ) > self::APPLY_WAIT ) {
+			// One more look before anything is decided by time: the answer may have come just now.
+			$status = self::guest_read( $r, $run );
+			if ( self::unfinished( $status ) ) {
+				self::slow( $r );
 				return;
 			}
+		}
+		if ( self::unfinished( $status ) ) {
 			self::schedule( $id, self::POLL );
 			return;
 		}
@@ -444,8 +469,46 @@ final class AppDomainChange {
 			self::commit( $r );
 			return;
 		}
+		if ( 'rollback' === ( $status['step'] ?? '' ) ) {
+			self::fail_unsafe( $r );
+			return;
+		}
 		$reason = (string) ( $status['reason'] ?? '' );
 		self::fail( $r, in_array( $reason, self::REASONS, true ) && 'none' !== $reason ? $reason : 'app' );
+	}
+
+	/** No answer yet: no status, or the guest says it is still running. */
+	private static function unfinished( ?array $status ): bool {
+		return null === $status || 'running' === ( $status['state'] ?? '' );
+	}
+
+	/**
+	 * The guest has not finished after the limit. Nothing is removed and nothing is said to be put back: the guest may still switch
+	 * to the new name, so its record stays. Staff are told once, the customer sees that it takes longer than expected, and the
+	 * look goes on: a later ready or failed ends the change as usual.
+	 */
+	private static function slow( Resource $r ): void {
+		if ( 'slow' !== (string) $r->get( 'app_chg_reason' ) ) {
+			if ( ! $r->set( array( 'app_chg_reason' => 'slow' ) ) ) {
+				self::schedule( $r->id(), 30 );
+				return;
+			}
+			AppAlerts::domain_change_slow( $r, (string) $r->get( 'app_chg_name' ) );
+		}
+		self::schedule( $r->id(), self::SLOW_POLL );
+	}
+
+	/**
+	 * The guest says the change failed and the put-back failed too: it may serve either name. Nothing is removed (the records of
+	 * the new name stay, and stay tracked so a deleted server still removes them), the customer is told, staff are told with the step.
+	 */
+	private static function fail_unsafe( Resource $r ): void {
+		$name = (string) $r->get( 'app_chg_name' );
+		if ( ! $r->set( array( 'app_chg_state' => 'failed', 'app_chg_reason' => 'rollback', 'app_chg_at' => time(), 'app_chg_run' => null, 'app_chg_tries' => null ) ) ) {
+			self::schedule( $r->id(), 30 );
+			return;
+		}
+		AppAlerts::domain_change_failed( $r, $name, 'rollback', 'rollback' );
 	}
 
 	/**
@@ -481,15 +544,28 @@ final class AppDomainChange {
 		$ip      = (string) $r->get( 'app_chg_ip' );
 		$now     = time();
 
+		// A record of the old site that the new site still uses (www.example.com as the old domain and the new www name, or the
+		// domain and its www name swapping places) stays ours: it is not queued for removal and ownership moves to its new role.
+		$old_ours = array();
+		if ( 'change' === $mode && '' !== $zone && $zone === (string) $r->get( 'app_zone' ) ) {
+			if ( '' !== $old && true === $r->get( 'app_domain_made' ) ) {
+				$old_ours[] = $old;
+			}
+			if ( true === $r->get( 'app_www_made' ) && '' !== (string) $r->get( 'app_www_ip' ) ) {
+				$old_ours[] = 'www.' . $zone;
+			}
+		}
+		$kept = array_values( array_intersect( $old_ours, array_filter( array( $new, $served ) ) ) );
+
 		// The old name's meta is read before anything of it is overwritten.
-		$meta = AppDomainRelease::queue_old( $r );
+		$meta = AppDomainRelease::queue_old( $r, $kept );
 		$meta = array_merge(
 			$meta,
 			self::cleared(),
 			array(
 				'app_domain'            => $new,
 				'app_zone'              => '' === $zone ? null : $zone,
-				'app_domain_made'       => 'change' === $mode && true === $r->get( 'app_chg_made' ),
+				'app_domain_made'       => 'change' === $mode && ( true === $r->get( 'app_chg_made' ) || in_array( $new, $kept, true ) ),
 				'app_domain_want'       => null,
 				'app_domain_error'      => null,
 				'app_domain_tries'      => null,
@@ -498,8 +574,8 @@ final class AppDomainChange {
 				'app_www_reason'        => '' !== $served || '' === $www ? null : 'none',
 				'app_www_checked'       => null,
 				'app_www_at'            => null,
-				'app_www_made'          => '' !== $served && true === $r->get( 'app_chg_www_made' ) ? true : null,
-				'app_www_ip'            => '' !== $served && true === $r->get( 'app_chg_www_made' ) ? $ip : null,
+				'app_www_made'          => '' !== $served && ( true === $r->get( 'app_chg_www_made' ) || in_array( $served, $kept, true ) ) ? true : null,
+				'app_www_ip'            => '' !== $served && ( true === $r->get( 'app_chg_www_made' ) || in_array( $served, $kept, true ) ) ? $ip : null,
 			)
 		);
 		if ( 'own' === $mode ) {

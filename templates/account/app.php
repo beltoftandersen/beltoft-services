@@ -191,7 +191,11 @@ $beltoft_services_status_text = array(
 						/* translators: %s: a domain name */
 						echo wp_kses( sprintf( esc_html__( 'Changing the address to %s', 'beltoft-services' ), $beltoft_services_wrap( $beltoft_services_new ) ), $beltoft_services_kses );
 						?></p>
-						<p class="beltoft-services-app-domain__hint description"><?php esc_html_e( 'The app keeps answering on the current address until the new one works. This takes a few minutes.', 'beltoft-services' ); ?></p>
+						<?php if ( 'slow' === (string) $beltoft_services_chg['reason'] ) : ?>
+							<p class="beltoft-services-app-domain__hint description" data-app-domain-slow><?php esc_html_e( 'The change is taking longer than expected. We have been told and are looking at it.', 'beltoft-services' ); ?></p>
+						<?php else : ?>
+							<p class="beltoft-services-app-domain__hint description"><?php esc_html_e( 'The app keeps answering on the current address until the new one works. This takes a few minutes.', 'beltoft-services' ); ?></p>
+						<?php endif; ?>
 					<?php elseif ( 'waiting' === $beltoft_services_cst ) : ?>
 						<p class="beltoft-services-app-domain__state is-busy" role="status" data-app-domain-status><?php esc_html_e( 'Waiting for your DNS record', 'beltoft-services' ); ?></p>
 						<p class="beltoft-services-app-domain__hint description" data-app-domain-record>
@@ -250,12 +254,13 @@ $beltoft_services_status_text = array(
 									'timeout'     => __( 'The name did not point to this server in time.', 'beltoft-services' ),
 									'agent'       => __( 'The server did not answer. Check that it is running.', 'beltoft-services' ),
 									'late'        => __( 'The change did not finish in time, so everything was put back.', 'beltoft-services' ),
+									'rollback'    => __( 'The change failed and could not be put back. We are looking at it.', 'beltoft-services' ),
 									'busy'        => __( 'Another change was still running. Try again in a few minutes.', 'beltoft-services' ),
 									'caddy', 'app', 'probe' => __( 'The app did not answer on the new address, so everything was put back.', 'beltoft-services' ),
 									default       => __( 'The change could not be finished.', 'beltoft-services' ),
 								}
 							);
-							echo ' ' . ( 'certificate' === (string) $beltoft_services_chg['reason'] && 'change' === (string) $beltoft_services_chg['mode']
+							echo 'rollback' === (string) $beltoft_services_chg['reason'] ? '' : ' ' . ( 'certificate' === (string) $beltoft_services_chg['reason'] && 'change' === (string) $beltoft_services_chg['mode']
 								? esc_html__( 'The app still answers on the current address.', 'beltoft-services' )
 								: esc_html__( 'The app still answers on the current address. You can try again. If it fails again, contact support.', 'beltoft-services' ) );
 							?>

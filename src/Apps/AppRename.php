@@ -28,18 +28,32 @@ defined( 'ABSPATH' ) || exit;
 final class AppRename {
 
 	public const DIR    = '/var/lib/beltoft-app';
-	public const SCRIPT = self::DIR . '/rename.sh';
-	public const WANT   = self::DIR . '/rename.json';
 	public const STATUS = self::DIR . '/rename.status.json';
+
+	/** The systemd unit a run lives in; while it is active nothing is written or started. */
+	public const UNIT = 'beltoft-rename';
+
+	/** Seconds the script itself may run (its own deadline; the plugin waits longer, see AppDomainChange::APPLY_WAIT). */
+	public const GUEST_DEADLINE = 600;
 
 	/** Meta: the run token and the domain the last push asked for (what read() holds the status against). */
 	public const ASKED = 'app_rename_asked';
 
 	public const STATES  = array( 'running', 'ready', 'failed' );
 	public const STEPS   = array( 'caddy', 'certificate', 'app', 'verify', 'rollback', 'done' );
-	public const REASONS = array( 'none', 'certificate', 'caddy', 'app', 'probe', 'busy' );
+	public const REASONS = array( 'none', 'certificate', 'caddy', 'app', 'probe', 'busy', 'late' );
 
 	private const NAME = '/^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/D';
+
+	/** Where the script of a run is written: one file per run, so a script that is running is never overwritten. */
+	public static function script_path( string $token ): string {
+		return self::DIR . '/rename-' . $token . '.sh';
+	}
+
+	/** Where the request of a run is written. */
+	public static function want_path( string $token ): string {
+		return self::DIR . '/rename-' . $token . '.json';
+	}
 
 	/**
 	 * Why this server's app cannot be moved to a domain, in words for the customer; null when it can.
@@ -93,7 +107,7 @@ final class AppRename {
 	 *
 	 * @param Resource             $r    Server.
 	 * @param array<string, mixed> $want domain, www, old_domain, old_www, ip, app, recipe (every value is checked here). The request itself (version, run token, mode, script checksum) is made here, never by the caller.
-	 * @return string|\WP_Error The run token.
+	 * @return string|\WP_Error The run token, or an error: `beltoft_rename_busy` (the unit of an earlier run is alive; nothing was written, ask again later), `beltoft_rename_unknown` (the start may have worked: the error data holds the run token to follow) or another code (nothing was started).
 	 */
 	public static function push( Resource $r, array $want ) {
 		$domain = strtolower( (string) ( $want['domain'] ?? '' ) );
@@ -122,6 +136,21 @@ final class AppRename {
 			return new \WP_Error( 'beltoft_rename_unavailable', 'The set-up for the change is not available.' );
 		}
 
+		$client = $guest['client'];
+		$base   = '/nodes/' . rawurlencode( $guest['node'] ) . '/qemu/' . $guest['vmid'];
+
+		// An earlier run that is still alive keeps its files and its lock; nothing is written until it has ended.
+		$alive = $client->request( 'POST', $base . '/agent/exec', array( 'command' => array( 'systemctl', 'is-active', '--quiet', self::UNIT ) ) );
+		$code  = is_array( $alive ) && isset( $alive['pid'] ) ? self::wait_for( $client, $base, (int) $alive['pid'] ) : null;
+
+		if ( null === $code ) {
+			return new \WP_Error( 'beltoft_rename_agent', 'The server could not be asked whether an earlier change is still running' . ( is_wp_error( $alive ) ? ': ' . self::clean( $alive->get_error_message() ) : '.' ) );
+		}
+
+		if ( 0 === $code ) {
+			return new \WP_Error( 'beltoft_rename_busy', 'An earlier change is still running on the server.' );
+		}
+
 		$token   = bin2hex( random_bytes( 12 ) ); // The one run token: 24 lowercase hex characters.
 		$request = wp_json_encode(
 			array(
@@ -135,6 +164,7 @@ final class AppRename {
 				'ip'         => $ip,
 				'app'        => $app,
 				'recipe'     => (int) ( $want['recipe'] ?? 0 ),
+				'deadline'   => self::GUEST_DEADLINE,
 				'sha256'     => hash( 'sha256', $script ),
 			)
 		);
@@ -143,10 +173,7 @@ final class AppRename {
 			return new \WP_Error( 'beltoft_rename_unavailable', 'The request could not be made.' );
 		}
 
-		$client = $guest['client'];
-		$base   = '/nodes/' . rawurlencode( $guest['node'] ) . '/qemu/' . $guest['vmid'];
-
-		foreach ( array( self::SCRIPT => $script, self::WANT => $request ) as $file => $content ) {
+		foreach ( array( self::script_path( $token ) => $script, self::want_path( $token ) => $request ) as $file => $content ) {
 			$wrote = $client->request( 'POST', $base . '/agent/file-write', array( 'file' => $file, 'content' => $content ) );
 
 			if ( is_wp_error( $wrote ) ) {
@@ -154,19 +181,29 @@ final class AppRename {
 			}
 		}
 
-		$exec = $client->request( 'POST', $base . '/agent/exec', array( 'command' => array( 'systemd-run', '--no-block', '--collect', '--unit=beltoft-rename', '/bin/bash', self::SCRIPT ) ) );
+		// From here on the script may be running, so the token is remembered before it is started.
+		$r->set( array( self::ASKED => array( 'run' => $token, 'domain' => $domain ) ) );
+
+		$exec = $client->request( 'POST', $base . '/agent/exec', array( 'command' => array( 'systemd-run', '--no-block', '--collect', '--unit=' . self::UNIT, '--setenv=BELTOFT_REN_WANT=' . self::want_path( $token ), '/bin/bash', self::script_path( $token ) ) ) );
 
 		if ( is_wp_error( $exec ) || ! is_array( $exec ) || ! isset( $exec['pid'] ) ) {
+			$r->set( array( self::ASKED => null ) ); // The agent refused the command: nothing runs.
+
 			return new \WP_Error( 'beltoft_rename_agent', 'The server refused to start the change' . ( is_wp_error( $exec ) ? ': ' . self::clean( $exec->get_error_message() ) : '.' ) );
 		}
 
 		$ended = self::wait_for( $client, $base, (int) $exec['pid'] );
 
-		if ( null === $ended || 0 !== $ended ) {
-			return new \WP_Error( 'beltoft_rename_agent', 'The server could not start the change.' );
+		if ( null === $ended ) {
+			// The start command was given and its answer did not come: the script may be running, so the caller follows this run.
+			return new \WP_Error( 'beltoft_rename_unknown', 'The server did not confirm the start of the change.', array( 'run' => $token ) );
 		}
 
-		$r->set( array( self::ASKED => array( 'run' => $token, 'domain' => $domain ) ) );
+		if ( 0 !== $ended ) {
+			$r->set( array( self::ASKED => null ) );
+
+			return new \WP_Error( 'beltoft_rename_agent', 'The server could not start the change.' );
+		}
 
 		return $token;
 	}

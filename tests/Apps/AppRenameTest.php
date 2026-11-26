@@ -144,10 +144,11 @@ final class AppRenameTest extends MonitoringTestCase {
 
 		$this->assertIsString( $token );
 		$this->assertMatchesRegularExpression( '/^[0-9a-f]{24}$/', $token );
-		$this->assertSame( AppRename::script( 'wordpress' ), $this->file( AppRename::SCRIPT ) );
+		$this->assertSame( AppRename::script( 'wordpress' ), $this->file( AppRename::script_path( $token ) ) );
 
-		$want = json_decode( (string) $this->file( AppRename::WANT ), true );
+		$want = json_decode( (string) $this->file( AppRename::want_path( $token ) ), true );
 		$this->assertSame( 1, $want['v'] );
+		$this->assertSame( 600, $want['deadline'], 'The guest gets its own deadline, below the limit of the plugin.' );
 		$this->assertSame( $token, $want['run'] );
 		$this->assertSame( 'domain', $want['mode'] );
 		$this->assertSame( self::NEW, $want['domain'] );
@@ -156,8 +157,47 @@ final class AppRenameTest extends MonitoringTestCase {
 		$this->assertSame( self::IP, $want['ip'] );
 		$this->assertSame( hash( 'sha256', AppRename::script( 'wordpress' ) ), $want['sha256'] );
 
-		$this->assertSame( array( array( 'systemd-run', '--no-block', '--collect', '--unit=beltoft-rename', '/bin/bash', AppRename::SCRIPT ) ), $this->fake->guest_execs( 5000 ) );
+		$this->assertSame( array( array( 'systemd-run', '--no-block', '--collect', '--unit=beltoft-rename', '--setenv=BELTOFT_REN_WANT=' . AppRename::want_path( $token ), '/bin/bash', AppRename::script_path( $token ) ) ), $this->fake->guest_execs( 5000 ) );
 		$this->assertSame( array( 'run' => $token, 'domain' => self::NEW ), Resource::find( $r->id() )->get( AppRename::ASKED ) );
+	}
+
+	public function test_a_second_push_never_overwrites_the_files_of_the_first_run(): void {
+		$r     = $this->server();
+		$first = AppRename::push( $r, $this->want() );
+		$this->assertIsString( $first );
+		$script = $this->file( AppRename::script_path( $first ) );
+		$this->fake->set_guest_rename_unit_active( 5000, false );
+		$second = AppRename::push( $r, $this->want( 'wordpress', array( 'domain' => 'two.example.com' ) ) );
+		$this->assertIsString( $second );
+		$this->assertNotSame( $first, $second );
+		$this->assertSame( $script, $this->file( AppRename::script_path( $first ) ), 'The first run\'s script file is as it was.' );
+		$this->assertNotSame( AppRename::script_path( $first ), AppRename::script_path( $second ) );
+		$this->assertNotSame( AppRename::want_path( $first ), AppRename::want_path( $second ) );
+	}
+
+	public function test_nothing_is_written_or_started_while_the_unit_of_an_earlier_run_is_active(): void {
+		$r = $this->server();
+		$this->fake->set_guest_rename_unit_active( 5000, true );
+		$out = AppRename::push( $r, $this->want() );
+		$this->assertWPError( $out );
+		$this->assertSame( 'beltoft_rename_busy', $out->get_error_code() );
+		$this->assertSame( array(), $this->fake->guest_files_under( 5000, AppRename::DIR . '/rename-' ), 'Not even the files are written.' );
+		$this->assertSame( array(), $this->fake->guest_execs( 5000 ), 'The check of the unit is not a start.' );
+		$this->assertNull( Resource::find( $r->id() )->get( AppRename::ASKED ) );
+
+		$this->fake->set_guest_rename_unit_active( 5000, false );
+		$this->assertIsString( AppRename::push( $r, $this->want() ) );
+	}
+
+	public function test_a_start_that_cannot_be_confirmed_may_have_worked_and_says_which_run(): void {
+		$r = $this->server();
+		$this->fake->set_guest_rename( 5000, 'lost' );
+		$out = AppRename::push( $r, $this->want() );
+		$this->assertWPError( $out );
+		$this->assertSame( 'beltoft_rename_unknown', $out->get_error_code() );
+		$data = $out->get_error_data();
+		$this->assertMatchesRegularExpression( '/^[0-9a-f]{24}$/', (string) ( $data['run'] ?? '' ) );
+		$this->assertSame( $data['run'], Resource::find( $r->id() )->get( AppRename::ASKED )['run'] );
 	}
 
 	public function test_a_request_that_is_not_valid_writes_and_runs_nothing(): void {
@@ -178,7 +218,7 @@ final class AppRenameTest extends MonitoringTestCase {
 			$this->assertWPError( $out, wp_json_encode( $over ) );
 		}
 
-		$this->assertNull( $this->file( AppRename::SCRIPT ) );
+		$this->assertSame( array(), $this->fake->guest_files_under( 5000, AppRename::DIR . '/rename-' ) );
 		$this->assertSame( array(), $this->fake->guest_execs( 5000 ) );
 	}
 

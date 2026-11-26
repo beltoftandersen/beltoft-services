@@ -77,6 +77,10 @@ final class AppDomainChangeTest extends MonitoringTestCase {
 			/** @var array<int, array<string, mixed>> */
 			public array $pushed = array();
 			public bool $push_fails = false;
+			/** @var \WP_Error|null What push() answers instead of a token. */
+			public ?\WP_Error $push_error = null;
+			/** @var array<int, array<string, mixed>|null> Answers for the next reads, one each; then $answer. */
+			public array $sequence = array();
 			/** @var array<string, mixed>|null What read() answers (run and domain are filled in). */
 			public ?array $answer = null;
 			public int $reads = 0;
@@ -84,6 +88,9 @@ final class AppDomainChangeTest extends MonitoringTestCase {
 				return $this->unsupported;
 			}
 			public function push( $r, array $want ) {
+				if ( null !== $this->push_error ) {
+					return $this->push_error;
+				}
 				if ( $this->push_fails ) {
 					return new \WP_Error( 'agent', 'down' );
 				}
@@ -93,6 +100,10 @@ final class AppDomainChangeTest extends MonitoringTestCase {
 			}
 			public function read( $r, string $run ): ?array {
 				++$this->reads;
+				if ( $this->sequence ) {
+					$next = array_shift( $this->sequence );
+					return null === $next ? null : $next + array( 'run' => $run );
+				}
 				return null === $this->answer ? null : $this->answer + array( 'run' => $run );
 			}
 		};
@@ -335,7 +346,7 @@ final class AppDomainChangeTest extends MonitoringTestCase {
 		$this->assertTrue( $this->started( $r, $this->change( 'shop' ) )->is_done() );
 		$this->assertContains( 'shop.mine.example A ' . self::IP, $this->records() );
 		$this->job( $r );
-		$this->guest->answer = array( 'state' => 'failed', 'step' => 'rollback', 'reason' => 'certificate', 'domain' => 'shop.mine.example' );
+		$this->guest->answer = array( 'state' => 'failed', 'step' => 'done', 'reason' => 'certificate', 'domain' => 'shop.mine.example' );
 		$this->job( $r );
 
 		$fresh = $this->fresh( $r );
@@ -355,7 +366,7 @@ final class AppDomainChangeTest extends MonitoringTestCase {
 		$this->assertTrue( $this->started( $r, $this->change( 'shop' ) )->is_done() );
 		$this->assertFalse( $this->fresh( $r )->get( 'app_chg_made' ), 'An adopted record is not marked ours.' );
 		$this->job( $r );
-		$this->guest->answer = array( 'state' => 'failed', 'step' => 'rollback', 'reason' => 'certificate', 'domain' => 'shop.mine.example' );
+		$this->guest->answer = array( 'state' => 'failed', 'step' => 'done', 'reason' => 'certificate', 'domain' => 'shop.mine.example' );
 		$this->job( $r );
 		$this->assertEmpty( (array) $this->fresh( $r )->get( 'app_domain_old' ) );
 		$this->assertContains( 'shop.mine.example A ' . self::IP, $this->records() );
@@ -365,7 +376,7 @@ final class AppDomainChangeTest extends MonitoringTestCase {
 		$r = $this->server();
 		$this->assertTrue( $this->started( $r, $this->change( 'shop' ) )->is_done() );
 		$this->job( $r );
-		$this->guest->answer = array( 'state' => 'failed', 'step' => 'rollback', 'reason' => 'caddy', 'domain' => 'shop.mine.example' );
+		$this->guest->answer = array( 'state' => 'failed', 'step' => 'done', 'reason' => 'caddy', 'domain' => 'shop.mine.example' );
 		$this->job( $r );
 		// The customer made the name theirs: another address, and a TXT beside it.
 		$this->assertTrue( DnsRecords::replace( self::ZONE, array( array( 'name' => 'shop', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.77' ) ) ) );
@@ -373,17 +384,116 @@ final class AppDomainChangeTest extends MonitoringTestCase {
 		$this->assertContains( 'shop.mine.example A 192.0.2.77', $this->records() );
 	}
 
-	public function test_a_silent_guest_and_a_refused_push_end_as_failed_with_the_old_name_working(): void {
-		$r = $this->server( array( 'app_domain' => 'old.mine.example', 'app_zone' => self::ZONE ) );
+	private function alerts(): array {
+		return array_values( array_filter( $this->mails, static fn( $m ) => str_contains( (string) ( $m['subject'] ?? '' ), 'App domain change' ) ) );
+	}
+
+	public function test_a_guest_that_still_runs_after_the_limit_keeps_the_new_record_and_staff_hear_once(): void {
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
+		$r = $this->server( array( 'app_domain' => 'old.mine.example', 'app_zone' => self::ZONE, 'app_domain_made' => true ) );
+		$this->assertTrue( DnsRecords::replace( self::ZONE, array( array( 'name' => 'old', 'type' => 'A', 'ttl' => 300, 'value' => self::IP ) ) ) );
+		$this->assertTrue( $this->started( $r, $this->change( 'shop' ) )->is_done() );
+		$this->job( $r );
+		$this->guest->answer = array( 'state' => 'running', 'step' => 'certificate', 'reason' => 'none', 'domain' => 'shop.mine.example' );
+		$this->assertTrue( $this->fresh( $r )->set( array( 'app_chg_at' => time() - AppDomainChange::APPLY_WAIT - 5 ) ) );
+		$this->job( $r );
+		$fresh = $this->fresh( $r );
+		$this->assertSame( 'applying', $fresh->get( 'app_chg_state' ) );
+		$this->assertSame( 'slow', $fresh->get( 'app_chg_reason' ) );
+		$this->assertTrue( $fresh->get( 'app_chg_made' ) );
+		$this->assertEmpty( (array) $fresh->get( 'app_domain_old' ) );
+		$this->assertContains( 'shop.mine.example A ' . self::IP, $this->records() );
+		$this->assertCount( 1, $this->alerts() );
+		$this->assertStringContainsString( 'still running', $this->alerts()[0]['message'] );
+
+		$this->job( $r );
+		$this->assertCount( 1, $this->alerts(), 'Told once.' );
+		$this->assertNotFalse( as_has_scheduled_action( AppDomainChange::HOOK, array( $r->id() ), Jobs::GROUP ), 'It is still looked at.' );
+
+		// A later look that sees ready finishes normally.
+		$this->guest->answer = array( 'state' => 'ready', 'step' => 'done', 'reason' => 'none', 'domain' => 'shop.mine.example' );
+		$this->job( $r );
+		$fresh = $this->fresh( $r );
+		$this->assertSame( 'shop.mine.example', $fresh->get( 'app_domain' ) );
+		$this->assertSame( '', (string) $fresh->get( 'app_chg_state' ) );
+		$this->assertNull( $fresh->get( 'app_chg_reason' ) );
+	}
+
+	public function test_a_later_failed_answer_after_slow_finishes_as_a_clean_failure(): void {
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
+		$r = $this->server();
 		$this->assertTrue( $this->started( $r, $this->change( 'shop' ) )->is_done() );
 		$this->job( $r );
 		$this->assertTrue( $this->fresh( $r )->set( array( 'app_chg_at' => time() - AppDomainChange::APPLY_WAIT - 5 ) ) );
 		$this->job( $r );
+		$this->assertSame( 'slow', $this->fresh( $r )->get( 'app_chg_reason' ) );
+		$this->guest->answer = array( 'state' => 'failed', 'step' => 'done', 'reason' => 'late', 'domain' => 'shop.mine.example' );
+		$this->job( $r );
+		$this->assertSame( 'failed', $this->fresh( $r )->get( 'app_chg_state' ) );
+		$this->assertSame( 'late', $this->fresh( $r )->get( 'app_chg_reason' ) );
+		$this->assertNotEmpty( (array) $this->fresh( $r )->get( 'app_domain_old' ), 'Now the guest has put everything back, so our record goes.' );
+	}
+
+	public function test_the_status_is_read_once_more_at_the_limit_and_a_ready_there_is_committed(): void {
+		$r = $this->server();
+		$this->assertTrue( $this->started( $r, $this->change( 'shop' ) )->is_done() );
+		$this->job( $r );
+		$this->assertTrue( $this->fresh( $r )->set( array( 'app_chg_at' => time() - AppDomainChange::APPLY_WAIT - 5 ) ) );
+		$running = array( 'state' => 'running', 'step' => 'app', 'reason' => 'none', 'domain' => 'shop.mine.example' );
+		$this->guest->sequence = array( $running, array( 'state' => 'ready', 'step' => 'done', 'reason' => 'none', 'domain' => 'shop.mine.example' ) );
+		$this->job( $r );
+		$this->assertSame( 'shop.mine.example', $this->fresh( $r )->get( 'app_domain' ) );
+		$this->assertSame( '', (string) $this->fresh( $r )->get( 'app_chg_state' ) );
+	}
+
+	public function test_a_start_that_may_have_worked_is_followed_not_given_up(): void {
+		$r = $this->server();
+		$this->assertTrue( $this->started( $r, $this->change( 'shop' ) )->is_done() );
+		$this->guest->push_error = new \WP_Error( 'beltoft_rename_unknown', 'lost', array( 'run' => 'abcabcabcabcabcabcabcabc' ) );
+		for ( $i = 0; $i < AppDomainChange::PUSH_TRIES + 1; $i++ ) {
+			$this->job( $r );
+		}
+		$fresh = $this->fresh( $r );
+		$this->assertSame( 'applying', $fresh->get( 'app_chg_state' ) );
+		$this->assertSame( 'abcabcabcabcabcabcabcabc', $fresh->get( 'app_chg_run' ), 'The run that may be going is followed, its DNS record is not removed.' );
+		$this->assertEmpty( (array) $fresh->get( 'app_domain_old' ) );
+	}
+
+	public function test_a_guest_that_is_busy_does_not_use_up_the_tries(): void {
+		$r = $this->server();
+		$this->assertTrue( $this->started( $r, $this->change( 'shop' ) )->is_done() );
+		$this->guest->push_error = new \WP_Error( 'beltoft_rename_busy', 'busy' );
+		for ( $i = 0; $i < AppDomainChange::PUSH_TRIES + 2; $i++ ) {
+			$this->job( $r );
+		}
+		$this->assertSame( 'applying', $this->fresh( $r )->get( 'app_chg_state' ) );
+		$this->assertEmpty( (int) $this->fresh( $r )->get( 'app_chg_tries' ) );
+		$this->assertTrue( $this->fresh( $r )->set( array( 'app_chg_at' => time() - AppDomainChange::APPLY_WAIT - 5 ) ) );
+		$this->job( $r );
+		$this->assertSame( 'slow', $this->fresh( $r )->get( 'app_chg_reason' ) );
+		$this->assertEmpty( (array) $this->fresh( $r )->get( 'app_domain_old' ) );
+		$this->guest->push_error = null;
+		$this->job( $r );
+		$this->assertNotSame( '', (string) $this->fresh( $r )->get( 'app_chg_run' ), 'When the guest is free the change goes on.' );
+		$this->assertNull( $this->fresh( $r )->get( 'app_chg_reason' ) );
+	}
+
+	public function test_a_rollback_that_failed_keeps_the_new_record_and_says_so(): void {
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
+		$r = $this->server( array( 'app_domain' => 'old.mine.example', 'app_zone' => self::ZONE, 'app_domain_made' => true ) );
+		$this->assertTrue( $this->started( $r, $this->change( 'shop' ) )->is_done() );
+		$this->job( $r );
+		$this->guest->answer = array( 'state' => 'failed', 'step' => 'rollback', 'reason' => 'app', 'domain' => 'shop.mine.example' );
+		$this->job( $r );
 		$fresh = $this->fresh( $r );
 		$this->assertSame( 'failed', $fresh->get( 'app_chg_state' ) );
-		$this->assertSame( 'late', $fresh->get( 'app_chg_reason' ), 'The wait limit has its own reason, not the one of a server that did not answer.' );
-		$this->assertSame( 'old.mine.example', $fresh->get( 'app_domain' ) );
-
+		$this->assertSame( 'rollback', $fresh->get( 'app_chg_reason' ) );
+		$this->assertEmpty( (array) $fresh->get( 'app_domain_old' ), 'The guest may serve either name: nothing is removed.' );
+		$this->assertTrue( $fresh->get( 'app_chg_made' ), 'Still tracked, so a deleted server removes it.' );
+		$this->assertContains( 'shop.mine.example A ' . self::IP, $this->records() );
+		$this->assertCount( 1, $this->alerts() );
+		$this->assertStringContainsString( 'step: rollback', $this->alerts()[0]['message'] );
+		$this->assertStringNotContainsString( 'still answers on its old address', $this->alerts()[0]['message'] );
 	}
 
 	public function test_a_refused_push_ends_as_failed_after_the_tries(): void {
@@ -639,6 +749,53 @@ final class AppDomainChangeTest extends MonitoringTestCase {
 		$this->assertSame( self::IP, $fresh->get( 'app_www_ip' ) );
 	}
 
+	public function test_moving_from_the_www_name_to_the_bare_domain_keeps_the_www_record_as_ours(): void {
+		$r = $this->server( array( 'app_recipe' => 2, 'app_domain' => 'www.mine.example', 'app_zone' => self::ZONE, 'app_domain_made' => true ) );
+		$this->assertTrue( DnsRecords::replace( self::ZONE, array( array( 'name' => 'www', 'type' => 'A', 'ttl' => 300, 'value' => self::IP ) ) ) );
+		$this->assertTrue( $this->started( $r, $this->change( '' ) )->is_done() );
+		$this->assertSame( 'www.mine.example', $this->fresh( $r )->get( 'app_chg_www' ) );
+		$this->assertFalse( $this->fresh( $r )->get( 'app_chg_www_made' ), 'The record was there already.' );
+		$this->job( $r );
+		$this->assertSame( 'www.mine.example', $this->guest->pushed[0]['old_domain'] );
+		$this->assertSame( 'mine.example', $this->guest->pushed[0]['domain'] );
+		$this->assertSame( 'www.mine.example', $this->guest->pushed[0]['www'] );
+		$this->guest->answer = array( 'state' => 'ready', 'step' => 'done', 'reason' => 'none', 'domain' => 'mine.example' );
+		$this->job( $r );
+
+		$fresh = $this->fresh( $r );
+		$this->assertSame( 'mine.example', $fresh->get( 'app_domain' ) );
+		$this->assertTrue( $fresh->get( 'app_domain_made' ) );
+		$this->assertSame( 'live', $fresh->get( 'app_www' ) );
+		$this->assertTrue( $fresh->get( 'app_www_made' ), 'The www record we made earlier is still ours, as the www name of the new site.' );
+		$this->assertSame( self::IP, $fresh->get( 'app_www_ip' ) );
+		$this->assertEmpty( (array) $fresh->get( 'app_domain_old' ), 'Nothing is queued: the site still uses that record.' );
+		AppDomainRelease::run( $r->id() );
+		$this->assertSame( array( 'mine.example A ' . self::IP, 'www.mine.example A ' . self::IP ), $this->records() );
+	}
+
+	public function test_moving_from_the_bare_domain_to_its_www_name_keeps_that_record_as_the_domains(): void {
+		$r = $this->server( array( 'app_recipe' => 2, 'app_domain' => 'mine.example', 'app_zone' => self::ZONE, 'app_domain_made' => true, 'app_www' => 'live', 'app_www_made' => true, 'app_www_ip' => self::IP ) );
+		$this->assertTrue( DnsRecords::replace( self::ZONE, array( array( 'name' => '@', 'type' => 'A', 'ttl' => 300, 'value' => self::IP ), array( 'name' => 'www', 'type' => 'A', 'ttl' => 300, 'value' => self::IP ) ) ) );
+		$this->assertTrue( $this->started( $r, $this->change( 'www' ) )->is_done(), wp_json_encode( $this->records() ) );
+		$this->assertFalse( $this->fresh( $r )->get( 'app_chg_made' ) );
+		$this->job( $r );
+		$this->assertSame( 'www.mine.example', $this->guest->pushed[0]['domain'] );
+		$this->assertSame( 'mine.example', $this->guest->pushed[0]['old_domain'] );
+		$this->assertSame( 'www.mine.example', $this->guest->pushed[0]['old_www'] );
+		$this->assertSame( '', $this->guest->pushed[0]['www'] );
+		$this->guest->answer = array( 'state' => 'ready', 'step' => 'done', 'reason' => 'none', 'domain' => 'www.mine.example' );
+		$this->job( $r );
+
+		$fresh = $this->fresh( $r );
+		$this->assertSame( 'www.mine.example', $fresh->get( 'app_domain' ) );
+		$this->assertTrue( $fresh->get( 'app_domain_made' ), 'The record we made as the www name is now the domain record.' );
+		$this->assertEmpty( (string) $fresh->get( 'app_www' ) );
+		$this->assertEmpty( $fresh->get( 'app_www_made' ) );
+		$this->assertSame( array( array( 'zone' => self::ZONE, 'name' => 'mine.example', 'ip' => self::IP, 'tries' => 0 ) ), $fresh->get( 'app_domain_old' ), 'Only the apex record goes.' );
+		AppDomainRelease::run( $r->id() );
+		$this->assertSame( array( 'www.mine.example A ' . self::IP ), $this->records() );
+	}
+
 	public function test_a_www_name_with_a_record_of_its_own_is_left_to_the_follow_up(): void {
 		$r = $this->server( array( 'app_recipe' => 2 ) );
 		$this->assertTrue( DnsRecords::replace( self::ZONE, array( array( 'name' => 'www', 'type' => 'A', 'ttl' => 300, 'value' => '192.0.2.99' ) ) ) );
@@ -751,7 +908,7 @@ final class AppDomainChangeTest extends MonitoringTestCase {
 		$this->assertTrue( $this->started( $r, $this->change( 'shop' ) )->is_done() );
 
 		$this->job( $r ); // The request is pushed.
-		$want = json_decode( (string) $this->fake->guest_file( 5000, \BeltoftServices\Apps\AppRename::WANT ), true );
+		$want = json_decode( (string) $this->fake->guest_file( 5000, \BeltoftServices\Apps\AppRename::want_path( (string) $this->fresh( $r )->get( 'app_chg_run' ) ) ), true );
 		$this->assertSame( 'shop.mine.example', $want['domain'] );
 		$this->assertSame( 'old.mine.example', $want['old_domain'] );
 		$this->assertMatchesRegularExpression( '/^[0-9a-f]{24}$/', $want['run'] );
@@ -778,7 +935,7 @@ final class AppDomainChangeTest extends MonitoringTestCase {
 		$this->assertContains( 'mine.example A ' . self::IP, $this->records() );
 		$this->assertContains( 'www.mine.example A ' . self::IP, $this->records() );
 		$this->job( $r );
-		$want = json_decode( (string) $this->fake->guest_file( 5000, \BeltoftServices\Apps\AppRename::WANT ), true );
+		$want = json_decode( (string) $this->fake->guest_file( 5000, \BeltoftServices\Apps\AppRename::want_path( (string) $this->fresh( $r )->get( 'app_chg_run' ) ) ), true );
 		$this->assertSame( 'mine.example', $want['domain'] );
 		$this->assertSame( 'www.mine.example', $want['www'] );
 		$this->job( $r );
@@ -804,7 +961,7 @@ final class AppDomainChangeTest extends MonitoringTestCase {
 
 	/** @return array<string, array{0: string, 1: string}> */
 	public static function failure_modes(): array {
-		return array( 'caddy' => array( 'caddy', 'caddy' ), 'app' => array( 'app', 'app' ), 'probe' => array( 'probe', 'probe' ), 'busy' => array( 'busy', 'busy' ), 'rollback_failed' => array( 'rollback_failed', 'app' ) );
+		return array( 'caddy' => array( 'caddy', 'caddy' ), 'app' => array( 'app', 'app' ), 'probe' => array( 'probe', 'probe' ), 'busy' => array( 'busy', 'busy' ), 'rollback_failed' => array( 'rollback_failed', 'rollback' ) );
 	}
 
 	/** @dataProvider failure_modes */
@@ -826,7 +983,7 @@ final class AppDomainChangeTest extends MonitoringTestCase {
 	}
 
 	/** @dataProvider silent_modes */
-	public function test_chain_a_guest_that_never_answers_ends_by_the_wait_limit_as_late( string $mode ): void {
+	public function test_chain_a_guest_that_never_answers_is_slow_not_failed_and_keeps_the_new_record( string $mode ): void {
 		$r = $this->chain_server();
 		$this->fake->set_guest_rename( 5000, $mode );
 		$this->assertTrue( $this->started( $r, $this->change( 'shop' ) )->is_done(), $mode );
@@ -835,9 +992,13 @@ final class AppDomainChangeTest extends MonitoringTestCase {
 		$this->assertSame( 'applying', $this->fresh( $r )->get( 'app_chg_state' ), $mode );
 		$this->assertTrue( $this->fresh( $r )->set( array( 'app_chg_at' => time() - AppDomainChange::APPLY_WAIT - 5 ) ) );
 		$this->job( $r );
-		$this->assertSame( 'failed', $this->fresh( $r )->get( 'app_chg_state' ), $mode );
-		$this->assertSame( 'late', $this->fresh( $r )->get( 'app_chg_reason' ), $mode );
-		$this->assertSame( 'old.mine.example', $this->fresh( $r )->get( 'app_domain' ), $mode );
+		$fresh = $this->fresh( $r );
+		$this->assertSame( 'applying', $fresh->get( 'app_chg_state' ), $mode . ': the change is not given up.' );
+		$this->assertSame( 'slow', $fresh->get( 'app_chg_reason' ), $mode );
+		$this->assertSame( 'old.mine.example', $fresh->get( 'app_domain' ), $mode );
+		$this->assertTrue( $fresh->get( 'app_chg_made' ), $mode );
+		$this->assertEmpty( (array) $fresh->get( 'app_domain_old' ), $mode . ': nothing is queued for removal.' );
+		$this->assertContains( 'shop.mine.example A ' . self::IP, $this->records(), $mode );
 	}
 
 	public function test_chain_a_guest_that_refuses_exec_ends_as_agent_after_the_tries(): void {
@@ -858,7 +1019,7 @@ final class AppDomainChangeTest extends MonitoringTestCase {
 		$this->assertTrue( $this->started( $r, $this->own() )->is_done() );
 		$this->job( $r );
 		$this->assertSame( 'waiting', $this->fresh( $r )->get( 'app_chg_state' ) );
-		$this->assertNull( $this->fake->guest_file( 5000, \BeltoftServices\Apps\AppRename::WANT ), 'Nothing is sent to the guest while the name does not point here.' );
+		$this->assertSame( array(), $this->fake->guest_files_under( 5000, \BeltoftServices\Apps\AppRename::DIR . '/rename-' ), 'Nothing is sent to the guest while the name does not point here.' );
 
 		$this->public[ 'A ' . self::OWN ] = array( self::IP );
 		$this->assertTrue( $this->fresh( $r )->set( array( 'app_chg_checked' => time() - 3600 ) ) );
@@ -971,8 +1132,10 @@ final class AppDomainChangeTest extends MonitoringTestCase {
 		$r = $this->server( array( 'app_domain' => 'old.mine.example', 'app_zone' => self::ZONE ) );
 		$this->assertTrue( $this->started( $r, $this->change( 'shop' ) )->is_done() );
 		$this->job( $r );
-		$this->assertTrue( $this->fresh( $r )->set( array( 'app_chg_at' => time() - AppDomainChange::APPLY_WAIT - 5 ) ) );
+		$this->assertTrue( $this->fresh( $r )->set( array( 'app_chg_at' => time() - 3 * DAY_IN_SECONDS ) ) );
+		$this->guest->answer = array( 'state' => 'failed', 'step' => 'done', 'reason' => 'caddy', 'domain' => 'shop.mine.example' );
 		$this->job( $r );
+		$this->assertSame( 'failed', $this->fresh( $r )->get( 'app_chg_state' ) );
 		$this->assertGreaterThan( time() - 60, (int) $this->fresh( $r )->get( 'app_chg_at' ) );
 	}
 }

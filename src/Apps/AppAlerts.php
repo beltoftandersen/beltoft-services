@@ -74,16 +74,39 @@ final class AppAlerts {
 		);
 	}
 
-	/** A change of domain on a running app failed: the old address still works. Tell an admin. */
-	public static function domain_change_failed( Resource $r, string $domain, string $reason ): void {
+	/**
+	 * A change of domain on a running app failed. Tell an admin. After a failed put-back (step rollback) the app may answer on either name.
+	 *
+	 * @param string $step The step the guest reported, '' when it is not known.
+	 */
+	public static function domain_change_failed( Resource $r, string $domain, string $reason, string $step = '' ): void {
+		$unsafe = 'rollback' === $step;
 		Alerts::notify(
 			sprintf( 'App domain change failed for server %d', $r->id() ),
-			array(
+			array_filter( array(
 				sprintf( 'Server resource: %d', $r->id() ),
 				sprintf( 'App: %s', (string) $r->get( 'app_id' ) ),
 				sprintf( 'New domain: %s', $domain ),
 				sprintf( 'Reason: %s', $reason ),
-				'The app still answers on its old address.',
+				'' !== $step ? sprintf( 'Failed at step: %s', $step ) : '',
+				$unsafe ? 'The change could not be put back. The app may answer on the old or the new name. The DNS record of the new name was kept. Look at the server (journalctl -u beltoft-rename, /var/lib/beltoft-app/rename.prev).' : 'The app still answers on its old address.',
+			) ),
+			$r,
+			'',
+			array( 'prefix' => false )
+		);
+	}
+
+	/** A change of domain on a running app has not finished after the limit and the guest still says running. Tell an admin once. */
+	public static function domain_change_slow( Resource $r, string $domain ): void {
+		Alerts::notify(
+			sprintf( 'App domain change is slow for server %d', $r->id() ),
+			array(
+				sprintf( 'Server resource: %d', $r->id() ),
+				sprintf( 'App: %s', (string) $r->get( 'app_id' ) ),
+				sprintf( 'New domain: %s', $domain ),
+				'The script on the server is still running or does not answer after the wait limit.',
+				'Nothing was put back and the DNS record of the new name was kept, because the server may still switch. The change is looked at again every few minutes and ends by itself when the server reports ready or failed.',
 			),
 			$r,
 			'',

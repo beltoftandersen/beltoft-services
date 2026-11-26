@@ -4,6 +4,13 @@ D=${STUB_DIR:?}
 echo "caddy $*" >>"$D/calls.log"
 if [ "$1" = validate ]; then
 	[ -f "$D/caddy_validate_fail" ] && exit 1
+	# Like the real thing: one address is one site block ("ambiguous site definition").
+	f=
+	for a in "$@"; do [ "$f" = 1 ] && { f=$a; break; }; [ "$a" = --config ] && f=1; done
+	if [ -f "$f" ]; then
+		dup=$(grep -E '^[^ #}].* \{$' "$f" | sort | uniq -d)
+		[ -z "$dup" ] || { echo "ambiguous site definition: $dup" >&2; exit 1; }
+	fi
 	exit 0
 fi
 exit 0

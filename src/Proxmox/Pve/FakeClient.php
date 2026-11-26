@@ -2061,7 +2061,15 @@ class FakeClient extends FakePve {
 
 		$command = array_values( (array) $p['command'] );
 
-		if ( 'systemd-run' === ( $command[0] ?? '' ) && in_array( \BeltoftServices\Apps\AppRename::SCRIPT, $command, true ) ) {
+		// Is the unit of an earlier rename run alive? Exit 0 when it is, 3 when it is not (systemctl is-active).
+		if ( array( 'systemctl', 'is-active', '--quiet', \BeltoftServices\Apps\AppRename::UNIT ) === $command ) {
+			$pid = 9000 + count( (array) ( $vm['exec_results'] ?? array() ) );
+			$this->state['vms'][ $vmid ]['exec_results'][ $pid ] = array( 'exited' => 1, 'exitcode' => ! empty( $vm['rename_unit_active'] ) ? 0 : 3, 'out-data' => '', 'err-data' => '' );
+
+			return array( 'pid' => $pid );
+		}
+
+		if ( 'systemd-run' === ( $command[0] ?? '' ) && array() !== preg_grep( '#^' . preg_quote( \BeltoftServices\Apps\AppRename::DIR, '#' ) . '/rename-[0-9a-f]+\.sh$#', $command ) ) {
 			return $this->rename_exec( $vmid, $vm, $command );
 		}
 
@@ -2117,7 +2125,7 @@ class FakeClient extends FakePve {
 	 * once and the outcome is in the status file). Modes: `ok` (default: the status ends `ready`), `blocked` (the agent refuses exec),
 	 * `error` (the start command exits 1, no status file), `no_status` (exit 0, no status file), `other_run` (a status of another run),
 	 * `hang` (the status stays `running`), `certificate`, `caddy`, `app` and `probe` (failed after a rollback, that reason), `busy`
-	 * (failed, another run holds the lock), `rollback_failed` (failed at the rollback step). The option `polls` makes the first N reads
+	 * (failed, another run holds the lock), `rollback_failed` (failed at the rollback step), `lost` (the script started, the start command's answer never comes). The option `polls` makes the first N reads
 	 * of the status file answer `running` before the final answer.
 	 *
 	 * @param int                  $vmid VMID.
@@ -2130,6 +2138,33 @@ class FakeClient extends FakePve {
 			$this->state['vms'][ $vmid ]['rename_mode'] = array_merge( array( 'polls' => 0 ), $opts, array( 'mode' => $mode ) );
 			$this->save();
 		}
+	}
+
+	/**
+	 * Whether the systemd unit of an earlier rename run is alive (what `systemctl is-active` answers).
+	 *
+	 * @param int  $vmid   VMID.
+	 * @param bool $active Active.
+	 */
+	public function set_guest_rename_unit_active( int $vmid, bool $active ): void {
+		$this->load();
+		if ( isset( $this->state['vms'][ $vmid ] ) ) {
+			$this->state['vms'][ $vmid ]['rename_unit_active'] = $active;
+			$this->save();
+		}
+	}
+
+	/**
+	 * The guest files whose path starts with a prefix.
+	 *
+	 * @param int    $vmid   VMID.
+	 * @param string $prefix Path prefix.
+	 * @return string[] Paths.
+	 */
+	public function guest_files_under( int $vmid, string $prefix ): array {
+		$this->load();
+
+		return array_values( array_filter( array_keys( (array) ( $this->state['vms'][ $vmid ]['guest_files'] ?? array() ) ), static fn( $f ) => str_starts_with( (string) $f, $prefix ) ) );
 	}
 
 	/**
@@ -2153,7 +2188,8 @@ class FakeClient extends FakePve {
 		$this->state['vms'][ $vmid ]['exec_log'][] = $command;
 
 		if ( ! in_array( $mode, array( 'error', 'no_status' ), true ) ) {
-			$want  = json_decode( (string) ( $vm['guest_files'][ \BeltoftServices\Apps\AppRename::WANT ] ?? '' ), true );
+			$files = array_values( preg_grep( '#\.sh$#', $command ) );
+			$want  = json_decode( (string) ( $vm['guest_files'][ preg_replace( '#\.sh$#', '.json', (string) end( $files ) ) ] ?? '' ), true );
 			$want  = is_array( $want ) ? $want : array();
 			$final = array(
 				'ok'              => array( 'ready', 'done', 'none' ),
@@ -2187,7 +2223,10 @@ class FakeClient extends FakePve {
 			}
 		}
 
-		$this->state['vms'][ $vmid ]['exec_results'][ $pid ] = $out;
+		// `lost`: the script started but the answer of the start command never arrives (exec-status fails).
+		if ( 'lost' !== $mode ) {
+			$this->state['vms'][ $vmid ]['exec_results'][ $pid ] = $out;
+		}
 
 		return array( 'pid' => $pid );
 	}

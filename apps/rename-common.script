@@ -9,10 +9,13 @@
 #   4. change the app's own host setting and wait until the app answers
 #   5. write the final Caddyfile (the new name only, and its www redirect), reload
 #   6. probe the new name again
+# One deadline covers the whole run (the request's "deadline" in seconds, default 600): the waits stop at it and the run ends in the
+# normal failure path (reason late, everything put back), so the plugin never gives up on a script that is still working.
 # Any failure after step 1 puts the Caddyfile and the app's host values back exactly. Customer content is never touched.
 # A second run with the same run token converges to the same state; a finished token is left as it is. Secrets are never printed.
 #
-# The BELTOFT_REN_* variables exist for the tests; on a server they are not set.
+# The plugin writes one script and one request per run (rename-<token>.sh and .json) and names the request in BELTOFT_REN_WANT, so a
+# script that is running is never overwritten. The other BELTOFT_REN_* variables exist for the tests; on a server they are not set.
 set -uo pipefail
 umask 077
 
@@ -20,17 +23,24 @@ state=${BELTOFT_REN_STATE:-/var/lib/beltoft-app}
 etc=${BELTOFT_REN_ETC:-/etc/caddy}
 tries=${BELTOFT_REN_TRIES:-24}
 pause=${BELTOFT_REN_SLEEP:-5}
-want=$state/rename.json
+want=${BELTOFT_REN_WANT:-$state/rename.json}
 status_file=$state/rename.status.json
 prev=$state/rename.prev
 caddyfile=$etc/Caddyfile
 body=$etc/beltoft-site.body
+deadline_default=600
+deadline_at=0
 run=
 domain=
 www=
 old_domain=
 old_www=
 ip=
+
+# Has the deadline of this run passed?
+over_deadline() {
+  [ "$deadline_at" -gt 0 ] && [ "$(date +%s)" -ge "$deadline_at" ]
+}
 
 # One status line: state step reason. The reader of the plugin takes only these fixed words.
 status() {
@@ -59,6 +69,14 @@ load() {
   [ -z "$old_domain" ] || { [[ "$old_domain" =~ $re && "$old_domain" == *.* ]] || return 1; }
   [ -z "$old_www" ] || [ "$old_www" = "www.$old_domain" ] || return 1
   [[ "$ip" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || return 1
+  # The deadline: a whole number of seconds in a sane range, else the default. The plugin's own limit is higher.
+  local dl min=${BELTOFT_REN_MIN_DEADLINE:-30}
+  dl=$(jq -r 'if (.deadline | type) == "number" and (.deadline | floor) == .deadline then .deadline else "" end' "$want" 2>/dev/null)
+  if [[ "$dl" =~ ^[0-9]{1,5}$ ]] && [ "$dl" -ge "$min" ] && [ "$dl" -le 3000 ]; then
+    deadline_at=$(( $(date +%s) + dl ))
+  else
+    deadline_at=$(( $(date +%s) + deadline_default ))
+  fi
   return 0
 }
 
@@ -79,20 +97,27 @@ emit_site() {
 emit_www() {
   [ -z "$1" ] || printf '%s {\n  redir https://%s{uri} permanent\n}\n' "$1" "$2"
 }
+# A host is written once. While both names must answer, a name that is in both sets (www.example.com as the old site and as the
+# new redirect, or the new site and the old redirect) serves the site: Caddy refuses the same address twice.
 emit_final() {
   emit_site "$domain"
-  emit_www "$www" "$domain"
+  [ "$www" = "$domain" ] || emit_www "$www" "$domain"
 }
 emit_both() {
   emit_site "$domain"
-  emit_www "$www" "$domain"
   if [ -n "$old_domain" ]; then
     emit_site "$old_domain"
-    emit_www "$old_www" "$old_domain"
   else
     printf 'http://%s {\n' "$ip"
     cat "$body"
     printf '}\n'
+  fi
+  # Redirects only for names that are no site here and not written before.
+  if [ -n "$www" ] && [ "$www" != "$domain" ] && [ "$www" != "$old_domain" ]; then
+    emit_www "$www" "$domain"
+  fi
+  if [ -n "$old_www" ] && [ "$old_www" != "$domain" ] && [ "$old_www" != "$old_domain" ] && [ "$old_www" != "$www" ]; then
+    emit_www "$old_www" "$old_domain"
   fi
 }
 
@@ -114,6 +139,7 @@ put_caddy() {
 wait_tls() {
   local n=0
   while [ "$n" -lt "$tries" ]; do
+    over_deadline && return 2
     if curl --silent --output /dev/null --max-time 10 --resolve "$domain:443:127.0.0.1" "https://$domain/"; then
       return 0
     fi
@@ -123,10 +149,23 @@ wait_tls() {
   return 1
 }
 
+# Runs a wait and ends the run on a failure: the deadline is reason late, anything else the reason given.
+must() {
+  local code
+  "$1"
+  code=$?
+  case "$code" in
+    0) return 0 ;;
+    2) fail late ;;
+    *) fail "$2" ;;
+  esac
+}
+
 # The app answers on the new name through Caddy (any answer below 400; a redirect is one).
 wait_web() {
   local n=0
   while [ "$n" -lt "$tries" ]; do
+    over_deadline && return 2
     if curl --fail --silent --output /dev/null --max-time 15 --resolve "$domain:443:127.0.0.1" "https://$domain$APP_PATH"; then
       return 0
     fi
@@ -150,28 +189,28 @@ env_set() {
   return "$code"
 }
 
-# Step 1: everything needed to go back. Skipped when this run token already saved it (a run that was cut off).
+# Step 1: everything needed to go back. Skipped when this run token already saved it (a run that was cut off). When another
+# token's copy is there (an earlier run was cut off before it ended, or its rollback failed) that state is the true original: it is
+# put back first, and only then is the state of this run saved. Returns 2 when that restore failed (nothing is changed then).
 save_prev() {
-  if [ -f "$prev/run" ] && [ "$(cat "$prev/run")" = "$run" ]; then
-    return 0
+  if [ -f "$prev/run" ]; then
+    [ "$(cat "$prev/run")" = "$run" ] && return 0
+    restore_prev || return 2
+    rm -rf "$prev"
   fi
-  local created=0
-  [ -f "$prev/body.created" ] && created=1
   rm -rf "$prev"
   mkdir -m 0700 "$prev" || return 1
-  if [ "$created" = 1 ] || [ ! -s "$body" ]; then
-    : > "$prev/body.created"
-  fi
+  [ -s "$body" ] || : > "$prev/body.created"
   cp -p "$caddyfile" "$prev/Caddyfile" || return 1
   app_save "$prev" || return 1
   printf '%s\n' "$run" > "$prev/run"
 }
 
-# Puts the Caddyfile and the app's values back. Returns 0 when both are back.
+# Puts the Caddyfile and the app's values back from the saved copy (of whichever run saved it). Returns 0 when both are back.
 restore_prev() {
-  [ -f "$prev/run" ] && [ "$(cat "$prev/run")" = "$run" ] || return 1
+  [ -f "$prev/run" ] || return 1
   local code=0
-  # The app is put back only when this run got as far as changing it (a failure before that leaves it alone: no restart).
+  # The app is put back only when that run got as far as changing it (a failure before that leaves it alone: no restart).
   if [ -f "$prev/app.touched" ]; then
     app_restore "$prev" || code=1
   fi
@@ -215,6 +254,12 @@ beltoft_rename_main() {
     fi
     exit 0
   fi
+  # The lock is ours: the files of earlier runs are not needed any more.
+  local f
+  for f in "$state"/rename-*.sh "$state"/rename-*.json; do
+    [ -e "$f" ] || continue
+    [ "$f" = "$want" ] || [ "$f" = "${want%.json}.sh" ] || rm -f "$f"
+  done
   if [ "$(jq -r '.run // ""' "$status_file" 2>/dev/null)" = "$run" ]; then
     case "$(jq -r '.state // ""' "$status_file" 2>/dev/null)" in
       ready | failed) exit 0 ;;
@@ -222,31 +267,43 @@ beltoft_rename_main() {
   fi
 
   status running caddy none
-  if [ "$domain" = "$old_domain" ] || [ "$domain" = "$old_www" ] || [ ! -f "$caddyfile" ] || ! command -v caddy >/dev/null 2>&1; then
+  if [ "$domain" = "$old_domain" ] || [ ! -f "$caddyfile" ] || ! command -v caddy >/dev/null 2>&1; then
     status failed caddy caddy
     exit 1
   fi
-  if ! save_prev; then
-    rm -rf "$prev"
-    status failed caddy caddy
-    exit 1
-  fi
+  save_prev
+  case $? in
+    0) ;;
+    2)
+      status failed rollback caddy
+      exit 1
+      ;;
+    *)
+      rm -rf "$prev"
+      status failed caddy caddy
+      exit 1
+      ;;
+  esac
   ensure_body || fail caddy
+  over_deadline && fail late
   put_caddy emit_both || fail caddy
 
   status running certificate none
-  wait_tls || fail certificate
+  must wait_tls certificate
 
   status running app none
   : > "$prev/app.touched"
+  over_deadline && fail late
   app_apply || fail app
-  wait_web || fail app
+  must wait_web app
+  over_deadline && fail late
 
   status running caddy none
   put_caddy emit_final || fail caddy
 
   status running verify none
-  { wait_tls && wait_web; } || fail probe
+  must wait_tls probe
+  must wait_web probe
 
   rm -rf "$prev"
   status ready done none

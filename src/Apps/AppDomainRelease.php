@@ -35,9 +35,10 @@ final class AppDomainRelease {
 	 * (removed later only while they still are what we wrote), a name that sat in our zone without a record of ours is noted
 	 * as left, and the www marks are cleared. The same for a reinstall and for a change of domain; nothing is written here.
 	 *
+	 * @param string[] $keep Names the new site still uses: their records are not queued (the change of domain moves their ownership).
 	 * @return array<string, mixed> Meta to merge.
 	 */
-	public static function queue_old( Resource $r ): array {
+	public static function queue_old( Resource $r, array $keep = array() ): array {
 		$meta      = array();
 		$published = (string) $r->get( 'app_domain' );
 		$own       = (string) $r->get( 'app_domain_own' );
@@ -50,7 +51,7 @@ final class AppDomainRelease {
 		}
 		$old    = (array) $r->get( 'app_domain_old' );
 		$queued = false;
-		if ( '' !== $published && true === $r->get( 'app_domain_made' ) && '' !== (string) $r->get( 'app_zone' ) ) {
+		if ( '' !== $published && true === $r->get( 'app_domain_made' ) && '' !== (string) $r->get( 'app_zone' ) && ! in_array( $published, $keep, true ) ) {
 			$ip    = \BeltoftServices\Proxmox\Network\IpPool::for_resource( $r->id() );
 			$old[] = array(
 				'zone'  => (string) $r->get( 'app_zone' ),
@@ -62,7 +63,7 @@ final class AppDomainRelease {
 		}
 		// The www record we wrote next to the domain's goes the same way: removed only while it is still the record we wrote.
 		$www_ip = (string) $r->get( 'app_www_ip' );
-		if ( true === $r->get( 'app_www_made' ) && '' !== (string) $r->get( 'app_zone' ) && '' !== $www_ip ) {
+		if ( true === $r->get( 'app_www_made' ) && '' !== (string) $r->get( 'app_zone' ) && '' !== $www_ip && ! in_array( 'www.' . (string) $r->get( 'app_zone' ), $keep, true ) ) {
 			$old[] = array(
 				'zone'  => (string) $r->get( 'app_zone' ),
 				'name'  => 'www.' . (string) $r->get( 'app_zone' ),

@@ -117,8 +117,8 @@ class AppRenameScriptTest extends TestCase {
 	}
 
 	/** Writes the request. */
-	private function want( string $domain = self::NEW, string $www = '', string $old = self::OLD, string $old_www = '', string $run = 'run00001abc' ): void {
-		file_put_contents( $this->dir . '/state/rename.json', wp_json_encode( array( 'v' => 1, 'run' => $run, 'mode' => 'domain', 'domain' => $domain, 'www' => $www, 'old_domain' => $old, 'old_www' => $old_www, 'ip' => self::IP, 'app' => 'x', 'recipe' => 1 ) ) );
+	private function want( string $domain = self::NEW, string $www = '', string $old = self::OLD, string $old_www = '', string $run = 'run00001abc', array $extra = array() ): void {
+		file_put_contents( $this->dir . '/state/rename.json', wp_json_encode( array_merge( array( 'v' => 1, 'run' => $run, 'mode' => 'domain', 'domain' => $domain, 'www' => $www, 'old_domain' => $old, 'old_www' => $old_www, 'ip' => self::IP, 'app' => 'x', 'recipe' => 1 ), $extra ) ) );
 	}
 
 	/**
@@ -574,5 +574,155 @@ class AppRenameScriptTest extends TestCase {
 			$this->assertSame( $config, $this->read( 'app/config.php' ), $name . ': the file is not written.' );
 			$this->assertSame( $caddy, $this->read( 'etc/Caddyfile' ), $name );
 		}
+	}
+
+	// -- The overall deadline (F1) -------------------------------------------------------------
+
+	public function test_the_run_has_one_overall_deadline_and_ends_in_the_normal_failure_path(): void {
+		$this->install( 'wordpress' );
+		$caddy = $this->read( 'etc/Caddyfile' );
+		$this->flag( 'curl_tls_fail' );
+		$this->want( self::NEW, '', self::OLD, '', 'run00001abc', array( 'deadline' => 3 ) );
+		$t = microtime( true );
+		list( $status, $code ) = $this->run_script( 'wordpress', array( 'BELTOFT_REN_TRIES' => '60', 'BELTOFT_REN_SLEEP' => '1', 'BELTOFT_REN_MIN_DEADLINE' => '1' ) );
+		$took = microtime( true ) - $t;
+
+		$this->assertLessThan( 15, $took, 'The waits stop at the deadline, they do not run all their tries.' );
+		$this->assertSame( 1, $code );
+		$this->assertSame( 'failed', $status['state'] );
+		$this->assertSame( 'late', $status['reason'] );
+		$this->assertSame( 'done', $status['step'], 'The rollback worked.' );
+		$this->assertSame( $caddy, $this->read( 'etc/Caddyfile' ) );
+		$this->assertDirectoryDoesNotExist( $this->dir . '/state/rename.prev' );
+	}
+
+	public function test_the_deadline_also_stops_the_wait_for_the_app_and_puts_the_app_value_back(): void {
+		$this->install( 'wordpress' );
+		$this->flag( 'curl_web_fail' );
+		$this->want( self::NEW, '', self::OLD, '', 'run00001abc', array( 'deadline' => 3 ) );
+		list( $status ) = $this->run_script( 'wordpress', array( 'BELTOFT_REN_TRIES' => '60', 'BELTOFT_REN_SLEEP' => '1', 'BELTOFT_REN_MIN_DEADLINE' => '1' ) );
+		$this->assertSame( 'failed', $status['state'] );
+		$this->assertSame( 'late', $status['reason'] );
+		$this->assertSame( 'https://' . self::OLD, trim( $this->read( 'stub/wp/siteurl' ) ) );
+	}
+
+	public function test_a_deadline_that_is_not_a_sane_number_is_ignored(): void {
+		foreach ( array( 'soon', -5, 0, 1000000, 12.5, array( 1 ) ) as $bad ) {
+			exec( 'rm -rf ' . escapeshellarg( $this->dir . '/state' ) . ' ' . escapeshellarg( $this->dir . '/stub' ) . ' && mkdir -p ' . escapeshellarg( $this->dir . '/state' ) . ' ' . escapeshellarg( $this->dir . '/stub' ) );
+			$this->install( 'wordpress' );
+			$this->want( self::NEW, '', self::OLD, '', 'run00001abc', array( 'deadline' => $bad ) );
+			list( $status ) = $this->run_script( 'wordpress' );
+			$this->assertSame( 'ready', $status['state'], wp_json_encode( $bad ) );
+		}
+	}
+
+	// -- A run cut off earlier (F3) ------------------------------------------------------------
+
+	public function test_a_new_token_first_restores_what_a_cut_off_run_saved(): void {
+		$this->install( 'wordpress' );
+		$original = $this->read( 'etc/Caddyfile' );
+		$this->want( self::NEW, '', self::OLD, '', 'runAAAAAAAA' );
+
+		// Run A saved the original, changed the Caddyfile and the app value, and was cut off.
+		mkdir( $this->dir . '/state/rename.prev', 0700 );
+		copy( $this->dir . '/etc/Caddyfile', $this->dir . '/state/rename.prev/Caddyfile' );
+		file_put_contents( $this->dir . '/state/rename.prev/siteurl', 'https://' . self::OLD . "\n" );
+		file_put_contents( $this->dir . '/state/rename.prev/home', 'https://' . self::OLD . "\n" );
+		file_put_contents( $this->dir . '/state/rename.prev/run', "runAAAAAAAA\n" );
+		touch( $this->dir . '/state/rename.prev/app.touched' );
+		file_put_contents( $this->dir . '/etc/Caddyfile', self::NEW . " {\n}\n" . self::OLD . " {\n}\n" );
+		file_put_contents( $this->dir . '/stub/wp/siteurl', 'https://' . self::NEW . "\n" );
+		file_put_contents( $this->dir . '/stub/wp/home', 'https://' . self::NEW . "\n" );
+
+		// Run B (a new token) fails: the true original is back, not the half-changed state run A left.
+		$this->want( self::NEW, '', self::OLD, '', 'runBBBBBBBB' );
+		$this->flag( 'curl_tls_fail' );
+		list( $status ) = $this->run_script( 'wordpress' );
+		$this->assertSame( 'failed', $status['state'], wp_json_encode( $status ) );
+		$this->assertSame( 'done', $status['step'] );
+		$this->assertSame( $original, $this->read( 'etc/Caddyfile' ) );
+		$this->assertSame( 'https://' . self::OLD, trim( $this->read( 'stub/wp/siteurl' ) ) );
+		$this->assertSame( 'https://' . self::OLD, trim( $this->read( 'stub/wp/home' ) ) );
+		$this->assertDirectoryDoesNotExist( $this->dir . '/state/rename.prev' );
+	}
+
+	public function test_a_new_token_that_cannot_restore_the_earlier_run_changes_nothing_more(): void {
+		$this->install( 'wordpress' );
+		mkdir( $this->dir . '/state/rename.prev', 0700 );
+		copy( $this->dir . '/etc/Caddyfile', $this->dir . '/state/rename.prev/Caddyfile' );
+		file_put_contents( $this->dir . '/state/rename.prev/run', "runAAAAAAAA\n" );
+		$this->flag( 'systemctl_caddy_fail' );
+		$this->want( self::NEW, '', self::OLD, '', 'runBBBBBBBB' );
+		list( $status, $code ) = $this->run_script( 'wordpress' );
+		$this->assertSame( 1, $code );
+		$this->assertSame( 'failed', $status['state'] );
+		$this->assertSame( 'rollback', $status['step'] );
+		$this->assertSame( 'runBBBBBBBB', $status['run'] );
+		$this->assertFileExists( $this->dir . '/state/rename.prev/run', 'The saved copy is kept for a person to use.' );
+		$this->assertSame( 'runAAAAAAAA', trim( $this->read( 'state/rename.prev/run' ) ) );
+		$this->assertStringNotContainsString( 'caddy validate', $this->read( 'stub/calls.log' ), 'No new Caddyfile was made.' );
+		$this->assertStringNotContainsString( 'wp option update', $this->read( 'stub/calls.log' ) );
+	}
+
+	public function test_a_finished_run_leaves_nothing_to_restore(): void {
+		$this->install( 'n8n' );
+		$this->want();
+		list( $ready ) = $this->run_script( 'n8n' );
+		$this->assertSame( 'ready', $ready['state'] );
+		$this->assertDirectoryDoesNotExist( $this->dir . '/state/rename.prev' );
+
+		exec( 'rm -rf ' . escapeshellarg( $this->dir . '/state' ) . ' ' . escapeshellarg( $this->dir . '/stub' ) . ' && mkdir -p ' . escapeshellarg( $this->dir . '/state' ) . ' ' . escapeshellarg( $this->dir . '/stub' ) );
+		$this->install( 'n8n' );
+		$this->flag( 'docker_up_fail' );
+		$this->want();
+		list( $failed ) = $this->run_script( 'n8n' );
+		$this->assertSame( 'done', $failed['step'] );
+		$this->assertDirectoryDoesNotExist( $this->dir . '/state/rename.prev' );
+	}
+
+	// -- www and the bare domain (F5) -----------------------------------------------------------
+
+	public function test_moving_from_www_to_the_bare_domain_serves_each_host_once(): void {
+		$this->install( 'wordpress', 'www.example.com' );
+		$this->want( 'example.com', 'www.example.com', 'www.example.com', '' );
+		list( $status, , $out ) = $this->run_script( 'wordpress' );
+		$this->assertSame( 'ready', $status['state'], wp_json_encode( $status ) . $out );
+
+		$dual = $this->read( 'stub/snap_tls' );
+		$this->assertSame( 1, substr_count( $dual, "www.example.com {\n" ), 'While both must answer the www name serves the site once.' );
+		$this->assertStringNotContainsString( 'redir', $dual, 'The name that is in both sets serves the site, not a redirect.' );
+		$this->assertStringContainsString( "\nexample.com {\n", "\n" . $dual );
+
+		$final = $this->read( 'etc/Caddyfile' );
+		$this->assertSame( 1, substr_count( $final, "\nexample.com {\n" ) + ( str_starts_with( $final, "example.com {\n" ) ? 1 : 0 ) );
+		$this->assertSame( 1, substr_count( $final, "www.example.com {\n  redir https://example.com{uri} permanent\n}\n" ), 'In the end www redirects to the domain.' );
+		$this->assertSame( 1, substr_count( $final, 'www.example.com {' ) );
+		$this->assertSame( 'https://example.com', trim( $this->read( 'stub/wp/siteurl' ) ) );
+	}
+
+	public function test_moving_from_the_bare_domain_to_its_www_name_works_and_drops_the_old_name(): void {
+		$this->install( 'wordpress', 'example.com' );
+		$this->want( 'www.example.com', '', 'example.com', 'www.example.com' );
+		list( $status, , $out ) = $this->run_script( 'wordpress' );
+		$this->assertSame( 'ready', $status['state'], wp_json_encode( $status ) . $out );
+
+		$dual = $this->read( 'stub/snap_tls' );
+		$this->assertSame( 1, substr_count( $dual, "www.example.com {\n" ) );
+		$this->assertStringNotContainsString( 'redir', $dual );
+		$this->assertSame( 1, substr_count( $dual, "\nexample.com {\n" . $this->recipe_body( 'wordpress' ) ) + ( str_starts_with( $dual, "example.com {\n" ) ? 1 : 0 ) );
+
+		$final = $this->read( 'etc/Caddyfile' );
+		$this->assertSame( "www.example.com {\n" . $this->recipe_body( 'wordpress' ) . "}\n", $final, 'Only the new name, no redirect to itself.' );
+		$this->assertSame( 'https://www.example.com', trim( $this->read( 'stub/wp/siteurl' ) ) );
+	}
+
+	public function test_a_failure_of_a_www_move_puts_the_old_caddyfile_back(): void {
+		$this->install( 'wordpress', 'example.com' );
+		$before = $this->read( 'etc/Caddyfile' );
+		$this->flag( 'curl_tls_fail' );
+		$this->want( 'www.example.com', '', 'example.com', 'www.example.com' );
+		list( $status ) = $this->run_script( 'wordpress' );
+		$this->assertSame( 'failed', $status['state'] );
+		$this->assertSame( $before, $this->read( 'etc/Caddyfile' ) );
 	}
 }
