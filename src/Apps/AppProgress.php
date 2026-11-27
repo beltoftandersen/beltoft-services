@@ -23,6 +23,7 @@ final class AppProgress {
 	 */
 	public static function register(): void {
 		add_filter( 'beltoft_services_panel_group', array( __CLASS__, 'panel_group' ), 10, 3 );
+		add_filter( 'beltoft_services_attention_waits_for_customer', static fn( $theirs, $r ) => $theirs || ( $r instanceof Resource && self::dns_wait( $r ) ), 10, 2 );
 		add_filter( 'beltoft_services_panel_label', array( __CLASS__, 'panel_label' ), 10, 3 );
 		add_filter( 'beltoft_services_panel_message', array( __CLASS__, 'panel_message' ), 20, 3 );
 		add_filter( 'beltoft_services_progress_idle_kind', array( __CLASS__, 'idle_kind' ), 10, 2 );

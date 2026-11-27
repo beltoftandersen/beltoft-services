@@ -328,7 +328,14 @@ final class OverviewData {
 			}
 
 			// The install waits for the customer's own domain: it is the customer's turn, not ours (owner 2026-11-27).
-			$theirs = \BeltoftServices\Apps\AppProgress::dns_wait( $resource );
+			/**
+			 * Does this work wait for the customer (a feature says so, e.g. an app install waiting for the customer's own domain)?
+			 * Then the banner says "Waiting for you / See how" instead of "Working / Follow it".
+			 *
+			 * @param bool     $theirs   Default false.
+			 * @param Resource $resource The resource.
+			 */
+			$theirs = (bool) apply_filters( 'beltoft_services_attention_waits_for_customer', false, $resource );
 
 			$items[] = array(
 				'tone'  => 'busy',
