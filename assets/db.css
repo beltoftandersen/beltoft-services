@@ -6,3 +6,5 @@
 .beltoft-services-dbconnect__action { display: block; margin-top: var(--bs-space-2); }
 .beltoft-services-dbconnect .beltoft-services-dnsbox__table code { overflow-wrap: anywhere; white-space: normal; }
 .beltoft-services-dbconnect .beltoft-services-ipv6only { margin: var(--bs-space-1) 0 0; font-size: var(--bs-fs-small); color: var(--bs-muted); }
+.beltoft-services-dbconnect .beltoft-services-dnsbox__table td:first-child { white-space: nowrap; }
+@media (max-width: 600px) { .beltoft-services-dbconnect .beltoft-services-dnsbox__table td:first-child { white-space: normal; } }
