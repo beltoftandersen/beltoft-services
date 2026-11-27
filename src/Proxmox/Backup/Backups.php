@@ -9,7 +9,6 @@ namespace BeltoftServices\Proxmox\Backup;
 
 use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
-use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Pve\Ownership;
 use BeltoftServices\Proxmox\Pve\Prepares;
@@ -84,7 +83,7 @@ final class Backups {
 	public const ORPHANS = 'beltoft_services_orphaned_backups';
 
 	/**
-	 * Days a managed database's backups are kept when its plan names none: a database is always backed up.
+	 * Days the backups of a database with the Managed add-on are kept when its plan names none.
 	 */
 	public const DB_DEFAULT_DAYS = 30;
 
@@ -105,7 +104,7 @@ final class Backups {
 	// -- Rules -----------------------------------------------------------------------------------
 
 	/**
-	 * Does this server get backups? The plan asks for them (a managed database always does), its cluster
+	 * Does this server get backups? The plan asks for them (a database only with the Managed add-on), its cluster
 	 * has a backup storage, and it is not an adopted machine.
 	 *
 	 * @param Resource $r Resource.
@@ -180,8 +179,8 @@ final class Backups {
 	public const PURGE_GRACE = 7 * DAY_IN_SECONDS;
 
 	/**
-	 * Days the plan keeps backups. A managed database whose plan names none keeps DB_DEFAULT_DAYS: its backups
-	 * do not depend on a backup variation.
+	 * Days the plan keeps backups, then the filter `beltoft_services_backup_days` (a database's backups come with the
+	 * Managed add-on, see Managed\ManagedBackups). A server's days are the plan's.
 	 *
 	 * @param Resource $r Resource.
 	 */
@@ -189,7 +188,36 @@ final class Backups {
 		$plan = (array) $r->get( 'plan' );
 		$days = max( 0, (int) ( $plan['backup_days'] ?? 0 ) );
 
-		return 0 === $days && DbDriver::ID === $r->get( 'driver' ) ? self::DB_DEFAULT_DAYS : $days;
+		/**
+		 * Filters the days a resource's backups are kept.
+		 *
+		 * @param int      $days Days of the plan.
+		 * @param Resource $r    The resource.
+		 */
+		return max( 0, (int) apply_filters( 'beltoft_services_backup_days', $days, $r ) );
+	}
+
+	/**
+	 * A resource that has lost its backups after having them queues the removal of the backups for the nightly
+	 * run (meta `backup_purge`); one that has them again cancels it. No Proxmox call. Uses the days that apply now
+	 * (days()), so a plan change never queues a purge for a database whose backups come with an add-on.
+	 *
+	 * @param Resource $r Resource.
+	 * @return bool False when the meta could not be stored.
+	 */
+	public static function sync_purge( Resource $r ): bool {
+		$days   = self::days( $r );
+		$queued = true === $r->get( 'backup_purge' );
+
+		if ( $days < 1 && ! $queued && $r->get( 'backup_ok_at' ) ) {
+			return $r->set( array( 'backup_purge' => true, 'backup_purge_at' => time() ) );
+		}
+
+		if ( $days >= 1 && $queued ) {
+			return $r->set( array( 'backup_purge' => null, 'backup_purge_at' => null ) );
+		}
+
+		return true;
 	}
 
 	/**

@@ -220,7 +220,7 @@ final class DiskCascade {
 
 		if ( \BeltoftServices\Proxmox\Managed\ManagedDriver::ID === $driver ) {
 			/* translators: %d: add-on subscription number. */
-			return sprintf( $again ? __( 'Managed server subscription #%d is active again with this server.', 'beltoft-services' ) : __( 'Managed server subscription #%d ends with this server.', 'beltoft-services' ), $id );
+			return sprintf( $again ? __( 'Managed subscription #%d is active again with its server or database.', 'beltoft-services' ) : __( 'Managed subscription #%d ends with its server or database.', 'beltoft-services' ), $id );
 		}
 
 		if ( AppLicenceDriver::ID === $driver ) {

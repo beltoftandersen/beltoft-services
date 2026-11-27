@@ -84,7 +84,8 @@ final class ManagedDriver implements Driver, \BeltoftServices\Drivers\UsageItems
 		}
 
 		// Staff picks the work up from this mail: the service is delivered by people, not by a driver call.
-		Alerts::admin( $r, 'Managed server started for server resource #' . $server->id() . ' (licence #' . $id . '). Check the first update, the alerts and the backups.' );
+		$what = ManagedMeta::is_database( $server ) ? 'database resource #' . $server->id() . ' (' . (string) ( (array) $server->get( 'plan' ) )['engine'] . ')' : 'server resource #' . $server->id();
+		Alerts::admin( $r, 'Managed service started for ' . $what . ' (licence #' . $id . '). Check the first update, the alerts and the backups.' );
 
 		return StepResult::done( array( 'steps' => array( 'ready' ) ) );
 	}
@@ -119,6 +120,13 @@ final class ManagedDriver implements Driver, \BeltoftServices\Drivers\UsageItems
 
 	public function render_account( Resource $r ): void {
 		$server = ManagedMeta::server_of( $r );
+
+		if ( $server && ManagedMeta::is_database( $server ) ) {
+			echo '<p>' . esc_html__( 'Managed database: we keep this database up to date, answer its alerts and check its backups.', 'beltoft-services' ) . '</p>';
+			echo '<p><a href="' . esc_url( DiskGuide::card_url( $server ) ) . '">' . esc_html__( 'Open the database', 'beltoft-services' ) . '</a></p>';
+			return;
+		}
+
 		echo '<p>' . esc_html__( 'Managed server: we keep this server up to date, answer its alerts and check its backups.', 'beltoft-services' ) . '</p>';
 
 		if ( $server ) {

@@ -1,6 +1,6 @@
 <?php
 /**
- * Buying a managed database through Claude: the summary with the breakdown, and the order.
+ * Buying a database through Claude: the summary with the breakdown, and the order.
  *
  * @package BeltoftServices
  */

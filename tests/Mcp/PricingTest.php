@@ -110,6 +110,31 @@ final class PricingTest extends UsageTestCase {
 		$this->assertStringContainsString( 'order_database', $out['note'] );
 	}
 
+	public function test_a_database_plan_says_backups_come_with_the_add_on_and_where_to_add_it(): void {
+		$plan = $this->call( 'catalog', array( 'kind' => 'database_plans' ) )['plans'][0];
+		$this->assertSame( 0, $plan['backup_days'], 'A database has no backups of its own.' );
+		$this->assertNull( $plan['managed_addon'], 'Not sold: nothing to say.' );
+
+		$managed = new \WC_Product_Subscription();
+		$managed->set_name( 'Managed server' );
+		$managed->set_status( 'publish' );
+		$managed->set_regular_price( '32.06' );
+		$managed->update_meta_data( '_subscription_price', '32.06' );
+		$managed->update_meta_data( '_subscription_period', 'month' );
+		$managed->update_meta_data( '_subscription_period_interval', '1' );
+		$managed->update_meta_data( \BeltoftServices\Product::META_DRIVER, \BeltoftServices\Proxmox\Managed\ManagedDriver::ID );
+		$managed->update_meta_data( \BeltoftLicenses\Software::META_LICENSED, 'yes' );
+		$managed->update_meta_data( \BeltoftLicenses\Software::META_SLUG, 'managed-' . wp_generate_password( 5, false ) );
+		$managed->save();
+		\BeltoftServices\Proxmox\Addon\AddonCart::reset_products();
+
+		$plan = $this->call( 'catalog', array( 'kind' => 'database_plans' ) )['plans'][0];
+		$this->assertNotNull( $plan['managed_addon'] );
+		$this->assertNotSame( '', $plan['managed_addon']['price_per_month'] );
+		$this->assertStringContainsString( 'My account', $plan['managed_addon']['where'] );
+		$this->assertStringContainsString( '30 days', $plan['managed_addon']['includes'] );
+	}
+
 	public function test_a_plan_of_a_monthly_product_is_not_listed(): void {
 		$plans = $this->call( 'catalog', array( 'kind' => 'database_plans' ) )['plans'];
 

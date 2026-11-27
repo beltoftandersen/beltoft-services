@@ -11,6 +11,8 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Backup\Backups;
+use BeltoftServices\Proxmox\Managed\ManagedDriver;
+use BeltoftServices\Proxmox\Managed\ManagedMeta;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Db\DbActions;
 use BeltoftServices\Proxmox\Db\DbAccess;
@@ -187,9 +189,10 @@ class DbPhase5Test extends TestCase {
 	/**
 	 * A database that is built and ready, with a healthy guest.
 	 *
-	 * @param array<string, mixed> $plan Plan overrides.
+	 * @param array<string, mixed> $plan    Plan overrides.
+	 * @param bool                $backups True: it keeps its backups (the grandfather meta); false: a plain database.
 	 */
-	private function ready_db( array $plan = array() ): Resource {
+	private function ready_db( array $plan = array(), bool $backups = true ): Resource {
 		$product = $this->service_product(
 			'proxmox-db',
 			array_merge( array( 'cluster' => 'lab', 'template' => 9100, 'engine' => 'postgres', 'major' => 18, 'cores' => 2, 'memory_mb' => 4096, 'disk_gb' => 20, 'public_ip' => 0 ), $plan ),
@@ -209,9 +212,28 @@ class DbPhase5Test extends TestCase {
 		$this->health( array( 'ok' => true ) );
 		$done = $driver->provision( Resource::find( $r->id() ) );
 		$this->assertTrue( $done->is_done(), $done->error() );
-		$this->assertTrue( Resource::find( $r->id() )->set( array_merge( $done->meta(), array( 'state' => 'ready', 'desired' => 'ready', 'task' => null ) ) ) );
+		$this->assertTrue( Resource::find( $r->id() )->set( array_merge( $done->meta(), array( 'state' => 'ready', 'desired' => 'ready', 'task' => null ), $backups ? array( 'backups_included' => true ) : array() ) ) );
 
 		return Resource::find( $r->id() );
+	}
+
+	/**
+	 * The Managed add-on bought for a database, run to the end of its build.
+	 *
+	 * @param Resource $db   The database.
+	 * @param bool     $done Whether to run its job (ready) or leave it new.
+	 */
+	private function managed_for( Resource $db, bool $done = true ): Resource {
+		$product = $this->service_product( ManagedDriver::ID, array(), array( 'slug' => 'managed-' . wp_generate_password( 6, false ) ) );
+		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $db->license()['user_id'], 'email' => self::OWNER ) );
+		$managed = Resource::create( $license, Registry::get( ManagedDriver::ID ), Product::plan( $product->get_id() ), array( 'server_license' => (int) $db->license()['id'] ) );
+		$this->assertInstanceOf( Resource::class, $managed );
+
+		if ( $done ) {
+			Jobs::run( $managed->id() );
+		}
+
+		return Resource::find( $managed->id() );
 	}
 
 	/**
@@ -245,22 +267,112 @@ class DbPhase5Test extends TestCase {
 
 	// -- Backups on by default -------------------------------------------------------------------
 
-	public function test_a_database_is_backed_up_without_a_backup_plan_and_keeps_thirty_days_by_default(): void {
-		$r = $this->ready_db();
+	public function test_a_plain_database_has_no_backups_whatever_its_plan_says(): void {
+		$r = $this->ready_db( array( 'backup_days' => 30 ), false );
 
-		$this->assertSame( 0, (int) ( (array) $r->get( 'plan' ) )['backup_days'], 'The plan names no backup days.' );
-		$this->assertTrue( Backups::enabled( $r ) );
+		$this->assertSame( 0, Backups::days( $r ) );
+		$this->assertFalse( Backups::enabled( $r ) );
+		$this->assertFalse( Backups::due( $r, time() ) );
+
+		BackupJobs::backup();
+		$this->assertSame( array(), $this->calls( 'POST', '/vzdump' ), 'No nightly backup of a plain database.' );
+	}
+
+	public function test_the_managed_add_on_gives_a_database_thirty_days_of_backups(): void {
+		$r = $this->ready_db( array(), false );
+		$this->assertFalse( Backups::enabled( $r ) );
+
+		$managed = $this->managed_for( $r );
+		$this->assertSame( 'ready', $managed->get( 'state' ), (string) $managed->get( 'last_error' ) );
+		$this->assertSame( $r->id(), ManagedMeta::server_of( $managed )->id() );
+
+		$r = Resource::find( $r->id() );
+		$this->assertTrue( ManagedMeta::is_managed( $r ) );
 		$this->assertSame( 30, Backups::days( $r ) );
+		$this->assertTrue( Backups::enabled( $r ) );
 		$this->assertTrue( Backups::due( $r, time() ) );
 	}
 
-	public function test_the_plan_days_win_for_a_database_and_a_cluster_without_storage_has_no_backups(): void {
-		$three = $this->ready_db( array( 'backup_days' => 3 ) );
-		$this->assertSame( 3, Backups::days( $three ) );
-		$this->assertTrue( Backups::enabled( $three ) );
+	public function test_the_managed_add_on_counts_only_while_its_licence_is_active(): void {
+		$r       = $this->ready_db( array(), false );
+		$managed = $this->managed_for( $r );
+		$this->assertSame( 30, Backups::days( Resource::find( $r->id() ) ) );
+
+		$managed->set( array( 'desired' => 'paused' ) );
+		$this->assertSame( 0, Backups::days( Resource::find( $r->id() ) ), 'A managed line that is not meant to be ready gives no backups.' );
+	}
+
+	public function test_a_database_that_keeps_its_backups_by_stamp_has_the_thirty_days_and_nothing_else_changes(): void {
+		$r = $this->ready_db( array(), true );
+
+		$this->assertTrue( $r->get( 'backups_included' ) );
+		$this->assertSame( 30, Backups::days( $r ) );
+		$this->assertFalse( ManagedMeta::is_managed( $r ) );
+	}
+
+	public function test_a_database_whose_plan_names_days_keeps_them_with_the_add_on(): void {
+		$r = $this->ready_db( array( 'backup_days' => 3 ) );
+
+		$this->assertSame( 3, Backups::days( $r ) );
+		$this->assertTrue( Backups::enabled( $r ) );
 
 		$this->save_cluster( array( 'token_secret' => '', 'backup_storage' => '' ) );
-		$this->assertFalse( Backups::enabled( Resource::find( $three->id() ) ) );
+		$this->assertFalse( Backups::enabled( Resource::find( $r->id() ) ) );
+	}
+
+	public function test_the_nightly_run_queues_the_removal_when_the_add_on_is_gone_and_cancels_it_when_it_returns(): void {
+		$r       = $this->ready_db( array(), false );
+		$managed = $this->managed_for( $r );
+		$this->assertSame( 30, Backups::days( Resource::find( $r->id() ) ) );
+		Resource::find( $r->id() )->set( array( 'backup_ok_at' => time() - HOUR_IN_SECONDS ) );
+
+		$managed->set( array( 'desired' => 'paused' ) );
+		BackupJobs::backup_next();
+
+		$fresh = Resource::find( $r->id() );
+		$this->assertTrue( $fresh->get( 'backup_purge' ), 'Queued.' );
+		$this->assertGreaterThan( 0, (int) $fresh->get( 'backup_purge_at' ) );
+		$this->assertFalse( Backups::purge_due( $fresh ), 'Not before the week is over.' );
+
+		$managed->set( array( 'desired' => 'ready' ) );
+		BackupJobs::backup_next();
+
+		$this->assertNull( Resource::find( $r->id() )->get( 'backup_purge' ), 'The add-on came back within the week.' );
+	}
+
+	public function test_the_removal_runs_only_with_deletion_on_and_after_the_week_and_the_dashboard_cannot_restore_meanwhile(): void {
+		$r = $this->ready_db( array(), false );
+		$r->set( array( 'backup_ok_at' => time() - HOUR_IN_SECONDS, 'backup_purge' => true, 'backup_purge_at' => time() - 8 * DAY_IN_SECONDS ) );
+
+		$this->settings( array( 'deletion_mode' => 'off' ) );
+		$this->assertFalse( Backups::purge_due( Resource::find( $r->id() ) ) );
+
+		$this->settings( array( 'deletion_mode' => 'on' ) );
+		$this->assertTrue( Backups::purge_due( Resource::find( $r->id() ) ) );
+		$this->assertFalse( Backups::enabled( Resource::find( $r->id() ) ), 'Not restorable: the backups tab is closed while they wait to be deleted.' );
+	}
+
+	public function test_a_plan_change_never_queues_a_purge_for_a_database_with_the_add_on(): void {
+		$with = $this->ready_db( array(), false );
+		$this->managed_for( $with );
+		$with = Resource::find( $with->id() );
+		$with->set( array( 'backup_ok_at' => time() - HOUR_IN_SECONDS, 'plan' => array_merge( (array) $with->get( 'plan' ), array( 'backup_days' => 0 ) ) ) );
+
+		$this->assertTrue( Backups::sync_purge( Resource::find( $with->id() ) ) );
+		$this->assertNull( Resource::find( $with->id() )->get( 'backup_purge' ), 'The plan says 0 days, the add-on decides.' );
+	}
+
+	public function test_a_plan_change_of_a_plain_database_that_never_had_backups_queues_nothing(): void {
+		$plain = $this->ready_db( array(), false );
+
+		$this->assertTrue( Backups::sync_purge( $plain ) );
+		$this->assertNull( Resource::find( $plain->id() )->get( 'backup_purge' ), 'Nothing was ever backed up.' );
+	}
+
+	public function test_a_server_keeps_the_rules_of_its_plan(): void {
+		$product = $this->service_product( 'proxmox', array( 'cluster' => 'lab', 'template' => 9000, 'cores' => 1, 'memory_mb' => 1024, 'disk_gb' => 10 ), array( 'max' => 3 ) );
+		$vps     = Resource::create( $this->service_license( $product, array( 'fire' => false ) ), Registry::get( 'proxmox' ), array_merge( Product::plan( $product->get_id() ), array( 'backup_days' => 7 ) ) );
+		$this->assertSame( 7, Backups::days( $vps ) );
 	}
 
 	public function test_a_server_without_backup_days_is_still_not_backed_up(): void {

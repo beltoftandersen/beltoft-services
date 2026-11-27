@@ -479,7 +479,7 @@ final class Operations {
 			return StepResult::fail( 'update: the plan needs positive cores, memory and disk' );
 		}
 
-		if ( ! $this->sync_backup_purge( (int) ( $plan['backup_days'] ?? 0 ) ) ) {
+		if ( ! Backups::sync_purge( $this->r ) ) {
 			return StepResult::retry( 0, 'update: progress could not be stored' );
 		}
 
@@ -751,27 +751,6 @@ final class Operations {
 		}
 
 		return $changed ? 'written' : 'same';
-	}
-
-	/**
-	 * A plan without backups after a plan with them queues the removal of the backups for the next
-	 * nightly run (meta `backup_purge`); a plan with backups again cancels it. No Proxmox call.
-	 *
-	 * @param int $days The plan's backup days.
-	 * @return bool False when the meta could not be stored.
-	 */
-	private function sync_backup_purge( int $days ): bool {
-		$queued = true === $this->r->get( 'backup_purge' );
-
-		if ( $days < 1 && ! $queued && $this->r->get( 'backup_ok_at' ) ) {
-			return $this->r->set( array( 'backup_purge' => true, 'backup_purge_at' => time() ) );
-		}
-
-		if ( $days >= 1 && $queued ) {
-			return $this->r->set( array( 'backup_purge' => null, 'backup_purge_at' => null ) );
-		}
-
-		return true;
 	}
 
 	/**

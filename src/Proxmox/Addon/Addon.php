@@ -93,7 +93,7 @@ final class Addon {
 			new self( DiskDriver::ID, 'disk', 'disk', '_disk_', 'beltoft-services-disk', true, false, 'ASC', 'Parent server deleted; extra disk no longer available', DiskMeta::after_parent_deleted( ... ), false ),
 			new self( SnapshotDriver::ID, 'snapshot', 'snapshot', '_snapshots_', 'beltoft-services-snapshots', false, true, 'ASC', 'Parent server deleted; snapshot slots no longer available', SnapshotMeta::after_parent_deleted( ... ) ),
 			new self( AppLicenceDriver::ID, 'applic', 'applic', '_applic_', AppLicenceCart::NONCE, true, false, 'DESC', 'Parent server deleted; app licence no longer available', AppLicence::after_parent_deleted( ... ), true, AppLicenceKeep::for_deleted_server( ... ) ),
-			new self( ManagedDriver::ID, 'managed', 'managed', '_managed_', 'beltoft-services-managed', true, true, 'ASC', 'Parent server deleted; managed server service no longer available', ManagedMeta::after_parent_deleted( ... ) ),
+			new self( ManagedDriver::ID, 'managed', 'managed', '_managed_', 'beltoft-services-managed', true, true, 'ASC', 'Parent server deleted; managed server service no longer available', ManagedMeta::after_parent_deleted( ... ), true, null, array( \BeltoftServices\Proxmox\Db\DbDriver::ID ) ),
 			new self( Ipv4Driver::ID, 'ipv4', 'ipv4', '_ipv4_', 'beltoft-services-ipv4', true, true, 'ASC', 'Parent deleted; IPv4 address no longer available', Ipv4Meta::after_parent_deleted( ... ), true, null, array( \BeltoftServices\Proxmox\Db\DbDriver::ID ) ),
 		);
 	}

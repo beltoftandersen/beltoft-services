@@ -139,6 +139,7 @@ final class DbCard {
 			'confirm'     => DbActions::phrase(),
 			'policy'      => DbPolicy::view( $r, $ready && ! $stopped && $r->accepts_actions() && array_key_exists( DbPolicy::ACTION, $offered ) ),
 			'backups'     => $backups,
+			'managed'     => \BeltoftServices\Proxmox\Vm\Panels::managed_panel( $r ),
 			'access'      => $access,
 			'public_connections' => $public,
 			'connect'     => $connect,

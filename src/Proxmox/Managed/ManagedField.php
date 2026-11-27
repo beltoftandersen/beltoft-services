@@ -9,12 +9,13 @@ namespace BeltoftServices\Proxmox\Managed;
 
 use BeltoftServices\Checkout\CheckBox;
 use BeltoftServices\Proxmox\Backup\CartSwap;
+use BeltoftServices\Proxmox\Db\DbIpField;
 use BeltoftServices\Proxmox\Disk\DiskField;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * One box: ticked, the cart holds one managed server line bought `cart_server`, with the new server (also for a visitor;
+ * One box: ticked, the cart holds one managed line bought `cart_server`, with the new server or database (also for a visitor;
  * the account is made at checkout). After the order the service finds its server in the same order (ManagedMeta::server_of).
  * A server that is removed takes the line with it. The block checkout is not covered (classic hook only, as the other lines).
  */
@@ -30,9 +31,17 @@ final class ManagedField {
 		add_action( 'woocommerce_cart_item_removed', array( __CLASS__, 'clean_orphan' ) );
 	}
 
-	/** Is there a box: the product is sold and the cart holds one new server. */
+	/** Is there a box: the product is sold and the cart holds one new server or one new database, not both (a line could not say which). */
 	public static function offered(): bool {
-		return null !== ManagedCart::product() && null !== DiskField::cart_server();
+		return null !== ManagedCart::product() && null !== self::target();
+	}
+
+	/** What the box is for: 'server', 'database' or null. */
+	public static function target(): ?string {
+		$server = null !== DiskField::cart_server();
+		$db     = null !== DbIpField::new_database();
+
+		return $server === $db ? null : ( $server ? 'server' : 'database' );
 	}
 
 	/** How many managed lines the cart holds for the new server. */
@@ -54,15 +63,17 @@ final class ManagedField {
 		$product = ManagedCart::product();
 		$price   = CheckBox::price( $product );
 
-		$html = CheckBox::html(
-			'beltoft_services_managed',
-			self::AJAX,
-			self::NONCE,
-			self::chosen() > 0,
+		if ( 'database' === self::target() ) {
 			/* translators: %s: the monthly price, such as 299 kr. */
-			sprintf( __( 'Managed server, %s a month', 'beltoft-services' ), $price ),
-			__( 'We install operating system updates, act on the server\'s alerts and check that the backups run. Help with your own software is billed per started 15 minutes.', 'beltoft-services' )
-		);
+			$label = sprintf( __( 'Managed database, %s a month', 'beltoft-services' ), $price );
+			$help  = __( 'Backups are taken every night and kept for 30 days. We install updates, act on the database\'s alerts and check that the backups run. Help with your own data and queries is billed per started 15 minutes.', 'beltoft-services' );
+		} else {
+			/* translators: %s: the monthly price, such as 299 kr. */
+			$label = sprintf( __( 'Managed server, %s a month', 'beltoft-services' ), $price );
+			$help  = __( 'We install operating system updates, act on the server\'s alerts and check that the backups run. Help with your own software is billed per started 15 minutes.', 'beltoft-services' );
+		}
+
+		$html = CheckBox::html( 'beltoft_services_managed', self::AJAX, self::NONCE, self::chosen() > 0, $label, $help );
 
 		echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in CheckBox::html().
 	}
@@ -118,7 +129,7 @@ final class ManagedField {
 
 	/** A removed server must not leave a managed line that has no server. */
 	public static function clean_orphan(): void {
-		if ( DiskField::server_swap_in_progress() || ! function_exists( 'WC' ) || ! WC()->cart || null !== DiskField::cart_server() ) {
+		if ( DiskField::server_swap_in_progress() || ! function_exists( 'WC' ) || ! WC()->cart || null !== self::target() ) {
 			return;
 		}
 

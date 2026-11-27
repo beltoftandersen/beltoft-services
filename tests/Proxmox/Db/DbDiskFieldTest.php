@@ -409,4 +409,74 @@ class DbDiskFieldTest extends BackupTestCase {
 		DbDiskField::validate( array(), $errors );
 		$this->assertSame( array(), $errors->get_error_codes(), 'A renewal is not checked.' );
 	}
+
+	// -- The Managed add-on box for a new database -------------------------------------------------
+
+	private function managed_product(): void {
+		$product = new \WC_Product_Subscription();
+		$product->set_name( 'Managed server' );
+		$product->set_status( 'publish' );
+		$product->set_regular_price( '299' );
+		$product->update_meta_data( '_subscription_price', '299' );
+		$product->update_meta_data( '_subscription_period', 'month' );
+		$product->update_meta_data( '_subscription_period_interval', '1' );
+		$product->update_meta_data( Product::META_DRIVER, \BeltoftServices\Proxmox\Managed\ManagedDriver::ID );
+		$product->update_meta_data( \BeltoftLicenses\Software::META_LICENSED, 'yes' );
+		$product->update_meta_data( \BeltoftLicenses\Software::META_SLUG, 'managed-' . wp_generate_password( 5, false ) );
+		$product->save();
+		\BeltoftServices\Proxmox\Addon\AddonCart::reset_products();
+	}
+
+	private function managed_html(): string {
+		ob_start();
+		\BeltoftServices\Proxmox\Managed\ManagedField::render();
+
+		return (string) ob_get_clean();
+	}
+
+	private function managed_lines(): int {
+		return count( array_filter( WC()->cart->get_cart(), static fn( $item ) => 'cart_server' === ( $item['beltoft_services_managed_for'] ?? null ) ) );
+	}
+
+	public function test_a_new_database_gets_the_managed_box_with_its_own_words_and_one_line(): void {
+		$this->managed_product();
+		$v = $this->db_variations();
+		$this->assertSame( '', $this->managed_html(), 'No database in the cart: no box.' );
+
+		$key = $this->add( $v['e0-0'] );
+		$html = $this->managed_html();
+		$this->assertStringContainsString( 'Managed database, ', $html );
+		$this->assertStringContainsString( '299', $html );
+		$this->assertStringContainsString( 'kept for 30 days', $html );
+		$this->assertStringNotContainsString( "\u{2014}", $html );
+
+		$this->assertTrue( \BeltoftServices\Proxmox\Managed\ManagedField::choose( true )['ok'], wp_json_encode( wc_get_notices() ) );
+		$this->assertTrue( \BeltoftServices\Proxmox\Managed\ManagedField::choose( true )['ok'] );
+		$this->assertSame( 1, $this->managed_lines() );
+
+		$errors = new \WP_Error();
+		\BeltoftServices\Proxmox\Managed\ManagedCart::checkout_validation( array(), $errors );
+		$this->assertFalse( $errors->has_errors(), wp_json_encode( $errors->get_error_messages() ) );
+
+		WC()->cart->remove_cart_item( $key );
+		$this->assertSame( 0, $this->managed_lines(), 'Removing the database takes the line with it.' );
+	}
+
+	public function test_a_cart_with_a_new_server_and_a_new_database_gets_no_managed_box(): void {
+		$this->managed_product();
+		$v = $this->db_variations();
+		$this->add( $v['e0-0'] );
+		$this->assertNotSame( '', $this->managed_html() );
+
+		$server = $this->variable_product();
+		$attrs  = array();
+
+		foreach ( $server['a-None']->get_attributes() as $name => $value ) {
+			$attrs[ 'attribute_' . $name ] = $value;
+		}
+
+		WC()->cart->add_to_cart( $server['a-None']->get_parent_id(), 1, $server['a-None']->get_id(), $attrs );
+
+		$this->assertSame( '', $this->managed_html(), 'A line could not say which of the two it is for.' );
+	}
 }

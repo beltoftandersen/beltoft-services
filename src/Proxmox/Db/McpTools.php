@@ -44,10 +44,10 @@ final class McpTools implements ToolSet {
 	 */
 	public static function tools(): array {
 		return array(
-			'database_info'    => Definitions::read( 'Shows how to connect to one managed database: engine, host, port, database name, user name and the TLS fingerprint. The password is never shown here.', Definitions::by_id() ),
-			'get_database_access' => Definitions::read( 'Shows which addresses may connect to one managed database that has a public IP address, whether it is open to everyone, and whether a change is being applied.' . Definitions::DATA, Definitions::by_id(), 30 ),
+			'database_info'    => Definitions::read( 'Shows how to connect to one database: engine, host, port, database name, user name and the TLS fingerprint. The password is never shown here.', Definitions::by_id() ),
+			'get_database_access' => Definitions::read( 'Shows which addresses may connect to one database that has a public IP address, whether it is open to everyone, and whether a change is being applied.' . Definitions::DATA, Definitions::by_id(), 30 ),
 			'set_database_access' => Definitions::act(
-				'Adds an address to, or removes one from, the list of addresses that may connect to a managed database with a public IP address, or closes the database again after it was open to everyone (world_off). The address is a public IPv4 address or range such as 203.0.113.7 or 203.0.113.0/24. Opening the database to everyone (world_on) needs Full access and a confirmation: the first call returns a summary and a confirm value, show the summary to the customer and send the value only after their clear yes. Ask the customer first.',
+				'Adds an address to, or removes one from, the list of addresses that may connect to a database with a public IP address, or closes the database again after it was open to everyone (world_off). The address is a public IPv4 address or range such as 203.0.113.7 or 203.0.113.0/24. Opening the database to everyone (world_on) needs Full access and a confirmation: the first call returns a summary and a confirm value, show the summary to the customer and send the value only after their clear yes. Ask the customer first.',
 				Definitions::obj(
 					array(
 						'id'      => Definitions::id(),
@@ -67,12 +67,12 @@ final class McpTools implements ToolSet {
 				true
 			),
 			'reveal_database_password' => Definitions::full(
-				'Shows the password of a managed database once. The value then is in this conversation and we no longer have it. If there is none to show, the customer makes a new password in the dashboard.',
+				'Shows the password of a database once. The value then is in this conversation and we no longer have it. If there is none to show, the customer makes a new password in the dashboard.',
 				Definitions::obj( array( 'id' => Definitions::id() ), array( 'id' ), true ),
 				true
 			),
 			'order_database'   => Definitions::full(
-				'Orders a new pay as you go managed database. Choose the plan (it fixes the engine and version), the public IPv4 address and the extra storage with the customer first, with catalog (database_plans) and price_quote. Nothing is charged now: the hours are billed monthly to the card saved on the customer\'s usage account (a saved card is required, credit alone is not enough; VAT is added on the invoice and credit is applied first). The confirmation summary shows the monthly lines, the max per month and the price per hour. A customer who has no usage account yet gets a link to finish the first order once in the browser, and nothing is ordered.',
+				'Orders a new pay as you go database. Choose the plan (it fixes the engine and version), the public IPv4 address and the extra storage with the customer first, with catalog (database_plans) and price_quote. Nothing is charged now: the hours are billed monthly to the card saved on the customer\'s usage account (a saved card is required, credit alone is not enough; VAT is added on the invoice and credit is applied first). The confirmation summary shows the monthly lines, the max per month and the price per hour. A customer who has no usage account yet gets a link to finish the first order once in the browser, and nothing is ordered.',
 				Definitions::obj(
 					array(
 						'plan'             => array( 'type' => 'string', 'maxLength' => 120, 'description' => 'The plan variation_id or its exact name, from catalog database_plans.' ),
@@ -87,7 +87,7 @@ final class McpTools implements ToolSet {
 				false
 			),
 			'get_database_ca_certificate' => Definitions::full(
-				'Shows the CA certificate of a managed database, the text the customer saves as a file to connect over TLS. It is a public certificate, not a password.',
+				'Shows the CA certificate of a database, the text the customer saves as a file to connect over TLS. It is a public certificate, not a password.',
 				Definitions::obj( array( 'id' => Definitions::id() ), array( 'id' ), true ),
 				true,
 				true,

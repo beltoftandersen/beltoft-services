@@ -256,6 +256,15 @@ final class Servers {
 						return false;
 					}
 
+					// A managed service of a database is shown on the database's page (the Servers list holds servers only).
+					if ( \BeltoftServices\Proxmox\Managed\ManagedDriver::ID === (string) $parent['resource']->get( 'driver' ) ) {
+						$of = \BeltoftServices\Proxmox\Managed\ManagedMeta::server_of( $parent['resource'] );
+
+						if ( $of && \BeltoftServices\Proxmox\Managed\ManagedMeta::is_database( $of ) ) {
+							return false;
+						}
+					}
+
 					if ( 0 === $parent['license_id'] ) {
 						return true;
 					}

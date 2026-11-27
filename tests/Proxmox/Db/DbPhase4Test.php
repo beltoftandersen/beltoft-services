@@ -11,6 +11,10 @@ use BeltoftServices\Drivers\Registry;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Pve\Clusters;
+use BeltoftServices\Proxmox\Addon\AddonCart;
+use BeltoftServices\Proxmox\Managed\ManagedCart;
+use BeltoftServices\Proxmox\Managed\ManagedDriver;
+use BeltoftServices\Proxmox\Managed\ManagedMeta;
 use BeltoftServices\Proxmox\Db\DbCard;
 use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\Proxmox\Db\DbGuest;
@@ -987,6 +991,112 @@ class DbPhase4Test extends TestCase {
 		} )( $view, array( 'overview' => 'Overview', 'access' => 'Access' ), $tab, static fn( $slug ) => '/x/' . $slug );
 
 		return (string) ob_get_clean();
+	}
+
+	/** The Managed add-on product (the one of the servers): a simple monthly subscription of 299. */
+	private function managed_product(): \WC_Product {
+		$product = new \WC_Product_Subscription();
+		$product->set_name( 'Managed server' );
+		$product->set_status( 'publish' );
+		$product->set_regular_price( '299' );
+		$product->update_meta_data( '_subscription_price', '299' );
+		$product->update_meta_data( '_subscription_period', 'month' );
+		$product->update_meta_data( '_subscription_period_interval', '1' );
+		$product->update_meta_data( Product::META_DRIVER, ManagedDriver::ID );
+		$product->update_meta_data( \BeltoftLicenses\Software::META_LICENSED, 'yes' );
+		$product->update_meta_data( \BeltoftLicenses\Software::META_SLUG, 'managed-' . wp_generate_password( 5, false ) );
+		$product->save();
+		AddonCart::reset_products();
+
+		return wc_get_product( $product->get_id() );
+	}
+
+	/** The Managed add-on of a database, as its order would make it. */
+	private function managed_addon( Resource $db ): Resource {
+		$product = $this->service_product( ManagedDriver::ID, array(), array( 'slug' => 'managed-' . wp_generate_password( 5, false ) ) );
+		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => (int) $db->license()['user_id'], 'email' => self::OWNER ) );
+		$addon   = Resource::create( $license, Registry::get( ManagedDriver::ID ), Product::plan( $product->get_id() ), array( 'server_license' => (int) $db->license()['id'] ) );
+		$this->assertInstanceOf( Resource::class, $addon );
+		Jobs::run( $addon->id() );
+
+		return Resource::find( $addon->id() );
+	}
+
+	public function test_the_overview_offers_the_managed_add_on_with_its_price_and_the_backups_tab_says_why_there_are_none(): void {
+		$this->managed_product();
+		$r = $this->ready_db();
+		wp_set_current_user( (int) $r->license()['user_id'] );
+
+		$html = $this->card( $r, 'overview' );
+		$this->assertStringContainsString( 'Add managed database', $html );
+		$this->assertStringContainsString( 'beltoft_services_managed_for=' . (int) $r->license()['id'], html_entity_decode( $html ) );
+		$this->assertStringContainsString( '299', $html );
+		$this->assertStringNotContainsString( "\u{2014}", $html );
+
+		$view = DbCard::view( Resource::find( $r->id() ) );
+		$this->assertFalse( $view['backups']['enabled'], 'A plain database has no backups.' );
+		ob_start();
+		( static function ( array $view, array $nav, string $active, callable $link ): void {
+			include BELTOFT_SERVICES_PATH . 'templates/account/db.php';
+		} )( $view, array( 'overview' => 'Overview', 'backups' => 'Backups' ), 'backups', static fn( $slug ) => '/x/' . $slug );
+		$tab = (string) ob_get_clean();
+		$this->assertStringContainsString( 'They come with Managed database', $tab );
+		$this->assertStringContainsString( 'Add managed database', $tab );
+	}
+
+	public function test_no_block_when_the_add_on_is_not_sold_and_the_active_one_is_told(): void {
+		$r = $this->ready_db();
+		wp_set_current_user( (int) $r->license()['user_id'] );
+		$this->assertStringNotContainsString( 'Managed database', $this->card( $r, 'overview' ) );
+
+		$this->managed_addon( $r );
+		$html = $this->card( $r, 'overview' );
+		$this->assertStringContainsString( 'This database is managed', $html );
+		$this->assertStringNotContainsString( 'Add managed database', $html );
+		$this->assertStringContainsString( 'Daily, kept 30 days', $html, 'The backups row appears with the add-on.' );
+	}
+
+	public function test_the_add_on_takes_a_database_of_its_own_ready_customer_only_once_and_not_an_adopted_one(): void {
+		$this->managed_product();
+		$r = $this->ready_db();
+		wp_set_current_user( (int) $r->license()['user_id'] );
+
+		$this->assertNotSame( '', ManagedCart::add_url( Resource::find( $r->id() ) ) );
+
+		$r->set( array( 'linked' => true ) );
+		$this->assertNull( \BeltoftServices\Proxmox\Vm\Panels::managed_panel( Resource::find( $r->id() ) ) );
+		$r->set( array( 'linked' => null ) );
+
+		$this->managed_addon( $r );
+		$this->assertSame( '', ManagedCart::add_url( Resource::find( $r->id() ) ), 'One per database.' );
+		$this->assertTrue( \BeltoftServices\Proxmox\Vm\Panels::managed_panel( Resource::find( $r->id() ) )['active'] );
+	}
+
+	public function test_a_managed_line_of_a_database_of_another_customer_is_not_delivered(): void {
+		$r      = $this->ready_db();
+		$other  = self::factory()->user->create();
+		$prod   = $this->service_product( ManagedDriver::ID, array(), array( 'slug' => 'managed-' . wp_generate_password( 5, false ) ) );
+		$lic    = $this->service_license( $prod, array( 'fire' => false, 'user_id' => $other ) );
+		$m      = Resource::create( $lic, Registry::get( ManagedDriver::ID ), Product::plan( $prod->get_id() ), array( 'server_license' => (int) $r->license()['id'] ) );
+		Jobs::run( $m->id() );
+
+		$this->assertNotSame( 'ready', Resource::find( $m->id() )->get( 'state' ) );
+		$this->assertFalse( ManagedMeta::is_managed( Resource::find( $r->id() ) ) );
+	}
+
+	public function test_a_deleted_database_ends_its_managed_line_and_the_line_is_no_row_of_the_servers_list(): void {
+		$r       = $this->ready_db();
+		$managed = $this->managed_addon( $r );
+		$this->assertSame( 'ready', $managed->get( 'state' ), (string) $managed->get( 'last_error' ) );
+
+		$view = array( 'id' => (int) $managed->license()['id'], 'license' => $managed->license() );
+		$this->assertSame( array(), \BeltoftServices\Proxmox\Vm\Servers::sort( array( $view ) )['others'], 'Shown on the database page, not as a stray row.' );
+
+		$this->assertTrue( Resource::find( $r->id() )->transition( 'deleted', 'test' ) );
+		\BeltoftServices\Reconciler::notify( Resource::find( $r->id() ), 'ready', 'deleted' );
+
+		$this->assertFalse( Resource::find( $managed->id() )->is_live(), 'The managed line is ended and closed with its database.' );
+		$this->assertSame( 'revoked', ( \BeltoftLicenses\Licenses::find( (int) $managed->license()['id'] )['status'] ?? '' ) );
 	}
 
 	public function test_every_tab_of_a_database_that_is_not_ready_says_so(): void {

@@ -53,7 +53,7 @@ final class BackupJobs {
 		$skip   = is_array( $skip ) ? array_map( 'intval', $skip ) : array();
 		$picked = null;
 
-		// Servers first, then managed databases (their backups do not depend on a plan variation).
+		// Servers first, then databases (their backups follow the Managed add-on).
 		foreach ( array( ProxmoxDriver::ID, DbDriver::ID ) as $driver_id ) {
 			$driver = Registry::get( $driver_id );
 
@@ -70,6 +70,11 @@ final class BackupJobs {
 				$resource = Resource::find( $id );
 
 				if ( ! $resource || $driver_id !== $resource->get( 'driver' ) ) {
+					continue;
+				}
+
+				// A database's backups follow its Managed add-on, which can end between plan changes: queue or cancel the removal here.
+				if ( DbDriver::ID === $driver_id && ! Backups::sync_purge( $resource ) ) {
 					continue;
 				}
 

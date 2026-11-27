@@ -9,7 +9,6 @@ namespace BeltoftServices\Proxmox\Db;
 
 use BeltoftServices\Billing\TaxNote;
 use BeltoftServices\Product;
-use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\Proxmox\Db\DbEngines;
 use BeltoftServices\Proxmox\Db\DbNeedsServer;
@@ -129,8 +128,6 @@ final class DbPicker {
 					continue;
 				}
 
-				$days    = max( 0, (int) ( $numbers['backup_days'] ?? 0 ) );
-
 				$plans[ $variation->get_id() ] = array(
 					'product_id'   => $product->get_id(),
 					'variation_id' => $variation->get_id(),
@@ -143,7 +140,7 @@ final class DbPicker {
 					'engine'       => (string) ( $numbers['engine'] ?? '' ),
 					'major'        => (int) ( $numbers['major'] ?? 0 ),
 					'cluster'      => (string) ( $numbers['cluster'] ?? '' ),
-					'backup_days'  => 0 === $days ? Backups::DB_DEFAULT_DAYS : $days,
+					'backup_days'  => 0, // A database has no backups of its own: they come with the Managed add-on.
 					// WooCommerce's own stock status, and a private network for the customer: a database cannot be built without one (a pool, not node capacity).
 					'in_stock'     => Offers::in_stock( $variation ) && \BeltoftServices\Proxmox\Network\PrivateNets::available_for( get_current_user_id(), (string) ( $numbers['cluster'] ?? '' ) ),
 					'usage'        => $rates, // A sold-out card keeps its price; process() refuses it.
@@ -567,8 +564,9 @@ final class DbPicker {
 		echo '<span>' . esc_html( ServerPicker::memory( (int) $plan['memory_mb'] ) ) . '</span>';
 		/* translators: %d: data disk size in gigabytes */
 		echo '<span>' . esc_html( sprintf( __( '%d GB data disk', 'beltoft-services' ), (int) $plan['disk_gb'] ) ) . '</span>';
-		/* translators: %d: number of days backups are kept */
-		echo '<span>' . esc_html( sprintf( _n( 'Daily backups, kept %d day', 'Daily backups, kept %d days', (int) $plan['backup_days'], 'beltoft-services' ), (int) $plan['backup_days'] ) ) . '</span>';
+		if ( null !== \BeltoftServices\Proxmox\Managed\ManagedCart::product() ) {
+			echo '<span>' . esc_html__( 'Backups come with the Managed add-on', 'beltoft-services' ) . '</span>';
+		}
 		echo '</span>';
 
 		if ( ! $stock ) {

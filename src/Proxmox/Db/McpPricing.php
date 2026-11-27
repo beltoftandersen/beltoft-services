@@ -1,6 +1,6 @@
 <?php
 /**
- * What the MCP tools say about the prices of a managed database: the plans with their options, the address and the parts of a quote.
+ * What the MCP tools say about the prices of a database: the plans with their options, the address and the parts of a quote.
  *
  * @package BeltoftServices
  */
@@ -48,10 +48,31 @@ final class McpPricing {
 
 			$row['price']   = Pricing::payg( (float) $plan['usage']['hourly'], (float) $plan['usage']['cap'] );
 			$row['options'] = self::database_options( (int) $plan['variation_id'] );
+			$row['managed_addon'] = self::managed_addon();
 			$out[]          = $row;
 		}
 
 		return $out;
+	}
+
+	/**
+	 * The Managed add-on of a database, to tell the customer: its monthly price and where to add it. Null when the shop does not sell it.
+	 * It is not ordered through Claude. Backups of a database come with it.
+	 *
+	 * @return array{price_per_month: string, where: string, includes: string}|null
+	 */
+	public static function managed_addon(): ?array {
+		$product = \BeltoftServices\Proxmox\Managed\ManagedCart::product();
+
+		if ( null === $product ) {
+			return null;
+		}
+
+		return array(
+			'price_per_month' => \BeltoftServices\Checkout\CheckBox::price( $product ),
+			'where'    => __( 'The customer adds it in My account, on the page of the database, or in the checkout when ordering in the browser.', 'beltoft-services' ),
+			'includes' => __( 'Backups every night kept for 30 days, updates, action on alerts and backup checks. A database without it has no backups.', 'beltoft-services' ),
+		);
 	}
 
 	/**

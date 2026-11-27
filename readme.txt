@@ -4,6 +4,8 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
+Stable tag: 0.67.0
+
 Stable tag: 0.66.10
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -257,6 +259,11 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.67.0 =
+* Databases are plain services and the Managed add-on (the product 1251 "Managed server") can be added to a database as it is to a server. A database without the add-on has no backups; automatic security updates and the down and disk-full emails stay. With the add-on: nightly backups kept 30 days, updates, action on alerts and backup checks. The add-on is offered on the database page in My Account and as a box in the checkout for a new database (not when the cart also holds a new server).
+* Backups follow the add-on through the new filter `beltoft_services_backup_days` (answered by `Managed\ManagedBackups`); the database default of 30 days is gone. A database with the meta `backups_included` keeps its backups without the add-on (stamp for a database bought before this release). When the add-on ends or its licence lapses the nightly run queues the removal of the backups (kept 7 days, not restorable, then deleted only with deletion mode on). A plan change no longer queues a purge from the plan's own days: `Backups::sync_purge()` uses the days that apply now.
+* A managed service of a database is not listed as a row of the Servers tab. The staff mail, the order email and the subscription notes name the database. The MCP tools say database, and `database_plans` carries `managed_addon` (price and where to add it); the new database cards no longer print backup days.
 
 = 0.66.10 =
 * Databases: a Connect to your database box on the Access tab (allowed address with one click, IPv6 or IPv4, the connection details and command per engine to copy, the private network).

@@ -52,7 +52,7 @@ class DbDriver extends ProxmoxDriver {
 	}
 
 	public function label(): string {
-		return __( 'Managed database', 'beltoft-services' );
+		return __( 'Database', 'beltoft-services' );
 	}
 
 	public function kind(): string {

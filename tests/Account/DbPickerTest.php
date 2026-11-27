@@ -148,18 +148,35 @@ class DbPickerTest extends BackupTestCase {
 		$this->assertStringContainsString( '8 GB RAM', $html );
 		$this->assertStringContainsString( '120 GB data disk', $html );
 		$this->assertStringContainsString( 'PostgreSQL 18', $html );
-		$this->assertStringContainsString( 'Daily backups, kept 30 days', $html );
+		$this->assertStringNotContainsString( 'Daily backups', $html, 'A database has no backups of its own.' );
+		$this->assertStringNotContainsString( 'Backups come with the Managed add-on', $html, 'Not sold here: no add-on product.' );
 		$this->assertStringContainsString( 'excluding VAT', $html );
 		$this->assertStringContainsString( 'name="' . DbPicker::FIELD . '"', $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
 		$this->assertStringNotContainsString( 'data-tiles', $html, 'No system or app tiles.' );
 	}
 
-	public function test_the_plan_days_come_from_the_plan_when_it_names_them(): void {
+	public function test_the_plan_days_are_ignored_and_the_add_on_is_pointed_to_only_when_it_is_sold(): void {
 		$this->v['Big']->update_meta_data( Product::META_PLAN . 'backup_days', '14' );
 		$this->v['Big']->save();
 
-		$this->assertStringContainsString( 'Daily backups, kept 14 days', $this->page() );
+		$this->assertSame( array( 0, 0 ), array_values( array_map( static fn( $p ) => $p['backup_days'], DbPicker::plans() ) ) );
+		$this->assertStringNotContainsString( 'Daily backups', $this->page() );
+
+		$managed = new \WC_Product_Subscription();
+		$managed->set_name( 'Managed server' );
+		$managed->set_status( 'publish' );
+		$managed->set_regular_price( '299' );
+		$managed->update_meta_data( '_subscription_price', '299' );
+		$managed->update_meta_data( '_subscription_period', 'month' );
+		$managed->update_meta_data( '_subscription_period_interval', '1' );
+		$managed->update_meta_data( Product::META_DRIVER, \BeltoftServices\Proxmox\Managed\ManagedDriver::ID );
+		$managed->update_meta_data( \BeltoftLicenses\Software::META_LICENSED, 'yes' );
+		$managed->update_meta_data( \BeltoftLicenses\Software::META_SLUG, 'managed-' . wp_generate_password( 5, false ) );
+		$managed->save();
+		\BeltoftServices\Proxmox\Addon\AddonCart::reset_products();
+
+		$this->assertStringContainsString( 'Backups come with the Managed add-on', $this->page() );
 	}
 
 	public function test_only_published_products_of_the_driver_are_offered(): void {

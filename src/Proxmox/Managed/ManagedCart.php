@@ -9,7 +9,6 @@ use BeltoftServices\Lifecycle;
 use BeltoftServices\Product;
 use BeltoftServices\Proxmox\Addon\Addon;
 use BeltoftServices\Proxmox\Addon\AddonCart;
-use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -30,9 +29,9 @@ final class ManagedCart {
 		return AddonCart::single_product( ManagedDriver::ID );
 	}
 
-	/** May this server take the service: a ready, active server. */
+	/** May this server or database take the service: a ready, active one. */
 	private static function server_ok( ?Resource $server ): bool {
-		return $server && ProxmoxDriver::ID === $server->get( 'driver' ) && 'ready' === $server->get( 'state' ) && 'ready' === $server->get( 'desired' )
+		return $server && in_array( (string) $server->get( 'driver' ), self::addon()->parent_drivers(), true ) && 'ready' === $server->get( 'state' ) && 'ready' === $server->get( 'desired' )
 			&& Lifecycle::is_active( $server->license() );
 	}
 
@@ -116,7 +115,7 @@ final class ManagedCart {
 		$data = is_array( $data ) ? $data : array();
 
 		if ( CartFlow::has_value( $data, array( CartFlow::RESUBSCRIBE ) ) ) {
-			wc_add_notice( __( 'Add the managed server service again from your server in My account.', 'beltoft-services' ), 'error' );
+			wc_add_notice( __( 'Add the managed service again from your server or database in My account.', 'beltoft-services' ), 'error' );
 			return false;
 		}
 
@@ -127,14 +126,14 @@ final class ManagedCart {
 		$link = self::link( $data );
 
 		if ( null === $link || 1 !== (int) $quantity ) {
-			wc_add_notice( __( 'Choose the managed server service for a server in your account.', 'beltoft-services' ), 'error' );
+			wc_add_notice( __( 'Choose the managed service for a server or database in your account.', 'beltoft-services' ), 'error' );
 			return false;
 		}
 
 		if ( 'cart_server' === $link ) {
 			// Bought with the new server of the cart (the checkout box): one line for it.
 			if ( self::in_cart_server() > 0 ) {
-				wc_add_notice( __( 'This server is managed already.', 'beltoft-services' ), 'error' );
+				wc_add_notice( __( 'This server or database is managed already.', 'beltoft-services' ), 'error' );
 				return false;
 			}
 
@@ -142,7 +141,7 @@ final class ManagedCart {
 		}
 
 		if ( ! self::room( Resource::for_license( $link ), self::in_cart( $link ) ) ) {
-			wc_add_notice( __( 'This server is managed already.', 'beltoft-services' ), 'error' );
+			wc_add_notice( __( 'This server or database is managed already.', 'beltoft-services' ), 'error' );
 			return false;
 		}
 
@@ -160,7 +159,7 @@ final class ManagedCart {
 		$link = self::link( $data );
 
 		if ( null === $link ) {
-			throw new \Exception( esc_html__( 'Choose the managed server service for a server in your account first.', 'beltoft-services' ) );
+			throw new \Exception( esc_html__( 'Choose the managed service for a server or database in your account first.', 'beltoft-services' ) );
 		}
 
 		$data['beltoft_services_managed_for'] = $link;
@@ -182,22 +181,22 @@ final class ManagedCart {
 
 			if ( 'cart_server' === $link ) {
 				if ( ! AddonCart::cart_has_parent( self::addon() ) ) {
-					$errors->add( 'managed_server_unavailable', __( 'The server for the managed service is no longer in the order.', 'beltoft-services' ) );
+					$errors->add( 'managed_server_unavailable', __( 'The server or database for the managed service is no longer in the order.', 'beltoft-services' ) );
 				} elseif ( self::in_cart_server() > 1 ) {
-					$errors->add( 'managed_limit', __( 'This server is managed already.', 'beltoft-services' ) );
+					$errors->add( 'managed_limit', __( 'This server or database is managed already.', 'beltoft-services' ) );
 				}
 				continue;
 			}
 
 			if ( ! is_int( $link ) || ! self::owned( $link ) ) {
-				$errors->add( 'managed_server_unavailable', __( 'The server for the managed service is no longer available.', 'beltoft-services' ) );
+				$errors->add( 'managed_server_unavailable', __( 'The server or database for the managed service is no longer available.', 'beltoft-services' ) );
 				continue;
 			}
 
 			$count[ $link ] = (int) ( $count[ $link ] ?? 0 ) + 1;
 
 			if ( $count[ $link ] > 1 || ! self::room( Resource::for_license( $link ) ) ) {
-				$errors->add( 'managed_limit', __( 'This server is managed already.', 'beltoft-services' ) );
+				$errors->add( 'managed_limit', __( 'This server or database is managed already.', 'beltoft-services' ) );
 			}
 		}
 	}

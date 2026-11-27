@@ -232,7 +232,9 @@ final class EmailDetails {
 		}
 		if ( \BeltoftServices\Proxmox\Managed\ManagedDriver::ID === $r->get( 'driver' ) ) {
 			$server = \BeltoftServices\Proxmox\Managed\ManagedMeta::server_of( $r );
-			if ( $server ) {
+			if ( $server && \BeltoftServices\Proxmox\Managed\ManagedMeta::is_database( $server ) ) {
+				$details[ __( 'Database', 'beltoft-services' ) ] = self::server_name( $server );
+			} elseif ( $server ) {
 				$details[ __( 'Server', 'beltoft-services' ) ] = self::server_name( $server );
 			}
 			return $details;

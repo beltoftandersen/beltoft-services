@@ -60,6 +60,18 @@ $beltoft_services_db_wait = array(
 	</dl>
 	<?php if ( '' !== (string) ( $view['limits'] ?? '' ) ) : ?><p class="description"><?php echo esc_html( (string) $view['limits'] ); ?></p><?php endif; ?>
 	<?php if ( '' !== (string) ( $view['cost'] ?? '' ) ) : ?><p class="beltoft-services-cost"><?php echo esc_html( $view['cost'] ); ?></p><?php endif; ?>
+	<?php if ( ! empty( $view['managed'] ) && 'ready' === $view['kind'] && ( $beltoft_services_all || 'overview' === $active ) ) : ?>
+		<div class="beltoft-services-vm__managed">
+			<h4><?php esc_html_e( 'Managed database', 'beltoft-services' ); ?></h4>
+			<?php if ( $view['managed']['active'] ) : ?>
+				<p class="description"><?php esc_html_e( 'This database is managed: backups every night kept for 30 days, and we install updates, answer its alerts and check the backups. Help with your own data and queries is billed per started 15 minutes.', 'beltoft-services' ); ?></p>
+			<?php else : ?>
+				<p class="description"><?php esc_html_e( 'Backups every night kept for 30 days, and we install updates, answer the database\'s alerts and check the backups. Help with your own data and queries is billed per started 15 minutes.', 'beltoft-services' ); ?></p>
+				<?php if ( '' !== $view['managed']['add_price'] ) : ?><p class="description"><?php /* translators: %s: price such as 349 kr. / month */ echo esc_html( sprintf( __( 'Price: %s.', 'beltoft-services' ), $view['managed']['add_price'] ) ); ?></p><?php endif; ?>
+				<p><a class="button woocommerce-button bs-btn" href="<?php echo esc_url( $view['managed']['add_url'] ); ?>"><?php esc_html_e( 'Add managed database', 'beltoft-services' ); ?></a></p>
+			<?php endif; ?>
+		</div>
+	<?php endif; ?>
 
 	<?php if ( $nav && array() !== $view['power']['actions'] ) : ?>
 		<?php // On a page the buttons and the note about billing are in the head. ?>
@@ -303,7 +315,12 @@ $beltoft_services_db_wait = array(
 		<div class="beltoft-services-vm__more beltoft-services-vm__backups">
 			<h4><?php esc_html_e( 'Backups', 'beltoft-services' ); ?></h4>
 			<?php if ( ! $beltoft_services_backups['enabled'] ) : ?>
+				<?php if ( ! empty( $view['managed'] ) && ! $view['managed']['active'] ) : ?>
+					<p><?php esc_html_e( 'Backups are not available for this database. They come with Managed database: every night, kept for 30 days.', 'beltoft-services' ); ?></p>
+					<p><a class="button woocommerce-button bs-btn" href="<?php echo esc_url( $view['managed']['add_url'] ); ?>"><?php esc_html_e( 'Add managed database', 'beltoft-services' ); ?></a></p>
+				<?php else : ?>
 				<p><?php esc_html_e( 'Backups are not available for this database.', 'beltoft-services' ); ?></p>
+				<?php endif; ?>
 			<?php else : ?>
 				<p><?php echo esc_html( sprintf( /* translators: %d: number of days */ _n( 'A backup of the whole database server is taken every night and kept for %d day.', 'A backup of the whole database server is taken every night and kept for %d days.', (int) $beltoft_services_backups['days'], 'beltoft-services' ), (int) $beltoft_services_backups['days'] ) ); ?></p>
 				<?php if ( '' !== $beltoft_services_backups['last_dump'] ) : ?>

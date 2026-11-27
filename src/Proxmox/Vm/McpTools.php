@@ -92,8 +92,8 @@ final class McpTools implements ToolSet {
 			'list_server_plans' => Definitions::read( 'Lists the server plans that can be ordered through Claude, pay as you go: id, name, CPU, memory and disk, price per hour and the max per month (excluding VAT), what daily backups add, the extra disk sizes with their price, the systems and the apps each plan offers. Use it before order_server.', $none, 20 ),
 			'console_link'     => Definitions::read( 'Gives the address of the console page of one server in the customer\'s dashboard. The customer opens it in the browser and logs in there. No console session is made here.', $by_id, 30 ),
 			'reboot'           => Definitions::act( 'Restarts a server. Running programs stop. Ask the customer first. The restart runs in the background.', $by_id, true ),
-			'start'            => Definitions::act( 'Starts a server or a managed database that is stopped. The start runs in the background.', $by_id, false, true ),
-			'shutdown'         => Definitions::act( 'Shuts a server or a managed database down. It stays stopped until it is started, and a stopped service is still billed until it is deleted. A database cannot be reached while it is stopped. Ask the customer first. The shutdown runs in the background.', $by_id, true, true ),
+			'start'            => Definitions::act( 'Starts a server or a database that is stopped. The start runs in the background.', $by_id, false, true ),
+			'shutdown'         => Definitions::act( 'Shuts a server or a database down. It stays stopped until it is started, and a stopped service is still billed until it is deleted. A database cannot be reached while it is stopped. Ask the customer first. The shutdown runs in the background.', $by_id, true, true ),
 			'create_snapshot'  => Definitions::act(
 				'Takes a snapshot of a server, if the customer has a free snapshot slot. It cannot restore or delete one.',
 				Definitions::obj( array( 'id' => $id, 'label' => array( 'type' => 'string', 'maxLength' => 60, 'description' => 'A name for the snapshot. Letters, numbers, spaces, dots, dashes and underscores. Optional.' ) ), array( 'id' ) ),
@@ -110,7 +110,7 @@ final class McpTools implements ToolSet {
 				Definitions::obj( array( 'id' => $id, 'snapshot' => array( 'type' => 'string', 'maxLength' => 20, 'description' => 'The snapshot id, from list_recovery_points.' ) ), array( 'id', 'snapshot' ), true )
 			),
 			'restore_backup'   => Definitions::full(
-				'Restores a server or a managed database from one of its backups. It replaces everything on it with the backup, and it is unavailable while this runs. Get the backup id from list_recovery_points.',
+				'Restores a server or a database from one of its backups. It replaces everything on it with the backup, and it is unavailable while this runs. Get the backup id from list_recovery_points.',
 				Definitions::obj( array( 'id' => $id, 'backup' => array( 'type' => 'string', 'maxLength' => 200, 'description' => 'The backup id, from list_recovery_points.' ) ), array( 'id', 'backup' ), true )
 			),
 			'reinstall_server' => Definitions::full(
