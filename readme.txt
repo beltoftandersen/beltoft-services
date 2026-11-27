@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.66.6
+Stable tag: 0.66.7
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,11 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.66.7 =
+* My Account: one list card for every list (servers, webhotels, domains, e-mail, apps, licences, empty lists, overview, billing), set by --bs-list-* CSS variables.
+* Servers list: no hover text on the usage bars. Subscriptions tab: one usage line with a link to the Pay as you go page. Pay as you go: the amount lines up with its table.
+* The app ready box title uses the type scale.
 
 = 0.66.6 =
 * The "Point your domain" box has a "Check now" button. It looks at the public DNS of the customer's domain at once, with the same code as the recurring check, and hands the name to the install when it points at the server. Limits kept on the server: one check a minute and ten an hour per server; a limited click answers 429 and the button says "You can check again at 14:32". The recurring check keeps its own schedule.
