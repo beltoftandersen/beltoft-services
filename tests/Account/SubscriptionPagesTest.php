@@ -116,9 +116,35 @@ final class SubscriptionPagesTest extends UsageTestCase {
 		$card = UsageView::card();
 		$this->assertStringContainsString( 'Pay as you go', $card );
 		$this->assertStringContainsString( esc_url( $account->get_view_order_url() ), $card );
-		$this->assertStringContainsString( 'View account', $card );
+		$this->assertStringContainsString( 'See usage', $card );
+		$this->assertStringNotContainsString( 'View account', $card );
 		$this->assertStringContainsString( 'aria-label="Pay as you go, Active"', $card );
 		$this->assertStringNotContainsString( 'Usage this month', $card );
+	}
+
+	public function test_the_list_card_is_one_usage_line_and_the_page_keeps_the_table(): void {
+		$user = $this->new_user();
+		wp_set_current_user( $user );
+		$account = $this->usage_account( $user );
+		$v       = $this->usage_product();
+		$r       = $this->usage_vm( $v['u-None'], $user, 5, $account->get_id() );
+		$now     = Ledger::hour( time() );
+		$month   = (int) strtotime( gmdate( 'Y-m-01 00:00:00', $now ) . ' UTC' );
+		$end     = ( $now - $month > 400 * HOUR_IN_SECONDS ? $now : $month - 15 * DAY_IN_SECONDS ) - HOUR_IN_SECONDS;
+		Ledger::record( $r->id(), $user, 'server', 1.0, 'hour', 0.02, $end );
+		Estimate::reset();
+		UsageView::reset();
+
+		$list = UsageView::card();
+		$this->assertStringContainsString( 'This month&#039;s usage:', $list );
+		$this->assertStringContainsString( 'See usage', $list );
+		$this->assertStringNotContainsString( '<table', $list );
+
+		Estimate::reset();
+		UsageView::reset();
+		$page = UsageView::card( false );
+		$this->assertStringContainsString( '<table', $page );
+		$this->assertStringNotContainsString( 'This month&#039;s usage:', $page );
 	}
 
 	public function test_a_deleted_service_in_the_card_has_no_link(): void {

@@ -44,9 +44,15 @@ use BeltoftServices\Usage\Estimate;
 			</div>
 			<?php endif; ?>
 		<div class="beltoft-services-usage__body">
+			<?php
+			// A currency sign can end in a full stop (kr.): the sentence adds its own.
+			$beltoft_services_usage_money = rtrim( Estimate::money( Estimate::shown_total( $estimate ), $estimate['currency'] ), '.' );
+			$beltoft_services_usage_next  = $estimate['next'] > 0 ? wp_date( (string) get_option( 'date_format' ), $estimate['next'] ) : '';
+			$beltoft_services_usage_full  = empty( $view_url );
+			?>
 			<?php if ( empty( $estimate['resources'] ) ) : ?>
 				<p class="beltoft-services-usage__note"><?php esc_html_e( 'No usage so far this month.', 'beltoft-services' ); ?></p>
-			<?php else : ?>
+			<?php elseif ( $beltoft_services_usage_full ) : ?>
 				<table class="beltoft-services-usage__table">
 					<thead>
 						<tr>
@@ -77,6 +83,18 @@ use BeltoftServices\Usage\Estimate;
 						<?php endforeach; ?>
 					</tbody>
 				</table>
+			<?php else : ?>
+				<p class="beltoft-services-usage__note">
+					<?php
+					if ( '' !== $beltoft_services_usage_next ) {
+						/* translators: 1: amount so far this month, 2: date of the next usage invoice. */
+						echo esc_html( sprintf( __( 'This month\'s usage: %1$s. Next invoice %2$s.', 'beltoft-services' ), $beltoft_services_usage_money, $beltoft_services_usage_next ) );
+					} else {
+						/* translators: %s: amount so far this month. */
+						echo esc_html( sprintf( __( 'This month\'s usage: %s.', 'beltoft-services' ), $beltoft_services_usage_money ) );
+					}
+					?>
+				</p>
 			<?php endif; ?>
 			<?php
 			$beltoft_services_usage_parts = array();
@@ -84,16 +102,16 @@ use BeltoftServices\Usage\Estimate;
 				/* translators: %s: amount. */
 				$beltoft_services_usage_parts[] = sprintf( __( 'Account credit %s is used first.', 'beltoft-services' ), Estimate::money( $credit / 100, $estimate['currency'] ) );
 			}
-			if ( $estimate['next'] > 0 ) {
+			if ( $beltoft_services_usage_full && $estimate['next'] > 0 ) {
 				/* translators: %s: date */
-				$beltoft_services_usage_parts[] = sprintf( __( 'Next usage invoice %s.', 'beltoft-services' ), wp_date( (string) get_option( 'date_format' ), $estimate['next'] ) );
+				$beltoft_services_usage_parts[] = sprintf( __( 'Next usage invoice %s.', 'beltoft-services' ), $beltoft_services_usage_next );
 			}
 			?>
 			<?php if ( array() !== $beltoft_services_usage_parts ) : ?>
 				<p class="beltoft-services-usage__note"><?php echo esc_html( implode( ' ', $beltoft_services_usage_parts ) ); ?></p>
 			<?php endif; ?>
-			<?php if ( ! empty( $view_url ) ) : ?>
-				<p class="beltoft-services-usage__note"><a href="<?php echo esc_url( $view_url ); ?>"><?php esc_html_e( 'View account', 'beltoft-services' ); ?> &rsaquo;</a></p>
+			<?php if ( ! $beltoft_services_usage_full ) : ?>
+				<p class="beltoft-services-usage__note"><a href="<?php echo esc_url( $view_url ); ?>"><?php esc_html_e( 'See usage', 'beltoft-services' ); ?> &rsaquo;</a></p>
 			<?php endif; ?>
 		</div>
 	</div>

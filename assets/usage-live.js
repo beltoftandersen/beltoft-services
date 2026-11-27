@@ -35,6 +35,13 @@
 		if ( at < text.length ) { el.appendChild( document.createTextNode( text.slice( at ) ) ); }
 	}
 
+	// The bar draws nothing on hover; its figure is the accessible name of the track.
+	function name( bar, text ) {
+		var track = bar.querySelector( '.beltoft-services-bar__track' );
+		var label = bar.firstElementChild;
+		if ( track && label ) { track.setAttribute( 'aria-label', ( label.textContent + ' ' + text ).trim() ); }
+	}
+
 	function memory( bar, info ) {
 		var fillNode = bar.querySelector( '[data-usage-fill]' );
 		var text = bar.querySelector( '[data-usage-text]' );
@@ -45,11 +52,13 @@
 		if ( 'ok' === state && 'number' === typeof info.percent ) {
 			if ( fillNode ) { fillNode.style.width = Math.max( 0, Math.min( 100, Math.round( info.percent ) ) ) + '%'; }
 			if ( text ) { text.textContent = Math.round( info.percent ) + '%'; }
+			name( bar, Math.round( info.percent ) + '%' );
 			if ( sub ) { hint( sub, '' ); }
 			return;
 		}
 		if ( fillNode ) { fillNode.style.width = '0%'; }
 		if ( text ) { text.textContent = 'no_agent' === state ? '–' : ( 'waiting' === state ? '…' : '' ); }
+		name( bar, '' );
 		if ( sub ) { hint( sub, 'no_agent' === state ? ( strings.hint || '' ) : '' ); }
 	}
 
@@ -67,6 +76,7 @@
 				var text = bar.querySelector( '[data-usage-text]' );
 				if ( fillNode ) { fillNode.style.width = percent + '%'; }
 				if ( text ) { text.textContent = percent + '%'; }
+				name( bar, percent + '%' );
 				bar.hidden = false;
 			} );
 		} );

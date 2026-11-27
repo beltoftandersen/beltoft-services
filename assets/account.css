@@ -690,6 +690,8 @@ a.beltoft-services-ov__who:hover { text-decoration: underline; }
 /* Databases and Apps lists: name and detail, state, one more value (the private host), then an arrow or the Open button. A row with a button is a div, the name is its link. */
 .beltoft-services-servers--area :is(a, div).beltoft-services-srv { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.4fr) auto; }
 .beltoft-services-servers--area div.beltoft-services-srv { display: grid; gap: 12px; align-items: center; color: var(--bs-ink); }
+/* The Pay as you go card on its own page has no arrow, so no third column: the amount ends where the table's Amount column ends (it was 12px short). */
+.beltoft-services-servers--subs.beltoft-services-servers--area div.beltoft-services-srv { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.4fr); }
 .beltoft-services-servers--area a.beltoft-services-srv__name { color: var(--bs-ink) !important; text-decoration: none !important; }
 .beltoft-services-servers--area a.beltoft-services-srv__name:hover, .beltoft-services-servers--area a.beltoft-services-srv__name:focus-visible { text-decoration: underline !important; }
 .beltoft-services-srv__extra { color: var(--bs-muted); font-size: var(--bs-fs-small); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
