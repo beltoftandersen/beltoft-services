@@ -2360,3 +2360,5 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__
 }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-dnsbox p { max-width: none; }
 .beltoft-services-dnsbox .beltoft-services-copy { white-space: nowrap; }
+/* The server page already shows the box above its tabs: the App tab does not print it a second time (it stays for a page without that block). */
+.beltoft-services-panel:has(.beltoft-services-progress__box) .beltoft-services-tab .beltoft-services-dnsbox { display: none; }
