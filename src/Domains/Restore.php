@@ -77,7 +77,7 @@ final class Restore {
 	 * registration of ours, a price is unknown, or a paid restore is still being carried out.
 	 *
 	 * @param Resource $r Domain resource.
-	 * @return array{renewal: float, fee: float, currency: string, total: float}|null
+	 * @return array{renewal: float, fee: float, currency: string, total: float, year_order: int}|null
 	 */
 	public static function offer( Resource $r ): ?array {
 		if ( ! self::enabled() || 'domain' !== $r->get( 'driver' ) || ! $r->is_live() || Stage::EXPIRED !== Stage::of( $r )['stage'] || null !== self::paid_open( $r ) ) {
@@ -93,7 +93,7 @@ final class Restore {
 	 * The two amounts of the order, excluding tax, in the customer's currency: the normal yearly price and the reactivation fee.
 	 *
 	 * @param Resource $r Domain resource.
-	 * @return array{renewal: float, fee: float, currency: string, total: float}|null
+	 * @return array{renewal: float, fee: float, currency: string, total: float, year_order: int}|null
 	 */
 	public static function amounts( Resource $r ): ?array {
 		$domain   = (string) $r->get( 'domain' );
@@ -112,12 +112,28 @@ final class Restore {
 			return null;
 		}
 
+		// A renewal paid after the expiry counts toward the restore: the customer pays the year once.
+		$year    = self::year_paid( $r );
+		$renewal = null === $year ? (float) $price : 0.0;
+
 		return array(
-			'renewal'  => (float) $price,
-			'fee'      => $fee,
-			'currency' => $currency,
-			'total'    => round( (float) $price + $fee, 2 ),
+			'renewal'    => $renewal,
+			'fee'        => $fee,
+			'currency'   => $currency,
+			'total'      => round( $renewal + $fee, 2 ),
+			'year_order' => null === $year ? 0 : $year,
 		);
+	}
+
+	/**
+	 * The late renewal order whose year counts toward the restore of the domain's current expiry, or null.
+	 *
+	 * @param Resource $r Domain resource.
+	 */
+	public static function year_paid( Resource $r ): ?int {
+		$paid = $r->get( 'restore_year_paid' );
+
+		return is_array( $paid ) && (int) ( $paid['order'] ?? 0 ) > 0 && (string) ( $paid['baseline'] ?? '' ) === (string) $r->get( 'expires_at' ) ? (int) $paid['order'] : null;
 	}
 
 	/**
@@ -236,7 +252,7 @@ final class Restore {
 
 		$domain   = (string) $r->get( 'domain' );
 		$baseline = (string) $r->get( 'expires_at' );
-		$problem  = SpendGuard::problem_restore_amounts( $domain, $amounts['renewal'] + $amounts['fee'], $amounts['currency'] );
+		$problem  = SpendGuard::problem_restore_amounts( $domain, $amounts['renewal'] + $amounts['fee'], $amounts['currency'], $amounts['year_order'] > 0 );
 
 		if ( null !== $problem ) {
 			Alerts::admin( $r, $problem . ' No restore order was made for ' . $domain . '.' );
@@ -249,7 +265,7 @@ final class Restore {
 		if ( $earlier instanceof \WC_Order && ! $earlier->is_paid() && $earlier->has_status( array( 'pending', 'failed' ) ) ) {
 			$meta = $earlier->get_meta( self::ORDER_META );
 
-			if ( is_array( $meta ) && (string) ( $meta['baseline'] ?? '' ) === $baseline && abs( (float) ( $meta['renewal'] ?? 0 ) - $amounts['renewal'] ) < 0.005 && abs( (float) ( $meta['fee'] ?? 0 ) - $amounts['fee'] ) < 0.005 && (string) ( $meta['currency'] ?? '' ) === $amounts['currency'] ) {
+			if ( is_array( $meta ) && (string) ( $meta['baseline'] ?? '' ) === $baseline && abs( (float) ( $meta['renewal'] ?? 0 ) - $amounts['renewal'] ) < 0.005 && abs( (float) ( $meta['fee'] ?? 0 ) - $amounts['fee'] ) < 0.005 && (int) ( $meta['year_order'] ?? 0 ) === $amounts['year_order'] && (string) ( $meta['currency'] ?? '' ) === $amounts['currency'] ) {
 				return $earlier;
 			}
 
@@ -273,13 +289,12 @@ final class Restore {
 		$product   = Cart::domain_product();
 		$tax_class = $product ? $product->get_tax_class() : '';
 		$shown     = HostName::display( $domain );
-		$lines     = array(
-			'renewal' => array(
-				/* translators: %s: domain name. */
-				sprintf( __( 'Renewal of %s for one year', 'beltoft-services' ), $shown ),
-				$amounts['renewal'],
-			),
-		);
+		$lines     = array();
+
+		if ( $amounts['renewal'] > 0.0 ) {
+			/* translators: %s: domain name. */
+			$lines['renewal'] = array( sprintf( __( 'Renewal of %s for one year', 'beltoft-services' ), $shown ), $amounts['renewal'] );
+		}
 
 		if ( $amounts['fee'] > 0.0 ) {
 			/* translators: %s: domain name. */
@@ -306,6 +321,7 @@ final class Restore {
 				'renewal'   => $amounts['renewal'],
 				'fee'       => $amounts['fee'],
 				'currency'  => $amounts['currency'],
+				'year_order' => $amounts['year_order'],
 			)
 		);
 		$order->calculate_totals( true );
@@ -405,26 +421,42 @@ final class Restore {
 	}
 
 	/**
-	 * A paid NORMAL renewal order that arrives after the expiry (plan finding 9). It paid the renewal only, not the reactivation fee, and the
-	 * registrar's restore is a separate, dearer purchase, so nothing is bought on it: no registrar call, one staff alert with the order, and the
-	 * job stops (it does not retry the renew every hour). Staff either refund it or ask the customer to pay the restore order. Chosen over
-	 * restoring automatically because that would spend the restore cost on money the customer never agreed to pay.
+	 * A paid NORMAL renewal order that arrives after the expiry (plan finding 9). The registrar's restore is a separate, dearer purchase, so
+	 * nothing is bought on it. Owner decision 2026-11-27: the customer never pays the year twice, so this order is recorded as the paid year of
+	 * the restore of this expiry (meta restore_year_paid). The restore order then has the reactivation fee alone, and the restore job counts
+	 * this order as the year. An unpaid two-line restore order is cancelled so the customer is offered the fee-only one. When a two-line
+	 * restore order is already paid, or another late renewal already counts, this order buys nothing and staff are told to refund it (the only
+	 * refund case left).
 	 *
 	 * @param Resource  $r        Domain.
 	 * @param \WC_Order $order    The paid renewal order.
 	 * @param string    $order_id Its id.
 	 */
 	public static function late_renewal( Resource $r, \WC_Order $order, string $order_id ): StepResult {
-		$domain = (string) $r->get( 'domain' );
+		$domain   = (string) $r->get( 'domain' );
+		$baseline = (string) $r->get( 'expires_at' );
+		$counted  = self::year_paid( $r );
+		$refund   = null !== self::paid_open( $r ) || ( null !== $counted && (string) $counted !== $order_id );
+
+		if ( ! $refund && (string) $counted !== $order_id ) {
+			$r->set( array( 'restore_year_paid' => array( 'order' => (int) $order_id, 'baseline' => $baseline ) ) );
+			$earlier = (int) $r->get( 'restore_order' ) > 0 ? wc_get_order( (int) $r->get( 'restore_order' ) ) : false;
+
+			if ( $earlier instanceof \WC_Order && ! $earlier->is_paid() && $earlier->has_status( array( 'pending', 'failed' ) ) ) {
+				$earlier->update_status( 'cancelled', __( 'Replaced: a renewal paid after the expiry now counts toward the restore.', 'beltoft-services' ) );
+			}
+		}
 
 		Alerts::notify(
-			'Paid renewal arrived after the domain expired: ' . $domain,
+			( $refund ? 'Paid renewal after expiry buys nothing, refund it: ' : 'Paid renewal after expiry counted toward the restore: ' ) . $domain,
 			array(
 				sprintf( 'Domain: %s', $domain ),
 				sprintf( 'Renewal order: %s (paid)', $order_id ),
 				sprintf( 'Paid: %s %s', (string) $order->get_total(), (string) $order->get_currency() ),
-				'The registrar has already expired this domain, and a restore costs more than a renewal. Nothing was bought at the registrar.',
-				'Either refund the order, or ask the customer to pay the restore order on the domain page (renewal plus reactivation fee).',
+				'The registrar has already expired this domain. Nothing was bought at the registrar on this order.',
+				$refund
+					? 'A restore order with the renewal year is already paid (or another late renewal already counts), so this order buys nothing. Refund it.'
+					: 'It was counted toward the restore: the customer now only pays the reactivation fee on the domain page, and the restore job uses this order as the paid year.',
 			),
 			$r,
 			'beltoft_services_late_renewal_' . $r->id() . '_' . $order_id,
@@ -434,7 +466,9 @@ final class Restore {
 		return StepResult::fail(
 			'The renewal was paid after the domain expired. Nothing was bought at the registrar.',
 			array(
-				Jobs::TEXT     => 'Your payment is received, but the domain had already expired. Restoring it costs more than a renewal. We have been told and will contact you.',
+				Jobs::TEXT     => $refund
+					? 'Your payment is received, but the domain had already expired and this payment is not needed. We have been told and will refund it.'
+					: 'Your payment is received and counts toward restoring the domain. To restore it, pay the reactivation fee on your domain page.',
 				Jobs::EXPECTED => true,
 			)
 		);
@@ -477,6 +511,17 @@ final class Restore {
 
 		if ( in_array( $order_id, $done, true ) ) {
 			return StepResult::done();
+		}
+
+		// A fee-only order counts on a late renewal order for the year: that order must be paid.
+		$year = (int) ( $meta['year_order'] ?? 0 );
+
+		if ( $year > 0 ) {
+			$year_order = wc_get_order( $year );
+
+			if ( ! $year_order instanceof \WC_Order || ! $year_order->is_paid() ) {
+				return StepResult::fail( 'The renewal order that paid the year of this restore is not paid.' );
+			}
 		}
 
 		if ( str_ends_with( strtolower( $domain ), '.dk' ) ) {
@@ -665,6 +710,15 @@ final class Restore {
 		}
 
 		$done[] = $order_id;
+		$year   = (int) ( $order->get_meta( self::ORDER_META )['year_order'] ?? 0 );
+
+		// The late renewal order that paid the year is finished with the restore: its own renew job must not buy a year again.
+		if ( $year > 0 ) {
+			$renewed   = array_map( 'strval', (array) $r->get( 'renewed_orders' ) );
+			$renewed[] = (string) $year;
+			$r->set( array( 'renewed_orders' => array_values( array_unique( $renewed ) ) ) );
+		}
+
 		unset( $started[ $order_id ], $posted[ $order_id ], $renew_started[ $order_id ] );
 		$order->update_meta_data( '_beltoft_services_restore_done', time() );
 		$order->add_order_note( sprintf( 'The domain %s was restored. It is registered until %s.', $domain, $expiry ) );

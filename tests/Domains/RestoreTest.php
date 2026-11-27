@@ -679,7 +679,7 @@ class RestoreTest extends TestCase {
 		$this->assertTrue( $result->is_failed(), 'It stops, it does not retry the renew every hour.' );
 		$this->assertCount( 0, $this->calls( $fake, 'POST' ) );
 		$this->assertTrue( (bool) ( $result->meta()[ Jobs::EXPECTED ] ?? false ) );
-		$this->assertStringContainsString( 'Paid renewal arrived after the domain expired', $this->staff_text() );
+		$this->assertStringContainsString( 'counted toward the restore', $this->staff_text() );
 		$this->assertStringContainsString( 'Renewal order: ' . $order->get_id(), $this->staff_text() );
 		$this->assert_no_delete( $fake );
 	}
@@ -705,6 +705,136 @@ class RestoreTest extends TestCase {
 		$result = Renewals::renew( $r, (string) $order->get_id() );
 		$this->assertTrue( $result->is_retry() );
 		$this->assertCount( 1, $this->calls( $fake, 'POST' ) );
+	}
+
+	/** A paid normal renewal order on the subscription of an expired domain. */
+	private function late_order( Resource $r ): \WC_Order {
+		$product = $this->service_product( 'domain' );
+		$sub     = \BeltoftServices\Domains\Stage::subscription( $r );
+		$sub->add_product( $product, 1 );
+		$sub->save();
+		$order = wcs_create_renewal_order( $sub );
+		$order->set_currency( 'EUR' );
+		$order->remove_order_items( 'line_item' );
+		$order->add_product( $product, 1, array( 'subtotal' => 13, 'total' => 13 ) );
+		$order->set_status( 'processing' );
+		$order->save();
+
+		return $order;
+	}
+
+	private function late_run( Resource $r, \WC_Order $order ): \BeltoftServices\Drivers\StepResult {
+		$fake = $this->fake();
+		$fake->reply( 'GET', '/domains/777', array( 'status' => 'ACT', 'renewal_date' => (string) $r->get( 'expires_at' ) ) );
+
+		return Renewals::renew( Resource::find( $r->id() ), (string) $order->get_id() );
+	}
+
+	public function test_a_late_renewal_counts_toward_the_restore_and_the_order_is_the_fee_alone(): void {
+		$r      = $this->expired();
+		$order  = $this->late_order( $r );
+		$result = $this->late_run( $r, $order );
+		$this->assertTrue( $result->is_failed() );
+		$r = Resource::find( $r->id() );
+		$this->assertSame( $order->get_id(), Restore::year_paid( $r ) );
+		$this->assertStringContainsString( 'counted toward the restore', $this->staff_text() );
+		$offer = Restore::offer( $r );
+		$this->assertSame( 0.0, $offer['renewal'] );
+		$this->assertSame( 56.0, $offer['total'], 'The fee alone.' );
+		$restore = Restore::create_order( $r, $this->user );
+		$this->assertCount( 1, $restore->get_items( 'fee' ) );
+		$this->assertSame( 56.0, (float) $restore->get_total() );
+		$this->assertSame( $order->get_id(), $restore->get_meta( Restore::ORDER_META )['year_order'] );
+		ob_start();
+		UnpaidView::overview( $r, array( 'dns_only' => false ) );
+		$html = (string) ob_get_clean();
+		$this->assertStringContainsString( 'Your renewal payment is received and counts toward restoring the domain. To restore it you only pay the reactivation fee of', $html );
+		$this->assertStringNotContainsString( 'Restoring costs the renewal plus', $html );
+	}
+
+	public function test_a_late_renewal_cancels_an_unpaid_two_line_order(): void {
+		$r     = $this->expired();
+		$two   = Restore::create_order( $r, $this->user );
+		$this->assertCount( 2, $two->get_items( 'fee' ) );
+		$this->late_run( $r, $this->late_order( $r ) );
+		$this->assertSame( 'cancelled', wc_get_order( $two->get_id() )->get_status() );
+		$one = Restore::create_order( Resource::find( $r->id() ), $this->user );
+		$this->assertNotSame( $two->get_id(), $one->get_id() );
+		$this->assertCount( 1, $one->get_items( 'fee' ) );
+	}
+
+	public function test_a_late_renewal_after_a_paid_two_line_restore_buys_nothing_and_staff_refund_it(): void {
+		$r = $this->expired();
+		$this->paid_order( $r );
+		$order = $this->late_order( Resource::find( $r->id() ) );
+		$this->late_run( Resource::find( $r->id() ), $order );
+		$this->assertNull( Restore::year_paid( Resource::find( $r->id() ) ) );
+		$this->assertStringContainsString( 'refund it', $this->staff_text() );
+	}
+
+	public function test_a_second_late_renewal_is_refunded_not_counted(): void {
+		$r     = $this->expired();
+		$first = $this->late_order( $r );
+		$this->late_run( $r, $first );
+		$second = $this->late_order( Resource::find( $r->id() ) );
+		$this->late_run( Resource::find( $r->id() ), $second );
+		$this->assertSame( $first->get_id(), Restore::year_paid( Resource::find( $r->id() ) ) );
+		$this->assertStringContainsString( 'refund it', $this->staff_text() );
+	}
+
+	public function test_the_guard_checks_the_fee_against_the_restore_cost_only_when_the_year_is_paid(): void {
+		$this->assertNull( \BeltoftServices\Domains\SpendGuard::problem_restore_amounts( 'a.com', 43.08, 'EUR', true ) );
+		$this->assertNotNull( \BeltoftServices\Domains\SpendGuard::problem_restore_amounts( 'a.com', 43.08, 'EUR', false ) );
+		$this->assertNotNull( \BeltoftServices\Domains\SpendGuard::problem_restore_amounts( 'a.com', 40.0, 'EUR', true ) );
+	}
+
+	public function test_a_fee_only_restore_finishes_and_counts_the_late_renewal_order_as_done(): void {
+		$r        = $this->expired();
+		$baseline = (string) $r->get( 'expires_at' );
+		$late     = $this->late_order( $r );
+		$this->late_run( $r, $late );
+		$order = $this->paid_order( Resource::find( $r->id() ) );
+		$fake  = $this->fake();
+		$next  = gmdate( 'Y-m-d H:i:s', strtotime( $baseline . ' UTC +1 year' ) );
+		$fake->reply( 'GET', '/domains/777', $this->domain_reply( $baseline, 'DEL' ) );
+		$fake->reply( 'POST', '/domains/777/restore', array( 'success' => true ) );
+		$fake->reply( 'GET', '/domains/777', $this->domain_reply( $next ) );
+		$result = Restore::run( Resource::find( $r->id() ), (string) $order->get_id() );
+		$this->assertTrue( $result->is_done(), (string) $result->error() );
+		$this->assertContains( (string) $late->get_id(), array_map( 'strval', (array) Resource::find( $r->id() )->get( 'renewed_orders' ) ) );
+		$this->assertTrue( Renewals::renew( Resource::find( $r->id() ), (string) $late->get_id() )->is_done(), 'The late order does not buy a year again.' );
+	}
+
+	public function test_a_fee_only_restore_waits_for_a_year_order_that_is_not_paid(): void {
+		$r    = $this->expired();
+		$late = $this->late_order( $r );
+		$this->late_run( $r, $late );
+		$order = $this->paid_order( Resource::find( $r->id() ) );
+		$late->set_status( 'refunded' );
+		$late->save();
+		$fake = $this->fake();
+		$this->assertTrue( Restore::run( Resource::find( $r->id() ), (string) $order->get_id() )->is_failed() );
+		$this->assertSame( array(), $fake->calls() );
+	}
+
+	public function test_the_button_shows_with_the_notices_off(): void {
+		$this->settings( array( 'domain_unpaid_notices' => 0 ) );
+		$r = $this->expired();
+		ob_start();
+		UnpaidView::overview( $r, array( 'dns_only' => false ) );
+		$html = (string) ob_get_clean();
+		$this->assertStringContainsString( 'Restore domain', $html );
+		$this->assertStringContainsString( 'This domain expired on', $html );
+		$this->assertStringContainsString( 'reactivation fee of', $html );
+		$this->settings( array( 'domain_restore_enabled' => 0 ) );
+		ob_start();
+		UnpaidView::overview( $r, array( 'dns_only' => false ) );
+		$this->assertSame( '', (string) ob_get_clean(), 'Both off: nothing.' );
+		$this->settings( array( 'domain_restore_enabled' => 1 ) );
+		$due = $this->expired( 'due2-example.com', gmdate( 'Y-m-d H:i:s', time() + 10 * DAY_IN_SECONDS ) );
+		ob_start();
+		UnpaidView::overview( $due, array( 'dns_only' => false ) );
+		$this->assertSame( '', (string) ob_get_clean(), 'A domain that is not expired shows nothing with the notices off.' );
 	}
 
 	public function test_the_fake_registrar_model_restores_a_domain(): void {

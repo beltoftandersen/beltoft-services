@@ -49,13 +49,13 @@ final class Unpaid {
 			'type'    => 'checkbox',
 			'default' => 0,
 			'label'   => __( 'Notices for domains whose renewal is not paid', 'beltoft-services' ),
-			'desc'    => __( 'On: a domain whose renewal could not be paid gets a plain email that says it still works until its expiry date (not "paused"), a reminder a week before, and after the expiry the notices about restoring it and when that ends. The domain page shows the renewal state, the restore period and the reactivation fee. Off: the generic paused email, as before. Staff alerts are sent either way.', 'beltoft-services' ),
+			'desc'    => __( 'On: a domain whose renewal could not be paid gets a plain email that says it still works until its expiry date (not "paused"), a reminder a week before, and after the expiry the notices about restoring it and when that ends. The domain page shows the renewal state, the restore period and the reactivation fee (an expired domain shows its restore price and button with the restore setting below, even with this off). Off: the generic paused email, as before. Staff alerts are sent either way.', 'beltoft-services' ),
 		);
 		$fields[ Restore::SETTING ]                  = $base + array(
 			'type'    => 'checkbox',
 			'default' => 0,
 			'label'   => __( 'Let customers restore an expired domain', 'beltoft-services' ),
-			'desc'    => __( 'On: the domain page of an expired domain has a Restore domain button. It makes one order with the renewal of one year and the reactivation fee, and when the order is paid the domain is restored at the registrar (.dk: our staff are told to restore it by hand). The fee is always charged, because it is not known whether the registrar restores free. A normal renewal that is paid after the expiry buys nothing and tells our staff. Off: the page says to contact us. Needs the notices setting above to show anything to the customer.', 'beltoft-services' ),
+			'desc'    => __( 'On: the domain page of an expired domain has a Restore domain button. It makes one order with the renewal of one year and the reactivation fee, and when the order is paid the domain is restored at the registrar (.dk: our staff are told to restore it by hand). The fee is always charged, because it is not known whether the registrar restores free. A normal renewal that is paid after the expiry buys nothing at the registrar and tells our staff. A renewal that is paid after the expiry counts toward the restore, so the customer only pays the fee then. The button and the restore price show on an expired domain whether or not the notices setting is on. Off: the page says to contact us.', 'beltoft-services' ),
 		);
 		$fields[ ReactivationFee::MARKUP_SETTING ] = $base + array(
 			'type'    => 'number',

@@ -30,6 +30,11 @@ final class UnpaidView {
 			return $out;
 		}
 
+		// With the notices off the page says nothing about renewals, only what an expired domain needs to be restored (when restoring is on).
+		if ( ! Notices::enabled() && ( ! Restore::enabled() || Stage::EXPIRED !== $stage['stage'] ) ) {
+			return $out;
+		}
+
 		$date     = wp_date( ServiceEmail::DATE, (int) $stage['expiry'] );
 		$deadline = null === $stage['window_end'] ? '' : wp_date( ServiceEmail::DATE, (int) $stage['window_end'] );
 		$terms    = ReactivationFee::terms( $domain );
@@ -49,7 +54,12 @@ final class UnpaidView {
 				$out['lines'][] = sprintf( __( 'You can restore it until %s.', 'beltoft-services' ), $deadline );
 			}
 
-			if ( null !== $fee ) {
+			$paid_year = Restore::year_paid( $r );
+
+			if ( null !== $paid_year && Restore::enabled() && null !== $fee ) {
+				/* translators: %s: reactivation fee, with "including VAT" or "excluding VAT". */
+				$out['lines'][] = sprintf( __( 'Your renewal payment is received and counts toward restoring the domain. To restore it you only pay the reactivation fee of %s.', 'beltoft-services' ), ReactivationFee::text( $fee, $currency, $domain ) . ', ' . self::vat() );
+			} elseif ( null !== $fee ) {
 				$out['lines'][] = $fee > 0.0
 					/* translators: 1: reactivation fee, 2: "including VAT" or "excluding VAT". */
 					? sprintf( __( 'Restoring costs the renewal plus a reactivation fee of %1$s, %2$s.', 'beltoft-services' ), ReactivationFee::text( $fee, $currency, $domain ), self::vat() )
@@ -120,7 +130,7 @@ final class UnpaidView {
 	 * @param mixed $d Page values.
 	 */
 	public static function overview( $r, $d = array() ): void {
-		if ( ! $r instanceof Resource || ! Notices::enabled() || 'domain' !== $r->get( 'driver' ) || ( is_array( $d ) && ! empty( $d['dns_only'] ) ) ) {
+		if ( ! $r instanceof Resource || ( ! Notices::enabled() && ! Restore::enabled() ) || 'domain' !== $r->get( 'driver' ) || ( is_array( $d ) && ! empty( $d['dns_only'] ) ) ) {
 			return;
 		}
 

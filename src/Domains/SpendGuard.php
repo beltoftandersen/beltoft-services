@@ -157,10 +157,12 @@ final class SpendGuard {
 	 * @param string $name     Full domain name.
 	 * @param float  $paid     Renewal line plus reactivation fee, excluding tax, in $currency.
 	 * @param string $currency Currency code of the amount.
+	 * @param bool   $year_paid The year was paid by a late renewal order, so $paid is the reactivation fee alone.
 	 * @return string|null Why not, or null when it is covered.
 	 */
-	public static function problem_restore_amounts( string $name, float $paid, string $currency ): ?string {
-		$renew   = Prices::cost( $name, 'renew' );
+	public static function problem_restore_amounts( string $name, float $paid, string $currency, bool $year_paid = false ): ?string {
+		// A renewal paid late counts toward the restore: that order's own guard covered the year, so only the restore cost is checked here.
+		$renew   = $year_paid ? 0.0 : Prices::cost( $name, 'renew' );
 		$restore = ReactivationFee::cost( $name );
 
 		if ( null === $renew || null === $restore ) { return 'The registrar cost to restore this domain is unknown.'; }
@@ -187,7 +189,9 @@ final class SpendGuard {
 			if ( '' !== (string) $item->get_meta( Restore::LINE_META, true ) ) { $paid += (float) $item->get_total(); }
 		}
 
-		return self::problem_restore_amounts( $name, $paid, (string) $order->get_currency() );
+		$meta = $order->get_meta( Restore::ORDER_META );
+
+		return self::problem_restore_amounts( $name, $paid, (string) $order->get_currency(), is_array( $meta ) && (int) ( $meta['year_order'] ?? 0 ) > 0 );
 	}
 
 	/** A failing step result and one admin alert, or null when the paid restore order covers the cost. */
