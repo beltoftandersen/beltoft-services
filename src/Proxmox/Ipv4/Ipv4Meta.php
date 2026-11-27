@@ -164,7 +164,16 @@ final class Ipv4Meta {
 	}
 
 	/**
-	 * How many addresses a parent may have through the add-on: one for a database, `ipv4_max_extra` for a server (default 16).
+	 * The most extra addresses a server may have: the setting `ipv4_max_extra`, which the filter may change.
+	 *
+	 * @param Resource|null $parent The server, or null in the checkout.
+	 */
+	public static function max_extra( ?Resource $parent = null ): int {
+		return max( 1, (int) apply_filters( 'beltoft_services_ipv4_max_per_server', max( 1, (int) \BeltoftServices\Settings::get( 'ipv4_max_extra' ) ), $parent ) );
+	}
+
+	/**
+	 * How many addresses a parent may have through the add-on: one for a database, the setting `ipv4_max_extra` for a server (default 10, through the filter below).
 	 *
 	 * @param Resource $parent Server or database.
 	 */
@@ -173,7 +182,7 @@ final class Ipv4Meta {
 			return 1;
 		}
 
-		return max( 1, (int) apply_filters( 'beltoft_services_ipv4_max_per_server', 16, $parent ) );
+		return self::max_extra( $parent );
 	}
 
 	/**

@@ -60,6 +60,7 @@ final class ProxmoxSettings {
 		'snapshot_reserve_gb' => array( 0, 10000 ),
 		'ip_reserve_for_vps' => array( 0, 100 ),
 		'ipv4_low_mark'    => array( 0, 1000 ),
+		'ipv4_max_extra'   => array( 1, 64 ),
 		'db_disk_max_gb'   => array( 1, 65536 ),
 		'db_disk_step_gb'  => array( 1, 1000 ),
 	);
@@ -258,6 +259,13 @@ final class ProxmoxSettings {
 			'min'     => self::RANGES['ipv4_low_mark'][0],
 			'label'   => __( 'Warn when this many IPv4 addresses are free', 'beltoft-services' ),
 			'desc'    => __( 'A mail is sent when the free addresses fall to this number, and another when none is left. At most one mail a day for each reason.', 'beltoft-services' ),
+		);
+		$fields['ipv4_max_extra'] = $base + array(
+			'type'    => 'number',
+			'default' => 10,
+			'min'     => self::RANGES['ipv4_max_extra'][0],
+			'label'   => __( 'Most extra IPv4 addresses per server', 'beltoft-services' ),
+			'desc'    => __( 'The most extra IPv4 addresses a dedicated server can have through the add-on, in the checkout and in My Account. The checkout offers 0 up to this number. A database always has one.', 'beltoft-services' ),
 		);
 		$fields['ipv6_test_url'] = $base + array(
 			'type'    => 'url',

@@ -1,5 +1,5 @@
 /**
- * Checkout: the "IPv4 address" line puts that many address lines in the cart (a number for a dedicated server, a box for a
+ * Checkout: the "IPv4 address" line puts that many address lines in the cart (a dropdown (0 up to the limit) for a dedicated server, a box for a
  * VPS Basic or a database), then asks WooCommerce to refresh the order review. A fixed message is shown when it fails.
  */
 ( function ( $ ) {
@@ -24,7 +24,14 @@
 			dataType: 'json',
 			data: { nonce: field.data( 'nonce' ), count: count }
 		} ).done( function ( answer ) {
-			field.data( 'was', answer && typeof answer.count === 'number' ? answer.count : count );
+			var now = answer && typeof answer.count === 'number' ? answer.count : count;
+
+			field.data( 'was', now );
+
+			// The server may have given fewer than asked (pool, limit): the select shows what the cart holds.
+			if ( ! field.is( ':checkbox' ) ) {
+				field.val( String( now ) );
+			}
 			$( document.body ).trigger( 'update_checkout' );
 		} ).fail( function () {
 			if ( field.is( ':checkbox' ) ) {
