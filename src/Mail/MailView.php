@@ -314,6 +314,7 @@ final class MailView {
 
 				if ( 'mx_second' === $row['code'] ) {
 					$note  = '';
+					/* translators: %s: another mail server with its priority, such as 5 mx.example.com. */
 					$wrong = __( 'Another mail server has the same or a better priority: %s. Remove it.', 'beltoft-services' );
 				}
 			}
