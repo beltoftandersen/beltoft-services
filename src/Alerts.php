@@ -359,81 +359,93 @@ final class Alerts {
 	}
 
 	/**
-	 * Alerts the admin that a mail domain that was on our name servers is not any more (the zone was deleted or the name
-	 * servers were moved). The daily look has read its records again; the line says whether sending is held. Once per
-	 * domain and day.
+	 * Alerts the admin that a watched domain that was on our name servers is not any more (the zone was deleted or the name servers
+	 * were moved). The daily look has read its records again. Once per domain and day. The feature adds its own lines.
 	 *
-	 * @param Resource $r    Mail resource.
-	 * @param string   $host Mail domain.
-	 * @param bool     $held Whether the records were not found and sending is held.
+	 * @param Resource $r       Resource.
+	 * @param string   $label   The feature's word, such as Mail.
+	 * @param string   $host    Domain.
+	 * @param bool     $lost    Whether needed records were not found at the new DNS.
+	 * @param string   $feature Feature id (part of the dedupe key).
+	 * @param string[] $extra   Lines of the feature.
 	 * @return bool Whether a mail was sent.
 	 */
-	public static function mail_domain_left( Resource $r, string $host, bool $held ): bool {
+	public static function dns_watch_left( Resource $r, string $label, string $host, bool $lost, string $feature, array $extra = array() ): bool {
 		$license = $r->license();
 
 		return self::notify(
-			sprintf( 'Mail domain left our name servers: %s', $host ),
-			array(
-				sprintf( 'Domain: %s', $host ),
-				sprintf( 'Mail resource: %d', $r->id() ),
-				sprintf( 'Customer: %d', (int) ( $license['user_id'] ?? 0 ) ),
-				$held ? 'Its SPF or DKIM record was not found elsewhere: sending is held and the customer was emailed.' : 'Its records were found at the new DNS: sending is not held.',
+			sprintf( '%s domain left our name servers: %s', $label, $host ),
+			array_merge(
+				array(
+					sprintf( 'Domain: %s', $host ),
+					sprintf( '%s resource: %d', $label, $r->id() ),
+					sprintf( 'Customer: %d', (int) ( $license['user_id'] ?? 0 ) ),
+				),
+				$extra
 			),
 			$r,
-			'beltoft_services_mail_left_' . md5( strtolower( $host ) )
+			'beltoft_services_' . $feature . '_left_' . md5( strtolower( $host ) )
 		);
 	}
 
 	/**
-	 * Alerts the admin that an email domain lost DNS records that were found before. At most once per throttle time per domain
-	 * (setting mail_dns_admin_throttle_days). Nothing is paused or deleted because of it.
+	 * Alerts the admin that a watched domain lost DNS records that were found before. At most once per throttle time per domain
+	 * (setting dns_watch_admin_throttle_days). Nothing is paused or deleted because of it.
 	 *
-	 * @param Resource           $r      Mail resource.
-	 * @param string             $host   Domain.
-	 * @param array<int, string> $keys   Keys of the lost records (mx, spf, dkim).
-	 * @param int                $ttl    Seconds before another alert about the domain may go out.
+	 * @param Resource           $r       Resource.
+	 * @param string             $label   The feature's word, such as Mail.
+	 * @param string             $host    Domain.
+	 * @param array<int, string> $keys    Keys of the lost records.
+	 * @param int                $ttl     Seconds before another alert about the domain may go out.
+	 * @param string             $feature Feature id (part of the dedupe key).
+	 * @param string[]           $extra   Lines of the feature.
 	 */
-	public static function mail_domain_lost( Resource $r, string $host, array $keys, int $ttl = WEEK_IN_SECONDS ): bool {
+	public static function dns_watch_lost( Resource $r, string $label, string $host, array $keys, int $ttl, string $feature, array $extra = array() ): bool {
 		$license = $r->license();
-		$moved   = (int) $r->get( 'mail_dns_moved' ) > 0;
-		$held    = 'held' === (string) $r->get( 'mail_hold' );
 
 		return self::notify(
-			sprintf( 'Mail domain lost DNS records: %s', $host ),
-			array(
-				sprintf( 'Domain: %s', $host ),
-				sprintf( 'Mail resource: %d', $r->id() ),
-				sprintf( 'Customer: %d', (int) ( $license['user_id'] ?? 0 ) ),
-				sprintf( 'Lost: %s', strtoupper( implode( ', ', array_map( 'strval', $keys ) ) ) ),
-				$moved ? 'The name servers no longer point to us.' : 'The records are not found at the DNS of the domain.',
-				$held ? 'Sending is held (SPF or DKIM). The customer was emailed.' : 'Sending is not held. The customer was emailed.',
+			sprintf( '%s domain lost DNS records: %s', $label, $host ),
+			array_merge(
+				array(
+					sprintf( 'Domain: %s', $host ),
+					sprintf( '%s resource: %d', $label, $r->id() ),
+					sprintf( 'Customer: %d', (int) ( $license['user_id'] ?? 0 ) ),
+					sprintf( 'Lost: %s', strtoupper( implode( ', ', array_map( 'strval', $keys ) ) ) ),
+				),
+				$extra
 			),
 			$r,
-			'beltoft_services_mail_lost_' . md5( strtolower( $host ) ),
+			'beltoft_services_' . $feature . '_lost_' . md5( strtolower( $host ) ),
 			array( 'ttl' => max( HOUR_IN_SECONDS, $ttl ) )
 		);
 	}
 
 	/**
-	 * Alerts the admin that an email domain has had no email DNS for a long time (once). No automatic action follows.
+	 * Alerts the admin that a watched domain has had no DNS records for a long time (once). No automatic action follows.
 	 *
-	 * @param Resource $r    Mail resource.
-	 * @param string   $host Domain.
-	 * @param int      $days Days without records.
+	 * @param Resource $r       Resource.
+	 * @param string   $label   The feature's word, such as Mail.
+	 * @param string   $host    Domain.
+	 * @param int      $days    Days without records.
+	 * @param string   $feature Feature id (part of the dedupe key).
+	 * @param string[] $extra   Lines of the feature.
+	 * @param string   $noun    What is missing, in words: "email DNS".
 	 */
-	public static function mail_domain_no_dns( Resource $r, string $host, int $days ): bool {
+	public static function dns_watch_no_dns( Resource $r, string $label, string $host, int $days, string $feature, array $extra = array(), string $noun = 'DNS records' ): bool {
 		$license = $r->license();
 
 		return self::notify(
-			sprintf( 'Mail domain has had no email DNS for %d days: %s', $days, $host ),
-			array(
-				sprintf( 'Domain: %s', $host ),
-				sprintf( 'Mail resource: %d', $r->id() ),
-				sprintf( 'Customer: %d', (int) ( $license['user_id'] ?? 0 ) ),
-				'The records are still not found. Mailboxes and mail are kept; nothing is paused or deleted by this.',
+			sprintf( '%s domain has had no %s for %d days: %s', $label, $noun, $days, $host ),
+			array_merge(
+				array(
+					sprintf( 'Domain: %s', $host ),
+					sprintf( '%s resource: %d', $label, $r->id() ),
+					sprintf( 'Customer: %d', (int) ( $license['user_id'] ?? 0 ) ),
+				),
+				$extra
 			),
 			$r,
-			'beltoft_services_mail_nodns_' . md5( strtolower( $host ) . '|' . $r->id() ),
+			'beltoft_services_' . $feature . '_nodns_' . md5( strtolower( $host ) . '|' . $r->id() ),
 			array( 'ttl' => 30 * DAY_IN_SECONDS )
 		);
 	}

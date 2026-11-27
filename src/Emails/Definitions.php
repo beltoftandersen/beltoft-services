@@ -165,27 +165,27 @@ final class Definitions {
 				'subject'     => __( 'Your email domain {domain_name} is ready', 'beltoft-services' ),
 				'heading'     => __( 'Your email domain is ready', 'beltoft-services' ),
 			),
-			'beltoft_services_mail_dns_reminder' => array(
-				'title'       => __( 'Email DNS records missing', 'beltoft-services' ),
-				'description' => __( 'Sent once, a day after an email domain hosted elsewhere was set up, when DNS records are still missing.', 'beltoft-services' ),
+			'beltoft_services_dns_reminder' => array(
+				'title'       => __( 'DNS records missing', 'beltoft-services' ),
+				'description' => __( 'Sent once, a day after a service on a domain hosted elsewhere was set up, when needed DNS records are still missing. The same text for every service that has DNS records to add (email first).', 'beltoft-services' ),
 				'subject'     => __( 'DNS records are still missing for {domain_name}', 'beltoft-services' ),
 				'heading'     => __( 'DNS records are still missing', 'beltoft-services' ),
 			),
-			'beltoft_services_mail_dns_lost' => array(
-				'title'       => __( 'Email DNS records lost', 'beltoft-services' ),
-				'description' => __( 'Sent when DNS records of an email domain that were found before are gone again, after a second read confirms it. Sent again as a reminder on the days set under Email settings, three emails at most for one loss. It says which records are missing and that nothing is deleted.', 'beltoft-services' ),
+			'beltoft_services_dns_lost' => array(
+				'title'       => __( 'DNS records lost', 'beltoft-services' ),
+				'description' => __( 'Sent when DNS records of a service that were found before are gone again, after a second read confirms it. Sent again as a reminder on the days set under Domains, DNS watch, three emails at most for one loss. It says which records are missing and that nothing is deleted.', 'beltoft-services' ),
 				'subject'     => __( 'DNS records are missing for {domain_name}', 'beltoft-services' ),
 				'heading'     => __( 'DNS records are missing', 'beltoft-services' ),
 			),
-			'beltoft_services_mail_dns_back' => array(
-				'title'       => __( 'Email DNS records found again', 'beltoft-services' ),
-				'description' => __( 'Sent once, only after the lost records email was sent, when the records of the email domain are found again.', 'beltoft-services' ),
+			'beltoft_services_dns_back' => array(
+				'title'       => __( 'DNS records found again', 'beltoft-services' ),
+				'description' => __( 'Sent once, only after the lost records email was sent, when the records of the service are found again.', 'beltoft-services' ),
 				'subject'     => __( 'The DNS records for {domain_name} are found again', 'beltoft-services' ),
 				'heading'     => __( 'DNS records found again', 'beltoft-services' ),
 			),
-			'beltoft_services_mail_dns_timeout' => array(
-				'title'       => __( 'Email DNS check stopped', 'beltoft-services' ),
-				'description' => __( 'Sent once when the ten minute look at the DNS records of an email domain stops after 14 days without the records. The customer can start it again with Check now.', 'beltoft-services' ),
+			'beltoft_services_dns_timeout' => array(
+				'title'       => __( 'DNS check stopped', 'beltoft-services' ),
+				'description' => __( 'Sent once when the look at the DNS records of a service stops after the days set under Domains, DNS watch, without the records. The customer can start it again with Check now.', 'beltoft-services' ),
 				'subject'     => __( 'We have stopped checking the DNS of {domain_name}', 'beltoft-services' ),
 				'heading'     => __( 'We have stopped checking DNS', 'beltoft-services' ),
 			),

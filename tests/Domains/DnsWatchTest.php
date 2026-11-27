@@ -1,0 +1,340 @@
+<?php
+/**
+ * The DNS watch engine, with a feature that is not email: every rule of the shared order, and that every number is a setting.
+ *
+ * @package BeltoftServices
+ */
+
+namespace BeltoftServices\Tests\Domains;
+
+use BeltoftServices\Domains\DnsWatch;
+use BeltoftServices\Domains\DnsWatchSettings;
+use BeltoftServices\Domains\DnsWatchState;
+use BeltoftServices\Resource;
+use BeltoftServices\Tests\TestCase;
+
+require_once __DIR__ . '/DnsWatchFakeFeature.php';
+
+final class DnsWatchTest extends TestCase {
+
+	/** @var array<int, array<string, mixed>> */
+	private array $mails = array();
+
+	/** @var array<int, string> Events seen by an observer of the action. */
+	private array $observed = array();
+
+	private DnsWatchFakeFeature $feature;
+
+	public function set_up(): void {
+		parent::set_up();
+
+		DnsWatchFakeFeature::$present = array();
+		DnsWatchFakeFeature::$failing = false;
+		DnsWatchFakeFeature::$events  = array();
+		$this->mails                  = array();
+		$this->observed               = array();
+		$this->feature                = new DnsWatchFakeFeature();
+
+		add_filter( 'beltoft_services_dns_watches', fn( $f ) => $f + array( 'fake' => $this->feature ) );
+		add_filter(
+			'pre_wp_mail',
+			function ( $pre, $args ) {
+				$this->mails[] = $args;
+				return true;
+			},
+			10,
+			2
+		);
+		add_action(
+			DnsWatch::EVENT,
+			function ( $event, $feature ) {
+				$this->observed[] = $feature . ':' . $event;
+			},
+			10,
+			2
+		);
+		$this->settings( array( 'admin_email' => 'christian.beltoft@gmail.com' ) );
+	}
+
+	public function tear_down(): void {
+		remove_all_filters( 'pre_wp_mail' );
+		parent::tear_down();
+	}
+
+	/**
+	 * A ready service of the fake kind with three records.
+	 *
+	 * @param string               $status waiting, ok or timeout.
+	 * @param array<string, mixed> $meta   More meta.
+	 */
+	private function service( string $status = 'waiting', array $meta = array() ): Resource {
+		$driver  = $this->fake_driver();
+		$product = $this->service_product( 'fake', array(), array( 'max' => 3 ) );
+		$license = $this->service_license( $product, array( 'fire' => false ) );
+		\BeltoftLicenses\Licenses::update( (int) $license['id'], array( 'email' => 'christian.beltoft@gmail.com' ) );
+		$ok = 'ok' === $status ? 'ok' : 'missing';
+		$r  = Resource::create(
+			$license,
+			$driver,
+			array(),
+			array_merge(
+				array(
+					'fk_domain'    => 'watched.example',
+					'fk_dns'       => $status,
+					'fk_dns_since' => time(),
+					'fk_mode'      => 'external',
+					'fk_records'   => array(
+						array( 'key' => 'a', 'name' => 'a', 'type' => 'TXT', 'value' => 'one', 'status' => $ok, 'reason' => '' ),
+						array( 'key' => 'b', 'name' => 'b', 'type' => 'TXT', 'value' => 'two', 'status' => $ok, 'reason' => '' ),
+						array( 'key' => 'c', 'name' => 'c', 'type' => 'TXT', 'value' => 'three', 'status' => $ok, 'reason' => '' ),
+					),
+				),
+				$meta
+			)
+		);
+		$this->assertInstanceOf( Resource::class, $r );
+		$this->assertTrue( $r->set( array( 'state' => 'ready' ) ) );
+
+		return Resource::find( $r->id() );
+	}
+
+	/**
+	 * @return string[]
+	 */
+	private function subjects(): array {
+		return array_map( 'strval', array_column( $this->mails, 'subject' ) );
+	}
+
+	private function fresh( Resource $r ): Resource {
+		return Resource::find( $r->id() );
+	}
+
+	public function test_a_feature_is_found_by_its_id_and_by_its_resource(): void {
+		$r = $this->service();
+
+		$this->assertSame( $this->feature, DnsWatch::feature( 'fake' ) );
+		$this->assertSame( $this->feature, DnsWatch::feature_of( $r ) );
+		$this->assertNull( DnsWatch::feature( 'nothing' ) );
+
+		add_filter( 'beltoft_services_dns_watches', fn( $f ) => $f + array( 'wrong-key' => new DnsWatchFakeFeature() ) );
+		$this->assertArrayNotHasKey( 'wrong-key', DnsWatch::features(), 'The key must be the id of the object.' );
+	}
+
+	public function test_the_needed_records_decide_and_the_recommended_one_never_does(): void {
+		$r = $this->service();
+		DnsWatchFakeFeature::$present = array( 'a' );
+		DnsWatch::run( $this->feature, $r->id() );
+		$this->assertSame( 'waiting', $this->fresh( $r )->get( 'fk_dns' ), 'B is still missing.' );
+		$this->assertNotFalse( as_next_scheduled_action( 'beltoft_services_test_fake_look', array( $r->id() ), \BeltoftServices\Jobs::GROUP ), 'The next look is queued.' );
+
+		DnsWatchFakeFeature::$present = array( 'a', 'b' );
+		$this->fresh( $r )->set( array( 'fk_dns_checked' => time() - DnsWatch::MIN_GAP - 1 ) );
+		DnsWatch::run( $this->feature, $r->id() );
+
+		$this->assertSame( 'ok', $this->fresh( $r )->get( 'fk_dns' ), 'C is only recommended.' );
+		$this->assertContains( 'changed', DnsWatchFakeFeature::$events );
+		$this->assertContains( 'fake:found', $this->observed );
+	}
+
+	public function test_a_lookup_that_fails_learns_nothing(): void {
+		$r = $this->service();
+		DnsWatchFakeFeature::$failing = true;
+		DnsWatch::run( $this->feature, $r->id() );
+
+		$rows = (array) $this->fresh( $r )->get( 'fk_records' );
+		$this->assertSame( 'missing', $rows[0]['status'] );
+		$this->assertSame( 'waiting', $this->fresh( $r )->get( 'fk_dns' ) );
+	}
+
+	public function test_the_days_of_the_wait_are_a_setting_and_the_customer_is_told_once(): void {
+		$this->settings( array( 'dns_watch_wait_days' => 3 ) );
+		$r = $this->service( 'waiting', array( 'fk_dns_since' => time() - 3 * DAY_IN_SECONDS - 5 ) );
+
+		DnsWatch::run( $this->feature, $r->id() );
+
+		$this->assertSame( 'timeout', $this->fresh( $r )->get( 'fk_dns' ) );
+		$this->assertSame( array( 'We have stopped checking the DNS of watched.example' ), $this->subjects() );
+		$text = wp_strip_all_tags( (string) $this->mails[0]['message'] );
+		$this->assertStringContainsString( 'after 3 days', $text );
+		$this->assertStringContainsString( 'The fake thing stops.', $text );
+		$this->assertStringContainsString( 'press Check now in the fake area', $text );
+		$this->assertContains( 'fake:timeout', $this->observed );
+
+		DnsWatch::timeout_notice( $this->feature, $r->id() );
+		$this->assertCount( 1, $this->mails, 'Once.' );
+	}
+
+	public function test_a_lost_record_is_read_again_confirmed_later_and_mailed_once(): void {
+		$r = $this->service( 'ok', array( 'fk_dns_since' => time() - 5 * DAY_IN_SECONDS ) );
+		DnsWatchFakeFeature::$present = array( 'a', 'c' );
+
+		DnsWatch::recheck( $this->feature, $r->id() );
+		$r = $this->fresh( $r );
+
+		$this->assertSame( 'waiting', $r->get( 'fk_dns' ) );
+		$this->assertGreaterThan( 0, (int) $r->get( 'fk_dns_lost_pending' ) );
+		$this->assertSame( array( 'b' ), $r->get( 'fk_dns_lost_keys' ) );
+		$this->assertSame( array(), $this->mails, 'Nothing is said before the second read.' );
+		$this->assertSame( DnsWatchState::OK, DnsWatchState::of( $this->feature, $r ), 'The page says nothing either (nothing is held).' );
+		$this->assertNotFalse( as_next_scheduled_action( 'beltoft_services_test_fake_confirm', array( $r->id() ), \BeltoftServices\Jobs::GROUP ) );
+
+		DnsWatch::confirm( $this->feature, $r->id() );
+		$r = $this->fresh( $r );
+
+		$this->assertGreaterThan( 0, (int) $r->get( 'fk_dns_lost_at' ) );
+		$this->assertSame( DnsWatchState::LOST, DnsWatchState::of( $this->feature, $r ) );
+		$this->assertContains( 'DNS records are missing for watched.example', $this->subjects() );
+		$this->assertCount( 1, array_filter( $this->subjects(), static fn( $s ) => str_contains( $s, 'Fake domain lost DNS records: watched.example' ) ), 'The staff are told too.' );
+		$this->assertContains( 'fake:lost_confirmed', $this->observed );
+		$text = wp_strip_all_tags( (string) $this->mails[0]['message'] );
+		$this->assertStringContainsString( 'These are not found now: B.', $text );
+		$this->assertStringContainsString( 'b.watched.example', $text );
+	}
+
+	public function test_a_record_that_is_back_before_the_second_read_is_no_event(): void {
+		$r = $this->service( 'ok' );
+		DnsWatchFakeFeature::$present = array( 'a' );
+		DnsWatch::recheck( $this->feature, $r->id() );
+
+		DnsWatchFakeFeature::$present = array( 'a', 'b', 'c' );
+		DnsWatch::confirm( $this->feature, $r->id() );
+		$r = $this->fresh( $r );
+
+		$this->assertSame( 'ok', $r->get( 'fk_dns' ) );
+		$this->assertSame( array(), $this->mails );
+		$this->assertSame( 0, (int) $r->get( 'fk_dns_lost_at' ) );
+	}
+
+	public function test_a_recommended_record_that_goes_is_not_a_loss(): void {
+		$r = $this->service( 'ok' );
+		DnsWatchFakeFeature::$present = array( 'a', 'b' );
+		DnsWatch::recheck( $this->feature, $r->id() );
+		$r = $this->fresh( $r );
+
+		$this->assertSame( 'ok', $r->get( 'fk_dns' ) );
+		$this->assertSame( 'missing', $r->get( 'fk_records' )[2]['status'], 'It is shown as missing.' );
+		$this->assertSame( array(), $this->mails );
+	}
+
+	public function test_the_found_mail_goes_once_after_a_told_loss_and_a_flapping_record_waits_for_the_gap(): void {
+		$r = $this->service( 'ok' );
+		DnsWatchFakeFeature::$present = array( 'a' );
+		DnsWatch::recheck( $this->feature, $r->id() );
+		DnsWatch::confirm( $this->feature, $r->id() );
+		$this->mails = array();
+
+		DnsWatchFakeFeature::$present = array( 'a', 'b', 'c' );
+		$this->fresh( $r )->set( array( 'fk_dns_checked' => time() - DnsWatch::MIN_GAP - 1 ) );
+		DnsWatch::run( $this->feature, $r->id() );
+
+		$this->assertSame( array( 'The DNS records for watched.example are found again' ), $this->subjects() );
+		$this->assertSame( 'ok', $this->fresh( $r )->get( 'fk_dns' ) );
+		$this->assertContains( 'fake:back', $this->observed );
+
+		// It goes missing again at once: inside the gap the customer is not mailed a second time.
+		$this->mails = array();
+		DnsWatchFakeFeature::$present = array( 'a', 'c' );
+		$this->fresh( $r )->set( array( 'fk_dns_rechecked' => 0 ) );
+		DnsWatch::recheck( $this->feature, $r->id() );
+		DnsWatch::confirm( $this->feature, $r->id() );
+
+		$this->assertSame( array(), array_filter( $this->subjects(), static fn( $s ) => str_starts_with( $s, 'DNS records are missing' ) ) );
+		$this->assertSame( DnsWatchState::LOST, DnsWatchState::of( $this->feature, $this->fresh( $r ) ), 'The page follows the real state.' );
+	}
+
+	public function test_reminders_follow_the_days_of_the_setting_and_never_exceed_them(): void {
+		$this->settings( array( 'dns_watch_remind_days' => '2, 5' ) );
+		$r = $this->service(
+			'waiting',
+			array(
+				'fk_dns_lost_at'    => time() - 3 * DAY_IN_SECONDS,
+				'fk_dns_lost_mails' => 1,
+				'fk_dns_lost_keys'  => array( 'b' ),
+			)
+		);
+
+		DnsWatch::lost_reminders( $this->feature, $r->id() );
+		$this->assertCount( 1, $this->mails, 'Day 2 has passed.' );
+
+		DnsWatch::lost_reminders( $this->feature, $r->id() );
+		$this->assertCount( 1, $this->mails, 'Day 5 has not.' );
+
+		$this->fresh( $r )->set( array( 'fk_dns_lost_at' => time() - 6 * DAY_IN_SECONDS ) );
+		DnsWatch::lost_reminders( $this->feature, $r->id() );
+		DnsWatch::lost_reminders( $this->feature, $r->id() );
+		$this->assertCount( 2, $this->mails, 'The first mail and two reminders at most: three in all.' . wp_json_encode( $this->subjects() ) );
+	}
+
+	public function test_the_first_reminder_hour_is_a_setting_and_only_an_outside_domain_is_reminded(): void {
+		$r = $this->service( 'waiting', array( 'fk_dns_since' => time() - 5 * HOUR_IN_SECONDS ) );
+		DnsWatch::remind( $this->feature, $r->id() );
+		$this->assertCount( 0, $this->mails );
+
+		$this->settings( array( 'dns_watch_first_remind_hours' => 4 ) );
+		DnsWatch::remind( $this->feature, $r->id() );
+		$this->assertCount( 1, $this->mails );
+		$this->assertSame( 'DNS records are still missing for watched.example', $this->subjects()[0] );
+
+		DnsWatch::remind( $this->feature, $r->id() );
+		$this->assertCount( 1, $this->mails, 'Once.' );
+	}
+
+	public function test_the_sweep_queues_one_look_per_ok_service_and_a_slow_look_for_a_stopped_one(): void {
+		$ok      = $this->service( 'ok' );
+		$stopped = $this->service( 'timeout', array( 'fk_dns_rechecked' => time() - 8 * DAY_IN_SECONDS, 'fk_dns_since' => time() - 20 * DAY_IN_SECONDS ) );
+
+		DnsWatch::recheck_all( $this->feature );
+
+		$this->assertNotFalse( as_next_scheduled_action( 'beltoft_services_test_fake_recheck', array( $ok->id() ), \BeltoftServices\Jobs::GROUP ) );
+		$this->assertNotFalse( as_next_scheduled_action( 'beltoft_services_test_fake_recheck', array( $stopped->id() ), \BeltoftServices\Jobs::GROUP ) );
+
+		$this->settings( array( 'dns_watch_stop_days' => 15 ) );
+		foreach ( array( 'beltoft_services_test_fake_recheck' ) as $hook ) {
+			as_unschedule_all_actions( $hook );
+		}
+		$this->fresh( $stopped )->set( array( 'fk_dns_since' => time() - 16 * DAY_IN_SECONDS ) );
+		DnsWatch::recheck_all( $this->feature );
+		$this->assertFalse( as_next_scheduled_action( 'beltoft_services_test_fake_recheck', array( $stopped->id() ), \BeltoftServices\Jobs::GROUP ), 'No look after the stop days.' );
+	}
+
+	public function test_a_feature_may_have_its_own_value_without_a_code_change(): void {
+		$this->assertSame( 10 * MINUTE_IN_SECONDS, DnsWatchSettings::confirm_seconds( 'fake' ) );
+
+		$stored = (array) get_option( \BeltoftServices\Settings::OPTION, array() );
+		update_option( \BeltoftServices\Settings::OPTION, $stored + array( 'fake_dns_watch_confirm_minutes' => 1 ) );
+
+		$this->assertSame( MINUTE_IN_SECONDS, DnsWatchSettings::confirm_seconds( 'fake' ) );
+		$this->assertSame( 10 * MINUTE_IN_SECONDS, DnsWatchSettings::confirm_seconds( 'mail' ), 'Others keep the shared value.' );
+	}
+
+	public function test_the_words_and_tones_of_the_state(): void {
+		$r = $this->service();
+		$this->assertSame( DnsWatchState::SETTING_UP, DnsWatchState::of( $this->feature, $r ) );
+		$this->assertSame( 'DNS records needed', DnsWatchState::word( $this->feature, $r ) );
+		$this->assertSame( 'busy', DnsWatchState::tone( $this->feature, $r ) );
+
+		$r->set( array( 'fk_dns_lost_at' => time() - 4 * DAY_IN_SECONDS, 'fk_dns_lost_keys' => array( 'b' ) ) );
+		$r = $this->fresh( $r );
+		$this->assertSame( DnsWatchState::LOST, DnsWatchState::of( $this->feature, $r ) );
+		$this->assertSame( 'bad', DnsWatchState::tone( $this->feature, $r ), 'Red after the days of the setting.' );
+
+		$r->set( array( 'fk_dns' => 'timeout' ) );
+		$this->assertSame( 'We stopped checking DNS', DnsWatchState::word( $this->feature, $this->fresh( $r ) ) );
+
+		$r->set( array( 'fk_dns' => 'ok' ) );
+		$this->assertSame( '', DnsWatchState::word( $this->feature, $this->fresh( $r ) ) );
+		$this->assertSame( 'ok', DnsWatchState::tone( $this->feature, $this->fresh( $r ) ) );
+	}
+
+	public function test_the_status_poll_and_the_list_row_take_the_word_from_the_engine(): void {
+		$r = $this->service();
+		$r->set( array( 'fk_dns_lost_at' => time() - 3600, 'fk_dns_lost_keys' => array( 'b' ) ) );
+		$r = $this->fresh( $r );
+
+		$state = apply_filters( 'beltoft_services_area_state', array( 'Ready', 'ok' ), $r );
+		$this->assertStringStartsWith( 'DNS records missing since', $state[0] );
+
+		$words = apply_filters( 'beltoft_services_status_words', array( 'label' => 'Ready', 'message' => '' ), $r );
+		$this->assertStringStartsWith( 'DNS records missing since', $words['label'] );
+	}
+}

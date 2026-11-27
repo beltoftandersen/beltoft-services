@@ -4,7 +4,7 @@ namespace BeltoftServices\Emails;
 
 defined( 'ABSPATH' ) || exit;
 
-final class MailDnsReminder extends ServiceEmail {
+final class DnsWatchReminder extends ServiceEmail {
 
-	protected const ID = 'beltoft_services_mail_dns_reminder';
+	protected const ID = 'beltoft_services_dns_reminder';
 }
