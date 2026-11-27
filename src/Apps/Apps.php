@@ -367,6 +367,10 @@ final class Apps {
 			$version['sha256'] = $hash;
 			$base = plugins_url( 'apps/', BELTOFT_SERVICES_FILE );
 			$version['url'] = set_url_scheme( trailingslashit( $base ) . $id . '/' . $version_id . '/' . $script, 'https' );
+			// The label is a customer text ("Odoo 20, Danish accounting"): every reader of a version (the order summary, the app tab, the lists) gets it in the page language.
+			if ( isset( $version['label'] ) && is_string( $version['label'] ) ) {
+				$version['label'] = AppTexts::translate( $version['label'] );
+			}
 			return array_merge( $data, $version, array( 'version_id' => $version_id ) );
 		}
 		return null;

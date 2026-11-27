@@ -74,6 +74,17 @@ class AppTextsTest extends TestCase {
 		$this->assertContains( array( 'docker', 'getting_started' ), $seen );
 	}
 
+	public function test_the_label_of_a_version_is_translated_where_the_version_is_read(): void {
+		$translate = static fn( $t, $text, $domain ) => 'beltoft-services' === $domain && 'Odoo 20, Danish accounting' === $text ? 'Odoo 20, dansk regnskab' : $t;
+		add_filter( 'gettext', $translate, 10, 3 );
+		$one = Apps::version( 'odoo', '20-dk' );
+		remove_filter( 'gettext', $translate, 10 );
+
+		$this->assertSame( 'Odoo 20, dansk regnskab', $one['label'], 'The checkout summary reads the label of the version itself.' );
+		$this->assertSame( 'Odoo 20, dansk regnskab', Apps::version_label( $one ), 'Translating twice changes nothing.' );
+		$this->assertSame( 'Odoo 20, Danish accounting', Apps::version( 'odoo', '20-dk' )['label'], 'English stays English.' );
+	}
+
 	public function test_a_version_label_is_translated_and_the_version_of_the_page_language_leads_the_list(): void {
 		$odoo = Apps::definition( 'odoo' );
 		$dk   = Apps::version( 'odoo', '20-dk' );
