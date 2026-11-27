@@ -135,6 +135,11 @@ ea_place() {
   old=$(mktemp -d /opt/.easyappointments-old.XXXXXX)
   cp -a "$src/application" "$src/system" "$src/vendor" "$work/"
   cp -a "$src/assets" "$work/assets"
+  # beltoft: the time zone choice of the booking page is hidden; the field keeps the visitor's browser time zone. Added once.
+  if ! grep -q 'select-timezone{display:none' "$work/assets/css/frontend.css"; then
+    printf '\n%s\n%s\n' '/* beltoft: the time zone choice is hidden; the field keeps the visitor'"'"'s browser time zone */' \
+      'label[for="select-timezone"],#select-timezone{display:none!important}' >> "$work/assets/css/frontend.css"
+  fi
   php "$lib/patch-index.php" "$src/index.php" "$work/index.php"
   if [ -f "$app/application/config/email.php" ]; then
     cp -p "$app/application/config/email.php" "$work/application/config/email.php"

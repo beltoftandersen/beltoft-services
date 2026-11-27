@@ -24,6 +24,15 @@ final class AppEasyAppointmentsTest extends TestCase {
 		$this->assertLessThanOrEqual( 12288, filesize( BELTOFT_SERVICES_PATH . 'assets/logos/easyappointments.svg' ) );
 	}
 
+	/** Owner 2026-11-27: the time zone choice of the booking page is hidden on every server, installed or updated, once. */
+	public function test_ea_place_hides_the_time_zone_choice_once_for_install_and_update(): void {
+		$script = $this->script();
+		$rule   = 'label[for="select-timezone"],#select-timezone{display:none!important}';
+		$this->assertSame( 1, substr_count( $script, $rule ) );
+		$this->assertStringContainsString( 'cp -a "$src/assets" "$work/assets"' . "\n" . '  # beltoft: the time zone choice', $script );
+		$this->assertStringContainsString( "grep -q 'select-timezone{display:none' \"\$work/assets/css/frontend.css\"", $script );
+	}
+
 	public function test_the_minimum_is_the_smallest_plan_and_the_definition_declares_domain_www_steps_and_credentials(): void {
 		$app = Apps::current( 'easyappointments' );
 		$raw = json_decode( (string) file_get_contents( BELTOFT_SERVICES_PATH . 'apps/easyappointments/app.json' ), true );
