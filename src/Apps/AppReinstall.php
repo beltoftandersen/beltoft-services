@@ -84,10 +84,13 @@ final class AppReinstall {
 		$cluster = $record ? (array) Clusters::get( $record['cluster'] ) : array();
 
 		if ( ! $retired ) {
-			$choices[ self::KEEP ] = __( 'Same app and version', 'beltoft-services' );
+			$mine = Apps::version( $id, $own );
+			/* translators: %s: app version the server has, such as Odoo 20, Danish accounting */
+			$choices[ self::KEEP ] = null === $mine ? __( 'Same app and version', 'beltoft-services' ) : sprintf( __( 'Same app and version: %s', 'beltoft-services' ), Apps::version_label( $mine ) );
 		}
 
-		foreach ( (array) $def['versions'] as $version ) {
+		// The versions in the order checkout lists them: the edition made for the page language first.
+		foreach ( Apps::language_first( array_column( array_filter( (array) $def['versions'], 'is_array' ), null, 'id' ) ) as $version ) {
 			$vid  = is_array( $version ) ? (string) ( $version['id'] ?? '' ) : '';
 			$full = '' === $vid || $vid === $own ? null : Apps::version( $id, $vid );
 
