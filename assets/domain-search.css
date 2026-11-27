@@ -91,6 +91,10 @@
   color: var(--bds-muted, var(--ink-grey, #59615c));
 }
 
+:where(.beltoft-domain-note, .beltoft-domain-transfer__help) {
+  color: var(--bds-muted, inherit);
+}
+
 :where(.beltoft-domain-result__transfer) {
   font-size: .9em;
   color: var(--bds-muted, var(--ink-grey, #59615c));
@@ -116,7 +120,7 @@
   min-width: 0;
 }
 
-:where(.beltoft-domain-result__name, .beltoft-domain-result__price, .beltoft-domain-result__status, .beltoft-domain-result__vat, .beltoft-domain-note, .beltoft-domain-transfer__help) {
+:where(.beltoft-domain-result__name, .beltoft-domain-result__price, .beltoft-domain-result__status, .beltoft-domain-result__vat) {
   color: var(--bds-ink, inherit);
 }
 
