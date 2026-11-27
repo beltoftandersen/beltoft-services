@@ -129,6 +129,10 @@ final class Renewals {
 		$done = (array) $r->get( 'renewed_orders' );
 		if ( in_array( $order_id, $done, true ) ) { return StepResult::done(); }
 		$started = (array) $r->get( 'renew_started' );
+		// One renewal at a time: another order's marker means its year is paid but not yet confirmed, and its new date would look like this order's own year (two orders paid, one year bought).
+		foreach ( array_keys( $started ) as $other ) {
+			if ( (string) $other !== $order_id ) { return StepResult::retry( 3600, 'Another renewal of this domain is awaiting registry confirmation.' ); }
+		}
 		$baseline = (string) ( $started[ $order_id ] ?? $r->get( 'expires_at' ) );
 		$id = (string) $r->get( 'remote_id' );
 		if ( '' === $id ) { return StepResult::retry( 3600, 'The registrar id is unavailable.' ); }

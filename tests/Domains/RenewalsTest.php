@@ -323,6 +323,53 @@ class RenewalsTest extends TestCase {
 		$this->assertCount( 3, $fake->calls() );
 	}
 
+	public function test_a_second_paid_renewal_order_waits_while_the_first_is_awaiting_the_registry(): void {
+		update_option( Prices::OPTION, array( 'com' => array( 'create' => 10.0, 'renew' => 12.5, 'transfer' => 9.0, 'restricted' => false, 'price' => 20 ) ) );
+		$product = $this->service_product( 'domain' );
+		$user = self::factory()->user->create();
+		$sub = wcs_create_subscription( array( 'customer_id' => $user, 'billing_period' => 'year', 'billing_interval' => 1 ) );
+		$this->clear_items( $sub );
+		$sub->add_product( $product, 1 );
+		$sub->save();
+		$license = $this->service_license( $product, array( 'fire' => false, 'user_id' => $user, 'subscription_id' => $sub->get_id() ) );
+		$r = Resource::create( $license, new DomainDriver(), array(), array( 'domain' => 'example.com', 'remote_id' => '123', 'expires_at' => '2027-10-26 00:00:00', 'state' => 'ready' ) );
+		$orders = array();
+		for ( $i = 0; $i < 2; $i++ ) {
+			$o = wcs_create_renewal_order( $sub );
+			$this->assertInstanceOf( \WC_Order::class, $o );
+			$this->domain_line( $o, $product, 50 );
+			$o->set_status( 'processing' );
+			$o->save();
+			$orders[] = (string) $o->get_id();
+		}
+		list( $a, $b ) = $orders;
+		$fake = new FakeClient();
+		$fake->reply( 'GET', '/domains/123', array( 'expiration_date' => '2027-10-26 00:00:00' ) );
+		$fake->reply( 'POST', '/domains/123/renew', new \WP_Error( 'transport', 'Registrar request could not be completed.' ) );
+		$fake->reply( 'GET', '/domains/123', array( 'expiration_date' => '2028-10-26 00:00:00' ) );
+		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
+		// A asked the registrar; the registry already shows the new year, but A has not finished.
+		$this->assertTrue( Renewals::renew( $r, $a )->is_retry() );
+		$this->assertArrayHasKey( $a, (array) $r->get( 'renew_started' ) );
+		$calls = count( $fake->calls() );
+		$wait = Renewals::renew( $r, $b );
+		$this->assertTrue( $wait->is_retry() );
+		$this->assertSame( $calls, count( $fake->calls() ), 'B does not touch the registrar while A is awaiting.' );
+		$this->assertSame( 1, $this->posts( $fake ) );
+		$this->assertNotContains( $b, (array) $r->get( 'renewed_orders' ) );
+		// A finishes (the queued 2028 date).
+		$first = Renewals::renew( $r, $a );
+		$this->assertTrue( $first->is_done(), (string) $first->error() );
+		$r->set( $first->meta() );
+		// B now buys its own year.
+		$fake->reply( 'GET', '/domains/123', array( 'expiration_date' => '2028-10-26 00:00:00' ) );
+		$fake->reply( 'POST', '/domains/123/renew', array( 'status' => 'ACT' ) );
+		$fake->reply( 'GET', '/domains/123', array( 'expiration_date' => '2029-10-26 00:00:00' ) );
+		$second = Renewals::renew( $r, $b );
+		$this->assertTrue( $second->is_done(), (string) $second->error() );
+		$this->assertSame( 2, $this->posts( $fake ) );
+	}
+
 	public function test_dk_transfer_prepays_year_and_schedules_allowed_window(): void {
 		update_option( Prices::OPTION, array( 'dk' => array( 'price' => 13, 'transfer' => 0.0, 'restricted' => true ) ) );
 		$product = $this->service_product( 'domain' );

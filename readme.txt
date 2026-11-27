@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.65.8
+Stable tag: 0.65.9
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.65.9 =
+* Domain renewals: two paid renewal orders of the same domain are renewed one at a time. Before, while the first order's year was waiting for the registry to show the new date, the second order's job could see that date, count it as its own year and finish without buying one. Now the second order waits (retry in an hour) until the first has finished, then buys its own year.
 
 = 0.65.8 =
 * Deleting a server or database from My Account: when the service is busy (its lock is held) the request is refused with "The service is busy right now. Please try again in a minute." Before, a request was queued without the protected, hold and busy checks and the license was revoked at once.
