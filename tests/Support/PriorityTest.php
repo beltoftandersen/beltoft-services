@@ -102,7 +102,7 @@ class PriorityTest extends TestCase {
 		$this->assertNotSame( '', $offer['price'] );
 
 		$html = \BeltoftServices\Account\Overview::section( 'support' );
-		$this->assertStringContainsString( 'Add priority support', $html );
+		$this->assertStringContainsString( 'Buy priority support', $html );
 		$this->assertStringContainsString( esc_html( Priority::promise() ), $html );
 		$this->assertStringNotContainsString( '&amp;', $html, 'The price markup is printed, not escaped twice.' );
 
@@ -110,7 +110,7 @@ class PriorityTest extends TestCase {
 		$this->assertTrue( Priority::offer( $user )['active'] );
 		$html = \BeltoftServices\Account\Overview::section( 'support' );
 		$this->assertStringContainsString( 'Active', $html );
-		$this->assertStringNotContainsString( 'Add priority support', $html );
+		$this->assertStringNotContainsString( 'Buy priority support', $html );
 	}
 
 	public function test_a_visitor_gets_no_offer(): void {
