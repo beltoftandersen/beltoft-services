@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.66.0
+Stable tag: 0.66.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.66.1 =
+* Account credit: a checkout whose payment did not finish (a declined card, a closed 3-D Secure window) no longer hides the credit when the customer comes back, and paying again no longer charges the full total while the credit is taken too. The unfinished order is cancelled when the checkout is submitted again, so the new order gets the credit once.
 
 = 0.66.0 =
 * Pay-to-restore for an expired domain, behind the new setting "Let customers restore an expired domain" (domain_restore_enabled, off by default). The domain page of an expired domain gets a Restore domain button. It makes one order with two lines, the renewal of one year at the normal price and the reactivation fee, paid on WooCommerce's payment page. When the order is paid the domain is restored at the registrar by the new internal job `restore`: a marker before the call, a read first (a domain that already shows a later renewal date is only recorded), POST restore, a fresh read, and a separate renew of one year only when the date still did not move 6 hours after the restore call (the registry can lag; until then the job waits and checks again every 30 minutes). A timeout keeps the marker and never posts twice, a clear refusal frees it. Name servers are put back only when they differ. Nothing is ever deleted. The job refuses an order paid below the registrar cost (renewal cost plus the full restore cost). .dk can be paid for, but the job writes nothing at the registrar and tells staff to restore it by hand.
