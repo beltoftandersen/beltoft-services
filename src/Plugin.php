@@ -148,6 +148,7 @@ final class Plugin {
 		do_action( 'beltoft_services_boot', 'activity' );
 		Status::register();
 		Checkout::register();
+		Checkout\TermsText::register();
 		IntroCoupon::register();
 		RenewalReminder::register();
 		Billing\ExistingFlow::register();
