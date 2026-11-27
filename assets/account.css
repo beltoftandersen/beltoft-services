@@ -540,6 +540,8 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-fw__ag
 /* The small Copy beside a command (the server's Log in line). */
 .beltoft-services-copy, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-copy { display: inline; width: auto; min-height: 0; margin: 0 0 0 var(--bs-space-2, 8px); padding: 0; border: 0; background: none; color: var(--bs-ink); font: inherit; font-size: 14px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .beltoft-services-copy:hover { background: none; color: var(--bs-ink); }
+/* The label changes to "Copied" for two seconds: a fixed width (left-aligned) so the row and the table columns do not move (owner 2026-11-27). */
+.beltoft-services-copy, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-copy { display: inline-block; min-width: 9ch; text-align: left; }
 /* A copy button after its value: beside it while it fits, else at the start of the next line (no indent from a left margin). */
 dd:has(> .beltoft-services-copy) { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--bs-space-2, 8px); }
 body.woocommerce-account .woocommerce-MyAccount-content dd > .beltoft-services-copy { margin-left: 0; }

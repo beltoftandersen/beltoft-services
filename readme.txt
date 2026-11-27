@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.66.4
+Stable tag: 0.66.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,10 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.66.5 =
+* The domain box no longer says "no A record" after a look made before the found addresses were stored; it says what the look found.
+* Copy buttons in My Account keep their width when the label changes to "Copied", so the row does not move.
 
 = 0.66.4 =
 * A server whose app waits for the customer's own domain shows one box, "Point example.dk to your server", on the server page and the App tab: numbered steps, the records to make (type, name, value, a copy button each), what DNS says right now and when it was last looked at, and the date the app is installed on the server address instead. The sentence under the status is short and the same words are no longer printed twice. The look job stores the A addresses it found (app_domain_dns_seen).

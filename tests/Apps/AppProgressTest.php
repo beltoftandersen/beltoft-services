@@ -91,6 +91,14 @@ class AppProgressTest extends MonitoringTestCase {
 	}
 
 	/** Owner 2026-11-27: an install that waits for the customer's own domain said "Downloading the installer"; it must say what to do. */
+	/** A look made before the addresses were stored (reason other, no seen list) must not claim the name has no A record. */
+	public function test_an_old_look_without_stored_addresses_does_not_say_no_a_record(): void {
+		$r   = $this->server( array( 'app_state' => 'pending', 'app_domain_own' => 'example.dk', 'app_domain_dns' => 'waiting', 'app_domain_dns_reason' => 'other', 'app_domain_dns_since' => time(), 'app_domain_dns_checked' => time() ) );
+		$box = \BeltoftServices\Apps\AppProgress::dns_view( $r );
+		$this->assertStringNotContainsString( 'has no A record', (string) $box['now'] );
+		$this->assertStringContainsString( 'does not point to this server only', (string) $box['now'] );
+	}
+
 	/** Owner 2026-11-27: the overview banner said "Working / Follow it" while the install waited for the customer. */
 	public function test_the_overview_banner_says_it_waits_for_the_customer_during_a_dns_wait(): void {
 		$r = $this->server( array( 'app_state' => 'pending', 'app_domain_own' => 'example.dk', 'app_domain_dns' => 'waiting', 'app_domain_dns_reason' => 'other', 'app_domain_dns_since' => time() ) );

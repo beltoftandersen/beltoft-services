@@ -364,9 +364,16 @@ final class AppProgress {
 			$now = __( 'We have not looked yet. We check soon.', 'beltoft-services' );
 		} elseif ( 'unreachable' === $reason ) {
 			$now = __( 'The name could not be looked up. We will try again.', 'beltoft-services' );
-		} elseif ( array() === $seen ) {
+		} elseif ( array() === $seen && 'none' === $reason ) {
 			/* translators: %s: domain name */
 			$now = sprintf( __( 'Right now %s has no A record.', 'beltoft-services' ), $name );
+		} elseif ( array() === $seen ) {
+			// A look from before the addresses were stored: say only what the verdict knows, never "no A record" (owner 2026-11-27).
+			$now = match ( $reason ) {
+				'other' => __( 'The name has an A record, but it does not point to this server only. Remove the other addresses.', 'beltoft-services' ),
+				'aaaa'  => __( 'The name points to this server, but it also has an AAAA record. Remove the AAAA record, because this server has no IPv6 address.', 'beltoft-services' ),
+				default => __( 'We have not looked yet. We check soon.', 'beltoft-services' ),
+			};
 		} else {
 			/* translators: 1: domain name, 2: IPv4 address or addresses */
 			$now = sprintf( __( 'Right now %1$s points to %2$s.', 'beltoft-services' ), $name, implode( ', ', $seen ) );
