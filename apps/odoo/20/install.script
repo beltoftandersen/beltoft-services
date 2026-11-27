@@ -53,7 +53,7 @@ place_helper() {
 # >>> EDITION BLOCK: the only part that differs between apps/odoo/20/install.script and apps/odoo/20-dk/install.script
 # tests/Apps/AppOdooTest.php fails when anything outside this block differs.
 # Standard edition: Odoo as it comes, plus the OdooWoo helper module.
-modules=odoowoo_helper
+modules=sale_management,odoowoo_helper
 language_args=()
 edition_fetch() { :; }
 edition_python=''

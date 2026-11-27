@@ -138,7 +138,7 @@ final class AppOdooEditionTest extends PaidAppCase {
 			$this->assertStringContainsString( 'addons_path = /mnt/extra-addons', $script );
 			$this->assertStringContainsString( 'set -Eeuo pipefail', $script );
 		}
-		$this->assertStringContainsString( 'modules=odoowoo_helper', $this->edition( '20' ) );
+		$this->assertStringContainsString( 'modules=sale_management,odoowoo_helper', $this->edition( '20' ) );
 		$this->assertStringNotContainsString( 'l10n_dk', $this->script( '20' ) );
 		$this->assertStringNotContainsString( 'odoo-dk-accounting', $this->script( '20' ) );
 		$this->assertStringNotContainsString( 'da_DK', $this->script( '20' ) );
@@ -152,7 +152,7 @@ final class AppOdooEditionTest extends PaidAppCase {
 		foreach ( self::BUNDLE_MODULES as $m ) {
 			$this->assertMatchesRegularExpression( '/bundle_modules=\'[^\']*\b' . $m . '\b/', $block, $m );
 		}
-		$this->assertStringContainsString( 'modules="account,l10n_dk,odoowoo_helper,', $block );
+		$this->assertStringContainsString( 'modules="account,l10n_dk,sale_management,odoowoo_helper,', $block );
 		$this->assertStringContainsString( '--load-language=da_DK', $block );
 		$this->assertStringContainsString( 'base.dk', $block );
 		$this->assertStringContainsString( 'base.DKK', $block );
