@@ -11,13 +11,28 @@ final class Prices {
 	public const OPTION = 'beltoft_services_domain_prices';
 	private const PAGE_SIZE = 100;
 
-	public static function rule( float $create, float $renew ): int {
+	/** The VAT the whole euro is counted with: the shop's own 25 percent (owner 2026-11-27, EUR prices with VAT are whole euros). */
+	private const VAT_FACTOR = 1.25;
+
+	/**
+	 * The public yearly price excluding VAT from the registrar's cost: the dearer of the markup and the minimum margin, then made so
+	 * that the price WITH VAT is a whole euro (rounded up, never below the rule), divided by the VAT again. A whole amount is an int.
+	 */
+	public static function rule( float $create, float $renew ): int|float {
 		$cost = max( $create, $renew );
 		$percent = Settings::get( 'domain_markup_percent' );
 		$margin = Settings::get( 'domain_min_margin' );
 		$percent = is_numeric( $percent ) ? (float) $percent : 30.0;
 		$margin = is_numeric( $margin ) ? (float) $margin : 4.0;
-		return (int) ceil( max( $cost * ( 1.0 + $percent / 100.0 ), $cost + $margin ) );
+		$wanted = max( $cost * ( 1.0 + $percent / 100.0 ), $cost + $margin );
+		$incl = ceil( round( $wanted * self::VAT_FACTOR, 6 ) );
+		return self::whole_or_float( $incl / self::VAT_FACTOR );
+	}
+
+	/** An int for a whole amount, else a float with at most two decimals. */
+	private static function whole_or_float( float $value ): int|float {
+		$value = round( $value, 2 );
+		return abs( $value - round( $value ) ) < 0.000001 ? (int) round( $value ) : $value;
 	}
 
 	/**
@@ -33,7 +48,7 @@ final class Prices {
 		$override = self::overrides( $currency )[ $tld ] ?? null;
 		if ( null !== $override ) { return $override; }
 		$table = get_option( self::OPTION, array() );
-		return (int) $table[ $tld ]['price'];
+		return self::whole_or_float( (float) $table[ $tld ]['price'] );
 	}
 
 	/** The registrar's transfer cost for a full domain, or null if no price is stored. */

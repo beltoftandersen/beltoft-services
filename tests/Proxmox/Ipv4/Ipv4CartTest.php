@@ -25,9 +25,29 @@ class Ipv4CartTest extends BackupTestCase {
 		parent::set_up();
 		$this->seed_private_nets();
 		remove_all_filters( 'beltoft_services_ipv4_alerts' );
+		$this->forget_saved_session();
 
 		WC()->cart->empty_cart();
 		wc_clear_notices();
+	}
+
+	/**
+	 * These tests build the cart in memory and call the swap directly. A WooCommerce session that an earlier test saved (its cookie
+	 * flag stays on the shared session object) makes CartSwap::locked() reload the stored cart over the one built here, so
+	 * the test starts without a saved session, as it would run alone.
+	 */
+	private function forget_saved_session(): void {
+		$session = WC()->session;
+
+		if ( ! $session instanceof \WC_Session_Handler ) {
+			return;
+		}
+
+		$flag = new \ReflectionProperty( \WC_Session_Handler::class, '_has_cookie' );
+		$flag->setAccessible( true );
+		$flag->setValue( $session, false );
+		unset( $_COOKIE[ 'wp_woocommerce_session_' . COOKIEHASH ] );
+		wp_set_current_user( 0 );
 	}
 
 	public function tear_down(): void {

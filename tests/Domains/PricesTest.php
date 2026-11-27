@@ -7,10 +7,30 @@ use BeltoftServices\Domains\Prices;
 use BeltoftServices\Tests\TestCase;
 
 class PricesTest extends TestCase {
-	public function test_real_cost_examples_follow_rule(): void {
-		foreach ( array( array( 8.15, 8.15, 13 ), array( 9.81, 9.81, 14 ), array( 7.04, 10.51, 15 ), array( 4.60, 4.60, 9 ), array( 3.68, 2.68, 8 ), array( 27.09, 27.09, 36 ), array( 46.90, 46.90, 61 ) ) as $case ) {
-			$this->assertSame( $case[2], Prices::rule( $case[0], $case[1] ) );
+	public function test_real_cost_examples_follow_rule_and_the_price_with_vat_is_a_whole_euro_rounded_up(): void {
+		// cost create, cost renew, price excluding VAT. max( cost x 1.30, cost + 4 ), x 1.25, rounded UP to a whole euro, / 1.25.
+		foreach ( array( array( 8.15, 8.15, 12.8 ), array( 9.81, 9.81, 14.4 ), array( 7.04, 10.51, 15.2 ), array( 4.60, 4.60, 8.8 ), array( 3.68, 2.68, 8 ), array( 27.09, 27.09, 36 ), array( 46.90, 46.90, 61.6 ) ) as $case ) {
+			$price = Prices::rule( $case[0], $case[1] );
+			$this->assertEquals( $case[2], $price, 'cost ' . $case[0] . '/' . $case[1] );
+			$this->assertEqualsWithDelta( round( $price * 1.25 ), $price * 1.25, 0.0001, 'whole euro with VAT' );
+			$cost = max( $case[0], $case[1] );
+			$this->assertGreaterThanOrEqual( max( $cost * 1.3, $cost + 4 ) - 0.0001, $price, 'never below the markup rule' );
 		}
+		$this->assertSame( 36, Prices::rule( 27.09, 27.09 ), 'A price that is already a whole euro with VAT is an int.' );
+	}
+
+	public function test_the_markup_and_the_minimum_margin_settings_still_decide_before_the_rounding(): void {
+		$this->settings( array( 'domain_markup_percent' => 100, 'domain_min_margin' => 1 ) );
+		$this->assertEquals( 16.0, Prices::rule( 8.0, 8.0 ) ); // 16 x 1.25 = 20 incl.
+		$this->settings( array( 'domain_markup_percent' => 0, 'domain_min_margin' => 0 ) );
+		$this->assertEquals( 8.0, Prices::rule( 8.0, 8.0 ) ); // 10 incl.
+		$this->assertEquals( 8.8, Prices::rule( 8.1, 8.1 ), '8.1 x 1.25 = 10.125 incl., up to 11, / 1.25.' );
+	}
+
+	public function test_a_stored_price_with_decimals_is_returned_as_it_is(): void {
+		update_option( Prices::OPTION, array( 'com' => array( 'create' => 8.0, 'renew' => 8.0, 'transfer' => 8.0, 'restricted' => false, 'price' => 12.8 ), 'net' => array( 'create' => 8.0, 'renew' => 8.0, 'transfer' => 8.0, 'restricted' => false, 'price' => 14 ) ) );
+		$this->assertSame( 12.8, Prices::price( 'com' ) );
+		$this->assertSame( 14, Prices::price( 'net' ) );
 	}
 
 	public function test_override_wins_and_restricted_is_hidden_except_dk(): void {
@@ -61,7 +81,7 @@ class PricesTest extends TestCase {
 		add_filter( 'beltoft_services_domains_client', static fn() => $fake );
 		$this->assertSame( 1, Prices::sync() );
 		$this->assertNull( Prices::price( 'missing' ) );
-		$this->assertSame( 13, Prices::price( 'com' ) );
+		$this->assertSame( 13.6, Prices::price( 'com' ), 'Cost 9: 13 excl., 16.25 incl., up to 17 incl.' );
 	}
 
 	public function test_an_override_below_the_registrar_cost_is_found_and_the_admin_is_told_after_a_refresh(): void {
