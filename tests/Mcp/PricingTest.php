@@ -110,9 +110,9 @@ final class PricingTest extends UsageTestCase {
 		$this->assertStringContainsString( 'order_database', $out['note'] );
 	}
 
-	public function test_a_database_plan_says_backups_come_with_the_add_on_and_where_to_add_it(): void {
+	public function test_a_database_plan_says_what_the_add_on_covers_and_where_to_add_it(): void {
 		$plan = $this->call( 'catalog', array( 'kind' => 'database_plans' ) )['plans'][0];
-		$this->assertSame( 0, $plan['backup_days'], 'A database has no backups of its own.' );
+		$this->assertSame( 0, $plan['backup_days'], 'The listed plan is the one without backups.' );
 		$this->assertNull( $plan['managed_addon'], 'Not sold: nothing to say.' );
 
 		$managed = new \WC_Product_Subscription();
@@ -132,7 +132,10 @@ final class PricingTest extends UsageTestCase {
 		$this->assertNotNull( $plan['managed_addon'] );
 		$this->assertNotSame( '', $plan['managed_addon']['price_per_month'] );
 		$this->assertStringContainsString( 'My account', $plan['managed_addon']['where'] );
-		$this->assertStringContainsString( '30 days', $plan['managed_addon']['includes'] );
+		$this->assertStringContainsString( 'billed per started 15 minutes', $plan['managed_addon']['includes'] );
+		$this->assertStringNotContainsString( '30 days', $plan['managed_addon']['includes'], 'Backups are a separate option, not part of Managed.' );
+		$this->assertArrayHasKey( 'daily_backups', $plan['options'] );
+		$this->assertNull( $plan['options']['daily_backups'], 'This fixture has no Daily backups variation.' );
 	}
 
 	public function test_a_plan_of_a_monthly_product_is_not_listed(): void {

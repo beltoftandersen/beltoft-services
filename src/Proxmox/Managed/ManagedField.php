@@ -64,7 +64,7 @@ final class ManagedField {
 		$price   = CheckBox::price( $product );
 
 		if ( 'database' === self::target() ) {
-			$help  = __( 'Backups are taken every night and kept for 30 days. We install updates, act on the database\'s alerts and check that the backups run. Help with your own data and queries is billed per started 15 minutes.', 'beltoft-services' );
+			$help  = __( 'We install updates, act on the database\'s alerts and check that the backups run. Help with your own data and queries is billed per started 15 minutes.', 'beltoft-services' );
 		} else {
 			$help  = __( 'We install operating system updates, act on the server\'s alerts and check that the backups run. Help with your own software is billed per started 15 minutes.', 'beltoft-services' );
 		}

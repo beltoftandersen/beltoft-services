@@ -8,6 +8,7 @@
 namespace BeltoftServices\Proxmox\Backup;
 
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\Proxmox\Disk\DiskField;
 use BeltoftServices\Proxmox\Pve\Clusters;
 use BeltoftServices\Proxmox\Vm\OsField;
@@ -61,8 +62,7 @@ final class BackupField {
 
 	/** Show the paid backup choice as its own line, with the surcharge inside the server price. */
 	public static function item_data( array $data, array $item ): array {
-		$driver = Product::driver_for( (int) ( $item['product_id'] ?? 0 ) );
-		if ( ! $driver || ProxmoxDriver::ID !== $driver->id() ) {
+		if ( ! self::is_machine( (int) ( $item['product_id'] ?? 0 ) ) ) {
 			return $data;
 		}
 		$variation = wc_get_product( (int) ( $item['variation_id'] ?? 0 ) );
@@ -81,12 +81,34 @@ final class BackupField {
 		return $data;
 	}
 
+	/**
+	 * Is this product a server or a database: the machines that backups can be bought for?
+	 *
+	 * @param int $product_id Product.
+	 */
+	private static function is_machine( int $product_id ): bool {
+		$driver = Product::driver_for( $product_id );
+
+		return $driver && in_array( $driver->id(), array( ProxmoxDriver::ID, DbDriver::ID ), true );
+	}
+
+	/**
+	 * Is this product a database?
+	 *
+	 * @param int $product_id Product.
+	 */
+	private static function is_database( int $product_id ): bool {
+		$driver = Product::driver_for( $product_id );
+
+		return $driver && DbDriver::ID === $driver->id();
+	}
+
 	// -- The cart --------------------------------------------------------------------------------
 
 	/**
 	 * The one server in the cart that backups can be switched on or off for.
 	 *
-	 * @return array{key: string, item: array<string, mixed>, variation: \WC_Product_Variation, has: bool, with: \WC_Product_Variation|null, without: \WC_Product_Variation|null}|null Null: no field.
+	 * @return array{key: string, item: array<string, mixed>, variation: \WC_Product_Variation, has: bool, database: bool, with: \WC_Product_Variation|null, without: \WC_Product_Variation|null}|null Null: no field.
 	 */
 	public static function cart_server(): ?array {
 		$cart = function_exists( 'WC' ) ? WC()->cart : null;
@@ -98,13 +120,11 @@ final class BackupField {
 		$found = null;
 
 		foreach ( $cart->get_cart() as $key => $item ) {
-			$driver = Product::driver_for( (int) ( $item['product_id'] ?? 0 ) );
-
-			if ( ! $driver || ProxmoxDriver::ID !== $driver->id() ) {
+			if ( ! self::is_machine( (int) ( $item['product_id'] ?? 0 ) ) ) {
 				continue;
 			}
 
-			// Two servers on one order: which one would the box mean?
+			// Two servers (or a server and a database) on one order: which one would the box mean?
 			if ( null !== $found ) {
 				return null;
 			}
@@ -146,6 +166,7 @@ final class BackupField {
 			'has'       => $has,
 			'with'      => $has ? $variation : $sibling,
 			'without'   => $has ? $sibling : $variation,
+			'database'  => self::is_database( (int) $found['item']['product_id'] ),
 			'days'      => $has ? (int) $plan['backup_days'] : (int) ( Product::plan( (int) $found['item']['product_id'], $sibling->get_id() )['backup_days'] ?? 0 ),
 		);
 	}
@@ -192,7 +213,15 @@ final class BackupField {
 			esc_html( self::label( $server['without'], $server['with'], $price ) )
 		);
 
-		if ( $server['days'] > 0 ) {
+		if ( $server['days'] > 0 && $server['database'] ) {
+			echo '<p class="description">' . esc_html(
+				sprintf(
+					/* translators: %d: number of days */
+					_n( 'The whole database server is backed up every night and kept for %d day. You can restore the database from your account.', 'The whole database server is backed up every night and kept for %d days. You can restore the database from your account.', $server['days'], 'beltoft-services' ),
+					$server['days']
+				)
+			) . '</p>';
+		} elseif ( $server['days'] > 0 ) {
 			echo '<p class="description">' . esc_html(
 				sprintf(
 					/* translators: %d: number of days */

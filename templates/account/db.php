@@ -64,9 +64,9 @@ $beltoft_services_db_wait = array(
 		<div class="beltoft-services-vm__managed">
 			<h4><?php esc_html_e( 'Managed', 'beltoft-services' ); ?></h4>
 			<?php if ( $view['managed']['active'] ) : ?>
-				<p class="description"><?php esc_html_e( 'This database is managed: backups every night kept for 30 days, and we install updates, answer its alerts and check the backups. Help with your own data and queries is billed per started 15 minutes.', 'beltoft-services' ); ?></p>
+				<p class="description"><?php esc_html_e( 'This database is managed: we install updates, act on its alerts and check that the backups run. Help with your own data and queries is billed per started 15 minutes.', 'beltoft-services' ); ?></p>
 			<?php else : ?>
-				<p class="description"><?php esc_html_e( 'Backups every night kept for 30 days, and we install updates, answer the database\'s alerts and check the backups. Help with your own data and queries is billed per started 15 minutes.', 'beltoft-services' ); ?></p>
+				<p class="description"><?php esc_html_e( 'We install updates, act on the database\'s alerts and check that the backups run. Help with your own data and queries is billed per started 15 minutes.', 'beltoft-services' ); ?></p>
 				<?php if ( '' !== $view['managed']['add_price'] ) : ?><p class="description"><?php /* translators: %s: price such as 349 kr. / month */ echo esc_html( sprintf( __( 'Price: %s.', 'beltoft-services' ), $view['managed']['add_price'] ) ); ?></p><?php endif; ?>
 				<p><a class="button woocommerce-button bs-btn" href="<?php echo esc_url( $view['managed']['add_url'] ); ?>"><?php esc_html_e( 'Buy Managed', 'beltoft-services' ); ?></a></p>
 			<?php endif; ?>
@@ -315,11 +315,12 @@ $beltoft_services_db_wait = array(
 		<div class="beltoft-services-vm__more beltoft-services-vm__backups">
 			<h4><?php esc_html_e( 'Backups', 'beltoft-services' ); ?></h4>
 			<?php if ( ! $beltoft_services_backups['enabled'] ) : ?>
-				<?php if ( ! empty( $view['managed'] ) && ! $view['managed']['active'] ) : ?>
-					<p><?php esc_html_e( 'Backups are not available for this database. They come with Managed: every night, kept for 30 days.', 'beltoft-services' ); ?></p>
-					<p><a class="button woocommerce-button bs-btn" href="<?php echo esc_url( $view['managed']['add_url'] ); ?>"><?php esc_html_e( 'Buy Managed', 'beltoft-services' ); ?></a></p>
+				<?php if ( '' !== $beltoft_services_backups['add_url'] ) : ?>
+					<?php if ( '' !== $beltoft_services_backups['add_price'] ) : ?><p class="description"><?php /* translators: %s: price such as 25 kr. / month */ echo esc_html( sprintf( __( 'Price: %s.', 'beltoft-services' ), $beltoft_services_backups['add_price'] ) ); ?></p><?php endif; ?>
+					<p><a class="button woocommerce-button bs-btn" href="<?php echo esc_url( $beltoft_services_backups['add_url'] ); ?>"><?php esc_html_e( 'Buy daily backups', 'beltoft-services' ); ?></a></p>
+					<p class="description"><?php esc_html_e( 'A backup of the whole database server is taken every night.', 'beltoft-services' ); ?></p>
 				<?php else : ?>
-				<p><?php esc_html_e( 'Backups are not available for this database.', 'beltoft-services' ); ?></p>
+					<p><?php esc_html_e( 'Backups are not available for this database.', 'beltoft-services' ); ?></p>
 				<?php endif; ?>
 			<?php else : ?>
 				<p><?php echo esc_html( sprintf( /* translators: %d: number of days */ _n( 'A backup of the whole database server is taken every night and kept for %d day.', 'A backup of the whole database server is taken every night and kept for %d days.', (int) $beltoft_services_backups['days'], 'beltoft-services' ), (int) $beltoft_services_backups['days'] ) ); ?></p>
@@ -368,6 +369,10 @@ $beltoft_services_db_wait = array(
 						<p><button type="button" class="button woocommerce-button" data-db-restore><?php esc_html_e( 'Restore now', 'beltoft-services' ); ?></button></p>
 						</div>
 					</details>
+				<?php endif; ?>
+				<?php if ( '' !== $beltoft_services_backups['remove_url'] ) : ?>
+					<p><a href="<?php echo esc_url( $beltoft_services_backups['remove_url'] ); ?>"><?php esc_html_e( 'Remove backups', 'beltoft-services' ); ?></a></p>
+					<p class="description"><?php esc_html_e( 'If you remove backups, all backups of this database are deleted.', 'beltoft-services' ); ?></p>
 				<?php endif; ?>
 			<?php endif; ?>
 		</div>

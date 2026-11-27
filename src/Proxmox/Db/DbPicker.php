@@ -9,6 +9,7 @@ namespace BeltoftServices\Proxmox\Db;
 
 use BeltoftServices\Billing\TaxNote;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Db\DbDriver;
 use BeltoftServices\Proxmox\Db\DbEngines;
 use BeltoftServices\Proxmox\Db\DbNeedsServer;
@@ -123,8 +124,8 @@ final class DbPicker {
 
 				$numbers = Product::plan( $product->get_id(), $variation->get_id() );
 
-				// The extra storage steps of a plan are chosen at checkout: each plan is listed once.
-				if ( \BeltoftServices\Proxmox\Db\DbDisk::extra( $numbers ) > 0 ) {
+				// The extra storage steps and the Daily backups option of a plan are chosen at checkout: each plan is listed once.
+				if ( \BeltoftServices\Proxmox\Db\DbDisk::extra( $numbers ) > 0 || (int) ( $numbers['backup_days'] ?? 0 ) > 0 ) {
 					continue;
 				}
 
@@ -140,7 +141,8 @@ final class DbPicker {
 					'engine'       => (string) ( $numbers['engine'] ?? '' ),
 					'major'        => (int) ( $numbers['major'] ?? 0 ),
 					'cluster'      => (string) ( $numbers['cluster'] ?? '' ),
-					'backup_days'  => 0, // A database has no backups of its own: they come with the Managed add-on.
+					'backup_days'  => 0, // The listed plan is the one without backups; the option is a sibling variation (`backups_option`).
+					'backups_option' => '' !== (string) ( \BeltoftServices\Proxmox\Pve\Clusters::get( (string) ( $numbers['cluster'] ?? '' ) )['backup_storage'] ?? '' ) && null !== Backups::sibling( $variation, true, true ),
 					// WooCommerce's own stock status, and a private network for the customer: a database cannot be built without one (a pool, not node capacity).
 					'in_stock'     => Offers::in_stock( $variation ) && \BeltoftServices\Proxmox\Network\PrivateNets::available_for( get_current_user_id(), (string) ( $numbers['cluster'] ?? '' ) ),
 					'usage'        => $rates, // A sold-out card keeps its price; process() refuses it.
@@ -564,8 +566,8 @@ final class DbPicker {
 		echo '<span>' . esc_html( ServerPicker::memory( (int) $plan['memory_mb'] ) ) . '</span>';
 		/* translators: %d: data disk size in gigabytes */
 		echo '<span>' . esc_html( sprintf( __( '%d GB data disk', 'beltoft-services' ), (int) $plan['disk_gb'] ) ) . '</span>';
-		if ( null !== \BeltoftServices\Proxmox\Managed\ManagedCart::product() ) {
-			echo '<span>' . esc_html__( 'Backups come with Managed', 'beltoft-services' ) . '</span>';
+		if ( ! empty( $plan['backups_option'] ) ) {
+			echo '<span>' . esc_html__( 'Daily backups as an option', 'beltoft-services' ) . '</span>';
 		}
 		echo '</span>';
 

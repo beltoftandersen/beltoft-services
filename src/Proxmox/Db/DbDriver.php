@@ -11,6 +11,7 @@ use BeltoftServices\Alerts;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Vm\Actions;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
@@ -313,14 +314,27 @@ class DbDriver extends ProxmoxDriver {
 			'single_line' => true,
 			'data_disk'   => true,
 			'parts'       => static function ( \WC_Product_Variation $usage, callable $price ): array {
-				$bare = DbDisk::ladder( $usage )[0] ?? $usage;
+				$backups = 0.0;
+				$plain   = $usage;
+
+				// The Daily backups variation costs more than the same plan without: the difference is its own line.
+				if ( (int) ( Product::plan( $usage->get_parent_id(), $usage->get_id() )['backup_days'] ?? 0 ) > 0 ) {
+					$without = Backups::sibling( $usage, false );
+
+					if ( $without ) {
+						$backups = max( 0.0, $price( $usage ) - $price( $without ) );
+						$plain   = $without;
+					}
+				}
+
+				$bare = DbDisk::ladder( $plain )[0] ?? $plain;
 
 				// 'ip' stays in the parts for the readers of the breakdown: a public IPv4 address is its own add-on line now.
 				return array(
 					'base'    => $price( $bare ),
 					'ip'      => 0.0,
-					'storage' => $price( $usage ) - $price( $bare ),
-					'backups' => 0.0,
+					'storage' => $price( $plain ) - $price( $bare ),
+					'backups' => $backups,
 					'gb'      => DbDisk::extra( Product::plan( $usage->get_parent_id(), $usage->get_id() ) ),
 				);
 			},

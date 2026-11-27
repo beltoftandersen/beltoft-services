@@ -156,12 +156,12 @@ class DbPickerTest extends BackupTestCase {
 		$this->assertStringNotContainsString( 'data-tiles', $html, 'No system or app tiles.' );
 	}
 
-	public function test_the_plan_days_are_ignored_and_the_add_on_is_pointed_to_only_when_it_is_sold(): void {
+	public function test_a_variation_with_backup_days_is_an_option_and_the_managed_add_on_is_not_mentioned_on_the_cards(): void {
 		$this->v['Big']->update_meta_data( Product::META_PLAN . 'backup_days', '14' );
 		$this->v['Big']->save();
 
-		$this->assertSame( array( 0, 0 ), array_values( array_map( static fn( $p ) => $p['backup_days'], DbPicker::plans() ) ) );
-		$this->assertStringNotContainsString( 'Daily backups', $this->page() );
+		$this->assertSame( array( 0 ), array_values( array_map( static fn( $p ) => $p['backup_days'], DbPicker::plans() ) ), 'A variation that names backup days is the Daily backups option of a plan, not a plan.' );
+		$this->assertStringNotContainsString( 'Daily backups', $this->page(), 'This fixture has no Daily backups variation.' );
 
 		$managed = new \WC_Product_Subscription();
 		$managed->set_name( 'Managed' );
@@ -176,7 +176,7 @@ class DbPickerTest extends BackupTestCase {
 		$managed->save();
 		\BeltoftServices\Proxmox\Addon\AddonCart::reset_products();
 
-		$this->assertStringContainsString( 'Backups come with Managed', $this->page() );
+		$this->assertStringNotContainsString( 'Backups come with Managed', $this->page(), 'Managed gives no backups.' );
 	}
 
 	public function test_only_published_products_of_the_driver_are_offered(): void {

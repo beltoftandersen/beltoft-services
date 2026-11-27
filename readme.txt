@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.67.0
+Stable tag: 0.68.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,11 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.68.0 =
+* Daily backup is its own option of a database, as on Dedicated VPS: a Backups None/Daily attribute with a Daily variation of every plan and storage step (backup_days 30). It is a tick box in the checkout for a new database (the same box as a server's, with database words, and the extra storage is kept when it is switched) and "Buy daily backups" / "Remove backups" on the Backups tab of the database page, through the same sibling switch (Backups::sibling) as a server. The New database page lists a plan once (the Daily variation is the option), says "Daily backups as an option", and the plan cards link to the plan with backups. The price breakdown of a Daily variation has its own backups line. The MCP database plans carry `options.daily_backups` (price; it is not ordered through Claude).
+* The Managed add-on no longer includes backups on a database: updates, action on alerts, a check that the backups run, help per started 15 minutes, the same for every server and database. Removed: the filter `beltoft_services_backup_days`, `Managed\ManagedBackups`, the `backups_included` stamp and `Backups::DB_DEFAULT_DAYS`. A database's backup days are its plan's. `Backups::sync_purge()` stays (plan change to a plan without the option queues the removal, kept 7 days and not restorable, then deleted only with deletion mode on). A database made before this release keeps the backup days stored in its plan.
+* Danish: "backup" in the server checkout line instead of "sikkerhedskopieret".
 
 = 0.67.0 =
 * Databases are plain services and the Managed add-on (the product 1251 "Managed server") can be added to a database as it is to a server. A database without the add-on has no backups; automatic security updates and the down and disk-full emails stay. With the add-on: nightly backups kept 30 days, updates, action on alerts and backup checks. The add-on is offered on the database page in My Account and as a box in the checkout for a new database (not when the cart also holds a new server).

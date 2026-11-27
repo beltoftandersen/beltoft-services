@@ -83,11 +83,6 @@ final class Backups {
 	public const ORPHANS = 'beltoft_services_orphaned_backups';
 
 	/**
-	 * Days the backups of a database with the Managed add-on are kept when its plan names none.
-	 */
-	public const DB_DEFAULT_DAYS = 30;
-
-	/**
 	 * Cluster settings (token secret decrypted).
 	 *
 	 * @var array<string, mixed>
@@ -104,7 +99,7 @@ final class Backups {
 	// -- Rules -----------------------------------------------------------------------------------
 
 	/**
-	 * Does this server get backups? The plan asks for them (a database only with the Managed add-on), its cluster
+	 * Does this server or database get backups? The plan asks for them (the Daily backups option), its cluster
 	 * has a backup storage, and it is not an adopted machine.
 	 *
 	 * @param Resource $r Resource.
@@ -179,28 +174,19 @@ final class Backups {
 	public const PURGE_GRACE = 7 * DAY_IN_SECONDS;
 
 	/**
-	 * Days the plan keeps backups, then the filter `beltoft_services_backup_days` (a database's backups come with the
-	 * Managed add-on, see Managed\ManagedBackups). A server's days are the plan's.
+	 * Days the plan keeps backups: the plan's own, for a server and for a database (the Daily backups option of its variation).
 	 *
 	 * @param Resource $r Resource.
 	 */
 	public static function days( Resource $r ): int {
 		$plan = (array) $r->get( 'plan' );
-		$days = max( 0, (int) ( $plan['backup_days'] ?? 0 ) );
 
-		/**
-		 * Filters the days a resource's backups are kept.
-		 *
-		 * @param int      $days Days of the plan.
-		 * @param Resource $r    The resource.
-		 */
-		return max( 0, (int) apply_filters( 'beltoft_services_backup_days', $days, $r ) );
+		return max( 0, (int) ( $plan['backup_days'] ?? 0 ) );
 	}
 
 	/**
 	 * A resource that has lost its backups after having them queues the removal of the backups for the nightly
-	 * run (meta `backup_purge`); one that has them again cancels it. No Proxmox call. Uses the days that apply now
-	 * (days()), so a plan change never queues a purge for a database whose backups come with an add-on.
+	 * run (meta `backup_purge`); one that has them again cancels it. No Proxmox call. Uses the days of the stored plan.
 	 *
 	 * @param Resource $r Resource.
 	 * @return bool False when the meta could not be stored.

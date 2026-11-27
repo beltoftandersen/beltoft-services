@@ -9,6 +9,7 @@ namespace BeltoftServices\Proxmox\Db;
 
 use BeltoftServices\Mcp\Pricing;
 use BeltoftServices\Product;
+use BeltoftServices\Proxmox\Backup\Backups;
 use BeltoftServices\Proxmox\Ipv4\Ipv4Cart;
 use BeltoftServices\Usage\Breakdown;
 use BeltoftServices\Usage\Rates;
@@ -57,7 +58,7 @@ final class McpPricing {
 
 	/**
 	 * The Managed add-on of a database, to tell the customer: its monthly price and where to add it. Null when the shop does not sell it.
-	 * It is not ordered through Claude. Backups of a database come with it.
+	 * It is not ordered through Claude.
 	 *
 	 * @return array{price_per_month: string, where: string, includes: string}|null
 	 */
@@ -71,7 +72,7 @@ final class McpPricing {
 		return array(
 			'price_per_month' => \BeltoftServices\Checkout\CheckBox::price( $product ),
 			'where'    => __( 'The customer adds it in My account, on the page of the database, or in the checkout when ordering in the browser.', 'beltoft-services' ),
-			'includes' => __( 'Backups every night kept for 30 days, updates, action on alerts and backup checks. A database without it has no backups.', 'beltoft-services' ),
+			'includes' => __( 'We install updates, act on the alerts and check that the backups run. Help with your own data and queries is billed per started 15 minutes. Daily backups are a separate option.', 'beltoft-services' ),
 		);
 	}
 
@@ -96,6 +97,15 @@ final class McpPricing {
 			),
 			'max_data_disk_gb' => DbDisk::max_gb(),
 		);
+
+		$with = $bare instanceof \WC_Product_Variation ? Backups::sibling( $bare, true, true ) : null;
+
+		// Daily backups are an option of the plan. Claude does not order it: the customer adds it at checkout or later in the dashboard.
+		$out['daily_backups'] = $with ? array(
+			'adds' => Pricing::addon_between( $bare, $with ),
+			'days' => (int) ( Product::plan( $with->get_parent_id(), $with->get_id() )['backup_days'] ?? 0 ),
+			'note' => __( 'Not ordered through Claude. The customer adds it at checkout in the browser, or later on the page of the database in My account.', 'beltoft-services' ),
+		) : null;
 
 		foreach ( $bare instanceof \WC_Product_Variation ? array_keys( DbDisk::ladder( $bare ) ) : array() as $gb ) {
 			if ( $gb < 1 ) {

@@ -1040,8 +1040,11 @@ class DbPhase4Test extends TestCase {
 			include BELTOFT_SERVICES_PATH . 'templates/account/db.php';
 		} )( $view, array( 'overview' => 'Overview', 'backups' => 'Backups' ), 'backups', static fn( $slug ) => '/x/' . $slug );
 		$tab = (string) ob_get_clean();
-		$this->assertStringContainsString( 'They come with Managed', $tab );
-		$this->assertStringContainsString( 'Buy Managed', $tab );
+		$this->assertStringContainsString( 'Backups are not available for this database', $tab );
+		$this->assertStringNotContainsString( 'They come with Managed', $tab, 'Backups are their own option now, not part of Managed.' );
+		$this->assertStringNotContainsString( 'Buy Managed', $tab );
+		$this->assertStringContainsString( 'check that the backups run', $html );
+		$this->assertStringNotContainsString( 'kept for 30 days', $html );
 	}
 
 	public function test_the_managed_line_says_what_it_covers_in_cart_order_and_name(): void {
@@ -1071,7 +1074,7 @@ class DbPhase4Test extends TestCase {
 		$html = $this->card( $r, 'overview' );
 		$this->assertStringContainsString( 'This database is managed', $html );
 		$this->assertStringNotContainsString( 'Buy Managed', $html );
-		$this->assertStringContainsString( 'Daily, kept 30 days', $html, 'The backups row appears with the add-on.' );
+		$this->assertStringNotContainsString( 'Daily, kept', $html, 'The add-on gives no backups: the plan option does.' );
 	}
 
 	public function test_the_add_on_takes_a_database_of_its_own_ready_customer_only_once_and_not_an_adopted_one(): void {

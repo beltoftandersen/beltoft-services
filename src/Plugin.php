@@ -278,7 +278,6 @@ final class Plugin {
 		Proxmox\Snapshot\SnapshotCart::register();
 		Proxmox\Managed\ManagedMeta::register();
 		Proxmox\Managed\ManagedCart::register();
-		Proxmox\Managed\ManagedBackups::register();
 		Proxmox\Ipv4\Ipv4Meta::register();
 		Proxmox\Ipv4\Ipv4Cart::register();
 		Proxmox\Ipv4\Ipv4Panels::register();

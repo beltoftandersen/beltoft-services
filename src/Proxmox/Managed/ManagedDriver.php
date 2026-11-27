@@ -122,7 +122,7 @@ final class ManagedDriver implements Driver, \BeltoftServices\Drivers\UsageItems
 		$server = ManagedMeta::server_of( $r );
 
 		if ( $server && ManagedMeta::is_database( $server ) ) {
-			echo '<p>' . esc_html__( 'Managed: we keep this database up to date, answer its alerts and check its backups.', 'beltoft-services' ) . '</p>';
+			echo '<p>' . esc_html__( 'Managed: we install updates, act on this database\'s alerts and check that the backups run.', 'beltoft-services' ) . '</p>';
 			echo '<p><a href="' . esc_url( DiskGuide::card_url( $server ) ) . '">' . esc_html__( 'Open the database', 'beltoft-services' ) . '</a></p>';
 			return;
 		}

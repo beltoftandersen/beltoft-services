@@ -171,6 +171,9 @@ final class DbCard {
 		$view    = Backups::listing( $r );
 		$dump    = (int) $r->get( 'db_last_dump' );
 		$format  = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
+		// Daily backups are a sibling variation of the plan, switched like a server's (Backups::switch_url).
+		$add     = $enabled ? '' : Backups::switch_url( $r, true );
+		$remove  = $enabled ? Backups::switch_url( $r, false ) : '';
 
 		return array(
 			'enabled'     => $enabled,
@@ -178,6 +181,9 @@ final class DbCard {
 			'list'        => $view['list'],
 			'last_ok'     => $view['last_ok'],
 			'last_dump'   => $dump > 0 ? wp_date( $format, $dump ) : '',
+			'add_url'     => $add,
+			'add_price'   => '' === $add ? '' : Backups::price_label( $r, true ),
+			'remove_url'  => $remove,
 			'can_restore' => $enabled && $offered && array() !== $view['list'],
 			'can_delete'  => $enabled && $delete && array() !== $view['list'] && ! Backups::running( $r ),
 			'confirm'     => Actions::CONFIRM_RESTORE,

@@ -447,7 +447,8 @@ class DbDiskFieldTest extends BackupTestCase {
 		$html = $this->managed_html();
 		$this->assertStringContainsString( 'Managed, ', $html );
 		$this->assertStringContainsString( '299', $html );
-		$this->assertStringContainsString( 'kept for 30 days', $html );
+		$this->assertStringContainsString( 'check that the backups run', $html );
+		$this->assertStringNotContainsString( 'kept for 30 days', $html, 'Backups are their own option, not part of Managed.' );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
 
 		$this->assertTrue( \BeltoftServices\Proxmox\Managed\ManagedField::choose( true )['ok'], wp_json_encode( wc_get_notices() ) );
