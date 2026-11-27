@@ -58,7 +58,7 @@ class DatabaseUsageTest extends UsageTestCase {
 		$product->update_meta_data( \BeltoftLicenses\Software::META_SLUG, 'db-' . wp_generate_password( 5, false ) );
 		$product->update_meta_data( Rates::META_PREMIUM, $premium );
 
-		foreach ( array( 'cluster' => 'lab', 'template' => '9100', 'major' => '18', 'cores' => '1', 'memory_mb' => '2048', 'disk_gb' => '20', 'backup_days' => '7' ) as $key => $value ) {
+		foreach ( array( 'cluster' => 'lab', 'template' => '9100', 'major' => '18', 'cores' => '1', 'memory_mb' => '2048', 'disk_gb' => '20' ) as $key => $value ) {
 			$product->update_meta_data( Product::META_PLAN . $key, $value );
 		}
 
