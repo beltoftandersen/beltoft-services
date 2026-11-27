@@ -326,6 +326,8 @@ final class MailDns {
 				return __( 'The name is an alias (CNAME) and cannot also hold this record.', 'beltoft-services' );
 			case 'mx_other':
 				return __( 'The domain already has other MX records.', 'beltoft-services' );
+			case 'mx_second':
+				return '';
 			case 'spf_exists':
 				/* translators: %s: SPF include to add */
 				return sprintf( __( 'The domain already has an SPF record. It was not changed: add include:%s to it.', 'beltoft-services' ), MailSettings::spf_include() );
@@ -486,6 +488,48 @@ final class MailDns {
 			default:
 				return in_array( $want, $found, true );
 		}
+	}
+
+	/**
+	 * The MX records of a domain against ours: ours is missing, alone, or has company. Company with the same or a better priority
+	 * (a lower number) splits the mail between two servers; with a worse priority it is only worth a note. The setting
+	 * mail_dns_mx_strict turns the first into a note too.
+	 *
+	 * @param array<string, mixed> $row   The stored MX row.
+	 * @param string[]             $found Values found: "priority host".
+	 * @return array{0:string,1:string[]} Verdict (missing, ok, ok_note, wrong) and the other records as "priority host".
+	 */
+	public static function mx_verdict( array $row, array $found ): array {
+		$want   = strtolower( rtrim( (string) $row['value'], '.' ) );
+		$ours   = array();
+		$others = array();
+
+		foreach ( $found as $value ) {
+			if ( 1 !== preg_match( '/^(\d+)\s+(\S+)$/D', strtolower( rtrim( trim( (string) $value ), '.' ) ), $m ) ) {
+				continue;
+			}
+
+			$host = rtrim( $m[2], '.' );
+
+			if ( $host === $want ) {
+				$ours[] = (int) $m[1];
+			} else {
+				$others[ (int) $m[1] . ' ' . $host ] = (int) $m[1];
+			}
+		}
+
+		if ( array() === $ours ) {
+			return array( 'missing', array() );
+		}
+
+		if ( array() === $others ) {
+			return array( 'ok', array() );
+		}
+
+		asort( $others );
+		$list = array_slice( array_keys( $others ), 0, 3 );
+
+		return array( MailSettings::dns_mx_strict() && min( $others ) <= min( $ours ) ? 'wrong' : 'ok_note', $list );
 	}
 
 	/**
@@ -722,6 +766,19 @@ final class MailDns {
 			$row['reason'] = '';
 			unset( $row['seen'], $row['merged'] );
 
+			// Ours is there: another mail server next to it is a problem or a note, by its priority.
+			if ( 'mx' === $row['key'] ) {
+				list( $verdict, $others ) = self::mx_verdict( $row, $found );
+
+				if ( 'wrong' === $verdict ) {
+					$row['status'] = 'conflict';
+					$row['reason'] = 'mx_second';
+					$row['seen']   = $others;
+				} elseif ( 'ok_note' === $verdict ) {
+					$row['seen'] = $others;
+				}
+			}
+
 			return $row;
 		}
 
@@ -731,6 +788,16 @@ final class MailDns {
 
 		// What is there now, for the guide: another MX, another SPF (and the SPF with our include added), another key.
 		$seen = array_values( array_filter( array_map( static fn( $v ) => substr( trim( (string) $v ), 0, 400 ), 'spf' === $row['key'] ? array_filter( $found, static fn( $v ) => 0 === stripos( (string) $v, 'v=spf1' ) ) : $found ), static fn( $v ) => '' !== $v ) );
+
+		// A name that holds an address where the alias should be (a proxy in front of it answers like that).
+		if ( 'CNAME' === $row['type'] && array() === $seen ) {
+			$addresses = self::lookup( $fqdn, 'A' );
+
+			if ( ! is_wp_error( $addresses ) ) {
+				$seen = array_values( array_filter( array_map( 'strval', $addresses ), static fn( $v ) => false !== filter_var( $v, FILTER_VALIDATE_IP ) ) );
+			}
+		}
+
 		$row['seen'] = array_slice( $seen, 0, 3 );
 
 		if ( 'spf' === $row['key'] && array() !== $seen ) {

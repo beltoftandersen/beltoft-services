@@ -831,4 +831,47 @@ final class MailAccountTest extends MailTestCase {
 		$r->set( array( 'mail_dns' => 'waiting', 'mail_dns_moved' => time(), 'mail_dns_lost_at' => time() ) );
 		$this->assertStringContainsString( 'The name servers of state.example no longer point to us.', $this->page( Resource::find( $r->id() ) ) );
 	}
+
+	public function test_a_paused_service_says_until_when_mailboxes_and_mail_are_kept(): void {
+		$r = $this->ready_mail( 'pausedpage.example', array(), $this->user );
+		$paused = time() - 5 * DAY_IN_SECONDS;
+		\BeltoftLicenses\Licenses::update( (int) $r->license()['id'], array( 'status' => \BeltoftLicenses\Licenses::STATUS_EXPIRED ) );
+		$r->set( array( 'state' => 'paused', 'desired' => 'paused', 'paused_at' => $paused ) );
+		$this->settings( array( 'deletion_mode' => 'on' ) );
+		$expected = wp_date( get_option( 'date_format' ), $paused + 30 * DAY_IN_SECONDS );
+
+		$view = \BeltoftServices\Mail\MailView::data( Resource::find( $r->id() ), array() );
+		$this->assertSame( 'paused', $view['kind'] );
+		$this->assertSame( $expected, $view['kept_until'], 'The 30 days of the email retention from the day it was paused.' );
+		$this->assertStringContainsString( 'Mailboxes and mail are kept until ' . $expected . '.', $this->page( Resource::find( $r->id() ) ) );
+
+		$this->settings( array( 'deletion_mode' => 'off' ) );
+		$this->assertSame( '', \BeltoftServices\Mail\MailView::data( Resource::find( $r->id() ), array() )['kept_until'], 'Nothing is deleted in this mode, so no date is promised.' );
+		$this->assertStringNotContainsString( 'are kept until', $this->page( Resource::find( $r->id() ) ) );
+	}
+
+	public function test_a_failed_proof_page_shows_the_record_and_try_again_then_the_order_again_text(): void {
+		$this->proof['check_txt'] = array( 'status' => 'missing', 'servers' => array(), 'reason' => 'not_found' );
+		$r = $this->mail_resource( 'failedpage.example', array( 'mail_proof_until' => time() - 60 ), array(), $this->user );
+		\BeltoftServices\Jobs::enqueue( $r->id() );
+		$this->run_jobs( 3 );
+		$r = Resource::find( $r->id() );
+		$this->assertSame( 'failed', $r->get( 'state' ) );
+
+		$html = $this->page( $r );
+		$this->assertStringContainsString( 'The ownership record was not found in 14 days. You can try again until', $html );
+		$this->assertStringContainsString( 'data-mail-retry', $html );
+		$this->assertStringContainsString( 'Try again', $html );
+		$this->assertStringContainsString( '_beltoft-verify', $html, 'The proof record.' );
+		$this->assertStringNotContainsString( 'Please contact support', $html );
+
+		$r->set( array( 'mail_proof_failed_at' => time() - 40 * DAY_IN_SECONDS ) );
+		$html = $this->page( Resource::find( $r->id() ) );
+		$this->assertStringContainsString( 'the time to try again is over. Order the email domain again.', $html );
+		$this->assertStringNotContainsString( 'data-mail-retry', $html );
+
+		$other = $this->mail_resource( 'systemfail.example', array(), array(), $this->user );
+		$other->set( array( 'state' => 'failed', 'desired' => 'ready', 'failed_op' => 'provision' ) );
+		$this->assertStringContainsString( 'Please contact support', $this->page( Resource::find( $other->id() ) ) );
+	}
 }

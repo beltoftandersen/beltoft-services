@@ -55,6 +55,12 @@ final class MailWake {
 				continue;
 			}
 
+			// A ready service whose DNS was elsewhere and is ours now: the records are written into the new zone.
+			if ( MailGuard::domain( $mail ) === $name && 'ready' === (string) $mail->get( 'state' ) && 'external' === (string) $mail->get( 'mail_mode' ) && MailDomain::on_our_servers( $name, $user ) ) {
+				MailDns::adopt_zone( $mail );
+				continue;
+			}
+
 			if ( MailGuard::domain( $mail ) !== $name || ! in_array( (string) $mail->get( 'state' ), array( 'requested', 'provisioning' ), true ) || in_array( 'proof', (array) $mail->get( 'steps' ), true ) ) {
 				continue;
 			}

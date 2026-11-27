@@ -28,8 +28,14 @@ $beltoft_services_wait   = array(
 	'building' => null !== $view['dns']['proof']
 		? ''
 		: __( 'Your email domain is being set up. Mailboxes can be made when it is ready. You can leave this page.', 'beltoft-services' ),
-	'paused'   => __( 'Your email service is paused. Mail to your addresses is not delivered until it is active again.', 'beltoft-services' ),
-	'failed'   => __( 'Your email domain could not be set up. We have been told about the problem. Please contact support.', 'beltoft-services' ),
+	'paused'   => '' !== (string) $view['kept_until']
+		? sprintf( /* translators: %s: a date such as 12 January 2027 */ __( 'Your email service is paused. Mail to your addresses is not delivered until it is active again. Mailboxes and mail are kept until %s.', 'beltoft-services' ), $view['kept_until'] )
+		: __( 'Your email service is paused. Mail to your addresses is not delivered until it is active again.', 'beltoft-services' ),
+	'failed'   => 'open' === $view['dns']['retry']['state']
+		? sprintf( /* translators: %s: a date such as 12 January */ __( 'The ownership record was not found in 14 days. You can try again until %s.', 'beltoft-services' ), $view['dns']['retry']['until'] )
+		: ( 'expired' === $view['dns']['retry']['state']
+			? __( 'The ownership record was not found in 14 days, and the time to try again is over. Order the email domain again.', 'beltoft-services' )
+			: __( 'Your email domain could not be set up. We have been told about the problem. Please contact support.', 'beltoft-services' ) ),
 	'removed'  => __( 'This email service has been removed.', 'beltoft-services' ),
 );
 $beltoft_services_size   = static function ( int $mb ): string {
@@ -159,6 +165,9 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 
 		<?php if ( isset( $beltoft_services_wait[ $view['kind'] ] ) ) : ?>
 			<?php if ( '' !== $beltoft_services_wait[ $view['kind'] ] ) : ?><p class="beltoft-services-panel__notice" role="status"><?php echo esc_html( $beltoft_services_wait[ $view['kind'] ] ); ?></p><?php endif; ?>
+			<?php if ( 'failed' === $view['kind'] && 'open' === $view['dns']['retry']['state'] && null !== $view['dns']['guide'] ) : ?>
+				<?php \BeltoftServices\Domains\DnsRecordsGuide::render( $view['dns']['guide'] ); ?>
+			<?php endif; ?>
 			<?php if ( 'building' === $view['kind'] && null !== $view['dns']['proof'] ) : ?>
 				<p><button type="button" class="button woocommerce-button" data-mail-proof-check><?php esc_html_e( 'Check now', 'beltoft-services' ); ?></button></p>
 			<?php endif; ?>

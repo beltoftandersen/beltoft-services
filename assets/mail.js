@@ -520,6 +520,21 @@
 			return;
 		}
 
+		if ( target.hasAttribute( 'data-mail-retry' ) ) {
+			guarded( box, target, strings.retrying, function ( h ) {
+				return call( box, 'POST', '/mail/retry' ).then( function ( result ) {
+					if ( result.ok ) {
+						S.done( h, strings.retrying );
+						fresh( box );
+					} else {
+						S.fail( h, problem( result ) );
+					}
+				} );
+			} );
+
+			return;
+		}
+
 		if ( target.hasAttribute( 'data-mail-dns-check' ) ) {
 			guarded( box, target, strings.checking, function ( h ) {
 				return call( box, 'POST', '/mail/dns/check' ).then( function ( result ) {

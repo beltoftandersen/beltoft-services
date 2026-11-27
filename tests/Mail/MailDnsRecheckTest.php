@@ -110,7 +110,7 @@ final class MailDnsRecheckTest extends MailTestCase {
 
 		MailDns::recheck( $r->id() );
 		$first = $looks;
-		$this->assertSame( 6, $first, 'One lookup per record.' );
+		$this->assertSame( 8, $first, 'One lookup per record, and an address lookup for each of the two aliases that are missing.' );
 
 		MailDns::recheck( $r->id() );
 		$this->assertSame( $first, $looks, 'The second call the same day reads nothing.' );

@@ -357,7 +357,7 @@ final class Retention {
 		$paused_at = $r->get( 'paused_at' );
 		$license   = $r->license();
 
-		if ( null === $paused_at || ! $license || 'on' !== (string) Settings::get( 'deletion_mode' ) || $r->on_hold() || 'paused' !== (string) $r->get( 'desired' ) ) {
+		if ( null === $paused_at || ! $license || 'on' !== (string) Settings::get( 'deletion_mode' ) || $r->on_hold() || 'paused' !== (string) $r->get( 'desired' ) || Licenses::STATUS_ACTIVE === Licenses::effective_status( $license ) ) {
 			return 0;
 		}
 

@@ -30,7 +30,7 @@ defined( 'ABSPATH' ) || exit;
  * - done_text (string): the one line shown when everything needed is found.
  * - hints (string[]): short lines under the records (for example the Cloudflare proxy hint).
  * - collapse (string): the label of a fold; the records are inside it, closed (a zone of ours, where nothing is added by hand).
- * - done_hint (string): a line under the done line (a recommended record still missing).
+ * - done_hint (string|string[]): lines under the done line (a recommended record still missing, a note).
  * - check: null for no button, or array(label, attrs, class, next, next_text): the button that starts a check (the feature's own
  *   script handles it); a next in the future (Unix time) draws it disabled with next_text, and its script enables it then. checked (int timestamp, 0 never), interval (seconds between automatic checks, 0 for none), days (how long it keeps
  *   checking, 0 for no limit).
@@ -155,8 +155,8 @@ final class DnsRecordsGuide {
 		if ( $done ) {
 			$out .= '<p class="beltoft-dnsg__done" role="status">' . esc_html( (string) ( $model['done_text'] ?? '' ) ) . '</p>';
 
-			if ( '' !== (string) ( $model['done_hint'] ?? '' ) ) {
-				$out .= '<p class="beltoft-dnsg__hint">' . esc_html( (string) $model['done_hint'] ) . '</p>';
+			foreach ( array_values( array_filter( array_map( 'strval', (array) ( $model['done_hint'] ?? array() ) ), static fn( $h ) => '' !== $h ) ) as $hint ) {
+				$out .= '<p class="beltoft-dnsg__hint">' . esc_html( $hint ) . '</p>';
 			}
 
 			$out .= self::group( __( 'Recommended', 'beltoft-services' ), array_filter( $records, static fn( $rec ) => empty( $rec['required'] ) && 'ok' !== ( $rec['status'] ?? '' ) ), $domain );

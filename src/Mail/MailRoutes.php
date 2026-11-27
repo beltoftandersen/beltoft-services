@@ -167,6 +167,12 @@ final class MailRoutes {
 			'permission_callback' => 'is_user_logged_in',
 			'args'                => $id,
 		) );
+		register_rest_route( $ns, $base . '/retry', array(
+			'methods'             => \WP_REST_Server::CREATABLE,
+			'callback'            => array( __CLASS__, 'retry' ),
+			'permission_callback' => 'is_user_logged_in',
+			'args'                => $id,
+		) );
 		register_rest_route( $ns, '/resources/(?P<id>\d+)/mail-domains', array(
 			'methods'             => \WP_REST_Server::CREATABLE,
 			'callback'            => array( __CLASS__, 'add_domain' ),
@@ -593,6 +599,32 @@ final class MailRoutes {
 		$view = MailView::data( Resource::find( $r->id() ) ?? $r, array() );
 
 		return self::queued( $r, Mailboxes::DNS_CHECK, array( 'dns' => $view['dns'], 'next' => ManualCheck::next( Resource::find( $r->id() ) ?? $r, MailView::MANUAL_META, MailSettings::dns_check_gap(), MailSettings::dns_check_per_hour() ) ), __( 'We are checking your DNS records. This can take a minute.', 'beltoft-services' ) );
+	}
+
+	/**
+	 * Try again after the ownership proof was not found in time: the set up runs again, for the days of the setting
+	 * mail_retry_days after the failure. Any other failure is not the customer's to retry.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 */
+	public static function retry( \WP_REST_Request $request ): \WP_REST_Response {
+		$r = self::guard( $request, false, 3 );
+
+		if ( ! $r instanceof Resource ) {
+			return $r;
+		}
+
+		$started = MailRetry::run( $r );
+
+		if ( null === $started ) {
+			return self::error( 'busy', __( 'This email domain is busy. Please try again in a moment.', 'beltoft-services' ) );
+		}
+
+		if ( ! $started ) {
+			return self::error( 'not_ready', MailRetry::state( $r ) === 'expired' ? __( 'The time to try again is over. Order the email domain again.', 'beltoft-services' ) : __( 'There is nothing to try again.', 'beltoft-services' ) );
+		}
+
+		return self::ok( array( 'retry' => true, 'message' => __( 'We are setting up your email domain again. This can take a minute.', 'beltoft-services' ) ), 202 );
 	}
 
 	/**
