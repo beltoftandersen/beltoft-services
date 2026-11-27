@@ -419,8 +419,10 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 .beltoft-services-servers { max-width: var(--bs-page-width); container-type: inline-size; }
 /* THE list card: every row of every list is one of these (the row's inner grid is its own rule below). */
 :is(.beltoft-services-servers > :is(a, div).beltoft-services-srv, .beltoft-services-ov__rows > :is(a, div).beltoft-services-ov__row, .beltoft-services-mail__list > .bs-item, .beltoft-services-glance > :is(a, div)) { box-sizing: border-box; padding: var(--bs-list-pad-y) var(--bs-list-pad-x); border: var(--bs-list-border); border-radius: var(--bs-list-radius); background: var(--bs-list-bg); }
+/* Tables that are lists (payment methods, the credit history): the same frame. */
+body.woocommerce-account .woocommerce-MyAccount-content :is(table.beltoft-services-credit__history, table.woocommerce-MyAccount-paymentMethods) { box-sizing: border-box; border: var(--bs-list-border); border-collapse: separate; border-spacing: 0; border-radius: var(--bs-list-radius); overflow: hidden; background: var(--bs-list-bg); }
 /* Cards that hold more than a row, and the empty-list card, share the same border, corner and ground. */
-:is(.beltoft-licenses__license, .beltoft-services-ov__money, .beltoft-services-ov__feed, .beltoft-services-credit__balance, .beltoft-services-credit__grid) { border: var(--bs-list-border); border-radius: var(--bs-list-radius); background: var(--bs-list-bg); }
+:is(.beltoft-licenses__license, .beltoft-services-facts, .beltoft-services-tab:not([data-tab="overview"]), .beltoft-services-ov__money, .beltoft-services-ov__feed, .beltoft-services-credit__balance, .beltoft-services-credit__grid) { border: var(--bs-list-border); border-radius: var(--bs-list-radius); background: var(--bs-list-bg); }
 .beltoft-services-servers a.beltoft-services-srv { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.4fr) minmax(0, 1.6fr) auto; gap: 12px; align-items: center; color: var(--bs-ink) !important; text-decoration: none !important; }
 /* One hover for everything that opens something (server and domain rows, overview rows, overview tiles): a soft ground; the thin line round it only for keyboard focus. */
 .beltoft-services-servers a.beltoft-services-srv:focus-visible,
@@ -541,8 +543,8 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 }
 
 /* The lines between the cells are each cell's shadow in the 1px gap, so a row that is not full stays white. */
-.beltoft-services-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 0; overflow: hidden; background: var(--bs-surface); }
-.beltoft-services-facts > div { margin: 0; padding: 8px 16px; background: var(--bs-surface); box-shadow: 0 0 0 1px var(--bs-warm); min-width: 0; }
+.beltoft-services-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 0; overflow: hidden; background: var(--bs-list-bg); }
+.beltoft-services-facts > div { margin: 0; padding: 8px 16px; background: var(--bs-list-bg); box-shadow: 0 0 0 1px var(--bs-warm); min-width: 0; }
 .beltoft-services-facts dt { margin: 0; color: var(--bs-muted); font-size: var(--bs-fs-caption); font-weight: var(--bs-fw-medium); }
 .beltoft-services-facts dd { margin: var(--bs-space-1) 0 0; font-weight: var(--bs-fw-medium); overflow-wrap: anywhere; }
 .beltoft-services-facts code { padding: 4px 8px; background: var(--bs-warm); font: inherit; font-size: 14px; }
@@ -560,7 +562,7 @@ dd:has(> .beltoft-services-copy) { display: flex; flex-wrap: wrap; align-items: 
 body.woocommerce-account .woocommerce-MyAccount-content dd > .beltoft-services-copy { margin-left: 0; }
 @media (max-width: 760px) { .beltoft-services-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
-.beltoft-services-tab:not([data-tab="overview"]) { padding: 16px; background: var(--bs-surface); }
+.beltoft-services-tab:not([data-tab="overview"]) { padding: 16px; background: var(--bs-list-bg); }
 .beltoft-services-tab > .beltoft-services-vm__disks { margin-top: 0; }
 .beltoft-services-glance { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--bs-list-gap); margin-top: 16px; }
 .beltoft-services-glance a.beltoft-services-glance__item { display: grid; gap: 4px; align-content: start; color: var(--bs-ink) !important; text-decoration: none !important; }
@@ -1496,7 +1498,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .bs-subscriptions__title
 .beltoft-services-servers--subs .beltoft-services-srv__state { justify-items: end; text-align: right; }
 .beltoft-services-srv__figure { font-size: var(--bs-fs-body); font-weight: var(--bs-fw-strong); font-variant-numeric: tabular-nums; }
 .beltoft-services-servers--subs .beltoft-services-srv__figure .woocommerce-Price-amount, .beltoft-services-servers--subs .beltoft-services-srv__sub .woocommerce-Price-amount { font-variant-numeric: tabular-nums; }
-.beltoft-services-usage__body { padding: 0 var(--bs-space-4) var(--bs-space-3); border-top: 1px solid var(--bs-warm); }
+.beltoft-services-usage__body { margin-top: var(--bs-list-gap); padding: 0 var(--bs-list-pad-x) var(--bs-space-3); border: var(--bs-list-border); border-radius: var(--bs-list-radius); background: var(--bs-list-bg); } /* the month's lines: a card under the pay as you go row */
 .beltoft-services-usage--card .beltoft-services-usage__table { margin-top: var(--bs-space-3); }
 .beltoft-services-usage--card .beltoft-services-usage__note { margin: var(--bs-space-2) 0 0; color: var(--bs-muted); font-size: var(--bs-fs-small); }
 .beltoft-services-usage--card { margin: 0 0 var(--bs-space-5); }
@@ -1766,7 +1768,7 @@ body.woocommerce-account .woocommerce-MyAccount-content section.beltoft-services
 
 /* Facts: three equal columns; the last cell(s) of a row that is not full span the rest, so no row has a blank end. Values are body size text in the
    page font (the v9 page sets code to monospace with an id selector, so the id is repeated here). */
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; background: var(--bs-surface); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; background: var(--bs-list-bg); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts > div { flex: none; box-shadow: inset 0 0 0 .5px var(--bs-line); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts > div:last-child:nth-child(3n+1) { grid-column: span 3; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts > div:last-child:nth-child(3n+2) { grid-column: span 2; }
@@ -1836,7 +1838,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-tile s
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-picker :is(.beltoft-services-app__note, .beltoft-services-tiles__note) { max-width: none; color: var(--bs-muted); font-size: var(--bs-fs-small); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-picker .beltoft-services-picker__product { color: var(--bs-ink); font-weight: var(--bs-fw-strong); }
 /* The disk tile of the monitoring block reads like the glance tiles: label over value. */
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-vm-usage__chart--disk { display: grid; gap: var(--bs-space-1); align-content: start; padding: var(--bs-space-2) var(--bs-space-4); border-radius: var(--bs-radius-lg); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-vm-usage__chart--disk { display: grid; gap: var(--bs-space-1); align-content: start; padding: var(--bs-list-pad-y) var(--bs-list-pad-x); border-radius: var(--bs-list-radius); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-vm-usage__chart--disk .beltoft-vm-usage__top { color: var(--bs-muted); font-size: var(--bs-fs-caption); font-weight: var(--bs-fw-medium); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-vm-usage__chart--disk .beltoft-vm-usage__top * { color: inherit; font: inherit; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-vm-usage p.beltoft-vm-usage__disk { color: var(--bs-ink); font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); }
@@ -2029,7 +2031,7 @@ body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-db
 /* The licences list: cards as wide as the page column, one status per card, values in the text colour, "Manage subscription" an outlined button. */
 .beltoft-licenses { max-width: var(--bs-page-width); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-licenses:not(:has(.beltoft-services-domain, .beltoft-services-vm)) { grid-template-columns: minmax(0, 1fr); }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-licenses__license { box-sizing: border-box; width: 100%; padding: var(--bs-card-pad); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-licenses__license { box-sizing: border-box; width: 100%; padding: var(--bs-card-pad); border: var(--bs-list-border); border-radius: var(--bs-list-radius); background: var(--bs-list-bg); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-licenses { gap: var(--bs-list-gap); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-licenses__facts dd { color: var(--bs-ink); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-licenses__facts dt { color: var(--bs-muted); }

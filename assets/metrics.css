@@ -15,7 +15,7 @@ body.woocommerce-account .beltoft-vm-usage p.beltoft-vm-usage__notice:empty { di
 .beltoft-vm-usage__more { margin-top: 12px; }
 .beltoft-vm-usage__more > summary { cursor: pointer; color: var(--bs-muted); font-size: 14px; }
 .beltoft-vm-usage__more .beltoft-vm-usage__grid { margin-top: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.beltoft-vm-usage__chart { min-width: 0; padding: 8px 16px 8px; border: 0; background: var(--bs-surface); }
+.beltoft-vm-usage__chart { min-width: 0; padding: var(--bs-list-pad-y, 14px) var(--bs-list-pad-x, 16px); border: var(--bs-list-border, 0); background: var(--bs-list-bg, var(--bs-surface)); }
 .beltoft-vm-usage__top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-height: 26px; }
 body.woocommerce-account .beltoft-vm-usage .beltoft-vm-usage__chart h5 { margin: 0; color: var(--bs-muted); font-size: var(--bs-fs-caption); font-weight: var(--bs-fw-medium); letter-spacing: 0; line-height: var(--bs-lh-text); text-transform: none; }
 .beltoft-vm-usage__now { font-variant-numeric: tabular-nums; }
@@ -51,10 +51,10 @@ body.woocommerce-account .beltoft-vm-usage p.beltoft-vm-usage__switch-note { mar
 body.woocommerce-account .beltoft-vm-usage p.beltoft-vm-usage__switch-note:empty { display: none; }
 
 /* Dashboard UI: the charts and the range switch take the account corners. */
-.beltoft-vm-usage__chart { border-radius: var(--bs-radius-lg, 12px); }
+.beltoft-vm-usage__chart { border-radius: var(--bs-list-radius, var(--bs-radius-lg, 12px)); }
 .beltoft-vm-usage__ranges { border-radius: var(--bs-radius, 8px); overflow: hidden; }
 .beltoft-vm-usage__ranges button { border-radius: 0; }
 
 /* Monitoring inside a hosting panel: the panel's own 24px is the space above the heading, and every chart (storage too) sits on the content edge. */
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting-panel .beltoft-vm-usage { margin-top: 0; }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting-panel .beltoft-vm-usage__chart { padding-right: 0; padding-left: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-hosting-panel .beltoft-vm-usage__chart { padding-right: 0; padding-left: 0; border: 0; } /* inside a panel (a card already): no second frame */
