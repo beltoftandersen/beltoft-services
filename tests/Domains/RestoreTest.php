@@ -110,6 +110,13 @@ class RestoreTest extends TestCase {
 		return $more + array( 'status' => $status, 'renewal_date' => $date, 'name_servers' => array( array( 'name' => 'ns1.example.net' ), array( 'name' => 'ns2.example.net' ) ) );
 	}
 
+	/** Moves the stored time of the restore POST back, as if $hours had passed since. */
+	private function age_post( Resource $r, \WC_Order $order, int $hours ): void {
+		$posted = (array) Resource::find( $r->id() )->get( 'restore_posted' );
+		$posted[ (string) $order->get_id() ] = time() - $hours * HOUR_IN_SECONDS;
+		$r->set( array( 'restore_posted' => $posted ) );
+	}
+
 	/** @return string[] Subjects of the staff mails (the shop's own order mails are left out). */
 	private function mail_subjects(): array {
 		return array_values( array_filter( array_column( $this->mails, 'subject' ), static fn( $s ) => ! str_contains( (string) $s, 'New order' ) ) );
@@ -330,7 +337,28 @@ class RestoreTest extends TestCase {
 		$this->assert_no_delete( $fake );
 	}
 
-	public function test_a_restore_that_leaves_the_date_buys_the_year_with_its_own_call(): void {
+	public function test_a_restore_that_leaves_the_date_waits_for_the_registry_and_buys_no_year_yet(): void {
+		$r        = $this->expired();
+		$baseline = (string) $r->get( 'expires_at' );
+		$order    = $this->paid_order( $r );
+		$fake     = $this->fake();
+		$fake->reply( 'GET', '/domains/777', $this->domain_reply( $baseline, 'DEL' ) );
+		$fake->reply( 'POST', '/domains/777/restore', array( 'success' => true ) );
+		$fake->reply( 'GET', '/domains/777', $this->domain_reply( $baseline ) );
+		$first = Restore::run( Resource::find( $r->id() ), (string) $order->get_id() );
+		$this->assertTrue( $first->is_retry() );
+		$this->assertSame( 1800, $first->delay() );
+		$this->assertSame( array( '/domains/777/restore' ), array_column( $this->calls( $fake, 'POST' ), 'path' ), 'No renew right after the restore.' );
+		// A second run well inside the wait: the date is still the old one.
+		$this->age_post( $r, $order, 1 );
+		$fake->reply( 'GET', '/domains/777', $this->domain_reply( $baseline ) );
+		$second = Restore::run( Resource::find( $r->id() ), (string) $order->get_id() );
+		$this->assertTrue( $second->is_retry() );
+		$this->assertSame( array( '/domains/777/restore' ), array_column( $this->calls( $fake, 'POST' ), 'path' ), 'Still no renew before 6 hours.' );
+		$this->assert_no_delete( $fake );
+	}
+
+	public function test_after_the_wait_with_the_date_still_old_the_year_is_bought_once(): void {
 		$r        = $this->expired();
 		$baseline = (string) $r->get( 'expires_at' );
 		$order    = $this->paid_order( $r );
@@ -338,6 +366,9 @@ class RestoreTest extends TestCase {
 		$next     = gmdate( 'Y-m-d H:i:s', strtotime( $baseline . ' UTC +1 year' ) );
 		$fake->reply( 'GET', '/domains/777', $this->domain_reply( $baseline, 'DEL' ) );
 		$fake->reply( 'POST', '/domains/777/restore', array( 'success' => true ) );
+		$fake->reply( 'GET', '/domains/777', $this->domain_reply( $baseline ) );
+		$this->assertTrue( Restore::run( Resource::find( $r->id() ), (string) $order->get_id() )->is_retry() );
+		$this->age_post( $r, $order, 7 );
 		$fake->reply( 'GET', '/domains/777', $this->domain_reply( $baseline ) );
 		$fake->reply( 'POST', '/domains/777/renew', array( 'success' => true ) );
 		$fake->reply( 'GET', '/domains/777', $this->domain_reply( $next ) );
@@ -347,6 +378,22 @@ class RestoreTest extends TestCase {
 		$this->assertSame( array( '/domains/777/restore', '/domains/777/renew' ), array_column( $posts, 'path' ) );
 		$this->assertSame( array( 'period' => 1 ), $posts[1]['body'] );
 		$this->assert_no_delete( $fake );
+	}
+
+	public function test_a_date_that_moves_during_the_wait_finishes_without_renewing(): void {
+		$r        = $this->expired();
+		$baseline = (string) $r->get( 'expires_at' );
+		$order    = $this->paid_order( $r );
+		$fake     = $this->fake();
+		$next     = gmdate( 'Y-m-d H:i:s', strtotime( $baseline . ' UTC +1 year' ) );
+		$fake->reply( 'GET', '/domains/777', $this->domain_reply( $baseline, 'DEL' ) );
+		$fake->reply( 'POST', '/domains/777/restore', array( 'success' => true ) );
+		$fake->reply( 'GET', '/domains/777', $this->domain_reply( $baseline ) );
+		$this->assertTrue( Restore::run( Resource::find( $r->id() ), (string) $order->get_id() )->is_retry() );
+		$fake->reply( 'GET', '/domains/777', $this->domain_reply( $next ) );
+		$result = Restore::run( Resource::find( $r->id() ), (string) $order->get_id() );
+		$this->assertTrue( $result->is_done(), (string) $result->error() );
+		$this->assertSame( array( '/domains/777/restore' ), array_column( $this->calls( $fake, 'POST' ), 'path' ), 'The registry showed the year: no renew.' );
 	}
 
 	public function test_finishing_sets_the_dates_reactivates_the_subscription_marks_the_order_and_sends_n6(): void {
@@ -438,6 +485,7 @@ class RestoreTest extends TestCase {
 		$fake->reply( 'POST', '/domains/777/restore', array( 'success' => true ) );
 		$fake->reply( 'GET', '/domains/777', new \WP_Error( 'transport', 'timeout' ) );
 		$this->assertTrue( Restore::run( Resource::find( $r->id() ), (string) $order->get_id() )->is_retry() );
+		$this->age_post( $r, $order, 7 );
 		$fake->reply( 'GET', '/domains/777', $this->domain_reply( $baseline ) );
 		$fake->reply( 'POST', '/domains/777/renew', array( 'success' => true ) );
 		$fake->reply( 'GET', '/domains/777', $this->domain_reply( gmdate( 'Y-m-d H:i:s', strtotime( $baseline . ' UTC +1 year' ) ) ) );
@@ -454,6 +502,9 @@ class RestoreTest extends TestCase {
 		$fake->reply( 'GET', '/domains/777', $this->domain_reply( $baseline, 'DEL' ) );
 		$fake->reply( 'POST', '/domains/777/restore', array( 'success' => true ) );
 		$fake->reply( 'GET', '/domains/777', $this->domain_reply( $baseline ) );
+		$this->assertTrue( Restore::run( Resource::find( $r->id() ), (string) $order->get_id() )->is_retry() );
+		$this->age_post( $r, $order, 7 );
+		$fake->reply( 'GET', '/domains/777', $this->domain_reply( $baseline ) );
 		$fake->reply( 'POST', '/domains/777/renew', new \WP_Error( 'http_503', 'unavailable' ) );
 		$this->assertTrue( Restore::run( Resource::find( $r->id() ), (string) $order->get_id() )->is_retry() );
 		$this->assertNotEmpty( Resource::find( $r->id() )->get( 'restore_renew_started' ) );
@@ -469,6 +520,9 @@ class RestoreTest extends TestCase {
 		$fake     = $this->fake();
 		$fake->reply( 'GET', '/domains/777', $this->domain_reply( $baseline, 'DEL' ) );
 		$fake->reply( 'POST', '/domains/777/restore', array( 'success' => true ) );
+		$fake->reply( 'GET', '/domains/777', $this->domain_reply( $baseline ) );
+		$this->assertTrue( Restore::run( Resource::find( $r->id() ), (string) $order->get_id() )->is_retry() );
+		$this->age_post( $r, $order, 7 );
 		$fake->reply( 'GET', '/domains/777', $this->domain_reply( $baseline ) );
 		$fake->reply( 'POST', '/domains/777/renew', new \WP_Error( 'op_399', 'Registrar request failed.', array( 'status' => 400 ) ) );
 		$this->assertTrue( Restore::run( Resource::find( $r->id() ), (string) $order->get_id() )->is_retry() );

@@ -51,6 +51,9 @@ final class Restore {
 	/** Posted field of the Restore button. */
 	public const FIELD = 'beltoft_domain_restore';
 
+	/** Seconds after a restore POST during which the registry may still show the old date: the separate renew waits this long (registry lag, plan 3.5 step 8). */
+	public const RENEW_WAIT = 6 * HOUR_IN_SECONDS;
+
 	/** What a customer reads while a paid restore waits for staff. */
 	public const WAITING = 'Your restore payment is received. Restoring the domain needs our staff. We have been told.';
 
@@ -520,6 +523,11 @@ final class Restore {
 			return StepResult::retry( 3600, 'A restore request is awaiting registry confirmation.' );
 		}
 
+		// The restore was sent but the date has not moved: the registry may lag, and the restore may have included the year. Wait before buying one.
+		if ( ! empty( $posted[ $order_id ] ) && time() - (int) $posted[ $order_id ] < self::RENEW_WAIT ) {
+			return StepResult::retry( 1800, 'The restore is awaiting registry confirmation.' );
+		}
+
 		if ( empty( $posted[ $order_id ] ) ) {
 			$over = self::window_over( $domain, $baseline, $detail );
 
@@ -554,7 +562,7 @@ final class Restore {
 				return StepResult::retry( 3600, 'The registrar restore was refused and will be tried again.' );
 			}
 
-			$posted[ $order_id ] = true;
+			$posted[ $order_id ] = time();
 
 			if ( ! $r->set( array( 'restore_posted' => $posted ) ) ) {
 				return StepResult::retry( 3600, 'The restore could not be recorded after requesting it.' );
@@ -572,6 +580,8 @@ final class Restore {
 			if ( Renewals::later( $expiry, $baseline ) ) {
 				return self::finish( $r, $order, $order_id, $detail, $expiry, $done, $started, $posted, $renew_started );
 			}
+
+			return StepResult::retry( 1800, 'The restore is awaiting registry confirmation.' );
 		}
 
 		// The restore call did not move the date: the year is bought separately (Openprovider: a restore needs at least one year of renewal).
