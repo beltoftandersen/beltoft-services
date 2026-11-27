@@ -22,6 +22,7 @@ final class Unpaid {
 		add_action( 'beltoft_services_domain_renewed', array( Notices::class, 'on_renewed' ), 10, 2 );
 		add_action( Notices::HOOK, array( Notices::class, 'run' ) );
 		add_filter( 'beltoft_services_domain_admin_details', array( UnpaidView::class, 'admin_details' ), 10, 2 );
+		Restore::register();
 		add_action( 'beltoft_services_domain_overview_end', array( UnpaidView::class, 'overview' ), 10, 2 );
 		Jobs::recurring( array( __CLASS__, 'schedule' ) );
 	}
@@ -50,13 +51,19 @@ final class Unpaid {
 			'label'   => __( 'Notices for domains whose renewal is not paid', 'beltoft-services' ),
 			'desc'    => __( 'On: a domain whose renewal could not be paid gets a plain email that says it still works until its expiry date (not "paused"), a reminder a week before, and after the expiry the notices about restoring it and when that ends. The domain page shows the renewal state, the restore period and the reactivation fee. Off: the generic paused email, as before. Staff alerts are sent either way.', 'beltoft-services' ),
 		);
+		$fields[ Restore::SETTING ]                  = $base + array(
+			'type'    => 'checkbox',
+			'default' => 0,
+			'label'   => __( 'Let customers restore an expired domain', 'beltoft-services' ),
+			'desc'    => __( 'On: the domain page of an expired domain has a Restore domain button. It makes one order with the renewal of one year and the reactivation fee, and when the order is paid the domain is restored at the registrar (.dk: our staff are told to restore it by hand). The fee is always charged, because it is not known whether the registrar restores free. A normal renewal that is paid after the expiry buys nothing and tells our staff. Off: the page says to contact us. Needs the notices setting above to show anything to the customer.', 'beltoft-services' ),
+		);
 		$fields[ ReactivationFee::MARKUP_SETTING ] = $base + array(
 			'type'    => 'number',
 			'default' => 30,
 			'min'     => 0,
 			'max'     => 500,
 			'label'   => __( 'Reactivation fee markup, in percent of the registrar restore cost', 'beltoft-services' ),
-			'desc'    => __( 'The fee for restoring an expired domain is the registrar restore cost plus this markup, on top of the normal renewal. No fee before the expiry, and none while the registrar restores free of charge.', 'beltoft-services' ),
+			'desc'    => __( 'The fee for restoring an expired domain is the full registrar restore cost plus this markup, on top of the normal renewal. No fee before the expiry. It is charged even while the registrar might restore free, because that is not known.', 'beltoft-services' ),
 		);
 
 		$fields[ ReactivationFee::DKK_RATE_SETTING ] = $base + array(

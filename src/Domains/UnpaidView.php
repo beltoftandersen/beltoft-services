@@ -19,10 +19,10 @@ final class UnpaidView {
 	 * The paragraphs of the domain page, from the stored data only (no registrar call).
 	 *
 	 * @param Resource $r Domain resource.
-	 * @return array{lines: string[], pay_url: string, restore_url: string, contact: bool}
+	 * @return array{lines: string[], pay_url: string, restore_url: string, restore_form: bool, contact: bool}
 	 */
 	public static function lines( Resource $r ): array {
-		$out    = array( 'lines' => array(), 'pay_url' => '', 'restore_url' => '', 'contact' => false );
+		$out    = array( 'lines' => array(), 'pay_url' => '', 'restore_url' => '', 'restore_form' => false, 'contact' => false );
 		$stage  = Stage::of( $r );
 		$domain = (string) $r->get( 'domain' );
 
@@ -34,7 +34,7 @@ final class UnpaidView {
 		$deadline = null === $stage['window_end'] ? '' : wp_date( ServiceEmail::DATE, (int) $stage['window_end'] );
 		$terms    = ReactivationFee::terms( $domain );
 		$currency = Currency::of_resource( $r );
-		$fee      = ReactivationFee::fee( $domain, null === $stage['days_after'] ? 0 : (int) $stage['days_after'] );
+		$fee      = ReactivationFee::fee( $domain );
 
 		if ( Stage::DUE === $stage['stage'] ) {
 			/* translators: %s: date. */
@@ -56,8 +56,16 @@ final class UnpaidView {
 					: __( 'Restoring costs the renewal. There is no reactivation fee.', 'beltoft-services' );
 			}
 
-			$out['restore_url'] = (string) apply_filters( 'beltoft_services_domain_restore_url', '', $r );
-			$out['contact']     = '' === $out['restore_url'];
+			if ( null !== Restore::paid_open( $r ) ) {
+				$out['lines'][] = __( 'We received your payment and are restoring this domain. You will get an email when it is done.', 'beltoft-services' );
+
+				return $out;
+			}
+
+			// The Restore button is a form on this page; a listener's own address (another shop flow) is a link instead.
+			$out['restore_form'] = null !== Restore::offer( $r );
+			$out['restore_url']  = $out['restore_form'] ? '' : (string) apply_filters( 'beltoft_services_domain_restore_url', '', $r );
+			$out['contact']      = ! $out['restore_form'] && '' === $out['restore_url'];
 		} elseif ( Stage::ENDED === $stage['stage'] ) {
 			/* translators: %s: domain name. */
 			$out['lines'][] = sprintf( __( '%s is no longer registered by us.', 'beltoft-services' ), $domain );
@@ -85,7 +93,7 @@ final class UnpaidView {
 			return __( 'If the renewal is not paid, the domain stops working on its expiry date.', 'beltoft-services' );
 		}
 
-		$fee = null !== $terms['free_fee'] && $terms['free_fee'] <= 0.0 && null === $terms['paid_fee'] ? 0.0 : ( $terms['paid_fee'] ?? $terms['free_fee'] );
+		$fee = $terms['fee'];
 
 		if ( null === $fee ) {
 			/* translators: %d: number of days. */
@@ -130,6 +138,18 @@ final class UnpaidView {
 
 		if ( '' !== $view['pay_url'] ) {
 			echo '<p><a class="bs-btn" href="' . esc_url( $view['pay_url'] ) . '">' . esc_html__( 'Pay the renewal', 'beltoft-services' ) . '</a></p>';
+		}
+
+		if ( $view['restore_form'] ) {
+			$license = $r->license();
+			$area    = \BeltoftServices\Account\ServiceArea::get( Domains::class );
+
+			echo '<form method="post" action="' . esc_url( $area->url( $license ) ) . '">';
+			echo '<input type="hidden" name="' . esc_attr( Restore::FIELD ) . '" value="1">';
+			echo '<input type="hidden" name="license" value="' . esc_attr( (string) (int) $license['id'] ) . '">';
+			echo '<input type="hidden" name="_wpnonce" value="' . esc_attr( wp_create_nonce( Restore::nonce_action( (int) $license['id'] ) ) ) . '">';
+			echo '<p><button type="submit" class="bs-btn">' . esc_html__( 'Restore domain', 'beltoft-services' ) . '</button></p>';
+			echo '</form>';
 		}
 
 		if ( '' !== $view['restore_url'] ) {

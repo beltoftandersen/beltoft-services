@@ -8,9 +8,11 @@ use BeltoftServices\Settings;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Owner decision 2026-11-19 (plan section 9): the fee is our restore cost times 1.30, on top of the normal renewal, with no minimum and the
- * same rule for .dk. No fee before the expiry, and none while the registrar restores free of charge (the extension's soft restore price is 0).
- * The cost is the restore price the price refresh stored (Prices::sync), in EUR excluding tax; nothing here is a fixed rate.
+ * Owner decisions (plan section 9): the fee is our restore cost times 1.30 (the markup is a setting), on top of the normal renewal, with no
+ * minimum and the same rule for .dk. No fee before the expiry. Since 2026-11-27 the cost is always the full restore price, never the soft
+ * restore price: Openprovider's semantics are not known, so the most expensive case is assumed and the fee is charged even while the
+ * registrar might restore free. The cost is the restore price the price refresh stored (Prices::sync), in EUR excluding tax; nothing here is
+ * a fixed rate.
  */
 final class ReactivationFee {
 
@@ -46,21 +48,15 @@ final class ReactivationFee {
 	}
 
 	/**
-	 * The registrar's cost to restore a domain, EUR excluding tax: the soft restore price while the domain is inside the extension's soft quarantine
-	 * (days after the renewal date given), else the restore price. Null when the price table does not state it.
+	 * The registrar's cost to restore a domain, EUR excluding tax: always the full restore price (never the soft restore price, owner decision
+	 * 2026-11-27). Null when the price table does not state it.
 	 *
-	 * @param string   $domain     Full domain name.
-	 * @param int|null $days_after Whole days since the renewal date, null for "after the free period".
+	 * @param string $domain Full domain name.
 	 */
-	public static function cost( string $domain, ?int $days_after = null ): ?float {
+	public static function cost( string $domain ): ?float {
 		list( , $row ) = RestoreFacts::row( $domain );
-		$soft_days     = (int) ( $row['soft_quarantine_days'] ?? 0 );
 
-		if ( null !== $days_after && $soft_days > 0 && $days_after <= $soft_days ) {
-			return isset( $row['soft_restore'] ) ? (float) $row['soft_restore'] : null;
-		}
-
-		return isset( $row['restore'] ) ? (float) $row['restore'] : null;
+		return isset( $row['restore'] ) && is_numeric( $row['restore'] ) ? (float) $row['restore'] : null;
 	}
 
 	/**
@@ -75,13 +71,40 @@ final class ReactivationFee {
 	/**
 	 * The fee of a domain excluding tax, in the shop's currency (the cost currency). Null when the cost is not known.
 	 *
-	 * @param string   $domain     Full domain name.
-	 * @param int|null $days_after See cost().
+	 * @param string $domain Full domain name.
 	 */
-	public static function fee( string $domain, ?int $days_after = null ): ?float {
-		$cost = self::cost( $domain, $days_after );
+	public static function fee( string $domain ): ?float {
+		$cost = self::cost( $domain );
 
 		return null === $cost ? null : self::of_cost( $cost );
+	}
+
+	/**
+	 * The fee in a currency, excluding tax: the shop's currency as it is, another one only from the fixed kroner rate or a site's own
+	 * listener (filter beltoft_services_domain_reactivation_fee). Null when there is no figure in that currency.
+	 *
+	 * @param float  $excl     Fee excluding tax, in the shop's currency.
+	 * @param string $currency Currency code, '' for the current one.
+	 * @param string $domain   Full domain name.
+	 */
+	public static function amount( float $excl, string $currency = '', string $domain = '' ): ?float {
+		$currency = Currency::or_current( $currency );
+
+		if ( Currency::base() === $currency ) {
+			return $excl;
+		}
+
+		/**
+		 * The reactivation fee in a currency other than the shop's, excluding tax, or null when the site has no figure for it.
+		 *
+		 * @param float|null $amount   Amount in $currency; for DKK the fixed rate setting's figure, else null.
+		 * @param float      $base     The fee in the shop's currency, excluding tax.
+		 * @param string     $currency Currency code.
+		 * @param string     $domain   Full domain name.
+		 */
+		$amount = apply_filters( 'beltoft_services_domain_reactivation_fee', 'DKK' === $currency ? self::dkk( $excl ) : null, $excl, $currency, $domain );
+
+		return is_numeric( $amount ) ? (float) $amount : null;
 	}
 
 	/**
@@ -96,46 +119,26 @@ final class ReactivationFee {
 	public static function text( float $excl, string $currency = '', string $domain = '' ): string {
 		$product  = Cart::domain_product();
 		$currency = Currency::or_current( $currency );
+		$amount   = Currency::base() !== $currency ? self::amount( $excl, $currency, $domain ) : null;
 
-		if ( Currency::base() !== $currency ) {
-			/**
-			 * The reactivation fee in a currency other than the shop's, excluding tax, or null when the site has no figure for it.
-			 *
-			 * @param float|null $amount   Amount in $currency; for DKK the fixed rate setting's figure, else null.
-			 * @param float      $base     The fee in the shop's currency, excluding tax.
-			 * @param string     $currency Currency code.
-			 * @param string     $domain   Full domain name.
-			 */
-			$amount = apply_filters( 'beltoft_services_domain_reactivation_fee', 'DKK' === $currency ? self::dkk( $excl ) : null, $excl, $currency, $domain );
-
-			if ( is_numeric( $amount ) ) {
-				return \BeltoftServices\Billing\TaxNote::text( (float) $amount, 2, $product, $currency, false );
-			}
+		if ( null !== $amount ) {
+			return \BeltoftServices\Billing\TaxNote::text( $amount, 2, $product, $currency, false );
 		}
 
 		return \BeltoftServices\Billing\TaxNote::text( $excl, 2, $product, Currency::base(), false );
 	}
 
 	/**
-	 * What the page and the notices say about an extension: the days it can be restored, the fee inside a free grace period and after it.
-	 * Computed from the stored price table, so a refreshed price changes it.
+	 * What the page and the notices say about an extension: the days it can be restored and the fee. Computed from the stored price table, so
+	 * a refreshed price changes it.
 	 *
 	 * @param string $domain Full domain name.
-	 * @return array{window: int|null, free_days: int, free_fee: float|null, paid_fee: float|null}
+	 * @return array{window: int|null, fee: float|null}
 	 */
 	public static function terms( string $domain ): array {
-		list( , $row ) = RestoreFacts::row( $domain );
-		$soft          = (int) ( $row['soft_quarantine_days'] ?? 0 );
-		$hard          = (int) ( $row['quarantine_days'] ?? 0 );
-		$free_fee      = $soft > 0 ? self::fee( $domain, 0 ) : null;
-		// The paid restore price applies from day 1 when there is no soft quarantine, and after it only when a quarantine period follows.
-		$paid_fee = 0 === $soft || $hard > 0 ? self::fee( $domain, null ) : null;
-
 		return array(
-			'window'    => RestoreFacts::window_days( $domain ),
-			'free_days' => $soft,
-			'free_fee'  => $free_fee,
-			'paid_fee'  => $paid_fee,
+			'window' => RestoreFacts::window_days( $domain ),
+			'fee'    => self::fee( $domain ),
 		);
 	}
 }

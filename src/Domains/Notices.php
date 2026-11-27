@@ -275,11 +275,9 @@ final class Notices {
 			$facts['renewal_price'] = TaxNote::text( $base, 2, Cart::domain_product(), $currency, false );
 		}
 
-		$days_after = $stage['days_after'];
-		$fee        = ReactivationFee::fee( $domain, null === $days_after ? 0 : (int) $days_after );
+		$fee = ReactivationFee::fee( $domain );
 
 		if ( null !== $fee ) {
-			// A domain that is not expired yet is told the fee of its first day.
 			$facts['fee_zero'] = $fee <= 0.0;
 			$facts['fee']      = $fee > 0.0 ? ReactivationFee::text( $fee, $currency, $domain ) : '';
 

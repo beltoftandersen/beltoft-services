@@ -146,4 +146,55 @@ final class SpendGuard {
 		Alerts::admin( $r, $why . ' No registrar order was placed for ' . $name . '.' );
 		return StepResult::fail( $why, array( Jobs::TEXT => self::RENEWAL_WAITING, Jobs::EXPECTED => true ) );
 	}
+
+	/** What a customer reads when a paid restore waits for staff. */
+	public const RESTORE_WAITING = Restore::WAITING;
+
+	/**
+	 * Does an amount in a currency cover the registrar's cost of restoring a domain: the renewal cost plus the full restore cost? A missing
+	 * cost, or an amount that cannot be compared, fails closed. Nothing here is shown to a customer.
+	 *
+	 * @param string $name     Full domain name.
+	 * @param float  $paid     Renewal line plus reactivation fee, excluding tax, in $currency.
+	 * @param string $currency Currency code of the amount.
+	 * @return string|null Why not, or null when it is covered.
+	 */
+	public static function problem_restore_amounts( string $name, float $paid, string $currency ): ?string {
+		$renew   = Prices::cost( $name, 'renew' );
+		$restore = ReactivationFee::cost( $name );
+
+		if ( null === $renew || null === $restore ) { return 'The registrar cost to restore this domain is unknown.'; }
+
+		$in_cost = Currency::to_cost( $paid, $currency );
+
+		if ( null === $in_cost ) { return 'The order is not in EUR; the registrar cost cannot be compared.'; }
+		if ( $in_cost + 0.01 < $renew + $restore ) { return self::MESSAGE; }
+
+		return null;
+	}
+
+	/**
+	 * Does the paid restore order cover the registrar's renewal plus restore cost? Counted from the order's own two fee lines, without tax.
+	 * Account credit is not added back: a fee line is not discounted by a coupon, so the credit is a payment, not a lower line.
+	 *
+	 * @param string    $name  Full domain name.
+	 * @param \WC_Order $order The restore order.
+	 */
+	public static function problem_restore( string $name, \WC_Order $order ): ?string {
+		$paid = 0.0;
+
+		foreach ( $order->get_items( 'fee' ) as $item ) {
+			if ( '' !== (string) $item->get_meta( Restore::LINE_META, true ) ) { $paid += (float) $item->get_total(); }
+		}
+
+		return self::problem_restore_amounts( $name, $paid, (string) $order->get_currency() );
+	}
+
+	/** A failing step result and one admin alert, or null when the paid restore order covers the cost. */
+	public static function guard_restore( Resource $r, string $name, \WC_Order $order ): ?StepResult {
+		$why = self::problem_restore( $name, $order );
+		if ( null === $why ) { return null; }
+		Alerts::admin( $r, $why . ' No registrar restore was placed for ' . $name . '.' );
+		return StepResult::fail( $why, array( Jobs::TEXT => self::RESTORE_WAITING, Jobs::EXPECTED => true ) );
+	}
 }

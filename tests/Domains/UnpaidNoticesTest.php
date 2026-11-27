@@ -100,8 +100,10 @@ class UnpaidNoticesTest extends TestCase {
 		$body = $this->body( 0 );
 		$this->assertStringContainsString( 'We could not take payment for the renewal of unpaid-example.com. The domain expires on 26 October 2027. Until then it works as normal.', $body );
 		$this->assertStringContainsString( 'If it is not paid, the domain stops working on 26 October 2027.', $body );
-		$this->assertStringContainsString( 'After that you can still restore it until 5 December 2027, at the price of the renewal', $body );
-		$this->assertStringContainsString( 'with no reactivation fee', $body );
+		$this->assertStringContainsString( 'After that you can still restore it until 5 December 2027, at a cost of', $body );
+		$this->assertStringContainsString( 'plus a reactivation fee of', $body );
+		$this->assertStringContainsString( '56.00', $body, 'The full restore cost 43.08 x 1.30, also inside the soft quarantine (owner 2026-11-27).' );
+		$this->assertStringNotContainsString( 'no reactivation fee', $body );
 		$this->assertStringContainsString( 'After 5 December 2027 the domain is released and anyone can register it.', $body );
 		$this->assertStringNotContainsString( 'paused', $body );
 		$this->assertStringContainsString( 'Pay the renewal', (string) $mails[0]['message'] );
@@ -147,7 +149,9 @@ class UnpaidNoticesTest extends TestCase {
 		$body = $this->body( count( $mails ) - 1 );
 		$this->assertStringContainsString( 'unpaid-example.com expired on 26 October 2027. The website and email on this domain do not work now.', $body );
 		$this->assertStringContainsString( 'You can restore it until 5 December 2027.', $body );
-		$this->assertStringContainsString( 'with no reactivation fee', $body, 'A .com inside its free soft quarantine costs the renewal only.' );
+		$this->assertStringContainsString( '69.00 (', $body, 'Renewal 13 plus the full-cost fee 56, also in the soft quarantine.' );
+		$this->assertStringContainsString( '56.00 reactivation fee', $body );
+		$this->assertStringNotContainsString( 'no reactivation fee', $body );
 		$this->assertStringContainsString( 'excluding VAT', $body );
 	}
 

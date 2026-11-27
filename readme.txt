@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.65.9
+Stable tag: 0.66.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,12 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.66.0 =
+* Pay-to-restore for an expired domain, behind the new setting "Let customers restore an expired domain" (domain_restore_enabled, off by default). The domain page of an expired domain gets a Restore domain button. It makes one order with two lines, the renewal of one year at the normal price and the reactivation fee, paid on WooCommerce's payment page. When the order is paid the domain is restored at the registrar by the new internal job `restore`: a marker before the call, a read first (a domain that already shows a later renewal date is only recorded), POST restore, a fresh read, and a separate renew of one year only when the date did not move. A timeout keeps the marker and never posts twice, a clear refusal frees it. Name servers are put back only when they differ. Nothing is ever deleted. The job refuses an order paid below the registrar cost (renewal cost plus the full restore cost). .dk can be paid for, but the job writes nothing at the registrar and tells staff to restore it by hand.
+* Reactivation fee (owner decision 2026-11-27): it is always the full registrar restore cost times the markup (default 30 percent), also while the registrar might restore free. The soft restore price is no longer used, so the notices and the domain page state the fee for every extension that has a restore price.
+* A paid normal renewal that arrives after the registrar's expiry date (with pay-to-restore on) buys nothing and no longer retries every hour: staff get one mail with the order, and refund it or ask the customer to pay the restore order.
+* Notices N3 to N5 link to the domain page, where the Restore domain button is, when pay-to-restore is on.
 
 = 0.65.9 =
 * Domain renewals: two paid renewal orders of the same domain are renewed one at a time. Before, while the first order's year was waiting for the registry to show the new date, the second order's job could see that date, count it as its own year and finish without buying one. Now the second order waits (retry in an hour) until the first has finished, then buys its own year.

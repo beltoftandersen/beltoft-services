@@ -61,12 +61,13 @@ class FakeClient implements Client {
 			update_option( self::OPTION, $state, false );
 			return $domain;
 		}
-		if ( preg_match( '#^/domains/(\d+)(/renew|/authcode)?$#D', $path, $match ) ) {
+		if ( preg_match( '#^/domains/(\d+)(/renew|/authcode|/restore)?$#D', $path, $match ) ) {
 			foreach ( $state['domains'] as $name => $domain ) {
 				if ( (int) $domain['id'] !== (int) $match[1] ) { continue; }
 				if ( 'GET' === $method && '/authcode' === ( $match[2] ?? '' ) ) { return array( 'auth_code' => 'FAKE-CODE-' . $domain['id'] ); }
 				if ( 'GET' === $method ) { return $domain; }
 				if ( 'POST' === $method && '/renew' === ( $match[2] ?? '' ) ) { $domain['expiration_date'] = gmdate( 'Y-m-d H:i:s', strtotime( '+1 year', strtotime( $domain['expiration_date'] ) ) ); }
+				elseif ( 'POST' === $method && '/restore' === ( $match[2] ?? '' ) ) { $domain['status'] = 'ACT'; }
 				elseif ( 'PUT' === $method && '' === ( $match[2] ?? '' ) ) {
 					$updated = $this->security_fields( array_merge( $domain, array_diff_key( $body, array_flip( array( 'dnssec_keys', 'is_dnssec_enabled', 'is_private_whois_enabled' ) ) ) ), $body, $domain );
 					if ( is_wp_error( $updated ) ) { return $updated; }

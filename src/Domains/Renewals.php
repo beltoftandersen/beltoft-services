@@ -141,6 +141,8 @@ final class Renewals {
 		$expiry = RestoreFacts::expiry_of( (array) $detail );
 		if ( self::later( $expiry, $baseline ) ) { return self::finish_renewal( $r, $order_id, $expiry, $done, $started ); }
 		if ( isset( $started[ $order_id ] ) ) { return StepResult::retry( 3600, 'A renewal request is awaiting registry confirmation.' ); }
+		// Past the registrar's expiry a plain renew is not the way back: the restore order is (plan finding 9). Only with pay-to-restore on.
+		if ( Restore::enabled() && Restore::expired( $expiry ) ) { return Restore::late_renewal( $r, $order, $order_id ); }
 		$blocked = SpendGuard::guard_renewal( $r, (string) $r->get( 'domain' ), SpendGuard::item_of_order( $order, (string) $r->get( 'domain' ) ), $order_id );
 		if ( $blocked ) { return $blocked; }
 		$started[ $order_id ] = $baseline;
@@ -160,7 +162,7 @@ final class Renewals {
 	}
 
 	/** Did the registrar answer and refuse (so nothing was bought)? Alerts the admin once when its balance is the reason. */
-	private static function refusal( Resource $r, \WP_Error $error ): bool {
+	public static function refusal( Resource $r, \WP_Error $error ): bool {
 		if ( 'op_920' === $error->get_error_code() ) {
 			Alerts::admin( $r, 'Registrar balance is too low.' );
 			return true;

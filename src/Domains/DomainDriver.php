@@ -39,7 +39,7 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 		return sprintf( _n( '%d domain', '%d domains', $max, 'beltoft-services' ), $used );
 	}
 	public function plan_fields(): array { return array(); }
-	public function internal_actions(): array { return array_merge( array( 'renew', 'transfer_renew' ), Actions::INTERNAL ); }
+	public function internal_actions(): array { return array_merge( array( 'renew', 'transfer_renew', Restore::ACTION ), Actions::INTERNAL ); }
 
 	public function provision( Resource $r ): StepResult {
 		$result = $this->build( $r );
@@ -467,6 +467,7 @@ final class DomainDriver implements Driver, StopsOnDelete, InternalActions, Need
 	public function act( Resource $r, string $action, array $args ): StepResult {
 		if ( 'renew' === $action ) { return Renewals::renew( $r, (string) ( $args['order'] ?? '' ) ); }
 		if ( 'transfer_renew' === $action ) { return Renewals::transfer_year( $r ); }
+		if ( Restore::ACTION === $action ) { return Restore::run( $r, (string) ( $args['order'] ?? '' ) ); }
 		return Actions::run( $r, $action, $args );
 	}
 	public function render_account( Resource $r ): void { Panels::account( $r ); }

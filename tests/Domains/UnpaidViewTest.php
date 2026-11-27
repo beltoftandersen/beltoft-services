@@ -77,12 +77,14 @@ class UnpaidViewTest extends TestCase {
 		$this->assertStringNotContainsString( 'Pay the renewal', $html );
 	}
 
-	public function test_a_gtld_has_no_fee_in_its_free_period_and_says_so(): void {
+	public function test_a_gtld_pays_the_fee_in_its_soft_quarantine_too(): void {
 		$r = $this->domain( 'free-example.com', gmdate( 'Y-m-d H:i:s', time() + 200 * DAY_IN_SECONDS ), false );
 		Licenses::update( (int) $r->license()['id'], array( 'status' => Licenses::STATUS_ACTIVE ) );
 		$html = $this->page( Resource::find( $r->id() ) );
 		$this->assertStringContainsString( 'You can restore it for 40 days after that', $html );
-		$this->assertStringContainsString( 'no reactivation fee', $html );
+		$this->assertStringContainsString( 'reactivation fee of', $html );
+		$this->assertStringContainsString( '56.00', $html, '43.08 x 1.30: the full restore cost, never the free soft restore.' );
+		$this->assertStringNotContainsString( 'no reactivation fee', $html );
 	}
 
 	public function test_an_extension_without_a_window_says_only_that_it_stops_working(): void {
@@ -110,7 +112,7 @@ class UnpaidViewTest extends TestCase {
 		$this->assertStringContainsString( 'You can restore it until', $html );
 		$this->assertStringContainsString( 'reactivation fee of', $html );
 		$this->assertStringContainsString( '22.83', $html );
-		$this->assertStringContainsString( 'To restore it, contact us.', $html, 'Phase 3 has no restore order yet.' );
+		$this->assertStringContainsString( 'To restore it, contact us.', $html, 'Pay-to-restore is off by default.' );
 		$this->assertStringNotContainsString( 'Restore the domain', $html );
 	}
 
@@ -119,7 +121,7 @@ class UnpaidViewTest extends TestCase {
 		$r    = $this->domain( 'gone2-example.com', gmdate( 'Y-m-d H:i:s', time() - 3 * DAY_IN_SECONDS ) );
 		$html = $this->page( $r );
 		$this->assertStringContainsString( 'href="https://example.org/restore"', $html );
-		$this->assertStringContainsString( 'Restoring costs the renewal. There is no reactivation fee.', $html );
+		$this->assertStringContainsString( 'Restoring costs the renewal plus a reactivation fee of', $html );
 		$this->assertStringNotContainsString( 'contact us', $html );
 	}
 
