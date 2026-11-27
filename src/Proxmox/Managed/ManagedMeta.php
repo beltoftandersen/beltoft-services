@@ -17,11 +17,41 @@ final class ManagedMeta {
 
 	public static function register(): void {
 		add_filter( 'beltoft_services_initial_meta', array( __CLASS__, 'initial_meta' ), 10, 3 );
+		add_filter( 'beltoft_services_simple_line_label', array( __CLASS__, 'line_label' ), 10, 3 );
 	}
 
 	/** The server chosen at add to cart, from the order line. */
 	public static function initial_meta( array $meta, array $license, Driver $driver ): array {
 		return AddonLink::initial_meta( self::addon(), $meta, $license, $driver );
+	}
+
+	/**
+	 * The name of a Managed line says what it covers: "Managed: web1" (a server by its name, a database by its engine).
+	 * Without a known server or database (one bought with the new server of the cart) the line keeps the product name.
+	 *
+	 * @param mixed $label      The name so far.
+	 * @param mixed $product    The product.
+	 * @param mixed $covered_id The licence id of the server or database, when known.
+	 * @return mixed
+	 */
+	public static function line_label( $label, $product = null, $covered_id = 0 ) {
+		$driver = $product instanceof \WC_Product ? \BeltoftServices\Product::driver_for( $product->get_id() ) : null;
+
+		if ( ! $driver || ManagedDriver::ID !== $driver->id() || ! is_numeric( $covered_id ) || (int) $covered_id < 1 ) {
+			return $label;
+		}
+
+		$parent  = Resource::for_license( (int) $covered_id );
+		$license = $parent ? $parent->license() : null;
+
+		if ( ! $parent || ! is_array( $license ) || ! in_array( (string) $parent->get( 'driver' ), self::addon()->parent_drivers(), true ) ) {
+			return $label;
+		}
+
+		$name = \BeltoftServices\Proxmox\Vm\ServerName::email_label( $parent, $license );
+
+		/* translators: 1: the name of the add-on (Managed), 2: the server or database it covers. */
+		return '' === $name ? $label : sprintf( __( '%1$s: %2$s', 'beltoft-services' ), $product->get_name(), $name );
 	}
 
 	private static function addon(): Addon {

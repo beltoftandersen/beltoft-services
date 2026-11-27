@@ -214,13 +214,13 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 	<?php endif; ?>
 	<?php if ( ! empty( $managed ) && $forms ) : ?>
 		<div class="beltoft-services-vm__managed">
-			<h4><?php esc_html_e( 'Managed server', 'beltoft-services' ); ?></h4>
+			<h4><?php esc_html_e( 'Managed', 'beltoft-services' ); ?></h4>
 			<?php if ( $managed['active'] ) : ?>
 				<p class="description"><?php esc_html_e( 'This server is managed: we keep it up to date, answer its alerts and check its backups. Help with your own software is billed per started 15 minutes.', 'beltoft-services' ); ?></p>
 			<?php else : ?>
 				<p class="description"><?php esc_html_e( 'We keep the server up to date, answer its alerts and check its backups. Help with your own software is billed per started 15 minutes.', 'beltoft-services' ); ?></p>
 				<?php if ( '' !== $managed['add_price'] ) : ?><p class="description"><?php /* translators: %s: price such as 19 kr. / month */ echo esc_html( sprintf( __( 'Price: %s.', 'beltoft-services' ), $managed['add_price'] ) ); ?></p><?php endif; ?>
-				<p><a class="button woocommerce-button bs-btn" href="<?php echo esc_url( $managed['add_url'] ); ?>"><?php esc_html_e( 'Buy managed server', 'beltoft-services' ); ?></a></p>
+				<p><a class="button woocommerce-button bs-btn" href="<?php echo esc_url( $managed['add_url'] ); ?>"><?php esc_html_e( 'Buy Managed', 'beltoft-services' ); ?></a></p>
 			<?php endif; ?>
 		</div>
 	<?php endif; ?>

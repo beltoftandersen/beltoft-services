@@ -39,7 +39,7 @@ class ManagedFieldTest extends BackupTestCase {
 	/** The managed server product: one monthly subscription of 299. */
 	private function product(): \WC_Product {
 		$product = new \WC_Product_Subscription();
-		$product->set_name( 'Managed server' );
+		$product->set_name( 'Managed' );
 		$product->set_status( 'publish' );
 		$product->set_regular_price( '299' );
 		$product->update_meta_data( '_subscription_price', '299' );
@@ -100,7 +100,7 @@ class ManagedFieldTest extends BackupTestCase {
 
 		$html = $this->html();
 		$this->assertStringContainsString( 'type="checkbox"', $html );
-		$this->assertStringContainsString( 'Managed server', $html );
+		$this->assertStringContainsString( 'Managed, ', $html );
 		$this->assertStringContainsString( '299', $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
 

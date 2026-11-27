@@ -1,5 +1,5 @@
 <?php
-/** Managed server service driver: a paid upkeep service for one server. @package BeltoftServices */
+/** Managed add-on driver: a paid upkeep service for one server or database. @package BeltoftServices */
 
 namespace BeltoftServices\Proxmox\Managed;
 
@@ -28,7 +28,7 @@ final class ManagedDriver implements Driver, \BeltoftServices\Drivers\UsageItems
 	}
 
 	public function label(): string {
-		return __( 'Managed server', 'beltoft-services' );
+		return __( 'Managed', 'beltoft-services' );
 	}
 
 	public function kind(): string {
@@ -36,8 +36,8 @@ final class ManagedDriver implements Driver, \BeltoftServices\Drivers\UsageItems
 	}
 
 	public function unit_label( int $used, int $max ): string {
-		/* translators: 1: managed servers in use, 2: managed servers allowed. */
-		return sprintf( _n( '%1$d of %2$d managed server', '%1$d of %2$d managed servers', $max, 'beltoft-services' ), $used, $max );
+		/* translators: 1: Managed add-ons in use, 2: Managed add-ons allowed. */
+		return sprintf( _n( '%1$d of %2$d Managed', '%1$d of %2$d Managed', $max, 'beltoft-services' ), $used, $max );
 	}
 
 	public function plan_fields(): array {
@@ -80,12 +80,12 @@ final class ManagedDriver implements Driver, \BeltoftServices\Drivers\UsageItems
 		if ( '' !== $why ) {
 			DiskCascade::cancel_undelivered( $r, $why . ' The managed service was not delivered.' );
 
-			return StepResult::fail( $why . ' Managed server not delivered: review and refund order #' . (int) ( $license['order_id'] ?? 0 ) . '; the subscription was cancelled.' );
+			return StepResult::fail( $why . ' Managed not delivered: review and refund order #' . (int) ( $license['order_id'] ?? 0 ) . '; the subscription was cancelled.' );
 		}
 
 		// Staff picks the work up from this mail: the service is delivered by people, not by a driver call.
 		$what = ManagedMeta::is_database( $server ) ? 'database resource #' . $server->id() . ' (' . (string) ( (array) $server->get( 'plan' ) )['engine'] . ')' : 'server resource #' . $server->id();
-		Alerts::admin( $r, 'Managed service started for ' . $what . ' (licence #' . $id . '). Check the first update, the alerts and the backups.' );
+		Alerts::admin( $r, 'Managed started for ' . $what . ' (licence #' . $id . '). Check the first update, the alerts and the backups.' );
 
 		return StepResult::done( array( 'steps' => array( 'ready' ) ) );
 	}
@@ -115,19 +115,19 @@ final class ManagedDriver implements Driver, \BeltoftServices\Drivers\UsageItems
 	}
 
 	public function act( Resource $r, string $action, array $args ): StepResult {
-		return StepResult::fail( 'This managed server action is not available.' );
+		return StepResult::fail( 'This Managed action is not available.' );
 	}
 
 	public function render_account( Resource $r ): void {
 		$server = ManagedMeta::server_of( $r );
 
 		if ( $server && ManagedMeta::is_database( $server ) ) {
-			echo '<p>' . esc_html__( 'Managed database: we keep this database up to date, answer its alerts and check its backups.', 'beltoft-services' ) . '</p>';
+			echo '<p>' . esc_html__( 'Managed: we keep this database up to date, answer its alerts and check its backups.', 'beltoft-services' ) . '</p>';
 			echo '<p><a href="' . esc_url( DiskGuide::card_url( $server ) ) . '">' . esc_html__( 'Open the database', 'beltoft-services' ) . '</a></p>';
 			return;
 		}
 
-		echo '<p>' . esc_html__( 'Managed server: we keep this server up to date, answer its alerts and check its backups.', 'beltoft-services' ) . '</p>';
+		echo '<p>' . esc_html__( 'Managed: we keep this server up to date, answer its alerts and check its backups.', 'beltoft-services' ) . '</p>';
 
 		if ( $server ) {
 			echo '<p><a href="' . esc_url( DiskGuide::card_url( $server ) ) . '">' . esc_html__( 'Open the server', 'beltoft-services' ) . '</a></p>';
@@ -136,7 +136,7 @@ final class ManagedDriver implements Driver, \BeltoftServices\Drivers\UsageItems
 
 	public function render_admin( Resource $r ): void {
 		$server = ManagedMeta::server_of( $r );
-		echo '<h3>' . esc_html__( 'Managed server', 'beltoft-services' ) . '</h3><table class="widefat striped"><tbody>';
+		echo '<h3>' . esc_html__( 'Managed', 'beltoft-services' ) . '</h3><table class="widefat striped"><tbody>';
 		echo '<tr><th scope="row">' . esc_html__( 'Server license', 'beltoft-services' ) . '</th><td>' . esc_html( (string) $r->get( 'server_license' ) ) . '</td></tr>';
 		echo '<tr><th scope="row">' . esc_html__( 'Server resource', 'beltoft-services' ) . '</th><td>' . esc_html( $server ? (string) $server->id() : '' ) . '</td></tr>';
 		echo '</tbody></table>';
@@ -158,6 +158,6 @@ final class ManagedDriver implements Driver, \BeltoftServices\Drivers\UsageItems
 	 * {@inheritDoc}
 	 */
 	public function usage_words(): array {
-		return array( 'managed' => array( 'label' => __( 'managed server', 'beltoft-services' ), 'word' => __( 'Managed server', 'beltoft-services' ) ) );
+		return array( 'managed' => array( 'label' => __( 'Managed', 'beltoft-services' ), 'word' => __( 'Managed', 'beltoft-services' ) ) );
 	}
 }

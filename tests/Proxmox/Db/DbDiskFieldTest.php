@@ -414,7 +414,7 @@ class DbDiskFieldTest extends BackupTestCase {
 
 	private function managed_product(): void {
 		$product = new \WC_Product_Subscription();
-		$product->set_name( 'Managed server' );
+		$product->set_name( 'Managed' );
 		$product->set_status( 'publish' );
 		$product->set_regular_price( '299' );
 		$product->update_meta_data( '_subscription_price', '299' );
@@ -445,7 +445,7 @@ class DbDiskFieldTest extends BackupTestCase {
 
 		$key = $this->add( $v['e0-0'] );
 		$html = $this->managed_html();
-		$this->assertStringContainsString( 'Managed database, ', $html );
+		$this->assertStringContainsString( 'Managed, ', $html );
 		$this->assertStringContainsString( '299', $html );
 		$this->assertStringContainsString( 'kept for 30 days', $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );

@@ -565,7 +565,7 @@ final class DbPicker {
 		/* translators: %d: data disk size in gigabytes */
 		echo '<span>' . esc_html( sprintf( __( '%d GB data disk', 'beltoft-services' ), (int) $plan['disk_gb'] ) ) . '</span>';
 		if ( null !== \BeltoftServices\Proxmox\Managed\ManagedCart::product() ) {
-			echo '<span>' . esc_html__( 'Backups come with the Managed add-on', 'beltoft-services' ) . '</span>';
+			echo '<span>' . esc_html__( 'Backups come with Managed', 'beltoft-services' ) . '</span>';
 		}
 		echo '</span>';
 

@@ -996,7 +996,7 @@ class DbPhase4Test extends TestCase {
 	/** The Managed add-on product (the one of the servers): a simple monthly subscription of 299. */
 	private function managed_product(): \WC_Product {
 		$product = new \WC_Product_Subscription();
-		$product->set_name( 'Managed server' );
+		$product->set_name( 'Managed' );
 		$product->set_status( 'publish' );
 		$product->set_regular_price( '299' );
 		$product->update_meta_data( '_subscription_price', '299' );
@@ -1028,7 +1028,7 @@ class DbPhase4Test extends TestCase {
 		wp_set_current_user( (int) $r->license()['user_id'] );
 
 		$html = $this->card( $r, 'overview' );
-		$this->assertStringContainsString( 'Add managed database', $html );
+		$this->assertStringContainsString( 'Buy Managed', $html );
 		$this->assertStringContainsString( 'beltoft_services_managed_for=' . (int) $r->license()['id'], html_entity_decode( $html ) );
 		$this->assertStringContainsString( '299', $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
@@ -1040,19 +1040,37 @@ class DbPhase4Test extends TestCase {
 			include BELTOFT_SERVICES_PATH . 'templates/account/db.php';
 		} )( $view, array( 'overview' => 'Overview', 'backups' => 'Backups' ), 'backups', static fn( $slug ) => '/x/' . $slug );
 		$tab = (string) ob_get_clean();
-		$this->assertStringContainsString( 'They come with Managed database', $tab );
-		$this->assertStringContainsString( 'Add managed database', $tab );
+		$this->assertStringContainsString( 'They come with Managed', $tab );
+		$this->assertStringContainsString( 'Buy Managed', $tab );
+	}
+
+	public function test_the_managed_line_says_what_it_covers_in_cart_order_and_name(): void {
+		$product = $this->managed_product();
+		$r       = $this->ready_db();
+		$on      = \BeltoftServices\Proxmox\Vm\ServerName::email_label( $r, $r->license() );
+		$this->assertNotSame( '', $on );
+
+		$this->assertSame( 'Managed: ' . $on, \BeltoftServices\LineNames::label( $product, (int) $r->license()['id'] ) );
+		$this->assertSame( '', \BeltoftServices\LineNames::label( $product, 0 ), 'Not known yet: the product name stays.' );
+		$this->assertSame( '', \BeltoftServices\LineNames::label( $product, 'cart_server' ) );
+		$this->assertSame( '', \BeltoftServices\LineNames::label( $product, 999999 ), 'A licence that is no server or database.' );
+
+		$item = new \WC_Order_Item_Product();
+		$item->set_product( $product );
+		$item->add_meta_data( '_beltoft_services_managed_server', (int) $r->license()['id'] );
+		$this->assertSame( 'Managed: ' . $on, \BeltoftServices\LineNames::display_name( $item ) );
+		$this->assertStringContainsString( 'Managed: ' . $on, \BeltoftServices\LineNames::cart_item_name( 'x', array( 'data' => $product, 'beltoft_services_managed_for' => (int) $r->license()['id'] ) ) );
 	}
 
 	public function test_no_block_when_the_add_on_is_not_sold_and_the_active_one_is_told(): void {
 		$r = $this->ready_db();
 		wp_set_current_user( (int) $r->license()['user_id'] );
-		$this->assertStringNotContainsString( 'Managed database', $this->card( $r, 'overview' ) );
+		$this->assertStringNotContainsString( 'Buy Managed', $this->card( $r, 'overview' ) );
 
 		$this->managed_addon( $r );
 		$html = $this->card( $r, 'overview' );
 		$this->assertStringContainsString( 'This database is managed', $html );
-		$this->assertStringNotContainsString( 'Add managed database', $html );
+		$this->assertStringNotContainsString( 'Buy Managed', $html );
 		$this->assertStringContainsString( 'Daily, kept 30 days', $html, 'The backups row appears with the add-on.' );
 	}
 

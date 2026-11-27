@@ -115,7 +115,7 @@ final class ManagedCart {
 		$data = is_array( $data ) ? $data : array();
 
 		if ( CartFlow::has_value( $data, array( CartFlow::RESUBSCRIBE ) ) ) {
-			wc_add_notice( __( 'Add the managed service again from your server or database in My account.', 'beltoft-services' ), 'error' );
+			wc_add_notice( __( 'Add Managed again from your server or database in My account.', 'beltoft-services' ), 'error' );
 			return false;
 		}
 
@@ -126,7 +126,7 @@ final class ManagedCart {
 		$link = self::link( $data );
 
 		if ( null === $link || 1 !== (int) $quantity ) {
-			wc_add_notice( __( 'Choose the managed service for a server or database in your account.', 'beltoft-services' ), 'error' );
+			wc_add_notice( __( 'Choose Managed for a server or database in your account.', 'beltoft-services' ), 'error' );
 			return false;
 		}
 
@@ -159,7 +159,7 @@ final class ManagedCart {
 		$link = self::link( $data );
 
 		if ( null === $link ) {
-			throw new \Exception( esc_html__( 'Choose the managed service for a server or database in your account first.', 'beltoft-services' ) );
+			throw new \Exception( esc_html__( 'Choose Managed for a server or database in your account first.', 'beltoft-services' ) );
 		}
 
 		$data['beltoft_services_managed_for'] = $link;
@@ -181,7 +181,7 @@ final class ManagedCart {
 
 			if ( 'cart_server' === $link ) {
 				if ( ! AddonCart::cart_has_parent( self::addon() ) ) {
-					$errors->add( 'managed_server_unavailable', __( 'The server or database for the managed service is no longer in the order.', 'beltoft-services' ) );
+					$errors->add( 'managed_server_unavailable', __( 'The server or database for Managed is no longer in the order.', 'beltoft-services' ) );
 				} elseif ( self::in_cart_server() > 1 ) {
 					$errors->add( 'managed_limit', __( 'This server or database is managed already.', 'beltoft-services' ) );
 				}
@@ -189,7 +189,7 @@ final class ManagedCart {
 			}
 
 			if ( ! is_int( $link ) || ! self::owned( $link ) ) {
-				$errors->add( 'managed_server_unavailable', __( 'The server or database for the managed service is no longer available.', 'beltoft-services' ) );
+				$errors->add( 'managed_server_unavailable', __( 'The server or database for Managed is no longer available.', 'beltoft-services' ) );
 				continue;
 			}
 

@@ -116,7 +116,7 @@ final class PricingTest extends UsageTestCase {
 		$this->assertNull( $plan['managed_addon'], 'Not sold: nothing to say.' );
 
 		$managed = new \WC_Product_Subscription();
-		$managed->set_name( 'Managed server' );
+		$managed->set_name( 'Managed' );
 		$managed->set_status( 'publish' );
 		$managed->set_regular_price( '32.06' );
 		$managed->update_meta_data( '_subscription_price', '32.06' );

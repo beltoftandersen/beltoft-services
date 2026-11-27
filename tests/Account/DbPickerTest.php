@@ -149,7 +149,7 @@ class DbPickerTest extends BackupTestCase {
 		$this->assertStringContainsString( '120 GB data disk', $html );
 		$this->assertStringContainsString( 'PostgreSQL 18', $html );
 		$this->assertStringNotContainsString( 'Daily backups', $html, 'A database has no backups of its own.' );
-		$this->assertStringNotContainsString( 'Backups come with the Managed add-on', $html, 'Not sold here: no add-on product.' );
+		$this->assertStringNotContainsString( 'Backups come with Managed', $html, 'Not sold here: no add-on product.' );
 		$this->assertStringContainsString( 'excluding VAT', $html );
 		$this->assertStringContainsString( 'name="' . DbPicker::FIELD . '"', $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
@@ -164,7 +164,7 @@ class DbPickerTest extends BackupTestCase {
 		$this->assertStringNotContainsString( 'Daily backups', $this->page() );
 
 		$managed = new \WC_Product_Subscription();
-		$managed->set_name( 'Managed server' );
+		$managed->set_name( 'Managed' );
 		$managed->set_status( 'publish' );
 		$managed->set_regular_price( '299' );
 		$managed->update_meta_data( '_subscription_price', '299' );
@@ -176,7 +176,7 @@ class DbPickerTest extends BackupTestCase {
 		$managed->save();
 		\BeltoftServices\Proxmox\Addon\AddonCart::reset_products();
 
-		$this->assertStringContainsString( 'Backups come with the Managed add-on', $this->page() );
+		$this->assertStringContainsString( 'Backups come with Managed', $this->page() );
 	}
 
 	public function test_only_published_products_of_the_driver_are_offered(): void {

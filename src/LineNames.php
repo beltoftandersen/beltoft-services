@@ -145,7 +145,7 @@ final class LineNames {
 
 		if ( $item instanceof \WC_Order_Item_Product ) {
 			// The same words as the order and cart lines (and the subscription page), from the same code path.
-			$label = self::label( $item->get_product(), $item->get_meta( '_beltoft_services_disk_server' ) );
+			$label = self::label( $item->get_product(), self::covered( $item ) );
 
 			if ( '' !== $label ) {
 				return $label;
@@ -153,6 +153,17 @@ final class LineNames {
 		}
 
 		return (string) $item->get_name();
+	}
+
+	/**
+	 * The licence id of the server or database an add-on line is for (an extra disk or the Managed add-on), 0 when none.
+	 *
+	 * @param \WC_Order_Item $item Order or subscription item.
+	 */
+	private static function covered( \WC_Order_Item $item ) {
+		$id = $item->get_meta( '_beltoft_services_disk_server' );
+
+		return $id ? $id : $item->get_meta( '_beltoft_services_managed_server' );
 	}
 
 	/**
@@ -171,7 +182,18 @@ final class LineNames {
 			return __( 'Pay as you go account', 'beltoft-services' );
 		}
 
-		if ( ! $product instanceof \WC_Product_Variation || ! Product::is_service( $product->get_id() ) ) {
+		if ( ! $product instanceof \WC_Product_Variation ) {
+			/**
+			 * The name of a line of a simple add-on product, for the feature that sells it ("Managed: web1").
+			 *
+			 * @param string      $label      Empty until the feature names the line.
+			 * @param \WC_Product $product    The product.
+			 * @param mixed       $covered_id The licence id of the server or database the line is for, when known.
+			 */
+			return (string) apply_filters( 'beltoft_services_simple_line_label', '', $product, $disk_server_id );
+		}
+
+		if ( ! Product::is_service( $product->get_id() ) ) {
 			return '';
 		}
 
@@ -326,7 +348,7 @@ final class LineNames {
 			return $name;
 		}
 
-		$label = self::label( $item->get_product(), $item->get_meta( '_beltoft_services_disk_server' ) );
+		$label = self::label( $item->get_product(), self::covered( $item ) );
 
 		return '' === $label ? $name : self::swap( (string) $name, $label );
 	}
@@ -343,7 +365,7 @@ final class LineNames {
 			return $name;
 		}
 
-		$label = self::label( $cart_item['data'], $cart_item['beltoft_services_disk_for'] ?? 0 );
+		$label = self::label( $cart_item['data'], $cart_item['beltoft_services_disk_for'] ?? ( $cart_item['beltoft_services_managed_for'] ?? 0 ) );
 
 		return '' === $label ? $name : self::swap( (string) $name, $label );
 	}
@@ -382,7 +404,7 @@ final class LineNames {
 
 		$product = $item->get_product();
 
-		if ( ! $product instanceof \WC_Product || '' === self::label( $product, $item->get_meta( '_beltoft_services_disk_server' ) ) ) {
+		if ( ! $product instanceof \WC_Product || '' === self::label( $product, self::covered( $item ) ) ) {
 			return $html;
 		}
 
@@ -439,7 +461,7 @@ final class LineNames {
 	 * @return mixed
 	 */
 	public static function cart_item_data( $data, $cart_item ) {
-		if ( ! is_array( $data ) || ! is_array( $cart_item ) || empty( $cart_item['data'] ) || '' === self::label( $cart_item['data'], $cart_item['beltoft_services_disk_for'] ?? 0 ) ) {
+		if ( ! is_array( $data ) || ! is_array( $cart_item ) || empty( $cart_item['data'] ) || '' === self::label( $cart_item['data'], $cart_item['beltoft_services_disk_for'] ?? ( $cart_item['beltoft_services_managed_for'] ?? 0 ) ) ) {
 			return $data;
 		}
 
