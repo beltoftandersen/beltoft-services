@@ -158,9 +158,13 @@ final class ValkeyEngine implements DbEngine, DbEngineEviction {
 
 	public function connections( string $host ): array {
 		return array(
-			array( 'label' => __( 'Connection URL (TLS):', 'beltoft-services' ), 'value' => 'rediss://' . self::ROLE . ':PASSWORD@' . $host . ':' . self::PORT ),
-			array( 'label' => __( 'Command line:', 'beltoft-services' ), 'value' => 'valkey-cli --tls --cacert ca.crt -h ' . $host . ' -p ' . self::PORT . ' --user ' . self::ROLE . ' --pass PASSWORD' ),
+			array( 'label' => __( 'Connection URL (TLS):', 'beltoft-services' ), 'value' => 'rediss://' . self::ROLE . ':PASSWORD@' . DbEngines::uri_host( $host ) . ':' . self::PORT ),
+			array( 'label' => __( 'Command line:', 'beltoft-services' ), 'value' => $this->command( $host ) ),
 		);
+	}
+
+	public function command( string $host ): string {
+		return 'valkey-cli --tls --cacert ca.crt -h ' . $host . ' -p ' . self::PORT . ' --user ' . self::ROLE . ' --pass PASSWORD';
 	}
 
 	public function connection_note(): string {

@@ -259,6 +259,12 @@ final class ProxmoxSettings {
 			'label'   => __( 'Warn when this many IPv4 addresses are free', 'beltoft-services' ),
 			'desc'    => __( 'A mail is sent when the free addresses fall to this number, and another when none is left. At most one mail a day for each reason.', 'beltoft-services' ),
 		);
+		$fields['ipv6_test_url'] = $base + array(
+			'type'    => 'url',
+			'default' => '',
+			'label'   => __( 'Address for the IPv6 test in the checkout', 'beltoft-services' ),
+			'desc'    => __( 'An https address of a tiny page that only has an IPv6 address (a name with an AAAA record and no A record). The checkout tries to load it in the visitor\'s browser when the cart holds a server or database without an IPv4 address, and offers the IPv4 add-on when it cannot be loaded. Empty: no test. The test is also off while the name has no AAAA record.', 'beltoft-services' ),
+		);
 		$fields['db_disk_max_gb'] = $base + array(
 			'type'    => 'number',
 			'default' => 1000,

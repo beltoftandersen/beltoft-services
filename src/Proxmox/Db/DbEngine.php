@@ -97,4 +97,11 @@ interface DbEngine {
 	 * A sentence on how to trust the CA certificate with this engine's clients.
 	 */
 	public function ca_hint(): string;
+
+	/**
+	 * The command line that connects to a host with the TLS settings the engine requires, the password as the word PASSWORD.
+	 *
+	 * @param string $host Address of the database (an IPv6 address without brackets).
+	 */
+	public function command( string $host ): string;
 }

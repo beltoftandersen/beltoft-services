@@ -311,6 +311,9 @@
 			} else {
 				S.fail( null, db.strings.noip );
 			}
+		} else if ( button.hasAttribute( 'data-db-access-allow' ) ) {
+			// The one-click form of "Use my current IP" and "Add address": the visitor's address, with a label.
+			access( panel, button, { op: 'add', cidr: button.getAttribute( 'data-db-access-allow' ), label: button.getAttribute( 'data-label' ) || '' } );
 		} else if ( button.hasAttribute( 'data-db-access-add' ) ) {
 			access( panel, button, { op: 'add', cidr: cidr ? cidr.value : '', label: label ? label.value : '' }, cidr );
 		} else if ( button.hasAttribute( 'data-db-access-remove' ) ) {
@@ -330,7 +333,7 @@
 	} );
 
 	document.addEventListener( 'click', function ( event ) {
-		var button = event.target.closest( '[data-db-reveal], [data-db-reset], [data-db-power], [data-db-restore], [data-db-backup-delete], [data-db-policy-save], [data-db-copy], [data-db-access-mine], [data-db-access-add], [data-db-access-remove], [data-db-access-world]' );
+		var button = event.target.closest( '[data-db-reveal], [data-db-reset], [data-db-power], [data-db-restore], [data-db-backup-delete], [data-db-policy-save], [data-db-copy], [data-db-access-mine], [data-db-access-allow], [data-db-access-add], [data-db-access-remove], [data-db-access-world]' );
 		var panel = button ? button.closest( '[data-resource]' ) : null;
 		// The power buttons are in the page's head, outside the card.
 		var box = button ? ( button.closest( '[data-db-card]' ) || ( panel ? panel.querySelector( '[data-db-card]' ) : null ) ) : null;
@@ -351,7 +354,7 @@
 			restore( box, panel, button );
 		} else if ( button.hasAttribute( 'data-db-backup-delete' ) ) {
 			removeBackup( box, panel, button );
-		} else if ( button.hasAttribute( 'data-db-access-mine' ) || button.hasAttribute( 'data-db-access-add' ) || button.hasAttribute( 'data-db-access-remove' ) || button.hasAttribute( 'data-db-access-world' ) ) {
+		} else if ( button.hasAttribute( 'data-db-access-mine' ) || button.hasAttribute( 'data-db-access-allow' ) || button.hasAttribute( 'data-db-access-add' ) || button.hasAttribute( 'data-db-access-remove' ) || button.hasAttribute( 'data-db-access-world' ) ) {
 			accessClick( box, panel, button );
 		} else {
 			reset( box, panel, button );

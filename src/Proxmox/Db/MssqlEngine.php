@@ -124,6 +124,11 @@ final class MssqlEngine implements DbEngine, DbEngineTerms {
 		);
 	}
 
+	public function command( string $host ): string {
+		// -N asks for an encrypted connection and checks the certificate (-C would skip the check).
+		return 'sqlcmd -S ' . $host . ',' . self::PORT . ' -d ' . $this->database() . ' -U ' . $this->login() . ' -P PASSWORD -N';
+	}
+
 	public function limits(): string {
 		return __( 'SQL Server Express edition: up to 50 GB per database, about 1.4 GB of memory for the database cache and up to 4 cores.', 'beltoft-services' );
 	}

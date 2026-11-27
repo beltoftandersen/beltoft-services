@@ -86,4 +86,13 @@ final class DbEngines {
 
 		return $lines[ $id ] ?? '';
 	}
+
+	/**
+	 * A host as a connection URL writes it: an IPv6 address goes in brackets.
+	 *
+	 * @param string $host IPv4 address, name or IPv6 address.
+	 */
+	public static function uri_host( string $host ): string {
+		return false !== strpos( $host, ':' ) && '[' !== substr( $host, 0, 1 ) ? '[' . $host . ']' : $host;
+	}
 }

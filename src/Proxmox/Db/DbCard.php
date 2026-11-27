@@ -91,6 +91,23 @@ final class DbCard {
 
 		$access['editable'] = $access['editable'] && ! $stopped;
 		$public  = $ready && '' !== $access['address'] ? $engine->connections( $access['address'] ) : array();
+		$connect = $ready ? DbConnect::build(
+			$engine,
+			array(
+				'address'        => $access['address'],
+				'address6'       => $access['address6'],
+				'my_ip'          => $access['my_ip'],
+				'entries'        => array_map( static fn( $e ) => (string) $e['cidr'], $access['entries'] ),
+				'world'          => $access['world'],
+				'editable'       => $access['editable'],
+				'add_url'        => $access['add_url'],
+				'add_price'      => $access['add_price'],
+				'adding'         => $access['adding'],
+				'sold_out'       => $access['sold_out'],
+				'private_host'   => $address,
+				'private_string' => (string) ( $engine->connections( $address )[0]['value'] ?? '' ),
+			)
+		) : null;
 
 		return array(
 			'resource_id' => $r->id(),
@@ -124,6 +141,7 @@ final class DbCard {
 			'backups'     => $backups,
 			'access'      => $access,
 			'public_connections' => $public,
+			'connect'     => $connect,
 			'version'     => (int) ( $plan['major'] ?? 0 ),
 			'size'        => sprintf(
 				/* translators: 1: number of vCPUs, 2: memory in GB, 3: disk in GB */

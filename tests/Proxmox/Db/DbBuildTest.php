@@ -551,6 +551,7 @@ class DbBuildTest extends TestCase {
 		$this->driver->render_account( $r );
 		$html = (string) ob_get_clean();
 
+		$html = (string) preg_replace( '#<section class="beltoft-services-dnsbox beltoft-services-dbconnect".*?</section>#s', '', $html ); // The Access tab box has its own copy buttons.
 		// Two connection strings, the password line (hidden until shown) and the fingerprint, each a code block with its own Copy button; only the strings are filled with the password.
 		$this->assertSame( 4, substr_count( $html, 'class="beltoft-services-db__block"' ) );
 		$this->assertSame( 4, substr_count( $html, 'data-db-copy' ) );

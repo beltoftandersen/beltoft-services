@@ -187,6 +187,10 @@ $beltoft_services_db_wait = array(
 
 	<?php if ( 'ready' === $view['kind'] && ( $beltoft_services_all || 'access' === $active ) ) : ?>
 		<?php $beltoft_services_access = $view['access']; ?>
+		<?php
+		$connect = $view['connect'];
+		include BELTOFT_SERVICES_PATH . 'templates/account/db-connect.php';
+		?>
 		<div class="beltoft-services-vm__more beltoft-services-db__access" data-db-access data-confirm-remove="<?php esc_attr_e( 'Remove this address from the list?', 'beltoft-services' ); ?>">
 			<?php if ( '' !== (string) $beltoft_services_access['address6'] ) : ?>
 				<h4><?php esc_html_e( 'IPv6 address', 'beltoft-services' ); ?></h4>

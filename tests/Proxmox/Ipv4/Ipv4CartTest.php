@@ -280,6 +280,54 @@ class Ipv4CartTest extends BackupTestCase {
 		$this->assertSame( 0, $this->lines() );
 	}
 
+	public function test_a_basic_server_and_a_database_get_the_ipv6_notice_only_with_a_test_page_that_has_an_aaaa_record(): void {
+		$this->product();
+		$this->server_in_cart( true );
+
+		$this->assertStringNotContainsString( 'data-ipv6-notice', $this->html(), 'No test page set: no notice.' );
+
+		$this->settings( array( 'ipv6_test_url' => 'https://ipv6test.example.test/ping' ) );
+		delete_transient( 'beltoft_services_ipv6_test_aaaa_' . md5( 'ipv6test.example.test' ) );
+		add_filter( 'beltoft_services_ipv6_test_has_aaaa', '__return_false' );
+		$this->assertStringNotContainsString( 'data-ipv6-notice', $this->html(), 'The name has no AAAA record yet: no test, no notice.' );
+
+		remove_filter( 'beltoft_services_ipv6_test_has_aaaa', '__return_false' );
+		delete_transient( 'beltoft_services_ipv6_test_aaaa_' . md5( 'ipv6test.example.test' ) );
+		add_filter( 'beltoft_services_ipv6_test_has_aaaa', '__return_true' );
+
+		$html = $this->html();
+		$this->assertStringContainsString( 'data-ipv6-notice', $html );
+		$this->assertStringContainsString( ' hidden>', $html, 'Hidden until the browser has tried.' );
+		$this->assertStringContainsString( 'Your internet connection has no IPv6. This server can only be reached over IPv6 unless you add an IPv4 address.', $html );
+		$this->assertMatchesRegularExpression( '/data-ipv6-add>Buy an IPv4 address \(\+[^)]*19[^)]*\)</', $html, 'The button names the price.' );
+		$this->assertStringContainsString( 'data-ipv6-check', $html );
+		$this->assertStringContainsString( '>Check again</button>', $html );
+		$this->assertStringContainsString( 'data-none="Your connection has no IPv6. Buy an IPv4 address, or use the browser console."', $html );
+		$this->assertStringContainsString( 'data-ipv6="Your connection has IPv6. You can connect to this server."', $html );
+		$this->assertStringNotContainsString( "\u{2014}", $html );
+
+		WC()->cart->empty_cart();
+		$this->add_line( $this->database() );
+		$this->assertStringContainsString( 'This database can only be reached over IPv6 unless you add an IPv4 address.', $this->html() );
+
+		WC()->cart->empty_cart();
+		$this->server_in_cart( false );
+		$this->assertStringNotContainsString( 'data-ipv6-notice', $this->html(), 'A dedicated server has its own IPv4 address.' );
+
+		remove_filter( 'beltoft_services_ipv6_test_has_aaaa', '__return_true' );
+	}
+
+	public function test_the_ipv6_test_script_is_loaded_only_with_a_usable_test_page(): void {
+		$this->settings( array( 'ipv6_test_url' => 'http://ipv6test.example.test/ping' ) );
+		$this->assertSame( '', \BeltoftServices\Proxmox\Ipv4\Ipv6Test::url(), 'Only https.' );
+
+		$this->settings( array( 'ipv6_test_url' => 'https://ipv6test.example.test/ping' ) );
+		delete_transient( 'beltoft_services_ipv6_test_aaaa_' . md5( 'ipv6test.example.test' ) );
+		add_filter( 'beltoft_services_ipv6_test_has_aaaa', '__return_true' );
+		$this->assertSame( 'https://ipv6test.example.test/ping', \BeltoftServices\Proxmox\Ipv4\Ipv6Test::url() );
+		remove_filter( 'beltoft_services_ipv6_test_has_aaaa', '__return_true' );
+	}
+
 	public function test_no_line_for_the_wrong_carts(): void {
 		$this->assertNull( Ipv4Field::target() );
 		$this->assertSame( '', $this->html() );
