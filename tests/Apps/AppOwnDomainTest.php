@@ -445,4 +445,138 @@ final class AppOwnDomainTest extends MonitoringTestCase {
 		$this->assertGreaterThan( 0, (int) Resource::find( $r->id() )->get( 'app_domain_dns_since' ) );
 		$this->assertLessThanOrEqual( time() + 2, (int) as_next_scheduled_action( AppOwnDomain::HOOK, array( $r->id() ), Jobs::GROUP ) );
 	}
+
+	// -- Check now ---------------------------------------------------------------------------------
+
+	private function check_request( int $id, int $user ): \WP_REST_Response {
+		wp_set_current_user( $user );
+		return rest_do_request( new \WP_REST_Request( 'POST', '/beltoft-services/v1/resources/' . $id . '/dns-check' ) );
+	}
+
+	private function owner( Resource $r ): int {
+		return (int) $r->license()['user_id'];
+	}
+
+	public function test_check_now_is_for_the_owner_only(): void {
+		$r = $this->waiting( array( 'app_domain_dns_since' => time() ) );
+
+		$this->assertSame( 401, $this->check_request( $r->id(), 0 )->get_status(), 'Logged out.' );
+		$this->assertSame( 403, $this->check_request( $r->id(), self::factory()->user->create() )->get_status(), 'Another customer.' );
+		$this->assertSame( array(), $this->lookups, 'Nothing was read for them.' );
+		$this->assertSame( 200, $this->check_request( $r->id(), $this->owner( $r ) )->get_status() );
+		$this->assertCount( 2, $this->lookups );
+	}
+
+	public function test_check_now_stores_the_look_and_answers_with_the_fresh_box_and_keeps_the_job_schedule(): void {
+		$r = $this->waiting( array( 'app_domain_dns_since' => time() ) );
+		AppOwnDomain::start( $r );
+		$when = as_next_scheduled_action( AppOwnDomain::HOOK, array( $r->id() ), Jobs::GROUP );
+		$this->assertNotFalse( $when );
+		$this->answers['A'] = array( '198.51.100.7' );
+
+		$reply = $this->check_request( $r->id(), $this->owner( $r ) );
+		$data  = $reply->get_data();
+		$this->assertSame( 200, $reply->get_status() );
+		$this->assertSame( 'other', $data['verdict'] );
+		$this->assertStringContainsString( 'Right now ' . self::NAME . ' points to 198.51.100.7.', $data['box'] );
+		$this->assertStringContainsString( 'Last checked at', $data['box'] );
+		$this->assertStringContainsString( 'You can check again at', $data['box'], 'The box is limited now.' );
+		$this->assertSame( 'other', Resource::find( $r->id() )->get( 'app_domain_dns_reason' ) );
+		$this->assertSame( $when, as_next_scheduled_action( AppOwnDomain::HOOK, array( $r->id() ), Jobs::GROUP ), 'The job keeps its time.' );
+		$this->assertSame( 1, $this->pending( $r->id(), AppOwnDomain::HOOK ) );
+	}
+
+	public function test_check_now_is_not_blocked_by_the_jobs_gap(): void {
+		$r = $this->waiting( array( 'app_domain_dns_since' => time(), 'app_domain_dns_checked' => time() - 5 ) );
+		$this->assertSame( 200, $this->check_request( $r->id(), $this->owner( $r ) )->get_status() );
+		$this->assertCount( 2, $this->lookups, 'A look made five seconds ago by the job does not stop the customer.' );
+	}
+
+	public function test_check_now_waits_a_minute_between_checks_and_says_when(): void {
+		$r    = $this->waiting( array( 'app_domain_dns_since' => time() ) );
+		$user = $this->owner( $r );
+		$this->assertSame( 200, $this->check_request( $r->id(), $user )->get_status() );
+		$made = count( $this->lookups );
+
+		$reply = $this->check_request( $r->id(), $user );
+		$data  = $reply->get_data();
+		$this->assertSame( 429, $reply->get_status() );
+		$this->assertCount( $made, $this->lookups, 'A limited click reads nothing.' );
+		$this->assertEqualsWithDelta( time() + 60, $data['next'], 3 );
+		$this->assertStringStartsWith( 'You can check again at ', $data['message'] );
+		$this->assertMatchesRegularExpression( '#data-dns-check[^>]*disabled>You can check again at #', $data['box'] );
+
+		// A minute later it may again.
+		$times = (array) Resource::find( $r->id() )->get( AppOwnDomain::MANUAL_META );
+		$this->assertTrue( Resource::find( $r->id() )->set( array( AppOwnDomain::MANUAL_META => array( time() - 61 ) ) ) );
+		$this->assertSame( 1, count( $times ) );
+		$this->assertSame( 200, $this->check_request( $r->id(), $user )->get_status() );
+	}
+
+	public function test_check_now_is_limited_to_ten_in_a_rolling_hour(): void {
+		$r    = $this->waiting( array( 'app_domain_dns_since' => time() ) );
+		$user = $this->owner( $r );
+		$old  = time() - 3000;
+		$full = array();
+		for ( $i = 0; $i < 10; $i++ ) {
+			$full[] = $old + $i * 70;
+		}
+		$this->assertTrue( $r->set( array( AppOwnDomain::MANUAL_META => $full ) ) );
+
+		$reply = $this->check_request( $r->id(), $user );
+		$this->assertSame( 429, $reply->get_status() );
+		$this->assertSame( $full[0] + 3600, $reply->get_data()['next'], 'The oldest check leaves the hour first.' );
+		$this->assertSame( array(), $this->lookups );
+
+		// The oldest one is an hour old: one more is allowed.
+		$full[0] = time() - 3601;
+		$this->assertTrue( Resource::find( $r->id() )->set( array( AppOwnDomain::MANUAL_META => $full ) ) );
+		$this->assertSame( 200, $this->check_request( $r->id(), $user )->get_status() );
+		$this->assertCount( 10, (array) Resource::find( $r->id() )->get( AppOwnDomain::MANUAL_META ), 'At most ten times are kept.' );
+	}
+
+	public function test_check_now_with_the_name_live_hands_over_to_the_install_like_the_job(): void {
+		$r = $this->waiting( array( 'app_domain_dns_since' => time() ) );
+		$this->answers['A'] = array( self::IP );
+
+		$reply = $this->check_request( $r->id(), $this->owner( $r ) );
+		$this->assertSame( 200, $reply->get_status() );
+		$this->assertTrue( $reply->get_data()['found'] );
+		$this->assertStringContainsString( 'is-found', $reply->get_data()['box'] );
+		$fresh = Resource::find( $r->id() );
+		$this->assertSame( 'live', $fresh->get( 'app_domain_dns' ) );
+		$this->assertSame( self::NAME, $fresh->get( 'app_domain' ) );
+		$this->assertFalse( $fresh->get( 'app_domain_made' ) );
+		$this->assertSame( 1, $this->pending( $r->id(), AppInstall::HOOK ) );
+
+		// Nothing to check any more.
+		$this->assertSame( 409, $this->check_request( $r->id(), $this->owner( $r ) )->get_status() );
+	}
+
+	public function test_check_now_needs_a_server_that_waits(): void {
+		$r = $this->waiting( array( 'app_domain_dns_since' => time(), 'app_domain_dns' => 'timeout' ) );
+		$this->assertSame( 409, $this->check_request( $r->id(), $this->owner( $r ) )->get_status() );
+		$this->assertSame( array(), $this->lookups );
+	}
+
+	public function test_the_box_shows_the_button_and_the_limited_state(): void {
+		$r    = $this->waiting( array( 'app_domain_dns_since' => time() ) );
+		$html = \BeltoftServices\Apps\AppProgress::dns_box( $r );
+		$this->assertMatchesRegularExpression( '#<button[^>]*data-dns-check="' . $r->id() . '"(?![^>]*disabled)[^>]*>Check now</button>#', $html );
+
+		$this->assertTrue( $r->set( array( AppOwnDomain::MANUAL_META => array( time() - 10 ) ) ) );
+		$html = \BeltoftServices\Apps\AppProgress::dns_box( Resource::find( $r->id() ) );
+		$this->assertMatchesRegularExpression( '#<button[^>]*disabled[^>]*>You can check again at \d#', $html );
+		$this->assertStringNotContainsString( "\u{2014}", $html );
+		$this->assertStringNotContainsString( "\u{00B7}", $html );
+	}
+
+	public function test_the_job_still_reads_at_its_own_gap_after_a_customer_check(): void {
+		$r = $this->waiting( array( 'app_domain_dns_since' => time() ) );
+		$this->check_request( $r->id(), $this->owner( $r ) );
+		$made = count( $this->lookups );
+		AppOwnDomain::run( $r->id() );
+		$this->assertCount( $made, $this->lookups, 'The job waits out its gap after the customer look.' );
+		$this->assertSame( 1, $this->pending( $r->id(), AppOwnDomain::HOOK ), 'And queues itself, never twice.' );
+	}
 }

@@ -61,6 +61,9 @@ if ( '' !== $box['ip'] ) {
 			<span class="beltoft-services-dnsbox__checked"><?php echo esc_html( $box['checked'] ); ?></span>
 		<?php endif; ?>
 	</p>
+	<?php if ( ! $box['found'] ) : ?>
+		<p class="beltoft-services-dnsbox__check"><button type="button" class="beltoft-services-dnsbox__button" data-dns-check="<?php echo esc_attr( (string) $box['id'] ); ?>" data-label="<?php esc_attr_e( 'Check now', 'beltoft-services' ); ?>" data-next="<?php echo esc_attr( (string) $box['next'] ); ?>"<?php echo $box['next'] > 0 ? ' disabled' : ''; ?>><?php echo $box['next'] > 0 ? esc_html( $box['next_text'] ) : esc_html__( 'Check now', 'beltoft-services' ); ?></button></p>
+	<?php endif; ?>
 	<p class="beltoft-services-dnsbox__foot"><?php esc_html_e( 'We check every 10 minutes and start the installation ourselves.', 'beltoft-services' ); ?>
 		<?php if ( '' !== $box['deadline'] ) : ?>
 			<?php echo esc_html( sprintf( /* translators: 1: date, 2: app name such as Odoo */ __( 'If this has not happened by %1$s, %2$s is installed on the server address instead.', 'beltoft-services' ), $box['deadline'], $box['app'] ) ); ?>

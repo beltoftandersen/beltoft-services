@@ -236,6 +236,7 @@ final class Plugin {
 		Apps\AppInstall::register();
 		Apps\AppDomainRelease::register();
 		Apps\AppOwnDomain::register();
+		Apps\AppDnsCheck::register();
 		Apps\AppWww::register();
 		Apps\AppDomainChange::register();
 		Apps\AppStatus::register();

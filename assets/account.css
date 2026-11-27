@@ -2362,5 +2362,8 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__
 }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-dnsbox p { max-width: none; }
 .beltoft-services-dnsbox .beltoft-services-copy { white-space: nowrap; }
+.beltoft-services-dnsbox__check { max-width: none; margin: 0 0 var(--bs-space-3); }
+.beltoft-services-dnsbox .beltoft-services-dnsbox__button, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-dnsbox .beltoft-services-dnsbox__button { display: inline-block; width: auto; min-width: 12ch; min-height: var(--bs-btn-h, 40px); margin: 0; padding: 0 var(--bs-space-4); border: 1px solid var(--bs-line); border-radius: var(--bs-radius); background: var(--bs-surface); color: var(--bs-ink); font: inherit; font-size: var(--bs-fs-body); font-weight: var(--bs-fw-medium); text-align: center; cursor: pointer; }
+.beltoft-services-dnsbox .beltoft-services-dnsbox__button:disabled { color: var(--bs-muted); cursor: default; }
 /* The server page already shows the box above its tabs: the App tab does not print it a second time (it stays for a page without that block). */
 .beltoft-services-panel:has(.beltoft-services-progress__box) .beltoft-services-tab .beltoft-services-dnsbox { display: none; }

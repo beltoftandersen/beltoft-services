@@ -214,6 +214,21 @@ final class AppOwnDomain {
 			return;
 		}
 
+		$verdict = self::look( $id, $name, $ip, $now );
+
+		if ( 'live' !== $verdict && null !== $verdict ) {
+			self::schedule( $id, self::INTERVAL );
+		}
+	}
+
+	/**
+	 * One read of public DNS for one name and what comes of it: the result is stored, and a name that points at this server alone
+	 * is handed to the install. The one code path of the recurring job and of the customer's Check now button.
+	 *
+	 * @return string|null The verdict (none, other, aaaa, unreachable, live), or null when the result could not be stored (the lock was busy;
+	 *                     store() has queued a look soon).
+	 */
+	private static function look( int $id, string $name, string $ip, int $now ): ?string {
 		$a    = DnsQuery::addresses( $name, 'A' );
 		$aaaa = DnsQuery::addresses( $name, 'AAAA' );
 		if ( is_wp_error( $a ) ) {
@@ -224,8 +239,7 @@ final class AppOwnDomain {
 
 		if ( 'live' === $verdict ) {
 			// No record of ours exists (app_domain_made false), so a later reinstall never removes anything for this name.
-			self::store( $id, array( 'app_domain' => $name, 'app_domain_made' => false, 'app_domain_dns' => 'live', 'app_domain_dns_checked' => $now, 'app_domain_dns_reason' => null ), true );
-			return;
+			return self::store( $id, array( 'app_domain' => $name, 'app_domain_made' => false, 'app_domain_dns' => 'live', 'app_domain_dns_checked' => $now, 'app_domain_dns_reason' => null ), true ) ? 'live' : null;
 		}
 
 		$meta = array( 'app_domain_dns_checked' => $now, 'app_domain_dns_reason' => $verdict );
@@ -233,9 +247,78 @@ final class AppOwnDomain {
 			$meta['app_domain_dns_seen'] = array_values( array_unique( array_filter( $a, static fn( $x ): bool => false !== filter_var( $x, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) ) );
 		}
 
-		if ( self::store( $id, $meta, false ) ) {
-			self::schedule( $id, self::INTERVAL );
+		return self::store( $id, $meta, false ) ? $verdict : null;
+	}
+
+	// -- The customer's Check now ----------------------------------------------------------------
+
+	/** Least seconds between two customer checks of one server. */
+	public const MANUAL_GAP = 60;
+
+	/** Most customer checks of one server in a rolling hour. */
+	public const MANUAL_PER_HOUR = 10;
+
+	/** The times (Unix) of the customer's checks of the last hour. */
+	public const MANUAL_META = 'app_domain_dns_manual';
+
+	/** The moment the customer may check again, 0 when now. */
+	public static function manual_next( Resource $r, ?int $now = null ): int {
+		$now   = $now ?? time();
+		$times = array_values( array_filter( array_map( 'intval', (array) $r->get( self::MANUAL_META ) ), static fn( int $t ): bool => $t > $now - HOUR_IN_SECONDS && $t <= $now ) );
+		if ( array() === $times ) {
+			return 0;
 		}
+		sort( $times );
+		$next = end( $times ) + self::MANUAL_GAP;
+		if ( count( $times ) >= self::MANUAL_PER_HOUR ) {
+			$next = max( $next, $times[ count( $times ) - self::MANUAL_PER_HOUR ] + HOUR_IN_SECONDS );
+		}
+
+		return $next > $now ? $next : 0;
+	}
+
+	/**
+	 * The customer asks for a look now. The look is the job's own (look()); the limits are kept here, on the server. The job's schedule
+	 * is not touched: its next run stays where it was, and its MIN_GAP never blocks this look.
+	 *
+	 * @return array{verdict: string|null}|\WP_Error Error codes: not_waiting (409), rate_limited (429, data: next), busy (409).
+	 */
+	public static function check_now( Resource $r ) {
+		if ( ! $r->is_live() || 'ready' !== $r->get( 'state' ) || ! self::waiting( $r ) || 0 === (int) $r->get( 'app_domain_dns_since' ) || '' === self::address( $r ) ) {
+			return new \WP_Error( 'not_waiting', __( 'This server is not waiting for your domain.', 'beltoft-services' ), array( 'status' => 409 ) );
+		}
+		$deadline = self::deadline( $r );
+		if ( $deadline > 0 && time() >= $deadline ) {
+			return new \WP_Error( 'not_waiting', __( 'This server is not waiting for your domain.', 'beltoft-services' ), array( 'status' => 409 ) );
+		}
+
+		// The count is kept under the lock, so two clicks at once make one look.
+		$next  = 0;
+		$noted = $r->locked(
+			static function () use ( $r, &$next ): bool {
+				$fresh = Resource::find( $r->id() );
+				if ( ! $fresh ) {
+					return false;
+				}
+				$next = self::manual_next( $fresh );
+				if ( $next > 0 ) {
+					return true;
+				}
+				$now   = time();
+				$times = array_values( array_filter( array_map( 'intval', (array) $fresh->get( self::MANUAL_META ) ), static fn( int $t ): bool => $t > $now - HOUR_IN_SECONDS ) );
+				$times[] = $now;
+
+				return $fresh->set( array( self::MANUAL_META => array_slice( $times, -self::MANUAL_PER_HOUR ) ) );
+			}
+		);
+		if ( true !== $noted ) {
+			return new \WP_Error( 'busy', __( 'This server is busy. Please try again in a moment.', 'beltoft-services' ), array( 'status' => 409 ) );
+		}
+		if ( $next > 0 ) {
+			return new \WP_Error( 'rate_limited', __( 'You are checking too often.', 'beltoft-services' ), array( 'status' => 429, 'next' => $next ) );
+		}
+
+		return array( 'verdict' => self::look( $r->id(), (string) $r->get( 'app_domain_own' ), self::address( $r ), time() ) );
 	}
 
 	/**

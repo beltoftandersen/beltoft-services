@@ -355,6 +355,7 @@ final class AppProgress {
 		$seen    = array_values( array_filter( (array) $r->get( 'app_domain_dns_seen' ), 'is_string' ) );
 		$deadline = AppOwnDomain::deadline( $r );
 		$today   = wp_date( 'Y-m-d' ) === wp_date( 'Y-m-d', $checked );
+		$next    = AppOwnDomain::manual_next( $r );
 
 		// The label of the www record is what the DNS panel of a provider asks for: "www", not the whole name.
 		$www_label = '' !== $www_name && str_ends_with( $www_name, '.' . $name ) ? substr( $www_name, 0, -strlen( $name ) - 1 ) : $www_name;
@@ -394,6 +395,9 @@ final class AppProgress {
 				$today ? wp_date( get_option( 'time_format' ), $checked ) : wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $checked )
 			) : '',
 			'deadline'  => $deadline > 0 ? wp_date( get_option( 'date_format' ), $deadline ) : '',
+			'id'        => $r->id(),
+			'next'      => $next,
+			'next_text' => $next > 0 ? sprintf( /* translators: %s: time of day such as 09:41 */ __( 'You can check again at %s', 'beltoft-services' ), wp_date( get_option( 'time_format' ), $next ) ) : '',
 		);
 	}
 
