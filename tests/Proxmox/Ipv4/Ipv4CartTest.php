@@ -487,11 +487,15 @@ class Ipv4CartTest extends BackupTestCase {
 		$this->assertSame( 200, $answer[1] );
 		$this->assertSame( 3, $this->lines() );
 
-		// A negative count is taken as its absolute value, still within the limit.
+		// A negative count, an array or text means none.
 		WC()->cart->empty_cart();
 		$this->server_in_cart();
+		$this->post( array( 'nonce' => $this->nonce(), 'count' => '2' ) );
 		$this->post( array( 'nonce' => $this->nonce(), 'count' => '-7' ) );
-		$this->assertLessThanOrEqual( 3, $this->lines() );
+		$this->assertSame( 0, $this->lines() );
+		$this->post( array( 'nonce' => $this->nonce(), 'count' => '2' ) );
+		$this->post( array( 'nonce' => $this->nonce(), 'count' => array( '5' ) ) );
+		$this->assertSame( 0, $this->lines() );
 
 		// Not a number, an array, a float and a huge number.
 		foreach ( array( 'abc', array( '5', '6' ), '2.9', '99999999999999999999', '' ) as $bad ) {

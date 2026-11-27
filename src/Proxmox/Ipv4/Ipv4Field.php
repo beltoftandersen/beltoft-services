@@ -220,7 +220,8 @@ final class Ipv4Field {
 		return CartSwap::answer(
 			self::NONCE,
 			static function (): array {
-				$count = isset( $_POST['count'] ) ? absint( wp_unslash( $_POST['count'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- checked in CartSwap::answer().
+				// A negative number, an array or text means none (absint would turn -7 into 7).
+				$count = isset( $_POST['count'] ) && is_scalar( $_POST['count'] ) ? max( 0, (int) wp_unslash( $_POST['count'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- checked in CartSwap::answer(); cast to int.
 
 				// Alone on the session's latest cart, saved before the lock is let go (CartSwap): two quick changes never drop one.
 				return CartSwap::locked( static fn(): array => self::choose( $count ) ) ?? array( 'ok' => false, 'count' => self::chosen() );
