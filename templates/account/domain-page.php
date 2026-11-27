@@ -179,7 +179,7 @@ if ( $d['dns_only'] ) {
 						</form>
 					</div>
 				<?php endif; ?>
-				<div class="beltoft-dnse" data-dns-editor data-resource="<?php echo esc_attr( (string) $r->id() ); ?>" data-zone="<?php echo esc_attr( strtolower( $d['domain'] ) ); ?>"<?php echo $d['off'] ? ' data-readonly="1"' : ''; ?><?php echo $d['rows_lazy'] ? ' data-rows-lazy' : ''; ?> data-rows="<?php echo esc_attr( (string) wp_json_encode( $d['rows'] ) ); ?>" data-i18n="<?php echo esc_attr( (string) wp_json_encode( $beltoft_i18n ) ); ?>">
+				<div class="beltoft-dnse" data-dns-editor data-resource="<?php echo esc_attr( (string) $r->id() ); ?>" data-zone="<?php echo esc_attr( strtolower( $d['domain'] ) ); ?>"<?php echo $d['off'] ? ' data-readonly="1"' : ''; ?><?php echo $d['rows_lazy'] ? ' data-rows-lazy' : ''; ?> data-rows="<?php echo esc_attr( (string) wp_json_encode( $d['rows'] ) ); ?>" data-notes="<?php echo esc_attr( (string) wp_json_encode( $d['notes'] ) ); ?>" data-i18n="<?php echo esc_attr( (string) wp_json_encode( $beltoft_i18n ) ); ?>">
 					<noscript><p class="beltoft-services-domain__note"><?php esc_html_e( 'Turn on JavaScript to see and change your DNS records.', 'beltoft-services' ); ?></p></noscript>
 				</div>
 				<?php if ( ! $d['off'] && ! $d['zone_unavailable'] ) : ?>

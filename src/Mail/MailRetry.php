@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Mail;
 
+use BeltoftLicenses\Events;
 use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 
@@ -82,10 +83,18 @@ final class MailRetry {
 						'mail_proof_failed_at' => 0,
 						'failed_op'            => '',
 						'last_error'           => '',
+						// Back in set up. No listener acts on this state, so nothing is announced.
+						'state'                => 'provisioning',
 					)
 				);
 
-				return $fresh->set( $meta ) && $fresh->transition( 'provisioning', 'Set up started again by the customer' );
+				if ( ! $fresh->set( $meta ) ) {
+					return false;
+				}
+
+				Events::add( (int) ( $fresh->license()['id'] ?? 0 ), 'service', 'Set up started again by the customer' );
+
+				return true;
 			}
 		);
 

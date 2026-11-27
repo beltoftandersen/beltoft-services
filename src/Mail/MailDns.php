@@ -136,11 +136,29 @@ final class MailDns {
 				return $result;
 			}
 
-			$rows[ $i ]['status'] = $result[0];
-			$rows[ $i ]['reason'] = $result[1];
+			$rows[ $i ] = self::with_result( $rows[ $i ], $result );
 		}
 
 		return $rows;
+	}
+
+	/**
+	 * A row with the outcome of publish(): the status and reason, and the mark written_by_us when this call wrote the record (a
+	 * record that was there before, or that the customer owns, never gets it: it is not ours to remove).
+	 *
+	 * @param array<string, mixed> $row    Row.
+	 * @param array<int, mixed>    $result publish() result.
+	 * @return array<string, mixed>
+	 */
+	private static function with_result( array $row, array $result ): array {
+		$row['status'] = $result[0];
+		$row['reason'] = $result[1];
+
+		if ( ! empty( $result[2] ) ) {
+			$row['written_by_us'] = true;
+		}
+
+		return $row;
 	}
 
 	/**
@@ -261,7 +279,7 @@ final class MailDns {
 	 * @param int                  $user_id Customer; the zone must be one of theirs on our name servers.
 	 * @param string               $zone    Zone (the domain).
 	 * @param array<string, mixed> $row     A row of records().
-	 * @return array{0:string,1:string}|\WP_Error [ status (ok or conflict), reason ], or a transient error.
+	 * @return array{0:string,1:string,2:bool}|\WP_Error [ status (ok or conflict), reason, whether this call wrote the record ], or a transient error.
 	 */
 	public static function publish( int $user_id, string $zone, array $row ) {
 		$fqdn = '@' === $row['name'] ? $zone : $row['name'] . '.' . $zone;
@@ -273,7 +291,7 @@ final class MailDns {
 			$rows,
 			static function ( array $zone_data, array $sets ) use ( $zone, $fqdn, $row ) {
 				$here = Records::sets_at( $zone, $fqdn, (array) ( $zone_data['rrsets'] ?? array() ) );
-				$plan = self::plan( $row, $here, $zone );
+				$plan = self::plan( $row, $here, $zone, 'dkim' === $row['key'] ? self::written_before( $zone, 'dkim' ) : array() );
 
 				if ( null === $plan['write'] ) {
 					return $plan['status'] . ':' . $plan['reason'];
@@ -293,14 +311,18 @@ final class MailDns {
 		}
 
 		if ( 'ok' === $result['status'] ) {
-			return array( 'ok', '' );
+			if ( ! empty( $result['wrote'] ) ) {
+				self::remember_written( $zone, (string) $row['key'], (string) $row['value'], true );
+			}
+
+			return array( 'ok', '', ! empty( $result['wrote'] ) );
 		}
 
 		if ( in_array( $result['reason'], array( 'not_ours', 'invalid', 'no_zone', 'paused' ), true ) ) {
-			return array( 'conflict', $result['reason'] );
+			return array( 'conflict', $result['reason'], false );
 		}
 
-		return explode( ':', $result['reason'], 2 );
+		return array_merge( explode( ':', $result['reason'], 2 ), array( false ) );
 	}
 
 	/**
@@ -348,9 +370,10 @@ final class MailDns {
 	 * @param array<string, mixed>                 $row  The wanted record.
 	 * @param array<string, array<string, mixed>> $here The raw RRsets at the name, by type.
 	 * @param string                               $zone Zone.
+	 * @param string[]                             $ours Values of this record we wrote earlier (a stale DKIM key): they may be replaced.
 	 * @return array{write:?bool,status:string,reason:string,keep:array<int,mixed>,ttl:?int} write is true to write.
 	 */
-	public static function plan( array $row, array $here, string $zone ): array {
+	public static function plan( array $row, array $here, string $zone, array $ours = array() ): array {
 		$none = array( 'write' => null, 'status' => 'ok', 'reason' => '', 'keep' => array(), 'ttl' => null );
 		$type = (string) $row['type'];
 
@@ -402,9 +425,18 @@ final class MailDns {
 					return array_merge( $none, array( 'write' => true ) );
 				}
 
-				return in_array( preg_replace( '/\s+/', '', (string) $row['value'] ), array_map( static fn( $v ) => preg_replace( '/\s+/', '', $v ), $have ), true )
-					? $none
-					: array_merge( $none, array( 'status' => 'conflict', 'reason' => 'dkim_other' ) );
+				$squash = static fn( $v ) => preg_replace( '/\s+/', '', (string) $v );
+
+				if ( in_array( $squash( $row['value'] ), array_map( $squash, $have ), true ) ) {
+					return $none;
+				}
+
+				// Every key at the name is one we wrote before: the mail server made a new key since, ours is replaced.
+				if ( array() !== $ours && array() === array_diff( array_map( $squash, $have ), array_map( $squash, $ours ) ) ) {
+					return array( 'write' => true, 'status' => 'ok', 'reason' => '', 'keep' => array(), 'ttl' => $ttl );
+				}
+
+				return array_merge( $none, array( 'status' => 'conflict', 'reason' => 'dkim_other' ) );
 
 			case 'dmarc':
 				if ( array() === $have ) {
@@ -442,6 +474,132 @@ final class MailDns {
 		}
 
 		return $out;
+	}
+
+	// -- What we wrote, and taking it away again ---------------------------------------------------
+
+	/** The record values we wrote into zones of ours, by domain and key: what a deleted service leaves behind remembered. */
+	public const WRITTEN_OPTION = 'beltoft_services_mail_written';
+
+	/**
+	 * The values of one record kind that we wrote into the zone of this domain, from this service or an earlier one. They tell a
+	 * stale key of ours from a key the customer made. Kept in an option because a deleted service's row is closed and is not found
+	 * by its meta any more.
+	 *
+	 * @param string $zone Zone (the domain).
+	 * @param string $key  Record key.
+	 * @return string[]
+	 */
+	private static function written_before( string $zone, string $key ): array {
+		$all = get_option( self::WRITTEN_OPTION, array() );
+
+		return array_values( array_map( 'strval', (array) ( is_array( $all ) ? ( $all[ $zone ][ $key ] ?? array() ) : array() ) ) );
+	}
+
+	/**
+	 * Remembers a value we wrote (or forgets it after it was removed again).
+	 *
+	 * @param string $zone  Zone.
+	 * @param string $key   Record key.
+	 * @param string $value The value.
+	 * @param bool   $add   True to remember, false to forget.
+	 */
+	private static function remember_written( string $zone, string $key, string $value, bool $add ): void {
+		$all = get_option( self::WRITTEN_OPTION, array() );
+		$all = is_array( $all ) ? $all : array();
+		$had = array_values( array_map( 'strval', (array) ( $all[ $zone ][ $key ] ?? array() ) ) );
+
+		$had = $add ? array_slice( array_values( array_unique( array_merge( $had, array( $value ) ) ) ), -5 ) : array_values( array_diff( $had, array( $value ) ) );
+
+		if ( array() === $had ) {
+			unset( $all[ $zone ][ $key ] );
+		} else {
+			$all[ $zone ][ $key ] = $had;
+		}
+
+		if ( array() === ( $all[ $zone ] ?? array( 1 ) ) ) {
+			unset( $all[ $zone ] );
+		}
+
+		update_option( self::WRITTEN_OPTION, $all, false );
+	}
+
+	/**
+	 * Takes one record we wrote out of the customer's zone, only the records of its set that hold exactly the value we wrote:
+	 * a set with other records keeps them, a record changed since is the customer's and stays. Always through the zone writer,
+	 * under the zone lock, after reading the zone again.
+	 *
+	 * @param int                  $user_id Customer; the zone must be one of theirs on our name servers.
+	 * @param string               $zone    Zone.
+	 * @param array<string, mixed> $row     The stored row (key, name, type, value, priority).
+	 * @return bool|\WP_Error True when done or when nothing of ours was there, an error when the zone could not be changed.
+	 */
+	public static function unpublish( int $user_id, string $zone, array $row ) {
+		$fqdn = '@' === $row['name'] ? $zone : $row['name'] . '.' . $zone;
+		$type = (string) $row['type'];
+
+		$done = ZoneWriter::remove(
+			$user_id,
+			$zone,
+			static function ( array $data ) use ( $zone, $fqdn, $type, $row ): array {
+				$here = Records::sets_at( $zone, $fqdn, (array) ( $data['rrsets'] ?? array() ) );
+				$set  = $here[ $type ] ?? null;
+
+				if ( null === $set ) {
+					return array();
+				}
+
+				$keep    = array();
+				$removed = false;
+
+				foreach ( (array) ( $set['records'] ?? array() ) as $record ) {
+					$one = Records::to_rows( $zone, array( array_merge( $set, array( 'records' => array( $record ) ) ) ) );
+
+					if ( 1 === count( $one ) && self::is_ours( $row, $one[0] ) ) {
+						$removed = true;
+						continue;
+					}
+
+					$keep[] = $record;
+				}
+
+				if ( ! $removed ) {
+					return array();
+				}
+
+				if ( array() === $keep ) {
+					return array( array( 'name' => $set['name'], 'type' => $type, 'changetype' => 'DELETE' ) );
+				}
+
+				return array( array( 'name' => $set['name'], 'type' => $type, 'ttl' => (int) ( $set['ttl'] ?? self::TTL ), 'changetype' => 'REPLACE', 'records' => $keep ) );
+			}
+		);
+
+		if ( true === $done ) {
+			self::remember_written( $zone, (string) $row['key'], (string) $row['value'], false );
+		}
+
+		return $done;
+	}
+
+	/**
+	 * Does a record of the zone hold exactly what we wrote?
+	 *
+	 * @param array<string, mixed> $row    The stored row.
+	 * @param array<string, mixed> $record An editor row of the zone.
+	 */
+	private static function is_ours( array $row, array $record ): bool {
+		$strip = static fn( $v ) => strtolower( rtrim( trim( (string) $v ), '.' ) );
+
+		switch ( $row['type'] ) {
+			case 'MX':
+				return $strip( $record['value'] ?? '' ) === $strip( $row['value'] ) && (int) ( $record['priority'] ?? 0 ) === (int) ( $row['priority'] ?? 10 );
+			case 'CNAME':
+				return $strip( $record['value'] ?? '' ) === $strip( $row['value'] );
+		}
+
+		// TXT: the same text, a long key may have been split into pieces by the server.
+		return preg_replace( '/\s+/', '', (string) ( $record['value'] ?? '' ) ) === preg_replace( '/\s+/', '', (string) $row['value'] );
 	}
 
 	// -- Public DNS, for domains we do not serve -------------------------------------------------
@@ -934,8 +1092,7 @@ final class MailDns {
 				$result = self::publish( $user, $domain, $row );
 
 				if ( ! is_wp_error( $result ) ) {
-					$rows[ $i ]['status'] = $result[0];
-					$rows[ $i ]['reason'] = $result[1];
+					$rows[ $i ] = self::with_result( $rows[ $i ], $result );
 				}
 
 				continue;
@@ -1100,8 +1257,7 @@ final class MailDns {
 				$result = self::publish( $user, $domain, $row );
 
 				if ( ! is_wp_error( $result ) ) {
-					$rows[ $i ]['status'] = $result[0];
-					$rows[ $i ]['reason'] = $result[1];
+					$rows[ $i ] = self::with_result( $rows[ $i ], $result );
 				}
 
 				continue;

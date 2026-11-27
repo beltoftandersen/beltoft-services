@@ -118,10 +118,31 @@ final class RecordRoutes {
 					'ttl_default' => 3600,
 					'paused'      => Records::paused( $zone, $data ),
 					'serial'      => (int) ( $data['serial'] ?? 0 ),
+					'notes'       => self::notes( $zone, (int) ( $r->license()['user_id'] ?? 0 ) ),
 				),
 				200
 			)
 		);
+	}
+
+	/**
+	 * Notes a feature has on records of the zone, shown before the customer deletes one (an email domain uses MX, SPF and DKIM).
+	 *
+	 * @param string $zone    Zone.
+	 * @param int    $user_id The customer.
+	 * @return array<int, array{name: string, type: string, match: string, text: string}>
+	 */
+	public static function notes( string $zone, int $user_id ): array {
+		/**
+		 * Filters the notes on the records of a zone.
+		 *
+		 * @param array  $notes   Arrays of name (as the editor shows it), type, match (a start of the value, '' for any) and text.
+		 * @param string $zone    Zone.
+		 * @param int    $user_id The customer.
+		 */
+		$notes = apply_filters( 'beltoft_services_dns_record_notes', array(), $zone, $user_id );
+
+		return is_array( $notes ) ? array_values( array_filter( $notes, 'is_array' ) ) : array();
 	}
 
 	/**

@@ -376,6 +376,10 @@ final class MailView {
 				__( 'A record marked Another value is there now was not added, because something else is already there. Change or remove that record, then press Check now.', 'beltoft-services' ),
 			);
 
+			if ( MailSettings::dns_cleanup_on_delete() ) {
+				$model['steps'][] = __( 'If you delete this email domain, we also remove the records we made in your DNS.', 'beltoft-services' );
+			}
+
 			// Nothing is added by hand: the table stays folded unless a record needs the customer.
 			if ( array() === array_filter( $records, static fn( $rec ) => in_array( $rec['status'], array( 'conflict', 'wrong' ), true ) ) ) {
 				$model['collapse'] = __( 'Show the records', 'beltoft-services' );

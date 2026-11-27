@@ -546,6 +546,13 @@ final class MailDriver implements Driver, NeedsBilling, InternalActions {
 			return StepResult::done();
 		}
 
+		// The records we made in the customer's zone of ours go first: they point at a mail host that will not know the domain.
+		$cleaned = MailCleanup::run( $r );
+
+		if ( is_wp_error( $cleaned ) ) {
+			return StepResult::retry( 300, $cleaned->get_error_message() );
+		}
+
 		$client = MailClients::for();
 		$have   = $client->get_domain( $domain );
 
