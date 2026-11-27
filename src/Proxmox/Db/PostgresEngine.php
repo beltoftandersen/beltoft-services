@@ -56,12 +56,16 @@ final class PostgresEngine implements DbEngine {
 	}
 
 	public function connection( string $host ): array {
-		$base = 'postgresql://' . $this->login() . ':PASSWORD@' . $host . ':' . $this->port() . '/' . $this->database();
+		$base = 'postgresql://' . $this->login() . ':PASSWORD@' . DbEngines::uri_host( $host ) . ':' . $this->port() . '/' . $this->database();
 
 		return array(
 			'verify'  => $base . '?sslmode=verify-full&sslrootcert=ca.crt',
 			'require' => $base . '?sslmode=require',
 		);
+	}
+
+	public function command( string $host ): string {
+		return 'psql "' . $this->connection( $host )['verify'] . '"';
 	}
 
 	public function limits(): string {

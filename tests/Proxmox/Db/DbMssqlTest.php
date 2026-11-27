@@ -349,6 +349,7 @@ class DbMssqlTest extends TestCase {
 		$this->assertStringContainsString( 'Server=10.64.0.2,1433;Database=app;User Id=app_user;Password=PASSWORD;Encrypt=True;TrustServerCertificate=False;', $html );
 		$this->assertStringContainsString( 'Server=10.64.0.2,1433;Database=app;User Id=app_user;Password=PASSWORD;Encrypt=True;TrustServerCertificate=True;', $html );
 		$this->assertStringContainsString( '50 GB per database', $html );
+		$this->assertStringContainsString( 'Connect to your database', $html, 'The Access tab box is on the card.' );
 		$this->assertStringContainsString( 'add the CA certificate to the trusted certificates', $html );
 		$this->assertStringContainsString( 'Download CA certificate', $html );
 		$this->assertStringContainsString( 'data-db-reveal', $html );

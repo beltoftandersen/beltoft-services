@@ -722,6 +722,12 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 
 	<?php if ( null === $beltoft_services_page || isset( $beltoft_services_tabs['access'] ) ) : ?>
 		<?php $beltoft_services_open( 'access' ); ?>
+		<?php if ( ! empty( $ipv4 ) && array() === $ipv4['addresses'] && $forms ) : ?>
+			<?php
+			$ipv6_only = array( 'kind' => 'server', 'add_url' => (string) $ipv4['add_url'], 'add_price' => (string) $ipv4['add_price'], 'adding' => false, 'sold_out' => ! empty( $ipv4['sold_out'] ) );
+			include BELTOFT_SERVICES_PATH . 'templates/account/ipv6-only.php';
+			?>
+		<?php endif; ?>
 		<?php if ( $forms ) : ?>
 		<?php if ( $can_reveal ) : ?>
 			<p class="beltoft-services-vm__reveal">

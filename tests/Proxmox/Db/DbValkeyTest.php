@@ -502,6 +502,7 @@ class DbValkeyTest extends TestCase {
 		$this->assertStringNotContainsString( 'postgresql', strtolower( $html ) );
 		$this->assertStringNotContainsString( self::PASSWORD, $html );
 		$this->assertStringNotContainsString( "\u{2014}", $html );
+		$html = (string) preg_replace( '#<section class="beltoft-services-dnsbox beltoft-services-dbconnect".*?</section>#s', '', $html ); // The Access tab box has its own copy buttons.
 		$this->assertSame( 2 + 1 + 1, substr_count( $html, 'class="beltoft-services-db__block"' ), 'Two connection strings, the hidden password line and the fingerprint.' );
 		$this->assertSame( 2, substr_count( $html, 'data-db-conn' ) );
 	}

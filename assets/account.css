@@ -2379,3 +2379,4 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-dnsbox
 .beltoft-services-dnsbox .beltoft-services-dnsbox__button:disabled { color: var(--bs-muted); cursor: default; }
 /* The server page already shows the box above its tabs: the App tab does not print it a second time (it stays for a page without that block). */
 .beltoft-services-panel:has(.beltoft-services-progress__box) .beltoft-services-tab .beltoft-services-dnsbox { display: none; }
+.beltoft-services-ipv6only { max-width: none; }

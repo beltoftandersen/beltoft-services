@@ -141,6 +141,34 @@ final class Ipv4Field {
 			echo '<p class="description">' . esc_html__( 'No IPv4 address is free right now. You can add one later from your dashboard.', 'beltoft-services' ) . '</p>';
 		}
 
+		if ( $target['box'] && '' !== Ipv6Test::url() ) {
+			self::notice( 'db' === $target['kind'], $free, $price );
+		}
+
+		echo '</div>';
+	}
+
+	/**
+	 * The notice of a visitor whose connection has no IPv6 (ipv6-test.js shows it, never before the test has failed): what it means
+	 * and one button that ticks the IPv4 box, so the address is added the way the box adds it. Nothing is added by itself.
+	 *
+	 * @param bool   $database Whether the cart holds a database (else a server).
+	 * @param bool   $free     Whether an IPv4 address is free.
+	 * @param string $price    The price of the address with its period, or ''.
+	 */
+	private static function notice( bool $database, bool $free, string $price ): void {
+		echo '<div class="beltoft-services-ipv6notice" data-ipv6-notice role="status" hidden>';
+		echo '<p>' . esc_html( $database ? __( 'Your internet connection has no IPv6. This database can only be reached over IPv6 unless you add an IPv4 address.', 'beltoft-services' ) : __( 'Your internet connection has no IPv6. This server can only be reached over IPv6 unless you add an IPv4 address.', 'beltoft-services' ) ) . '</p>';
+
+		if ( $free ) {
+			/* translators: %s: the price of the address with its period, such as 5 EUR a month */
+			$label = '' === $price ? __( 'Buy an IPv4 address', 'beltoft-services' ) : sprintf( __( 'Buy an IPv4 address (+%s)', 'beltoft-services' ), $price );
+			echo '<p><button type="button" class="button" data-ipv6-add>' . esc_html( $label ) . '</button></p>';
+		}
+
+		// Checked again on request; the same words as everywhere else.
+		echo '<p>' . wp_kses( Ipv6Test::button( $database ? 'database' : 'server', __( 'Check again', 'beltoft-services' ) ), array( 'span' => array( 'class' => true, 'data-ipv6-result' => true, 'role' => true ), 'button' => array( 'type' => true, 'class' => true, 'data-ipv6-check' => true, 'data-checking' => true, 'data-ipv6' => true, 'data-none' => true, 'data-unknown' => true ) ) ) . '</p>';
+
 		echo '</div>';
 	}
 
@@ -153,6 +181,8 @@ final class Ipv4Field {
 		}
 
 		wp_enqueue_script( self::HANDLE, plugins_url( 'assets/ipv4-field.js', BELTOFT_SERVICES_FILE ), array( 'jquery', 'beltoft-services-status' ), \BeltoftServices\Assets::version( 'assets/ipv4-field.js' ), true );
+		Ipv6Test::enqueue();
+
 		wp_localize_script(
 			self::HANDLE,
 			'beltoftServicesIpv4',

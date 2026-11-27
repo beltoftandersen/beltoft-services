@@ -4,7 +4,7 @@
  * One request per interval to the order progress route (the block carries its URL; the overview's route is the customer's own
  * and the block carries the wp_rest nonce) serves every service row. Each row's progress block is drawn by assets/progress.js;
  * the row itself switches to "Ready" with its link to the card when the service is ready. In the overview (data-bs-flow) the
- * row also has a track that fills with the finished steps, the dashboard bar says the same through window.beltoftStatus, and a
+ * row also has a track that fills with the finished steps, the dashboard bar (window.beltoftStatus) only when there is no order card around it, and a
  * closing line with each service's link shows when nothing is running any more. All texts come from the server. No dependencies.
  */
 ( function () {
@@ -133,7 +133,8 @@
 			var counted;
 			var text;
 
-			if ( ! flow || ! window.beltoftStatus ) {
+			// The order card has its own track and closing line: the sticky line would say the same a second time (owner 2026-11-27).
+			if ( ! flow || ! window.beltoftStatus || section ) {
 				return;
 			}
 
