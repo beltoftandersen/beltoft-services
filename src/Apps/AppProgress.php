@@ -253,7 +253,11 @@ final class AppProgress {
 		}
 
 		if ( self::dns_wait( $r ) ) {
-			return __( 'Waiting for your DNS record', 'beltoft-services' );
+			// The short line of every list (overview, servers, order rows) carries the action itself (owner 2026-11-27).
+			$ip = self::server_ip( $r );
+
+			/* translators: 1: domain name, 2: server IPv4 address */
+			return '' !== $ip ? sprintf( __( 'Point %1$s to %2$s', 'beltoft-services' ), (string) $r->get( 'app_domain_own' ), $ip ) : __( 'Waiting for your DNS record', 'beltoft-services' );
 		}
 
 		$labels = AppTab::step_labels();
@@ -312,8 +316,7 @@ final class AppProgress {
 	 */
 	public static function dns_text( Resource $r ): string {
 		$name = (string) $r->get( 'app_domain_own' );
-		$ip   = AppOwnDomain::address( $r );
-		$ip   = '' !== $ip ? $ip : ( false !== filter_var( (string) $r->get( 'ip' ), FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ? (string) $r->get( 'ip' ) : '' );
+		$ip   = self::server_ip( $r );
 		$www  = AppWww::view( $r );
 		$out  = array();
 
@@ -339,5 +342,16 @@ final class AppProgress {
 		$out[]    = sprintf( _n( 'We check every ten minutes. When the name points to this server, the app is installed with HTTPS, and we email you. If this has not happened by %2$s (%1$d day after the server started), the app is installed on the server address instead.', 'We check every ten minutes. When the name points to this server, the app is installed with HTTPS, and we email you. If this has not happened by %2$s (%1$d days after the server started), the app is installed on the server address instead.', $days, 'beltoft-services' ), $days, $deadline > 0 ? wp_date( get_option( 'date_format' ), $deadline ) : '' );
 
 		return implode( ' ', $out );
+	}
+
+	/**
+	 * The server's IPv4 address the customer's A record must point to: the pool's, else the resource's own.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	private static function server_ip( Resource $r ): string {
+		$ip = AppOwnDomain::address( $r );
+
+		return '' !== $ip ? $ip : ( false !== filter_var( (string) $r->get( 'ip' ), FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ? (string) $r->get( 'ip' ) : '' );
 	}
 }

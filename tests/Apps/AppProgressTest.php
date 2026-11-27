@@ -105,9 +105,11 @@ class AppProgressTest extends MonitoringTestCase {
 		$this->assertSame( 'current', $st['app_dns'], 'The DNS wait is the step in progress.' );
 		$this->assertSame( 'todo', $st['app_download'], 'Nothing is downloading.' );
 
-		$this->assertSame( 'Waiting for your DNS record', Panel::label( 'ready', $r ) );
+		$this->assertSame( 'Point example.dk to 192.0.2.10', Panel::label( 'ready', $r ), 'The short line of every list says what to do.' );
 		$this->assertStringContainsString( '192.0.2.10', Panel::message( 'ready', $r ) );
-		$this->assertSame( 'Waiting for your DNS record', ThankYou::row( $r )['label'] );
+		$this->assertSame( 'Point example.dk to 192.0.2.10', ThankYou::row( $r )['label'] );
+		$view = View::license( $r->license() );
+		$this->assertSame( 'Point example.dk to 192.0.2.10', Servers::rows( array( $view ), array( (int) $view['id'] => $r ) )[0]['state'] );
 	}
 
 	public function test_the_server_card_says_installing_not_running_and_not_ready(): void {

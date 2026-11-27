@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.66.2
+Stable tag: 0.66.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.66.3 =
+* The short status line of such a server (overview, server list, order rows) says the action: "Point example.dk to 192.0.2.10".
 
 = 0.66.2 =
 * App on a server with the customer's own domain: while the install waits for the domain to point at the server, the server page, the overview, the server list and the order page say so ("Point your domain at this server", the A record to make with the server's address, what DNS says now, and the date the app is installed on the server address instead). Before, they said "Downloading the installer".
