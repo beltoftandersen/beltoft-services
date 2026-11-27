@@ -29,6 +29,7 @@ final class AppProgress {
 		add_filter( 'beltoft_services_progress_work', array( __CLASS__, 'work' ), 10, 4 );
 		add_filter( 'beltoft_services_progress_extra_steps', array( __CLASS__, 'extra_steps' ), 10, 4 );
 		add_filter( 'beltoft_services_progress_text', array( __CLASS__, 'text' ), 10, 5 );
+		add_filter( 'beltoft_services_progress_box', array( __CLASS__, 'box' ), 10, 4 );
 	}
 
 	/**
@@ -152,7 +153,8 @@ final class AppProgress {
 		if ( self::dns_wait( $r ) ) {
 			return array(
 				'title' => __( 'Point your domain at this server', 'beltoft-services' ),
-				'text'  => self::dns_text( $r ),
+				// The box (self::box) says it all; the sentence would only say it twice.
+				'text'  => '',
 			);
 		}
 
@@ -278,7 +280,8 @@ final class AppProgress {
 		$name  = self::name( $r );
 
 		if ( 'installing' === $state && self::dns_wait( $r ) ) {
-			return self::dns_text( $r );
+			/* translators: %s: app name such as Odoo */
+			return sprintf( __( '%s is waiting for your domain. Follow the steps below.', 'beltoft-services' ), $name );
 		}
 
 		if ( 'installing' === $state ) {
@@ -309,39 +312,82 @@ final class AppProgress {
 	}
 
 	/**
-	 * What the customer must do while the install waits for their domain: the record to make, what DNS says now, and what
-	 * happens next. The same sentences as the App tab (templates/account/app.php), so one translation serves both.
+	 * The box that tells the customer how to point their domain (HTML), for the progress block of an install that waits for it.
+	 *
+	 * @param mixed    $box   Box so far.
+	 * @param Resource $r     Resource.
+	 * @param string   $kind  Kind of work.
+	 * @param string   $phase Phase (unused).
+	 * @return mixed
+	 */
+	public static function box( $box, $r, $kind, $phase ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- filter signature.
+		return 'app' === $kind && $r instanceof Resource && self::dns_wait( $r ) ? self::dns_box( $r ) : $box;
+	}
+
+	/**
+	 * The "Point your domain" box as HTML, one template for the server page and the App tab.
 	 *
 	 * @param Resource $r Resource.
 	 */
-	public static function dns_text( Resource $r ): string {
-		$name = (string) $r->get( 'app_domain_own' );
-		$ip   = self::server_ip( $r );
-		$www  = AppWww::view( $r );
-		$out  = array();
+	public static function dns_box( Resource $r ): string {
+		$box = self::dns_view( $r );
 
-		if ( '' !== $ip && '' !== (string) ( $www['name'] ?? '' ) ) {
-			/* translators: 1: domain name, 2: www name, 3: server IPv4 address */
-			$out[] = sprintf( __( 'Point A records for %1$s and %2$s to %3$s.', 'beltoft-services' ), $name, (string) $www['name'], $ip );
-		} elseif ( '' !== $ip ) {
-			/* translators: 1: domain name, 2: server IPv4 address */
-			$out[] = sprintf( __( 'Point an A record for %1$s to %2$s.', 'beltoft-services' ), $name, $ip );
+		ob_start();
+		( static function ( array $box ): void {
+			include BELTOFT_SERVICES_PATH . 'templates/account/app-dns-box.php';
+		} )( $box );
+
+		return (string) ob_get_clean();
+	}
+
+	/**
+	 * What the box shows. Everything comes from what the check job stored: no look-up when a page is shown.
+	 *
+	 * @param Resource $r Resource.
+	 * @return array<string, mixed>
+	 */
+	public static function dns_view( Resource $r ): array {
+		$name    = (string) $r->get( 'app_domain_own' );
+		$www     = AppWww::view( $r );
+		$www_name = (string) ( $www['name'] ?? '' );
+		$checked = (int) $r->get( 'app_domain_dns_checked' );
+		$reason  = (string) $r->get( 'app_domain_dns_reason' );
+		$seen    = array_values( array_filter( (array) $r->get( 'app_domain_dns_seen' ), 'is_string' ) );
+		$deadline = AppOwnDomain::deadline( $r );
+		$today   = wp_date( 'Y-m-d' ) === wp_date( 'Y-m-d', $checked );
+
+		// The label of the www record is what the DNS panel of a provider asks for: "www", not the whole name.
+		$www_label = '' !== $www_name && str_ends_with( $www_name, '.' . $name ) ? substr( $www_name, 0, -strlen( $name ) - 1 ) : $www_name;
+
+		// What DNS said at the last look: nothing yet, could not be read, or the addresses found.
+		if ( 0 === $checked ) {
+			$now = __( 'We have not looked yet. We check soon.', 'beltoft-services' );
+		} elseif ( 'unreachable' === $reason ) {
+			$now = __( 'The name could not be looked up. We will try again.', 'beltoft-services' );
+		} elseif ( array() === $seen ) {
+			/* translators: %s: domain name */
+			$now = sprintf( __( 'Right now %s has no A record.', 'beltoft-services' ), $name );
+		} else {
+			/* translators: 1: domain name, 2: IPv4 address or addresses */
+			$now = sprintf( __( 'Right now %1$s points to %2$s.', 'beltoft-services' ), $name, implode( ', ', $seen ) );
 		}
 
-		$out[] = match ( (string) $r->get( 'app_domain_dns_reason' ) ) {
-			'none'        => __( 'The name has no A record yet.', 'beltoft-services' ),
-			'other'       => __( 'The name has an A record, but it does not point to this server only. Remove the other addresses.', 'beltoft-services' ),
-			'aaaa'        => __( 'The name points to this server, but it also has an AAAA record. Remove the AAAA record, because this server has no IPv6 address.', 'beltoft-services' ),
-			'unreachable' => __( 'The name could not be looked up. We will try again.', 'beltoft-services' ),
-			default       => __( 'We have not looked yet. We check soon.', 'beltoft-services' ),
-		};
-
-		$deadline = AppOwnDomain::deadline( $r );
-		$days     = AppOwnDomain::WAIT_DAYS;
-		/* translators: 1: number of days, 2: date */
-		$out[]    = sprintf( _n( 'We check every ten minutes. When the name points to this server, the app is installed with HTTPS, and we email you. If this has not happened by %2$s (%1$d day after the server started), the app is installed on the server address instead.', 'We check every ten minutes. When the name points to this server, the app is installed with HTTPS, and we email you. If this has not happened by %2$s (%1$d days after the server started), the app is installed on the server address instead.', $days, 'beltoft-services' ), $days, $deadline > 0 ? wp_date( get_option( 'date_format' ), $deadline ) : '' );
-
-		return implode( ' ', $out );
+		return array(
+			'app'       => self::name( $r ),
+			'name'      => $name,
+			'ip'        => self::server_ip( $r ),
+			'www'       => $www_name,
+			'www_label' => $www_label,
+			'found'     => 'live' === (string) $r->get( 'app_domain_dns' ),
+			'aaaa'      => 'aaaa' === $reason,
+			'now'       => $now,
+			'checked'   => $checked > 0 ? sprintf(
+				/* translators: %s: time of day such as 09:41, or a date and time when it was not today */
+				__( 'Last checked at %s', 'beltoft-services' ),
+				$today ? wp_date( get_option( 'time_format' ), $checked ) : wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $checked )
+			) : '',
+			'deadline'  => $deadline > 0 ? wp_date( get_option( 'date_format' ), $deadline ) : '',
+		);
 	}
 
 	/**

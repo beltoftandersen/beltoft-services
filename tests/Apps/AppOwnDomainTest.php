@@ -179,12 +179,14 @@ final class AppOwnDomainTest extends MonitoringTestCase {
 
 		AppOwnDomain::run( $r->id() );
 		$this->assertSame( 'none', Resource::find( $r->id() )->get( 'app_domain_dns_reason' ) );
+		$this->assertSame( array(), Resource::find( $r->id() )->get( 'app_domain_dns_seen' ), 'The box says "no A record".' );
 		$this->assertSame( 1, $this->pending( $r->id(), AppOwnDomain::HOOK ), 'The next look is queued.' );
 
 		$this->backdate( Resource::find( $r->id() ), 'app_domain_dns_checked', 700 );
 		$this->answers['A'] = array( '198.51.100.7' );
 		AppOwnDomain::run( $r->id() );
 		$this->assertSame( 'other', Resource::find( $r->id() )->get( 'app_domain_dns_reason' ) );
+		$this->assertSame( array( '198.51.100.7' ), Resource::find( $r->id() )->get( 'app_domain_dns_seen' ), 'What the look found, for the box.' );
 
 		$this->backdate( Resource::find( $r->id() ), 'app_domain_dns_checked', 700 );
 		$this->answers = array( 'A' => array( self::IP ), 'AAAA' => array( '2001:db8::7' ) );
@@ -196,6 +198,7 @@ final class AppOwnDomainTest extends MonitoringTestCase {
 		AppOwnDomain::run( $r->id() );
 		$fresh = Resource::find( $r->id() );
 		$this->assertSame( 'unreachable', $fresh->get( 'app_domain_dns_reason' ) );
+		$this->assertSame( array( self::IP ), $fresh->get( 'app_domain_dns_seen' ), 'A failed look keeps the last addresses seen.' );
 		$this->assertSame( 'waiting', $fresh->get( 'app_domain_dns' ) );
 		$this->assertNull( $fresh->get( 'app_domain' ) );
 	}
@@ -331,8 +334,8 @@ final class AppOwnDomainTest extends MonitoringTestCase {
 
 		$pane = $this->pane( $r );
 		$this->assertStringContainsString( 'data-app-state="dns"', $pane );
-		$this->assertStringContainsString( 'Point an A record for <strong>' . self::NAME . '</strong> to <strong>' . self::IP . '</strong>.', $pane );
-		$this->assertStringContainsString( 'does not point to this server only', $pane );
+		$this->assertStringContainsString( 'Point ' . self::NAME . ' to your server', $pane, 'The same box as the server page.' );
+		$this->assertStringContainsString( 'data-copy="' . self::IP . '"', $pane );
 		$this->assertStringContainsString( 'installed on the server address instead', $pane );
 		$this->assertStringNotContainsString( "\u{2014}", $pane );
 	}

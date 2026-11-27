@@ -466,9 +466,8 @@ $this->assertSame( 'retry', $fresh->get( 'app_www_reason' ) );
 		$r    = $this->own_server( 'example.com' );
 		$pane = $this->pane( $r );
 		$this->assertStringContainsString( 'data-app-state="dns"', $pane );
-		$this->assertStringContainsString( 'data-app-own-www', $pane );
+		$this->assertStringContainsString( '<code>www</code>', $pane );
 		$this->assertStringContainsString( 'example.com', $pane );
-		$this->assertStringContainsString( 'www.example.com', $pane );
 		$this->assertStringContainsString( self::IP, $pane );
 		$this->assertStringNotContainsString( "\u{2014}", $pane );
 

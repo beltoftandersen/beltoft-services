@@ -94,55 +94,7 @@ $beltoft_services_status_text = array(
 			<p class="description"><?php esc_html_e( 'You can leave this page. The login appears here when the app is ready.', 'beltoft-services' ); ?></p>
 		</div>
 	<?php elseif ( 'dns' === $beltoft_services_kind ) : ?>
-		<div class="beltoft-services-vm__more" data-app-own-domain>
-			<h4><?php esc_html_e( 'Point your domain at this server', 'beltoft-services' ); ?></h4>
-			<?php if ( '' !== $view['own']['ip'] && '' !== $view['www']['name'] ) : ?>
-				<p data-app-own-www><?php
-				printf(
-					/* translators: 1: domain name, 2: www name, 3: server IPv4 address */
-					esc_html__( 'Point A records for %1$s and %2$s to %3$s.', 'beltoft-services' ),
-					'<strong>' . esc_html( (string) $view['own']['name'] ) . '</strong>',
-					'<strong>' . esc_html( (string) $view['www']['name'] ) . '</strong>',
-					'<strong>' . esc_html( (string) $view['own']['ip'] ) . '</strong>'
-				);
-				?></p>
-				<p class="description"><?php esc_html_e( 'The app goes live as soon as the first name points to this server. The www name is added when its record is there too, and it redirects to the first name.', 'beltoft-services' ); ?></p>
-			<?php elseif ( '' !== $view['own']['ip'] ) : ?>
-				<p><?php
-				printf(
-					/* translators: 1: domain name, 2: server IPv4 address */
-					esc_html__( 'Point an A record for %1$s to %2$s.', 'beltoft-services' ),
-					'<strong>' . esc_html( (string) $view['own']['name'] ) . '</strong>',
-					'<strong>' . esc_html( (string) $view['own']['ip'] ) . '</strong>'
-				);
-				?></p>
-			<?php endif; ?>
-			<p data-app-own-status role="status">
-				<?php
-				echo esc_html(
-					match ( (string) $view['own']['reason'] ) {
-						'none'        => __( 'The name has no A record yet.', 'beltoft-services' ),
-						'other'       => __( 'The name has an A record, but it does not point to this server only. Remove the other addresses.', 'beltoft-services' ),
-						'aaaa'        => __( 'The name points to this server, but it also has an AAAA record. Remove the AAAA record, because this server has no IPv6 address.', 'beltoft-services' ),
-						'unreachable' => __( 'The name could not be looked up. We will try again.', 'beltoft-services' ),
-						default       => __( 'We have not looked yet. We check soon.', 'beltoft-services' ),
-					}
-				);
-				?>
-			</p>
-			<p class="description">
-				<?php
-				echo esc_html(
-					sprintf(
-						/* translators: 1: number of days, 2: date */
-						_n( 'We check every ten minutes. When the name points to this server, the app is installed with HTTPS, and we email you. If this has not happened by %2$s (%1$d day after the server started), the app is installed on the server address instead.', 'We check every ten minutes. When the name points to this server, the app is installed with HTTPS, and we email you. If this has not happened by %2$s (%1$d days after the server started), the app is installed on the server address instead.', (int) $view['own']['days'], 'beltoft-services' ),
-						(int) $view['own']['days'],
-						(string) $view['own']['deadline']
-					)
-				);
-				?>
-			</p>
-		</div>
+		<?php echo \BeltoftServices\Apps\AppProgress::dns_box( \BeltoftServices\Resource::find( (int) $view['resource_id'] ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in the template. ?>
 	<?php elseif ( 'slow' === $beltoft_services_kind ) : ?>
 		<div class="beltoft-services-vm__more">
 			<h4><?php esc_html_e( 'Taking longer than usual', 'beltoft-services' ); ?></h4>

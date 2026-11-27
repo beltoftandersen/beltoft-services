@@ -21,7 +21,8 @@ defined( 'ABSPATH' ) || exit;
  * app's Caddy asks for its certificate. After the waiting time the app is installed on the server address instead.
  *
  * Meta: app_domain_own (the name), app_domain_dns (waiting, live, timeout), app_domain_dns_since, app_domain_dns_checked,
- * app_domain_dns_reason (none, other, aaaa, unreachable), app_domain_dns_mailed. When the name is live the usual
+ * app_domain_dns_reason (none, other, aaaa, unreachable), app_domain_dns_seen (the IPv4 addresses the last read found, for the
+ * box that tells the customer what DNS says now), app_domain_dns_mailed. When the name is live the usual
  * app_domain is set (app_domain_made stays false: no record of ours exists, so nothing is ever removed later).
  */
 final class AppOwnDomain {
@@ -87,6 +88,7 @@ final class AppOwnDomain {
 			'app_domain_dns_since'   => null,
 			'app_domain_dns_checked' => null,
 			'app_domain_dns_reason'  => null,
+			'app_domain_dns_seen'    => null,
 			'app_domain_dns_mailed'  => null,
 		);
 	}
@@ -99,6 +101,7 @@ final class AppOwnDomain {
 			'app_domain_dns_since'   => null,
 			'app_domain_dns_checked' => null,
 			'app_domain_dns_reason'  => null,
+			'app_domain_dns_seen'    => null,
 			'app_domain_dns_mailed'  => null,
 		);
 	}
@@ -225,7 +228,12 @@ final class AppOwnDomain {
 			return;
 		}
 
-		if ( self::store( $id, array( 'app_domain_dns_checked' => $now, 'app_domain_dns_reason' => $verdict ), false ) ) {
+		$meta = array( 'app_domain_dns_checked' => $now, 'app_domain_dns_reason' => $verdict );
+		if ( ! is_wp_error( $a ) ) {
+			$meta['app_domain_dns_seen'] = array_values( array_unique( array_filter( $a, static fn( $x ): bool => false !== filter_var( $x, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) ) );
+		}
+
+		if ( self::store( $id, $meta, false ) ) {
 			self::schedule( $id, self::INTERVAL );
 		}
 	}

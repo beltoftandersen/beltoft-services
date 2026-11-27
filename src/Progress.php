@@ -328,7 +328,18 @@ final class Progress {
 		$words = (array) apply_filters( 'beltoft_services_progress_text', array( 'title' => $title, 'text' => $text ), $r, $kind, $phase, $eta );
 		$words = array( 'title' => (string) ( $words['title'] ?? $title ), 'text' => (string) ( $words['text'] ?? $text ) );
 
-		return array(
+		/**
+		 * A ready-made box (HTML made by the feature, escaped there) the block shows above its steps, for work that asks the
+		 * customer to do something (the app waiting for the customer's own domain). '' for none.
+		 *
+		 * @param string   $box   Box so far ('').
+		 * @param Resource $r     Resource.
+		 * @param string   $kind  Kind of work, empty when idle.
+		 * @param string   $phase idle, queued, running or failed.
+		 */
+		$box = '' === $kind ? '' : (string) apply_filters( 'beltoft_services_progress_box', '', $r, $kind, $phase );
+
+		$payload = array(
 			'kind'    => $kind,
 			'phase'   => $phase,
 			'active'  => in_array( $phase, array( 'queued', 'running' ), true ),
@@ -344,6 +355,13 @@ final class Progress {
 			'hosts'   => $wait['hosts'],
 			'link'    => $wait['link'],
 		);
+
+		// Only when there is one: the payload of every other work is exactly what outside callers pinned.
+		if ( '' !== $box ) {
+			$payload['box'] = $box;
+		}
+
+		return $payload;
 	}
 
 	/**

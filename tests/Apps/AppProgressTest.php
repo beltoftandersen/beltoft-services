@@ -97,19 +97,77 @@ class AppProgressTest extends MonitoringTestCase {
 
 		$this->assertTrue( $p['active'] );
 		$this->assertSame( 'Point your domain at this server', $p['title'] );
-		$this->assertStringContainsString( 'example.dk', $p['text'] );
-		$this->assertStringContainsString( '192.0.2.10', $p['text'], 'The address to point the record at.' );
-		$this->assertStringContainsString( 'does not point to this server only', $p['text'], 'What DNS says now.' );
-		$this->assertStringNotContainsString( 'Downloading the installer', $p['text'] );
+		$this->assertSame( '', $p['text'], 'The box says it all: the same words are not shown twice.' );
+		$this->assertStringContainsString( 'example.dk', $p['box'] );
+		$this->assertStringContainsString( '192.0.2.10', $p['box'], 'The address to point the record at.' );
+		$this->assertStringNotContainsString( 'Downloading the installer', $p['box'] );
 		$st = $this->statuses( $p );
 		$this->assertSame( 'current', $st['app_dns'], 'The DNS wait is the step in progress.' );
 		$this->assertSame( 'todo', $st['app_download'], 'Nothing is downloading.' );
 
 		$this->assertSame( 'Point example.dk to 192.0.2.10', Panel::label( 'ready', $r ), 'The short line of every list says what to do.' );
-		$this->assertStringContainsString( '192.0.2.10', Panel::message( 'ready', $r ) );
+		$this->assertSame( 'WordPress is waiting for your domain. Follow the steps below.', Panel::message( 'ready', $r ), 'One short sentence under the status.' );
 		$this->assertSame( 'Point example.dk to 192.0.2.10', ThankYou::row( $r )['label'] );
 		$view = View::license( $r->license() );
 		$this->assertSame( 'Point example.dk to 192.0.2.10', Servers::rows( array( $view ), array( (int) $view['id'] => $r ) )[0]['state'] );
+	}
+
+	private function box( array $meta, int $vmid = 5000 ): string {
+		return Progress::build( $this->server( array_merge( array( 'app_state' => 'pending', 'app_domain_own' => 'example.dk', 'app_domain_dns' => 'waiting', 'app_domain_dns_since' => time() ), $meta ), $vmid ) )['box'];
+	}
+
+	/** Owner 2026-11-27: one box with the steps, the records to make and what DNS says now, not a paragraph twice. */
+	public function test_the_dns_box_lists_steps_records_what_dns_says_and_what_happens_next(): void {
+		$checked = (int) strtotime( 'today 09:41' );
+		$html    = $this->box( array( 'app_domain_dns_reason' => 'other', 'app_domain_dns_seen' => array( '192.0.2.99' ), 'app_domain_dns_checked' => $checked, 'app_domain_dns_since' => $checked ) );
+
+		$this->assertStringContainsString( 'Point example.dk to your server', $html );
+		$this->assertStringContainsString( 'Missing', $html );
+		$this->assertStringContainsString( 'WordPress is installed as soon as your domain points to the server.', $html );
+		$this->assertStringContainsString( 'Log in to your DNS provider (where example.dk is set up).', $html );
+		$this->assertSame( 2, substr_count( $html, 'data-copy="192.0.2.10"' ), 'A copy button for each record.' );
+		$this->assertStringContainsString( '<code>example.dk (@)</code>', $html );
+		$this->assertStringContainsString( '<code>www</code>', $html, 'The www record.' );
+		$this->assertStringContainsString( 'Delete any other A records for these names.', $html );
+		$this->assertStringNotContainsString( 'Delete the AAAA record.', $html );
+		$this->assertStringContainsString( 'Using Cloudflare?', $html );
+		$this->assertStringContainsString( 'Right now example.dk points to 192.0.2.99.', $html );
+		$this->assertStringContainsString( 'Last checked at ' . wp_date( get_option( 'time_format' ), $checked ), $html );
+		$this->assertStringContainsString( 'We check every 10 minutes and start the installation ourselves.', $html );
+		$this->assertStringContainsString( 'If this has not happened by ' . wp_date( get_option( 'date_format' ), $checked + 14 * DAY_IN_SECONDS ) . ', WordPress is installed on the server address instead.', $html );
+		$this->assertStringNotContainsString( "\u{2014}", $html );
+		$this->assertStringNotContainsString( "\u{00B7}", $html );
+	}
+
+	public function test_the_dns_box_says_no_record_nothing_looked_and_the_aaaa_step(): void {
+		$this->assertStringContainsString( 'We have not looked yet.', $this->box( array() ) );
+		$this->assertStringNotContainsString( 'Last checked', $this->box( array(), 5001 ) );
+
+		$none = $this->box( array( 'app_domain_dns_reason' => 'none', 'app_domain_dns_seen' => array(), 'app_domain_dns_checked' => time() ), 5002 );
+		$this->assertStringContainsString( 'Right now example.dk has no A record.', $none );
+
+		$aaaa = $this->box( array( 'app_domain_dns_reason' => 'aaaa', 'app_domain_dns_seen' => array( '192.0.2.10' ), 'app_domain_dns_checked' => time() ), 5003 );
+		$this->assertStringContainsString( 'Delete the AAAA record.', $aaaa );
+	}
+
+	public function test_the_dns_box_has_no_www_row_for_a_subdomain_and_other_work_has_no_box(): void {
+		$sub = Progress::build( $this->server( array( 'app_state' => 'pending', 'app_domain_own' => 'shop.example.dk', 'app_domain_dns' => 'waiting', 'app_domain_dns_since' => time() ), 5004 ) )['box'];
+		$this->assertSame( 1, substr_count( $sub, 'data-copy=' ) );
+		$this->assertStringNotContainsString( '<code>www</code>', $sub );
+
+		$this->assertArrayNotHasKey( 'box', Progress::build( $this->server( array( 'app_state' => 'installing', 'app_step' => 'database' ), 5005 ) ) );
+	}
+
+	public function test_the_progress_block_prints_the_box_outside_the_text_and_the_steps_stay(): void {
+		$r = $this->server( array( 'app_state' => 'pending', 'app_domain_own' => 'example.dk', 'app_domain_dns' => 'waiting', 'app_domain_dns_since' => time() ), 5006 );
+		ob_start();
+		Progress::render( Progress::build( $r ) );
+		$html = (string) ob_get_clean();
+
+		$this->assertMatchesRegularExpression( '#data-progress-text></p>#', $html, 'The progress sentence is empty for this state.' );
+		$this->assertMatchesRegularExpression( '#<div class="beltoft-services-progress__box" data-progress-box><section class="beltoft-services-dnsbox"#', $html );
+		$this->assertSame( 1, substr_count( $html, 'Point example.dk to your server' ), 'Said once.' );
+		$this->assertStringContainsString( 'Waiting for your DNS record', $html, 'The step stays in the list.' );
 	}
 
 	public function test_the_server_card_says_installing_not_running_and_not_ready(): void {

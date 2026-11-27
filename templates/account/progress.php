@@ -15,6 +15,9 @@ $beltoft_services_phase = (string) ( $progress['phase'] ?? 'idle' );
 ?>
 <div class="beltoft-services-progress is-<?php echo esc_attr( $beltoft_services_phase ); ?>" data-progress data-phase="<?php echo esc_attr( $beltoft_services_phase ); ?>"<?php echo ! empty( $progress['active'] ) ? ' aria-busy="true"' : ''; ?><?php echo '' !== $poll_url ? ' data-progress-url="' . esc_url( $poll_url ) . '"' : ''; ?>>
 	<p class="beltoft-services-progress__text" role="status" aria-live="polite" data-progress-text><?php echo esc_html( (string) ( $progress['text'] ?? '' ) ); ?></p>
+	<?php if ( '' !== (string) ( $progress['box'] ?? '' ) ) : // Only printed when there is one (the pinned markup of every other block stays; assets/progress.js adds it later). ?>
+		<div class="beltoft-services-progress__box" data-progress-box><?php echo (string) $progress['box']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- made and escaped by the feature (templates/account/app-dns-box.php). ?></div>
+	<?php endif; ?>
 	<ol class="beltoft-services-progress__steps" data-progress-steps<?php echo empty( $progress['steps'] ) ? ' hidden' : ''; ?>>
 		<?php foreach ( (array) ( $progress['steps'] ?? array() ) as $beltoft_services_step ) : ?>
 			<li class="is-<?php echo esc_attr( $beltoft_services_step['status'] ); ?>"<?php echo 'current' === $beltoft_services_step['status'] ? ' aria-current="step"' : ''; ?> data-step="<?php echo esc_attr( $beltoft_services_step['key'] ); ?>">

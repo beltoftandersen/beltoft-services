@@ -65,6 +65,30 @@
 			text.textContent = payload.text || '';
 		}
 
+		var box = element.querySelector( '[data-progress-box]' );
+
+		if ( ! box && payload.box && list ) {
+			box = document.createElement( 'div' );
+			box.className = 'beltoft-services-progress__box';
+			box.setAttribute( 'data-progress-box', '' );
+			list.parentNode.insertBefore( box, list );
+		}
+
+		// The box is made by the server; it is only replaced when it changed, and its copy buttons are shown again.
+		if ( box ) {
+			var html = payload.box || '';
+
+			if ( box.getAttribute( 'data-box-html' ) !== html ) {
+				box.setAttribute( 'data-box-html', html );
+				box.innerHTML = html;
+				Array.prototype.forEach.call( box.querySelectorAll( '[data-copy]' ), function ( button ) {
+					button.hidden = false;
+				} );
+			}
+
+			box.hidden = ! html;
+		}
+
 		if ( list ) {
 			steps( list, payload );
 		}
