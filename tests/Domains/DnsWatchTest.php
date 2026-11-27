@@ -337,4 +337,21 @@ final class DnsWatchTest extends TestCase {
 		$words = apply_filters( 'beltoft_services_status_words', array( 'label' => 'Ready', 'message' => '' ), $r );
 		$this->assertStringStartsWith( 'DNS records missing since', $words['label'] );
 	}
+
+	public function test_hooking_the_jobs_twice_never_doubles_them_and_a_fired_hook_finds_its_feature(): void {
+		$count = static fn( string $hook ): int => count( $GLOBALS['wp_filter'][ $hook ]->callbacks[10] ?? array() );
+
+		\BeltoftServices\Domains\DnsWatchJobs::register();
+		$once = $count( 'beltoft_services_test_fake_look' );
+		\BeltoftServices\Domains\DnsWatchJobs::register();
+
+		$this->assertSame( 1, $once );
+		$this->assertSame( $once, $count( 'beltoft_services_test_fake_look' ) );
+
+		$r = $this->service();
+		DnsWatchFakeFeature::$present = array( 'a', 'b' );
+		do_action( 'beltoft_services_test_fake_look', $r->id() );
+
+		$this->assertSame( 'ok', $this->fresh( $r )->get( 'fk_dns' ), 'The hook that fired found the fake feature and ran its look.' );
+	}
 }

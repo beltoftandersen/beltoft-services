@@ -20,22 +20,14 @@ defined( 'ABSPATH' ) || exit;
 final class DnsWatchJobs {
 
 	/**
-	 * Hooks the jobs of every feature: the look while waiting, the daily look with its sweep, the second read of a loss.
+	 * Hooks the jobs of every feature: the look while waiting, the daily look with its sweep, the second read of a loss. The callbacks
+	 * are static methods that find the feature by the hook that fired, so hooking twice (a second boot) never doubles a job.
 	 */
 	public static function register(): void {
 		foreach ( DnsWatch::features() as $feature ) {
 			$id = $feature->id();
 
-			add_action(
-				$feature->hook( 'look' ),
-				static function ( $resource_id ) use ( $id ): void {
-					$f = DnsWatch::feature( $id );
-
-					if ( $f ) {
-						DnsWatch::run( $f, (int) $resource_id );
-					}
-				}
-			);
+			add_action( $feature->hook( 'look' ), array( __CLASS__, 'on_look' ) );
 			Background::declare(
 				$feature->hook( 'look' ),
 				array(
@@ -45,54 +37,82 @@ final class DnsWatchJobs {
 				)
 			);
 
-			add_action(
-				$feature->hook( 'recheck_all' ),
-				static function () use ( $id ): void {
-					$f = DnsWatch::feature( $id );
-
-					if ( $f ) {
-						DnsWatch::recheck_all( $f );
-					}
-				}
-			);
-			add_action(
-				$feature->hook( 'recheck' ),
-				static function ( $resource_id ) use ( $id ): void {
-					$f = DnsWatch::feature( $id );
-
-					if ( $f ) {
-						DnsWatch::recheck( $f, (int) $resource_id );
-					}
-				}
-			);
+			add_action( $feature->hook( 'recheck_all' ), array( __CLASS__, 'on_recheck_all' ) );
+			add_action( $feature->hook( 'recheck' ), array( __CLASS__, 'on_recheck' ) );
 			// One look a day per service, queued by the daily sweep: claimed by the runners and covered when it crashes. No watchdog.
 			Background::declare( $feature->hook( 'recheck' ), array( 'resource' => true, 'label' => $feature->label() . ' DNS daily look' ) );
-			Jobs::recurring(
-				static function () use ( $id ): void {
-					$f = DnsWatch::feature( $id );
 
-					if ( $f ) {
-						self::schedule_recheck( $f );
-					}
-				}
-			);
-
-			add_action(
-				$feature->hook( 'confirm' ),
-				static function ( $resource_id ) use ( $id ): void {
-					$f = DnsWatch::feature( $id );
-
-					if ( $f ) {
-						DnsWatch::confirm( $f, (int) $resource_id );
-					}
-				}
-			);
+			add_action( $feature->hook( 'confirm' ), array( __CLASS__, 'on_confirm' ) );
 			Background::declare( $feature->hook( 'confirm' ), array( 'resource' => true, 'label' => $feature->label() . ' DNS loss confirmation' ) );
+		}
+
+		Jobs::recurring( array( __CLASS__, 'schedule' ) );
+	}
+
+	/**
+	 * The recurring part: the sweep of every feature exists as a cron job (the times of day follow the setting).
+	 */
+	public static function schedule(): void {
+		foreach ( DnsWatch::features() as $feature ) {
+			self::schedule_recheck( $feature );
 		}
 	}
 
 	/**
-	 * Schedules the sweep once (the times of day follow the setting).
+	 * The feature whose hook for a job is the one that fired.
+	 *
+	 * @param string $job look, recheck_all, recheck or confirm.
+	 */
+	private static function fired( string $job ): ?DnsWatchFeature {
+		$hook = current_action();
+
+		foreach ( DnsWatch::features() as $feature ) {
+			if ( $feature->hook( $job ) === $hook ) {
+				return $feature;
+			}
+		}
+
+		return null;
+	}
+
+	/** @param mixed $resource_id Resource id. */
+	public static function on_look( $resource_id ): void {
+		$f = self::fired( 'look' );
+
+		if ( $f ) {
+			DnsWatch::run( $f, (int) $resource_id );
+		}
+	}
+
+	/** The daily sweep. */
+	public static function on_recheck_all(): void {
+		$f = self::fired( 'recheck_all' );
+
+		if ( $f ) {
+			DnsWatch::recheck_all( $f );
+		}
+	}
+
+	/** @param mixed $resource_id Resource id. */
+	public static function on_recheck( $resource_id ): void {
+		$f = self::fired( 'recheck' );
+
+		if ( $f ) {
+			DnsWatch::recheck( $f, (int) $resource_id );
+		}
+	}
+
+	/** @param mixed $resource_id Resource id. */
+	public static function on_confirm( $resource_id ): void {
+		$f = self::fired( 'confirm' );
+
+		if ( $f ) {
+			DnsWatch::confirm( $f, (int) $resource_id );
+		}
+	}
+
+	/**
+	 * Schedules the sweep of one feature once (the times of day follow the setting).
 	 *
 	 * @param DnsWatchFeature $feature Feature.
 	 */

@@ -159,7 +159,7 @@ final class DnsWatch {
 		 * @param Resource             $r          Resource.
 		 * @param array<string, mixed> $ctx        Data.
 		 */
-		do_action( self::EVENT, $event, $f->id(), $r, $ctx );
+		do_action( 'beltoft_services_dns_watch_event', $event, $f->id(), $r, $ctx );
 	}
 
 	/**
