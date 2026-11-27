@@ -508,4 +508,39 @@ final class MailRoutesTest extends MailTestCase {
 		$this->run_jobs();
 		$this->assertSame( 429, $this->call( 'POST', $path, $user )->get_status() );
 	}
+
+	public function test_the_status_poll_says_the_same_word_as_the_page_and_never_ready_while_email_is_broken(): void {
+		add_filter( 'beltoft_services_rest_rate_limit', '__return_zero' );
+		list( $r, $user ) = $this->domain( 'badge.example' );
+		$label = fn() => $this->call( 'GET', $r->id(), $user )->get_data()['label'];
+
+		$this->assertSame( 'DNS records needed', $label() );
+
+		$r->set( array( 'mail_dns' => 'waiting', 'mail_dns_lost_at' => time() - 3600, 'mail_dns_lost_keys' => array( 'mx' ) ) );
+		$this->assertStringStartsWith( 'DNS records missing since', $label() );
+
+		$r->set( array( 'mail_dns' => 'timeout', 'mail_dns_lost_at' => 0 ) );
+		$this->assertSame( 'We stopped checking DNS', $label() );
+
+		$r->set( array( 'mail_dns' => 'waiting', 'mail_dns_moved' => time(), 'mail_dns_lost_at' => time() ) );
+		$this->assertSame( 'DNS is at another provider', $label() );
+
+		$rows = (array) $r->get( 'mail_records' );
+		foreach ( $rows as $i => $row ) {
+			$rows[ $i ]['status'] = 'ok';
+		}
+		$r->set( array( 'mail_records' => $rows, 'mail_dns' => 'ok', 'mail_dns_moved' => 0, 'mail_dns_lost_at' => 0 ) );
+		$this->assertSame( 'Ready', $label() );
+	}
+
+	public function test_a_failed_proof_with_try_again_open_says_not_set_up_in_the_poll(): void {
+		$user = self::factory()->user->create();
+		$r    = $this->mail_resource( 'proofbadge.example', array(), array(), $user );
+		$r->set( array( 'state' => 'failed', 'desired' => 'ready', 'failed_op' => 'provision', 'attempts' => 5, 'mail_proof_failed_at' => time() - DAY_IN_SECONDS ) );
+
+		$this->assertSame( 'Not set up', $this->call( 'GET', $r->id(), $user )->get_data()['label'] );
+
+		$r->set( array( 'mail_proof_failed_at' => time() - 40 * DAY_IN_SECONDS ) );
+		$this->assertNotSame( 'Not set up', $this->call( 'GET', $r->id(), $user )->get_data()['label'], 'After the window the usual words are back.' );
+	}
 }

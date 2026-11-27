@@ -874,4 +874,36 @@ final class MailAccountTest extends MailTestCase {
 		$other->set( array( 'state' => 'failed', 'desired' => 'ready', 'failed_op' => 'provision' ) );
 		$this->assertStringContainsString( 'Please contact support', $this->page( Resource::find( $other->id() ) ) );
 	}
+
+	public function test_the_head_badge_never_says_ready_while_email_is_broken(): void {
+		$r = $this->ready_mail( 'headbadge.example', array(), $this->user );
+		$this->assertMatchesRegularExpression( '/data-badge>DNS records needed</', $this->page( $r ) );
+
+		$r->set( array( 'mail_dns' => 'waiting', 'mail_dns_lost_at' => time() - 3600, 'mail_dns_lost_keys' => array( 'mx' ) ) );
+		$this->assertMatchesRegularExpression( '/data-badge>DNS records missing since/', $this->page( Resource::find( $r->id() ) ) );
+
+		$r->set( array( 'mail_dns' => 'timeout', 'mail_dns_lost_at' => 0 ) );
+		$this->assertMatchesRegularExpression( '/data-badge>We stopped checking DNS</', $this->page( Resource::find( $r->id() ) ) );
+
+		$r->set( array( 'mail_dns' => 'waiting', 'mail_dns_moved' => time(), 'mail_dns_lost_at' => time() ) );
+		$this->assertMatchesRegularExpression( '/data-badge>DNS is at another provider</', $this->page( Resource::find( $r->id() ) ) );
+	}
+
+	public function test_a_failed_proof_head_says_not_set_up_while_try_again_is_open_and_the_old_words_after(): void {
+		$this->proof['check_txt'] = array( 'status' => 'missing', 'servers' => array(), 'reason' => 'not_found' );
+		$r = $this->mail_resource( 'headfail.example', array( 'mail_proof_until' => time() - 60 ), array(), $this->user );
+		\BeltoftServices\Jobs::enqueue( $r->id() );
+		$this->run_jobs( 3 );
+
+		$html = $this->page( Resource::find( $r->id() ) );
+		$this->assertMatchesRegularExpression( '/data-badge>Not set up</', $html );
+		$this->assertStringNotContainsString( 'Failed: contact us', $html );
+		$this->assertStringNotContainsString( 'Something went wrong with your service', $html );
+		$this->assertStringContainsString( 'You can try again until', $html );
+
+		Resource::find( $r->id() )->set( array( 'mail_proof_failed_at' => time() - 40 * DAY_IN_SECONDS ) );
+		$html = $this->page( Resource::find( $r->id() ) );
+		$this->assertStringContainsString( 'Failed: contact us', $html );
+		$this->assertStringContainsString( 'Something went wrong with your service', $html );
+	}
 }

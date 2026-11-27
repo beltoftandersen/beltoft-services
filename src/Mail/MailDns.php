@@ -1284,7 +1284,14 @@ final class MailDns {
 			return;
 		}
 
-		$meta = array_merge( $clear, array( 'mail_records' => $rows, 'mail_dns_lost_keys' => $still, 'mail_dns_lost_at' => time(), 'mail_dns_lost_mails' => 1 ) );
+		// A loss right after a lost or found mail (a record that flaps) is not mailed again: the page and the hold follow the real state,
+		// and lost_reminders() tells the customer if it lasts past the gap.
+		$quiet = self::within_gap( (int) $r->get( 'mail_dns_last_mail' ) );
+		$meta  = array_merge( $clear, array( 'mail_records' => $rows, 'mail_dns_lost_keys' => $still, 'mail_dns_lost_at' => time(), 'mail_dns_lost_mails' => $quiet ? 0 : 1 ) );
+
+		if ( ! $quiet ) {
+			$meta['mail_dns_last_mail'] = time();
+		}
 
 		if ( ! self::store( $id, $meta, null ) ) {
 			self::schedule_confirm_again( $id );
@@ -1294,8 +1301,23 @@ final class MailDns {
 		$fresh = Resource::find( $id ) ?? $r;
 
 		MailHold::sync( $fresh );
-		\BeltoftServices\Emails\Emails::send( 'beltoft_services_mail_dns_lost', $fresh );
+
+		if ( ! $quiet ) {
+			\BeltoftServices\Emails\Emails::send( 'beltoft_services_mail_dns_lost', $fresh );
+		}
+
 		\BeltoftServices\Alerts::mail_domain_lost( $fresh, $domain, $still, MailSettings::dns_admin_throttle() );
+	}
+
+	/**
+	 * Is a time inside the gap after which a new lost mail may go out?
+	 *
+	 * @param int $at Time of the last lost or found mail, 0 for none.
+	 */
+	private static function within_gap( int $at ): bool {
+		$gap = MailSettings::dns_mail_gap();
+
+		return $gap > 0 && $at > 0 && time() < $at + $gap;
 	}
 
 	/**
@@ -1326,7 +1348,16 @@ final class MailDns {
 		$days  = MailSettings::dns_remind_days();
 		$index = $sent - 1;
 
-		if ( $at <= 0 || $sent < 1 || $index >= count( $days ) || time() < $at + $days[ $index ] * DAY_IN_SECONDS ) {
+		if ( $at <= 0 ) {
+			return;
+		}
+
+		// A loss that was quiet (a flapping record): the first mail goes out once the gap since the last mail is over.
+		if ( 0 === $sent ) {
+			if ( self::within_gap( (int) $r->get( 'mail_dns_last_mail' ) ) ) {
+				return;
+			}
+		} elseif ( $index >= count( $days ) || time() < $at + $days[ $index ] * DAY_IN_SECONDS ) {
 			return;
 		}
 
@@ -1334,7 +1365,7 @@ final class MailDns {
 			static function () use ( $id, $sent ): bool {
 				$fresh = Resource::find( $id );
 
-				return $fresh && self::waiting( $fresh ) && (int) $fresh->get( 'mail_dns_lost_mails' ) === $sent && $fresh->set( array( 'mail_dns_lost_mails' => $sent + 1 ) );
+				return $fresh && self::waiting( $fresh ) && (int) $fresh->get( 'mail_dns_lost_mails' ) === $sent && $fresh->set( array( 'mail_dns_lost_mails' => $sent + 1, 'mail_dns_last_mail' => time() ) );
 			}
 		);
 
@@ -1356,7 +1387,9 @@ final class MailDns {
 			return;
 		}
 
-		$told  = (int) $r->get( 'mail_dns_lost_at' ) > 0 && (int) $r->get( 'mail_dns_lost_mails' ) > 0;
+		// Told that records were lost, and no found mail went out inside the gap: a flapping record gets one found mail.
+		$gap   = MailSettings::dns_mail_gap();
+		$told  = (int) $r->get( 'mail_dns_lost_at' ) > 0 && (int) $r->get( 'mail_dns_lost_mails' ) > 0 && ! ( $gap > 0 && time() < (int) $r->get( 'mail_dns_back_at' ) + $gap );
 		$marks = array( 'mail_dns_lost_at', 'mail_dns_lost_keys', 'mail_dns_lost_mails', 'mail_dns_lost_pending', 'mail_dns_moved', 'mail_dns_timeout_mailed', 'mail_dns_admin_alerted' );
 		$set   = false;
 
@@ -1370,12 +1403,18 @@ final class MailDns {
 		}
 
 		$cleared = $r->locked(
-			static function () use ( $id, $marks ): bool {
+			static function () use ( $id, $marks, $told ): bool {
 				$fresh = Resource::find( $id );
+				$send  = $told;
 				$meta  = array();
 
 				foreach ( $marks as $mark ) {
 					$meta[ $mark ] = 'mail_dns_lost_keys' === $mark ? array() : 0;
+				}
+
+				if ( $send ) {
+					$meta['mail_dns_back_at']   = time();
+					$meta['mail_dns_last_mail'] = time();
 				}
 
 				return $fresh && 'ok' === (string) $fresh->get( 'mail_dns' ) && $fresh->set( $meta );

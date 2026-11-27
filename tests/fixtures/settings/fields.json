@@ -1101,6 +1101,16 @@
         "max": 365,
         "label": "Days between two alerts about the same domain losing records"
     },
+    "mail_dns_lost_mail_gap_hours": {
+        "tab": "mail",
+        "section": "mail_watch",
+        "type": "number",
+        "default": 24,
+        "min": 0,
+        "max": 720,
+        "label": "Hours between a lost mail and the next one for the same domain",
+        "desc": "A record that goes missing and comes back again and again does not mail the customer each time: a loss confirmed within this many hours after the last lost or found mail sends no new lost mail, and a found mail is not sent again within this time. The page and the sending hold always follow the real state. 0 turns this off."
+    },
     "mail_dns_check_gap": {
         "tab": "mail",
         "section": "mail_watch",

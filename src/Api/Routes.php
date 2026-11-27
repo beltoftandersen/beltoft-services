@@ -168,14 +168,24 @@ final class Routes {
 		// A customer waiting for a queued action should not wait for the next cron tick.
 		Jobs::run_waiting( $resource->id() );
 
+		/**
+		 * Filters the words the status poll puts in the badge and under the head, so a feature can say more than the shared state
+		 * does (the same words the page printed).
+		 *
+		 * @param array{label: string, message: string} $words    Words so far.
+		 * @param Resource                              $resource Resource.
+		 */
+		$words = apply_filters( 'beltoft_services_status_words', array( 'label' => Panel::label( $state, $resource ), 'message' => Panel::message( $state, $resource ) ), $resource );
+		$words = is_array( $words ) && isset( $words['label'], $words['message'] ) ? $words : array( 'label' => Panel::label( $state, $resource ), 'message' => Panel::message( $state, $resource ) );
+
 		return new \WP_REST_Response(
 			array(
 				'state'    => $state,
 				'desired'  => (string) $resource->get( 'desired' ),
 				'working'  => Jobs::acting( $resource->id() ),
 				'app_state' => (string) $resource->get( 'app_state' ),
-				'label'    => Panel::label( $state, $resource ),
-				'message'  => Panel::message( $state, $resource ),
+				'label'    => (string) $words['label'],
+				'message'  => (string) $words['message'],
 				'progress' => Progress::build( $resource ),
 				// The outcome of the last customer action (action, ok, at, text) and the server's clock to compare it with.
 				'last_result' => is_array( $resource->get( Jobs::RESULT ) ) ? $resource->get( Jobs::RESULT ) : null,

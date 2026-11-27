@@ -266,4 +266,57 @@ final class MailDnsLostTest extends MailTestCase {
 		$r->set( array( 'mail_dns_lost_at' => time() - 4 * DAY_IN_SECONDS ) );
 		$this->assertSame( 'bad', MailDnsState::tone( Resource::find( $r->id() ) ), 'Red after three days.' );
 	}
+
+	public function test_a_record_that_flaps_mails_one_lost_and_one_back_within_the_gap(): void {
+		$r = $this->found_once( 'flap.example' );
+
+		// Lost, back, lost, back within the hour.
+		for ( $i = 0; $i < 2; $i++ ) {
+			$this->found( $r, array( 'mx', 'dkim' ) );
+			Resource::find( $r->id() )->set( array( 'mail_dns_rechecked' => 0 ) );
+			MailDns::recheck( $r->id() );
+			MailDns::confirm( $r->id() );
+			$lost = Resource::find( $r->id() );
+
+			$this->assertSame( MailDnsState::LOST, MailDnsState::of( $lost ), 'The page follows the real state.' );
+			$this->assertTrue( MailHold::held( $lost ), 'So does the sending hold.' );
+
+			$this->found( $r, array( 'mx', 'spf', 'dkim' ) );
+			$lost->set( array( 'mail_dns_checked' => time() - 2 * MailDns::INTERVAL ) );
+			MailDns::run( $r->id() );
+			$this->assertSame( 'ok', Resource::find( $r->id() )->get( 'mail_dns' ) );
+			$this->assertFalse( MailHold::held( Resource::find( $r->id() ) ) );
+		}
+
+		$this->assertSame( 1, $this->count_mails( 'DNS records are missing for flap.example' ), 'One lost mail.' );
+		$this->assertSame( 1, $this->count_mails( 'The DNS records for flap.example are found again' ), 'One back mail.' );
+	}
+
+	public function test_a_quiet_loss_that_lasts_past_the_gap_is_mailed_then(): void {
+		$r = $this->found_once( 'quiet.example' );
+		$r->set( array( 'mail_dns_last_mail' => time() - HOUR_IN_SECONDS ) );
+		$this->found( $r, array( 'mx', 'dkim' ) );
+		MailDns::recheck( $r->id() );
+		MailDns::confirm( $r->id() );
+		$this->assertSame( 0, $this->count_mails( 'DNS records are missing for' ), 'Inside the gap: nothing.' );
+
+		MailDns::lost_reminders( $r->id() );
+		$this->assertSame( 0, $this->count_mails( 'DNS records are missing for' ) );
+
+		Resource::find( $r->id() )->set( array( 'mail_dns_last_mail' => time() - 25 * HOUR_IN_SECONDS ) );
+		MailDns::lost_reminders( $r->id() );
+		MailDns::lost_reminders( $r->id() );
+		$this->assertSame( 1, $this->count_mails( 'DNS records are missing for quiet.example' ), 'Past the gap, still lost: told once.' );
+	}
+
+	public function test_the_gap_is_a_setting_and_zero_turns_it_off(): void {
+		$this->settings( array( 'mail_dns_lost_mail_gap_hours' => 0 ) );
+		$r = $this->found_once( 'nogap.example' );
+		$r->set( array( 'mail_dns_last_mail' => time() ) );
+		$this->found( $r, array( 'mx', 'dkim' ) );
+		MailDns::recheck( $r->id() );
+		MailDns::confirm( $r->id() );
+
+		$this->assertSame( 1, $this->count_mails( 'DNS records are missing for nogap.example' ) );
+	}
 }

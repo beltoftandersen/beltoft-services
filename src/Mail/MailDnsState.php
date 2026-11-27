@@ -31,6 +31,33 @@ final class MailDnsState {
 	 */
 	public static function register(): void {
 		add_filter( 'beltoft_services_area_state', array( __CLASS__, 'area_state' ), 10, 2 );
+		add_filter( 'beltoft_services_status_words', array( __CLASS__, 'status_words' ), 10, 2 );
+	}
+
+	/**
+	 * The words of the status poll: the same word as the page, so the badge is never "Ready" while email is broken.
+	 *
+	 * @param mixed $words    array( label, message ).
+	 * @param mixed $resource Resource.
+	 * @return mixed
+	 */
+	public static function status_words( $words, $resource ) {
+		if ( ! is_array( $words ) || ! $resource instanceof Resource || MailDriver::ID !== $resource->get( 'driver' ) ) {
+			return $words;
+		}
+
+		$state = self::area_state( array( (string) ( $words['label'] ?? '' ), '' ), $resource );
+
+		if ( is_array( $state ) && $state[0] !== $words['label'] ) {
+			$words['label'] = $state[0];
+
+			// A failed proof that can be tried again has no "contact us" sentence: the page says what to do.
+			if ( 'failed' === (string) $resource->get( 'state' ) ) {
+				$words['message'] = '';
+			}
+		}
+
+		return $words;
 	}
 
 	/**
@@ -41,7 +68,16 @@ final class MailDnsState {
 	 * @return mixed
 	 */
 	public static function area_state( $state, $resource ) {
-		if ( ! is_array( $state ) || ! $resource instanceof Resource || MailDriver::ID !== $resource->get( 'driver' ) || 'ready' !== (string) $resource->get( 'state' ) || ! $resource->is_live() ) {
+		if ( ! is_array( $state ) || ! $resource instanceof Resource || MailDriver::ID !== $resource->get( 'driver' ) || ! $resource->is_live() ) {
+			return $state;
+		}
+
+		// A failed proof that can still be tried again is not a failure to contact us about.
+		if ( 'failed' === (string) $resource->get( 'state' ) && MailRetry::open( $resource ) ) {
+			return array( __( 'Not set up', 'beltoft-services' ), 'busy' );
+		}
+
+		if ( 'ready' !== (string) $resource->get( 'state' ) ) {
 			return $state;
 		}
 

@@ -228,6 +228,14 @@ final class MailSettings {
 			'max'     => 365,
 			'label'   => __( 'Days between two alerts about the same domain losing records', 'beltoft-services' ),
 		);
+		$fields['mail_dns_lost_mail_gap_hours'] = $watch + array(
+			'type'    => 'number',
+			'default' => 24,
+			'min'     => 0,
+			'max'     => 720,
+			'label'   => __( 'Hours between a lost mail and the next one for the same domain', 'beltoft-services' ),
+			'desc'    => __( 'A record that goes missing and comes back again and again does not mail the customer each time: a loss confirmed within this many hours after the last lost or found mail sends no new lost mail, and a found mail is not sent again within this time. The page and the sending hold always follow the real state. 0 turns this off.', 'beltoft-services' ),
+		);
 		$fields['mail_dns_check_gap'] = $watch + array(
 			'type'    => 'number',
 			'default' => 60,
@@ -475,6 +483,11 @@ final class MailSettings {
 	/** Seconds between two admin alerts about the same domain losing records. */
 	public static function dns_admin_throttle(): int {
 		return max( 1, (int) Settings::get( 'mail_dns_admin_throttle_days' ) ) * DAY_IN_SECONDS;
+	}
+
+	/** Seconds that must pass after the last lost or found mail before a new lost mail goes out. */
+	public static function dns_mail_gap(): int {
+		return max( 0, (int) Settings::get( 'mail_dns_lost_mail_gap_hours' ) ) * HOUR_IN_SECONDS;
 	}
 
 	/** Seconds between two Check now presses. */

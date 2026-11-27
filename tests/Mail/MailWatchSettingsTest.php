@@ -30,6 +30,7 @@ final class MailWatchSettingsTest extends MailTestCase {
 		$this->assertTrue( MailSettings::dns_mx_strict() );
 		$this->assertTrue( MailSettings::dns_cleanup_on_delete() );
 		$this->assertSame( 30 * DAY_IN_SECONDS, MailSettings::retry_seconds() );
+		$this->assertSame( 24 * HOUR_IN_SECONDS, MailSettings::dns_mail_gap() );
 		$this->assertSame( 7, (int) Settings::get( 'dns_delegation_recheck_days' ) );
 	}
 
@@ -68,7 +69,7 @@ final class MailWatchSettingsTest extends MailTestCase {
 	public function test_the_fields_are_on_the_email_tab(): void {
 		$fields = Settings::fields();
 
-		foreach ( array( 'mail_dns_confirm_minutes', 'mail_dns_remind_days', 'mail_dns_recheck_per_day', 'mail_dns_weekly_days', 'mail_dns_stop_days', 'mail_dns_admin_days', 'mail_dns_admin_throttle_days', 'mail_dns_check_gap', 'mail_dns_check_per_hour', 'mail_dns_lost_red_days', 'mail_dns_mx_strict', 'mail_dns_cleanup_on_delete', 'mail_retry_days' ) as $key ) {
+		foreach ( array( 'mail_dns_confirm_minutes', 'mail_dns_remind_days', 'mail_dns_recheck_per_day', 'mail_dns_weekly_days', 'mail_dns_stop_days', 'mail_dns_admin_days', 'mail_dns_admin_throttle_days', 'mail_dns_check_gap', 'mail_dns_check_per_hour', 'mail_dns_lost_red_days', 'mail_dns_mx_strict', 'mail_dns_cleanup_on_delete', 'mail_retry_days', 'mail_dns_lost_mail_gap_hours' ) as $key ) {
 			$this->assertSame( 'mail', $fields[ $key ]['tab'], $key );
 			$this->assertSame( 'mail_watch', $fields[ $key ]['section'], $key );
 		}
