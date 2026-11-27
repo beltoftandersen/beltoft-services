@@ -312,7 +312,7 @@
       const refused = errors.filter(function (error) { return error.retryAfter; }).sort(function (a, b) { return b.retryAfter - a.retryAfter; })[0];
       if (refused) {
         // A limit, not a failure of the search: the line under the field and the countdown on the button say so.
-        if (!data) results.replaceChildren();
+        if (!results.querySelector('.beltoft-domain-result')) results.replaceChildren(); // no stray "No results found" next to the limit line
         results.removeAttribute('aria-busy');
         searchButton.disabled = false;
         if (data) { remember(typed, data); keepInAddress(typed); }
