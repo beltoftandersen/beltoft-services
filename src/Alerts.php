@@ -385,6 +385,60 @@ final class Alerts {
 	}
 
 	/**
+	 * Alerts the admin that an email domain lost DNS records that were found before. At most once per throttle time per domain
+	 * (setting mail_dns_admin_throttle_days). Nothing is paused or deleted because of it.
+	 *
+	 * @param Resource           $r      Mail resource.
+	 * @param string             $host   Domain.
+	 * @param array<int, string> $keys   Keys of the lost records (mx, spf, dkim).
+	 * @param int                $ttl    Seconds before another alert about the domain may go out.
+	 */
+	public static function mail_domain_lost( Resource $r, string $host, array $keys, int $ttl = WEEK_IN_SECONDS ): bool {
+		$license = $r->license();
+		$moved   = (int) $r->get( 'mail_dns_moved' ) > 0;
+		$held    = 'held' === (string) $r->get( 'mail_hold' );
+
+		return self::notify(
+			sprintf( 'Mail domain lost DNS records: %s', $host ),
+			array(
+				sprintf( 'Domain: %s', $host ),
+				sprintf( 'Mail resource: %d', $r->id() ),
+				sprintf( 'Customer: %d', (int) ( $license['user_id'] ?? 0 ) ),
+				sprintf( 'Lost: %s', strtoupper( implode( ', ', array_map( 'strval', $keys ) ) ) ),
+				$moved ? 'The name servers no longer point to us.' : 'The records are not found at the DNS of the domain.',
+				$held ? 'Sending is held (SPF or DKIM). The customer was emailed.' : 'Sending is not held. The customer was emailed.',
+			),
+			$r,
+			'beltoft_services_mail_lost_' . md5( strtolower( $host ) ),
+			array( 'ttl' => max( HOUR_IN_SECONDS, $ttl ) )
+		);
+	}
+
+	/**
+	 * Alerts the admin that an email domain has had no email DNS for a long time (once). No automatic action follows.
+	 *
+	 * @param Resource $r    Mail resource.
+	 * @param string   $host Domain.
+	 * @param int      $days Days without records.
+	 */
+	public static function mail_domain_no_dns( Resource $r, string $host, int $days ): bool {
+		$license = $r->license();
+
+		return self::notify(
+			sprintf( 'Mail domain has had no email DNS for %d days: %s', $days, $host ),
+			array(
+				sprintf( 'Domain: %s', $host ),
+				sprintf( 'Mail resource: %d', $r->id() ),
+				sprintf( 'Customer: %d', (int) ( $license['user_id'] ?? 0 ) ),
+				'The records are still not found. Mailboxes and mail are kept; nothing is paused or deleted by this.',
+			),
+			$r,
+			'beltoft_services_mail_nodns_' . md5( strtolower( $host ) . '|' . $r->id() ),
+			array( 'ttl' => 30 * DAY_IN_SECONDS )
+		);
+	}
+
+	/**
 	 * Alerts the admin that the nightly scan of a hosting account found malware (the customer is told by email, the website stays
 	 * online). Once per newest find: the dedupe key holds the date of the oldest new file.
 	 *

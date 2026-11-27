@@ -120,7 +120,7 @@ final class MailDomain {
 	 * @param int    $user_id Customer.
 	 */
 	public static function on_our_servers( string $name, int $user_id ): bool {
-		return in_array( $name, ZoneAccess::zones( $user_id ), true );
+		return in_array( $name, ZoneAccess::zones( $user_id ), true ) && ! MailMoved::away( $name, $user_id );
 	}
 
 	/**

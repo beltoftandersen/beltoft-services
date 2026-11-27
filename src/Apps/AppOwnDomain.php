@@ -9,6 +9,7 @@ use BeltoftServices\Domains\HostName;
 use BeltoftServices\Emails\Emails;
 use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Network\IpPool;
+use BeltoftServices\Domains\ManualCheck;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -263,18 +264,7 @@ final class AppOwnDomain {
 
 	/** The moment the customer may check again, 0 when now. */
 	public static function manual_next( Resource $r, ?int $now = null ): int {
-		$now   = $now ?? time();
-		$times = array_values( array_filter( array_map( 'intval', (array) $r->get( self::MANUAL_META ) ), static fn( int $t ): bool => $t > $now - HOUR_IN_SECONDS && $t <= $now ) );
-		if ( array() === $times ) {
-			return 0;
-		}
-		sort( $times );
-		$next = end( $times ) + self::MANUAL_GAP;
-		if ( count( $times ) >= self::MANUAL_PER_HOUR ) {
-			$next = max( $next, $times[ count( $times ) - self::MANUAL_PER_HOUR ] + HOUR_IN_SECONDS );
-		}
-
-		return $next > $now ? $next : 0;
+		return ManualCheck::next( $r, self::MANUAL_META, self::MANUAL_GAP, self::MANUAL_PER_HOUR, $now );
 	}
 
 	/**
@@ -293,25 +283,8 @@ final class AppOwnDomain {
 		}
 
 		// The count is kept under the lock, so two clicks at once make one look.
-		$next  = 0;
-		$noted = $r->locked(
-			static function () use ( $r, &$next ): bool {
-				$fresh = Resource::find( $r->id() );
-				if ( ! $fresh ) {
-					return false;
-				}
-				$next = self::manual_next( $fresh );
-				if ( $next > 0 ) {
-					return true;
-				}
-				$now   = time();
-				$times = array_values( array_filter( array_map( 'intval', (array) $fresh->get( self::MANUAL_META ) ), static fn( int $t ): bool => $t > $now - HOUR_IN_SECONDS ) );
-				$times[] = $now;
-
-				return $fresh->set( array( self::MANUAL_META => array_slice( $times, -self::MANUAL_PER_HOUR ) ) );
-			}
-		);
-		if ( true !== $noted ) {
+		$next = ManualCheck::claim( $r, self::MANUAL_META, self::MANUAL_GAP, self::MANUAL_PER_HOUR );
+		if ( null === $next ) {
 			return new \WP_Error( 'busy', __( 'This server is busy. Please try again in a moment.', 'beltoft-services' ), array( 'status' => 409 ) );
 		}
 		if ( $next > 0 ) {

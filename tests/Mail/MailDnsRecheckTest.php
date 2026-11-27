@@ -123,6 +123,7 @@ final class MailDnsRecheckTest extends MailTestCase {
 		$this->found( $r, array( 'mx', 'dkim' ) );
 
 		MailDns::recheck( $r->id() );
+		MailDns::confirm( $r->id() );
 		$r = Resource::find( $r->id() );
 
 		$this->assertSame( 'waiting', $r->get( 'mail_dns' ) );
@@ -132,18 +133,20 @@ final class MailDnsRecheckTest extends MailTestCase {
 		$this->assertNotSame( '', MailHold::notice( $r ), 'The page shows the held line.' );
 		$this->assertTrue( Jobs::pending_action( MailDns::HOOK, array( $r->id() ) ), 'The ten minute look takes over.' );
 
-		$this->assertCount( 1, $this->mails );
-		$this->assertSame( 'DNS records are still missing for lost.example', $this->mails[0]['subject'] );
-		$this->assertSame( array( 'christian.beltoft@gmail.com' ), (array) $this->mails[0]['to'] );
-		$this->assertStringContainsString( 'v=spf1', (string) $this->mails[0]['message'] );
-		$this->assertStringContainsString( 'cannot send until the SPF and DKIM records are found', (string) preg_replace( '/\s+/', ' ', (string) $this->mails[0]['message'] ) ); // A plain-text mail wraps its lines.
+		$mails = array_values( array_filter( $this->mails, static fn( $m ) => ! str_contains( (string) $m['subject'], 'Mail domain' ) ) );
+		$this->assertCount( 1, $mails );
+		$this->assertSame( 'DNS records are missing for lost.example', $mails[0]['subject'] );
+		$this->assertSame( array( 'christian.beltoft@gmail.com' ), (array) $mails[0]['to'] );
+		$this->assertStringContainsString( 'v=spf1', (string) $mails[0]['message'] );
+		$this->assertStringContainsString( 'sending can be paused', (string) preg_replace( '/\s+/', ' ', (string) $mails[0]['message'] ) ); // A plain-text mail wraps its lines.
 
 		$this->assertTrue( MailView::data( $r, array() )['send_held'] );
 
-		// The ten minute look sends no second mail, even a day later.
+		// The first set up reminder is not sent for a loss, even a day later.
+		$count = count( $this->mails );
 		$r->set( array( 'mail_dns_since' => time() - 2 * DAY_IN_SECONDS ) );
 		MailDns::remind( $r->id() );
-		$this->assertCount( 1, $this->mails );
+		$this->assertCount( $count, $this->mails );
 	}
 
 	public function test_when_the_record_comes_back_the_existing_look_lifts_the_hold(): void {
@@ -288,6 +291,7 @@ final class MailDnsRecheckTest extends MailTestCase {
 		$this->dns = array();
 
 		MailDns::recheck( $r->id() );
+		MailDns::confirm( $r->id() );
 
 		$r = Resource::find( $r->id() );
 		$this->assertSame( 'external', $r->get( 'mail_mode' ), 'Stored again from the live answer.' );
@@ -296,11 +300,13 @@ final class MailDnsRecheckTest extends MailTestCase {
 		$this->assertSame( 'held', $r->get( 'mail_hold' ) );
 		$this->assertFalse( $this->mailcow->mailbox( 'anna@moved.example' )['smtp'], 'Sending is held.' );
 		$subjects = array_column( $this->mails, 'subject' );
-		$this->assertCount( 1, array_keys( $subjects, 'DNS records are still missing for moved.example', true ), 'One mail to the customer.' );
+		$this->assertCount( 1, array_keys( $subjects, 'DNS records are missing for moved.example', true ), 'One mail to the customer.' );
 		$this->assertCount( 1, array_filter( $subjects, static fn( $x ) => str_contains( (string) $x, 'Mail domain left our name servers: moved.example' ) ), 'One mail to staff.' );
 
+		$count = count( $this->mails );
 		MailDns::recheck( $r->id() );
-		$this->assertCount( 2, $this->mails, 'The next look sends no second pair.' );
+		MailDns::confirm( $r->id() );
+		$this->assertCount( $count, $this->mails, 'The next look sends nothing more.' );
 	}
 
 	public function test_a_domain_that_left_our_servers_with_its_records_intact_is_not_held(): void {
@@ -315,6 +321,6 @@ final class MailDnsRecheckTest extends MailTestCase {
 		$this->assertSame( 'ok', $r->get( 'mail_dns' ) );
 		$this->assertFalse( MailHold::held( $r ) );
 		$this->assertTrue( $this->mailcow->mailbox( 'anna@kept.example' )['smtp'] );
-		$this->assertCount( 0, array_filter( array_column( $this->mails, 'subject' ), static fn( $x ) => str_contains( (string) $x, 'DNS records are still missing' ) ), 'No mail to the customer.' );
+		$this->assertCount( 0, array_filter( array_column( $this->mails, 'subject' ), static fn( $x ) => str_contains( (string) $x, 'DNS records are' ) ), 'No mail to the customer.' );
 	}
 }

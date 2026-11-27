@@ -348,6 +348,37 @@ final class Retention {
 	}
 
 	/**
+	 * The earliest moment a paused service is deleted: what the page of a paused service tells the customer. 0 when the
+	 * service is not paused, is held, has no retention, or deletion is not switched on (nothing is deleted then).
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function end_date( Resource $r ): int {
+		$paused_at = $r->get( 'paused_at' );
+		$license   = $r->license();
+
+		if ( null === $paused_at || ! $license || 'on' !== (string) Settings::get( 'deletion_mode' ) || $r->on_hold() || 'paused' !== (string) $r->get( 'desired' ) ) {
+			return 0;
+		}
+
+		$days = Product::retention_days( (int) ( $license['product_id'] ?? 0 ) );
+
+		if ( $days <= 0 ) {
+			return 0;
+		}
+
+		$ends   = (int) $paused_at + $days * DAY_IN_SECONDS;
+		$warned = $r->get( 'warned_at' );
+
+		// Like check(): a warning of an earlier pause does not count, and a deletion is never before the date a warning gave.
+		if ( null !== $warned && (int) $warned >= (int) $paused_at ) {
+			$ends = max( $ends, (int) $warned + self::warning_days() * DAY_IN_SECONDS, (int) $r->get( 'deletes_at' ) );
+		}
+
+		return $ends;
+	}
+
+	/**
 	 * Days of notice before a deletion: the setting, never less than 1.
 	 */
 	public static function warning_days(): int {

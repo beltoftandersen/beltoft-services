@@ -94,6 +94,7 @@ final class Plugin {
 		Mail\BricksElements::register();
 		Mail\MailDns::register();
 		Mail\MailHold::register();
+		Mail\MailDnsState::register();
 		Mail\EmailValues::register();
 		do_action( 'beltoft_services_boot', 'email_values' );
 		Ssl\EmailValues::register();

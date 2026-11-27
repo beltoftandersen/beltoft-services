@@ -255,7 +255,6 @@ final class Email extends ServiceArea {
 
 		$root   = MailPlan::root( $resource );
 		$limits = MailPlan::limits( $resource );
-		$dns    = (string) $resource->get( 'mail_dns' );
 
 		return array(
 			'id'      => $resource->id(),
@@ -277,7 +276,8 @@ final class Email extends ServiceArea {
 			),
 			'state'   => $state,
 			'tone'    => $tone,
-			'extra'   => 'ready' === (string) $resource->get( 'state' ) && 'ok' !== $dns && '' !== $dns ? __( 'DNS records missing', 'beltoft-services' ) : '',
+			// The DNS word is the status itself (MailDnsState through the filter of ServiceArea::state()).
+			'extra'   => '',
 			'action'  => array(),
 		);
 	}

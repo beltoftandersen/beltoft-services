@@ -212,11 +212,16 @@ final class MailView {
 
 		$checked = (int) $r->get( 'mail_dns_checked' );
 		$status  = (string) $r->get( 'mail_dns' );
+		$word    = MailDnsState::of( $r );
 		$state   = in_array( $status, array( 'ok', 'timeout' ), true ) ? $status : ( array() === $rows ? '' : 'waiting' );
 		$can     = 'ready' === $kind && array() !== $rows && 'ok' !== $status;
 
 		return array(
 			'mode'       => $mode,
+			'state'      => $word,
+			'word'       => MailDnsState::word( $r ),
+			'tone'       => MailDnsState::tone( $r ),
+			'notice'     => 'ready' === $kind ? MailDnsState::notice( $r, \BeltoftServices\Domains\HostName::display( $domain ) ) : '',
 			'status'     => $state,
 			'rows'       => $rows,
 			'proof'      => $proof,

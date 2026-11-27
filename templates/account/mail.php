@@ -163,10 +163,8 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 				<p><button type="button" class="button woocommerce-button" data-mail-proof-check><?php esc_html_e( 'Check now', 'beltoft-services' ); ?></button></p>
 			<?php endif; ?>
 		<?php else : ?>
-			<?php if ( ! empty( $view['send_held'] ) ) : ?>
-				<p class="beltoft-services-panel__notice" role="status" data-mail-hold><?php esc_html_e( 'Mail does not arrive on this domain until the MX record is in place, and your mailboxes cannot send until the SPF and DKIM records are found. You can make mailboxes now.', 'beltoft-services' ); ?> <a href="<?php echo esc_url( $nav ? $link( 'dns' ) : '#beltoft-mail-dns' ); ?>"><?php esc_html_e( 'Open the DNS records guide', 'beltoft-services' ); ?></a></p>
-			<?php elseif ( 'ok' !== $view['dns']['status'] && array() !== $view['dns']['rows'] ) : ?>
-				<p class="beltoft-services-panel__notice" role="status"><?php esc_html_e( 'Mail does not arrive on this domain until its DNS records are in place. You can make mailboxes now.', 'beltoft-services' ); ?> <a href="<?php echo esc_url( $nav ? $link( 'dns' ) : '#beltoft-mail-dns' ); ?>"><?php esc_html_e( 'Open the DNS records guide', 'beltoft-services' ); ?></a></p>
+			<?php if ( '' !== (string) $view['dns']['notice'] ) : ?>
+				<p class="beltoft-services-panel__notice beltoft-services-mail__dnsnote is-<?php echo esc_attr( (string) $view['dns']['tone'] ); ?>" role="status" data-mail-dns-state="<?php echo esc_attr( (string) $view['dns']['state'] ); ?>"<?php echo ! empty( $view['send_held'] ) ? ' data-mail-hold' : ''; ?>><strong><?php echo esc_html( (string) $view['dns']['word'] ); ?></strong> <?php echo esc_html( (string) $view['dns']['notice'] ); ?> <a href="<?php echo esc_url( $nav ? $link( 'dns' ) : '#beltoft-mail-dns' ); ?>"><?php esc_html_e( 'Show the DNS records', 'beltoft-services' ); ?></a></p>
 			<?php endif; ?>
 			<div class="beltoft-services-vm__more">
 				<h4><?php esc_html_e( 'Mailboxes', 'beltoft-services' ); ?></h4>

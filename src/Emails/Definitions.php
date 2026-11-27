@@ -171,6 +171,24 @@ final class Definitions {
 				'subject'     => __( 'DNS records are still missing for {domain_name}', 'beltoft-services' ),
 				'heading'     => __( 'DNS records are still missing', 'beltoft-services' ),
 			),
+			'beltoft_services_mail_dns_lost' => array(
+				'title'       => __( 'Email DNS records lost', 'beltoft-services' ),
+				'description' => __( 'Sent when DNS records of an email domain that were found before are gone again, after a second read confirms it. Sent again as a reminder on the days set under Email settings, three emails at most for one loss. It says which records are missing and that nothing is deleted.', 'beltoft-services' ),
+				'subject'     => __( 'DNS records are missing for {domain_name}', 'beltoft-services' ),
+				'heading'     => __( 'DNS records are missing', 'beltoft-services' ),
+			),
+			'beltoft_services_mail_dns_back' => array(
+				'title'       => __( 'Email DNS records found again', 'beltoft-services' ),
+				'description' => __( 'Sent once, only after the lost records email was sent, when the records of the email domain are found again.', 'beltoft-services' ),
+				'subject'     => __( 'The DNS records for {domain_name} are found again', 'beltoft-services' ),
+				'heading'     => __( 'DNS records found again', 'beltoft-services' ),
+			),
+			'beltoft_services_mail_dns_timeout' => array(
+				'title'       => __( 'Email DNS check stopped', 'beltoft-services' ),
+				'description' => __( 'Sent once when the ten minute look at the DNS records of an email domain stops after 14 days without the records. The customer can start it again with Check now.', 'beltoft-services' ),
+				'subject'     => __( 'We have stopped checking the DNS of {domain_name}', 'beltoft-services' ),
+				'heading'     => __( 'We have stopped checking DNS', 'beltoft-services' ),
+			),
 			'beltoft_services_renewal_reminder' => array(
 				'title'       => __( 'Renewal reminder', 'beltoft-services' ),
 				'description' => __( 'Sent a product-set number of days before a long renewal (for example 30 days before a yearly hosting renewal): the plan, the date, the full price and how to cancel.', 'beltoft-services' ),

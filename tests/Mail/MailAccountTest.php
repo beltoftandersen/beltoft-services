@@ -99,9 +99,9 @@ final class MailAccountTest extends MailTestCase {
 
 		$this->assertSame( 'rows.example', $row['name'] );
 		$this->assertSame( '2 of 5 mailboxes', $row['details'] );
-		$this->assertSame( 'Ready', $row['state'] );
-		$this->assertSame( 'ok', $row['tone'] );
-		$this->assertSame( 'DNS records missing', $row['extra'] );
+		$this->assertSame( 'DNS records needed', $row['state'], 'The DNS word is the status while records are still to be added.' );
+		$this->assertSame( 'busy', $row['tone'] );
+		$this->assertSame( '', $row['extra'] );
 		$this->assertSame( $this->area()->url( $r->license() ), $row['url'] );
 
 		$html = $this->render( $this->views( $r ) );
@@ -265,7 +265,7 @@ final class MailAccountTest extends MailTestCase {
 		$html = $this->page( Resource::find( $r->id() ), 'dns' );
 		$this->assertStringContainsString( 'Email DNS for elsewhere.example is set up. All needed records were found.', $html );
 		$this->assertStringNotContainsString( 'data-mail-dns-check', $html );
-		$this->assertStringNotContainsString( 'Mail does not arrive on this domain', $this->page( Resource::find( $r->id() ) ), 'Nothing to warn about any more.' );
+		$this->assertStringNotContainsString( 'data-mail-dns-state', $this->page( Resource::find( $r->id() ) ), 'Nothing to warn about any more.' );
 	}
 
 	public function test_the_proof_step_uses_the_same_guide_and_the_central_record(): void {
@@ -367,8 +367,8 @@ final class MailAccountTest extends MailTestCase {
 		$this->assertStringContainsString( 'dkim._domainkey.elsewhere.example', $html );
 		$this->assertStringContainsString( 'Not checked yet', $html );
 		$this->assertStringContainsString( 'data-mail-dns-check', $html );
-		$this->assertStringContainsString( 'Mail does not arrive on this domain until', $this->page( $r ), 'The first tab says it too, with a link to the guide.' );
-		$this->assertStringContainsString( 'Open the DNS records guide', $this->page( $r ) );
+		$this->assertStringContainsString( 'Email works on elsewhere.example when the DNS records below are in place', $this->page( $r ), 'The first tab says it too, with a link to the guide.' );
+		$this->assertStringContainsString( 'Show the DNS records', $this->page( $r ) );
 
 		$ours = $this->our_zone( $this->user, 'ours.example' );
 		$mine = $this->ready_mail( 'ours.example', array(), $this->user );
@@ -389,9 +389,9 @@ final class MailAccountTest extends MailTestCase {
 		$this->assertStringContainsString( 'data-mail-hold>', $html );
 		$this->assertStringContainsString( 'data-mail-hold-row', $html );
 		$this->assertStringNotContainsString( 'data-mail-hold-form', $html );
-		$this->assertSame( 1, substr_count( $html, 'Open the DNS records guide' ), 'one link to the guide' );
-		$this->assertSame( 0, substr_count( $html, $line ), 'the long line is said once, in the combined notice' );
-		$this->assertStringContainsString( 'your mailboxes cannot send until the SPF and DKIM records are found', $html );
+		$this->assertSame( 1, substr_count( $html, 'Show the DNS records' ), 'one link to the guide' );
+		$this->assertSame( 0, substr_count( $html, $line ), 'the old long line is gone' );
+		$this->assertStringContainsString( 'Email works on held.example when the DNS records below are in place', $html );
 
 		$fresh = Resource::find( $r->id() );
 		$rows  = (array) $fresh->get( 'mail_records' );
