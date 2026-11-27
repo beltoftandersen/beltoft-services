@@ -108,6 +108,7 @@ final class DomainPage {
 			'zone_unavailable' => $zone_unavailable,
 			'rows'             => $rows,
 			'rows_lazy'        => $rows_lazy,
+			'notes'            => $has_editor ? RecordRoutes::notes( strtolower( (string) $r->get( 'domain' ) ), (int) ( $r->license()['user_id'] ?? 0 ) ) : array(),
 			'transfer_price'   => $price,
 			'transfer'         => $transfer,
 			'fix'              => $dns_only ? null : TransferFix::view( $r ),

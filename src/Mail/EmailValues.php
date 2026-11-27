@@ -53,6 +53,10 @@ final class EmailValues {
 		$values['mail_external']  = $mail && 'external' === (string) $mail->get( 'mail_mode' );
 		$values['mail_records']   = $mail ? MailDns::missing_rows( $mail ) : array();
 		$values['mail_records_needed'] = $mail ? MailDns::missing_rows( $mail, true ) : array();
+		$lost                     = $mail ? MailDnsState::lost_keys( $mail ) : array();
+		$values['mail_records_lost'] = $mail ? array_values( array_filter( MailDns::missing_rows( $mail, true ), static fn( $row ) => in_array( (string) $row['key'], $lost, true ) ) ) : array();
+		$values['mail_lost_names']   = MailDnsState::names( $lost );
+		$values['mail_moved']        = $mail && (int) $mail->get( 'mail_dns_moved' ) > 0;
 		$values['mail_host']      = $mail ? MailSettings::host() : '';
 		$values['mail_imap']      = MailView::IMAP_PORT;
 		$values['mail_smtp']      = MailView::SMTP_SSL;

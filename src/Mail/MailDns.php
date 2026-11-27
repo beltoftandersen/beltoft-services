@@ -54,7 +54,10 @@ final class MailDns {
 	/** The daily sweep that queues a look at each domain whose records were found, and the look. */
 	public const RECHECK_ALL  = 'beltoft_services_mail_dns_recheck_all';
 	public const RECHECK      = 'beltoft_services_mail_dns_recheck';
-	public const RECHECK_CRON = '40 3 * * *';
+	public const RECHECK_CRON = '40 3,15 * * *';
+
+	/** The second read of a lost record, a few minutes after the first. */
+	public const CONFIRM = 'beltoft_services_mail_dns_confirm';
 
 	/** The DKIM selector mailcow is asked for. */
 	public const SELECTOR = 'dkim';
@@ -70,6 +73,8 @@ final class MailDns {
 			)
 		);
 		self::register_recheck();
+		add_action( self::CONFIRM, array( __CLASS__, 'confirm' ) );
+		Background::declare( self::CONFIRM, array( 'resource' => true, 'label' => 'Email DNS loss confirmation' ) );
 	}
 
 	// -- The records ---------------------------------------------------------------------------
@@ -131,11 +136,29 @@ final class MailDns {
 				return $result;
 			}
 
-			$rows[ $i ]['status'] = $result[0];
-			$rows[ $i ]['reason'] = $result[1];
+			$rows[ $i ] = self::with_result( $rows[ $i ], $result );
 		}
 
 		return $rows;
+	}
+
+	/**
+	 * A row with the outcome of publish(): the status and reason, and the mark written_by_us when this call wrote the record (a
+	 * record that was there before, or that the customer owns, never gets it: it is not ours to remove).
+	 *
+	 * @param array<string, mixed> $row    Row.
+	 * @param array<int, mixed>    $result publish() result.
+	 * @return array<string, mixed>
+	 */
+	private static function with_result( array $row, array $result ): array {
+		$row['status'] = $result[0];
+		$row['reason'] = $result[1];
+
+		if ( ! empty( $result[2] ) ) {
+			$row['written_by_us'] = true;
+		}
+
+		return $row;
 	}
 
 	/**
@@ -156,6 +179,7 @@ final class MailDns {
 			}
 
 			$out[] = array(
+				'key'      => (string) ( $row['key'] ?? '' ),
 				'name'     => '@' === $row['name'] ? $domain : $row['name'] . '.' . $domain,
 				'type'     => (string) $row['type'],
 				'value'    => (string) $row['value'],
@@ -255,7 +279,7 @@ final class MailDns {
 	 * @param int                  $user_id Customer; the zone must be one of theirs on our name servers.
 	 * @param string               $zone    Zone (the domain).
 	 * @param array<string, mixed> $row     A row of records().
-	 * @return array{0:string,1:string}|\WP_Error [ status (ok or conflict), reason ], or a transient error.
+	 * @return array{0:string,1:string,2:bool}|\WP_Error [ status (ok or conflict), reason, whether this call wrote the record ], or a transient error.
 	 */
 	public static function publish( int $user_id, string $zone, array $row ) {
 		$fqdn = '@' === $row['name'] ? $zone : $row['name'] . '.' . $zone;
@@ -267,7 +291,7 @@ final class MailDns {
 			$rows,
 			static function ( array $zone_data, array $sets ) use ( $zone, $fqdn, $row ) {
 				$here = Records::sets_at( $zone, $fqdn, (array) ( $zone_data['rrsets'] ?? array() ) );
-				$plan = self::plan( $row, $here, $zone );
+				$plan = self::plan( $row, $here, $zone, 'dkim' === $row['key'] ? self::written_before( $zone, 'dkim' ) : array() );
 
 				if ( null === $plan['write'] ) {
 					return $plan['status'] . ':' . $plan['reason'];
@@ -287,14 +311,18 @@ final class MailDns {
 		}
 
 		if ( 'ok' === $result['status'] ) {
-			return array( 'ok', '' );
+			if ( ! empty( $result['wrote'] ) ) {
+				self::remember_written( $zone, (string) $row['key'], (string) $row['value'], true );
+			}
+
+			return array( 'ok', '', ! empty( $result['wrote'] ) );
 		}
 
 		if ( in_array( $result['reason'], array( 'not_ours', 'invalid', 'no_zone', 'paused' ), true ) ) {
-			return array( 'conflict', $result['reason'] );
+			return array( 'conflict', $result['reason'], false );
 		}
 
-		return explode( ':', $result['reason'], 2 );
+		return array_merge( explode( ':', $result['reason'], 2 ), array( false ) );
 	}
 
 	/**
@@ -320,6 +348,8 @@ final class MailDns {
 				return __( 'The name is an alias (CNAME) and cannot also hold this record.', 'beltoft-services' );
 			case 'mx_other':
 				return __( 'The domain already has other MX records.', 'beltoft-services' );
+			case 'mx_second':
+				return '';
 			case 'spf_exists':
 				/* translators: %s: SPF include to add */
 				return sprintf( __( 'The domain already has an SPF record. It was not changed: add include:%s to it.', 'beltoft-services' ), MailSettings::spf_include() );
@@ -340,9 +370,10 @@ final class MailDns {
 	 * @param array<string, mixed>                 $row  The wanted record.
 	 * @param array<string, array<string, mixed>> $here The raw RRsets at the name, by type.
 	 * @param string                               $zone Zone.
+	 * @param string[]                             $ours Values of this record we wrote earlier (a stale DKIM key): they may be replaced.
 	 * @return array{write:?bool,status:string,reason:string,keep:array<int,mixed>,ttl:?int} write is true to write.
 	 */
-	public static function plan( array $row, array $here, string $zone ): array {
+	public static function plan( array $row, array $here, string $zone, array $ours = array() ): array {
 		$none = array( 'write' => null, 'status' => 'ok', 'reason' => '', 'keep' => array(), 'ttl' => null );
 		$type = (string) $row['type'];
 
@@ -394,9 +425,18 @@ final class MailDns {
 					return array_merge( $none, array( 'write' => true ) );
 				}
 
-				return in_array( preg_replace( '/\s+/', '', (string) $row['value'] ), array_map( static fn( $v ) => preg_replace( '/\s+/', '', $v ), $have ), true )
-					? $none
-					: array_merge( $none, array( 'status' => 'conflict', 'reason' => 'dkim_other' ) );
+				$squash = static fn( $v ) => preg_replace( '/\s+/', '', (string) $v );
+
+				if ( in_array( $squash( $row['value'] ), array_map( $squash, $have ), true ) ) {
+					return $none;
+				}
+
+				// Every key at the name is one we wrote before: the mail server made a new key since, ours is replaced.
+				if ( array() !== $ours && array() === array_diff( array_map( $squash, $have ), array_map( $squash, $ours ) ) ) {
+					return array( 'write' => true, 'status' => 'ok', 'reason' => '', 'keep' => array(), 'ttl' => $ttl );
+				}
+
+				return array_merge( $none, array( 'status' => 'conflict', 'reason' => 'dkim_other' ) );
 
 			case 'dmarc':
 				if ( array() === $have ) {
@@ -434,6 +474,132 @@ final class MailDns {
 		}
 
 		return $out;
+	}
+
+	// -- What we wrote, and taking it away again ---------------------------------------------------
+
+	/** The record values we wrote into zones of ours, by domain and key: what a deleted service leaves behind remembered. */
+	public const WRITTEN_OPTION = 'beltoft_services_mail_written';
+
+	/**
+	 * The values of one record kind that we wrote into the zone of this domain, from this service or an earlier one. They tell a
+	 * stale key of ours from a key the customer made. Kept in an option because a deleted service's row is closed and is not found
+	 * by its meta any more.
+	 *
+	 * @param string $zone Zone (the domain).
+	 * @param string $key  Record key.
+	 * @return string[]
+	 */
+	private static function written_before( string $zone, string $key ): array {
+		$all = get_option( self::WRITTEN_OPTION, array() );
+
+		return array_values( array_map( 'strval', (array) ( is_array( $all ) ? ( $all[ $zone ][ $key ] ?? array() ) : array() ) ) );
+	}
+
+	/**
+	 * Remembers a value we wrote (or forgets it after it was removed again).
+	 *
+	 * @param string $zone  Zone.
+	 * @param string $key   Record key.
+	 * @param string $value The value.
+	 * @param bool   $add   True to remember, false to forget.
+	 */
+	private static function remember_written( string $zone, string $key, string $value, bool $add ): void {
+		$all = get_option( self::WRITTEN_OPTION, array() );
+		$all = is_array( $all ) ? $all : array();
+		$had = array_values( array_map( 'strval', (array) ( $all[ $zone ][ $key ] ?? array() ) ) );
+
+		$had = $add ? array_slice( array_values( array_unique( array_merge( $had, array( $value ) ) ) ), -5 ) : array_values( array_diff( $had, array( $value ) ) );
+
+		if ( array() === $had ) {
+			unset( $all[ $zone ][ $key ] );
+		} else {
+			$all[ $zone ][ $key ] = $had;
+		}
+
+		if ( array() === ( $all[ $zone ] ?? array( 1 ) ) ) {
+			unset( $all[ $zone ] );
+		}
+
+		update_option( self::WRITTEN_OPTION, $all, false );
+	}
+
+	/**
+	 * Takes one record we wrote out of the customer's zone, only the records of its set that hold exactly the value we wrote:
+	 * a set with other records keeps them, a record changed since is the customer's and stays. Always through the zone writer,
+	 * under the zone lock, after reading the zone again.
+	 *
+	 * @param int                  $user_id Customer; the zone must be one of theirs on our name servers.
+	 * @param string               $zone    Zone.
+	 * @param array<string, mixed> $row     The stored row (key, name, type, value, priority).
+	 * @return bool|\WP_Error True when done or when nothing of ours was there, an error when the zone could not be changed.
+	 */
+	public static function unpublish( int $user_id, string $zone, array $row ) {
+		$fqdn = '@' === $row['name'] ? $zone : $row['name'] . '.' . $zone;
+		$type = (string) $row['type'];
+
+		$done = ZoneWriter::remove(
+			$user_id,
+			$zone,
+			static function ( array $data ) use ( $zone, $fqdn, $type, $row ): array {
+				$here = Records::sets_at( $zone, $fqdn, (array) ( $data['rrsets'] ?? array() ) );
+				$set  = $here[ $type ] ?? null;
+
+				if ( null === $set ) {
+					return array();
+				}
+
+				$keep    = array();
+				$removed = false;
+
+				foreach ( (array) ( $set['records'] ?? array() ) as $record ) {
+					$one = Records::to_rows( $zone, array( array_merge( $set, array( 'records' => array( $record ) ) ) ) );
+
+					if ( 1 === count( $one ) && self::is_ours( $row, $one[0] ) ) {
+						$removed = true;
+						continue;
+					}
+
+					$keep[] = $record;
+				}
+
+				if ( ! $removed ) {
+					return array();
+				}
+
+				if ( array() === $keep ) {
+					return array( array( 'name' => $set['name'], 'type' => $type, 'changetype' => 'DELETE' ) );
+				}
+
+				return array( array( 'name' => $set['name'], 'type' => $type, 'ttl' => (int) ( $set['ttl'] ?? self::TTL ), 'changetype' => 'REPLACE', 'records' => $keep ) );
+			}
+		);
+
+		if ( true === $done ) {
+			self::remember_written( $zone, (string) $row['key'], (string) $row['value'], false );
+		}
+
+		return $done;
+	}
+
+	/**
+	 * Does a record of the zone hold exactly what we wrote?
+	 *
+	 * @param array<string, mixed> $row    The stored row.
+	 * @param array<string, mixed> $record An editor row of the zone.
+	 */
+	private static function is_ours( array $row, array $record ): bool {
+		$strip = static fn( $v ) => strtolower( rtrim( trim( (string) $v ), '.' ) );
+
+		switch ( $row['type'] ) {
+			case 'MX':
+				return $strip( $record['value'] ?? '' ) === $strip( $row['value'] ) && (int) ( $record['priority'] ?? 0 ) === (int) ( $row['priority'] ?? 10 );
+			case 'CNAME':
+				return $strip( $record['value'] ?? '' ) === $strip( $row['value'] );
+		}
+
+		// TXT: the same text, a long key may have been split into pieces by the server.
+		return preg_replace( '/\s+/', '', (string) ( $record['value'] ?? '' ) ) === preg_replace( '/\s+/', '', (string) $row['value'] );
 	}
 
 	// -- Public DNS, for domains we do not serve -------------------------------------------------
@@ -480,6 +646,48 @@ final class MailDns {
 			default:
 				return in_array( $want, $found, true );
 		}
+	}
+
+	/**
+	 * The MX records of a domain against ours: ours is missing, alone, or has company. Company with the same or a better priority
+	 * (a lower number) splits the mail between two servers; with a worse priority it is only worth a note. The setting
+	 * mail_dns_mx_strict turns the first into a note too.
+	 *
+	 * @param array<string, mixed> $row   The stored MX row.
+	 * @param string[]             $found Values found: "priority host".
+	 * @return array{0:string,1:string[]} Verdict (missing, ok, ok_note, wrong) and the other records as "priority host".
+	 */
+	public static function mx_verdict( array $row, array $found ): array {
+		$want   = strtolower( rtrim( (string) $row['value'], '.' ) );
+		$ours   = array();
+		$others = array();
+
+		foreach ( $found as $value ) {
+			if ( 1 !== preg_match( '/^(\d+)\s+(\S+)$/D', strtolower( rtrim( trim( (string) $value ), '.' ) ), $m ) ) {
+				continue;
+			}
+
+			$host = rtrim( $m[2], '.' );
+
+			if ( $host === $want ) {
+				$ours[] = (int) $m[1];
+			} else {
+				$others[ (int) $m[1] . ' ' . $host ] = (int) $m[1];
+			}
+		}
+
+		if ( array() === $ours ) {
+			return array( 'missing', array() );
+		}
+
+		if ( array() === $others ) {
+			return array( 'ok', array() );
+		}
+
+		asort( $others );
+		$list = array_slice( array_keys( $others ), 0, 3 );
+
+		return array( MailSettings::dns_mx_strict() && min( $others ) <= min( $ours ) ? 'wrong' : 'ok_note', $list );
 	}
 
 	/**
@@ -632,7 +840,10 @@ final class MailDns {
 		$since = (int) $r->get( 'mail_dns_since' );
 
 		if ( $since > 0 && $now >= $since + self::WAIT_DAYS * DAY_IN_SECONDS ) {
-			self::store( $id, array( 'mail_dns' => 'timeout', 'mail_dns_checked' => $now ), null );
+			if ( self::store( $id, array( 'mail_dns' => 'timeout', 'mail_dns_checked' => $now, 'mail_dns_rechecked' => $now ), null ) ) {
+				self::timeout_notice( $id );
+			}
+
 			return;
 		}
 
@@ -669,7 +880,7 @@ final class MailDns {
 		}
 
 		$done = self::complete( $rows );
-		$meta = array( 'mail_records' => $rows, 'mail_dns_checked' => $now );
+		$meta = array( 'mail_records' => $rows, 'mail_dns_checked' => $now, 'mail_mode' => $ours ? 'ours' : 'external' );
 
 		if ( $done ) {
 			$meta['mail_dns'] = 'ok';
@@ -678,7 +889,14 @@ final class MailDns {
 		if ( self::store( $id, $meta, $done ? null : self::INTERVAL ) ) {
 			// Sending is held or lifted from the records just stored (the system mailbox of Email lite included).
 			MailHold::sync( Resource::find( $id ) ?? $r );
-			self::remind( $id );
+
+			if ( $done ) {
+				self::after_found( $id );
+			} else {
+				self::remind( $id );
+				self::lost_reminders( $id );
+			}
+
 			return;
 		}
 
@@ -706,6 +924,19 @@ final class MailDns {
 			$row['reason'] = '';
 			unset( $row['seen'], $row['merged'] );
 
+			// Ours is there: another mail server next to it is a problem or a note, by its priority.
+			if ( 'mx' === $row['key'] ) {
+				list( $verdict, $others ) = self::mx_verdict( $row, $found );
+
+				if ( 'wrong' === $verdict ) {
+					$row['status'] = 'conflict';
+					$row['reason'] = 'mx_second';
+					$row['seen']   = $others;
+				} elseif ( 'ok_note' === $verdict ) {
+					$row['seen'] = $others;
+				}
+			}
+
 			return $row;
 		}
 
@@ -715,6 +946,16 @@ final class MailDns {
 
 		// What is there now, for the guide: another MX, another SPF (and the SPF with our include added), another key.
 		$seen = array_values( array_filter( array_map( static fn( $v ) => substr( trim( (string) $v ), 0, 400 ), 'spf' === $row['key'] ? array_filter( $found, static fn( $v ) => 0 === stripos( (string) $v, 'v=spf1' ) ) : $found ), static fn( $v ) => '' !== $v ) );
+
+		// A name that holds an address where the alias should be (a proxy in front of it answers like that).
+		if ( 'CNAME' === $row['type'] && array() === $seen ) {
+			$addresses = self::lookup( $fqdn, 'A' );
+
+			if ( ! is_wp_error( $addresses ) ) {
+				$seen = array_values( array_filter( array_map( 'strval', $addresses ), static fn( $v ) => false !== filter_var( $v, FILTER_VALIDATE_IP ) ) );
+			}
+		}
+
 		$row['seen'] = array_slice( $seen, 0, 3 );
 
 		if ( 'spf' === $row['key'] && array() !== $seen ) {
@@ -738,59 +979,122 @@ final class MailDns {
 	}
 
 	/**
-	 * Schedules the daily sweep once.
+	 * Schedules the sweep once (the times of day follow the setting).
 	 */
 	public static function schedule_recheck(): void {
-		Jobs::ensure_cron( self::RECHECK_ALL, self::RECHECK_CRON, array(), HOUR_IN_SECONDS );
+		Jobs::ensure_cron( self::RECHECK_ALL, MailSettings::dns_recheck_cron(), array(), HOUR_IN_SECONDS );
 	}
 
 	/**
-	 * The daily sweep: one look per domain hosted elsewhere whose records were found, spread over the next hours so the
-	 * lookups of many domains never come at once. Domains still waiting are not in it (the ten minute look has them), and a
-	 * domain on our name servers is never looked at this way (recheck() leaves it).
+	 * The sweep: one look per domain whose records were found, spread over the hours until the next sweep so the lookups of
+	 * many domains never come at once, and one slow look per domain that stopped being looked at after 14 days, until the day the
+	 * setting names. Domains still waiting are not in it (the ten minute look has them).
 	 */
 	public static function recheck_all(): void {
-		$step = 0;
+		$step   = 0;
+		$spread = MailSettings::dns_recheck_spread();
 
 		foreach ( Resource::find_by_meta( MailDriver::KIND, 'mail_dns', 'ok' ) as $id ) {
-			Jobs::schedule_once( time() + min( $step * 4, 20 * HOUR_IN_SECONDS ), self::RECHECK, array( (int) $id ) );
+			Jobs::schedule_once( time() + min( $step * 4, $spread ), self::RECHECK, array( (int) $id ) );
 			++$step;
+		}
+
+		foreach ( Resource::find_by_meta( MailDriver::KIND, 'mail_dns', 'timeout' ) as $id ) {
+			$r = Resource::find( (int) $id );
+
+			if ( $r && self::slow_look_due( $r ) ) {
+				Jobs::schedule_once( time() + min( $step * 4, $spread ), self::RECHECK, array( (int) $id ) );
+				++$step;
+			}
 		}
 	}
 
 	/**
-	 * The look at one domain after its records were found: all six records are read once and stored, so the
-	 * recommended ones show their real state. A needed record (MX, SPF or DKIM) that is no longer found is confirmed with a
-	 * second read straight away; if it is still gone the domain goes back to waiting (the ten minute look and "Check now" of
-	 * the Email page work as before), sending is held again when SPF or DKIM is the one that went, and the customer gets the
-	 * email about missing records once. When the records come back the ten minute look lifts the hold as it always did.
+	 * Is a domain that stopped being looked at due for its slow look? Not before the days between looks have passed since the
+	 * last one, never after the day the setting names.
 	 *
-	 * A lookup that fails changes nothing. At most one look a day for a domain (mail_dns_rechecked).
+	 * @param Resource $r Resource.
+	 */
+	private static function slow_look_due( Resource $r ): bool {
+		if ( ! $r->is_live() || 'ready' !== (string) $r->get( 'state' ) || 'timeout' !== (string) $r->get( 'mail_dns' ) ) {
+			return false;
+		}
+
+		$since = (int) $r->get( 'mail_dns_since' );
+
+		if ( $since > 0 && time() >= $since + MailSettings::dns_stop_days() * DAY_IN_SECONDS ) {
+			return false;
+		}
+
+		return time() - (int) $r->get( 'mail_dns_rechecked' ) >= MailSettings::dns_weekly_days() * DAY_IN_SECONDS - 12 * HOUR_IN_SECONDS;
+	}
+
+	/**
+	 * The look at one domain after its records were found (or, slowly, after we stopped looking): all six records are read once and
+	 * stored, so the recommended ones show their real state. For a zone of ours each record is written again where it is missing
+	 * and free (publish never overwrites a record that is somebody's). A needed record (MX, SPF or DKIM) that is no longer found is
+	 * confirmed with a second read straight away; if it is still gone the domain goes back to waiting, sending is held when SPF or
+	 * DKIM is the one that went, and a confirmation is queued a few minutes later: only then is the customer told, once.
+	 *
+	 * A lookup that fails changes nothing. At most one look per guard time for a domain (mail_dns_rechecked).
 	 *
 	 * @param int $id Resource id.
 	 */
 	public static function recheck( int $id ): void {
 		$r = Resource::find( $id );
 
-		if ( ! $r || ! $r->is_live() || 'ok' !== (string) $r->get( 'mail_dns' ) || 'ready' !== (string) $r->get( 'state' ) || 'external' !== MailHold::mode( $r ) ) {
+		if ( ! $r || ! $r->is_live() || 'ready' !== (string) $r->get( 'state' ) ) {
 			return;
 		}
 
-		$now = time();
+		$status = (string) $r->get( 'mail_dns' );
 
-		if ( $now - (int) $r->get( 'mail_dns_rechecked' ) < 20 * HOUR_IN_SECONDS ) {
+		if ( 'ok' !== $status && 'timeout' !== $status ) {
+			return;
+		}
+
+		$timeout = 'timeout' === $status;
+		$now     = time();
+
+		if ( $timeout ? ! self::slow_look_due( $r ) : $now - (int) $r->get( 'mail_dns_rechecked' ) < MailSettings::dns_recheck_guard() ) {
 			return;
 		}
 
 		$domain = (string) $r->get( MailDomain::META_DOMAIN );
 		$rows   = (array) $r->get( 'mail_records' );
+		$user   = (int) ( $r->license()['user_id'] ?? 0 );
 
 		if ( '' === $domain || array() === $rows ) {
 			return;
 		}
 
+		// A zone of ours is asked, once a week, whether the name servers still point to us (MailDomain::on_our_servers follows it).
+		MailMoved::watch( $r );
+
+		$mode   = MailHold::mode( $r );
+		$ours   = 'ours' === $mode;
+		$stored = (string) $r->get( 'mail_mode' );
+
+		// A name that became ours since the last look (the customer moved their DNS to us): the records are written into the new zone.
+		if ( $ours && 'ours' !== $stored && '' !== $stored ) {
+			self::adopt_zone( $r );
+			return;
+		}
+
+		$before = self::ok_keys( $rows );
+
 		foreach ( $rows as $i => $row ) {
 			if ( ! is_array( $row ) || ! isset( $row['name'], $row['type'], $row['value'], $row['key'] ) ) {
+				continue;
+			}
+
+			if ( $ours ) {
+				$result = self::publish( $user, $domain, $row );
+
+				if ( ! is_wp_error( $result ) ) {
+					$rows[ $i ] = self::with_result( $rows[ $i ], $result );
+				}
+
 				continue;
 			}
 
@@ -814,20 +1118,39 @@ final class MailDns {
 
 		$lost = ! self::complete( $rows );
 		$meta = array( 'mail_records' => $rows, 'mail_dns_rechecked' => $now );
+		$gone = array_values( array_intersect( self::NEEDED, $before, array_diff( self::NEEDED, self::ok_keys( $rows ) ) ) );
 
 		// The domain was ours when it was set up and is not on our servers any more: the stored mode follows the live one.
-		$left = 'external' !== (string) $r->get( 'mail_mode' );
+		$left = ! $ours && 'external' !== $stored;
 
 		if ( $left ) {
 			$meta['mail_mode'] = 'external';
 		}
 
-		if ( $lost ) {
-			// Waiting again, as if just set up; the reminder mail is the one sent below, so the ten minute look sends none.
-			$meta += array( 'mail_dns' => 'waiting', 'mail_dns_since' => $now, 'mail_dns_checked' => $now, 'mail_dns_reminded' => $now );
+		if ( $left && MailMoved::away( $domain, $user ) ) {
+			$meta['mail_dns_moved'] = $now;
 		}
 
-		$stored = $r->locked(
+		if ( $timeout ) {
+			self::finish_slow_look( $r, $meta, ! $lost );
+			return;
+		}
+
+		if ( $lost ) {
+			// Waiting again, as if just set up; the reminder of a new domain is not sent, the confirmation below decides on mail.
+			$meta += array(
+				'mail_dns'              => 'waiting',
+				'mail_dns_since'        => $now,
+				'mail_dns_checked'      => $now,
+				'mail_dns_reminded'     => $now,
+				'mail_dns_lost_pending' => $now,
+				'mail_dns_lost_keys'    => $gone,
+				'mail_dns_lost_at'      => 0,
+				'mail_dns_lost_mails'   => 0,
+			);
+		}
+
+		$stored_ok = $r->locked(
 			static function () use ( $id, $meta ): bool {
 				$fresh = Resource::find( $id );
 
@@ -835,7 +1158,7 @@ final class MailDns {
 			}
 		);
 
-		if ( true !== $stored ) {
+		if ( true !== $stored_ok ) {
 			return;
 		}
 
@@ -849,8 +1172,343 @@ final class MailDns {
 
 		if ( $lost ) {
 			self::schedule( $id, self::INTERVAL );
-			\BeltoftServices\Emails\Emails::send( 'beltoft_services_mail_dns_reminder', $fresh );
+			Jobs::schedule_once( time() + MailSettings::dns_confirm_seconds(), self::CONFIRM, array( $id ) );
 		}
+	}
+
+	/**
+	 * The end of a slow look at a domain we stopped looking at: the rows are stored; when all needed records are found the domain is
+	 * ok again, else the admin hears once when it has been without email DNS for the days the setting names.
+	 *
+	 * @param Resource             $r     Resource.
+	 * @param array<string, mixed> $meta  Meta to store.
+	 * @param bool                 $found All needed records were found.
+	 */
+	private static function finish_slow_look( Resource $r, array $meta, bool $found ): void {
+		$id = $r->id();
+
+		if ( $found ) {
+			$meta['mail_dns'] = 'ok';
+		}
+
+		$stored = $r->locked(
+			static function () use ( $id, $meta ): bool {
+				$fresh = Resource::find( $id );
+
+				return $fresh && 'timeout' === (string) $fresh->get( 'mail_dns' ) && $fresh->set( $meta );
+			}
+		);
+
+		if ( true !== $stored ) {
+			return;
+		}
+
+		$fresh = Resource::find( $id ) ?? $r;
+
+		MailHold::sync( $fresh );
+
+		if ( $found ) {
+			self::after_found( $id );
+			return;
+		}
+
+		$since = (int) $fresh->get( 'mail_dns_since' );
+
+		if ( $since > 0 && time() >= $since + MailSettings::dns_admin_days() * DAY_IN_SECONDS && ! (int) $fresh->get( 'mail_dns_admin_alerted' ) ) {
+			$marked = $fresh->locked(
+				static function () use ( $id ): bool {
+					$again = Resource::find( $id );
+
+					return $again && ! (int) $again->get( 'mail_dns_admin_alerted' ) && $again->set( array( 'mail_dns_admin_alerted' => time() ) );
+				}
+			);
+
+			if ( true === $marked ) {
+				\BeltoftServices\Alerts::mail_domain_no_dns( $fresh, (string) $fresh->get( MailDomain::META_DOMAIN ), MailSettings::dns_admin_days() );
+			}
+		}
+	}
+
+	/**
+	 * The second read of a record that was found before and was not found by the daily look. Only if it is still gone is the
+	 * loss real: the customer gets the first email and the staff are told. A record that is back is no event at all.
+	 *
+	 * @param int $id Resource id.
+	 */
+	public static function confirm( int $id ): void {
+		$r = Resource::find( $id );
+
+		if ( ! $r || ! $r->is_live() || ! self::waiting( $r ) || (int) $r->get( 'mail_dns_lost_pending' ) <= 0 ) {
+			return;
+		}
+
+		$domain = (string) $r->get( MailDomain::META_DOMAIN );
+		$user   = (int) ( $r->license()['user_id'] ?? 0 );
+		$ours   = MailDomain::on_our_servers( $domain, $user );
+		$keys   = MailDnsState::lost_keys( $r );
+		$rows   = (array) $r->get( 'mail_records' );
+
+		foreach ( $rows as $i => $row ) {
+			if ( ! is_array( $row ) || ! in_array( (string) ( $row['key'] ?? '' ), $keys, true ) || 'ok' === ( $row['status'] ?? '' ) ) {
+				continue;
+			}
+
+			if ( $ours ) {
+				$result = self::publish( $user, $domain, $row );
+
+				if ( ! is_wp_error( $result ) ) {
+					$rows[ $i ] = self::with_result( $rows[ $i ], $result );
+				}
+
+				continue;
+			}
+
+			$read = self::read_row( $row, $domain );
+
+			if ( null !== $read ) {
+				$rows[ $i ] = $read;
+			}
+		}
+
+		$still = array_values( array_intersect( $keys, array_diff( self::NEEDED, self::ok_keys( $rows ) ) ) );
+		$clear = array( 'mail_dns_lost_pending' => 0 );
+
+		if ( array() === $still || self::complete( $rows ) ) {
+			// It is back: nobody was told, nobody needs to be.
+			$meta = array_merge( $clear, array( 'mail_records' => $rows, 'mail_dns' => 'ok', 'mail_dns_lost_keys' => array(), 'mail_dns_checked' => time() ) );
+
+			if ( self::store( $id, $meta, null ) ) {
+				MailHold::sync( Resource::find( $id ) ?? $r );
+			}
+
+			return;
+		}
+
+		// A loss right after a lost or found mail (a record that flaps) is not mailed again: the page and the hold follow the real state,
+		// and lost_reminders() tells the customer if it lasts past the gap.
+		$quiet = self::within_gap( (int) $r->get( 'mail_dns_last_mail' ) );
+		$meta  = array_merge( $clear, array( 'mail_records' => $rows, 'mail_dns_lost_keys' => $still, 'mail_dns_lost_at' => time(), 'mail_dns_lost_mails' => $quiet ? 0 : 1 ) );
+
+		if ( ! $quiet ) {
+			$meta['mail_dns_last_mail'] = time();
+		}
+
+		if ( ! self::store( $id, $meta, null ) ) {
+			self::schedule_confirm_again( $id );
+			return;
+		}
+
+		$fresh = Resource::find( $id ) ?? $r;
+
+		MailHold::sync( $fresh );
+
+		if ( ! $quiet ) {
+			\BeltoftServices\Emails\Emails::send( 'beltoft_services_mail_dns_lost', $fresh );
+		}
+
+		\BeltoftServices\Alerts::mail_domain_lost( $fresh, $domain, $still, MailSettings::dns_admin_throttle() );
+	}
+
+	/**
+	 * Is a time inside the gap after which a new lost mail may go out?
+	 *
+	 * @param int $at Time of the last lost or found mail, 0 for none.
+	 */
+	private static function within_gap( int $at ): bool {
+		$gap = MailSettings::dns_mail_gap();
+
+		return $gap > 0 && $at > 0 && time() < $at + $gap;
+	}
+
+	/**
+	 * The resource lock was busy: the confirmation is tried again in a minute.
+	 *
+	 * @param int $id Resource id.
+	 */
+	private static function schedule_confirm_again( int $id ): void {
+		Jobs::schedule_once( time() + 60, self::CONFIRM, array( $id ) );
+	}
+
+	/**
+	 * The reminders of a loss that goes on: one email on each day the setting names, counted from the day the loss was confirmed,
+	 * never more than the days named plus the first email. The count is stored under the resource lock before the mail goes out,
+	 * so a retry never mails twice.
+	 *
+	 * @param int $id Resource id.
+	 */
+	public static function lost_reminders( int $id ): void {
+		$r = Resource::find( $id );
+
+		if ( ! $r || ! $r->is_live() || ! self::waiting( $r ) ) {
+			return;
+		}
+
+		$at    = (int) $r->get( 'mail_dns_lost_at' );
+		$sent  = (int) $r->get( 'mail_dns_lost_mails' );
+		$days  = MailSettings::dns_remind_days();
+		$index = $sent - 1;
+
+		if ( $at <= 0 ) {
+			return;
+		}
+
+		// A loss that was quiet (a flapping record): the first mail goes out once the gap since the last mail is over.
+		if ( 0 === $sent ) {
+			if ( self::within_gap( (int) $r->get( 'mail_dns_last_mail' ) ) ) {
+				return;
+			}
+		} elseif ( $index >= count( $days ) || time() < $at + $days[ $index ] * DAY_IN_SECONDS ) {
+			return;
+		}
+
+		$marked = $r->locked(
+			static function () use ( $id, $sent ): bool {
+				$fresh = Resource::find( $id );
+
+				return $fresh && self::waiting( $fresh ) && (int) $fresh->get( 'mail_dns_lost_mails' ) === $sent && $fresh->set( array( 'mail_dns_lost_mails' => $sent + 1, 'mail_dns_last_mail' => time() ) );
+			}
+		);
+
+		if ( true === $marked ) {
+			\BeltoftServices\Emails\Emails::send( 'beltoft_services_mail_dns_lost', Resource::find( $id ) ?? $r );
+		}
+	}
+
+	/**
+	 * The needed records are found again. When the customer was told that some were lost, they are told that it is over, once;
+	 * every mark of the loss is cleared either way.
+	 *
+	 * @param int $id Resource id.
+	 */
+	public static function after_found( int $id ): void {
+		$r = Resource::find( $id );
+
+		if ( ! $r || 'ok' !== (string) $r->get( 'mail_dns' ) ) {
+			return;
+		}
+
+		// Told that records were lost, and no found mail went out inside the gap: a flapping record gets one found mail.
+		$gap   = MailSettings::dns_mail_gap();
+		$told  = (int) $r->get( 'mail_dns_lost_at' ) > 0 && (int) $r->get( 'mail_dns_lost_mails' ) > 0 && ! ( $gap > 0 && time() < (int) $r->get( 'mail_dns_back_at' ) + $gap );
+		$marks = array( 'mail_dns_lost_at', 'mail_dns_lost_keys', 'mail_dns_lost_mails', 'mail_dns_lost_pending', 'mail_dns_moved', 'mail_dns_timeout_mailed', 'mail_dns_admin_alerted' );
+		$set   = false;
+
+		foreach ( $marks as $mark ) {
+			$value = $r->get( $mark );
+			$set   = $set || ( is_array( $value ) ? array() !== $value : (int) $value > 0 );
+		}
+
+		if ( ! $set ) {
+			return;
+		}
+
+		$cleared = $r->locked(
+			static function () use ( $id, $marks, $told ): bool {
+				$fresh = Resource::find( $id );
+				$send  = $told;
+				$meta  = array();
+
+				foreach ( $marks as $mark ) {
+					$meta[ $mark ] = 'mail_dns_lost_keys' === $mark ? array() : 0;
+				}
+
+				if ( $send ) {
+					$meta['mail_dns_back_at']   = time();
+					$meta['mail_dns_last_mail'] = time();
+				}
+
+				return $fresh && 'ok' === (string) $fresh->get( 'mail_dns' ) && $fresh->set( $meta );
+			}
+		);
+
+		if ( true === $cleared && $told ) {
+			\BeltoftServices\Emails\Emails::send( 'beltoft_services_mail_dns_back', Resource::find( $id ) ?? $r );
+		}
+	}
+
+	/**
+	 * The look stopped after 14 days: the customer is told once. The mark is stored under the resource lock before the mail goes.
+	 *
+	 * @param int $id Resource id.
+	 */
+	public static function timeout_notice( int $id ): void {
+		$r = Resource::find( $id );
+
+		if ( ! $r || ! $r->is_live() || 'timeout' !== (string) $r->get( 'mail_dns' ) || (int) $r->get( 'mail_dns_timeout_mailed' ) > 0 ) {
+			return;
+		}
+
+		$marked = $r->locked(
+			static function () use ( $id ): bool {
+				$fresh = Resource::find( $id );
+
+				return $fresh && 'timeout' === (string) $fresh->get( 'mail_dns' ) && ! (int) $fresh->get( 'mail_dns_timeout_mailed' ) && $fresh->set( array( 'mail_dns_timeout_mailed' => time() ) );
+			}
+		);
+
+		if ( true === $marked ) {
+			\BeltoftServices\Emails\Emails::send( 'beltoft_services_mail_dns_timeout', Resource::find( $id ) ?? $r );
+		}
+	}
+
+	/**
+	 * The name is on our name servers now and the records were made for it elsewhere: every record is written into the new zone
+	 * (or reported as a conflict), by the ten minute look.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function adopt_zone( Resource $r ): void {
+		$id   = $r->id();
+		$rows = array();
+
+		foreach ( (array) $r->get( 'mail_records' ) as $row ) {
+			if ( is_array( $row ) ) {
+				$row['status'] = 'missing';
+				$row['reason'] = '';
+				unset( $row['seen'], $row['merged'] );
+				$rows[] = $row;
+			}
+		}
+
+		$done = $r->locked(
+			static function () use ( $id, $rows ): bool {
+				$fresh = Resource::find( $id );
+
+				return $fresh && $fresh->set(
+					array(
+						'mail_mode'         => 'ours',
+						'mail_records'      => $rows,
+						'mail_dns'          => 'waiting',
+						'mail_dns_since'    => time(),
+						'mail_dns_checked'  => null,
+						'mail_dns_reminded' => time(),
+						'mail_dns_moved'    => 0,
+					)
+				);
+			}
+		);
+
+		if ( true === $done ) {
+			self::schedule( $id, 0 );
+		}
+	}
+
+	/**
+	 * The keys of the records that are ok.
+	 *
+	 * @param array<int, array<string, mixed>> $rows Rows.
+	 * @return string[]
+	 */
+	private static function ok_keys( array $rows ): array {
+		$ok = array();
+
+		foreach ( $rows as $row ) {
+			if ( is_array( $row ) && 'ok' === ( $row['status'] ?? '' ) ) {
+				$ok[] = (string) ( $row['key'] ?? '' );
+			}
+		}
+
+		return $ok;
 	}
 
 	/**

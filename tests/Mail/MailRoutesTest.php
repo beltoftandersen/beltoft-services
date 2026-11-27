@@ -463,4 +463,84 @@ final class MailRoutesTest extends MailTestCase {
 		Resource::find( $r->id() )->set( array( 'state' => 'paused' ) );
 		$this->assertSame( 403, $this->call( 'DELETE', $r->id() . '/mail-domains/full.example', $user )->get_status(), 'A paused plan is not available to the routes.' );
 	}
+
+	public function test_check_now_has_a_gap_of_60_seconds_and_ten_presses_an_hour_and_says_when_it_works_again(): void {
+		add_filter( 'beltoft_services_rest_rate_limit', '__return_zero' );
+		list( $r, $user ) = $this->domain( 'limit.example' );
+		$path = $r->id() . '/mail/dns/check';
+
+		$this->assertSame( 202, $this->call( 'POST', $path, $user )->get_status() );
+		$this->run_jobs();
+
+		$second = $this->call( 'POST', $path, $user );
+		$this->assertSame( 429, $second->get_status(), 'No second press inside the gap.' );
+		$data = $second->get_data();
+		$this->assertSame( 'beltoft_services_mail_rate_limited', $data['code'] );
+		$this->assertStringStartsWith( 'You can check again at', $data['message'] );
+		$this->assertEqualsWithDelta( time() + 60, (int) $data['next'], 3 );
+		$this->assertGreaterThan( 0, (int) $second->get_headers()['Retry-After'] );
+		$this->assertGreaterThan( time(), (int) $data['dns']['next'], 'The page can draw the countdown.' );
+		$this->assertCount( 1, (array) Resource::find( $r->id() )->get( 'mail_dns_manual' ), 'A refused press is not counted.' );
+
+		// Sixty seconds later it works; ten presses in the hour is the most.
+		$times = array();
+		for ( $i = 0; $i < 10; $i++ ) {
+			$times[] = time() - 3000 + $i * 61;
+		}
+		Resource::find( $r->id() )->set( array( 'mail_dns_manual' => $times ) );
+		$ten = $this->call( 'POST', $path, $user );
+		$this->assertSame( 429, $ten->get_status(), 'Ten presses in the hour: the next waits until the first is an hour old.' );
+		$this->assertEqualsWithDelta( $times[0] + HOUR_IN_SECONDS, (int) $ten->get_data()['next'], 3 );
+
+		Resource::find( $r->id() )->set( array( 'mail_dns_manual' => array( time() - 61 ) ) );
+		$this->assertSame( 202, $this->call( 'POST', $path, $user )->get_status() );
+	}
+
+	public function test_the_gap_and_the_hourly_count_are_settings(): void {
+		add_filter( 'beltoft_services_rest_rate_limit', '__return_zero' );
+		$this->settings( array( 'mail_dns_check_gap' => 0, 'mail_dns_check_per_hour' => 2 ) );
+		list( $r, $user ) = $this->domain( 'setting.example' );
+		$path = $r->id() . '/mail/dns/check';
+
+		$this->assertSame( 202, $this->call( 'POST', $path, $user )->get_status() );
+		$this->run_jobs();
+		$this->assertSame( 202, $this->call( 'POST', $path, $user )->get_status() );
+		$this->run_jobs();
+		$this->assertSame( 429, $this->call( 'POST', $path, $user )->get_status() );
+	}
+
+	public function test_the_status_poll_says_the_same_word_as_the_page_and_never_ready_while_email_is_broken(): void {
+		add_filter( 'beltoft_services_rest_rate_limit', '__return_zero' );
+		list( $r, $user ) = $this->domain( 'badge.example' );
+		$label = fn() => $this->call( 'GET', $r->id(), $user )->get_data()['label'];
+
+		$this->assertSame( 'DNS records needed', $label() );
+
+		$r->set( array( 'mail_dns' => 'waiting', 'mail_dns_lost_at' => time() - 3600, 'mail_dns_lost_keys' => array( 'mx' ) ) );
+		$this->assertStringStartsWith( 'DNS records missing since', $label() );
+
+		$r->set( array( 'mail_dns' => 'timeout', 'mail_dns_lost_at' => 0 ) );
+		$this->assertSame( 'We stopped checking DNS', $label() );
+
+		$r->set( array( 'mail_dns' => 'waiting', 'mail_dns_moved' => time(), 'mail_dns_lost_at' => time() ) );
+		$this->assertSame( 'DNS is at another provider', $label() );
+
+		$rows = (array) $r->get( 'mail_records' );
+		foreach ( $rows as $i => $row ) {
+			$rows[ $i ]['status'] = 'ok';
+		}
+		$r->set( array( 'mail_records' => $rows, 'mail_dns' => 'ok', 'mail_dns_moved' => 0, 'mail_dns_lost_at' => 0 ) );
+		$this->assertSame( 'Ready', $label() );
+	}
+
+	public function test_a_failed_proof_with_try_again_open_says_not_set_up_in_the_poll(): void {
+		$user = self::factory()->user->create();
+		$r    = $this->mail_resource( 'proofbadge.example', array(), array(), $user );
+		$r->set( array( 'state' => 'failed', 'desired' => 'ready', 'failed_op' => 'provision', 'attempts' => 5, 'mail_proof_failed_at' => time() - DAY_IN_SECONDS ) );
+
+		$this->assertSame( 'Not set up', $this->call( 'GET', $r->id(), $user )->get_data()['label'] );
+
+		$r->set( array( 'mail_proof_failed_at' => time() - 40 * DAY_IN_SECONDS ) );
+		$this->assertNotSame( 'Not set up', $this->call( 'GET', $r->id(), $user )->get_data()['label'], 'After the window the usual words are back.' );
+	}
 }

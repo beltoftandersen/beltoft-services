@@ -48,7 +48,9 @@ final class Sync {
 	public static function delegation(): void {
 		foreach ( Resource::live_ids( 'dns' ) as $id ) {
 			$r = Resource::find( $id );
-			if ( $r && $r->is_live() && 'ours' !== $r->get( 'delegation' ) ) { Delegation::refresh( $r ); }
+			if ( ! $r || ! $r->is_live() ) { continue; }
+			// One that points to us is looked at again every few days (a moved domain), one that does not every day.
+			if ( 'ours' !== $r->get( 'delegation' ) || (int) $r->get( 'delegation_checked' ) <= time() - max( 1, (int) \BeltoftServices\Settings::get( 'dns_delegation_recheck_days' ) ) * DAY_IN_SECONDS + HOUR_IN_SECONDS ) { Delegation::refresh( $r ); }
 		}
 	}
 }

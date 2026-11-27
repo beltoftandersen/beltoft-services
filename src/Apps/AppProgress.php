@@ -398,7 +398,7 @@ final class AppProgress {
 			'deadline'  => $deadline > 0 ? wp_date( get_option( 'date_format' ), $deadline ) : '',
 			'id'        => $r->id(),
 			'next'      => $next,
-			'next_text' => $next > 0 ? sprintf( /* translators: %s: time of day such as 09:41 */ __( 'You can check again at %s', 'beltoft-services' ), wp_date( get_option( 'time_format' ), $next ) ) : '',
+			'next_text' => $next > 0 ? \BeltoftServices\Domains\ManualCheck::text( $next ) : '',
 		);
 	}
 

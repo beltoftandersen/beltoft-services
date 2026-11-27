@@ -9,6 +9,7 @@ namespace BeltoftServices\Mail;
 
 use BeltoftServices\Domains\DnsRecordsGuide;
 use BeltoftServices\Domains\HostName;
+use BeltoftServices\Domains\ManualCheck;
 use BeltoftServices\Domains\Ownership;
 use BeltoftServices\Jobs;
 use BeltoftServices\Progress;
@@ -28,6 +29,9 @@ final class MailView {
 	public const SMTP_SSL  = 465;
 	public const SMTP_TLS  = 587;
 	public const POP_PORT  = 995;
+
+	/** The times of the customer's Check now presses of the last hour (Domains\ManualCheck). */
+	public const MANUAL_META = 'mail_dns_manual';
 
 	/**
 	 * The view.
@@ -54,6 +58,8 @@ final class MailView {
 			'aliases'   => null,
 			'errors'    => array(),
 			'dns'       => self::dns( $r, $kind ),
+			// The date a paused service keeps its mailboxes and mail until ('' when nothing is deleted or no date is known).
+			'kept_until' => 'paused' === $kind ? MailDnsState::kept_until( $r ) : '',
 			'send_held' => $ready && MailHold::held( $r ),
 			'hold_text' => $ready ? MailHold::notice( $r ) : '',
 			'connect'   => self::connect( MailGuard::domain( $r ) ),
@@ -197,6 +203,7 @@ final class MailView {
 				'value'    => (string) ( $row['value'] ?? '' ),
 				'status'   => in_array( $row['status'] ?? '', array( 'ok', 'conflict' ), true ) ? (string) $row['status'] : 'missing',
 				'reason'   => MailDns::reason_text( (string) ( $row['reason'] ?? '' ) ),
+				'code'     => (string) ( $row['reason'] ?? '' ),
 			);
 		}
 
@@ -210,21 +217,38 @@ final class MailView {
 			$proof = MailDomain::proof_record( $domain, $user );
 		}
 
+		// A failed proof can be tried again for a while: the proof record is shown again, with the button.
+		$retry = array( 'state' => MailRetry::state( $r ), 'until' => '' );
+
+		if ( 'open' === $retry['state'] ) {
+			$retry['until'] = wp_date( get_option( 'date_format' ), MailRetry::until( $r ) );
+			$proof          = MailDomain::proof_record( $domain, $user );
+		}
+
 		$checked = (int) $r->get( 'mail_dns_checked' );
 		$status  = (string) $r->get( 'mail_dns' );
+		$word    = MailDnsState::of( $r );
 		$state   = in_array( $status, array( 'ok', 'timeout' ), true ) ? $status : ( array() === $rows ? '' : 'waiting' );
 		$can     = 'ready' === $kind && array() !== $rows && 'ok' !== $status;
+		$next    = $can ? ManualCheck::next( $r, self::MANUAL_META, MailSettings::dns_check_gap(), MailSettings::dns_check_per_hour() ) : 0;
 
 		return array(
 			'mode'       => $mode,
+			'state'      => $word,
+			'word'       => MailDnsState::word( $r ),
+			'tone'       => MailDnsState::tone( $r ),
+			'notice'     => 'ready' === $kind ? MailDnsState::notice( $r, \BeltoftServices\Domains\HostName::display( $domain ) ) : '',
 			'status'     => $state,
 			'rows'       => $rows,
 			'proof'      => $proof,
+			'retry'      => $retry,
 			'can_check'  => $can,
+			'next'       => $next,
+			'next_text'  => $next > 0 ? ManualCheck::text( $next ) : '',
 			'checked'    => $checked > 0 ? wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $checked ) : '',
 			'checked_at' => $checked,
 			'days'       => MailDns::WAIT_DAYS,
-			'guide'      => self::guide( $domain, $mode, $rows, $proof, $state, $can, $checked ),
+			'guide'      => self::guide( $domain, $mode, $rows, $proof, $state, $can, $checked, $next, 'open' === $retry['state'] ),
 		);
 	}
 
@@ -239,9 +263,11 @@ final class MailView {
 	 * @param string                               $state   ok, timeout, waiting or ''.
 	 * @param bool                                 $can     The customer can start a check.
 	 * @param int                                  $checked Time of the last check, 0 for never.
+	 * @param int                                  $next    The moment the customer may press Check now again, 0 when now.
+	 * @param bool                                 $retry   The proof was not found in time and the customer may try again.
 	 * @return array<string, mixed>|null
 	 */
-	private static function guide( string $domain, string $mode, array $rows, ?array $proof, string $state, bool $can, int $checked ): ?array {
+	private static function guide( string $domain, string $mode, array $rows, ?array $proof, string $state, bool $can, int $checked, int $next = 0, bool $retry = false ): ?array {
 		$shown = HostName::display( $domain );
 
 		if ( null !== $proof ) {
@@ -249,7 +275,9 @@ final class MailView {
 				'id'       => 'proof',
 				'domain'   => $domain,
 				'title'    => sprintf( /* translators: %s: domain name. */ __( 'Show that %s is yours', 'beltoft-services' ), $shown ),
-				'why'      => __( 'We set up email for the domain after we find this record. Nothing else works until then.', 'beltoft-services' ),
+				'why'      => $retry
+					? __( 'The ownership record was not found in 14 days. Add this record, then press Try again.', 'beltoft-services' )
+					: __( 'We set up email for the domain after we find this record. Nothing else works until then.', 'beltoft-services' ),
 				'records'  => array(
 					array(
 						'key'      => 'proof',
@@ -261,8 +289,8 @@ final class MailView {
 						'status'   => 'unchecked',
 					),
 				),
-				'check'    => array( 'attrs' => array( 'data-mail-proof-check' => '' ) ),
-				'interval' => MailDns::INTERVAL,
+				'check'    => $retry ? array( 'label' => __( 'Try again', 'beltoft-services' ), 'attrs' => array( 'data-mail-retry' => '' ) ) : array( 'attrs' => array( 'data-mail-proof-check' => '' ) ),
+				'interval' => $retry ? 0 : MailDns::INTERVAL,
 				'days'     => MailDns::WAIT_DAYS,
 			);
 		}
@@ -272,14 +300,33 @@ final class MailView {
 		}
 
 		$records = array();
+		$second  = '';
 
 		foreach ( $rows as $row ) {
 			$key    = (string) $row['key'];
 			$note   = '';
 			$status = 'missing' === $row['status'] && 0 === $checked && 'external' === $mode ? 'unchecked' : $row['status'];
 
+			$wrong = '';
+
 			if ( 'mx' === $key && array() !== $row['seen'] && 'ok' !== $row['status'] ) {
-				$note  = __( 'This domain has MX records for another mail provider. Remove them, or mail keeps going there.', 'beltoft-services' );
+				$note = __( 'This domain has MX records for another mail provider. Remove them, or mail keeps going there.', 'beltoft-services' );
+
+				if ( 'mx_second' === $row['code'] ) {
+					$note  = '';
+					/* translators: %s: another mail server with its priority, such as 5 mx.example.com. */
+					$wrong = __( 'Another mail server has the same or a better priority: %s. Remove it.', 'beltoft-services' );
+				}
+			}
+
+			// An address where the alias should be: the name is behind a proxy, or has an A record of its own.
+			if ( in_array( $key, array( 'autoconfig', 'autodiscover' ), true ) && array() !== $row['seen'] && 'ok' !== $row['status'] && array() === array_filter( $row['seen'], static fn( $v ) => false === filter_var( $v, FILTER_VALIDATE_IP ) ) ) {
+				$note = __( 'This name has an address record, not an alias. Using Cloudflare? Set it to DNS only (grey cloud) and make it an alias to our mail server.', 'beltoft-services' );
+			}
+
+			// Ours is found and another server is listed after it: some mail may go there.
+			if ( 'mx' === $key && array() !== $row['seen'] && 'ok' === $row['status'] ) {
+				$second = sprintf( /* translators: %s: another mail server with its priority, such as 20 mx.example.com. */ __( 'Some mail may also go to %s.', 'beltoft-services' ), (string) $row['seen'][0] );
 			}
 
 			if ( 'spf' === $key && array() !== $row['seen'] && 'ok' !== $row['status'] ) {
@@ -301,14 +348,12 @@ final class MailView {
 				'reason'   => $row['reason'],
 				'merged'   => $row['merged'],
 				'note'     => $note,
+				'wrong_text' => $wrong,
 			);
 		}
 
-		$notes = array();
-
-		if ( 'timeout' === $state ) {
-			$notes[] = __( 'We stopped looking for the records. Add them, then check again.', 'beltoft-services' );
-		}
+		$notes   = '' !== $second ? array( $second ) : array();
+		$missing = array_column( array_filter( $rows, static fn( $row ) => 'ok' !== $row['status'] ), 'key' );
 
 		$model = array(
 			'id'        => 'mail',
@@ -318,7 +363,9 @@ final class MailView {
 			'records'   => $records,
 			'notes'     => $notes,
 			'done_text' => sprintf( /* translators: %s: domain name. */ __( 'Email DNS for %s is set up. All needed records were found.', 'beltoft-services' ), $shown ),
-			'check'     => $can ? array( 'attrs' => array( 'data-mail-dns-check' => '' ) ) : null,
+			'check'     => $can ? array( 'attrs' => array( 'data-mail-dns-check' => '' ), 'next' => $next, 'next_text' => $next > 0 ? ManualCheck::text( $next ) : '' ) : null,
+			'hints'     => 'ours' === $mode ? array() : array( __( 'Using Cloudflare? Set these records to DNS only (grey cloud). Mail records cannot be proxied.', 'beltoft-services' ) ),
+			'done_hint' => array_values( array_filter( array( $second, in_array( 'dmarc', $missing, true ) ? __( 'Recommended: add a DMARC record.', 'beltoft-services' ) : '' ) ) ),
 			'checked'   => $checked,
 			'interval'  => 'external' === $mode && 'timeout' !== $state && 'ok' !== $state ? MailDns::INTERVAL : 0,
 			'days'      => MailDns::WAIT_DAYS,
@@ -326,8 +373,23 @@ final class MailView {
 
 		if ( 'ours' === $mode ) {
 			$model['steps'] = array(
-				__( 'The DNS of this domain is on our name servers, so we add these records for you.', 'beltoft-services' ),
+				__( 'The DNS of this domain is on our name servers. We keep these records in place for you.', 'beltoft-services' ),
 				__( 'A record marked Another value is there now was not added, because something else is already there. Change or remove that record, then press Check now.', 'beltoft-services' ),
+			);
+
+			if ( MailSettings::dns_cleanup_on_delete() ) {
+				$model['steps'][] = __( 'If you delete this email domain, we also remove the records we made in your DNS.', 'beltoft-services' );
+			}
+
+			// Nothing is added by hand: the table stays folded unless a record needs the customer.
+			if ( array() === array_filter( $records, static fn( $rec ) => in_array( $rec['status'], array( 'conflict', 'wrong' ), true ) ) ) {
+				$model['collapse'] = __( 'Show the records', 'beltoft-services' );
+			}
+		} else {
+			$model['steps'] = array(
+				sprintf( /* translators: %s: domain name. */ __( 'Log in where the DNS of %s is managed. That is usually where you bought the domain.', 'beltoft-services' ), $shown ),
+				__( 'Add or change these records. Copy each name and value as it is. Delete other MX records.', 'beltoft-services' ),
+				__( 'Come back here and press Check now.', 'beltoft-services' ),
 			);
 		}
 

@@ -280,7 +280,7 @@ final class MailDriver implements Driver, NeedsBilling, InternalActions {
 		}
 
 		if ( time() >= $until ) {
-			return StepResult::fail( 'The ownership proof for the domain was not found in time.' );
+			return StepResult::fail( 'The ownership proof for the domain was not found in time.', array( 'mail_proof_failed_at' => time() ) );
 		}
 
 		return StepResult::wait( MailDns::INTERVAL, 'Waiting for the ownership proof (' . ( '' !== $check['reason'] ? $check['reason'] : $check['status'] ) . ').', $until, array( 'mail_proof_until' => $until, 'mail_mode' => 'external' ) );
@@ -544,6 +544,13 @@ final class MailDriver implements Driver, NeedsBilling, InternalActions {
 			MailAccess::purge_all( $r );
 
 			return StepResult::done();
+		}
+
+		// The records we made in the customer's zone of ours go first: they point at a mail host that will not know the domain.
+		$cleaned = MailCleanup::run( $r );
+
+		if ( is_wp_error( $cleaned ) ) {
+			return StepResult::retry( 300, $cleaned->get_error_message() );
 		}
 
 		$client = MailClients::for();

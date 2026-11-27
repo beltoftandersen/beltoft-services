@@ -957,7 +957,15 @@ abstract class ServiceArea {
 
 		$tone = $resource->on_hold() || 'failed' === $group ? 'bad' : ( 'ready' === $group ? 'ok' : ( 'getting-ready' === $group ? 'busy' : 'off' ) );
 
-		return array( Panel::label( $state, $resource ), $tone );
+		/**
+		 * Filters the status words and colour of a service in an area, so a feature can say more than the shared state does.
+		 *
+		 * @param array{0:string,1:string} $status   Label and tone (ok, busy, off, bad).
+		 * @param Resource                 $resource Resource.
+		 */
+		$filtered = apply_filters( 'beltoft_services_area_state', array( Panel::label( $state, $resource ), $tone ), $resource );
+
+		return is_array( $filtered ) && 2 === count( $filtered ) ? array_values( $filtered ) : array( Panel::label( $state, $resource ), $tone );
 	}
 
 	/**

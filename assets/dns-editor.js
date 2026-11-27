@@ -49,6 +49,7 @@
 		this.query = '';
 		this.focusAfter = null;
 		this.draft = null; // what the customer typed in the row being edited, kept when a save fails
+		this.notes = JSON.parse( root.getAttribute( 'data-notes' ) || '[]' ); // what a feature says about a record before it is deleted
 		this.setRows( JSON.parse( root.getAttribute( 'data-rows' ) || '[]' ) );
 		this.build();
 
@@ -82,6 +83,7 @@
 		}
 		request( 'GET', this.resource + '/dns-records' ).then( function ( result ) {
 			if ( result.ok && Array.isArray( result.data.rows ) ) {
+				self.notes = Array.isArray( result.data.notes ) ? result.data.notes : self.notes;
 				self.setRows( result.data.rows );
 				self.render();
 			} else {
@@ -95,6 +97,18 @@
 		if ( '' === n || n === this.zone ) { return '@'; }
 		if ( this.zone && n.slice( -( this.zone.length + 1 ) ) === '.' + this.zone ) { return n.slice( 0, -( this.zone.length + 1 ) ); }
 		return n;
+	};
+
+	// The words a feature has on this record (an email domain uses it), '' for none.
+	Editor.prototype.noteFor = function ( row ) {
+		var text = '';
+		var self = this;
+		( this.notes || [] ).forEach( function ( note ) {
+			if ( ! text && note.name === self.norm( row.name ) && String( note.type ).toUpperCase() === String( row.type ).toUpperCase() && ( ! note.match || 0 === String( row.value || '' ).toLowerCase().indexOf( String( note.match ).toLowerCase() ) ) ) {
+				text = note.text;
+			}
+		} );
+		return text;
 	};
 
 	Editor.prototype.key = function ( row ) {
@@ -304,7 +318,8 @@
 		var actions = el( 'td', { 'class': 'beltoft-dnse__actions' } );
 
 		if ( ! locked && row.id === this.confirm ) {
-			actions.appendChild( el( 'span', { 'class': 'beltoft-dnse__ask', text: this.t.delete_q } ) );
+			var note = this.noteFor( row );
+			actions.appendChild( el( 'span', { 'class': 'beltoft-dnse__ask', text: ( note ? note + ' ' : '' ) + this.t.delete_q } ) );
 			var yes = el( 'button', { type: 'button', 'class': 'bs-btn bs-btn--danger-solid bs-btn--sm beltoft-dnse__danger', 'data-act': 'delete-yes', text: this.t.delete, disabled: this.busy } );
 			var no = el( 'button', { type: 'button', 'class': 'bs-btn bs-btn--secondary bs-btn--sm', 'data-act': 'delete-no', text: this.t.keep, disabled: this.busy } );
 			yes.addEventListener( 'click', function () { self.remove( row ); } );

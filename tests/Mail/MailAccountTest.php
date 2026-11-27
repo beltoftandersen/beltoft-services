@@ -99,9 +99,9 @@ final class MailAccountTest extends MailTestCase {
 
 		$this->assertSame( 'rows.example', $row['name'] );
 		$this->assertSame( '2 of 5 mailboxes', $row['details'] );
-		$this->assertSame( 'Ready', $row['state'] );
-		$this->assertSame( 'ok', $row['tone'] );
-		$this->assertSame( 'DNS records missing', $row['extra'] );
+		$this->assertSame( 'DNS records needed', $row['state'], 'The DNS word is the status while records are still to be added.' );
+		$this->assertSame( 'busy', $row['tone'] );
+		$this->assertSame( '', $row['extra'] );
 		$this->assertSame( $this->area()->url( $r->license() ), $row['url'] );
 
 		$html = $this->render( $this->views( $r ) );
@@ -265,7 +265,7 @@ final class MailAccountTest extends MailTestCase {
 		$html = $this->page( Resource::find( $r->id() ), 'dns' );
 		$this->assertStringContainsString( 'Email DNS for elsewhere.example is set up. All needed records were found.', $html );
 		$this->assertStringNotContainsString( 'data-mail-dns-check', $html );
-		$this->assertStringNotContainsString( 'Mail does not arrive on this domain', $this->page( Resource::find( $r->id() ) ), 'Nothing to warn about any more.' );
+		$this->assertStringNotContainsString( 'data-mail-dns-state', $this->page( Resource::find( $r->id() ) ), 'Nothing to warn about any more.' );
 	}
 
 	public function test_the_proof_step_uses_the_same_guide_and_the_central_record(): void {
@@ -367,8 +367,8 @@ final class MailAccountTest extends MailTestCase {
 		$this->assertStringContainsString( 'dkim._domainkey.elsewhere.example', $html );
 		$this->assertStringContainsString( 'Not checked yet', $html );
 		$this->assertStringContainsString( 'data-mail-dns-check', $html );
-		$this->assertStringContainsString( 'Mail does not arrive on this domain until', $this->page( $r ), 'The first tab says it too, with a link to the guide.' );
-		$this->assertStringContainsString( 'Open the DNS records guide', $this->page( $r ) );
+		$this->assertStringContainsString( 'Email works on elsewhere.example when the DNS records below are in place', $this->page( $r ), 'The first tab says it too, with a link to the guide.' );
+		$this->assertStringContainsString( 'Show the DNS records', $this->page( $r ) );
 
 		$ours = $this->our_zone( $this->user, 'ours.example' );
 		$mine = $this->ready_mail( 'ours.example', array(), $this->user );
@@ -389,9 +389,9 @@ final class MailAccountTest extends MailTestCase {
 		$this->assertStringContainsString( 'data-mail-hold>', $html );
 		$this->assertStringContainsString( 'data-mail-hold-row', $html );
 		$this->assertStringNotContainsString( 'data-mail-hold-form', $html );
-		$this->assertSame( 1, substr_count( $html, 'Open the DNS records guide' ), 'one link to the guide' );
-		$this->assertSame( 0, substr_count( $html, $line ), 'the long line is said once, in the combined notice' );
-		$this->assertStringContainsString( 'your mailboxes cannot send until the SPF and DKIM records are found', $html );
+		$this->assertSame( 1, substr_count( $html, 'Show the DNS records' ), 'one link to the guide' );
+		$this->assertSame( 0, substr_count( $html, $line ), 'the old long line is gone' );
+		$this->assertStringContainsString( 'Email works on held.example when the DNS records below are in place', $html );
 
 		$fresh = Resource::find( $r->id() );
 		$rows  = (array) $fresh->get( 'mail_records' );
@@ -409,7 +409,7 @@ final class MailAccountTest extends MailTestCase {
 
 		$html = $this->page( $r, 'dns' );
 
-		$this->assertStringContainsString( 'on our name servers, so we add these records for you', $html );
+		$this->assertStringContainsString( 'on our name servers. We keep these records in place for you', $html );
 		$this->assertStringContainsString( 'Another value is there now', $html );
 		$this->assertStringContainsString( 'The domain already has other MX records.', $html );
 		$this->assertStringContainsString( 'data-mail-dns-check', $html );
@@ -762,5 +762,148 @@ final class MailAccountTest extends MailTestCase {
 		$r2->locked( static fn() => MailAccess::begin( $r2, 'c@race.example' ) && true );
 		MailAccess::purge( $stale, 'zz@race.example' );
 		$this->assertArrayHasKey( 'c@race.example', (array) Resource::find( $r->id() )->get( MailAccess::META ), 'A purge works on the current map, not an old copy.' );
+	}
+
+	public function test_the_limited_check_button_is_drawn_with_its_time_and_the_guide_has_the_new_lines(): void {
+		$r = $this->ready_mail( 'guide.example', array(), $this->user );
+		$html = $this->page( $r, 'dns' );
+
+		$this->assertStringContainsString( 'Log in where the DNS of guide.example is managed', $html );
+		$this->assertStringContainsString( 'Delete other MX records', $html );
+		$this->assertStringContainsString( 'Using Cloudflare? Set these records to DNS only (grey cloud). Mail records cannot be proxied.', $html );
+		$this->assertStringNotContainsString( ' disabled data-next', $html, 'No wait yet.' );
+
+		$next = time() + 40;
+		$r->set( array( 'mail_dns_manual' => array( $next - 60 ) ) );
+		$html = $this->page( Resource::find( $r->id() ), 'dns' );
+
+		$this->assertStringContainsString( 'disabled data-next="' . $next . '"', $html );
+		$this->assertStringContainsString( 'data-label="Check now"', $html );
+		$this->assertStringContainsString( 'You can check again at ' . wp_date( get_option( 'time_format' ), $next ), $html );
+	}
+
+	public function test_a_domain_that_is_done_but_has_no_dmarc_says_so_in_one_line(): void {
+		$r = $this->ready_mail( 'dmarcless.example', array(), $this->user );
+		$rows = (array) $r->get( 'mail_records' );
+
+		foreach ( $rows as $i => $row ) {
+			$rows[ $i ]['status'] = in_array( $row['key'], array( 'mx', 'spf', 'dkim' ), true ) ? 'ok' : 'missing';
+		}
+
+		$r->set( array( 'mail_records' => $rows, 'mail_dns' => 'ok' ) );
+		$html = $this->page( Resource::find( $r->id() ), 'dns' );
+
+		$this->assertStringContainsString( 'Recommended: add a DMARC record.', $html );
+		$this->assertStringContainsString( 'beltoft-dnsg__done', $html );
+	}
+
+	public function test_a_zone_of_ours_is_folded_until_a_record_needs_the_customer(): void {
+		$this->our_zone( $this->user, 'fold.example' );
+		$r = $this->ready_mail( 'fold.example', array(), $this->user );
+		$rows = (array) $r->get( 'mail_records' );
+		$rows[0]['status'] = 'missing';
+		$r->set( array( 'mail_records' => $rows, 'mail_dns' => 'waiting', 'mail_mode' => 'ours' ) );
+
+		$html = $this->page( Resource::find( $r->id() ), 'dns' );
+		$this->assertStringContainsString( 'We keep these records in place for you', $html );
+		$this->assertStringContainsString( '<details class="beltoft-dnsg__more"><summary>Show the records</summary>', $html );
+
+		$rows[0]['status'] = 'conflict';
+		$r->set( array( 'mail_records' => $rows ) );
+		$html = $this->page( Resource::find( $r->id() ), 'dns' );
+		$this->assertStringNotContainsString( 'beltoft-dnsg__more', $html, 'A record that needs the customer is never hidden.' );
+	}
+
+	public function test_the_notice_follows_the_state_on_the_overview_and_the_dns_tab(): void {
+		$r = $this->ready_mail( 'state.example', array(), $this->user );
+		$this->assertStringContainsString( 'Email works on state.example when the DNS records below are in place', $this->page( $r ) );
+
+		$r->set( array( 'mail_dns' => 'waiting', 'mail_dns_lost_at' => time() - 86400, 'mail_dns_lost_keys' => array( 'mx' ) ) );
+		$html = $this->page( Resource::find( $r->id() ) );
+		$this->assertStringContainsString( 'These DNS records were found before but are not found now: MX.', $html );
+		$this->assertStringContainsString( 'Nothing has been deleted: your mailboxes and your mail are kept.', $html );
+		$this->assertStringContainsString( 'DNS records missing since', $html );
+		$this->assertStringContainsString( 'These DNS records were found before', $this->page( Resource::find( $r->id() ), 'dns' ), 'The DNS tab says it too.' );
+
+		$r->set( array( 'mail_dns' => 'timeout', 'mail_dns_lost_at' => 0 ) );
+		$this->assertStringContainsString( 'We stopped checking after 14 days. Add the records, then press Check now and we check again.', $this->page( Resource::find( $r->id() ) ) );
+
+		$r->set( array( 'mail_dns' => 'waiting', 'mail_dns_moved' => time(), 'mail_dns_lost_at' => time() ) );
+		$this->assertStringContainsString( 'The name servers of state.example no longer point to us.', $this->page( Resource::find( $r->id() ) ) );
+	}
+
+	public function test_a_paused_service_says_until_when_mailboxes_and_mail_are_kept(): void {
+		$r = $this->ready_mail( 'pausedpage.example', array(), $this->user );
+		$paused = time() - 5 * DAY_IN_SECONDS;
+		\BeltoftLicenses\Licenses::update( (int) $r->license()['id'], array( 'status' => \BeltoftLicenses\Licenses::STATUS_EXPIRED ) );
+		$r->set( array( 'state' => 'paused', 'desired' => 'paused', 'paused_at' => $paused ) );
+		$this->settings( array( 'deletion_mode' => 'on' ) );
+		$expected = wp_date( get_option( 'date_format' ), $paused + 30 * DAY_IN_SECONDS );
+
+		$view = \BeltoftServices\Mail\MailView::data( Resource::find( $r->id() ), array() );
+		$this->assertSame( 'paused', $view['kind'] );
+		$this->assertSame( $expected, $view['kept_until'], 'The 30 days of the email retention from the day it was paused.' );
+		$this->assertStringContainsString( 'Mailboxes and mail are kept until ' . $expected . '.', $this->page( Resource::find( $r->id() ) ) );
+
+		$this->settings( array( 'deletion_mode' => 'off' ) );
+		$this->assertSame( '', \BeltoftServices\Mail\MailView::data( Resource::find( $r->id() ), array() )['kept_until'], 'Nothing is deleted in this mode, so no date is promised.' );
+		$this->assertStringNotContainsString( 'are kept until', $this->page( Resource::find( $r->id() ) ) );
+	}
+
+	public function test_a_failed_proof_page_shows_the_record_and_try_again_then_the_order_again_text(): void {
+		$this->proof['check_txt'] = array( 'status' => 'missing', 'servers' => array(), 'reason' => 'not_found' );
+		$r = $this->mail_resource( 'failedpage.example', array( 'mail_proof_until' => time() - 60 ), array(), $this->user );
+		\BeltoftServices\Jobs::enqueue( $r->id() );
+		$this->run_jobs( 3 );
+		$r = Resource::find( $r->id() );
+		$this->assertSame( 'failed', $r->get( 'state' ) );
+
+		$html = $this->page( $r );
+		$this->assertStringContainsString( 'The ownership record was not found in 14 days. You can try again until', $html );
+		$this->assertStringContainsString( 'data-mail-retry', $html );
+		$this->assertStringContainsString( 'Try again', $html );
+		$this->assertStringContainsString( '_beltoft-verify', $html, 'The proof record.' );
+		$this->assertStringNotContainsString( 'Please contact support', $html );
+
+		$r->set( array( 'mail_proof_failed_at' => time() - 40 * DAY_IN_SECONDS ) );
+		$html = $this->page( Resource::find( $r->id() ) );
+		$this->assertStringContainsString( 'the time to try again is over. Order the email domain again.', $html );
+		$this->assertStringNotContainsString( 'data-mail-retry', $html );
+
+		$other = $this->mail_resource( 'systemfail.example', array(), array(), $this->user );
+		$other->set( array( 'state' => 'failed', 'desired' => 'ready', 'failed_op' => 'provision' ) );
+		$this->assertStringContainsString( 'Please contact support', $this->page( Resource::find( $other->id() ) ) );
+	}
+
+	public function test_the_head_badge_never_says_ready_while_email_is_broken(): void {
+		$r = $this->ready_mail( 'headbadge.example', array(), $this->user );
+		$this->assertMatchesRegularExpression( '/data-badge>DNS records needed</', $this->page( $r ) );
+
+		$r->set( array( 'mail_dns' => 'waiting', 'mail_dns_lost_at' => time() - 3600, 'mail_dns_lost_keys' => array( 'mx' ) ) );
+		$this->assertMatchesRegularExpression( '/data-badge>DNS records missing since/', $this->page( Resource::find( $r->id() ) ) );
+
+		$r->set( array( 'mail_dns' => 'timeout', 'mail_dns_lost_at' => 0 ) );
+		$this->assertMatchesRegularExpression( '/data-badge>We stopped checking DNS</', $this->page( Resource::find( $r->id() ) ) );
+
+		$r->set( array( 'mail_dns' => 'waiting', 'mail_dns_moved' => time(), 'mail_dns_lost_at' => time() ) );
+		$this->assertMatchesRegularExpression( '/data-badge>DNS is at another provider</', $this->page( Resource::find( $r->id() ) ) );
+	}
+
+	public function test_a_failed_proof_head_says_not_set_up_while_try_again_is_open_and_the_old_words_after(): void {
+		$this->proof['check_txt'] = array( 'status' => 'missing', 'servers' => array(), 'reason' => 'not_found' );
+		$r = $this->mail_resource( 'headfail.example', array( 'mail_proof_until' => time() - 60 ), array(), $this->user );
+		\BeltoftServices\Jobs::enqueue( $r->id() );
+		$this->run_jobs( 3 );
+
+		$html = $this->page( Resource::find( $r->id() ) );
+		$this->assertMatchesRegularExpression( '/data-badge>Not set up</', $html );
+		$this->assertStringNotContainsString( 'Failed: contact us', $html );
+		$this->assertStringNotContainsString( 'Something went wrong with your service', $html );
+		$this->assertStringContainsString( 'You can try again until', $html );
+
+		Resource::find( $r->id() )->set( array( 'mail_proof_failed_at' => time() - 40 * DAY_IN_SECONDS ) );
+		$html = $this->page( Resource::find( $r->id() ) );
+		$this->assertStringContainsString( 'Failed: contact us', $html );
+		$this->assertStringContainsString( 'Something went wrong with your service', $html );
 	}
 }

@@ -71,6 +71,7 @@ final class MailSettings {
 		if ( is_array( $sections ) ) {
 			$sections['mail']        = __( 'Mail server', 'beltoft-services' );
 			$sections['mail_dns']    = __( 'DNS records customers get', 'beltoft-services' );
+			$sections['mail_watch']  = __( 'Watching the DNS records', 'beltoft-services' );
 			$sections['mail_limits'] = __( 'Limits', 'beltoft-services' );
 		}
 
@@ -89,6 +90,7 @@ final class MailSettings {
 		$server = array( 'tab' => self::TAB, 'section' => 'mail' );
 		$dns    = array( 'tab' => self::TAB, 'section' => 'mail_dns' );
 		$limits = array( 'tab' => self::TAB, 'section' => 'mail_limits' );
+		$watch  = array( 'tab' => self::TAB, 'section' => 'mail_watch' );
 
 		$fields['mail_client']  = $server + array(
 			'type'    => 'select',
@@ -170,6 +172,110 @@ final class MailSettings {
 			'default' => '',
 			'label'   => __( 'DMARC report address', 'beltoft-services' ),
 			'desc'    => __( 'Where DMARC reports for customer domains go. Empty: the WordPress admin email.', 'beltoft-services' ),
+		);
+
+		$fields['mail_dns_confirm_minutes'] = $watch + array(
+			'type'    => 'number',
+			'default' => 10,
+			'min'     => 0,
+			'max'     => 1440,
+			'label'   => __( 'Minutes to wait before a lost record is confirmed', 'beltoft-services' ),
+			'desc'    => __( 'When a needed DNS record is not found, the record is read once more after this many minutes. Only if it is still gone is the customer told. 0 confirms at once.', 'beltoft-services' ),
+		);
+		$fields['mail_dns_remind_days'] = $watch + array(
+			'type'    => 'text',
+			'default' => '3,10',
+			'label'   => __( 'Days after a loss when the customer is reminded', 'beltoft-services' ),
+			'desc'    => __( 'Day numbers separated by commas. The first email goes out when the loss is confirmed; each day here adds one reminder while the records are still missing. Empty sends the first email only.', 'beltoft-services' ),
+		);
+		$fields['mail_dns_recheck_per_day'] = $watch + array(
+			'type'    => 'select',
+			'default' => '2',
+			'options' => array(
+				'1' => __( 'Once a day', 'beltoft-services' ),
+				'2' => __( 'Twice a day', 'beltoft-services' ),
+				'4' => __( 'Four times a day', 'beltoft-services' ),
+			),
+			'label'   => __( 'How often a domain with all records is looked at again', 'beltoft-services' ),
+		);
+		$fields['mail_dns_weekly_days'] = $watch + array(
+			'type'    => 'number',
+			'default' => 7,
+			'min'     => 1,
+			'max'     => 60,
+			'label'   => __( 'Days between looks after the first 14 days', 'beltoft-services' ),
+			'desc'    => __( 'After the ten minute look has stopped, a domain that still lacks records is looked at this often.', 'beltoft-services' ),
+		);
+		$fields['mail_dns_stop_days'] = $watch + array(
+			'type'    => 'number',
+			'default' => 90,
+			'min'     => 15,
+			'max'     => 3650,
+			'label'   => __( 'Days after which the look stops for good', 'beltoft-services' ),
+		);
+		$fields['mail_dns_admin_days'] = $watch + array(
+			'type'    => 'number',
+			'default' => 60,
+			'min'     => 1,
+			'max'     => 3650,
+			'label'   => __( 'Days without email DNS before you get one alert', 'beltoft-services' ),
+			'desc'    => __( 'You get one email. Nothing is paused or deleted because of it.', 'beltoft-services' ),
+		);
+		$fields['mail_dns_admin_throttle_days'] = $watch + array(
+			'type'    => 'number',
+			'default' => 7,
+			'min'     => 1,
+			'max'     => 365,
+			'label'   => __( 'Days between two alerts about the same domain losing records', 'beltoft-services' ),
+		);
+		$fields['mail_dns_lost_mail_gap_hours'] = $watch + array(
+			'type'    => 'number',
+			'default' => 24,
+			'min'     => 0,
+			'max'     => 720,
+			'label'   => __( 'Hours between a lost mail and the next one for the same domain', 'beltoft-services' ),
+			'desc'    => __( 'A record that goes missing and comes back again and again does not mail the customer each time: a loss confirmed within this many hours after the last lost or found mail sends no new lost mail, and a found mail is not sent again within this time. The page and the sending hold always follow the real state. 0 turns this off.', 'beltoft-services' ),
+		);
+		$fields['mail_dns_check_gap'] = $watch + array(
+			'type'    => 'number',
+			'default' => 60,
+			'min'     => 0,
+			'max'     => 3600,
+			'label'   => __( 'Seconds between two Check now presses of a customer', 'beltoft-services' ),
+		);
+		$fields['mail_dns_check_per_hour'] = $watch + array(
+			'type'    => 'number',
+			'default' => 10,
+			'min'     => 1,
+			'max'     => 1000,
+			'label'   => __( 'Check now presses of a customer in an hour', 'beltoft-services' ),
+		);
+		$fields['mail_dns_lost_red_days'] = $watch + array(
+			'type'    => 'number',
+			'default' => 3,
+			'min'     => 0,
+			'max'     => 365,
+			'label'   => __( 'Days after a loss when the status turns red', 'beltoft-services' ),
+		);
+		$fields['mail_dns_mx_strict'] = $watch + array(
+			'type'    => 'checkbox',
+			'default' => 1,
+			'label'   => __( 'Count a second MX record with the same or a better priority as a problem', 'beltoft-services' ),
+			'desc'    => __( 'Off: it is only shown as a note and the domain still counts as set up.', 'beltoft-services' ),
+		);
+		$fields['mail_dns_cleanup_on_delete'] = $watch + array(
+			'type'    => 'checkbox',
+			'default' => 1,
+			'label'   => __( 'Remove our email records from the customer zone when the email domain is deleted', 'beltoft-services' ),
+			'desc'    => __( 'Only for zones on our own name servers, and only records that still hold exactly the value we wrote. Records at other DNS providers are never touched.', 'beltoft-services' ),
+		);
+		$fields['mail_retry_days'] = $watch + array(
+			'type'    => 'number',
+			'default' => 30,
+			'min'     => 0,
+			'max'     => 365,
+			'label'   => __( 'Days a customer may press Try again after the domain proof was not found', 'beltoft-services' ),
+			'desc'    => __( 'The name stays reserved for that customer for this time. After it the name is free for a new order. 0 turns Try again off.', 'beltoft-services' ),
 		);
 
 		$fields['mail_rl_minute'] = $limits + array(
@@ -306,5 +412,111 @@ final class MailSettings {
 		$minute = self::override( $r, 'minute', (int) Settings::get( 'mail_rl_minute' ) );
 
 		return $minute > 0 ? array( $minute, 'm' ) : null;
+	}
+
+	// -- Watching the DNS records -----------------------------------------------------------------
+
+	/** Seconds to wait before a lost record is confirmed. */
+	public static function dns_confirm_seconds(): int {
+		return max( 0, (int) Settings::get( 'mail_dns_confirm_minutes' ) ) * MINUTE_IN_SECONDS;
+	}
+
+	/**
+	 * The days after a loss when a reminder goes out, ascending.
+	 *
+	 * @return int[]
+	 */
+	public static function dns_remind_days(): array {
+		$days = array();
+
+		foreach ( preg_split( '/[\s,;]+/', (string) Settings::get( 'mail_dns_remind_days' ), -1, PREG_SPLIT_NO_EMPTY ) ?: array() as $day ) {
+			if ( ctype_digit( $day ) && (int) $day > 0 ) {
+				$days[] = (int) $day;
+			}
+		}
+
+		$days = array_values( array_unique( $days ) );
+		sort( $days );
+
+		return $days;
+	}
+
+	/** Looks per day at a domain with all records. 1, 2 or 4. */
+	public static function dns_recheck_per_day(): int {
+		$n = (int) Settings::get( 'mail_dns_recheck_per_day' );
+
+		return in_array( $n, array( 1, 2, 4 ), true ) ? $n : 2;
+	}
+
+	/** The cron string of the sweep that queues those looks. */
+	public static function dns_recheck_cron(): string {
+		$hours = array( 1 => '3', 2 => '3,15', 4 => '3,9,15,21' );
+
+		return '40 ' . $hours[ self::dns_recheck_per_day() ] . ' * * *';
+	}
+
+	/** Seconds a domain is left alone after a look: a little under the gap between two sweeps. */
+	public static function dns_recheck_guard(): int {
+		return ( intdiv( 24, self::dns_recheck_per_day() ) - 2 ) * HOUR_IN_SECONDS;
+	}
+
+	/** Seconds over which one sweep spreads its looks. */
+	public static function dns_recheck_spread(): int {
+		return ( intdiv( 24, self::dns_recheck_per_day() ) - 1 ) * HOUR_IN_SECONDS;
+	}
+
+	/** Days between the slow looks after the ten minute look has stopped. */
+	public static function dns_weekly_days(): int {
+		return max( 1, (int) Settings::get( 'mail_dns_weekly_days' ) );
+	}
+
+	/** Days after which no look is made at all. */
+	public static function dns_stop_days(): int {
+		return max( 15, (int) Settings::get( 'mail_dns_stop_days' ) );
+	}
+
+	/** Days without email DNS before the one admin alert. */
+	public static function dns_admin_days(): int {
+		return max( 1, (int) Settings::get( 'mail_dns_admin_days' ) );
+	}
+
+	/** Seconds between two admin alerts about the same domain losing records. */
+	public static function dns_admin_throttle(): int {
+		return max( 1, (int) Settings::get( 'mail_dns_admin_throttle_days' ) ) * DAY_IN_SECONDS;
+	}
+
+	/** Seconds that must pass after the last lost or found mail before a new lost mail goes out. */
+	public static function dns_mail_gap(): int {
+		return max( 0, (int) Settings::get( 'mail_dns_lost_mail_gap_hours' ) ) * HOUR_IN_SECONDS;
+	}
+
+	/** Seconds between two Check now presses. */
+	public static function dns_check_gap(): int {
+		return max( 0, (int) Settings::get( 'mail_dns_check_gap' ) );
+	}
+
+	/** Check now presses in a rolling hour. */
+	public static function dns_check_per_hour(): int {
+		return max( 1, (int) Settings::get( 'mail_dns_check_per_hour' ) );
+	}
+
+	/** Seconds after a loss when the status turns red. */
+	public static function dns_red_after(): int {
+		return max( 0, (int) Settings::get( 'mail_dns_lost_red_days' ) ) * DAY_IN_SECONDS;
+	}
+
+	/** Is a second MX with the same or a better priority a problem? */
+	public static function dns_mx_strict(): bool {
+		return (bool) Settings::get( 'mail_dns_mx_strict' );
+	}
+
+	/** Are our records removed from the customer zone when the domain is deleted? */
+	public static function dns_cleanup_on_delete(): bool {
+		return (bool) Settings::get( 'mail_dns_cleanup_on_delete' );
+	}
+
+	/** Seconds a customer may press Try again after the proof was not found. 0: never. */
+	public static function retry_seconds(): int {
+		return max( 0, (int) Settings::get( 'mail_retry_days' ) ) * DAY_IN_SECONDS;
 	}
 }

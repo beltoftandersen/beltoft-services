@@ -71,10 +71,15 @@ final class MailCard {
 					'aliasing'  => __( 'Making the alias…', 'beltoft-services' ),
 					'adding'    => __( 'Adding the domain…', 'beltoft-services' ),
 					'removing'  => __( 'Removing the domain…', 'beltoft-services' ),
-					'removeAsk' => __( 'Remove this domain from your plan?', 'beltoft-services' ),
+					'removeAsk' => MailSettings::dns_cleanup_on_delete()
+						? __( 'Remove this domain from your plan? We also remove the email records we made in your DNS on our name servers.', 'beltoft-services' )
+						: __( 'Remove this domain from your plan?', 'beltoft-services' ),
 					'checking'  => __( 'Looking at your DNS. This can take a few seconds.', 'beltoft-services' ),
 					'proofNot'  => __( 'Checked. The proof record is not found yet. Add it on the DNS tab, then check again.', 'beltoft-services' ),
 					'checked'   => __( 'Checked.', 'beltoft-services' ),
+					'retrying'  => __( 'We are setting up your email domain again. This can take a minute.', 'beltoft-services' ),
+					/* translators: %d: seconds */
+					'again'     => __( 'Check again in %d s', 'beltoft-services' ),
 					'slow'      => __( 'This is taking longer than usual. It goes on in the background: reload the page in a minute to see the result.', 'beltoft-services' ),
 				),
 			)

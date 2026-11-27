@@ -10,6 +10,7 @@ namespace BeltoftServices\Mail;
 use BeltoftServices\Mail\Email;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Api\Routes;
+use BeltoftServices\Domains\ManualCheck;
 use BeltoftServices\Jobs;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
@@ -163,6 +164,12 @@ final class MailRoutes {
 		register_rest_route( $ns, $base . '/proof/check', array(
 			'methods'             => \WP_REST_Server::CREATABLE,
 			'callback'            => array( __CLASS__, 'check_proof' ),
+			'permission_callback' => 'is_user_logged_in',
+			'args'                => $id,
+		) );
+		register_rest_route( $ns, $base . '/retry', array(
+			'methods'             => \WP_REST_Server::CREATABLE,
+			'callback'            => array( __CLASS__, 'retry' ),
 			'permission_callback' => 'is_user_logged_in',
 			'args'                => $id,
 		) );
@@ -559,10 +566,27 @@ final class MailRoutes {
 			return $r;
 		}
 
-		$limited = self::too_many( $r, 'dns', self::CHECK_LIMIT );
+		// A gap between two presses and a most per hour, as the app box has them; both are settings.
+		$next = ManualCheck::claim( $r, MailView::MANUAL_META, MailSettings::dns_check_gap(), MailSettings::dns_check_per_hour() );
 
-		if ( $limited ) {
-			return $limited;
+		if ( null === $next ) {
+			return self::error( 'busy', __( 'This email domain is busy. Please try again in a moment.', 'beltoft-services' ) );
+		}
+
+		if ( $next > 0 ) {
+			$view  = MailView::data( Resource::find( $r->id() ) ?? $r, array() );
+			$reply = self::ok(
+				array(
+					'code'    => 'beltoft_services_mail_rate_limited',
+					'message' => ManualCheck::text( $next ),
+					'next'    => $next,
+					'dns'     => $view['dns'],
+				),
+				429
+			);
+			$reply->header( 'Retry-After', (string) max( 1, $next - time() ) );
+
+			return $reply;
 		}
 
 		// The look publishes records into the customer's zone and changes the sending hold: it is the shared action mail_dns_check.
@@ -574,7 +598,33 @@ final class MailRoutes {
 
 		$view = MailView::data( Resource::find( $r->id() ) ?? $r, array() );
 
-		return self::queued( $r, Mailboxes::DNS_CHECK, array( 'dns' => $view['dns'] ), __( 'We are checking your DNS records. This can take a minute.', 'beltoft-services' ) );
+		return self::queued( $r, Mailboxes::DNS_CHECK, array( 'dns' => $view['dns'], 'next' => ManualCheck::next( Resource::find( $r->id() ) ?? $r, MailView::MANUAL_META, MailSettings::dns_check_gap(), MailSettings::dns_check_per_hour() ) ), __( 'We are checking your DNS records. This can take a minute.', 'beltoft-services' ) );
+	}
+
+	/**
+	 * Try again after the ownership proof was not found in time: the set up runs again, for the days of the setting
+	 * mail_retry_days after the failure. Any other failure is not the customer's to retry.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 */
+	public static function retry( \WP_REST_Request $request ): \WP_REST_Response {
+		$r = self::guard( $request, false, 3 );
+
+		if ( ! $r instanceof Resource ) {
+			return $r;
+		}
+
+		$started = MailRetry::run( $r );
+
+		if ( null === $started ) {
+			return self::error( 'busy', __( 'This email domain is busy. Please try again in a moment.', 'beltoft-services' ) );
+		}
+
+		if ( ! $started ) {
+			return self::error( 'not_ready', MailRetry::state( $r ) === 'expired' ? __( 'The time to try again is over. Order the email domain again.', 'beltoft-services' ) : __( 'There is nothing to try again.', 'beltoft-services' ) );
+		}
+
+		return self::ok( array( 'retry' => true, 'message' => __( 'We are setting up your email domain again. This can take a minute.', 'beltoft-services' ) ), 202 );
 	}
 
 	/**

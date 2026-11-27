@@ -245,6 +245,22 @@ final class Email extends ServiceArea {
 	}
 
 	/**
+	 * The head of a failed proof that can be tried again has no "contact us" sentence: the page says what to do.
+	 *
+	 * @param Resource             $resource Resource.
+	 * @param array<string, mixed> $vars     Head variables.
+	 * @return array<string, mixed>
+	 */
+	protected function head_vars( Resource $resource, array $vars ): array {
+		if ( 'failed' === (string) $resource->get( 'state' ) && MailRetry::open( $resource ) ) {
+			$vars['message']      = '';
+			$vars['show_message'] = false;
+		}
+
+		return $vars;
+	}
+
+	/**
 	 * {@inheritDoc}
 	 *
 	 * @param array<string, mixed> $view     License view.
@@ -255,7 +271,6 @@ final class Email extends ServiceArea {
 
 		$root   = MailPlan::root( $resource );
 		$limits = MailPlan::limits( $resource );
-		$dns    = (string) $resource->get( 'mail_dns' );
 
 		return array(
 			'id'      => $resource->id(),
@@ -277,7 +292,8 @@ final class Email extends ServiceArea {
 			),
 			'state'   => $state,
 			'tone'    => $tone,
-			'extra'   => 'ready' === (string) $resource->get( 'state' ) && 'ok' !== $dns && '' !== $dns ? __( 'DNS records missing', 'beltoft-services' ) : '',
+			// The DNS word is the status itself (MailDnsState through the filter of ServiceArea::state()).
+			'extra'   => '',
 			'action'  => array(),
 		);
 	}
