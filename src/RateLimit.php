@@ -86,6 +86,18 @@ final class RateLimit {
 	}
 
 	/**
+	 * Seconds until the current window ends and its counters start again (1 to $window). The windows are fixed, so this is the
+	 * wait a caller that was refused must be told.
+	 *
+	 * @param int $window Window length in seconds.
+	 */
+	public static function seconds_left( int $window = MINUTE_IN_SECONDS ): int {
+		$window = max( 1, $window );
+
+		return $window - ( time() % $window );
+	}
+
+	/**
 	 * Clears the count of the current window.
 	 *
 	 * @param int|string $user_id User id or visitor key.

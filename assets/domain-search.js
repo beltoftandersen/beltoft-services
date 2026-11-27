@@ -59,6 +59,12 @@
     button.textContent = text;
   }
 
+  // Seconds as m:ss (a wait of an hour as 60:00).
+  function clock(seconds) {
+    const left = Math.max(0, Math.ceil(seconds));
+    return Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
+  }
+
   // A visible waiting state: a registrar answer can take a few seconds.
   function loader(text) {
     const box = element('div', 'beltoft-domain-loading', '');
@@ -76,7 +82,15 @@
     const response = await fetch(root.dataset.check + '?name=' + encodeURIComponent(name) + (part ? '&part=' + part : ''), { credentials: 'same-origin' });
     // An error page that is not JSON (a 502, maintenance) gives the translated message below, not a parse error.
     const data = await response.json().catch(function () { return {}; });
-    if (!response.ok) throw new Error(data.message || __('The search could not be completed.', 'beltoft-services'));
+    if (!response.ok) {
+      const failure = new Error(data.message || __('The search could not be completed.', 'beltoft-services'));
+      // A refused search (429) says how long to wait: the countdown on the button uses it.
+      if (response.status === 429) {
+        failure.code = data.code || '';
+        failure.retryAfter = Math.max(1, parseInt(data.retry_after || (data.data && data.data.retry_after) || (response.headers && response.headers.get && response.headers.get('Retry-After')) || 60, 10) || 60);
+      }
+      throw failure;
+    }
     taxMode = data.tax === 'incl' ? 'incl' : 'excl';
     return data;
   }
@@ -215,9 +229,47 @@
       return true;
     }
 
+    // After a refusal (429) the button counts down to the time the search can be used again.
+    const limitLine = element('p', 'beltoft-domain-limit', '');
+    limitLine.setAttribute('role', 'alert');
+    limitLine.hidden = true;
+    searchButton.after(limitLine);
+    const searchLabel = searchButton.textContent;
+    let cooldown = 0;
+    let ticker = null;
+    function limited(refused) {
+      const until = Date.now() + refused.retryAfter * 1000;
+      cooldown = until;
+      limitLine.textContent = refused.code === 'search_busy'
+        ? __('Domain search is busy right now. You can search again when the time on the button has run out.', 'beltoft-services')
+        : __('You have searched many times in a short while. You can search again in a moment.', 'beltoft-services');
+      limitLine.hidden = false;
+      searchButton.disabled = true;
+      searchButton.classList.toggle('is-limited', true);
+      if (ticker) window.clearInterval(ticker);
+      const tick = function () {
+        const left = Math.ceil((until - Date.now()) / 1000);
+        if (left <= 0) {
+          window.clearInterval(ticker);
+          ticker = null;
+          cooldown = 0;
+          limitLine.hidden = true;
+          searchButton.textContent = searchLabel;
+          searchButton.classList.toggle('is-limited', false);
+          searchButton.disabled = false;
+          return;
+        }
+        searchButton.textContent = sprintf(__('Try again in %s', 'beltoft-services'), clock(left));
+      };
+      tick();
+      ticker = window.setInterval(tick, 1000);
+    }
+
     let waiting = null;
     async function search() {
+      if (cooldown > Date.now()) return;
       if (handOff()) return;
+      limitLine.hidden = true;
       if (offer) offer.hidden = true;
       results.replaceChildren(loader(__('Searching for domains…', 'beltoft-services')));
       results.setAttribute('aria-busy', 'true');
@@ -242,7 +294,7 @@
       let firstDone = false;
       let held = null;
       const take = function (part, isFirst) {
-        if (part.error) { errors.push(part.error.message); } else {
+        if (part.error) { errors.push(part.error); } else {
           data = !data ? part.data : Object.assign({}, data, { results: isFirst ? part.data.results.concat(data.results) : data.results.concat(part.data.results) });
         }
         if (isFirst) firstDone = true;
@@ -257,9 +309,19 @@
       waiting = null;
       // A row the registrar never answered (its lookup failed) is not left as checking.
       results.querySelectorAll('.beltoft-domain-result--checking').forEach(function (row) { row.replaceWith(result({ domain: row.dataset.domain, display: row.querySelector('.beltoft-domain-result__name').textContent, status: 'unknown' }, false)); });
+      const refused = errors.filter(function (error) { return error.retryAfter; }).sort(function (a, b) { return b.retryAfter - a.retryAfter; })[0];
+      if (refused) {
+        // A limit, not a failure of the search: the line under the field and the countdown on the button say so.
+        if (!results.querySelector('.beltoft-domain-result')) results.replaceChildren(); // no stray "No results found" next to the limit line
+        results.removeAttribute('aria-busy');
+        searchButton.disabled = false;
+        if (data) { remember(typed, data); keepInAddress(typed); }
+        limited(refused);
+        return;
+      }
       if (errors.length) {
         if (!data) results.replaceChildren();
-        results.appendChild(element('p', 'beltoft-domain-error', errors[0]));
+        results.appendChild(element('p', 'beltoft-domain-error', errors[0].message));
       } else if (!results.querySelector('.beltoft-domain-result')) {
         results.textContent = __('No results found.', 'beltoft-services');
       }
