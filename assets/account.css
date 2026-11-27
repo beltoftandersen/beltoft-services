@@ -2386,3 +2386,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-dnsbox
 /* The server page already shows the box above its tabs: the App tab does not print it a second time (it stays for a page without that block). */
 .beltoft-services-panel:has(.beltoft-services-progress__box) .beltoft-services-tab .beltoft-services-dnsbox { display: none; }
 .beltoft-services-ipv6only { max-width: none; }
+/* Email DNS notice: amber while something is to be added, red once a loss is old. */
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail p.beltoft-services-mail__dnsnote--warn { border-left-color: var(--bs-status-warn); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail p.beltoft-services-mail__dnsnote--bad { border-left-color: var(--bs-status-fail); }
+.beltoft-services-dnsg__hint, .beltoft-dnsg__hint { margin: 8px 0 0; }

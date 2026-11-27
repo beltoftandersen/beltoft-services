@@ -173,7 +173,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 			<?php endif; ?>
 		<?php else : ?>
 			<?php if ( '' !== (string) $view['dns']['notice'] ) : ?>
-				<p class="beltoft-services-panel__notice beltoft-services-mail__dnsnote is-<?php echo esc_attr( (string) $view['dns']['tone'] ); ?>" role="status" data-mail-dns-state="<?php echo esc_attr( (string) $view['dns']['state'] ); ?>"<?php echo ! empty( $view['send_held'] ) ? ' data-mail-hold' : ''; ?>><strong><?php echo esc_html( (string) $view['dns']['word'] ); ?></strong> <?php echo esc_html( (string) $view['dns']['notice'] ); ?> <a href="<?php echo esc_url( $nav ? $link( 'dns' ) : '#beltoft-mail-dns' ); ?>"><?php esc_html_e( 'Show the DNS records', 'beltoft-services' ); ?></a></p>
+				<p class="beltoft-services-panel__notice beltoft-services-mail__dnsnote beltoft-services-mail__dnsnote--<?php echo 'bad' === $view['dns']['tone'] ? 'bad' : 'warn'; ?>" role="status" data-mail-dns-state="<?php echo esc_attr( (string) $view['dns']['state'] ); ?>"<?php echo ! empty( $view['send_held'] ) ? ' data-mail-hold' : ''; ?>><strong><?php echo esc_html( (string) $view['dns']['word'] ); ?></strong> <?php echo esc_html( (string) $view['dns']['notice'] ); ?> <a href="<?php echo esc_url( $nav ? $link( 'dns' ) : '#beltoft-mail-dns' ); ?>"><?php esc_html_e( 'Show the DNS records', 'beltoft-services' ); ?></a></p>
 			<?php endif; ?>
 			<div class="beltoft-services-vm__more">
 				<h4><?php esc_html_e( 'Mailboxes', 'beltoft-services' ); ?></h4>
@@ -368,7 +368,7 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 		<div class="beltoft-services-vm__more" id="beltoft-mail-dns" data-mail-dns>
 			<h4><?php esc_html_e( 'DNS records', 'beltoft-services' ); ?></h4>
 			<?php if ( $nav && 'ready' === $view['kind'] && '' !== (string) $beltoft_services_dns['notice'] ) : ?>
-				<p class="beltoft-services-panel__notice beltoft-services-mail__dnsnote is-<?php echo esc_attr( (string) $beltoft_services_dns['tone'] ); ?>" role="status"><strong><?php echo esc_html( (string) $beltoft_services_dns['word'] ); ?></strong> <?php echo esc_html( (string) $beltoft_services_dns['notice'] ); ?></p>
+				<p class="beltoft-services-panel__notice beltoft-services-mail__dnsnote beltoft-services-mail__dnsnote--<?php echo 'bad' === $beltoft_services_dns['tone'] ? 'bad' : 'warn'; ?>" role="status"><strong><?php echo esc_html( (string) $beltoft_services_dns['word'] ); ?></strong> <?php echo esc_html( (string) $beltoft_services_dns['notice'] ); ?></p>
 			<?php endif; ?>
 			<?php if ( null === $beltoft_services_dns['guide'] ) : ?>
 				<p><?php esc_html_e( 'The records appear here when your email domain is ready.', 'beltoft-services' ); ?></p>
