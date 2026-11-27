@@ -28,8 +28,11 @@ defined( 'ABSPATH' ) || exit;
  *   value to use instead, with its own Copy button), key (string, optional).
  * - notes (string[]): lines for special cases, shown only because the caller found they apply.
  * - done_text (string): the one line shown when everything needed is found.
- * - check: null for no button, or array(label, attrs, class): the button that starts a check (the feature's own script handles
- *   it). checked (int timestamp, 0 never), interval (seconds between automatic checks, 0 for none), days (how long it keeps
+ * - hints (string[]): short lines under the records (for example the Cloudflare proxy hint).
+ * - collapse (string): the label of a fold; the records are inside it, closed (a zone of ours, where nothing is added by hand).
+ * - done_hint (string): a line under the done line (a recommended record still missing).
+ * - check: null for no button, or array(label, attrs, class, next, next_text): the button that starts a check (the feature's own
+ *   script handles it); a next in the future (Unix time) draws it disabled with next_text, and its script enables it then. checked (int timestamp, 0 never), interval (seconds between automatic checks, 0 for none), days (how long it keeps
  *   checking, 0 for no limit).
  * - attrs (array): extra attributes of the section (a value of '' prints the bare attribute), class (string).
  */
@@ -151,6 +154,11 @@ final class DnsRecordsGuide {
 
 		if ( $done ) {
 			$out .= '<p class="beltoft-dnsg__done" role="status">' . esc_html( (string) ( $model['done_text'] ?? '' ) ) . '</p>';
+
+			if ( '' !== (string) ( $model['done_hint'] ?? '' ) ) {
+				$out .= '<p class="beltoft-dnsg__hint">' . esc_html( (string) $model['done_hint'] ) . '</p>';
+			}
+
 			$out .= self::group( __( 'Recommended', 'beltoft-services' ), array_filter( $records, static fn( $rec ) => empty( $rec['required'] ) && 'ok' !== ( $rec['status'] ?? '' ) ), $domain );
 			$out .= self::check_line( $model, false );
 
@@ -162,8 +170,17 @@ final class DnsRecordsGuide {
 		}
 
 		$out .= self::steps( $model, $shown );
-		$out .= self::group( __( 'Needed', 'beltoft-services' ), array_filter( $records, static fn( $rec ) => ! empty( $rec['required'] ) ), $domain );
-		$out .= self::group( __( 'Recommended', 'beltoft-services' ), array_filter( $records, static fn( $rec ) => empty( $rec['required'] ) ), $domain );
+
+		$groups  = self::group( __( 'Needed', 'beltoft-services' ), array_filter( $records, static fn( $rec ) => ! empty( $rec['required'] ) ), $domain );
+		$groups .= self::group( __( 'Recommended', 'beltoft-services' ), array_filter( $records, static fn( $rec ) => empty( $rec['required'] ) ), $domain );
+
+		$out .= '' !== (string) ( $model['collapse'] ?? '' )
+			? '<details class="beltoft-dnsg__more"><summary>' . esc_html( (string) $model['collapse'] ) . '</summary>' . $groups . '</details>'
+			: $groups;
+
+		foreach ( array_values( array_filter( array_map( 'strval', (array) ( $model['hints'] ?? array() ) ), static fn( $h ) => '' !== $h ) ) as $hint ) {
+			$out .= '<p class="beltoft-dnsg__hint">' . esc_html( $hint ) . '</p>';
+		}
 
 		$notes = array_values( array_filter( array_map( 'strval', (array) ( $model['notes'] ?? array() ) ), static fn( $n ) => '' !== $n ) );
 
@@ -321,7 +338,15 @@ final class DnsRecordsGuide {
 				$attrs .= ' ' . esc_attr( (string) $name ) . '="' . esc_attr( (string) $value ) . '"';
 			}
 
-			$out .= '<button type="button" class="' . esc_attr( (string) ( $check['class'] ?? 'button woocommerce-button' ) ) . '"' . $attrs . '>' . esc_html( (string) ( $check['label'] ?? __( 'Check now', 'beltoft-services' ) ) ) . '</button>';
+			$label = (string) ( $check['label'] ?? __( 'Check now', 'beltoft-services' ) );
+			$next  = (int) ( $check['next'] ?? 0 );
+			$wait  = $next > time();
+
+			if ( $wait ) {
+				$attrs .= ' disabled data-next="' . esc_attr( (string) $next ) . '" data-label="' . esc_attr( $label ) . '"';
+			}
+
+			$out .= '<button type="button" class="' . esc_attr( (string) ( $check['class'] ?? 'button woocommerce-button' ) ) . '"' . $attrs . '>' . esc_html( $wait ? (string) ( $check['next_text'] ?? $label ) : $label ) . '</button>';
 		}
 
 		$when = '';

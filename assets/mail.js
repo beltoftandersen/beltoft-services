@@ -26,6 +26,11 @@
 	}
 
 	function problem( result ) {
+		// The Check now limit says when the button works again; any other limit has its own general sentence.
+		if ( 429 === result.status && result.data && 'beltoft_services_mail_rate_limited' === result.data.code && result.data.message ) {
+			return result.data.message;
+		}
+
 		if ( 429 === result.status ) {
 			return strings.limit;
 		}
@@ -138,8 +143,53 @@
 			if ( next ) {
 				box.innerHTML = next.innerHTML;
 			}
+
+			arm();
 		} ).catch( function () {} );
 	}
+
+	// A Check now button that waits for its time counts the seconds down and works again when they are over.
+	var timer = 0;
+
+	function tick() {
+		var waiting = false;
+
+		Array.prototype.forEach.call( document.querySelectorAll( '[data-mail-dns-check][data-next]' ), function ( button ) {
+			var left = Math.ceil( ( parseInt( button.getAttribute( 'data-next' ), 10 ) || 0 ) - Date.now() / 1000 );
+
+			if ( left <= 0 ) {
+				button.disabled = false;
+				button.textContent = button.getAttribute( 'data-label' ) || button.textContent;
+				button.removeAttribute( 'data-next' );
+
+				return;
+			}
+
+			waiting = true;
+			button.disabled = true;
+
+			if ( left <= 90 && strings.again ) {
+				button.textContent = strings.again.replace( '%d', left );
+			}
+		} );
+
+		if ( ! waiting ) {
+			window.clearInterval( timer );
+			timer = 0;
+		}
+	}
+
+	function arm() {
+		window.clearInterval( timer );
+		timer = 0;
+
+		if ( document.querySelector( '[data-mail-dns-check][data-next]' ) ) {
+			tick();
+			timer = window.setInterval( tick, 1000 );
+		}
+	}
+
+	arm();
 
 	// A light copy of the server's password rules (MailPassword::check is the authority): the sentence that says what is wrong, or ''.
 	function passwordProblem( password, again, email ) {
@@ -475,6 +525,11 @@
 				return call( box, 'POST', '/mail/dns/check' ).then( function ( result ) {
 					if ( ! result.ok ) {
 						S.fail( h, problem( result ) );
+
+						// Limited: the page draws the button with its time.
+						if ( 429 === result.status ) {
+							redraw( box );
+						}
 
 						return null;
 					}

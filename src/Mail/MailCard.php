@@ -75,6 +75,8 @@ final class MailCard {
 					'checking'  => __( 'Looking at your DNS. This can take a few seconds.', 'beltoft-services' ),
 					'proofNot'  => __( 'Checked. The proof record is not found yet. Add it on the DNS tab, then check again.', 'beltoft-services' ),
 					'checked'   => __( 'Checked.', 'beltoft-services' ),
+					/* translators: %d: seconds */
+					'again'     => __( 'Check again in %d s', 'beltoft-services' ),
 					'slow'      => __( 'This is taking longer than usual. It goes on in the background: reload the page in a minute to see the result.', 'beltoft-services' ),
 				),
 			)

@@ -10,6 +10,7 @@ namespace BeltoftServices\Mail;
 use BeltoftServices\Mail\Email;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Api\Routes;
+use BeltoftServices\Domains\ManualCheck;
 use BeltoftServices\Jobs;
 use BeltoftServices\RateLimit;
 use BeltoftServices\Resource;
@@ -559,10 +560,27 @@ final class MailRoutes {
 			return $r;
 		}
 
-		$limited = self::too_many( $r, 'dns', self::CHECK_LIMIT );
+		// A gap between two presses and a most per hour, as the app box has them; both are settings.
+		$next = ManualCheck::claim( $r, MailView::MANUAL_META, MailSettings::dns_check_gap(), MailSettings::dns_check_per_hour() );
 
-		if ( $limited ) {
-			return $limited;
+		if ( null === $next ) {
+			return self::error( 'busy', __( 'This email domain is busy. Please try again in a moment.', 'beltoft-services' ) );
+		}
+
+		if ( $next > 0 ) {
+			$view  = MailView::data( Resource::find( $r->id() ) ?? $r, array() );
+			$reply = self::ok(
+				array(
+					'code'    => 'beltoft_services_mail_rate_limited',
+					'message' => ManualCheck::text( $next ),
+					'next'    => $next,
+					'dns'     => $view['dns'],
+				),
+				429
+			);
+			$reply->header( 'Retry-After', (string) max( 1, $next - time() ) );
+
+			return $reply;
 		}
 
 		// The look publishes records into the customer's zone and changes the sending hold: it is the shared action mail_dns_check.
@@ -574,7 +592,7 @@ final class MailRoutes {
 
 		$view = MailView::data( Resource::find( $r->id() ) ?? $r, array() );
 
-		return self::queued( $r, Mailboxes::DNS_CHECK, array( 'dns' => $view['dns'] ), __( 'We are checking your DNS records. This can take a minute.', 'beltoft-services' ) );
+		return self::queued( $r, Mailboxes::DNS_CHECK, array( 'dns' => $view['dns'], 'next' => ManualCheck::next( Resource::find( $r->id() ) ?? $r, MailView::MANUAL_META, MailSettings::dns_check_gap(), MailSettings::dns_check_per_hour() ) ), __( 'We are checking your DNS records. This can take a minute.', 'beltoft-services' ) );
 	}
 
 	/**

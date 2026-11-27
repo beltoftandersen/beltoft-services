@@ -9,6 +9,7 @@ namespace BeltoftServices\Mail;
 
 use BeltoftServices\Domains\DnsRecordsGuide;
 use BeltoftServices\Domains\HostName;
+use BeltoftServices\Domains\ManualCheck;
 use BeltoftServices\Domains\Ownership;
 use BeltoftServices\Jobs;
 use BeltoftServices\Progress;
@@ -28,6 +29,9 @@ final class MailView {
 	public const SMTP_SSL  = 465;
 	public const SMTP_TLS  = 587;
 	public const POP_PORT  = 995;
+
+	/** The times of the customer's Check now presses of the last hour (Domains\ManualCheck). */
+	public const MANUAL_META = 'mail_dns_manual';
 
 	/**
 	 * The view.
@@ -215,6 +219,7 @@ final class MailView {
 		$word    = MailDnsState::of( $r );
 		$state   = in_array( $status, array( 'ok', 'timeout' ), true ) ? $status : ( array() === $rows ? '' : 'waiting' );
 		$can     = 'ready' === $kind && array() !== $rows && 'ok' !== $status;
+		$next    = $can ? ManualCheck::next( $r, self::MANUAL_META, MailSettings::dns_check_gap(), MailSettings::dns_check_per_hour() ) : 0;
 
 		return array(
 			'mode'       => $mode,
@@ -226,10 +231,12 @@ final class MailView {
 			'rows'       => $rows,
 			'proof'      => $proof,
 			'can_check'  => $can,
+			'next'       => $next,
+			'next_text'  => $next > 0 ? ManualCheck::text( $next ) : '',
 			'checked'    => $checked > 0 ? wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $checked ) : '',
 			'checked_at' => $checked,
 			'days'       => MailDns::WAIT_DAYS,
-			'guide'      => self::guide( $domain, $mode, $rows, $proof, $state, $can, $checked ),
+			'guide'      => self::guide( $domain, $mode, $rows, $proof, $state, $can, $checked, $next ),
 		);
 	}
 
@@ -244,9 +251,10 @@ final class MailView {
 	 * @param string                               $state   ok, timeout, waiting or ''.
 	 * @param bool                                 $can     The customer can start a check.
 	 * @param int                                  $checked Time of the last check, 0 for never.
+	 * @param int                                  $next    The moment the customer may press Check now again, 0 when now.
 	 * @return array<string, mixed>|null
 	 */
-	private static function guide( string $domain, string $mode, array $rows, ?array $proof, string $state, bool $can, int $checked ): ?array {
+	private static function guide( string $domain, string $mode, array $rows, ?array $proof, string $state, bool $can, int $checked, int $next = 0 ): ?array {
 		$shown = HostName::display( $domain );
 
 		if ( null !== $proof ) {
@@ -309,11 +317,8 @@ final class MailView {
 			);
 		}
 
-		$notes = array();
-
-		if ( 'timeout' === $state ) {
-			$notes[] = __( 'We stopped looking for the records. Add them, then check again.', 'beltoft-services' );
-		}
+		$notes   = array();
+		$missing = array_column( array_filter( $rows, static fn( $row ) => 'ok' !== $row['status'] ), 'key' );
 
 		$model = array(
 			'id'        => 'mail',
@@ -323,7 +328,9 @@ final class MailView {
 			'records'   => $records,
 			'notes'     => $notes,
 			'done_text' => sprintf( /* translators: %s: domain name. */ __( 'Email DNS for %s is set up. All needed records were found.', 'beltoft-services' ), $shown ),
-			'check'     => $can ? array( 'attrs' => array( 'data-mail-dns-check' => '' ) ) : null,
+			'check'     => $can ? array( 'attrs' => array( 'data-mail-dns-check' => '' ), 'next' => $next, 'next_text' => $next > 0 ? ManualCheck::text( $next ) : '' ) : null,
+			'hints'     => 'ours' === $mode ? array() : array( __( 'Using Cloudflare? Set these records to DNS only (grey cloud). Mail records cannot be proxied.', 'beltoft-services' ) ),
+			'done_hint' => in_array( 'dmarc', $missing, true ) ? __( 'Recommended: add a DMARC record.', 'beltoft-services' ) : '',
 			'checked'   => $checked,
 			'interval'  => 'external' === $mode && 'timeout' !== $state && 'ok' !== $state ? MailDns::INTERVAL : 0,
 			'days'      => MailDns::WAIT_DAYS,
@@ -331,8 +338,19 @@ final class MailView {
 
 		if ( 'ours' === $mode ) {
 			$model['steps'] = array(
-				__( 'The DNS of this domain is on our name servers, so we add these records for you.', 'beltoft-services' ),
+				__( 'The DNS of this domain is on our name servers. We keep these records in place for you.', 'beltoft-services' ),
 				__( 'A record marked Another value is there now was not added, because something else is already there. Change or remove that record, then press Check now.', 'beltoft-services' ),
+			);
+
+			// Nothing is added by hand: the table stays folded unless a record needs the customer.
+			if ( array() === array_filter( $records, static fn( $rec ) => in_array( $rec['status'], array( 'conflict', 'wrong' ), true ) ) ) {
+				$model['collapse'] = __( 'Show the records', 'beltoft-services' );
+			}
+		} else {
+			$model['steps'] = array(
+				sprintf( /* translators: %s: domain name. */ __( 'Log in where the DNS of %s is managed. That is usually where you bought the domain.', 'beltoft-services' ), $shown ),
+				__( 'Add or change these records. Copy each name and value as it is. Delete other MX records.', 'beltoft-services' ),
+				__( 'Come back here and press Check now.', 'beltoft-services' ),
 			);
 		}
 

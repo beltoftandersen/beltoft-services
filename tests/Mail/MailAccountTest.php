@@ -409,7 +409,7 @@ final class MailAccountTest extends MailTestCase {
 
 		$html = $this->page( $r, 'dns' );
 
-		$this->assertStringContainsString( 'on our name servers, so we add these records for you', $html );
+		$this->assertStringContainsString( 'on our name servers. We keep these records in place for you', $html );
 		$this->assertStringContainsString( 'Another value is there now', $html );
 		$this->assertStringContainsString( 'The domain already has other MX records.', $html );
 		$this->assertStringContainsString( 'data-mail-dns-check', $html );
@@ -762,5 +762,73 @@ final class MailAccountTest extends MailTestCase {
 		$r2->locked( static fn() => MailAccess::begin( $r2, 'c@race.example' ) && true );
 		MailAccess::purge( $stale, 'zz@race.example' );
 		$this->assertArrayHasKey( 'c@race.example', (array) Resource::find( $r->id() )->get( MailAccess::META ), 'A purge works on the current map, not an old copy.' );
+	}
+
+	public function test_the_limited_check_button_is_drawn_with_its_time_and_the_guide_has_the_new_lines(): void {
+		$r = $this->ready_mail( 'guide.example', array(), $this->user );
+		$html = $this->page( $r, 'dns' );
+
+		$this->assertStringContainsString( 'Log in where the DNS of guide.example is managed', $html );
+		$this->assertStringContainsString( 'Delete other MX records', $html );
+		$this->assertStringContainsString( 'Using Cloudflare? Set these records to DNS only (grey cloud). Mail records cannot be proxied.', $html );
+		$this->assertStringNotContainsString( ' disabled data-next', $html, 'No wait yet.' );
+
+		$next = time() + 40;
+		$r->set( array( 'mail_dns_manual' => array( $next - 60 ) ) );
+		$html = $this->page( Resource::find( $r->id() ), 'dns' );
+
+		$this->assertStringContainsString( 'disabled data-next="' . $next . '"', $html );
+		$this->assertStringContainsString( 'data-label="Check now"', $html );
+		$this->assertStringContainsString( 'You can check again at ' . wp_date( get_option( 'time_format' ), $next ), $html );
+	}
+
+	public function test_a_domain_that_is_done_but_has_no_dmarc_says_so_in_one_line(): void {
+		$r = $this->ready_mail( 'dmarcless.example', array(), $this->user );
+		$rows = (array) $r->get( 'mail_records' );
+
+		foreach ( $rows as $i => $row ) {
+			$rows[ $i ]['status'] = in_array( $row['key'], array( 'mx', 'spf', 'dkim' ), true ) ? 'ok' : 'missing';
+		}
+
+		$r->set( array( 'mail_records' => $rows, 'mail_dns' => 'ok' ) );
+		$html = $this->page( Resource::find( $r->id() ), 'dns' );
+
+		$this->assertStringContainsString( 'Recommended: add a DMARC record.', $html );
+		$this->assertStringContainsString( 'beltoft-dnsg__done', $html );
+	}
+
+	public function test_a_zone_of_ours_is_folded_until_a_record_needs_the_customer(): void {
+		$this->our_zone( $this->user, 'fold.example' );
+		$r = $this->ready_mail( 'fold.example', array(), $this->user );
+		$rows = (array) $r->get( 'mail_records' );
+		$rows[0]['status'] = 'missing';
+		$r->set( array( 'mail_records' => $rows, 'mail_dns' => 'waiting', 'mail_mode' => 'ours' ) );
+
+		$html = $this->page( Resource::find( $r->id() ), 'dns' );
+		$this->assertStringContainsString( 'We keep these records in place for you', $html );
+		$this->assertStringContainsString( '<details class="beltoft-dnsg__more"><summary>Show the records</summary>', $html );
+
+		$rows[0]['status'] = 'conflict';
+		$r->set( array( 'mail_records' => $rows ) );
+		$html = $this->page( Resource::find( $r->id() ), 'dns' );
+		$this->assertStringNotContainsString( 'beltoft-dnsg__more', $html, 'A record that needs the customer is never hidden.' );
+	}
+
+	public function test_the_notice_follows_the_state_on_the_overview_and_the_dns_tab(): void {
+		$r = $this->ready_mail( 'state.example', array(), $this->user );
+		$this->assertStringContainsString( 'Email works on state.example when the DNS records below are in place', $this->page( $r ) );
+
+		$r->set( array( 'mail_dns' => 'waiting', 'mail_dns_lost_at' => time() - 86400, 'mail_dns_lost_keys' => array( 'mx' ) ) );
+		$html = $this->page( Resource::find( $r->id() ) );
+		$this->assertStringContainsString( 'These DNS records were found before but are not found now: MX.', $html );
+		$this->assertStringContainsString( 'Nothing has been deleted: your mailboxes and your mail are kept.', $html );
+		$this->assertStringContainsString( 'DNS records missing since', $html );
+		$this->assertStringContainsString( 'These DNS records were found before', $this->page( Resource::find( $r->id() ), 'dns' ), 'The DNS tab says it too.' );
+
+		$r->set( array( 'mail_dns' => 'timeout', 'mail_dns_lost_at' => 0 ) );
+		$this->assertStringContainsString( 'We stopped checking after 14 days. Add the records, then press Check now and we check again.', $this->page( Resource::find( $r->id() ) ) );
+
+		$r->set( array( 'mail_dns' => 'waiting', 'mail_dns_moved' => time(), 'mail_dns_lost_at' => time() ) );
+		$this->assertStringContainsString( 'The name servers of state.example no longer point to us.', $this->page( Resource::find( $r->id() ) ) );
 	}
 }

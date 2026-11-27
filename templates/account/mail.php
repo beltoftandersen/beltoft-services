@@ -358,6 +358,9 @@ $beltoft_services_row    = static function ( string $label, string $value ): voi
 		<?php $beltoft_services_dns = $view['dns']; ?>
 		<div class="beltoft-services-vm__more" id="beltoft-mail-dns" data-mail-dns>
 			<h4><?php esc_html_e( 'DNS records', 'beltoft-services' ); ?></h4>
+			<?php if ( $nav && 'ready' === $view['kind'] && '' !== (string) $beltoft_services_dns['notice'] ) : ?>
+				<p class="beltoft-services-panel__notice beltoft-services-mail__dnsnote is-<?php echo esc_attr( (string) $beltoft_services_dns['tone'] ); ?>" role="status"><strong><?php echo esc_html( (string) $beltoft_services_dns['word'] ); ?></strong> <?php echo esc_html( (string) $beltoft_services_dns['notice'] ); ?></p>
+			<?php endif; ?>
 			<?php if ( null === $beltoft_services_dns['guide'] ) : ?>
 				<p><?php esc_html_e( 'The records appear here when your email domain is ready.', 'beltoft-services' ); ?></p>
 			<?php else : ?>
