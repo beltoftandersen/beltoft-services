@@ -335,6 +335,15 @@
         "label": "Warn when this many IPv4 addresses are free",
         "desc": "A mail is sent when the free addresses fall to this number, and another when none is left. At most one mail a day for each reason."
     },
+    "ipv4_max_extra": {
+        "tab": "proxmox",
+        "section": "proxmox",
+        "type": "number",
+        "default": 10,
+        "min": 1,
+        "label": "Most extra IPv4 addresses per server",
+        "desc": "The most extra IPv4 addresses a dedicated server can have through the add-on, in the checkout and in My Account. The checkout offers 0 up to this number. A database always has one."
+    },
     "ipv6_test_url": {
         "tab": "proxmox",
         "section": "proxmox",

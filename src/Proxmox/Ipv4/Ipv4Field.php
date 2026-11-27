@@ -19,7 +19,7 @@ use BeltoftServices\Usage\Rates;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * One line, the same for every product: a number for a dedicated server (any number up to the limit), a box for a VPS Basic
+ * One line, the same for every product: a dropdown for a dedicated server (0 up to the limit), a box for a VPS Basic
  * and a database (one). Each address is one cart line of the add-on bought `cart_server`, with the new server or database;
  * the line changes the cart through a wc-ajax call and the page then refreshes the order review. A server that is removed
  * takes its address lines with it. The block checkout is not covered (classic hook only, as the other lines).
@@ -38,6 +38,7 @@ final class Ipv4Field {
 		add_action( 'wc_ajax_' . self::AJAX, array( __CLASS__, 'ajax' ) );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
 		add_action( 'woocommerce_cart_item_removed', array( __CLASS__, 'clean_orphan' ) );
+		add_action( 'woocommerce_check_cart_items', array( __CLASS__, 'trim_excess' ), 5 );
 	}
 
 	/**
@@ -60,7 +61,7 @@ final class Ipv4Field {
 		if ( null !== $server ) {
 			$dedicated = VpsProfile::plan_has_ipv4( Product::plan( (int) ( $server['item']['product_id'] ?? 0 ), (int) ( $server['item']['variation_id'] ?? 0 ) ) );
 
-			return array( 'kind' => 'server', 'max' => $dedicated ? max( 1, (int) apply_filters( 'beltoft_services_ipv4_max_per_server', 16, null ) ) : 1, 'box' => ! $dedicated );
+			return array( 'kind' => 'server', 'max' => $dedicated ? Ipv4Meta::max_extra() : 1, 'box' => ! $dedicated );
 		}
 
 		return null !== DbIpField::new_database() ? array( 'kind' => 'db', 'max' => 1, 'box' => true ) : null;
@@ -119,13 +120,21 @@ final class Ipv4Field {
 				esc_html( $label )
 			);
 		} else {
+			$available = IpPool::available_for_addon() + $chosen;
+			$options   = '';
+
+			for ( $n = 0; $n <= (int) $target['max']; $n++ ) {
+				// More than the pool can give is shown but cannot be picked (the server checks it again).
+				$options .= sprintf( '<option value="%1$d" %2$s %3$s>%1$d</option>', $n, selected( $chosen, $n, false ), disabled( $n > $available, true, false ) );
+			}
+
 			printf(
-				'<p class="form-row form-row-wide"><label for="beltoft_services_ipv4">%1$s</label><input type="number" class="input-text" id="beltoft_services_ipv4" min="0" max="%2$d" step="1" value="%3$d" data-nonce="%4$s" data-was="%3$d" %5$s></p>',
+				'<p class="form-row form-row-wide"><label for="beltoft_services_ipv4">%1$s</label><select class="select" id="beltoft_services_ipv4" data-nonce="%2$s" data-was="%3$d" %4$s>%5$s</select></p>',
 				esc_html( $label ),
-				(int) $target['max'],
-				(int) $chosen,
 				esc_attr( wp_create_nonce( self::NONCE ) ),
-				disabled( $free, false, false )
+				(int) $chosen,
+				disabled( $free, false, false ),
+				$options // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built above from integers and WordPress helpers.
 			);
 		}
 
@@ -134,7 +143,7 @@ final class Ipv4Field {
 		} elseif ( $target['box'] ) {
 			echo '<p class="description">' . esc_html__( 'A server with an IPv6 address only can be reached over IPv6. An IPv4 address makes it reachable over IPv4 too. The first IPv4 address becomes the main address of the server.', 'beltoft-services' ) . '</p>';
 		} else {
-			echo '<p class="description">' . esc_html__( 'Your server includes one IPv4 address. Enter how many extra addresses you want. They are set up in the server itself, which the dashboard explains.', 'beltoft-services' ) . '</p>';
+			echo '<p class="description">' . esc_html__( 'Your server includes one IPv4 address. Choose how many extra addresses you want. They are set up in the server itself, which the dashboard explains.', 'beltoft-services' ) . '</p>';
 		}
 
 		if ( ! $free ) {
@@ -211,7 +220,8 @@ final class Ipv4Field {
 		return CartSwap::answer(
 			self::NONCE,
 			static function (): array {
-				$count = isset( $_POST['count'] ) ? absint( wp_unslash( $_POST['count'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- checked in CartSwap::answer().
+				// A negative number, an array or text means none (absint would turn -7 into 7).
+				$count = isset( $_POST['count'] ) && is_scalar( $_POST['count'] ) ? max( 0, (int) wp_unslash( $_POST['count'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- checked in CartSwap::answer(); cast to int.
 
 				// Alone on the session's latest cart, saved before the lock is let go (CartSwap): two quick changes never drop one.
 				return CartSwap::locked( static fn(): array => self::choose( $count ) ) ?? array( 'ok' => false, 'count' => self::chosen() );
@@ -271,19 +281,41 @@ final class Ipv4Field {
 	 * A removed server or database must not leave an address line that cannot be delivered.
 	 */
 	public static function clean_orphan(): void {
+		self::trim();
+	}
+
+	/**
+	 * Cart and checkout: address lines beyond the limit (a crafted add to cart, a lowered setting) are taken away with a notice.
+	 * Checkout validation refuses such a cart as well, so an order never holds more.
+	 */
+	public static function trim_excess(): void {
+		if ( self::trim() > 0 && function_exists( 'wc_add_notice' ) ) {
+			wc_add_notice( __( 'There were more extra IPv4 addresses in your cart than one server can have. The extra ones were removed.', 'beltoft-services' ), 'notice' );
+		}
+	}
+
+	/**
+	 * Takes away the new-server address lines beyond what the cart may hold: none without exactly one new server or database, else up to its limit.
+	 *
+	 * @return int How many lines were removed.
+	 */
+	private static function trim(): int {
 		if ( DiskField::server_swap_in_progress() || ! function_exists( 'WC' ) || ! WC()->cart ) {
-			return;
+			return 0;
 		}
 
-		// What the lines may be now: none without exactly one new server or database, else up to its limit.
-		$target = self::target();
-		$max    = null === $target ? 0 : (int) $target['max'];
-		$kept   = 0;
+		$target  = self::target();
+		$max     = null === $target ? 0 : (int) $target['max'];
+		$kept    = 0;
+		$removed = 0;
 
 		foreach ( WC()->cart->get_cart() as $key => $item ) {
 			if ( 'cart_server' === ( $item['beltoft_services_ipv4_for'] ?? null ) && ++$kept > $max ) {
 				WC()->cart->remove_cart_item( (string) $key );
+				++$removed;
 			}
 		}
+
+		return $removed;
 	}
 }

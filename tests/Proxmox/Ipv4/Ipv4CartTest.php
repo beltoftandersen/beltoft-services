@@ -13,6 +13,7 @@ use BeltoftServices\Proxmox\Db\DbIpField;
 use BeltoftServices\Proxmox\Ipv4\Ipv4Cart;
 use BeltoftServices\Proxmox\Ipv4\Ipv4Driver;
 use BeltoftServices\Proxmox\Ipv4\Ipv4Field;
+use BeltoftServices\Proxmox\Ipv4\Ipv4Meta;
 use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Tests\Proxmox\Backup\BackupTestCase;
 
@@ -183,7 +184,8 @@ class Ipv4CartTest extends BackupTestCase {
 		$this->assertSame( 'server', $target['kind'] );
 		$this->assertFalse( $target['box'] );
 		$html = $this->html();
-		$this->assertStringContainsString( 'type="number"', $html );
+		$this->assertStringContainsString( '<select class="select" id="beltoft_services_ipv4"', $html );
+		$this->assertStringNotContainsString( 'type="number"', $html );
 		$this->assertStringContainsString( 'Extra IPv4 addresses, ', $html, 'The server already has one address: the number counts extra ones.' );
 		$this->assertStringContainsString( 'Your server includes one IPv4 address.', $html );
 		$this->assertStringContainsString( '19', $html );
@@ -399,5 +401,181 @@ class Ipv4CartTest extends BackupTestCase {
 
 		$this->assertSame( 200, $answer[1] );
 		$this->assertSame( 2, $answer[0]['count'] );
+	}
+
+	// -- The dropdown and its server side guards ----------------------------------------------------
+
+	private function post( array $post ): array {
+		$_POST = $_REQUEST = $post;
+
+		return Ipv4Field::respond();
+	}
+
+	private function nonce(): string {
+		return wp_create_nonce( Ipv4Field::NONCE );
+	}
+
+	public function test_the_limit_is_a_setting_with_default_10_and_the_filter_still_wins(): void {
+		$this->assertSame( 10, \BeltoftServices\Settings::get( 'ipv4_max_extra' ) );
+		$this->product();
+		$this->server_in_cart();
+		$this->assertSame( 10, Ipv4Field::target()['max'] );
+
+		$this->settings( array( 'ipv4_max_extra' => 4 ) );
+		$this->assertSame( 4, Ipv4Field::target()['max'] );
+		$this->assertSame( 4, Ipv4Meta::max_extra() );
+
+		add_filter( 'beltoft_services_ipv4_max_per_server', static fn() => 2 );
+		$this->assertSame( 2, Ipv4Field::target()['max'] );
+	}
+
+	public function test_the_select_offers_zero_to_the_limit_with_the_chosen_one_selected(): void {
+		$this->product();
+		$this->settings( array( 'ipv4_max_extra' => 5 ) );
+		$this->server_in_cart();
+		$this->backup_wipe();
+		IpPool::add( '192.0.2.210' );
+		IpPool::add( '192.0.2.211' );
+		IpPool::add( '192.0.2.212' );
+		IpPool::add( '192.0.2.213' );
+		$this->assertSame( 3, IpPool::available_for_addon() );
+		Ipv4Field::choose( 2 );
+
+		$html = $this->html();
+		$this->assertSame( 6, substr_count( $html, '<option ' ) );
+		$this->assertStringContainsString( '<option value="0"', $html );
+		$this->assertStringContainsString( '<option value="5"', $html );
+		$this->assertStringNotContainsString( 'value="6"', $html );
+		$this->assertMatchesRegularExpression( '#<option value="2"\s+selected=\'selected\'#', $html );
+		$this->assertMatchesRegularExpression( '#data-nonce="[^"]+" data-was="2"#', $html );
+		$this->assertStringContainsString( 'for="beltoft_services_ipv4"', $html );
+
+		// The pool gives 3 more now (one is in the cart): up to 3 + 2 is open, nothing above it.
+		$this->assertDoesNotMatchRegularExpression( '#<option value="[0-5]"[^>]*disabled#', $html );
+		IpPool::block( '192.0.2.213' );
+		IpPool::block( '192.0.2.212' );
+		$html = $this->html();
+		$this->assertDoesNotMatchRegularExpression( '#<option value="[0-3]"[^>]*disabled#', $html );
+		$this->assertMatchesRegularExpression( '#<option value="4"[^>]*disabled#', $html );
+		$this->assertMatchesRegularExpression( '#<option value="5"[^>]*disabled#', $html );
+		$this->assertDoesNotMatchRegularExpression( '#<select[^>]*disabled#', $html );
+	}
+
+	public function test_the_select_is_disabled_when_no_address_is_free(): void {
+		$this->product();
+		$this->server_in_cart();
+		$this->backup_wipe();
+		$this->assertMatchesRegularExpression( '#<select[^>]*disabled#', $this->html() );
+	}
+
+	public function test_a_basic_server_still_gets_a_checkbox_and_no_select(): void {
+		$this->product();
+		$this->server_in_cart( true );
+		$html = $this->html();
+		$this->assertStringContainsString( 'type="checkbox"', $html );
+		$this->assertStringNotContainsString( '<select', $html );
+	}
+
+	public function test_the_ajax_never_puts_more_than_the_limit_in_the_cart(): void {
+		$this->product();
+		$this->settings( array( 'ipv4_max_extra' => 3 ) );
+		$this->server_in_cart();
+		$this->assertGreaterThanOrEqual( 3, IpPool::available_for_addon() );
+
+		// A count over the limit is clamped.
+		$answer = $this->post( array( 'nonce' => $this->nonce(), 'count' => '999' ) );
+		$this->assertSame( 200, $answer[1] );
+		$this->assertSame( 3, $this->lines() );
+
+		// A negative count, an array or text means none.
+		WC()->cart->empty_cart();
+		$this->server_in_cart();
+		$this->post( array( 'nonce' => $this->nonce(), 'count' => '2' ) );
+		$this->post( array( 'nonce' => $this->nonce(), 'count' => '-7' ) );
+		$this->assertSame( 0, $this->lines() );
+		$this->post( array( 'nonce' => $this->nonce(), 'count' => '2' ) );
+		$this->post( array( 'nonce' => $this->nonce(), 'count' => array( '5' ) ) );
+		$this->assertSame( 0, $this->lines() );
+
+		// Not a number, an array, a float and a huge number.
+		foreach ( array( 'abc', array( '5', '6' ), '2.9', '99999999999999999999', '' ) as $bad ) {
+			$this->post( array( 'nonce' => $this->nonce(), 'count' => $bad ) );
+			$this->assertLessThanOrEqual( 3, $this->lines(), wp_json_encode( $bad ) );
+		}
+
+		$this->post( array( 'nonce' => $this->nonce(), 'count' => 'abc' ) );
+		$this->assertSame( 0, $this->lines(), 'Not a number is 0.' );
+	}
+
+	public function test_a_missing_or_wrong_nonce_changes_nothing(): void {
+		$this->product();
+		$this->server_in_cart();
+
+		$this->assertSame( 403, $this->post( array( 'count' => '3' ) )[1] );
+		$this->assertSame( 403, $this->post( array( 'nonce' => 'wrong', 'count' => '3' ) )[1] );
+		$this->assertSame( 0, $this->lines() );
+	}
+
+	public function test_a_count_the_pool_cannot_give_is_refused_and_the_cart_keeps_what_it_had(): void {
+		$this->product();
+		$this->server_in_cart();
+		$this->backup_wipe();
+		IpPool::add( '192.0.2.220' );
+		IpPool::add( '192.0.2.221' );
+		$free = IpPool::available_for_addon();
+		$this->assertGreaterThan( 0, $free );
+		$this->assertTrue( Ipv4Field::choose( $free )['ok'] );
+
+		$answer = $this->post( array( 'nonce' => $this->nonce(), 'count' => (string) ( $free + 1 ) ) );
+		$this->assertFalse( $answer[0]['ok'] );
+		$this->assertSame( $free, $answer[0]['count'] );
+		$this->assertSame( $free, $this->lines() );
+	}
+
+	public function test_add_to_cart_validation_needs_quantity_one_the_cart_server_link_and_stays_under_the_limit(): void {
+		$this->product();
+		$this->settings( array( 'ipv4_max_extra' => 2 ) );
+		$this->server_in_cart();
+		$v    = Ipv4Cart::product();
+		$data = array( 'beltoft_services_ipv4_for' => 'cart_server' );
+
+		$this->assertTrue( Ipv4Cart::validate( true, $v->get_parent_id(), 1, $v->get_id(), array(), $data ) );
+		$this->assertFalse( Ipv4Cart::validate( true, $v->get_parent_id(), 2, $v->get_id(), array(), $data ), 'Quantity must be 1.' );
+		$this->assertFalse( Ipv4Cart::validate( true, $v->get_parent_id(), 1, $v->get_id(), array(), array() ), 'A link is needed.' );
+		$this->assertFalse( Ipv4Cart::validate( true, $v->get_parent_id(), 1, $v->get_id(), array(), array( 'beltoft_services_ipv4_for' => 'nonsense' ) ) );
+
+		Ipv4Field::choose( 2 );
+		$this->assertFalse( Ipv4Cart::validate( true, $v->get_parent_id(), 1, $v->get_id(), array(), $data ), 'Two lines is the limit.' );
+	}
+
+	public function test_a_cart_over_the_limit_is_refused_at_checkout_and_trimmed_in_the_cart(): void {
+		$this->product();
+		$this->server_in_cart();
+		$this->assertTrue( Ipv4Field::choose( 3 )['ok'] );
+		$this->settings( array( 'ipv4_max_extra' => 1 ) );
+
+		$errors = new \WP_Error();
+		Ipv4Cart::checkout_validation( array(), $errors );
+		$this->assertContains( 'ipv4_limit', $errors->get_error_codes(), 'Checkout refuses lines over the limit.' );
+
+		wc_clear_notices();
+		Ipv4Field::trim_excess();
+		$this->assertSame( 1, $this->lines() );
+		$this->assertNotEmpty( wc_get_notices( 'notice' ) );
+
+		$errors = new \WP_Error();
+		Ipv4Cart::checkout_validation( array(), $errors );
+		$this->assertNotContains( 'ipv4_limit', $errors->get_error_codes() );
+
+		wc_clear_notices();
+		Ipv4Field::trim_excess();
+		$this->assertEmpty( wc_get_notices( 'notice' ), 'Nothing to trim, no notice.' );
+		$this->assertNotFalse( has_action( 'woocommerce_check_cart_items', array( Ipv4Field::class, 'trim_excess' ) ) );
+	}
+
+	public function test_the_script_restores_the_select_on_failure_and_shows_what_the_cart_holds(): void {
+		$js = (string) file_get_contents( dirname( __DIR__, 3 ) . '/assets/ipv4-field.js' );
+		$this->assertStringContainsString( 'field.val( before )', $js );
+		$this->assertStringContainsString( "field.val( String( now ) )", $js );
 	}
 }
