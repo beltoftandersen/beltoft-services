@@ -172,6 +172,15 @@ final class AppOdooEditionTest extends PaidAppCase {
 		$this->switch_edition( '20-dk', '20' );
 	}
 
+	public function test_the_danish_edition_leads_the_list_on_a_danish_page(): void {
+		$r = $this->odoo_server( '20', 5000 );
+		wp_set_current_user( (int) $r->license()['user_id'] );
+		switch_to_locale( 'da_DK' );
+		$keys = array_keys( AppReinstall::options( $r )['choices'] );
+		restore_previous_locale();
+		$this->assertSame( array( AppReinstall::KEEP, '20-dk', AppReinstall::NONE ), array_map( 'strval', $keys ) );
+	}
+
 	private function switch_edition( string $from, string $to ): void {
 		$r = $this->odoo_server( $from, 5000 );
 		wp_set_current_user( (int) $r->license()['user_id'] );
@@ -180,6 +189,9 @@ final class AppOdooEditionTest extends PaidAppCase {
 		$this->assertArrayHasKey( $to, $options['choices'], 'The other edition is offered.' );
 		$this->assertArrayNotHasKey( $from, $options['choices'], 'The own edition is the keep choice.' );
 		$this->assertStringContainsString( 'Odoo 20', $options['choices'][ $to ] );
+		// Both editions can be read in the list: the keep choice names the edition the server has.
+		$this->assertStringContainsString( (string) Apps::version( 'odoo', $from )['label'], $options['choices'][ AppReinstall::KEEP ] );
+		$this->assertCount( 3, $options['choices'], 'Keep, the other edition and no app.' );
 
 		$args = array( 'app_version' => $to, 'app_domain_mode' => 'none' );
 		$this->assertNull( AppReinstall::check( null, $r, $args ), $from . ' to ' . $to );
