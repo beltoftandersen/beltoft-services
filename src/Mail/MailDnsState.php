@@ -124,7 +124,7 @@ final class MailDnsState {
 				$since = (int) $r->get( 'mail_dns_lost_at' );
 
 				return $since > 0
-					? sprintf( /* translators: %s: a date such as 12 December */ __( 'DNS records missing since %s', 'beltoft-services' ), wp_date( 'j F', $since ) )
+					? sprintf( /* translators: %s: a date such as 12 December */ __( 'DNS records missing since %s', 'beltoft-services' ), wp_date( _x( 'j F', 'a day and a month, such as 12 December', 'beltoft-services' ), $since ) )
 					: __( 'DNS records missing', 'beltoft-services' );
 			case self::PARTIAL_SEND:
 				return __( 'Sending is held', 'beltoft-services' );
