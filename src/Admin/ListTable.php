@@ -53,6 +53,7 @@ final class ListTable extends \WP_List_Table {
 		return array(
 			'license'  => __( 'License', 'beltoft-services' ),
 			'customer' => __( 'Customer', 'beltoft-services' ),
+			'vm'       => __( 'VM', 'beltoft-services' ),
 			'ip'       => __( 'IP', 'beltoft-services' ),
 			'driver'   => __( 'Driver', 'beltoft-services' ),
 			'state'    => __( 'State', 'beltoft-services' ),
@@ -160,6 +161,10 @@ final class ListTable extends \WP_List_Table {
 				return $html;
 			case 'customer':
 				return $this->customer( $license );
+			case 'vm':
+				// The Proxmox VM number of a server or database (searchable: the search box matches it); empty for other services.
+				$vmid = (int) $item->get( 'vmid' );
+				return $vmid > 0 ? '<code>' . esc_html( (string) $vmid ) . '</code>' : '';
 			case 'ip':
 				return $this->addresses( $item );
 			case 'driver':

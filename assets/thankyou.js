@@ -145,7 +145,8 @@
 					handle = window.beltoftStatus.busy( root.getAttribute( 'data-bar-text' ) || 'Setting up your order', null, null, { lock: false } );
 				}
 
-				window.beltoftStatus.progress( handle, counted.all ? counted.done / counted.all : 0.06 );
+				// A little of the line always shows, also before the first step is done (owner 2026-11-27: the line seemed gone).
+				window.beltoftStatus.progress( handle, Math.max( 0.06, counted.all ? counted.done / counted.all : 0 ) );
 			} else if ( handle ) {
 				// closing() has filled the text before this runs. Some of the order failed: the bar says so, it is not "done".
 				if ( 'failed' === stateOf( rows ) || 'mixed' === stateOf( rows ) ) {

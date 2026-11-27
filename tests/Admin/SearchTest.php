@@ -147,6 +147,16 @@ final class SearchTest extends TestCase {
 		$this->assertContains( $a->id(), $this->found( '4455002' ), 'Subscription id.' );
 	}
 
+	/** Owner 2026-11-27: the admin list shows the Proxmox VM number. */
+	public function test_the_list_has_a_vm_column_with_the_vm_number(): void {
+		$r     = $this->service( array( 'vmid' => 202 ) );
+		$table = new \BeltoftServices\Admin\ListTable();
+		$this->assertArrayHasKey( 'vm', $table->get_columns() );
+		$cell = ( new \ReflectionMethod( $table, 'column_default' ) )->invoke( $table, $r, 'vm' );
+		$this->assertSame( '<code>202</code>', $cell );
+		$this->assertContains( $r->id(), $this->found( '202' ), 'Searching the VM number finds it.' );
+	}
+
 	public function test_no_match_and_empty_search(): void {
 		$a = $this->service( array( 'ip' => '203.0.113.50' ) );
 

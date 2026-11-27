@@ -260,6 +260,10 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 = 0.66.6 =
 * The "Point your domain" box has a "Check now" button. It looks at the public DNS of the customer's domain at once, with the same code as the recurring check, and hands the name to the install when it points at the server. Limits kept on the server: one check a minute and ten an hour per server; a limited click answers 429 and the button says "You can check again at 14:32". The recurring check keeps its own schedule.
+* Odoo: both editions install the Sales app by default.
+* Apps: when an app is ready, the server overview shows it with Open and Show login; the order page and the ready email point to the login under App; every login field has a translated label.
+* Admin: WooCommerce > Services has a VM column (the Proxmox VM number; searching the number finds the server).
+* The progress line of a new order always shows a little and keeps moving while a step runs.
 
 = 0.66.5 =
 * The domain box no longer says "no A record" after a look made before the found addresses were stored; it says what the look found.
