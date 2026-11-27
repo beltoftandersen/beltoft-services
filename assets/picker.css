@@ -19,7 +19,7 @@
 .beltoft-services-plan__hourly { font-size: 14px; line-height: 1.3; opacity: 0.75; font-variant-numeric: tabular-nums; }
 .beltoft-services-plan__specs { display: grid; gap: 4px; margin-top: auto; font-size: 14px; }
 .beltoft-services-plan__stock { font-size: 14px; font-weight: 500; }
-.beltoft-services-plan .beltoft-services-plan__input:checked + .beltoft-services-plan__face, .beltoft-services-plan:hover .beltoft-services-plan__input:checked + .beltoft-services-plan__face { background: var(--bs-surface, #fff); color: var(--bs-ink, #17201b); border-color: var(--bs-dark, #10241b); box-shadow: inset 0 0 0 1px var(--bs-dark, #10241b); }
+.beltoft-services-plan .beltoft-services-plan__input:checked + .beltoft-services-plan__face, .beltoft-services-plan:hover .beltoft-services-plan__input:checked + .beltoft-services-plan__face { background: var(--bs-choice-sel-bg, var(--bs-surface, #fff)); color: var(--bs-ink, #17201b); border-color: var(--bs-choice-sel-border, var(--bs-dark, #10241b)); box-shadow: var(--bs-choice-sel-ring, inset 0 0 0 1px var(--bs-dark, #10241b)); }
 .beltoft-services-plan .beltoft-services-plan__input:focus-visible + .beltoft-services-plan__face { outline: 2px solid var(--bs-focus, #10241b); outline-offset: 2px; }
 .beltoft-services-plan.is-disabled { cursor: not-allowed; }
 .beltoft-services-plan.is-disabled .beltoft-services-plan__face, .beltoft-services-plan.is-disabled:hover .beltoft-services-plan__face { background: var(--bs-warm, #eeebe3); color: var(--bs-ink, #17201b); }
@@ -57,3 +57,8 @@
 .woocommerce-account .woocommerce fieldset.beltoft-services-picker__plans { gap: 0; }
 /* Groups of the form (engines, plans, options) are 24px apart; the theme gives every account form a 16px gap. */
 .woocommerce-account .woocommerce form.beltoft-services-picker__form { gap: var(--bs-space-5, 24px); }
+
+/* Selected choice tile: the --bs-choice-sel-* variables (defaults in account.css :root) and a check badge in the corner (--bs-choice-check: none drops it). */
+.beltoft-services-plan__input:checked + .beltoft-services-plan__face::after { content: ""; display: var(--bs-choice-check, block); position: absolute; top: 8px; right: 8px; width: 18px; height: 18px; border-radius: 50%; background: var(--bs-choice-sel-border, var(--bs-dark, #10241b)); }
+.beltoft-services-plan__input:checked + .beltoft-services-plan__face::before { content: ""; display: var(--bs-choice-check, block); position: absolute; z-index: 1; top: 12px; right: 15px; width: 4px; height: 8px; border: solid var(--bs-choice-check-ink, #fff); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.beltoft-services-plan__input:checked + .beltoft-services-plan__face { position: relative; }

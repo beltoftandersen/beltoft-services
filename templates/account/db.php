@@ -213,7 +213,7 @@ $beltoft_services_db_wait = array(
 			<?php elseif ( '' !== $beltoft_services_access['add_url'] ) : ?>
 				<p><?php echo esc_html( '' !== (string) $beltoft_services_access['address6'] ? __( 'An IPv4 address makes your database reachable over IPv4 too, for the addresses you allow. Some networks and applications still have no IPv6.', 'beltoft-services' ) : __( 'Your database is reachable from your servers on the private network. A public IP address makes it reachable from elsewhere too, for the addresses you allow.', 'beltoft-services' ) ); ?></p>
 				<p class="description"><?php echo esc_html( '' !== $beltoft_services_access['add_price'] ? sprintf( /* translators: %s: the price per period, such as +€4.00 / month */ __( 'Price: %s. Your database restarts once, which takes about a minute.', 'beltoft-services' ), $beltoft_services_access['add_price'] ) : __( 'Your database restarts once, which takes about a minute.', 'beltoft-services' ) ); ?></p>
-				<p><a class="button woocommerce-button" href="<?php echo esc_url( (string) $beltoft_services_access['add_url'] ); ?>"><?php esc_html_e( 'Add an IPv4 address', 'beltoft-services' ); ?></a></p>
+				<p><a class="button woocommerce-button" href="<?php echo esc_url( (string) $beltoft_services_access['add_url'] ); ?>"><?php esc_html_e( 'Buy an IPv4 address', 'beltoft-services' ); ?></a></p>
 			<?php else : ?>
 				<p><?php esc_html_e( 'This database has no public IP address. It is reachable from your servers on the private network.', 'beltoft-services' ); ?></p>
 			<?php endif; ?>

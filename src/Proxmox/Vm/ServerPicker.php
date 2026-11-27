@@ -638,6 +638,11 @@ final class ServerPicker {
 		echo '<span>' . esc_html( self::memory( (int) $plan['memory_mb'] ) ) . '</span>';
 		/* translators: %d: disk size in gigabytes */
 		echo '<span>' . esc_html( sprintf( __( '%d GB disk', 'beltoft-services' ), (int) $plan['disk_gb'] ) ) . '</span>';
+		if ( (float) ( $plan['net_mbit'] ?? 0 ) > 0 ) {
+			/* translators: %s: network speed of the plan, for example 500 Mbit/s or 1 Gbit/s. */
+			echo '<span>' . esc_html( sprintf( __( '%s port', 'beltoft-services' ), Panels::speed_label( (float) $plan['net_mbit'] ) ) ) . '</span>';
+		}
+
 		echo '</span>';
 
 		if ( ! $stock ) {

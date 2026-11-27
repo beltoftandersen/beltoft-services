@@ -215,6 +215,7 @@ final class Offers {
 			'cores'        => (int) ( $numbers['cores'] ?? 0 ),
 			'memory_mb'    => (int) ( $numbers['memory_mb'] ?? 0 ),
 			'disk_gb'      => (int) ( $numbers['disk_gb'] ?? 0 ),
+			'net_mbit'     => max( 0.0, (float) ( $numbers['net_mbit'] ?? 0 ) ),
 			'cluster'      => (string) ( $numbers['cluster'] ?? '' ),
 			'in_stock'     => self::in_stock( $variation ),
 			'backups'      => $backups,

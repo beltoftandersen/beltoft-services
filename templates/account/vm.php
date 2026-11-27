@@ -220,7 +220,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 			<?php else : ?>
 				<p class="description"><?php esc_html_e( 'We keep the server up to date, answer its alerts and check its backups. Help with your own software is billed per started 15 minutes.', 'beltoft-services' ); ?></p>
 				<?php if ( '' !== $managed['add_price'] ) : ?><p class="description"><?php /* translators: %s: price such as 19 kr. / month */ echo esc_html( sprintf( __( 'Price: %s.', 'beltoft-services' ), $managed['add_price'] ) ); ?></p><?php endif; ?>
-				<p><a class="button woocommerce-button bs-btn" href="<?php echo esc_url( $managed['add_url'] ); ?>"><?php esc_html_e( 'Add managed server', 'beltoft-services' ); ?></a></p>
+				<p><a class="button woocommerce-button bs-btn" href="<?php echo esc_url( $managed['add_url'] ); ?>"><?php esc_html_e( 'Buy managed server', 'beltoft-services' ); ?></a></p>
 			<?php endif; ?>
 		</div>
 	<?php endif; ?>
@@ -487,7 +487,7 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 			<h4><?php esc_html_e( 'Backups', 'beltoft-services' ); ?></h4>
 			<?php if ( ! $backups['enabled'] ) : ?>
 				<?php if ( '' !== $backups['add_price'] ) : ?><p class="description"><?php /* translators: %s: price such as 19 kr. / month */ echo esc_html( sprintf( __( 'Price: %s.', 'beltoft-services' ), $backups['add_price'] ) ); ?></p><?php endif; ?>
-				<p><a class="button woocommerce-button bs-btn" href="<?php echo esc_url( $backups['add_url'] ); ?>"><?php esc_html_e( 'Add daily backups', 'beltoft-services' ); ?></a></p>
+				<p><a class="button woocommerce-button bs-btn" href="<?php echo esc_url( $backups['add_url'] ); ?>"><?php esc_html_e( 'Buy daily backups', 'beltoft-services' ); ?></a></p>
 				<p class="description"><?php esc_html_e( 'A backup of the whole server is taken every night.', 'beltoft-services' ); ?></p>
 			<?php else : ?>
 				<p class="description">

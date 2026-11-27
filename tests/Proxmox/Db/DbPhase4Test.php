@@ -597,7 +597,7 @@ class DbPhase4Test extends TestCase {
 		add_filter( 'woocommerce_subscriptions_can_item_be_switched_by_user', '__return_true' );
 
 		$html = $this->card( $r );
-		$this->assertStringContainsString( 'Add an IPv4 address', $html );
+		$this->assertStringContainsString( 'Buy an IPv4 address', $html );
 		$this->assertStringContainsString( 'restarts once', $html );
 		$this->assertStringContainsString( 'beltoft_services_ipv4_for=' . (int) $r->license()['id'], html_entity_decode( $html ) );
 		$this->assertStringContainsString( '19', $html );
@@ -609,7 +609,7 @@ class DbPhase4Test extends TestCase {
 		delete_transient( IpPool::FREE_TRANSIENT );
 		$html = $this->card( $r );
 		$this->assertStringContainsString( 'No IPv4 address is free right now', $html );
-		$this->assertStringNotContainsString( 'Add an IPv4 address', $html );
+		$this->assertStringNotContainsString( 'Buy an IPv4 address', $html );
 		remove_all_filters( 'woocommerce_subscriptions_can_item_be_switched_by_user' );
 	}
 

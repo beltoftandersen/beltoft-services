@@ -21,6 +21,6 @@ defined( 'ABSPATH' ) || exit;
 	<p class="beltoft-licenses__empty"><?php if ( $active ) : ?><span class="beltoft-services-state is-ok"><?php esc_html_e( 'Active', 'beltoft-services' ); ?></span><?php endif; ?><?php echo esc_html( $promise ); ?></p>
 	<?php if ( ! $active ) : ?>
 		<?php if ( '' !== $price ) : ?><p class="beltoft-licenses__empty"><?php echo wp_kses_post( $price ); ?></p><?php endif; ?>
-		<?php \BeltoftServices\Account\ServiceArea::actions( array( array( 'label' => __( 'Add priority support', 'beltoft-services' ), 'url' => $url ) ), true ); ?>
+		<?php \BeltoftServices\Account\ServiceArea::actions( array( array( 'label' => __( 'Buy priority support', 'beltoft-services' ), 'url' => $url ) ), true ); ?>
 	<?php endif; ?>
 </section>

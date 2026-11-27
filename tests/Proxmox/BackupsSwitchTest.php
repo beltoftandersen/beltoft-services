@@ -103,7 +103,7 @@ class BackupsSwitchTest extends BackupTestCase {
 		$this->switchable();
 
 		$html = $this->panel( $r );
-		$url  = $this->href( $html, 'Add daily backups' );
+		$url  = $this->href( $html, 'Buy daily backups' );
 		$args = array();
 		wp_parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $args );
 
@@ -118,7 +118,7 @@ class BackupsSwitchTest extends BackupTestCase {
 		$this->assertNotFalse( wp_verify_nonce( $args['_wcsnonce'], 'wcs_switch_request' ) );
 
 		$this->assertMatchesRegularExpression( '#Price: \+[^<]*2\.00#', $html, 'The price difference is beside the link, not on it.' );
-		$this->assertDoesNotMatchRegularExpression( '#Add daily backups \(#', $html, 'No price in the button.' );
+		$this->assertDoesNotMatchRegularExpression( '#Buy daily backups \(#', $html, 'No price in the button.' );
 		$this->assertStringNotContainsString( 'Remove backups', $html );
 		$this->assertStringNotContainsString( 'data-action="restore"', $html );
 	}
@@ -142,7 +142,7 @@ class BackupsSwitchTest extends BackupTestCase {
 		$this->assertStringContainsString( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $stored[0]['ctime'] ), $html );
 		$this->assertStringContainsString( 'Type RESTORE to confirm', $html );
 		$this->assertStringContainsString( 'password and the SSH key go back', $html );
-		$this->assertStringNotContainsString( 'Add daily backups', $html );
+		$this->assertStringNotContainsString( 'Buy daily backups', $html );
 
 		$remove = $this->href( $html, 'Remove backups' );
 		$args   = array();
@@ -167,7 +167,7 @@ class BackupsSwitchTest extends BackupTestCase {
 		$this->switchable( false );
 
 		$this->assertSame( '', Backups::switch_url( $r, true ) );
-		$this->assertStringNotContainsString( 'Add daily backups', $this->panel( $r ) );
+		$this->assertStringNotContainsString( 'Buy daily backups', $this->panel( $r ) );
 		$this->assertStringNotContainsString( 'beltoft-services-vm__backups', $this->panel( $r ) );
 
 		list( , $none ) = $this->on_variation( 'a-None', false );

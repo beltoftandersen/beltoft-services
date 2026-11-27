@@ -11,7 +11,7 @@
 .beltoft-services-od-tile:hover .beltoft-services-od-tile__face { background: var(--bs-line, #e2ded5); }
 .beltoft-services-od-tile__name { font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
 .beltoft-services-od-tile__line { font-size: 14px; font-weight: 400; line-height: 1.4; opacity: 0.8; overflow-wrap: anywhere; }
-.beltoft-services-od-tile__input:checked + .beltoft-services-od-tile__face, .beltoft-services-od-tile:hover .beltoft-services-od-tile__input:checked + .beltoft-services-od-tile__face { background: var(--bs-surface, #fff); color: var(--bs-ink, #17201b); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bs-dark, #10241b) 22%, transparent), 0 1px 4px color-mix(in srgb, var(--bs-dark, #10241b) 10%, transparent); }
+.beltoft-services-od-tile__input:checked + .beltoft-services-od-tile__face, .beltoft-services-od-tile:hover .beltoft-services-od-tile__input:checked + .beltoft-services-od-tile__face { background: var(--bs-choice-sel-bg, var(--bs-surface, #fff)); color: var(--bs-ink, #17201b); border-color: var(--bs-choice-sel-border, var(--bs-dark, #10241b)); box-shadow: var(--bs-choice-sel-ring, inset 0 0 0 1px var(--bs-dark, #10241b)); }
 .beltoft-services-od-tile__input:checked:focus-visible + .beltoft-services-od-tile__face { outline: 2px solid var(--bs-dark, #10241b); outline-offset: 2px; }
 
 /* The panel of a tile. */
@@ -56,3 +56,8 @@
 .beltoft-services-whois { display: flex; align-items: flex-start; gap: 8px; margin: 0; font-weight: 400; line-height: 1.4; }
 .beltoft-services-whois input { flex: 0 0 auto; margin: 3px 0 0; }
 .beltoft-services-whois__note:not(:empty) { display: block; margin: 4px 0 0; font-size: 14px; }
+
+/* Selected choice tile: the --bs-choice-sel-* variables (defaults in account.css :root) and a check badge in the corner (--bs-choice-check: none drops it). */
+.beltoft-services-od-tile__input:checked + .beltoft-services-od-tile__face::after { content: ""; display: var(--bs-choice-check, block); position: absolute; top: 8px; right: 8px; width: 18px; height: 18px; border-radius: 50%; background: var(--bs-choice-sel-border, var(--bs-dark, #10241b)); }
+.beltoft-services-od-tile__input:checked + .beltoft-services-od-tile__face::before { content: ""; display: var(--bs-choice-check, block); position: absolute; z-index: 1; top: 12px; right: 15px; width: 4px; height: 8px; border: solid var(--bs-choice-check-ink, #fff); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.beltoft-services-od-tile__input:checked + .beltoft-services-od-tile__face { position: relative; }
