@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Mail;
 
+use BeltoftServices\Domains\DnsWatchSettings;
 use BeltoftLicenses\Events;
 use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
@@ -79,7 +80,7 @@ final class MailRetry {
 				$meta = array_merge(
 					Resource::retry_reset(),
 					array(
-						'mail_proof_until'     => time() + MailDns::WAIT_DAYS * DAY_IN_SECONDS,
+						'mail_proof_until'     => time() + DnsWatchSettings::wait_days( MailDnsWatch::ID ) * DAY_IN_SECONDS,
 						'mail_proof_failed_at' => 0,
 						'failed_op'            => '',
 						'last_error'           => '',

@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Mail;
 
+use BeltoftServices\Domains\DnsWatchSettings;
 use BeltoftServices\Domains\DnsRecordsGuide;
 use BeltoftServices\Domains\HostName;
 use BeltoftServices\Domains\ManualCheck;
@@ -230,7 +231,7 @@ final class MailView {
 		$word    = MailDnsState::of( $r );
 		$state   = in_array( $status, array( 'ok', 'timeout' ), true ) ? $status : ( array() === $rows ? '' : 'waiting' );
 		$can     = 'ready' === $kind && array() !== $rows && 'ok' !== $status;
-		$next    = $can ? ManualCheck::next( $r, self::MANUAL_META, MailSettings::dns_check_gap(), MailSettings::dns_check_per_hour() ) : 0;
+		$next    = $can ? ManualCheck::next( $r, self::MANUAL_META, DnsWatchSettings::check_gap( MailDnsWatch::ID ), DnsWatchSettings::check_per_hour( MailDnsWatch::ID ) ) : 0;
 
 		return array(
 			'mode'       => $mode,
@@ -247,7 +248,7 @@ final class MailView {
 			'next_text'  => $next > 0 ? ManualCheck::text( $next ) : '',
 			'checked'    => $checked > 0 ? wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $checked ) : '',
 			'checked_at' => $checked,
-			'days'       => MailDns::WAIT_DAYS,
+			'days'       => DnsWatchSettings::wait_days( MailDnsWatch::ID ),
 			'guide'      => self::guide( $domain, $mode, $rows, $proof, $state, $can, $checked, $next, 'open' === $retry['state'] ),
 		);
 	}
@@ -290,8 +291,8 @@ final class MailView {
 					),
 				),
 				'check'    => $retry ? array( 'label' => __( 'Try again', 'beltoft-services' ), 'attrs' => array( 'data-mail-retry' => '' ) ) : array( 'attrs' => array( 'data-mail-proof-check' => '' ) ),
-				'interval' => $retry ? 0 : MailDns::INTERVAL,
-				'days'     => MailDns::WAIT_DAYS,
+				'interval' => $retry ? 0 : DnsWatchSettings::look_seconds( MailDnsWatch::ID ),
+				'days'     => DnsWatchSettings::wait_days( MailDnsWatch::ID ),
 			);
 		}
 
@@ -367,8 +368,8 @@ final class MailView {
 			'hints'     => 'ours' === $mode ? array() : array( __( 'Using Cloudflare? Set these records to DNS only (grey cloud). Mail records cannot be proxied.', 'beltoft-services' ) ),
 			'done_hint' => array_values( array_filter( array( $second, in_array( 'dmarc', $missing, true ) ? __( 'Recommended: add a DMARC record.', 'beltoft-services' ) : '' ) ) ),
 			'checked'   => $checked,
-			'interval'  => 'external' === $mode && 'timeout' !== $state && 'ok' !== $state ? MailDns::INTERVAL : 0,
-			'days'      => MailDns::WAIT_DAYS,
+			'interval'  => 'external' === $mode && 'timeout' !== $state && 'ok' !== $state ? DnsWatchSettings::look_seconds( MailDnsWatch::ID ) : 0,
+			'days'      => DnsWatchSettings::wait_days( MailDnsWatch::ID ),
 		);
 
 		if ( 'ours' === $mode ) {
@@ -377,7 +378,7 @@ final class MailView {
 				__( 'A record marked Another value is there now was not added, because something else is already there. Change or remove that record, then press Check now.', 'beltoft-services' ),
 			);
 
-			if ( MailSettings::dns_cleanup_on_delete() ) {
+			if ( DnsWatchSettings::cleanup_on_delete( MailDnsWatch::ID ) ) {
 				$model['steps'][] = __( 'If you delete this email domain, we also remove the records we made in your DNS.', 'beltoft-services' );
 			}
 

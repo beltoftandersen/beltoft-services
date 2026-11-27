@@ -163,41 +163,41 @@ return array (
     'html' => 'emails/beltoft-services-mail-ready.php',
     'plain' => 'emails/plain/beltoft-services-mail-ready.php',
   ),
-  'beltoft_services_mail_dns_reminder' => 
+  'beltoft_services_dns_reminder' => 
   array (
-    'title' => 'Email DNS records missing',
-    'description' => 'Sent once, a day after an email domain hosted elsewhere was set up, when DNS records are still missing.',
+    'title' => 'DNS records missing',
+    'description' => 'Sent once, a day after a service on a domain hosted elsewhere was set up, when needed DNS records are still missing. The same text for every service that has DNS records to add (email first).',
     'subject' => 'DNS records are still missing for {domain_name}',
     'heading' => 'DNS records are still missing',
-    'html' => 'emails/beltoft-services-mail-dns-reminder.php',
-    'plain' => 'emails/plain/beltoft-services-mail-dns-reminder.php',
+    'html' => 'emails/beltoft-services-dns-reminder.php',
+    'plain' => 'emails/plain/beltoft-services-dns-reminder.php',
   ),
-  'beltoft_services_mail_dns_lost' => 
+  'beltoft_services_dns_lost' => 
   array (
-    'title' => 'Email DNS records lost',
-    'description' => 'Sent when DNS records of an email domain that were found before are gone again, after a second read confirms it. Sent again as a reminder on the days set under Email settings, three emails at most for one loss. It says which records are missing and that nothing is deleted.',
+    'title' => 'DNS records lost',
+    'description' => 'Sent when DNS records of a service that were found before are gone again, after a second read confirms it. Sent again as a reminder on the days set under Domains, DNS watch, three emails at most for one loss. It says which records are missing and that nothing is deleted.',
     'subject' => 'DNS records are missing for {domain_name}',
     'heading' => 'DNS records are missing',
-    'html' => 'emails/beltoft-services-mail-dns-lost.php',
-    'plain' => 'emails/plain/beltoft-services-mail-dns-lost.php',
+    'html' => 'emails/beltoft-services-dns-lost.php',
+    'plain' => 'emails/plain/beltoft-services-dns-lost.php',
   ),
-  'beltoft_services_mail_dns_back' => 
+  'beltoft_services_dns_back' => 
   array (
-    'title' => 'Email DNS records found again',
-    'description' => 'Sent once, only after the lost records email was sent, when the records of the email domain are found again.',
+    'title' => 'DNS records found again',
+    'description' => 'Sent once, only after the lost records email was sent, when the records of the service are found again.',
     'subject' => 'The DNS records for {domain_name} are found again',
     'heading' => 'DNS records found again',
-    'html' => 'emails/beltoft-services-mail-dns-back.php',
-    'plain' => 'emails/plain/beltoft-services-mail-dns-back.php',
+    'html' => 'emails/beltoft-services-dns-back.php',
+    'plain' => 'emails/plain/beltoft-services-dns-back.php',
   ),
-  'beltoft_services_mail_dns_timeout' => 
+  'beltoft_services_dns_timeout' => 
   array (
-    'title' => 'Email DNS check stopped',
-    'description' => 'Sent once when the ten minute look at the DNS records of an email domain stops after 14 days without the records. The customer can start it again with Check now.',
+    'title' => 'DNS check stopped',
+    'description' => 'Sent once when the look at the DNS records of a service stops after the days set under Domains, DNS watch, without the records. The customer can start it again with Check now.',
     'subject' => 'We have stopped checking the DNS of {domain_name}',
     'heading' => 'We have stopped checking DNS',
-    'html' => 'emails/beltoft-services-mail-dns-timeout.php',
-    'plain' => 'emails/plain/beltoft-services-mail-dns-timeout.php',
+    'html' => 'emails/beltoft-services-dns-timeout.php',
+    'plain' => 'emails/plain/beltoft-services-dns-timeout.php',
   ),
   'beltoft_services_renewal_reminder' => 
   array (

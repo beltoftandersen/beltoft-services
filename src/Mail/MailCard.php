@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Mail;
 
+use BeltoftServices\Domains\DnsWatchSettings;
 use BeltoftServices\Mail\Email;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Resource;
@@ -71,7 +72,7 @@ final class MailCard {
 					'aliasing'  => __( 'Making the alias…', 'beltoft-services' ),
 					'adding'    => __( 'Adding the domain…', 'beltoft-services' ),
 					'removing'  => __( 'Removing the domain…', 'beltoft-services' ),
-					'removeAsk' => MailSettings::dns_cleanup_on_delete()
+					'removeAsk' => DnsWatchSettings::cleanup_on_delete( MailDnsWatch::ID )
 						? __( 'Remove this domain from your plan? We also remove the email records we made in your DNS on our name servers.', 'beltoft-services' )
 						: __( 'Remove this domain from your plan?', 'beltoft-services' ),
 					'checking'  => __( 'Looking at your DNS. This can take a few seconds.', 'beltoft-services' ),

@@ -304,6 +304,8 @@ final class Plugin {
 		Admin\Panel::register();
 		Admin\Screen::register();
 		Admin\LicenceServiceColumn::register();
+		// After every feature has put its object into beltoft_services_dns_watches (email above, hosting in its boot stage).
+		Domains\DnsWatch::register();
 		Emails\Emails::register();
 		Proxmox\Disk\UsageDisk::register();
 		Proxmox\Network\PowerWatch::register();

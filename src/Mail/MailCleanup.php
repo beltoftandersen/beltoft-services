@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Mail;
 
+use BeltoftServices\Domains\DnsWatchSettings;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -14,7 +15,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Only for a zone of ours, only the records this service wrote (mail_records, mark written_by_us), only a record that still holds
  * exactly the value we wrote, and only through MailDns::unpublish() (the zone writer). A domain at another provider has no zone
- * of ours: nothing is written anywhere. Behind the setting mail_dns_cleanup_on_delete. Run again after a retry it finds nothing
+ * of ours: nothing is written anywhere. Behind the setting dns_watch_cleanup_on_delete (Domains). Run again after a retry it finds nothing
  * more to remove.
  */
 final class MailCleanup {
@@ -26,7 +27,7 @@ final class MailCleanup {
 	 * @return true|\WP_Error True when done or not due; an error when the zone could not be changed (the delete tries again).
 	 */
 	public static function run( Resource $r ) {
-		if ( ! MailSettings::dns_cleanup_on_delete() ) {
+		if ( ! DnsWatchSettings::cleanup_on_delete( MailDnsWatch::ID ) ) {
 			return true;
 		}
 

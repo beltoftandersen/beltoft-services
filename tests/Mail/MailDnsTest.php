@@ -8,6 +8,7 @@
 namespace BeltoftServices\Tests\Mail;
 
 use BeltoftServices\Domains\FakeDns;
+use BeltoftServices\Domains\DnsWatchSettings;
 use BeltoftServices\Jobs;
 use BeltoftServices\Mail\MailDns;
 use BeltoftServices\Resource;
@@ -127,7 +128,7 @@ final class MailDnsTest extends MailTestCase {
 		$this->assertSame( 1, $this->pending( $r->id() ), 'The next look is queued.' );
 
 		$this->publish_all();
-		$fresh->set( array( 'mail_dns_checked' => time() - 2 * MailDns::INTERVAL ) );
+		$fresh->set( array( 'mail_dns_checked' => time() - 2 * DnsWatchSettings::look_seconds() ) );
 		MailDns::run( $r->id() );
 		$fresh = Resource::find( $r->id() );
 		$this->assertSame( array( 'ok' ), array_values( array_unique( array_column( $fresh->get( 'mail_records' ), 'status' ) ) ) );
@@ -168,7 +169,7 @@ final class MailDnsTest extends MailTestCase {
 		$this->assertSame( 1, $this->pending( $r->id() ) );
 
 		$r = Resource::find( $r->id() );
-		$r->set( array( 'mail_dns_checked' => time() - 2 * MailDns::INTERVAL, 'mail_dns_since' => time() - 15 * DAY_IN_SECONDS ) );
+		$r->set( array( 'mail_dns_checked' => time() - 2 * DnsWatchSettings::look_seconds(), 'mail_dns_since' => time() - 15 * DAY_IN_SECONDS ) );
 		MailDns::run( $r->id() );
 		$fresh = Resource::find( $r->id() );
 		$this->assertSame( 'timeout', $fresh->get( 'mail_dns' ) );

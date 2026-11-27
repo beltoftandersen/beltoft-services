@@ -9,6 +9,7 @@
 namespace BeltoftServices\Tests\Mail;
 
 use BeltoftServices\Jobs;
+use BeltoftServices\Domains\DnsWatchSettings;
 use BeltoftServices\Mail\MailDns;
 use BeltoftServices\Mail\MailDnsState;
 use BeltoftServices\Mail\MailHold;
@@ -34,7 +35,7 @@ final class MailDnsLostTest extends MailTestCase {
 	public function test_a_domain_with_mx_but_no_spf_or_dkim_says_sending_is_held(): void {
 		$r = $this->ready_mail( 'half.example' );
 		$this->found( $r, array( 'mx' ) );
-		$r->set( array( 'mail_dns_checked' => time() - 2 * MailDns::INTERVAL ) );
+		$r->set( array( 'mail_dns_checked' => time() - 2 * DnsWatchSettings::look_seconds() ) );
 		MailDns::run( $r->id() );
 		$r = Resource::find( $r->id() );
 
@@ -97,7 +98,7 @@ final class MailDnsLostTest extends MailTestCase {
 	}
 
 	public function test_the_confirm_wait_is_a_setting(): void {
-		$this->settings( array( 'mail_dns_confirm_minutes' => 30 ) );
+		$this->settings( array( 'dns_watch_confirm_minutes' => 30 ) );
 		$r = $this->found_once( 'wait.example' );
 		$this->found( $r, array( 'mx', 'dkim' ) );
 		MailDns::recheck( $r->id() );
@@ -130,7 +131,7 @@ final class MailDnsLostTest extends MailTestCase {
 	}
 
 	public function test_the_reminder_days_are_a_setting(): void {
-		$this->settings( array( 'mail_dns_remind_days' => '' ) );
+		$this->settings( array( 'dns_watch_remind_days' => '' ) );
 		$r = $this->confirmed_loss( 'single.example' );
 		$r->set( array( 'mail_dns_lost_at' => time() - 20 * DAY_IN_SECONDS ) );
 		MailDns::lost_reminders( $r->id() );
@@ -143,7 +144,7 @@ final class MailDnsLostTest extends MailTestCase {
 		$this->mails = array();
 
 		$this->found( $r, array( 'mx', 'spf', 'dkim' ) );
-		$r->set( array( 'mail_dns_checked' => time() - 2 * MailDns::INTERVAL ) );
+		$r->set( array( 'mail_dns_checked' => time() - 2 * DnsWatchSettings::look_seconds() ) );
 		MailDns::run( $r->id() );
 		$r = Resource::find( $r->id() );
 
@@ -165,7 +166,7 @@ final class MailDnsLostTest extends MailTestCase {
 	public function test_no_back_mail_when_no_lost_mail_was_sent(): void {
 		$r = $this->ready_mail( 'first.example' );
 		$this->found( $r, array( 'mx', 'spf', 'dkim' ) );
-		$r->set( array( 'mail_dns_checked' => time() - 2 * MailDns::INTERVAL ) );
+		$r->set( array( 'mail_dns_checked' => time() - 2 * DnsWatchSettings::look_seconds() ) );
 		MailDns::run( $r->id() );
 
 		$this->assertSame( 'ok', Resource::find( $r->id() )->get( 'mail_dns' ) );
@@ -175,7 +176,7 @@ final class MailDnsLostTest extends MailTestCase {
 	public function test_after_14_days_the_customer_is_told_once_that_we_stopped_looking(): void {
 		$r = $this->ready_mail( 'late.example' );
 		\BeltoftLicenses\Licenses::update( (int) $r->license()['id'], array( 'email' => 'christian.beltoft@gmail.com' ) );
-		$r->set( array( 'mail_dns_since' => time() - 15 * DAY_IN_SECONDS, 'mail_dns_checked' => time() - 2 * MailDns::INTERVAL, 'mail_dns_reminded' => time() ) );
+		$r->set( array( 'mail_dns_since' => time() - 15 * DAY_IN_SECONDS, 'mail_dns_checked' => time() - 2 * DnsWatchSettings::look_seconds(), 'mail_dns_reminded' => time() ) );
 		$this->dns = array();
 
 		MailDns::run( $r->id() );
@@ -282,7 +283,7 @@ final class MailDnsLostTest extends MailTestCase {
 			$this->assertTrue( MailHold::held( $lost ), 'So does the sending hold.' );
 
 			$this->found( $r, array( 'mx', 'spf', 'dkim' ) );
-			$lost->set( array( 'mail_dns_checked' => time() - 2 * MailDns::INTERVAL ) );
+			$lost->set( array( 'mail_dns_checked' => time() - 2 * DnsWatchSettings::look_seconds() ) );
 			MailDns::run( $r->id() );
 			$this->assertSame( 'ok', Resource::find( $r->id() )->get( 'mail_dns' ) );
 			$this->assertFalse( MailHold::held( Resource::find( $r->id() ) ) );
@@ -310,7 +311,7 @@ final class MailDnsLostTest extends MailTestCase {
 	}
 
 	public function test_the_gap_is_a_setting_and_zero_turns_it_off(): void {
-		$this->settings( array( 'mail_dns_lost_mail_gap_hours' => 0 ) );
+		$this->settings( array( 'dns_watch_lost_mail_gap_hours' => 0 ) );
 		$r = $this->found_once( 'nogap.example' );
 		$r->set( array( 'mail_dns_last_mail' => time() ) );
 		$this->found( $r, array( 'mx', 'dkim' ) );

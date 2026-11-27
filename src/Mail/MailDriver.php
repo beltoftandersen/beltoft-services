@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Mail;
 
+use BeltoftServices\Domains\DnsWatchSettings;
 use BeltoftServices\Alerts;
 use BeltoftServices\Domains\Ownership;
 use BeltoftServices\Drivers\Driver;
@@ -233,7 +234,7 @@ final class MailDriver implements Driver, NeedsBilling, InternalActions {
 		$meta = array_merge( MailDns::meta_for( $rows ), array( 'steps' => array_merge( $steps, array( 'dns' ) ) ) );
 
 		if ( 'waiting' === $meta['mail_dns'] ) {
-			MailDns::schedule( $r->id(), MailDns::INTERVAL );
+			MailDns::schedule( $r->id(), DnsWatchSettings::look_seconds( MailDnsWatch::ID ) );
 		}
 
 		return StepResult::done( $meta, 'Email domain ready' );
@@ -268,7 +269,7 @@ final class MailDriver implements Driver, NeedsBilling, InternalActions {
 		}
 
 		$until = (int) $r->get( 'mail_proof_until' );
-		$until = $until > 0 ? $until : time() + MailDns::WAIT_DAYS * DAY_IN_SECONDS;
+		$until = $until > 0 ? $until : time() + DnsWatchSettings::wait_days( MailDnsWatch::ID ) * DAY_IN_SECONDS;
 		$check = Ownership::check( $user, $name, array_filter( array( MailDomain::legacy_token( $r ) ) ) );
 
 		if ( 'found' === $check['status'] ) {
@@ -283,7 +284,7 @@ final class MailDriver implements Driver, NeedsBilling, InternalActions {
 			return StepResult::fail( 'The ownership proof for the domain was not found in time.', array( 'mail_proof_failed_at' => time() ) );
 		}
 
-		return StepResult::wait( MailDns::INTERVAL, 'Waiting for the ownership proof (' . ( '' !== $check['reason'] ? $check['reason'] : $check['status'] ) . ').', $until, array( 'mail_proof_until' => $until, 'mail_mode' => 'external' ) );
+		return StepResult::wait( DnsWatchSettings::look_seconds( MailDnsWatch::ID ), 'Waiting for the ownership proof (' . ( '' !== $check['reason'] ? $check['reason'] : $check['status'] ) . ').', $until, array( 'mail_proof_until' => $until, 'mail_mode' => 'external' ) );
 	}
 
 	/**

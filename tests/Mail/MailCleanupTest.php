@@ -93,7 +93,7 @@ final class MailCleanupTest extends MailTestCase {
 	}
 
 	public function test_it_is_a_setting_and_off_removes_nothing(): void {
-		$this->settings( array( 'mail_dns_cleanup_on_delete' => 0 ) );
+		$this->settings( array( 'dns_watch_cleanup_on_delete' => 0 ) );
 		list( $r ) = $this->ours( 'keep.example' );
 		$before = $this->types( 'keep.example' );
 
@@ -133,7 +133,7 @@ final class MailCleanupTest extends MailTestCase {
 	}
 
 	public function test_a_stale_dkim_key_of_ours_is_replaced_when_the_domain_is_set_up_again(): void {
-		$this->settings( array( 'mail_dns_cleanup_on_delete' => 0 ) );
+		$this->settings( array( 'dns_watch_cleanup_on_delete' => 0 ) );
 		list( $old, $user ) = $this->ours( 'again.example' );
 
 		// The key we wrote earlier was another one (the mail server made a new key since): the old record and the old service remember it.

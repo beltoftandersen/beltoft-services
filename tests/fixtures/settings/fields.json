@@ -1042,111 +1042,6 @@
         "label": "DMARC report address",
         "desc": "Where DMARC reports for customer domains go. Empty: the WordPress admin email."
     },
-    "mail_dns_confirm_minutes": {
-        "tab": "mail",
-        "section": "mail_watch",
-        "type": "number",
-        "default": 10,
-        "min": 0,
-        "max": 1440,
-        "label": "Minutes to wait before a lost record is confirmed",
-        "desc": "When a needed DNS record is not found, the record is read once more after this many minutes. Only if it is still gone is the customer told. 0 confirms at once."
-    },
-    "mail_dns_remind_days": {
-        "tab": "mail",
-        "section": "mail_watch",
-        "type": "text",
-        "default": "3,10",
-        "label": "Days after a loss when the customer is reminded",
-        "desc": "Day numbers separated by commas. The first email goes out when the loss is confirmed; each day here adds one reminder while the records are still missing. Empty sends the first email only."
-    },
-    "mail_dns_recheck_per_day": {
-        "tab": "mail",
-        "section": "mail_watch",
-        "type": "select",
-        "default": "2",
-        "options": {
-            "1": "Once a day",
-            "2": "Twice a day",
-            "4": "Four times a day"
-        },
-        "label": "How often a domain with all records is looked at again"
-    },
-    "mail_dns_weekly_days": {
-        "tab": "mail",
-        "section": "mail_watch",
-        "type": "number",
-        "default": 7,
-        "min": 1,
-        "max": 60,
-        "label": "Days between looks after the first 14 days",
-        "desc": "After the ten minute look has stopped, a domain that still lacks records is looked at this often."
-    },
-    "mail_dns_stop_days": {
-        "tab": "mail",
-        "section": "mail_watch",
-        "type": "number",
-        "default": 90,
-        "min": 15,
-        "max": 3650,
-        "label": "Days after which the look stops for good"
-    },
-    "mail_dns_admin_days": {
-        "tab": "mail",
-        "section": "mail_watch",
-        "type": "number",
-        "default": 60,
-        "min": 1,
-        "max": 3650,
-        "label": "Days without email DNS before you get one alert",
-        "desc": "You get one email. Nothing is paused or deleted because of it."
-    },
-    "mail_dns_admin_throttle_days": {
-        "tab": "mail",
-        "section": "mail_watch",
-        "type": "number",
-        "default": 7,
-        "min": 1,
-        "max": 365,
-        "label": "Days between two alerts about the same domain losing records"
-    },
-    "mail_dns_lost_mail_gap_hours": {
-        "tab": "mail",
-        "section": "mail_watch",
-        "type": "number",
-        "default": 24,
-        "min": 0,
-        "max": 720,
-        "label": "Hours between a lost mail and the next one for the same domain",
-        "desc": "A record that goes missing and comes back again and again does not mail the customer each time: a loss confirmed within this many hours after the last lost or found mail sends no new lost mail, and a found mail is not sent again within this time. The page and the sending hold always follow the real state. 0 turns this off."
-    },
-    "mail_dns_check_gap": {
-        "tab": "mail",
-        "section": "mail_watch",
-        "type": "number",
-        "default": 60,
-        "min": 0,
-        "max": 3600,
-        "label": "Seconds between two Check now presses of a customer"
-    },
-    "mail_dns_check_per_hour": {
-        "tab": "mail",
-        "section": "mail_watch",
-        "type": "number",
-        "default": 10,
-        "min": 1,
-        "max": 1000,
-        "label": "Check now presses of a customer in an hour"
-    },
-    "mail_dns_lost_red_days": {
-        "tab": "mail",
-        "section": "mail_watch",
-        "type": "number",
-        "default": 3,
-        "min": 0,
-        "max": 365,
-        "label": "Days after a loss when the status turns red"
-    },
     "mail_dns_mx_strict": {
         "tab": "mail",
         "section": "mail_watch",
@@ -1154,14 +1049,6 @@
         "default": 1,
         "label": "Count a second MX record with the same or a better priority as a problem",
         "desc": "Off: it is only shown as a note and the domain still counts as set up."
-    },
-    "mail_dns_cleanup_on_delete": {
-        "tab": "mail",
-        "section": "mail_watch",
-        "type": "checkbox",
-        "default": 1,
-        "label": "Remove our email records from the customer zone when the email domain is deleted",
-        "desc": "Only for zones on our own name servers, and only records that still hold exactly the value we wrote. Records at other DNS providers are never touched."
     },
     "mail_retry_days": {
         "tab": "mail",
@@ -1259,6 +1146,148 @@
         "default": "",
         "label": "Plesk licence costs",
         "desc": "One tier key and what Openprovider charges per month in EUR excluding VAT, for example pro=12.50. A licence is only ordered when the paid line of the tier covers this. Empty means unknown, and the live client refuses to order."
+    },
+    "dns_watch_wait_days": {
+        "tab": "domains",
+        "section": "dns_watch",
+        "type": "number",
+        "default": 14,
+        "min": 1,
+        "max": 365,
+        "label": "Days the DNS records are looked for every few minutes",
+        "desc": "After a service is set up, its DNS records are looked for this long. Then the look slows down (see the days between looks below)."
+    },
+    "dns_watch_look_minutes": {
+        "tab": "domains",
+        "section": "dns_watch",
+        "type": "number",
+        "default": 10,
+        "min": 5,
+        "max": 1440,
+        "label": "Minutes between two looks while the records are awaited"
+    },
+    "dns_watch_first_remind_hours": {
+        "tab": "domains",
+        "section": "dns_watch",
+        "type": "number",
+        "default": 24,
+        "min": 1,
+        "max": 720,
+        "label": "Hours after setup before the customer is reminded of missing records",
+        "desc": "One email, only for a domain hosted at another DNS provider and only while needed records are missing."
+    },
+    "dns_watch_confirm_minutes": {
+        "tab": "domains",
+        "section": "dns_watch",
+        "type": "number",
+        "default": 10,
+        "min": 0,
+        "max": 1440,
+        "label": "Minutes to wait before a lost record is confirmed",
+        "desc": "When a needed DNS record is not found, the record is read once more after this many minutes. Only if it is still gone is the customer told. 0 confirms at once."
+    },
+    "dns_watch_remind_days": {
+        "tab": "domains",
+        "section": "dns_watch",
+        "type": "text",
+        "default": "3,10",
+        "label": "Days after a loss when the customer is reminded",
+        "desc": "Day numbers separated by commas. The first email goes out when the loss is confirmed; each day here adds one reminder while the records are still missing. Empty sends the first email only."
+    },
+    "dns_watch_recheck_per_day": {
+        "tab": "domains",
+        "section": "dns_watch",
+        "type": "select",
+        "default": "2",
+        "options": {
+            "1": "Once a day",
+            "2": "Twice a day",
+            "4": "Four times a day"
+        },
+        "label": "How often a service with all records is looked at again"
+    },
+    "dns_watch_weekly_days": {
+        "tab": "domains",
+        "section": "dns_watch",
+        "type": "number",
+        "default": 7,
+        "min": 1,
+        "max": 60,
+        "label": "Days between looks after the first 14 days",
+        "desc": "After the first look has stopped, a service that still lacks records is looked at this often."
+    },
+    "dns_watch_stop_days": {
+        "tab": "domains",
+        "section": "dns_watch",
+        "type": "number",
+        "default": 90,
+        "min": 15,
+        "max": 3650,
+        "label": "Days after which the look stops for good"
+    },
+    "dns_watch_admin_days": {
+        "tab": "domains",
+        "section": "dns_watch",
+        "type": "number",
+        "default": 60,
+        "min": 1,
+        "max": 3650,
+        "label": "Days without the records before you get one alert",
+        "desc": "You get one email. Nothing is paused or deleted because of it."
+    },
+    "dns_watch_admin_throttle_days": {
+        "tab": "domains",
+        "section": "dns_watch",
+        "type": "number",
+        "default": 7,
+        "min": 1,
+        "max": 365,
+        "label": "Days between two alerts about the same domain losing records"
+    },
+    "dns_watch_lost_mail_gap_hours": {
+        "tab": "domains",
+        "section": "dns_watch",
+        "type": "number",
+        "default": 24,
+        "min": 0,
+        "max": 720,
+        "label": "Hours between a lost mail and the next one for the same domain",
+        "desc": "A record that goes missing and comes back again and again does not mail the customer each time: a loss confirmed within this many hours after the last lost or found mail sends no new lost mail, and a found mail is not sent again within this time. The page and anything held always follow the real state. 0 turns this off."
+    },
+    "dns_watch_check_gap": {
+        "tab": "domains",
+        "section": "dns_watch",
+        "type": "number",
+        "default": 60,
+        "min": 0,
+        "max": 3600,
+        "label": "Seconds between two Check now presses of a customer"
+    },
+    "dns_watch_check_per_hour": {
+        "tab": "domains",
+        "section": "dns_watch",
+        "type": "number",
+        "default": 10,
+        "min": 1,
+        "max": 1000,
+        "label": "Check now presses of a customer in an hour"
+    },
+    "dns_watch_lost_red_days": {
+        "tab": "domains",
+        "section": "dns_watch",
+        "type": "number",
+        "default": 3,
+        "min": 0,
+        "max": 365,
+        "label": "Days after a loss when the status turns red"
+    },
+    "dns_watch_cleanup_on_delete": {
+        "tab": "domains",
+        "section": "dns_watch",
+        "type": "checkbox",
+        "default": 1,
+        "label": "Remove our DNS records from the customer zone when the service is deleted",
+        "desc": "Only for zones on our own name servers, and only records that still hold exactly the value we wrote. Records at other DNS providers are never touched."
     },
     "counted_billing": {
         "tab": "general",

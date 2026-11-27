@@ -8,6 +8,7 @@
 namespace BeltoftServices\Tests\Mail;
 
 use BeltoftServices\Mail\MailDns;
+use BeltoftServices\Domains\DnsWatchSettings;
 use BeltoftServices\Mail\MailView;
 use BeltoftServices\Resource;
 
@@ -33,7 +34,7 @@ final class MailDnsMxTest extends MailTestCase {
 		$r = $this->ready_mail( 'split.example' );
 		$this->found( $r, array( 'spf', 'dkim' ) );
 		$this->dns['MX split.example'] = array( '10 mail.example.net.', '5 mx.other.example.' );
-		$r->set( array( 'mail_dns_checked' => time() - 2 * MailDns::INTERVAL ) );
+		$r->set( array( 'mail_dns_checked' => time() - 2 * DnsWatchSettings::look_seconds() ) );
 
 		MailDns::run( $r->id() );
 		$r    = Resource::find( $r->id() );
@@ -52,7 +53,7 @@ final class MailDnsMxTest extends MailTestCase {
 		$r = $this->ready_mail( 'note.example' );
 		$this->found( $r, array( 'spf', 'dkim' ) );
 		$this->dns['MX note.example'] = array( '10 mail.example.net.', '20 mx.other.example.' );
-		$r->set( array( 'mail_dns_checked' => time() - 2 * MailDns::INTERVAL ) );
+		$r->set( array( 'mail_dns_checked' => time() - 2 * DnsWatchSettings::look_seconds() ) );
 
 		MailDns::run( $r->id() );
 		$r = Resource::find( $r->id() );
@@ -66,7 +67,7 @@ final class MailDnsMxTest extends MailTestCase {
 		$r = $this->ready_mail( 'lax.example' );
 		$this->found( $r, array( 'spf', 'dkim' ) );
 		$this->dns['MX lax.example'] = array( '10 mail.example.net.', '5 mx.other.example.' );
-		$r->set( array( 'mail_dns_checked' => time() - 2 * MailDns::INTERVAL ) );
+		$r->set( array( 'mail_dns_checked' => time() - 2 * DnsWatchSettings::look_seconds() ) );
 
 		MailDns::run( $r->id() );
 		$r = Resource::find( $r->id() );
@@ -79,7 +80,7 @@ final class MailDnsMxTest extends MailTestCase {
 		$r = $this->ready_mail( 'proxy.example' );
 		$this->found( $r, array( 'mx', 'spf', 'dkim' ) );
 		$this->dns['A autoconfig.proxy.example'] = array( '104.16.1.1' );
-		$r->set( array( 'mail_dns_checked' => time() - 2 * MailDns::INTERVAL ) );
+		$r->set( array( 'mail_dns_checked' => time() - 2 * DnsWatchSettings::look_seconds() ) );
 
 		MailDns::run( $r->id() );
 		$r    = Resource::find( $r->id() );

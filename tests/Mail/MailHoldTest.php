@@ -8,6 +8,7 @@
 namespace BeltoftServices\Tests\Mail;
 
 use BeltoftServices\Mail\MailDns;
+use BeltoftServices\Domains\DnsWatchSettings;
 use BeltoftServices\Mail\MailHold;
 use BeltoftServices\Mail\MailView;
 use BeltoftServices\Mail\Mailboxes;
@@ -36,7 +37,7 @@ final class MailHoldTest extends MailTestCase {
 	}
 
 	private function check( Resource $r ): Resource {
-		$r->set( array( 'mail_dns_checked' => time() - 2 * MailDns::INTERVAL ) );
+		$r->set( array( 'mail_dns_checked' => time() - 2 * DnsWatchSettings::look_seconds() ) );
 		MailDns::run( $r->id() );
 
 		return Resource::find( $r->id() );

@@ -8,6 +8,7 @@
 namespace BeltoftServices\Tests\Mail;
 
 use BeltoftLicenses\Account\Endpoint;
+use BeltoftServices\Domains\DnsWatchSettings;
 use BeltoftLicenses\Account\View;
 use BeltoftServices\Mail\Email;
 use BeltoftServices\Account\Overview;
@@ -241,7 +242,7 @@ final class MailAccountTest extends MailTestCase {
 		$r = $this->ready_mail( 'elsewhere.example', array(), $this->user );
 		$this->dns['MX elsewhere.example']  = array( '10 mx.other-provider.example.' );
 		$this->dns['TXT elsewhere.example'] = array( 'v=spf1 include:_spf.google.com ~all' );
-		$r->set( array( 'mail_dns_checked' => time() - 2 * \BeltoftServices\Mail\MailDns::INTERVAL ) );
+		$r->set( array( 'mail_dns_checked' => time() - 2 * DnsWatchSettings::look_seconds() ) );
 		\BeltoftServices\Mail\MailDns::run( $r->id() );
 
 		$html = $this->page( Resource::find( $r->id() ), 'dns' );
@@ -259,7 +260,7 @@ final class MailAccountTest extends MailTestCase {
 		$this->dns['TXT _dmarc.elsewhere.example']          = array( 'v=DMARC1; p=none' );
 		$this->dns['CNAME autoconfig.elsewhere.example']    = array( 'mail.example.net.' );
 		$this->dns['CNAME autodiscover.elsewhere.example']  = array( 'mail.example.net.' );
-		Resource::find( $r->id() )->set( array( 'mail_dns_checked' => time() - 2 * \BeltoftServices\Mail\MailDns::INTERVAL ) );
+		Resource::find( $r->id() )->set( array( 'mail_dns_checked' => time() - 2 * DnsWatchSettings::look_seconds() ) );
 		\BeltoftServices\Mail\MailDns::run( $r->id() );
 
 		$html = $this->page( Resource::find( $r->id() ), 'dns' );

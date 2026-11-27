@@ -9,7 +9,6 @@ namespace BeltoftServices\Mail;
 
 use BeltoftServices\Domains\Ownership;
 use BeltoftServices\Resource;
-use BeltoftServices\Domains\ZoneAccess;
 use BeltoftServices\Domains\HostName;
 
 defined( 'ABSPATH' ) || exit;
@@ -120,7 +119,7 @@ final class MailDomain {
 	 * @param int    $user_id Customer.
 	 */
 	public static function on_our_servers( string $name, int $user_id ): bool {
-		return in_array( $name, ZoneAccess::zones( $user_id ), true ) && ! MailMoved::away( $name, $user_id );
+		return \BeltoftServices\Domains\DnsWatch::on_our_servers( $name, $user_id );
 	}
 
 	/**

@@ -8,6 +8,7 @@
 namespace BeltoftServices\Tests\Mail;
 
 use BeltoftServices\Mail\MailDns;
+use BeltoftServices\Domains\DnsWatchSettings;
 use BeltoftServices\Mail\MailHold;
 use BeltoftServices\Resource;
 
@@ -46,7 +47,7 @@ trait DnsFixtures {
 		$this->assertIsArray( $this->create_box( Resource::find( $r->id() ), 'anna' ) );
 
 		$this->found( $r, array( 'mx', 'spf', 'dkim' ) );
-		$r->set( array( 'mail_dns_checked' => time() - 2 * MailDns::INTERVAL ) );
+		$r->set( array( 'mail_dns_checked' => time() - 2 * DnsWatchSettings::look_seconds() ) );
 		MailDns::run( $r->id() );
 		$r = Resource::find( $r->id() );
 

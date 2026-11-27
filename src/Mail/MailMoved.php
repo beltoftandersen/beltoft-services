@@ -7,15 +7,13 @@
 
 namespace BeltoftServices\Mail;
 
-use BeltoftServices\Domains\Delegation;
-use BeltoftServices\Domains\DnsAssignments;
-use BeltoftServices\Domains\DnsSchema;
+use BeltoftServices\Domains\DnsWatch;
 use BeltoftServices\Resource;
-use BeltoftServices\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
+ * The work is the shared DNS watch's (Domains\DnsWatch); these are email's names for it.
  * Whether a name counts as ours is a database answer (ZoneAccess). For a DNS hosting service the parent zone can say otherwise:
  * the customer pointed the name servers somewhere else. The delegation of the service is read again every few days (the days
  * between two checks are a setting of the domains tab); once it says other, the name stops counting as ours for email, and the
@@ -29,19 +27,7 @@ final class MailMoved {
 	 * @param string $domain Domain.
 	 */
 	public static function service( string $domain ): ?Resource {
-		if ( ! DnsSchema::ready() ) {
-			return null;
-		}
-
-		$row = DnsAssignments::get( $domain );
-
-		if ( null === $row || 'active' !== $row['status'] || (int) $row['resource_id'] <= 0 ) {
-			return null;
-		}
-
-		$r = Resource::find( (int) $row['resource_id'] );
-
-		return $r && 'dns' === $r->get( 'driver' ) ? $r : null;
+		return DnsWatch::service( $domain );
 	}
 
 	/**
@@ -53,9 +39,7 @@ final class MailMoved {
 	public static function away( string $domain, int $user_id ): bool {
 		unset( $user_id );
 
-		$service = self::service( $domain );
-
-		return null !== $service && 'other' === (string) $service->get( 'delegation' );
+		return DnsWatch::away( $domain );
 	}
 
 	/**
@@ -64,16 +48,6 @@ final class MailMoved {
 	 * @param Resource $r Mail resource.
 	 */
 	public static function watch( Resource $r ): void {
-		$service = self::service( (string) $r->get( MailDomain::META_DOMAIN ) );
-
-		if ( null === $service || ! $service->is_live() ) {
-			return;
-		}
-
-		$days = max( 1, (int) Settings::get( 'dns_delegation_recheck_days' ) );
-
-		if ( time() - (int) $service->get( 'delegation_checked' ) >= $days * DAY_IN_SECONDS - HOUR_IN_SECONDS ) {
-			Delegation::refresh( $service );
-		}
+		DnsWatch::watch_delegation( (string) $r->get( MailDomain::META_DOMAIN ) );
 	}
 }

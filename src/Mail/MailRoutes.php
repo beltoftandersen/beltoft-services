@@ -7,6 +7,7 @@
 
 namespace BeltoftServices\Mail;
 
+use BeltoftServices\Domains\DnsWatchSettings;
 use BeltoftServices\Mail\Email;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Api\Routes;
@@ -567,7 +568,7 @@ final class MailRoutes {
 		}
 
 		// A gap between two presses and a most per hour, as the app box has them; both are settings.
-		$next = ManualCheck::claim( $r, MailView::MANUAL_META, MailSettings::dns_check_gap(), MailSettings::dns_check_per_hour() );
+		$next = ManualCheck::claim( $r, MailView::MANUAL_META, DnsWatchSettings::check_gap( MailDnsWatch::ID ), DnsWatchSettings::check_per_hour( MailDnsWatch::ID ) );
 
 		if ( null === $next ) {
 			return self::error( 'busy', __( 'This email domain is busy. Please try again in a moment.', 'beltoft-services' ) );
@@ -598,7 +599,7 @@ final class MailRoutes {
 
 		$view = MailView::data( Resource::find( $r->id() ) ?? $r, array() );
 
-		return self::queued( $r, Mailboxes::DNS_CHECK, array( 'dns' => $view['dns'], 'next' => ManualCheck::next( Resource::find( $r->id() ) ?? $r, MailView::MANUAL_META, MailSettings::dns_check_gap(), MailSettings::dns_check_per_hour() ) ), __( 'We are checking your DNS records. This can take a minute.', 'beltoft-services' ) );
+		return self::queued( $r, Mailboxes::DNS_CHECK, array( 'dns' => $view['dns'], 'next' => ManualCheck::next( Resource::find( $r->id() ) ?? $r, MailView::MANUAL_META, DnsWatchSettings::check_gap( MailDnsWatch::ID ), DnsWatchSettings::check_per_hour( MailDnsWatch::ID ) ) ), __( 'We are checking your DNS records. This can take a minute.', 'beltoft-services' ) );
 	}
 
 	/**

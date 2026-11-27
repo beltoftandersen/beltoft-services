@@ -498,7 +498,7 @@ final class MailRoutesTest extends MailTestCase {
 
 	public function test_the_gap_and_the_hourly_count_are_settings(): void {
 		add_filter( 'beltoft_services_rest_rate_limit', '__return_zero' );
-		$this->settings( array( 'mail_dns_check_gap' => 0, 'mail_dns_check_per_hour' => 2 ) );
+		$this->settings( array( 'dns_watch_check_gap' => 0, 'dns_watch_check_per_hour' => 2 ) );
 		list( $r, $user ) = $this->domain( 'setting.example' );
 		$path = $r->id() . '/mail/dns/check';
 
