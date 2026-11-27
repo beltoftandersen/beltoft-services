@@ -8,6 +8,7 @@
 namespace BeltoftServices\GiftCredit;
 
 use Bgca\Pay;
+use Bgca\Reserve;
 use Bgca\Wallet;
 use BeltoftServices\Billing\CartFlow;
 use BeltoftServices\Card\Card;
@@ -78,6 +79,8 @@ final class Checkout {
 		add_filter( 'woocommerce_cart_needs_payment', array( __CLASS__, 'gateway_saves_card' ), 40, 2 );
 		// First of all: the order exists, the forecast is no longer the answer.
 		add_action( 'woocommerce_checkout_order_processed', array( __CLASS__, 'order_exists' ), 0 );
+		// Before WooCommerce looks for an order to resume: an unfinished order of this checkout that holds credit is let go.
+		add_filter( 'woocommerce_create_order', array( __CLASS__, 'let_go_of_unfinished_order' ), 0 );
 		add_action( 'woocommerce_review_order_before_submit', array( __CLASS__, 'saved_method_line' ) );
 		// After WooCommerce Subscriptions made the subscriptions (100) and the add-on put the cards on the order (200).
 		add_action( 'woocommerce_checkout_order_processed', array( __CLASS__, 'saved_card_on_subscriptions' ), 250, 3 );
@@ -302,11 +305,12 @@ final class Checkout {
 			return null;
 		}
 
-		$cap = Pay::free_cap( self::draft_lines( $cart, $draft ) );
-		$key = implode( '|', array( $user_id, $currency, $total, $cap, Wallet::totals( $user_id, $currency )['total'] ) );
+		$cap      = Pay::free_cap( self::draft_lines( $cart, $draft ) );
+		$awaiting = self::unfinished_order_id( $user_id );
+		$key      = implode( '|', array( $user_id, $currency, $total, $cap, Wallet::totals( $user_id, $currency )['total'], $awaiting ) );
 
 		if ( ! array_key_exists( $key, self::$memo ) ) {
-			$plan = Pay::plan( Wallet::cards( $user_id, $currency ), $total, $cap, static fn( int $rest ): bool => Rules::rest_allowed( $rest, $currency ) );
+			$plan = Pay::plan( self::cards_for_forecast( $user_id, $currency, $awaiting ), $total, $cap, static fn( int $rest ): bool => Rules::rest_allowed( $rest, $currency ) );
 
 			self::$memo[ $key ] = $plan['cents'] < 1 ? null : array(
 				'credit'   => $plan['cents'],
@@ -319,6 +323,87 @@ final class Checkout {
 		}
 
 		return self::$memo[ $key ];
+	}
+
+	/**
+	 * The unfinished order of this checkout that holds the customer's credit: the order WooCommerce has in the session as awaiting
+	 * payment (a submit that was declined or abandoned), still pending or failed, with cards on it. 0 when there is none.
+	 *
+	 * The next submit lets go of it ({@see Checkout::let_go_of_unfinished_order()}), so its hold must not count against the forecast.
+	 *
+	 * @param int $user_id Customer.
+	 */
+	private static function unfinished_order_id( int $user_id ): int {
+		$session = function_exists( 'WC' ) ? WC()->session : null;
+		$id      = $session ? absint( $session->get( 'order_awaiting_payment' ) ) : 0;
+		$order   = $id > 0 ? wc_get_order( $id ) : null;
+
+		if ( ! $order instanceof \WC_Order || (int) $order->get_customer_id() !== $user_id || ! $order->has_status( array( 'pending', 'failed' ) ) || Pay::applied( $order ) < 1 ) {
+			return 0;
+		}
+
+		return $id;
+	}
+
+	/**
+	 * The customer's cards for the forecast: the add-on's available balances, except that the credit held for the unfinished order of this
+	 * checkout is available again.
+	 *
+	 * @param int    $user_id  Customer.
+	 * @param string $currency Currency.
+	 * @param int    $awaiting The unfinished order ({@see Checkout::unfinished_order_id()}), 0 for none.
+	 * @return object[]
+	 */
+	private static function cards_for_forecast( int $user_id, string $currency, int $awaiting ): array {
+		if ( $awaiting < 1 ) {
+			return Wallet::cards( $user_id, $currency );
+		}
+
+		$held  = Reserve::held( $user_id, $awaiting );
+		$cards = array();
+
+		foreach ( Wallet::cards( $user_id, $currency, false ) as $card ) {
+			$off = $held[ (int) $card->id ] ?? 0;
+
+			if ( $off > 0 ) {
+				$card          = clone $card;
+				$card->balance = Wallet::amount( max( 0, Wallet::cents( $card->balance ) - $off ) );
+			}
+
+			if ( Wallet::balance( $card ) > 0 ) {
+				$cards[] = $card;
+			}
+		}
+
+		return $cards;
+	}
+
+	/**
+	 * The submit makes an order. An unfinished order of this checkout that already carries cards is cancelled first: WooCommerce would
+	 * resume it, remove its lines (and with them the card coupons) and build it again, while the add-on still sees the cards as applied
+	 * and does not apply them again. The customer would then be charged the whole total, and the credit taken from the cards too when the
+	 * order is paid. A cancelled order frees its hold ({@see \Bgca\Reserve}) and takes nothing from the cards (nothing was deducted yet);
+	 * the order made now gets the cards from scratch.
+	 *
+	 * @param mixed $order_id The id a filter may short-circuit with (passed on).
+	 * @return mixed
+	 */
+	public static function let_go_of_unfinished_order( $order_id ) {
+		$user_id = get_current_user_id();
+		$id      = $user_id > 0 && GiftCredit::active() ? self::unfinished_order_id( $user_id ) : 0;
+
+		if ( $id > 0 ) {
+			$order = wc_get_order( $id );
+
+			if ( $order instanceof \WC_Order ) {
+				$order->update_status( 'cancelled', __( 'The checkout was submitted again: this order is replaced and its account credit is free for the new order.', 'beltoft-services' ) );
+			}
+
+			WC()->session->set( 'order_awaiting_payment', null );
+			self::$memo = array();
+		}
+
+		return $order_id;
 	}
 
 	/**

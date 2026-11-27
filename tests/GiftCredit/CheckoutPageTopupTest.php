@@ -429,6 +429,46 @@ class CheckoutPageTopupTest extends GiftCreditTestCase {
 	}
 
 	/**
+	 * The customer came back to the checkout after a submit that did not finish (a declined card, a closed 3-D Secure window): the order of
+	 * that submit is pending, it holds the credit and WooCommerce resumes it. The page shows the credit again (the resumed order's own hold
+	 * does not count against the forecast), and the resumed submit pays from the credit again: found on production 2026-11-27, the page
+	 * showed no credit row and the card was charged the full total while the credit was taken as well.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_a_pending_order_of_this_checkout_does_not_hide_the_credit_and_the_resumed_submit_uses_it_again(): void {
+		$user = $this->subscription_cart( 400 );
+		define_if_missing( 'WOOCOMMERCE_CHECKOUT' );
+		Checkout::reset();
+
+		list( $first ) = $this->check_out( $user );
+		$this->assertSame( 600, \Bgca\Wallet::cents( $first->get_total() ), 'The first submit paid 4 from the credit.' );
+		$this->assertTrue( $first->has_status( 'pending' ) );
+
+		// The browser comes back: the session still names the pending order, and the credit is held for it.
+		WC()->session->set( 'order_awaiting_payment', $first->get_id() );
+		Checkout::reset();
+		$p = Checkout::preview();
+		$this->assertNotNull( $p, 'The credit held for the order this checkout resumes is shown.' );
+		$this->assertSame( array( 400, 600 ), array( $p['credit'], $p['due'] ) );
+
+		list( $second ) = $this->check_out( $user );
+		$this->assertSame( 600, \Bgca\Wallet::cents( $second->get_total() ), 'The resumed submit is not charged the credit again.' );
+		$this->assertSame( 400, \Bgca\Pay::applied( $second ) );
+		$this->assertCount( 1, $second->get_items( 'coupon' ) );
+
+		if ( (int) $second->get_id() !== (int) $first->get_id() ) {
+			$this->assertTrue( wc_get_order( $first->get_id() )->has_status( 'cancelled' ), 'The order that is not used any more is cancelled.' );
+		}
+
+		// Another open order of the customer (not this checkout's) still holds its credit.
+		WC()->session->set( 'order_awaiting_payment', 0 );
+		Checkout::reset();
+		$this->assertNull( Checkout::preview(), 'Credit held by another order is not forecast.' );
+	}
+
+	/**
 	 * @runInSeparateProcess
 	 * @preserveGlobalState disabled
 	 */
