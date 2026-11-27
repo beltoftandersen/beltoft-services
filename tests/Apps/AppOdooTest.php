@@ -45,7 +45,7 @@ final class AppOdooTest extends TestCase {
 			$this->assertArrayHasKey( $step, $labels );
 		}
 		$this->assertStringContainsString( "jq '{root_email,root_password,master_password}' \"\$secrets/odoo.json\" > \"\$secrets/credentials.json\"", $this->script() );
-		$this->assertStringContainsString( "master_password: 'master'", (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/app-tab.js' ) );
+		$this->assertSame( 'Master password (only for database management)', \BeltoftServices\Apps\AppTab::credential_labels()['master_password'] );
 	}
 
 	public function test_the_script_is_strict_valid_bash_with_pinned_images_and_no_secrets_in_arguments(): void {

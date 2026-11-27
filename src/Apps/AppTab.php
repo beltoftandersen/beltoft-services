@@ -20,10 +20,95 @@ defined( 'ABSPATH' ) || exit;
  */
 final class AppTab {
 
-	use ServerTabHooks;
+	use ServerTabHooks {
+		register as register_tab;
+	}
 
 	public const SLUG   = 'app';
 	public const HANDLE = 'beltoft-services-app-tab';
+
+	public const LOGIN_ID = 'beltoft-app-login';
+
+	/**
+	 * Hooks: the tab (the shared ones), the ready box on the overview, and the lines that say where the login is.
+	 */
+	public static function register(): void {
+		self::register_tab();
+		add_action( 'beltoft_services_server_overview_top', array( __CLASS__, 'ready_box' ), 10, 1 );
+		add_filter( 'beltoft_services_thankyou_row', array( __CLASS__, 'thankyou_row' ), 15, 2 );
+		add_filter( 'beltoft_services_email_details', array( __CLASS__, 'email_details' ), 20, 3 );
+	}
+
+	/**
+	 * The words for every key an app lists under credentials. A key without a word here is shown as a plain password.
+	 *
+	 * @return array<string, string>
+	 */
+	public static function credential_labels(): array {
+		return array(
+			'admin_user'      => __( 'Username', 'beltoft-services' ),
+			'admin_password'  => __( 'Password', 'beltoft-services' ),
+			'root_email'      => __( 'Email', 'beltoft-services' ),
+			'root_password'   => __( 'Password', 'beltoft-services' ),
+			'encryption_key'  => __( 'Encryption key', 'beltoft-services' ),
+			'master_password' => __( 'Master password (only for database management)', 'beltoft-services' ),
+		);
+	}
+
+	/**
+	 * The box at the top of the overview of a server whose app is ready: open it, and where the login is.
+	 *
+	 * @param mixed $resource_id Resource id.
+	 */
+	public static function ready_box( $resource_id = 0 ): void {
+		$r    = Resource::find( (int) $resource_id );
+		$view = $r && '' !== (string) $r->get( 'app_id' ) ? self::view( $r ) : null;
+
+		if ( null === $view || 'ready' !== $view['kind'] || ! $r->license() ) {
+			return;
+		}
+
+		$login_url = ServerLinks::url( $r->license(), self::SLUG ) . '#' . self::LOGIN_ID;
+		include BELTOFT_SERVICES_PATH . 'templates/account/app-ready.php';
+	}
+
+	/**
+	 * A server with an app: its row on the order received page leads to the App tab, where the login is.
+	 *
+	 * @param mixed $row     Row.
+	 * @param mixed $r       Resource.
+	 */
+	public static function thankyou_row( $row, $r = null ) {
+		if ( ! is_array( $row ) || ! $r instanceof Resource || '' === (string) $r->get( 'app_id' ) || ! $r->license() || 'vm' !== ( $row['kind'] ?? '' ) ) {
+			return $row;
+		}
+
+		$row['url']        = ServerLinks::url( $r->license(), self::SLUG ) . '#' . self::LOGIN_ID;
+		$row['open_label'] = __( 'Go to your app and login', 'beltoft-services' );
+
+		return $row;
+	}
+
+	/**
+	 * The ready email of an app server says where the login is.
+	 *
+	 * @param mixed $details  Lines so far.
+	 * @param mixed $email_id Email id.
+	 * @param mixed $r        Resource.
+	 */
+	public static function email_details( $details, $email_id = '', $r = null ) {
+		if ( ! is_array( $details ) || 'beltoft_services_ready' !== $email_id || ! $r instanceof Resource || '' === (string) $r->get( 'app_id' ) || 'vm' !== self::kind_of( $r ) ) {
+			return $details;
+		}
+
+		$details[ __( 'Login', 'beltoft-services' ) ] = __( 'Your login is on the server page in My Account, under App.', 'beltoft-services' );
+
+		return $details;
+	}
+
+	private static function kind_of( Resource $r ): string {
+		return \BeltoftServices\Proxmox\Vm\ProxmoxDriver::ID === (string) $r->get( 'driver' ) ? 'vm' : '';
+	}
 
 	/**
 	 * Adds the tab after the overview, for a server with an app.
@@ -83,11 +168,9 @@ final class AppTab {
 					'revealed' => __( 'The login is shown below, one time only. Copy it now.', 'beltoft-services' ),
 					'retrying' => __( 'Starting again…', 'beltoft-services' ),
 					'limit'  => __( 'You can try again three times an hour. Please wait and try again later.', 'beltoft-services' ),
-					'user'   => __( 'Username', 'beltoft-services' ),
-					'email'  => __( 'Email', 'beltoft-services' ),
 					'pass'   => __( 'Password', 'beltoft-services' ),
-					'key'    => __( 'Encryption key', 'beltoft-services' ),
 				),
+				'labels'  => self::credential_labels(),
 			)
 		);
 	}

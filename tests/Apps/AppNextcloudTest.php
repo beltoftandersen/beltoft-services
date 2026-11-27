@@ -42,9 +42,9 @@ final class AppNextcloudTest extends TestCase {
 			$this->assertArrayHasKey( $step, $labels );
 		}
 		$this->assertStringContainsString( "jq '{admin_user,admin_password}' \"\$secrets/nextcloud.json\" > \"\$secrets/credentials.json\"", $this->script() );
-		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/app-tab.js' );
-		$this->assertStringContainsString( "admin_user: 'user'", $js );
-		$this->assertStringContainsString( "admin_password: 'pass'", $js );
+		$labels = \BeltoftServices\Apps\AppTab::credential_labels();
+		$this->assertSame( 'Username', $labels['admin_user'] );
+		$this->assertSame( 'Password', $labels['admin_password'] );
 	}
 
 	public function test_the_script_is_strict_valid_bash_with_pinned_images_and_no_secrets_in_arguments(): void {

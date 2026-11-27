@@ -796,10 +796,86 @@ class AppTabTest extends MonitoringTestCase {
 		}
 	}
 
-	public function test_the_app_tab_script_has_a_label_for_the_encryption_key(): void {
+	// -- Where the login is -------------------------------------------------------------------
+
+	private function overview_of( string $html ): string {
+		$this->assertMatchesRegularExpression( '#<section[^>]*data-tab="overview"[^>]*>(.*?)</section>#s', $html );
+		preg_match( '#<section[^>]*data-tab="overview"[^>]*>(.*?)</section>#s', $html, $m );
+
+		return $m[1];
+	}
+
+	/**
+	 * @return array<string, array{0: string, 1: string, 2: string}>
+	 */
+	public static function ready_apps(): array {
+		return array(
+			'wordpress' => array( 'wordpress', '7.1.4', 'WordPress' ),
+			'n8n'       => array( 'n8n', '2', 'n8n' ),
+		);
+	}
+
+	/**
+	 * @dataProvider ready_apps
+	 */
+	public function test_the_overview_of_a_ready_app_server_says_where_the_app_and_the_login_are( string $id, string $version, string $name ): void {
+		$r    = $this->with_app( array( 'app_id' => $id, 'app_version' => $version, 'app_state' => 'ready', 'app_step' => 'complete', 'app_installed_at' => time(), 'app_reveal' => Crypto::encrypt( '{"admin_password":"x"}' ), 'app_reveal_until' => time() + DAY_IN_SECONDS ) );
+		$html = $this->page( $r );
+		$box  = $this->overview_of( $html );
+
+		$this->assertStringContainsString( 'data-app-ready', $box );
+		$this->assertStringContainsString( $name . ' is ready', $box );
+		$this->assertMatchesRegularExpression( '#<a[^>]*href="http://192\.0\.2\.10[^"]*"[^>]*>Open ' . preg_quote( $name, '#' ) . '</a>#', $box );
+		$this->assertMatchesRegularExpression( '#<a[^>]*data-tab-link="app"[^>]*href="[^"]*/app/?\#beltoft-app-login"[^>]*>Show login</a>|<a[^>]*href="[^"]*/app/?\#beltoft-app-login"[^>]*data-tab-link="app"[^>]*>Show login</a>#', $box );
+		$this->assertStringContainsString( 'id="beltoft-app-login"', $this->pane( $html ) );
+		$this->assertStringNotContainsString( 'Secret', $box );
+	}
+
+	public function test_the_ready_box_has_no_show_login_when_the_login_is_gone_and_no_box_before_ready(): void {
+		$gone = $this->overview_of( $this->page( $this->with_app( array( 'app_state' => 'ready', 'app_step' => 'complete', 'app_installed_at' => time() ) ) ) );
+		$this->assertStringContainsString( 'WordPress is ready', $gone );
+		$this->assertStringNotContainsString( 'Show login', $gone );
+
+		$busy = $this->overview_of( $this->page( $this->with_app( array( 'app_state' => 'installing', 'app_step' => 'packages', 'app_reveal' => Crypto::encrypt( '{"admin_password":"x"}' ), 'app_reveal_until' => time() + DAY_IN_SECONDS ), 5002 ) ) );
+		$this->assertStringNotContainsString( 'data-app-ready', $busy );
+
+		$plain = $this->overview_of( $this->page( $this->ready_vm( 5003 ) ) );
+		$this->assertStringNotContainsString( 'data-app-ready', $plain );
+	}
+
+	public function test_the_ready_email_says_where_the_login_is_only_for_an_app_server(): void {
+		$app   = $this->with_app( array( 'app_state' => 'ready' ) );
+		$lines = apply_filters( 'beltoft_services_email_details', array(), 'beltoft_services_ready', $app );
+		$this->assertSame( 'Your login is on the server page in My Account, under App.', $lines['Login'] ?? '' );
+
+		$plain = apply_filters( 'beltoft_services_email_details', array(), 'beltoft_services_ready', $this->ready_vm( 5004 ) );
+		$this->assertArrayNotHasKey( 'Login', $plain );
+	}
+
+	public function test_the_thank_you_row_of_an_app_server_leads_to_the_login(): void {
+		$app = \BeltoftServices\ThankYou::row( $this->with_app( array( 'app_state' => 'ready' ) ) );
+		$this->assertMatchesRegularExpression( '#/app/?\\#beltoft-app-login$#', $app['url'] );
+		$this->assertSame( 'Go to your app and login', $app['open_label'] );
+
+		$plain = \BeltoftServices\ThankYou::row( $this->ready_vm( 5005 ) );
+		$this->assertStringNotContainsString( 'beltoft-app-login', $plain['url'] );
+		$this->assertArrayNotHasKey( 'open_label', $plain );
+	}
+
+	public function test_every_credential_key_has_a_translated_label_and_no_raw_key_is_shown(): void {
+		$keys = array();
+		foreach ( glob( BELTOFT_SERVICES_PATH . 'apps/*/app.json' ) as $file ) {
+			$def  = json_decode( (string) file_get_contents( $file ), true );
+			$keys = array_merge( $keys, (array) ( $def['credentials'] ?? array() ) );
+		}
+		$labels = \BeltoftServices\Apps\AppTab::credential_labels();
+		foreach ( array_unique( $keys ) as $key ) {
+			$this->assertArrayHasKey( $key, $labels, $key );
+			$this->assertNotSame( $key, $labels[ $key ] );
+			$this->assertDoesNotMatchRegularExpression( '/_/', $labels[ $key ] );
+		}
+		$this->assertSame( 'Master password (only for database management)', $labels['master_password'] );
 		$js = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/app-tab.js' );
-		$this->assertStringContainsString( "encryption_key: 'key'", $js );
-		$php = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'src/Apps/AppTab.php' );
-		$this->assertStringContainsString( "'key'    => __( 'Encryption key'", $php );
+		$this->assertStringNotContainsString( '|| key', $js );
 	}
 }

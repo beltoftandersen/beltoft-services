@@ -25,7 +25,7 @@ $beltoft_flow = ! empty( $flow );
 		<?php BeltoftServices\Progress::render( $beltoft_row['progress'] ); ?>
 		<p class="beltoft-service__message" data-service-message<?php echo '' === $beltoft_row['message'] ? ' hidden' : ''; ?>><?php echo esc_html( $beltoft_row['message'] ); ?></p>
 		<p class="beltoft-service__open" data-service-open<?php echo $beltoft_row['ready'] ? '' : ' hidden'; ?>>
-			<a href="<?php echo esc_url( $beltoft_row['url'] ); ?>"><?php echo esc_html( BeltoftServices\ThankYou::open_label( $beltoft_row['kind'] ) ); ?></a>
+			<a href="<?php echo esc_url( $beltoft_row['url'] ); ?>"><?php echo esc_html( ! empty( $beltoft_row['open_label'] ) ? (string) $beltoft_row['open_label'] : BeltoftServices\ThankYou::open_label( $beltoft_row['kind'] ) ); ?></a>
 		</p>
 		<?php if ( ! empty( $beltoft_row['snapshot'] ) && 'failed' !== $beltoft_row['group'] ) : ?>
 			<p class="beltoft-service__note">
