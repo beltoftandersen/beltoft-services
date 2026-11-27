@@ -60,5 +60,5 @@
 
 /* Selected choice tile: the --bs-choice-sel-* variables (defaults in account.css :root) and a check badge in the corner (--bs-choice-check: none drops it). */
 .beltoft-services-plan__input:checked + .beltoft-services-plan__face::after { content: ""; display: var(--bs-choice-check, block); position: absolute; top: 8px; right: 8px; width: 18px; height: 18px; border-radius: 50%; background: var(--bs-choice-sel-border, var(--bs-dark, #10241b)); }
-.beltoft-services-plan__input:checked + .beltoft-services-plan__face::before { content: ""; display: var(--bs-choice-check, block); position: absolute; z-index: 1; top: 12px; right: 15px; width: 4px; height: 8px; border: solid var(--bs-choice-check-ink, #fff); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.beltoft-services-plan__input:checked + .beltoft-services-plan__face::before { content: ""; display: var(--bs-choice-check, block); position: absolute; z-index: 1; top: 12px; right: 15px; width: 4px; height: 8px; border: solid var(--bs-choice-check-ink, var(--bs-surface, #fff)); border-width: 0 2px 2px 0; transform: rotate(45deg); }
 .beltoft-services-plan__input:checked + .beltoft-services-plan__face { position: relative; }
