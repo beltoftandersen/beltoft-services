@@ -8,7 +8,6 @@
 
 	var account = window.beltoftServicesAccount;
 	var app = window.beltoftServicesApp;
-	var labels = { admin_user: 'user', admin_password: 'pass', root_email: 'email', root_password: 'pass', encryption_key: 'key', master_password: 'master' };
 
 	if ( ! account || ! app || ! window.fetch || ! window.beltoftApi ) {
 		return;
@@ -30,7 +29,7 @@
 			var value = document.createElement( 'dd' );
 			var code = document.createElement( 'code' );
 
-			term.textContent = app.strings[ labels[ key ] ] || key;
+			term.textContent = ( app.labels && app.labels[ key ] ) || app.strings.pass;
 			code.textContent = credentials[ key ];
 			value.appendChild( code );
 			row.appendChild( term );
@@ -220,5 +219,28 @@
 				window.location.reload();
 			}
 		}, 'dns' === state ? 60000 : 20000 );
+	}
+
+	// "Show login" on the overview opens this tab (the server page does that); then the button that shows the login is scrolled to and focused.
+	function focusLogin() {
+		var spot = document.getElementById( 'beltoft-app-login' );
+		var button = spot ? spot.querySelector( 'button' ) : null;
+
+		if ( button && ! button.closest( '[hidden]' ) ) {
+			spot.scrollIntoView( { block: 'center' } );
+			button.focus();
+		}
+	}
+
+	document.addEventListener( 'click', function ( event ) {
+		var link = event.target.closest ? event.target.closest( 'a[href$="#beltoft-app-login"]' ) : null;
+
+		if ( link ) {
+			window.setTimeout( focusLogin, 50 );
+		}
+	} );
+
+	if ( '#beltoft-app-login' === window.location.hash ) {
+		window.setTimeout( focusLogin, 100 );
 	}
 }() );

@@ -30,3 +30,6 @@
 .beltoft-services-app-reinstall__choice .description { display: block; margin: 4px 0 0; }
 .beltoft-services-app-reinstall__domain-fields { display: grid; gap: 8px; margin: 0 0 16px; }
 .beltoft-services-app-reinstall__domain-fields input[type="text"], .beltoft-services-app-reinstall__domain-fields select { width: 100%; box-sizing: border-box; border-radius: 0; }
+.beltoft-services-app-ready { margin: 0 0 24px; padding: 16px 20px; background: var(--bs-warm); border-radius: 8px; }
+.beltoft-services-app-ready__title { margin: 0 0 12px; font-weight: var(--bs-fw-medium); font-size: 18px; }
+.beltoft-services-app-ready__buttons { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }

@@ -123,6 +123,14 @@ $beltoft_services_note = static function () use ( $beltoft_services_pending, $fo
 
 	<?php $beltoft_services_open( 'overview' ); ?>
 	<?php if ( null !== $beltoft_services_page ) : ?>
+		<?php
+		/**
+		 * Prints a box at the top of the overview of a server page (an app that is ready, where its login is).
+		 *
+		 * @param int $resource_id The server's resource id.
+		 */
+		do_action( 'beltoft_services_server_overview_top', (int) $resource_id );
+		?>
 		<dl class="beltoft-services-facts">
 			<?php $beltoft_services_host = '' !== $ip ? $ip : (string) ( $ip6 ?? '' ); ?>
 			<?php if ( '' !== $beltoft_services_host ) : ?>

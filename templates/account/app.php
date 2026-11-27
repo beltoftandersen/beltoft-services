@@ -302,7 +302,7 @@ $beltoft_services_status_text = array(
 		<?php if ( $view['can_reveal'] ) : ?>
 			<div class="beltoft-services-vm__more">
 				<h4><?php esc_html_e( 'Login', 'beltoft-services' ); ?></h4>
-				<p class="beltoft-services-vm__reveal">
+				<p class="beltoft-services-vm__reveal" id="beltoft-app-login">
 					<button type="button" class="button woocommerce-button" data-app-reveal><?php esc_html_e( 'Show login once', 'beltoft-services' ); ?></button>
 				</p>
 				<dl class="beltoft-services-app-login" data-app-login hidden></dl>
