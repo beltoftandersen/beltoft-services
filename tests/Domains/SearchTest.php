@@ -5,6 +5,7 @@ namespace BeltoftServices\Tests\Domains;
 use BeltoftServices\Domains\FakeClient;
 use BeltoftServices\Domains\Prices;
 use BeltoftServices\Domains\Search;
+use BeltoftServices\RateLimit;
 use BeltoftServices\Tests\TestCase;
 
 class SearchTest extends TestCase {
@@ -177,6 +178,41 @@ class SearchTest extends TestCase {
 
 	public function test_the_plugins_own_errors_stay_as_they_are(): void {
 		$this->assertSame( 'bad_domain', Search::find( '-bad-.com' )->get_error_code() );
+	}
+
+	public function test_a_refused_search_says_when_to_try_again(): void {
+		$name = $this->unique( 'retry' );
+		$this->client( array( $name ) );
+		$_SERVER['REMOTE_ADDR'] = '203.0.113.' . wp_rand( 1, 250 );
+		add_filter( 'beltoft_services_domain_search_limit', static fn() => 1 );
+		$request = new \WP_REST_Request( 'GET', '/beltoft-services/v1/domains/check' );
+		$request->set_param( 'name', $name );
+		Search::rest_check( $request );
+		$error = Search::rest_check( $request );
+
+		$this->assertWPError( $error );
+		$this->assertSame( 'rate_limited', $error->get_error_code() );
+		$seconds = $error->get_error_data()['retry_after'];
+		$this->assertGreaterThanOrEqual( 1, $seconds );
+		$this->assertLessThanOrEqual( 60, $seconds, 'The minute bucket frees within its window.' );
+		$this->assertSame( $seconds, RateLimit::seconds_left( MINUTE_IN_SECONDS ) );
+
+		$response = apply_filters( 'rest_post_dispatch', rest_convert_error_to_response( $error ), rest_get_server(), $request );
+		$this->assertSame( 429, $response->get_status() );
+		$this->assertSame( (string) $seconds, $response->get_headers()['Retry-After'] );
+		$this->assertSame( $seconds, $response->get_data()['retry_after'] );
+	}
+
+	public function test_a_busy_registrar_answer_carries_a_wait_within_the_hour(): void {
+		list( $a, $b ) = array( $this->unique( 'busya' ), $this->unique( 'busyb' ) );
+		$this->client( array( $a ) );
+		add_filter( 'beltoft_services_domain_lookup_limit', static fn() => 1 );
+		Search::find( $a . '.com' );
+		$busy = Search::find( $b . '.com' );
+
+		$this->assertSame( 'search_busy', $busy->get_error_code() );
+		$this->assertGreaterThanOrEqual( 1, $busy->get_error_data()['retry_after'] );
+		$this->assertLessThanOrEqual( HOUR_IN_SECONDS, $busy->get_error_data()['retry_after'] );
 	}
 
 	public function test_public_searches_stop_at_80_percent_and_an_order_lookup_still_works(): void {

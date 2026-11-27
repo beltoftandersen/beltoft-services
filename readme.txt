@@ -264,6 +264,7 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 * Apps: when an app is ready, the server overview shows it with Open and Show login; the order page and the ready email point to the login under App; every login field has a translated label.
 * Admin: WooCommerce > Services has a VM column (the Proxmox VM number; searching the number finds the server).
 * The progress line of a new order always shows a little and keeps moving while a step runs.
+* Domain search: a refused search (too many searches, or a busy registrar) answers 429 with a Retry-After header and retry_after seconds; the button counts down ("Try again in 0:42") and one line under the field says why. All text colours of the search read variables (--bds-ink, --bds-muted, --bds-error, --bds-warn), so a dark site sets them once.
 
 = 0.66.5 =
 * The domain box no longer says "no A record" after a look made before the found addresses were stored; it says what the look found.

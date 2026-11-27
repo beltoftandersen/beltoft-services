@@ -1,12 +1,24 @@
 /*
  * Domain search. Colours come from variables that fall back to the site's own and then to a neutral default:
- *   --bds-accent, --bds-border, --bds-muted, --bds-bar, --bds-track.
+ *   --bds-ink (text), --bds-muted (secondary text), --bds-accent, --bds-border, --bds-bar, --bds-track, --bds-error (error text),
+ *   --bds-warn (the "too many searches" line), --bds-taken-bg, --bds-taken-opacity.
+ * Every text colour here reads one of them, so a site sets them once (on :root) and the search, its waiting state, its results
+ * and its errors follow, on a dark page as on a light one. Without them the text takes the colour of the page.
  * The layout is kept in :where() (no specificity), so the Bricks element's controls, a theme or custom CSS win.
  */
 :where(.beltoft-domain-search, .beltoft-domain-form, .beltoft-domain-transfer-box) {
   display: grid;
   gap: .75rem;
   max-width: 42rem;
+}
+
+/* The text of the whole search: the site's ink when it sets one, else the page's own colour. */
+:where(.beltoft-domain-search, .beltoft-domain-form, .beltoft-domain-transfer-box, .beltoft-domain-results, .beltoft-domain-transfer-result) {
+  color: var(--bds-ink, inherit);
+}
+
+:where(.beltoft-domain-search input, .beltoft-domain-form input, .beltoft-domain-transfer-box input, .beltoft-domain-transfer input) {
+  color: var(--bds-ink, fieldtext);
 }
 
 /* Scrolled to on arrival from another page: room for a fixed site header (--bds-scroll-offset). */
@@ -104,6 +116,10 @@
   min-width: 0;
 }
 
+:where(.beltoft-domain-result__name, .beltoft-domain-result__price, .beltoft-domain-result__status, .beltoft-domain-result__vat, .beltoft-domain-note, .beltoft-domain-transfer__help) {
+  color: var(--bds-ink, inherit);
+}
+
 :where(.beltoft-domain-result__name) {
   overflow-wrap: anywhere;
 }
@@ -141,7 +157,25 @@
 
 :where(.beltoft-domain-error) {
   margin: 0;
-  color: #9b2727;
+  color: var(--bds-error, #9b2727);
+}
+
+/* The search was refused for too many searches (or a busy registrar): one clear line under the button, which counts down. */
+:where(.beltoft-domain-limit) {
+  margin: 0;
+  padding-left: .75rem;
+  border-left: 3px solid var(--bds-warn, #b26a00);
+  color: var(--bds-ink, inherit);
+  font-size: .95em;
+}
+
+:where(.beltoft-domain-limit[hidden]) {
+  display: none;
+}
+
+:where(.beltoft-domain-search > button.is-limited) {
+  cursor: not-allowed;
+  opacity: .75;
 }
 
 :where(.beltoft-domain-note) {
@@ -222,6 +256,7 @@
 }
 
 :where(.beltoft-domain-loading__text) {
+  color: var(--bds-ink, inherit);
   font-size: 1.15em;
   font-weight: 700;
 }

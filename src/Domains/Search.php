@@ -16,6 +16,24 @@ final class Search {
 		add_shortcode( 'beltoft_domain_search', array( __CLASS__, 'shortcode' ) );
 		add_shortcode( 'beltoft_domain_transfer', array( __CLASS__, 'transfer_shortcode' ) );
 		add_action( Sync::HOOK, array( __CLASS__, 'cleanup' ) );
+		add_filter( 'rest_post_dispatch', array( __CLASS__, 'retry_header' ), 10, 1 );
+	}
+
+	/**
+	 * A refused search says when to try again: the Retry-After header and a retry_after value (seconds) in the answer.
+	 *
+	 * @param mixed $response The REST response.
+	 * @return mixed
+	 */
+	public static function retry_header( $response ) {
+		if ( ! $response instanceof \WP_REST_Response || 429 !== $response->get_status() ) { return $response; }
+		$data = $response->get_data();
+		if ( ! is_array( $data ) || ! isset( $data['data']['retry_after'] ) ) { return $response; }
+		$seconds = max( 1, (int) $data['data']['retry_after'] );
+		$response->header( 'Retry-After', (string) $seconds );
+		$data['retry_after'] = $seconds;
+		$response->set_data( $data );
+		return $response;
 	}
 
 	/** Daily: delete the expired cached availability answers. Without an object cache they are transients in the options table, which only a read removes. */
@@ -72,8 +90,15 @@ final class Search {
 		/** Searches allowed per visitor: per minute and per hour. */
 		$per_minute = (int) apply_filters( 'beltoft_services_domain_search_limit', 20 );
 		$per_hour   = 200;
-		if ( RateLimit::exceeded( $id, 'domain-search' . $bucket, $per_minute ) || RateLimit::exceeded( $id, 'domain-search-hour' . $bucket, $per_hour, HOUR_IN_SECONDS ) ) {
-			return new \WP_Error( 'rate_limited', __( 'Too many searches. Please wait a minute.', 'beltoft-services' ), array( 'status' => 429 ) );
+		// The windows are fixed, so the counter starts again when the window ends: that is the wait.
+		$wait = 0;
+		if ( RateLimit::exceeded( $id, 'domain-search' . $bucket, $per_minute ) ) {
+			$wait = RateLimit::seconds_left( MINUTE_IN_SECONDS );
+		} elseif ( RateLimit::exceeded( $id, 'domain-search-hour' . $bucket, $per_hour, HOUR_IN_SECONDS ) ) {
+			$wait = RateLimit::seconds_left( HOUR_IN_SECONDS );
+		}
+		if ( $wait > 0 ) {
+			return new \WP_Error( 'rate_limited', __( 'Too many searches. Please wait a minute.', 'beltoft-services' ), array( 'status' => 429, 'retry_after' => $wait ) );
 		}
 		if ( strlen( $name ) > 253 ) {
 			return new \WP_Error( 'bad_domain', __( 'A valid domain name is required.', 'beltoft-services' ), array( 'status' => 400 ) );
@@ -141,7 +166,7 @@ final class Search {
 			$busy = $cap > 0 && RateLimit::exceeded( 0, 'domain-registrar-lookups', (int) ceil( $cap * 0.8 ), HOUR_IN_SECONDS );
 		}
 		if ( $busy ) {
-			return new \WP_Error( 'search_busy', __( 'Domain search is busy. Please try again in a few minutes.', 'beltoft-services' ), array( 'status' => 429 ) );
+			return new \WP_Error( 'search_busy', __( 'Domain search is busy right now. Please try again later.', 'beltoft-services' ), array( 'status' => 429, 'retry_after' => RateLimit::seconds_left( HOUR_IN_SECONDS ) ) );
 		}
 
 		$reply = Clients::registrar()->request( 'POST', '/domains/check', array( 'domains' => $check, 'with_price' => false ) );
