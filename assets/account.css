@@ -47,6 +47,18 @@
 	/* Corners: one for controls (buttons, fields), one for cards and panels, the same as the website. */
 	--bs-radius: 8px;
 	--bs-radius-lg: 12px;
+
+	/* The list card: one look for every row of every list in My Account (servers, databases, domains, mail domains, mailboxes,
+	   apps, subscriptions, overview rows, an empty list) and for the cards that hold more than a row (licences, panels, tiles).
+	   Defined here once; the theme or a page layer only sets the values (body.page-id-N { --bs-list-radius: 4px; ... }). */
+	--bs-list-gap: 12px; /* between two cards of a list */
+	--bs-list-pad-y: 14px; /* inside a row card */
+	--bs-list-pad-x: 16px;
+	--bs-list-border: 1px solid var(--bs-line); /* a whole border shorthand; none to drop the line */
+	--bs-list-radius: var(--bs-radius);
+	--bs-list-bg: var(--bs-surface);
+	--bs-list-hover-bg: var(--bs-warm); /* a row that opens something, on hover and keyboard focus */
+	--bs-card-pad: var(--bs-space-5); /* inside a card that holds more than a row (a licence, a hosting panel) */
 }
 
 .beltoft-services-panel {
@@ -403,18 +415,19 @@ section.beltoft-licenses__license:has(.beltoft-services-domain):not(.beltoft-ser
 
 /* Servers: the list, and one server's page (templates/account/servers-list.php, vm-head.php, vm.php). Palette variables come from the theme; the fallbacks keep the layout when they are missing. */
 .beltoft-services-notice { margin: 0 0 12px; padding: 8px 16px; background: var(--bs-warm); color: var(--bs-ink); }
-.beltoft-services-servers { max-width: var(--bs-page-width); background: var(--bs-surface); container-type: inline-size; }
-.beltoft-services-servers a.beltoft-services-srv { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.4fr) minmax(0, 1.6fr) auto; gap: 12px; align-items: center; padding: 8px 16px; border-top: 1px solid var(--bs-warm); color: var(--bs-ink) !important; text-decoration: none !important; }
-.beltoft-services-servers a.beltoft-services-srv:first-child { border-top: 0; }
+.beltoft-services-servers, .beltoft-services-ov__rows { display: flex; flex-direction: column; gap: var(--bs-list-gap); background: transparent; }
+.beltoft-services-servers { max-width: var(--bs-page-width); container-type: inline-size; }
+/* THE list card: every row of every list is one of these (the row's inner grid is its own rule below). */
+:is(.beltoft-services-servers > :is(a, div).beltoft-services-srv, .beltoft-services-ov__rows > :is(a, div).beltoft-services-ov__row, .beltoft-services-mail__list > .bs-item, .beltoft-services-glance > :is(a, div)) { box-sizing: border-box; padding: var(--bs-list-pad-y) var(--bs-list-pad-x); border: var(--bs-list-border); border-radius: var(--bs-list-radius); background: var(--bs-list-bg); }
+/* Cards that hold more than a row, and the empty-list card, share the same border, corner and ground. */
+:is(.beltoft-licenses__license, .beltoft-services-ov__money, .beltoft-services-ov__feed, .beltoft-services-credit__balance, .beltoft-services-credit__grid) { border: var(--bs-list-border); border-radius: var(--bs-list-radius); background: var(--bs-list-bg); }
+.beltoft-services-servers a.beltoft-services-srv { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.4fr) minmax(0, 1.6fr) auto; gap: 12px; align-items: center; color: var(--bs-ink) !important; text-decoration: none !important; }
 /* One hover for everything that opens something (server and domain rows, overview rows, overview tiles): a soft ground; the thin line round it only for keyboard focus. */
 .beltoft-services-servers a.beltoft-services-srv:focus-visible,
 .beltoft-services-ov__rows a.beltoft-services-ov__row:focus-visible { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bs-dark) 25%, transparent); }
-.beltoft-services-servers a.beltoft-services-srv:hover, .beltoft-services-servers a.beltoft-services-srv:focus-visible,
-.beltoft-services-ov__rows a.beltoft-services-ov__row:hover, .beltoft-services-ov__rows a.beltoft-services-ov__row:focus-visible { background: var(--bs-warm); }
-.beltoft-services-glance a.beltoft-services-glance__item:hover { background: var(--bs-surface); }
-/* The line follows the card's round corners on the first and last row. */
-:is(.beltoft-services-servers > a.beltoft-services-srv, .beltoft-services-ov__rows > a.beltoft-services-ov__row):first-child { border-top-left-radius: var(--bs-radius-lg); border-top-right-radius: var(--bs-radius-lg); }
-:is(.beltoft-services-servers > a.beltoft-services-srv, .beltoft-services-ov__rows > a.beltoft-services-ov__row):last-child { border-bottom-left-radius: var(--bs-radius-lg); border-bottom-right-radius: var(--bs-radius-lg); }
+.beltoft-services-servers > a.beltoft-services-srv:hover, .beltoft-services-servers > a.beltoft-services-srv:focus-visible,
+.beltoft-services-ov__rows > a.beltoft-services-ov__row:hover, .beltoft-services-ov__rows > a.beltoft-services-ov__row:focus-visible { background: var(--bs-list-hover-bg); }
+.beltoft-services-glance > a.beltoft-services-glance__item:hover { background: var(--bs-list-bg); }
 .beltoft-services-servers a.beltoft-services-srv:focus-visible { outline: 2px solid var(--bs-focus); outline-offset: -2px; }
 .beltoft-services-srv__id, .beltoft-services-srv__state { display: grid; gap: 0; min-width: 0; }
 .beltoft-services-srv__name { font-size: var(--bs-fs-body); font-weight: var(--bs-fw-strong); overflow-wrap: anywhere; }
@@ -549,11 +562,11 @@ body.woocommerce-account .woocommerce-MyAccount-content dd > .beltoft-services-c
 
 .beltoft-services-tab:not([data-tab="overview"]) { padding: 16px; background: var(--bs-surface); }
 .beltoft-services-tab > .beltoft-services-vm__disks { margin-top: 0; }
-.beltoft-services-glance { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
-.beltoft-services-glance a.beltoft-services-glance__item { display: grid; gap: 4px; align-content: start; padding: 8px 16px; background: var(--bs-surface); color: var(--bs-ink) !important; text-decoration: none !important; }
+.beltoft-services-glance { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--bs-list-gap); margin-top: 16px; }
+.beltoft-services-glance a.beltoft-services-glance__item { display: grid; gap: 4px; align-content: start; color: var(--bs-ink) !important; text-decoration: none !important; }
 .beltoft-services-glance__label { color: var(--bs-muted); font-size: var(--bs-fs-caption); font-weight: var(--bs-fw-medium); }
 .beltoft-services-glance__value { font-weight: var(--bs-fw-medium); }
-@media (max-width: 760px) { .beltoft-services-glance { grid-template-columns: minmax(0, 1fr); gap: 8px; } }
+@media (max-width: 760px) { .beltoft-services-glance { grid-template-columns: minmax(0, 1fr); } }
 /* Snapshot slots in use: the count, and under it a bar whose filled part is the share in use (the look of the server list's usage bars). */
 .beltoft-services-slotrow { display: grid; gap: var(--bs-space-2, 8px); margin: 8px 0 var(--bs-space-4, 16px); }
 .beltoft-services-slotrow .description { margin: 0; color: var(--bs-ink); font-weight: var(--bs-fw-medium, 500); font-variant-numeric: tabular-nums; }
@@ -569,10 +582,8 @@ div.beltoft-services-vm__more > h4 { margin-top: 16px; }
 
 /* An extra disk, snapshot pack or app licence with no server on the list: a row like the others, the status on the right. Under the server list it continues it (the -12px takes back the content column's gap). */
 .beltoft-services-servers--addons { margin-top: 12px; }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-servers--addons.is-joined { margin-top: -12px; border-top: 1px solid var(--bs-warm); border-top-left-radius: 0; border-top-right-radius: 0; }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-servers:has(+ .beltoft-services-servers--addons.is-joined) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-.beltoft-services-servers .beltoft-services-srv--addon { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 8px 16px; border-top: 1px solid var(--bs-warm); color: var(--bs-ink); }
-.beltoft-services-servers .beltoft-services-srv--addon:first-child { border-top: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-servers--addons.is-joined { margin-top: 0; } /* a row of the list like the others: the column's gap is the list gap */
+.beltoft-services-servers .beltoft-services-srv--addon { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; color: var(--bs-ink); }
 .beltoft-services-srv--addon .beltoft-services-srv__state { justify-items: end; text-align: right; }
 .beltoft-services-srv__body { color: var(--bs-muted); font-size: var(--bs-fs-small); }
 .beltoft-services-srv__body p { margin: 0; }
@@ -603,9 +614,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-server
 .beltoft-services-ov__attention > div { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; min-width: 0; }
 .beltoft-services-ov__attention b { font-weight: 500; overflow-wrap: anywhere; }
 .beltoft-services-ov__attention a { color: var(--bs-status-ok) !important; font-weight: 500; text-decoration: underline !important; text-underline-offset: 3px; }
-.beltoft-services-ov__rows { background: var(--bs-surface); }
-.beltoft-services-ov__rows a.beltoft-services-ov__row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 16px; border-top: 1px solid var(--bs-warm); color: var(--bs-ink) !important; text-decoration: none !important; }
-.beltoft-services-ov__rows a.beltoft-services-ov__row:first-child { border-top: 0; }
+.beltoft-services-ov__rows a.beltoft-services-ov__row { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--bs-ink) !important; text-decoration: none !important; }
 .beltoft-services-ov__rows a.beltoft-services-ov__row:focus-visible { outline: 2px solid var(--bs-focus); outline-offset: -2px; }
 .beltoft-services-ov__id, .beltoft-services-ov__end { display: grid; gap: 0; min-width: 0; }
 .beltoft-services-ov__id b { font-weight: var(--bs-fw-strong); overflow-wrap: anywhere; }
@@ -678,8 +687,7 @@ a.beltoft-services-ov__who:hover { text-decoration: underline; }
 @media (max-width: 700px) { .beltoft-services-servers--domains a.beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; } }
 /* Databases and Apps lists: name and detail, state, one more value (the private host), then an arrow or the Open button. A row with a button is a div, the name is its link. */
 .beltoft-services-servers--area :is(a, div).beltoft-services-srv { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.4fr) auto; }
-.beltoft-services-servers--area div.beltoft-services-srv { display: grid; gap: 12px; align-items: center; padding: 8px 16px; border-top: 1px solid var(--bs-warm); color: var(--bs-ink); }
-.beltoft-services-servers--area div.beltoft-services-srv:first-child { border-top: 0; }
+.beltoft-services-servers--area div.beltoft-services-srv { display: grid; gap: 12px; align-items: center; color: var(--bs-ink); }
 .beltoft-services-servers--area a.beltoft-services-srv__name { color: var(--bs-ink) !important; text-decoration: none !important; }
 .beltoft-services-servers--area a.beltoft-services-srv__name:hover, .beltoft-services-servers--area a.beltoft-services-srv__name:focus-visible { text-decoration: underline !important; }
 .beltoft-services-srv__extra { color: var(--bs-muted); font-size: var(--bs-fs-small); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
@@ -1200,7 +1208,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .bs-confirm__body { marg
 .beltoft-licenses__status::before, .beltoft-services-badge::before, .beltoft-services-state::before, .beltoft-hosting-status::before { border-radius: 50%; }
 
 /* The white boxes of every page take the card corner (overview, lists of servers and other services, facts, credit). */
-body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-ov__attention, .beltoft-services-ov__feed, .beltoft-services-ov__money, .beltoft-services-ov__rows, .beltoft-services-servers, .beltoft-services-credit__balance, .beltoft-services-credit__grid, .beltoft-services-facts) { border-radius: var(--bs-radius-lg); overflow: hidden; }
+body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-ov__attention, .beltoft-services-ov__feed, .beltoft-services-ov__money, .beltoft-services-credit__balance, .beltoft-services-credit__grid, .beltoft-services-facts) { border-radius: var(--bs-list-radius); overflow: hidden; }
 
 /* A danger section (delete a server, a database): a closed row with a red name; it opens to what deleting does and the confirmation. */
 body.woocommerce-account .woocommerce-MyAccount-content .bs-danger { margin: var(--bs-space-6) 0 0; padding: 0; border: 1px solid color-mix(in srgb, var(--bs-status-fail) 25%, var(--bs-surface)); border-radius: var(--bs-radius-lg); background: var(--bs-surface); }
@@ -1212,9 +1220,9 @@ body.woocommerce-account .woocommerce-MyAccount-content .bs-danger__body { paddi
 body.woocommerce-account .woocommerce-MyAccount-content .bs-danger__body > p:last-child { margin-bottom: 0; }
 
 /* An empty list (no domains, no databases, ...): the line and its buttons as one card, not loose text on the page. */
-body.woocommerce-account .woocommerce-MyAccount-content p.beltoft-licenses__empty { box-sizing: border-box; width: 100%; margin: 0; max-width: var(--bs-page-width); padding: var(--bs-space-4); border-radius: var(--bs-radius-lg); background: var(--bs-surface); color: var(--bs-ink); font-size: 16px; }
-body.woocommerce-account .woocommerce-MyAccount-content p.beltoft-licenses__empty:has(+ .beltoft-services-list-actions.is-start), body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domains.is-empty p.beltoft-licenses__empty { padding-bottom: var(--bs-space-3); border-radius: var(--bs-radius-lg) var(--bs-radius-lg) 0 0; }
-body.woocommerce-account .woocommerce-MyAccount-content p.beltoft-licenses__empty + .beltoft-services-list-actions.is-start, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domains.is-empty .beltoft-services-list-actions { box-sizing: border-box; width: 100%; max-width: var(--bs-page-width); margin: 0; padding: 0 var(--bs-space-4) var(--bs-space-4); border-radius: 0 0 var(--bs-radius-lg) var(--bs-radius-lg); background: var(--bs-surface); justify-content: flex-start; }
+body.woocommerce-account .woocommerce-MyAccount-content p.beltoft-licenses__empty { box-sizing: border-box; width: 100%; margin: 0; max-width: var(--bs-page-width); padding: var(--bs-list-pad-y) var(--bs-list-pad-x); border: var(--bs-list-border); border-radius: var(--bs-list-radius); background: var(--bs-list-bg); color: var(--bs-ink); font-size: 16px; }
+body.woocommerce-account .woocommerce-MyAccount-content p.beltoft-licenses__empty:has(+ .beltoft-services-list-actions.is-start), body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domains.is-empty p.beltoft-licenses__empty { padding-bottom: var(--bs-space-3); border-bottom: 0; border-radius: var(--bs-list-radius) var(--bs-list-radius) 0 0; }
+body.woocommerce-account .woocommerce-MyAccount-content p.beltoft-licenses__empty + .beltoft-services-list-actions.is-start, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domains.is-empty .beltoft-services-list-actions { box-sizing: border-box; width: 100%; max-width: var(--bs-page-width); margin: 0; padding: 0 var(--bs-list-pad-x) var(--bs-list-pad-y); border: var(--bs-list-border); border-top: 0; border-radius: 0 0 var(--bs-list-radius) var(--bs-list-radius); background: var(--bs-list-bg); justify-content: flex-start; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-list-btn { border-radius: var(--bs-radius); }
 body.woocommerce-account .woocommerce-MyAccount-content > p.beltoft-licenses__empty + .beltoft-services-list-actions.is-start { margin-top: -12px; } /* the content column's 12px gap would split the card */
 
@@ -1223,9 +1231,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts 
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts > div { flex: 1 1 200px; padding: var(--bs-space-3) var(--bs-space-4); box-shadow: none; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-facts code { border-radius: 4px; }
 /* The glance cards under a server (disk, extra disks, snapshots, backups): equal rounded cards in a row. */
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-glance { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-glance > * { border-radius: var(--bs-radius-lg); }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-glance a.beltoft-services-glance__item, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-glance > div { padding: var(--bs-space-4); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-glance { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--bs-list-gap); }
 
 /* Forms that make something (a mailbox, a database user, ...): one card; a field and its suffix (@domain) on one line. */
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-db__form[data-mail-create] { box-sizing: border-box; max-width: var(--bs-page-width); padding: var(--bs-space-5); border-radius: var(--bs-radius-lg); background: var(--bs-surface); }
@@ -1499,7 +1505,7 @@ body.woocommerce-account .woocommerce-MyAccount-content .bs-subscriptions__ended
 body.woocommerce-account .woocommerce-MyAccount-content .bs-subscriptions__ended[open] > summary { margin-bottom: var(--bs-space-3); }
 /* A phone: name first, the price under the status column on the right, no chevron; the list's own container rule does the grid. */
 @media (max-width: 767px) {
-	.beltoft-services-servers--area.beltoft-services-servers--subs :is(a, div).beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; padding-block: var(--bs-space-3); }
+	.beltoft-services-servers--area.beltoft-services-servers--subs :is(a, div).beltoft-services-srv { grid-template-columns: minmax(0, 1fr) auto; }
 	.beltoft-services-servers--subs .beltoft-services-srv__go { display: none; }
 }
 
@@ -1566,8 +1572,8 @@ body.woocommerce-account :is(.woocommerce-message, .woocommerce-info, .woocommer
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-ov__money:has(+ .beltoft-services-ov__usage) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-ov__money + .beltoft-services-ov__usage { border-top-left-radius: 0; border-top-right-radius: 0; }
 .woocommerce-MyAccount-content .beltoft-services-ov__section .beltoft-services-ov__money p { color: var(--bs-ink); }
-body.woocommerce-account .woocommerce-MyAccount-content p.beltoft-licenses__empty:has(+ p.beltoft-licenses__empty) { padding-bottom: var(--bs-space-2); border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-body.woocommerce-account .woocommerce-MyAccount-content p.beltoft-licenses__empty + p.beltoft-licenses__empty { padding-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content p.beltoft-licenses__empty:has(+ p.beltoft-licenses__empty) { padding-bottom: var(--bs-space-2); border-bottom: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+body.woocommerce-account .woocommerce-MyAccount-content p.beltoft-licenses__empty + p.beltoft-licenses__empty { padding-top: 0; border-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
 body.woocommerce-account .woocommerce-MyAccount-content p.beltoft-licenses__empty:has(+ p.beltoft-licenses__empty + .beltoft-services-list-actions) + p.beltoft-licenses__empty { padding-bottom: var(--bs-space-3); }
 /* Recent activity: a day is a small heading inside the list, under the section heading in weight; the filter has the section gap. */
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-ov__feed .beltoft-services-ov__day { margin: 0; padding: var(--bs-space-3) var(--bs-space-4) var(--bs-space-1); color: var(--bs-muted); font-family: inherit; font-size: var(--bs-fs-small); font-weight: var(--bs-fw-medium); line-height: var(--bs-lh-text); }
@@ -1590,8 +1596,6 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-ov__fe
 .beltoft-services-srv__id > .beltoft-services-srv__name { order: 1; flex: 0 1 auto; min-width: 0; }
 .beltoft-services-srv__id > .beltoft-services-state { order: 2; flex: 0 1 auto; max-width: 100%; white-space: normal; }
 .beltoft-services-srv__id > .beltoft-services-srv__sub { order: 3; flex: 0 0 100%; }
-.beltoft-services-servers a.beltoft-services-srv, .beltoft-services-servers--area div.beltoft-services-srv { border-top-color: var(--bs-line); }
-.beltoft-services-servers a.beltoft-services-srv:first-child, .beltoft-services-servers--area div.beltoft-services-srv:first-child { border-top-width: 0; }
 
 /* Payment methods: the note under the table is 16px away from it. */
 .beltoft-services-card__needed { margin: var(--bs-space-4) 0 0; color: var(--bs-muted); font-size: var(--bs-fs-small); }
@@ -2025,7 +2029,8 @@ body.woocommerce-account .woocommerce-MyAccount-content :is(.beltoft-services-db
 /* The licences list: cards as wide as the page column, one status per card, values in the text colour, "Manage subscription" an outlined button. */
 .beltoft-licenses { max-width: var(--bs-page-width); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-licenses:not(:has(.beltoft-services-domain, .beltoft-services-vm)) { grid-template-columns: minmax(0, 1fr); }
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-licenses__license { box-sizing: border-box; width: 100%; padding: var(--bs-space-5); border-radius: var(--bs-radius-lg); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-licenses__license { box-sizing: border-box; width: 100%; padding: var(--bs-card-pad); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-licenses { gap: var(--bs-list-gap); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-licenses__facts dd { color: var(--bs-ink); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-licenses__facts dt { color: var(--bs-muted); }
 body.woocommerce-account .woocommerce-MyAccount-content a.beltoft-licenses__subscription:not(.btn):not(.button) { box-sizing: border-box; display: inline-flex; align-items: center; min-height: var(--bs-btn-h); padding: 0 var(--bs-space-4); border: 1px solid var(--bs-input-border); border-radius: var(--bs-radius); background: var(--bs-surface); color: var(--bs-ink); font-weight: var(--bs-fw-medium); text-decoration: none; }
@@ -2130,7 +2135,6 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-area-p
 
 /* Rows of the domain list: a row without a sub line (an order that never got a name) is as high as the others. */
 .beltoft-services-servers--domains a.beltoft-services-srv { min-height: 65px; }
-.beltoft-services-servers--domains a.beltoft-services-srv:first-child { min-height: 64px; }
 
 /* Facts of a domain: six tiles in three even columns (two on a tablet, one on a phone), 8px apart, no hairlines. */
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-domain--page .beltoft-services-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--bs-space-2); overflow: visible; background: none; }
@@ -2295,7 +2299,8 @@ body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail p
 }
 
 /* Mailbox rows (third round): address and meter on the first line, the actions on a second line at the row's left edge; an opened form fills that line and the meter keeps its place. */
-body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list > .bs-item { grid-template-columns: minmax(0, 1fr) minmax(160px, 220px); gap: var(--bs-space-3) var(--bs-space-5); }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list { display: grid; gap: var(--bs-list-gap); border-radius: 0; background: transparent; }
+body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list > .bs-item { grid-template-columns: minmax(0, 1fr) minmax(160px, 220px); gap: var(--bs-space-3) var(--bs-space-5); padding: var(--bs-list-pad-y) var(--bs-list-pad-x); border: var(--bs-list-border); }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list .bs-item__name { overflow-wrap: break-word; word-break: normal; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list > .bs-item > .bs-item__actions, body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list > .bs-item:has(.bs-confirm[open]) > .bs-item__actions { grid-column: 1 / -1; grid-row: 2; justify-content: flex-start; }
 body.woocommerce-account .woocommerce-MyAccount-content .beltoft-services-mail__list .bs-item__actions > details.bs-confirm[open] { flex: 0 0 100%; order: 2; max-width: var(--bs-page-width); margin: 0; }
