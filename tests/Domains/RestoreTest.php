@@ -890,6 +890,8 @@ class RestoreTest extends TestCase {
 		$this->assertFalse( $result['paid'] );
 		$this->assertStringContainsString( 'pay_for_order', $result['redirect'] );
 		$this->assertStringNotContainsString( 'subscription_renewal', $result['redirect'], 'That parameter rebuilds a cart from product lines: empty for a fee-only order.' );
+		$order = wc_get_order( (int) Resource::find( $r->id() )->get( 'restore_order' ) );
+		$this->assertSame( '', (string) $order->get_meta( '_subscription_renewal' ), 'A plain order on the payment page: the renewal relation would rebuild an empty cart.' );
 	}
 
 	public function test_a_restore_order_is_never_renewed_by_the_plain_renew_job(): void {

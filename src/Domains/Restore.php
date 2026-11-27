@@ -246,12 +246,19 @@ final class Restore {
 
 	/**
 	 * The page where the customer pays a restore order. WooCommerce Subscriptions adds subscription_renewal=true to the payment address of a
-	 * renewal order, and with it the page rebuilds a cart from the renewal's product lines; a restore order has fee lines only, so that cart
-	 * is empty (found on staging 2026-11-27). Without the parameter it is WooCommerce's own pay-for-order page.
+	 * renewal order, and with it (and with the order's renewal relation) the page rebuilds a cart from the renewal's product lines; a restore
+	 * order has fee lines only, so that cart is empty (found on staging 2026-11-27). Without both it is WooCommerce's own pay-for-order page.
 	 *
 	 * @param \WC_Order $order Restore order.
 	 */
 	public static function payment_url( \WC_Order $order ): string {
+		// WooCommerce Subscriptions also rebuilds a cart from any order it knows as a renewal, whatever the address says. The relation was only
+		// needed for the charge of the saved method; on the way to the payment page the order is made a plain order.
+		if ( '' !== (string) $order->get_meta( '_subscription_renewal' ) ) {
+			$order->delete_meta_data( '_subscription_renewal' );
+			$order->save();
+		}
+
 		return remove_query_arg( 'subscription_renewal', (string) $order->get_checkout_payment_url() );
 	}
 
