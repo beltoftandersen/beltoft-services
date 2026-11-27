@@ -169,4 +169,10 @@ class UnpaidViewTest extends TestCase {
 		$this->assertSame( 30, $fields['domain_reactivation_markup_percent']['default'] );
 		$this->assertSame( 'domains', $fields[ Unpaid::SETTING ]['tab'] );
 	}
+
+	public function test_the_page_code_does_not_load_the_email_class(): void {
+		// ServiceEmail extends WC_Email, which a My Account page has not loaded: touching it there is a fatal error (found on staging 2026-11-27).
+		$this->assertStringNotContainsString( 'ServiceEmail', (string) file_get_contents( dirname( __DIR__, 2 ) . '/src/Domains/UnpaidView.php' ) );
+		$this->assertStringNotContainsString( 'ServiceEmail', (string) file_get_contents( dirname( __DIR__, 2 ) . '/src/Domains/Restore.php' ) );
+	}
 }

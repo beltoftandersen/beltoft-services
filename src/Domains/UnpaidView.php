@@ -4,7 +4,6 @@ namespace BeltoftServices\Domains;
 
 use BeltoftServices\Billing\TaxNote;
 use BeltoftServices\Currency;
-use BeltoftServices\Emails\ServiceEmail;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -42,8 +41,8 @@ final class UnpaidView {
 			return $out;
 		}
 
-		$date     = wp_date( ServiceEmail::DATE, (int) $stage['expiry'] );
-		$deadline = null === $stage['window_end'] ? '' : wp_date( ServiceEmail::DATE, (int) $stage['window_end'] );
+		$date     = wp_date( Notices::DATE, (int) $stage['expiry'] );
+		$deadline = null === $stage['window_end'] ? '' : wp_date( Notices::DATE, (int) $stage['window_end'] );
 		$terms    = ReactivationFee::terms( $domain );
 		$currency = Currency::of_resource( $r );
 		$fee      = ReactivationFee::fee( $domain );

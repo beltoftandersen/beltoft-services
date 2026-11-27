@@ -7,7 +7,6 @@ use BeltoftServices\Alerts;
 use BeltoftServices\Billing\TaxNote;
 use BeltoftServices\Currency;
 use BeltoftServices\Emails\Emails;
-use BeltoftServices\Emails\ServiceEmail;
 use BeltoftServices\Locks;
 use BeltoftServices\Resource;
 use BeltoftServices\Settings;
@@ -36,6 +35,9 @@ final class Notices {
 	public const CRON      = '30 7 * * *';
 	public const LOG       = 'unpaid_notices';
 	public const MAX_TRIES = 3;
+
+	/** The date format of the notices and the domain page. Not ServiceEmail::DATE: that class extends WC_Email, which a My Account page has not loaded. */
+	public const DATE = 'j F Y';
 
 	/** Notices in the order they fall due. N6 is event driven and not in this list. */
 	private const ORDER = array( 'N1', 'N2', 'N3', 'N4', 'N5', 'N7' );
@@ -255,7 +257,7 @@ final class Notices {
 	public static function facts( Resource $r, string $kind, array $stage, int $now ): array {
 		$domain   = (string) $r->get( 'domain' );
 		$currency = Currency::of_resource( $r );
-		$fmt      = static fn( ?int $time ): string => $time ? wp_date( ServiceEmail::DATE, $time ) : '';
+		$fmt      = static fn( ?int $time ): string => $time ? wp_date( self::DATE, $time ) : '';
 		$end      = $stage['window_end'];
 		$days     = 'N2' === $kind ? max( 0, (int) $stage['days_to_expiry'] ) : ( null !== $end ? max( 0, (int) ceil( ( $end - $now ) / DAY_IN_SECONDS ) ) : 0 );
 		$facts    = array(
