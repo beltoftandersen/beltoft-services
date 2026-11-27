@@ -241,7 +241,18 @@ final class Restore {
 			}
 		}
 
-		return array( 'ok' => true, 'paid' => false, 'message' => '', 'redirect' => (string) $order->get_checkout_payment_url() );
+		return array( 'ok' => true, 'paid' => false, 'message' => '', 'redirect' => self::payment_url( $order ) );
+	}
+
+	/**
+	 * The page where the customer pays a restore order. WooCommerce Subscriptions adds subscription_renewal=true to the payment address of a
+	 * renewal order, and with it the page rebuilds a cart from the renewal's product lines; a restore order has fee lines only, so that cart
+	 * is empty (found on staging 2026-11-27). Without the parameter it is WooCommerce's own pay-for-order page.
+	 *
+	 * @param \WC_Order $order Restore order.
+	 */
+	public static function payment_url( \WC_Order $order ): string {
+		return remove_query_arg( 'subscription_renewal', (string) $order->get_checkout_payment_url() );
 	}
 
 	/**

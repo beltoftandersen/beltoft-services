@@ -889,6 +889,7 @@ class RestoreTest extends TestCase {
 		$result = Restore::process( $this->user, (int) $r->license()['id'] );
 		$this->assertFalse( $result['paid'] );
 		$this->assertStringContainsString( 'pay_for_order', $result['redirect'] );
+		$this->assertStringNotContainsString( 'subscription_renewal', $result['redirect'], 'That parameter rebuilds a cart from product lines: empty for a fee-only order.' );
 	}
 
 	public function test_a_restore_order_is_never_renewed_by_the_plain_renew_job(): void {
