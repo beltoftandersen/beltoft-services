@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.66.7
+Stable tag: 0.66.8
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -258,6 +258,10 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 
 == Changelog ==
 
+= 0.66.8 =
+* Domain search: a refused search (too many searches, or a busy registrar) answers 429 with a Retry-After header and retry_after seconds; the button counts down ("Try again in 0:42") and one line under the field says why. All text colours of the search read variables (--bds-ink, --bds-muted, --bds-error, --bds-warn), so a dark site sets them once.
+* Domain search: every text colour reads a --bds-* variable (the site sets them once), so the loading text and notes are readable on the dark site.
+
 = 0.66.7 =
 * My Account: one list card for every list (servers, webhotels, domains, e-mail, apps, licences, empty lists, overview, billing), set by --bs-list-* CSS variables.
 * Servers list: no hover text on the usage bars. Subscriptions tab: one usage line with a link to the Pay as you go page. Pay as you go: the amount lines up with its table.
@@ -269,7 +273,6 @@ The settings, connections, clusters, IP pool, VM records, breach marks, DNS host
 * Apps: when an app is ready, the server overview shows it with Open and Show login; the order page and the ready email point to the login under App; every login field has a translated label.
 * Admin: WooCommerce > Services has a VM column (the Proxmox VM number; searching the number finds the server).
 * The progress line of a new order always shows a little and keeps moving while a step runs.
-* Domain search: a refused search (too many searches, or a busy registrar) answers 429 with a Retry-After header and retry_after seconds; the button counts down ("Try again in 0:42") and one line under the field says why. All text colours of the search read variables (--bds-ink, --bds-muted, --bds-error, --bds-warn), so a dark site sets them once.
 
 = 0.66.5 =
 * The domain box no longer says "no A record" after a look made before the found addresses were stored; it says what the look found.
