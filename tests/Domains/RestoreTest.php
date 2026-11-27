@@ -837,6 +837,74 @@ class RestoreTest extends TestCase {
 		$this->assertSame( '', (string) ob_get_clean(), 'A domain that is not expired shows nothing with the notices off.' );
 	}
 
+	/** The expired domain's subscription has a saved payment method of a test gateway that charges when WooCommerce Subscriptions asks. */
+	private function saved_method( Resource $r, bool $succeeds, int &$charges ): void {
+		$sub = \BeltoftServices\Domains\Stage::subscription( $r );
+		$sub->set_payment_method( 'testgw' );
+		$sub->set_requires_manual_renewal( false );
+		$sub->save();
+		add_action(
+			'woocommerce_scheduled_subscription_payment_testgw',
+			static function ( $amount, $order ) use ( $succeeds, &$charges ): void {
+				++$charges;
+				if ( $succeeds ) {
+					$order->payment_complete( 'test-charge' );
+				}
+			},
+			10,
+			2
+		);
+	}
+
+	public function test_the_saved_payment_method_is_charged_without_asking(): void {
+		$r       = $this->expired();
+		$charges = 0;
+		$this->saved_method( $r, true, $charges );
+		$result = Restore::process( $this->user, (int) $r->license()['id'] );
+		$this->assertTrue( $result['ok'] );
+		$this->assertTrue( $result['paid'], 'Charged from the saved method.' );
+		$this->assertStringNotContainsString( 'pay_for_order', $result['redirect'], 'No payment page.' );
+		$this->assertSame( 1, $charges );
+		$order = wc_get_order( (int) Resource::find( $r->id() )->get( 'restore_order' ) );
+		$this->assertTrue( $order->is_paid() );
+		$this->assertSame( 69.0, (float) $order->get_total() );
+		$this->assertCount( 2, $order->get_items( 'fee' ) );
+		$this->assertCount( 0, $order->get_items( 'line_item' ) );
+	}
+
+	public function test_a_declined_saved_method_falls_back_to_the_payment_page_and_is_not_tried_again_on_a_click(): void {
+		$r       = $this->expired();
+		$charges = 0;
+		$this->saved_method( $r, false, $charges );
+		$first = Restore::process( $this->user, (int) $r->license()['id'] );
+		$this->assertFalse( $first['paid'] );
+		$this->assertStringContainsString( 'pay_for_order', $first['redirect'] );
+		$second = Restore::process( $this->user, (int) $r->license()['id'] );
+		$this->assertSame( $first['redirect'], $second['redirect'], 'The same order.' );
+		$this->assertSame( 1, $charges, 'Not charged again on a second click.' );
+	}
+
+	public function test_without_a_saved_method_the_customer_gets_the_payment_page(): void {
+		$r      = $this->expired();
+		$result = Restore::process( $this->user, (int) $r->license()['id'] );
+		$this->assertFalse( $result['paid'] );
+		$this->assertStringContainsString( 'pay_for_order', $result['redirect'] );
+	}
+
+	public function test_a_restore_order_is_never_renewed_by_the_plain_renew_job(): void {
+		$r       = $this->expired();
+		$charges = 0;
+		$this->saved_method( $r, true, $charges );
+		Restore::process( $this->user, (int) $r->license()['id'] );
+		$order = wc_get_order( (int) Resource::find( $r->id() )->get( 'restore_order' ) );
+		$fake  = $this->fake();
+		$this->assertTrue( Renewals::renew( Resource::find( $r->id() ), (string) $order->get_id() )->is_done() );
+		$this->assertSame( array(), $fake->calls(), 'No registrar call on a restore order.' );
+		Renewals::on_paid( \BeltoftServices\Domains\Stage::subscription( $r ), $order );
+		$jobs = as_get_scheduled_actions( array( 'hook' => Jobs::ACT, 'group' => Jobs::GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING ), 'ids' );
+		$this->assertCount( 0, array_filter( $jobs, static fn( $id ) => $r->id() === (int) \ActionScheduler::store()->fetch_action( $id )->get_args()[0] ), 'No renew job.' );
+	}
+
 	public function test_the_fake_registrar_model_restores_a_domain(): void {
 		delete_option( FakeClient::OPTION );
 		$client  = new FakeClient( true );

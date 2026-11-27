@@ -30,6 +30,13 @@ final class UnpaidView {
 			return $out;
 		}
 
+		// A paid restore that is being carried out shows whatever the stage says (paying it can already have made the licence active).
+		if ( null !== Restore::paid_open( $r ) ) {
+			$out['lines'][] = __( 'We received your payment and are restoring this domain. You will get an email when it is done.', 'beltoft-services' );
+
+			return $out;
+		}
+
 		// With the notices off the page says nothing about renewals, only what an expired domain needs to be restored (when restoring is on).
 		if ( ! Notices::enabled() && ( ! Restore::enabled() || Stage::EXPIRED !== $stage['stage'] ) ) {
 			return $out;

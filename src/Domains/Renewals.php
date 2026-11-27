@@ -60,6 +60,8 @@ final class Renewals {
 	}
 
 	public static function on_paid( $subscription, $order ): void {
+		// A restore order is a renewal order of the subscription too, but it is paid for the restore job, never for a plain renew.
+		if ( $order instanceof \WC_Order && is_array( $order->get_meta( Restore::ORDER_META ) ) ) { return; }
 		RenewalSweep::on_paid( $subscription, $order, 'domain' );
 	}
 
@@ -126,6 +128,8 @@ final class Renewals {
 		$sub_id = (int) ( $r->license()['subscription_id'] ?? 0 );
 		$linked = $order && function_exists( 'wcs_get_subscriptions_for_renewal_order' ) ? wcs_get_subscriptions_for_renewal_order( $order ) : array();
 		if ( ! $order || ! $order->is_paid() || ! $sub_id || ! isset( $linked[ $sub_id ] ) ) { return StepResult::fail( 'No paid renewal order belongs to this domain.' ); }
+		// A restore order is carried out by the restore job: the sweep must not buy a year on it.
+		if ( is_array( $order->get_meta( Restore::ORDER_META ) ) ) { return StepResult::done(); }
 		$done = (array) $r->get( 'renewed_orders' );
 		if ( in_array( $order_id, $done, true ) ) { return StepResult::done(); }
 		$started = (array) $r->get( 'renew_started' );

@@ -195,7 +195,7 @@ final class Restore {
 		$result = self::process( get_current_user_id(), $license_id );
 
 		if ( '' !== $result['message'] ) {
-			wc_add_notice( $result['message'], 'error' );
+			wc_add_notice( $result['message'], $result['ok'] ? 'success' : 'error' );
 		}
 
 		wp_safe_redirect( $result['redirect'] );
@@ -207,7 +207,7 @@ final class Restore {
 	 *
 	 * @param int $user_id    Customer.
 	 * @param int $license_id License of the domain.
-	 * @return array{ok: bool, message: string, redirect: string} Redirect is the payment page when ok.
+	 * @return array{ok: bool, paid?: bool, message: string, redirect: string} Redirect is the domain page when paid, else the payment page.
 	 */
 	public static function process( int $user_id, int $license_id ): array {
 		$license  = Licenses::find( $license_id );
@@ -230,7 +230,47 @@ final class Restore {
 			return array( 'ok' => false, 'message' => $order->get_error_message(), 'redirect' => $back );
 		}
 
-		return array( 'ok' => true, 'message' => '', 'redirect' => (string) $order->get_checkout_payment_url() );
+		// Credit first, then the saved payment method; only what neither covers goes to the payment page (owner rule: never ask for a card
+		// that is saved, never ask at all when credit covers it). Tried once, on a new order: a reused order goes straight to the page.
+		if ( $order->get_meta( '_beltoft_services_restore_fresh' ) ) {
+			$order->delete_meta_data( '_beltoft_services_restore_fresh' );
+			$order->save();
+
+			if ( self::pay_without_asking( $order ) ) {
+				return array( 'ok' => true, 'paid' => true, 'message' => __( 'Payment received. We are restoring your domain and will email you when it is done.', 'beltoft-services' ), 'redirect' => $back );
+			}
+		}
+
+		return array( 'ok' => true, 'paid' => false, 'message' => '', 'redirect' => (string) $order->get_checkout_payment_url() );
+	}
+
+	/**
+	 * Pays a restore order from the customer's account credit and then from the saved payment method of the domain subscription, charged the
+	 * way WooCommerce Subscriptions charges a renewal. Nothing is asked of the customer.
+	 *
+	 * @param \WC_Order $order The new, unpaid restore order.
+	 * @return bool Whether the order is paid now.
+	 */
+	public static function pay_without_asking( \WC_Order $order ): bool {
+		if ( class_exists( '\\Bgca\\Pay' ) && \Bgca\Pay::wanted( $order, 'renewal' ) ) {
+			\Bgca\Pay::apply( $order, 'renewal' );
+			$order = wc_get_order( $order->get_id() ) ?: $order;
+
+			// The credit covered it all: completed now, which is when the gift card plugin takes the balance.
+			\Bgca\Pay::settle( $order );
+			$order = wc_get_order( $order->get_id() ) ?: $order;
+		}
+
+		if ( $order->is_paid() ) {
+			return true;
+		}
+
+		if ( (float) $order->get_total() > 0 && '' !== (string) $order->get_payment_method() ) {
+			\BeltoftServices\Billing\Subscriptions::charge_now( $order );
+			$order = wc_get_order( $order->get_id() ) ?: $order;
+		}
+
+		return $order->is_paid();
 	}
 
 	/**
@@ -272,20 +312,32 @@ final class Restore {
 			$earlier->update_status( 'cancelled', __( 'Replaced by a new restore order for this domain.', 'beltoft-services' ) );
 		}
 
-		$order = wc_create_order( array( 'customer_id' => $user_id, 'status' => 'pending', 'created_via' => 'beltoft-services-restore' ) );
+		$subscription = Stage::subscription( $r );
 
-		if ( ! $order instanceof \WC_Order ) {
+		if ( ! $subscription || ! function_exists( 'wcs_create_renewal_order' ) ) {
 			return $not_available;
 		}
 
-		$order->set_currency( $amounts['currency'] );
-		$subscription = Stage::subscription( $r );
-		$billing      = $subscription ? (array) $subscription->get_address( 'billing' ) : array();
+		// A renewal order of the domain's subscription, the way Usage\Threshold bills an early invoice: WooCommerce Subscriptions gives it the
+		// subscription's payment method and saved token, so the same gateway call that charges a renewal can charge it, and paying it on the
+		// payment page works too. The lines are replaced below; the credit is applied after that, never on the copied lines.
+		$hold = static fn(): bool => false;
+		add_filter( 'bgca_auto_apply', $hold, PHP_INT_MAX );
 
-		if ( $billing ) {
-			$order->set_address( $billing, 'billing' );
+		try {
+			$order = wcs_create_renewal_order( $subscription );
+		} finally {
+			remove_filter( 'bgca_auto_apply', $hold, PHP_INT_MAX );
 		}
 
+		if ( is_wp_error( $order ) || ! $order instanceof \WC_Order ) {
+			return $not_available;
+		}
+
+		$order->remove_order_items();
+		$order->set_created_via( 'beltoft-services-restore' );
+		$order->set_payment_method( $subscription->get_payment_method() );
+		$order->set_currency( $amounts['currency'] );
 		$product   = Cart::domain_product();
 		$tax_class = $product ? $product->get_tax_class() : '';
 		$shown     = HostName::display( $domain );
@@ -325,6 +377,7 @@ final class Restore {
 			)
 		);
 		$order->calculate_totals( true );
+		$order->update_meta_data( '_beltoft_services_restore_fresh', 1 );
 		$order->add_order_note( sprintf( 'Restore order for %s (expired %s): renewal and reactivation fee.', $domain, $baseline ) );
 		$order->save();
 		$r->set( array( 'restore_order' => $order->get_id() ) );
