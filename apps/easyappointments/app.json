@@ -16,6 +16,6 @@
   "open": {"path": "/index.php/login"},
   "docs_url": "https://easyappointments.org/docs.html",
   "versions": [
-    {"id": "1.6", "label": "Easy!Appointments 1.6", "upstream": "1.6.1", "recipe": 1, "status": "current", "min_plan": "starter", "os": ["ubuntu-24.04"], "install": "install.script", "sha256": "c80eaaa25dc817344a7f8bd6d865a44c57949b023af9d2811e1af3fff959e191", "eol": ""}
+    {"id": "1.6", "label": "Easy!Appointments 1.6", "upstream": "1.6.1", "recipe": 1, "status": "current", "min_plan": "starter", "os": ["ubuntu-24.04"], "install": "install.script", "sha256": "b01d6fcbc116732c87b563bb73b03e68768c6a8af35bc896204cac934e0d28a3", "eol": ""}
   ]
 }

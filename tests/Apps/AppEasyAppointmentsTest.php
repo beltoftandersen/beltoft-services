@@ -30,7 +30,9 @@ final class AppEasyAppointmentsTest extends TestCase {
 		$rule   = 'label[for="select-timezone"],#select-timezone{display:none!important}';
 		$this->assertSame( 1, substr_count( $script, $rule ) );
 		$this->assertStringContainsString( 'cp -a "$src/assets" "$work/assets"' . "\n" . '  # beltoft: the time zone choice', $script );
-		$this->assertStringContainsString( "grep -q 'select-timezone{display:none' \"\$work/assets/css/frontend.css\"", $script );
+		// Both files: the booking page loads frontend.min.css when DEBUG_MODE is off (production), frontend.css otherwise.
+		$this->assertStringContainsString( 'for css in frontend.css frontend.min.css; do', $script );
+		$this->assertStringContainsString( "grep -q 'select-timezone{display:none' \"\$work/assets/css/\$css\"", $script );
 	}
 
 	public function test_the_minimum_is_the_smallest_plan_and_the_definition_declares_domain_www_steps_and_credentials(): void {
