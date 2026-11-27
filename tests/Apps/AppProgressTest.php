@@ -91,6 +91,19 @@ class AppProgressTest extends MonitoringTestCase {
 	}
 
 	/** Owner 2026-11-27: an install that waits for the customer's own domain said "Downloading the installer"; it must say what to do. */
+	/** Owner 2026-11-27: the overview banner said "Working / Follow it" while the install waited for the customer. */
+	public function test_the_overview_banner_says_it_waits_for_the_customer_during_a_dns_wait(): void {
+		$r = $this->server( array( 'app_state' => 'pending', 'app_domain_own' => 'example.dk', 'app_domain_dns' => 'waiting', 'app_domain_dns_reason' => 'other', 'app_domain_dns_since' => time() ) );
+		wp_set_current_user( (int) $r->license()['user_id'] );
+		\BeltoftServices\Account\OverviewData::reset();
+		$items = array_values( array_filter( \BeltoftServices\Account\OverviewData::data()['attention'], static fn( $i ) => (int) ( $i['license'] ?? 0 ) === (int) $r->license()['id'] ) );
+
+		$this->assertCount( 1, $items );
+		$this->assertSame( 'Waiting for you', $items[0]['state'] );
+		$this->assertSame( 'See how', $items[0]['label'] );
+		$this->assertSame( 'Point example.dk to 192.0.2.10', $items[0]['text'] );
+	}
+
 	public function test_an_install_waiting_for_the_customers_own_domain_says_what_to_do_everywhere(): void {
 		$r = $this->server( array( 'app_state' => 'pending', 'app_domain_own' => 'example.dk', 'app_domain_dns' => 'waiting', 'app_domain_dns_reason' => 'other', 'app_domain_dns_since' => time() ) );
 		$p = Progress::build( $r );

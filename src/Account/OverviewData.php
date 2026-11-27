@@ -327,15 +327,18 @@ final class OverviewData {
 				continue;
 			}
 
+			// The install waits for the customer's own domain: it is the customer's turn, not ours (owner 2026-11-27).
+			$theirs = \BeltoftServices\Apps\AppProgress::dns_wait( $resource );
+
 			$items[] = array(
 				'tone'  => 'busy',
 				'license' => (int) $id,
 				'sep'   => ':',
-				'state' => __( 'Working', 'beltoft-services' ),
+				'state' => $theirs ? __( 'Waiting for you', 'beltoft-services' ) : __( 'Working', 'beltoft-services' ),
 				'name'  => $names[ $id ] ?? View::product_name( $license ),
 				'text'  => 'app' === $progress['kind'] ? Panel::line_of( (string) $resource->get( 'state' ), $resource ) : (string) $progress['title'],
 				'link'  => self::follow_url( $license ),
-				'label' => __( 'Follow it', 'beltoft-services' ),
+				'label' => $theirs ? __( 'See how', 'beltoft-services' ) : __( 'Follow it', 'beltoft-services' ),
 			);
 		}
 
