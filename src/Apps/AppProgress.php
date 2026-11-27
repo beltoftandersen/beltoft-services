@@ -97,6 +97,11 @@ final class AppProgress {
 		$done   = array_keys( $labels );
 		$info   = self::steps( $r );
 
+		// Waiting for the customer's own domain: that is the step in progress, not the first install step (owner 2026-11-27).
+		if ( self::dns_wait( $r ) ) {
+			$labels['app_dns'] = __( 'Waiting for your DNS record', 'beltoft-services' );
+		}
+
 		foreach ( $info['codes'] as $i => $code ) {
 			$labels[ 'app_' . $code ] = self::step_label( $code );
 
@@ -142,6 +147,13 @@ final class AppProgress {
 	public static function text( $words, $r, $kind, $phase, $eta ) {
 		if ( 'app' !== $kind || ! is_array( $words ) || ! $r instanceof Resource ) {
 			return $words;
+		}
+
+		if ( self::dns_wait( $r ) ) {
+			return array(
+				'title' => __( 'Point your domain at this server', 'beltoft-services' ),
+				'text'  => self::dns_text( $r ),
+			);
 		}
 
 		return array(
@@ -240,6 +252,10 @@ final class AppProgress {
 			return sprintf( __( 'Server ready, %s is taking longer than usual', 'beltoft-services' ), $name );
 		}
 
+		if ( self::dns_wait( $r ) ) {
+			return __( 'Waiting for your DNS record', 'beltoft-services' );
+		}
+
 		$labels = AppTab::step_labels();
 		$info   = self::steps( $r );
 		$code   = false !== $info['at'] ? $info['codes'][ $info['at'] ] : ( $info['codes'][0] ?? '' );
@@ -257,6 +273,10 @@ final class AppProgress {
 		$state = self::state( $r );
 		$name  = self::name( $r );
 
+		if ( 'installing' === $state && self::dns_wait( $r ) ) {
+			return self::dns_text( $r );
+		}
+
 		if ( 'installing' === $state ) {
 			/* translators: %s: app name such as WordPress */
 			return sprintf( __( 'Your server is up and %s is being installed on it. This page updates by itself.', 'beltoft-services' ), $name );
@@ -273,5 +293,51 @@ final class AppProgress {
 		}
 
 		return '';
+	}
+
+	/**
+	 * Is the install waiting for the customer's own domain to point at the server (nothing runs until it does)?
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function dns_wait( Resource $r ): bool {
+		return 'installing' === self::state( $r ) && in_array( (string) $r->get( 'app_state' ), array( '', 'pending' ), true ) && AppOwnDomain::waiting( $r );
+	}
+
+	/**
+	 * What the customer must do while the install waits for their domain: the record to make, what DNS says now, and what
+	 * happens next. The same sentences as the App tab (templates/account/app.php), so one translation serves both.
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public static function dns_text( Resource $r ): string {
+		$name = (string) $r->get( 'app_domain_own' );
+		$ip   = AppOwnDomain::address( $r );
+		$ip   = '' !== $ip ? $ip : ( false !== filter_var( (string) $r->get( 'ip' ), FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ? (string) $r->get( 'ip' ) : '' );
+		$www  = AppWww::view( $r );
+		$out  = array();
+
+		if ( '' !== $ip && '' !== (string) ( $www['name'] ?? '' ) ) {
+			/* translators: 1: domain name, 2: www name, 3: server IPv4 address */
+			$out[] = sprintf( __( 'Point A records for %1$s and %2$s to %3$s.', 'beltoft-services' ), $name, (string) $www['name'], $ip );
+		} elseif ( '' !== $ip ) {
+			/* translators: 1: domain name, 2: server IPv4 address */
+			$out[] = sprintf( __( 'Point an A record for %1$s to %2$s.', 'beltoft-services' ), $name, $ip );
+		}
+
+		$out[] = match ( (string) $r->get( 'app_domain_dns_reason' ) ) {
+			'none'        => __( 'The name has no A record yet.', 'beltoft-services' ),
+			'other'       => __( 'The name has an A record, but it does not point to this server only. Remove the other addresses.', 'beltoft-services' ),
+			'aaaa'        => __( 'The name points to this server, but it also has an AAAA record. Remove the AAAA record, because this server has no IPv6 address.', 'beltoft-services' ),
+			'unreachable' => __( 'The name could not be looked up. We will try again.', 'beltoft-services' ),
+			default       => __( 'We have not looked yet. We check soon.', 'beltoft-services' ),
+		};
+
+		$deadline = AppOwnDomain::deadline( $r );
+		$days     = AppOwnDomain::WAIT_DAYS;
+		/* translators: 1: number of days, 2: date */
+		$out[]    = sprintf( _n( 'We check every ten minutes. When the name points to this server, the app is installed with HTTPS, and we email you. If this has not happened by %2$s (%1$d day after the server started), the app is installed on the server address instead.', 'We check every ten minutes. When the name points to this server, the app is installed with HTTPS, and we email you. If this has not happened by %2$s (%1$d days after the server started), the app is installed on the server address instead.', $days, 'beltoft-services' ), $days, $deadline > 0 ? wp_date( get_option( 'date_format' ), $deadline ) : '' );
+
+		return implode( ' ', $out );
 	}
 }

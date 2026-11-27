@@ -90,6 +90,26 @@ class AppProgressTest extends MonitoringTestCase {
 		$this->assertTrue( $thanks['progress']['active'] );
 	}
 
+	/** Owner 2026-11-27: an install that waits for the customer's own domain said "Downloading the installer"; it must say what to do. */
+	public function test_an_install_waiting_for_the_customers_own_domain_says_what_to_do_everywhere(): void {
+		$r = $this->server( array( 'app_state' => 'pending', 'app_domain_own' => 'example.dk', 'app_domain_dns' => 'waiting', 'app_domain_dns_reason' => 'other', 'app_domain_dns_since' => time() ) );
+		$p = Progress::build( $r );
+
+		$this->assertTrue( $p['active'] );
+		$this->assertSame( 'Point your domain at this server', $p['title'] );
+		$this->assertStringContainsString( 'example.dk', $p['text'] );
+		$this->assertStringContainsString( '192.0.2.10', $p['text'], 'The address to point the record at.' );
+		$this->assertStringContainsString( 'does not point to this server only', $p['text'], 'What DNS says now.' );
+		$this->assertStringNotContainsString( 'Downloading the installer', $p['text'] );
+		$st = $this->statuses( $p );
+		$this->assertSame( 'current', $st['app_dns'], 'The DNS wait is the step in progress.' );
+		$this->assertSame( 'todo', $st['app_download'], 'Nothing is downloading.' );
+
+		$this->assertSame( 'Waiting for your DNS record', Panel::label( 'ready', $r ) );
+		$this->assertStringContainsString( '192.0.2.10', Panel::message( 'ready', $r ) );
+		$this->assertSame( 'Waiting for your DNS record', ThankYou::row( $r )['label'] );
+	}
+
 	public function test_the_server_card_says_installing_not_running_and_not_ready(): void {
 		$r = $this->server( array( 'app_state' => 'installing', 'app_step' => 'packages' ) );
 		wp_set_current_user( (int) $r->license()['user_id'] );
