@@ -213,7 +213,7 @@ class GuestMemoryTest extends MonitoringTestCase {
 		$this->assertSame( 'ok', $ok['state'] );
 		$this->assertSame( 21, $ok['percent'] );
 		$this->assertSame( '', $ok['sub'], 'The list shows the percent only, no GB line.' );
-		$this->assertSame( 'Memory', $ok['title'] );
+		$this->assertArrayNotHasKey( 'title', $ok, 'No hover title on the list bar (owner 2026-11-27); the bar carries its name as an aria-label.' );
 
 		set_transient( Operations::STATUS_PREFIX . $r->id(), array( 'power' => 'stopped', 'cpu' => 0.0, 'mem' => 0 ), HOUR_IN_SECONDS );
 		$rows = Servers::rows( array( View::license( $r->license() ) ) );

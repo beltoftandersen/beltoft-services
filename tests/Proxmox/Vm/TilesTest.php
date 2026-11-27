@@ -105,7 +105,8 @@ class TilesTest extends TestCase {
 	public function test_a_selected_tile_is_light_and_keeps_the_colours_of_its_logo(): void {
 		$css = (string) file_get_contents( BELTOFT_SERVICES_PATH . 'assets/tiles.css' );
 		$this->assertStringNotContainsString( 'fill: currentColor', $css, 'The logo keeps its brand colours on the selected tile.' );
-		$this->assertMatchesRegularExpression( '/__input:checked \+ \.beltoft-services-tile__face[^{]*\{ background: var\(--bs-surface, #fff\);/', $css );
+		// The selected tile takes the shared choice variables (owner 2026-11-27: one place to turn for every choice tile).
+		$this->assertMatchesRegularExpression( '/__input:checked \+ \.beltoft-services-tile__face[^{]*\{ background: var\(--bs-choice-sel-bg/', $css );
 	}
 
 	public function test_the_apps_name_their_logo_in_app_json_and_the_shipped_ones_exist(): void {
@@ -246,8 +247,8 @@ class TilesTest extends TestCase {
 
 		$this->assertStringContainsString( 'repeat(3, minmax(0, 1fr))', $css );
 		$this->assertStringContainsString( 'repeat(2, minmax(0, 1fr))', $css );
-		$this->assertStringNotContainsString( 'border-radius: ', str_replace( 'border-radius: 0', '', $css ), 'No rounded corners.' );
-		$this->assertMatchesRegularExpression( '/__input:checked \+ \.beltoft-services-tile__face[^{]*\{[^}]*var\(--bs-dark/', $css );
+		$this->assertStringNotContainsString( 'border-radius: ', str_replace( array( 'border-radius: 0', 'border-radius: 50%' ), '', $css ), 'No rounded corners (only the round check mark).' );
+		$this->assertMatchesRegularExpression( '/__input:checked \+ \.beltoft-services-tile__face[^{]*\{[^}]*var\(--bs-choice-sel/', $css );
 		$this->assertMatchesRegularExpression( '/__input:focus-visible \+ \.beltoft-services-tile__face/', $css );
 	}
 

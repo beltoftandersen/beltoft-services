@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.66.9
+Stable tag: 0.66.10
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,12 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.66.10 =
+* Databases: a Connect to your database box on the Access tab (allowed address with one click, IPv6 or IPv4, the connection details and command per engine to copy, the private network).
+* Servers and databases with an IPv6 address only say so on the Access tab, with Check my connection (shown once the IPv6 test address is set up) and Buy an IPv4 address.
+* No second progress line at the top while the order card shows the setup.
+* Reinstall names the version kept (e.g. Odoo 20, Danish accounting) and lists the Danish edition first on Danish pages.
 
 = 0.66.9 =
 * Choice tiles (plans, OS, apps, domains, credit amounts) show the chosen one clearly, set by --bs-choice-* variables; plan tiles show the network port.
