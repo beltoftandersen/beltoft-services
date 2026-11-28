@@ -18,6 +18,9 @@ final class DnsWatchFakeFeature implements DnsWatchFeature {
 	/** @var bool A lookup that fails. */
 	public static bool $failing = false;
 
+	/** @var bool What before_look() answers. */
+	public static bool $before = true;
+
 	/** @var array<int, string> Events the feature was told, in order. */
 	public static array $events = array();
 
@@ -70,7 +73,7 @@ final class DnsWatchFakeFeature implements DnsWatchFeature {
 	}
 
 	public function before_look( Resource $r ): bool {
-		return true;
+		return self::$before;
 	}
 
 	public function mails( string $event, Resource $r ): bool {

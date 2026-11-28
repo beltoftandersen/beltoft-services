@@ -34,6 +34,7 @@ final class DnsWatchTest extends TestCase {
 		DnsWatchFakeFeature::$present = array();
 		DnsWatchFakeFeature::$failing = false;
 		DnsWatchFakeFeature::$events  = array();
+		DnsWatchFakeFeature::$before  = true;
 		$this->mails                  = array();
 		$this->observed               = array();
 		$this->feature                = new DnsWatchFakeFeature();
@@ -569,5 +570,21 @@ final class DnsWatchTest extends TestCase {
 		$this->assertFalse( \BeltoftServices\Domains\DnsWatchHealth::tripped( $this->feature ) );
 		$this->assertSame( array( 1, 1 ), array_slice( \BeltoftServices\Domains\DnsWatchHealth::counts( $this->feature ), 0, 2 ) );
 		$this->assertSame( '', DnsWatchSettings::health_probe_name() );
+	}
+
+	public function test_the_watchdog_queues_only_services_that_a_look_would_work_on(): void {
+		$ready = $this->service();
+		$gone  = $this->service();
+		$this->assertTrue( $gone->set( array( 'state' => 'deleted' ) ) );
+		$later = $this->service();
+		$this->assertTrue( $later->set( array( 'state' => 'paused' ) ) );
+
+		$due = array_column( \BeltoftServices\Domains\DnsWatchJobs::due( 'fake' ), 0 );
+		$this->assertContains( $ready->id(), $due );
+		$this->assertNotContains( $gone->id(), $due, 'A deleted service is not queued.' );
+		$this->assertNotContains( $later->id(), $due, 'A service the feature does not look at is not queued.' );
+
+		DnsWatchFakeFeature::$before = false;
+		$this->assertSame( array(), \BeltoftServices\Domains\DnsWatchJobs::due( 'fake' ), 'A service that is not ready for a look (before_look) is not queued.' );
 	}
 }

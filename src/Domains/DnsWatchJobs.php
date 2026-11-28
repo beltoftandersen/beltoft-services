@@ -143,7 +143,9 @@ final class DnsWatchJobs {
 	}
 
 	/**
-	 * The watchdog's list: every service still waiting for records should have a read queued.
+	 * The watchdog's list: every service still waiting for records, that a look would work on, should have a read queued. A deleted or
+	 * ended service (the feature's active()) and one that is not ready for a look (before_look()) is left out, so the watchdog never
+	 * queues a look that does nothing.
 	 *
 	 * @param string $feature_id Feature id.
 	 * @return array<int, array<int, int>>
@@ -155,6 +157,16 @@ final class DnsWatchJobs {
 			return array();
 		}
 
-		return array_map( static fn( $id ): array => array( (int) $id ), Resource::find_by_meta( $f->kind(), $f->prefix(), 'waiting' ) );
+		$due = array();
+
+		foreach ( Resource::find_by_meta( $f->kind(), $f->prefix(), 'waiting' ) as $id ) {
+			$r = Resource::find( (int) $id );
+
+			if ( $r && $r->is_live() && $f->active( $r ) && $f->before_look( $r ) ) {
+				$due[] = array( (int) $id );
+			}
+		}
+
+		return $due;
 	}
 }
