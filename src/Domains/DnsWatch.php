@@ -738,7 +738,7 @@ final class DnsWatch {
 			DnsWatchMail::send( 'lost', $f, $fresh );
 		}
 
-		Alerts::dns_watch_lost( $fresh, $f->label(), $domain, $still, DnsWatchSettings::admin_throttle( $f->id() ), $f->id(), $f->alert_lines( 'lost', $fresh ) );
+		Alerts::dns_watch_lost( $fresh, $f->label(), $domain, $still, DnsWatchSettings::admin_throttle( $f->id() ), $f->id(), $f->alert_lines( 'lost', $fresh, array( 'mailed' => ! $quiet ) ) );
 		self::event( $f, 'lost_confirmed', $fresh, array( 'keys' => $still, 'mailed' => ! $quiet ) );
 	}
 

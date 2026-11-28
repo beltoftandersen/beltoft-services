@@ -527,4 +527,40 @@ final class AppDnsWatchTest extends MonitoringTestCase {
 		// What a loss that is found again clears is a part of the same list.
 		$this->assertSame( array(), array_diff( DnsWatch::loss_marks( 'app_domain_dns' ), $marks ) );
 	}
+
+	/** Bodies of the staff alert about the lost name. */
+	private function staff_lost_bodies(): array {
+		$out = array();
+		foreach ( $this->mails as $m ) {
+			if ( str_contains( (string) ( $m['subject'] ?? '' ), 'lost DNS records' ) ) {
+				$out[] = (string) $m['message'];
+			}
+		}
+
+		return $out;
+	}
+
+	public function test_the_staff_alert_says_whether_the_customer_was_emailed(): void {
+		$loss = function ( Resource $r ): void {
+			$this->answers['A'] = array( '198.51.100.7' );
+			$this->recheck( $r );
+			DnsWatch::confirm( $this->f(), $r->id() );
+		};
+
+		$loss( $this->live() );
+		$bodies = $this->staff_lost_bodies();
+		$this->assertCount( 1, $bodies );
+		$this->assertStringContainsString( 'The customer was emailed.', $bodies[0] );
+		$this->assertStringNotContainsString( 'not emailed', $bodies[0] );
+
+		// A loss inside the mail gap after the last mail (a flapping record): the customer is not mailed again, and the alert says so.
+		$this->mails = array();
+		delete_transient( 'beltoft_services_app_lost_' . md5( strtolower( self::NAME ) ) );
+		$loss( $this->live( array( 'app_domain_dns_last_mail' => time() - 60 ), 5001 ) );
+		$bodies = $this->staff_lost_bodies();
+		$this->assertCount( 1, $bodies );
+		$this->assertStringContainsString( 'The customer was not emailed again: inside the mail gap.', $bodies[0] );
+		$this->assertStringNotContainsString( 'The customer was emailed.', $bodies[0] );
+		$this->assertSame( array(), $this->customer_subjects() );
+	}
 }

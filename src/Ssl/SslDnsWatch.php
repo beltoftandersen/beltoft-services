@@ -10,6 +10,7 @@ namespace BeltoftServices\Ssl;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Domains\DnsWatch;
 use BeltoftServices\Domains\DnsWatchFeature;
+use BeltoftServices\Domains\DnsWatchMail;
 use BeltoftServices\Domains\DnsWatchJobs;
 use BeltoftServices\Domains\HostName;
 use BeltoftServices\Domains\PublicDns;
@@ -418,11 +419,11 @@ final class SslDnsWatch implements DnsWatchFeature {
 	}
 
 	public function alert_lines( string $event, Resource $r, array $ctx = array() ): array {
-		unset( $r, $ctx );
+		unset( $r );
 
 		switch ( $event ) {
 			case 'lost':
-				return array( 'The validation CNAME of the certificate is gone. The certificate keeps working; its next renewal or reissue waits for the record. Nothing is ordered, reissued or cancelled by this. The customer was emailed.' );
+				return array( 'The validation CNAME of the certificate is gone. The certificate keeps working; its next renewal or reissue waits for the record. Nothing is ordered, reissued or cancelled by this. ' . DnsWatchMail::mailed_line( $ctx ) );
 			case 'no_dns':
 				return array( 'The validation CNAME of the certificate is still missing. Nothing is ordered, reissued or cancelled by this.' );
 		}

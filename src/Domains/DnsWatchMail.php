@@ -24,6 +24,19 @@ final class DnsWatchMail {
 
 	public const EVENTS = array( 'reminder', 'lost', 'back', 'timeout' );
 
+	/**
+	 * The sentence of a staff alert about a confirmed loss that says whether the customer was emailed, from the engine's flag
+	 * (`mailed` in the context of alert_lines('lost')). Without the flag the customer was emailed, as the engine always did before the
+	 * flag existed.
+	 *
+	 * @param array<string, mixed> $ctx Context of alert_lines().
+	 */
+	public static function mailed_line( array $ctx ): string {
+		return ! array_key_exists( 'mailed', $ctx ) || $ctx['mailed']
+			? 'The customer was emailed.'
+			: 'The customer was not emailed again: inside the mail gap.';
+	}
+
 	/** Option that remembers the saved texts were moved. */
 	public const MIGRATED = 'beltoft_services_dns_watch_emails_migrated';
 

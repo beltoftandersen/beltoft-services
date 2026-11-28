@@ -320,4 +320,14 @@ final class MailDnsLostTest extends MailTestCase {
 
 		$this->assertSame( 1, $this->count_mails( 'DNS records are missing for nogap.example' ) );
 	}
+
+	public function test_the_staff_alert_of_a_loss_follows_the_mail_flag(): void {
+		$r = $this->found_once( 'flag.example' );
+		$f = new \BeltoftServices\Mail\MailDnsWatch();
+
+		$this->assertStringContainsString( 'The customer was emailed.', implode( ' ', $f->alert_lines( 'lost', $r, array( 'mailed' => true ) ) ) );
+		$quiet = implode( ' ', $f->alert_lines( 'lost', $r, array( 'mailed' => false ) ) );
+		$this->assertStringContainsString( 'The customer was not emailed again: inside the mail gap.', $quiet );
+		$this->assertStringNotContainsString( 'The customer was emailed.', $quiet );
+	}
 }

@@ -220,6 +220,15 @@ final class SslDnsWatchTest extends SslTestCase {
 		$this->assertSame( array(), $fresh->get( 'ssl_dns_lost_keys' ) );
 	}
 
+	public function test_the_staff_alert_of_a_loss_follows_the_mail_flag(): void {
+		$r = $this->waiting();
+		$this->assertStringContainsString( 'The customer was emailed.', implode( ' ', $this->f()->alert_lines( 'lost', $r, array( 'mailed' => true ) ) ) );
+		$this->assertStringContainsString( 'The customer was emailed.', implode( ' ', $this->f()->alert_lines( 'lost', $r ) ), 'Without the flag as before.' );
+		$quiet = implode( ' ', $this->f()->alert_lines( 'lost', $r, array( 'mailed' => false ) ) );
+		$this->assertStringContainsString( 'The customer was not emailed again: inside the mail gap.', $quiet );
+		$this->assertStringNotContainsString( 'The customer was emailed.', $quiet );
+	}
+
 	// -- The standing look after the certificate is issued -----------------------------------------------
 
 	public function test_an_issued_order_with_no_record_of_ours_yet_starts_as_found(): void {

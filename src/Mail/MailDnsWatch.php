@@ -8,6 +8,7 @@
 namespace BeltoftServices\Mail;
 
 use BeltoftServices\Domains\DnsWatchFeature;
+use BeltoftServices\Domains\DnsWatchMail;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -178,7 +179,7 @@ final class MailDnsWatch implements DnsWatchFeature {
 			case 'lost':
 				return array(
 					(int) $r->get( 'mail_dns_moved' ) > 0 ? 'The name servers no longer point to us.' : 'The records are not found at the DNS of the domain.',
-					'held' === (string) $r->get( 'mail_hold' ) ? 'Sending is held (SPF or DKIM). The customer was emailed.' : 'Sending is not held. The customer was emailed.',
+					( 'held' === (string) $r->get( 'mail_hold' ) ? 'Sending is held (SPF or DKIM). ' : 'Sending is not held. ' ) . DnsWatchMail::mailed_line( $ctx ),
 				);
 			case 'no_dns':
 				return array( 'The records are still not found. Mailboxes and mail are kept; nothing is paused or deleted by this.' );

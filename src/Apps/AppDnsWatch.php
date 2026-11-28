@@ -10,6 +10,7 @@ namespace BeltoftServices\Apps;
 use BeltoftServices\Account\ServiceArea;
 use BeltoftServices\Domains\DnsQuery;
 use BeltoftServices\Domains\DnsWatchFeature;
+use BeltoftServices\Domains\DnsWatchMail;
 use BeltoftServices\Domains\HostName;
 use BeltoftServices\Proxmox\Vm\ProxmoxDriver;
 use BeltoftServices\Resource;
@@ -258,11 +259,9 @@ final class AppDnsWatch implements DnsWatchFeature {
 	}
 
 	public function alert_lines( string $event, Resource $r, array $ctx = array() ): array {
-		unset( $ctx );
-
 		switch ( $event ) {
 			case 'lost':
-				return array( 'The name no longer points to the server only. The app keeps running; nothing is stopped or reinstalled. The customer was emailed.' );
+				return array( 'The name no longer points to the server only. The app keeps running; nothing is stopped or reinstalled. ' . DnsWatchMail::mailed_line( $ctx ) );
 			case 'no_dns':
 				return array( 'The name still does not point to the server. The app and its data are kept; nothing is stopped or removed by this.' );
 		}
