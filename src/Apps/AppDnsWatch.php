@@ -168,13 +168,13 @@ final class AppDnsWatch implements DnsWatchFeature {
 		$aaaa = DnsQuery::addresses( $domain, 'AAAA' );
 
 		if ( is_wp_error( $a ) ) {
-			// A lookup that fails learns nothing about a name that was found; for one still awaited it is shown as such.
-			if ( 'ok' === ( $row['status'] ?? '' ) ) {
-				return null;
-			}
+			// A lookup that fails is unknown: the watch learns nothing from it (the flag), the box says so while the name is awaited.
+			$row['unknown'] = true;
 
-			$row['status'] = 'missing';
-			$row['reason'] = 'unreachable';
+			if ( 'ok' !== ( $row['status'] ?? '' ) ) {
+				$row['status'] = 'missing';
+				$row['reason'] = 'unreachable';
+			}
 
 			return $row;
 		}

@@ -141,6 +141,34 @@ final class DnsWatch {
 	}
 
 	/**
+	 * One read of one row. A read that failed (the feature answers null, or flags the row `unknown`) is unknown: it never counts as a record that
+	 * is gone. The flag is taken off the row; the tally counts the lookups of this look for the sweep's health.
+	 *
+	 * @param DnsWatchFeature      $f      Feature.
+	 * @param array<string, mixed> $row    Stored row.
+	 * @param string               $domain Domain.
+	 * @param array{total:int,bad:int} $tally  Counts, by reference.
+	 * @return array{0: array<string, mixed>|null, 1: bool} The row (null when nothing was learned) and whether the read is unknown.
+	 */
+	private static function read( DnsWatchFeature $f, array $row, string $domain, array &$tally ): array {
+		$read = $f->read_row( $row, $domain );
+
+		++$tally['total'];
+
+		$unknown = null === $read || ! empty( $read['unknown'] );
+
+		if ( $unknown ) {
+			++$tally['bad'];
+		}
+
+		if ( is_array( $read ) ) {
+			unset( $read['unknown'] );
+		}
+
+		return array( $read, $unknown );
+	}
+
+	/**
 	 * The status of a resource as the engine reads it: waiting, ok or timeout (a feature may store ok under another word).
 	 *
 	 * @param DnsWatchFeature $f Feature.
@@ -267,6 +295,7 @@ final class DnsWatch {
 		$rows   = $f->rows( $r );
 		$user   = $f->zone_user( $r );
 		$ours   = $f->on_our_servers( $r );
+		$tally  = array( 'total' => 0, 'bad' => 0 );
 
 		foreach ( $rows as $i => $row ) {
 			if ( ! is_array( $row ) || 'ok' === ( $row['status'] ?? '' ) ) {
@@ -288,7 +317,7 @@ final class DnsWatch {
 				continue;
 			}
 
-			$read = $f->read_row( $row, $domain );
+			list( $read ) = self::read( $f, $row, $domain, $tally );
 
 			if ( null !== $read ) {
 				$rows[ $i ] = $read;
@@ -309,7 +338,8 @@ final class DnsWatch {
 			if ( $done ) {
 				self::event( $f, 'found', Resource::find( $id ) ?? $r );
 				self::after_found( $f, $id );
-			} else {
+			} elseif ( 0 === $tally['bad'] ) {
+				// A look that failed sends nothing: no reminder and no lost mail rest on a lookup that learned nothing.
 				self::remind( $f, $id );
 				self::lost_reminders( $f, $id );
 			}
@@ -332,6 +362,8 @@ final class DnsWatch {
 	public static function recheck_all( DnsWatchFeature $f ): void {
 		$step   = 0;
 		$spread = DnsWatchSettings::recheck_spread( $f->id() );
+
+		DnsWatchHealth::reset( $f );
 
 		foreach ( Resource::find_by_meta( $f->kind(), $f->prefix(), $f->status_in( 'ok' ) ) as $id ) {
 			Jobs::schedule_once( time() + min( $step * 4, $spread ), $f->hook( 'recheck' ), array( (int) $id ) );
@@ -424,6 +456,7 @@ final class DnsWatch {
 		}
 
 		$before = DnsWatchState::keys_ok( $rows );
+		$tally  = array( 'total' => 0, 'bad' => 0 );
 
 		foreach ( $rows as $i => $row ) {
 			if ( ! is_array( $row ) || ! isset( $row['name'], $row['type'], $row['value'], $row['key'] ) ) {
@@ -440,25 +473,39 @@ final class DnsWatch {
 				continue;
 			}
 
-			$read = $f->read_row( $row, $domain );
+			list( $read, $unknown ) = self::read( $f, $row, $domain, $tally );
+
+			// A lookup that failed learns nothing: the row stays as it was.
+			if ( $unknown ) {
+				continue;
+			}
 
 			// Not found: look once more before saying so, so a flaky answer never marks a customer's records lost.
-			if ( null !== $read && 'ok' !== $read['status'] && 'ok' === ( $row['status'] ?? '' ) ) {
-				$read = $f->read_row( $row, $domain );
+			if ( 'ok' !== $read['status'] && 'ok' === ( $row['status'] ?? '' ) ) {
+				list( $read, $unknown ) = self::read( $f, $row, $domain, $tally );
 
-				if ( null !== $read && 'ok' !== $read['status'] ) {
+				if ( ! $unknown && 'ok' !== $read['status'] ) {
 					$rows[ $i ] = $read;
 				}
 
 				continue;
 			}
 
-			if ( null !== $read ) {
-				$rows[ $i ] = $read;
-			}
+			$rows[ $i ] = $read;
 		}
 
+		DnsWatchHealth::note( $f, $tally['bad'], $tally['total'] );
+
 		$lost = ! self::complete( $f, $rows );
+
+		// Most lookups of this sweep failed: the resolver is the problem, not the customer's DNS. Nothing is stored as lost.
+		if ( $lost && ! $timeout && DnsWatchHealth::tripped( $f ) ) {
+			$counts = DnsWatchHealth::counts( $f );
+			Alerts::dns_sweep_unhealthy( $f->label(), $f->id(), $counts[0], $counts[1] );
+
+			return;
+		}
+
 		$meta = array( $f->rows_key() => $rows, $p . '_rechecked' => $now );
 		$gone = array_values( array_intersect( $f->needed(), $before, array_diff( $f->needed(), DnsWatchState::keys_ok( $rows ) ) ) );
 
@@ -597,6 +644,7 @@ final class DnsWatch {
 		$ours   = $f->on_our_servers( $r );
 		$keys   = DnsWatchState::lost_keys( $f, $r );
 		$rows   = $f->rows( $r );
+		$tally  = array( 'total' => 0, 'bad' => 0 );
 
 		foreach ( $rows as $i => $row ) {
 			if ( ! is_array( $row ) || ! in_array( (string) ( $row['key'] ?? '' ), $keys, true ) || 'ok' === ( $row['status'] ?? '' ) ) {
@@ -613,15 +661,22 @@ final class DnsWatch {
 				continue;
 			}
 
-			$read = $f->read_row( $row, $domain );
+			list( $read ) = self::read( $f, $row, $domain, $tally );
 
-			if ( null !== $read ) {
+			if ( null !== $read && 0 === $tally['bad'] ) {
 				$rows[ $i ] = $read;
 			}
 		}
 
+		// A lookup that failed confirms nothing: the loss stays pending, is looked at again later, and no mail goes out on it.
+		if ( $tally['bad'] > 0 ) {
+			self::confirm_unknown( $f, $r, $domain );
+
+			return;
+		}
+
 		$still = array_values( array_intersect( $keys, array_diff( $f->needed(), DnsWatchState::keys_ok( $rows ) ) ) );
-		$clear = array( $p . '_lost_pending' => 0 );
+		$clear = array( $p . '_lost_pending' => 0, $p . '_unknown_tries' => 0 );
 
 		if ( array() === $still || self::complete( $f, $rows ) ) {
 			// It is back: nobody was told, nobody needs to be.
@@ -658,6 +713,44 @@ final class DnsWatch {
 
 		Alerts::dns_watch_lost( $fresh, $f->label(), $domain, $still, DnsWatchSettings::admin_throttle( $f->id() ), $f->id(), $f->alert_lines( 'lost', $fresh ) );
 		self::event( $f, 'lost_confirmed', $fresh, array( 'keys' => $still, 'mailed' => ! $quiet ) );
+	}
+
+	/**
+	 * The second read of a loss could not be made. The try is counted and the read is queued again after the confirm minutes; after the
+	 * setting's number of tries the staff hear once (the loss stays unconfirmed, nobody is mailed) and the reads go on every hour.
+	 *
+	 * @param DnsWatchFeature $f      Feature.
+	 * @param Resource        $r      Resource.
+	 * @param string          $domain Domain.
+	 */
+	private static function confirm_unknown( DnsWatchFeature $f, Resource $r, string $domain ): void {
+		$p     = $f->prefix();
+		$id    = $r->id();
+		$tries = (int) $r->get( $p . '_unknown_tries' ) + 1;
+		$cap   = DnsWatchSettings::unknown_retries( $f->id() );
+
+		if ( ! self::store( $f, $id, array( $p . '_unknown_tries' => $tries ), null ) ) {
+			DnsWatchJobs::confirm( $f, $id, 60 );
+
+			return;
+		}
+
+		if ( $tries > $cap ) {
+			$fresh  = Resource::find( $id ) ?? $r;
+			$marked = $fresh->locked(
+				static function () use ( $id, $p ): bool {
+					$again = Resource::find( $id );
+
+					return $again && ! (int) $again->get( $p . '_unknown_alerted' ) && $again->set( array( $p . '_unknown_alerted' => time() ) );
+				}
+			);
+
+			if ( true === $marked ) {
+				Alerts::dns_lookups_failing( $fresh, $f->label(), $domain, $f->id() );
+			}
+		}
+
+		DnsWatchJobs::confirm( $f, $id, $tries > $cap ? HOUR_IN_SECONDS : max( 60, DnsWatchSettings::confirm_seconds( $f->id() ) ) );
 	}
 
 	/**
@@ -737,7 +830,7 @@ final class DnsWatch {
 		// Told that records were lost, and no found mail went out inside the gap: a flapping record gets one found mail.
 		$gap   = DnsWatchSettings::mail_gap( $f->id() );
 		$told  = (int) $r->get( $p . '_lost_at' ) > 0 && (int) $r->get( $p . '_lost_mails' ) > 0 && ! ( $gap > 0 && time() < (int) $r->get( $p . '_back_at' ) + $gap );
-		$marks = array( $p . '_lost_at', $p . '_lost_keys', $p . '_lost_mails', $p . '_lost_pending', $p . '_moved', $p . '_timeout_mailed', $p . '_admin_alerted' );
+		$marks = array( $p . '_lost_at', $p . '_lost_keys', $p . '_lost_mails', $p . '_lost_pending', $p . '_moved', $p . '_timeout_mailed', $p . '_admin_alerted', $p . '_unknown_tries', $p . '_unknown_alerted' );
 		$set   = false;
 
 		foreach ( $marks as $mark ) {

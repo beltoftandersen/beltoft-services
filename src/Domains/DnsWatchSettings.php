@@ -175,6 +175,16 @@ final class DnsWatchSettings {
 		return max( 1, (int) self::get( 'wait_days', $feature ) );
 	}
 
+	/** How many times a lost record whose lookup keeps failing is looked at again before the staff are told. */
+	public static function unknown_retries( string $feature = '' ): int {
+		return max( 1, (int) self::get( 'unknown_retries', $feature ) );
+	}
+
+	/** Percent of the lookups of one sweep that may fail before the sweep starts no loss. */
+	public static function sweep_fail_percent( string $feature = '' ): int {
+		return min( 100, max( 1, (int) self::get( 'sweep_fail_percent', $feature ) ) );
+	}
+
 	/** Seconds between two reads of public DNS while the records are awaited. */
 	public static function look_seconds( string $feature = '' ): int {
 		return max( 5, (int) self::get( 'look_minutes', $feature ) ) * MINUTE_IN_SECONDS;
@@ -217,6 +227,22 @@ final class DnsWatchSettings {
 			'min'     => 5,
 			'max'     => 1440,
 			'label'   => __( 'Minutes between two looks while the records are awaited', 'beltoft-services' ),
+		);
+		$fields['dns_watch_unknown_retries'] = $w + array(
+			'type'    => 'number',
+			'default' => 6,
+			'min'     => 1,
+			'max'     => 48,
+			'label'   => __( 'Times a lost record is looked at again when the lookup itself fails', 'beltoft-services' ),
+			'desc'    => __( 'A lookup that fails (no answer from the resolver) never confirms a loss and sends no email. The record is looked at again after the confirm minutes; after this many failed tries you get one alert and the loss stays unconfirmed.', 'beltoft-services' ),
+		);
+		$fields['dns_watch_sweep_fail_percent'] = $w + array(
+			'type'    => 'number',
+			'default' => 50,
+			'min'     => 1,
+			'max'     => 100,
+			'label'   => __( 'Percent of failed lookups in one daily sweep that stops it from starting any loss', 'beltoft-services' ),
+			'desc'    => __( 'When more than this share of the lookups of a sweep fail, the resolver is the problem: no service is marked as losing records in that sweep, and you get one alert a day.', 'beltoft-services' ),
 		);
 		$fields['dns_watch_first_remind_hours'] = $w + array(
 			'type'    => 'number',

@@ -451,6 +451,46 @@ final class Alerts {
 	}
 
 	/**
+	 * Alerts the admin that the DNS lookups of a lost record keep failing, so the loss cannot be confirmed (once a day at most).
+	 *
+	 * @param Resource $r       Resource.
+	 * @param string   $label   The feature's word, such as Mail.
+	 * @param string   $host    Domain.
+	 * @param string   $feature Feature id.
+	 */
+	public static function dns_lookups_failing( Resource $r, string $label, string $host, string $feature ): bool {
+		return self::notify(
+			sprintf( '%s DNS lookups failing: %s', $label, $host ),
+			array(
+				sprintf( 'Domain: %s', $host ),
+				sprintf( '%s resource: %d', $label, $r->id() ),
+				'The lookups of a record that went missing keep failing (no answer from the resolver), so the loss is not confirmed and the customer was not emailed. Check the server resolver.',
+			),
+			$r,
+			'beltoft_services_' . $feature . '_lookups_' . md5( strtolower( $host ) . '|' . $r->id() ),
+			array( 'ttl' => DAY_IN_SECONDS )
+		);
+	}
+
+	/**
+	 * Alerts the admin that most lookups of a daily sweep failed, so the sweep started no loss (once a day at most).
+	 *
+	 * @param string $label   The feature's word.
+	 * @param string $feature Feature id.
+	 * @param int    $bad     Lookups that failed.
+	 * @param int    $total   Lookups made.
+	 */
+	public static function dns_sweep_unhealthy( string $label, string $feature, int $bad, int $total ): bool {
+		return self::notify(
+			sprintf( '%s DNS lookups failing: %d of %d in one sweep', $label, $bad, $total ),
+			array( 'The server resolver is probably down. This sweep started no loss and no customer was emailed. Check the resolver.' ),
+			null,
+			'beltoft_services_' . $feature . '_sweep_fail',
+			array( 'ttl' => DAY_IN_SECONDS )
+		);
+	}
+
+	/**
 	 * Alerts the admin that the nightly scan of a hosting account found malware (the customer is told by email, the website stays
 	 * online). Once per newest find: the dedupe key holds the date of the oldest new file.
 	 *

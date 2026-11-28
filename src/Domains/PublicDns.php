@@ -62,10 +62,58 @@ final class PublicDns {
 		$records = self::records( $name, $flag );
 
 		if ( false === $records ) {
-			return new \WP_Error( 'dns_transport', __( 'The name did not resolve.', 'beltoft-services' ) );
+			// The system call is false for a name that does not exist and for a resolver that failed. Only a name the resolver says does
+			// not exist (NXDOMAIN) is an empty answer; anything else is unknown and stays an error, so nothing takes it for "no record".
+			return 3 === self::rcode( $name, $type ) ? array() : new \WP_Error( 'dns_transport', __( 'The name did not resolve.', 'beltoft-services' ) );
 		}
 
 		return self::shape( $records, $type );
+	}
+
+	/**
+	 * The response code the system resolver gives for a name (3 is NXDOMAIN, 2 is SERVFAIL), or null when it cannot be told: no resolver
+	 * answered the question, or a test run (tests answer through the filter beltoft_services_dns_rcode).
+	 *
+	 * @param string $name Name.
+	 * @param string $type A, AAAA, MX, TXT, CNAME or NS.
+	 */
+	public static function rcode( string $name, string $type ): ?int {
+		/**
+		 * Replaces the response code read (tests only).
+		 *
+		 * @param int|null $rcode Null to ask the resolver.
+		 * @param string   $name  Name.
+		 * @param string   $type  Type.
+		 */
+		$test = apply_filters( 'beltoft_services_dns_rcode', null, $name, $type );
+
+		if ( null !== $test ) {
+			return (int) $test;
+		}
+
+		if ( is_callable( self::$reader ) ) {
+			return null;
+		}
+
+		$resolver = '';
+
+		foreach ( (array) @file( '/etc/resolv.conf', FILE_IGNORE_NEW_LINES ) as $line ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- no file means no answer.
+			if ( 1 === preg_match( '/^\s*nameserver\s+(\S+)/', (string) $line, $m ) && false !== filter_var( $m[1], FILTER_VALIDATE_IP ) ) {
+				$resolver = $m[1];
+				break;
+			}
+		}
+
+		$code = array( 'A' => 1, 'AAAA' => 28, 'MX' => 15, 'TXT' => 16, 'CNAME' => 5, 'NS' => 2 )[ $type ] ?? 16;
+
+		if ( '' === $resolver ) {
+			return null;
+		}
+
+		// The resolver is named by the server's own configuration, never by a customer: trusted.
+		$answer = DnsTransport::ask( $resolver, strtolower( rtrim( trim( $name ), '.' ) ), $code, array( 'rd' => true, 'trusted' => true ) );
+
+		return is_wp_error( $answer ) ? null : (int) $answer['rcode'];
 	}
 
 	/**

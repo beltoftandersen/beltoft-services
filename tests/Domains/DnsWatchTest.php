@@ -364,4 +364,106 @@ final class DnsWatchTest extends TestCase {
 		$this->assertNotContains( 'moved_away', DnsWatchFakeFeature::$events );
 		$this->assertSame( array(), $this->subjects() );
 	}
+
+	// -- A lookup that fails is unknown, never a loss ------------------------------------------------
+
+	private function pending_loss( array $meta = array() ): Resource {
+		return $this->service( 'waiting', array_merge( array( 'fk_dns_lost_pending' => time(), 'fk_dns_lost_keys' => array( 'b' ), 'fk_dns_since' => time() - DAY_IN_SECONDS ), $meta ) );
+	}
+
+	private function failing_subjects(): array {
+		return array_values( array_filter( $this->subjects(), static fn( $s ) => str_contains( $s, 'DNS lookups failing' ) ) );
+	}
+
+	public function test_a_resolver_outage_at_the_confirm_step_sends_no_mail_and_stays_pending(): void {
+		$r = $this->pending_loss();
+		DnsWatchFakeFeature::$failing = true;
+
+		DnsWatch::confirm( $this->feature, $r->id() );
+		$r = $this->fresh( $r );
+
+		$this->assertSame( array(), $this->mails );
+		$this->assertGreaterThan( 0, (int) $r->get( 'fk_dns_lost_pending' ), 'Still pending.' );
+		$this->assertSame( 0, (int) $r->get( 'fk_dns_lost_at' ) );
+		$this->assertSame( 1, (int) $r->get( 'fk_dns_unknown_tries' ) );
+		$this->assertNotFalse( as_next_scheduled_action( 'beltoft_services_test_fake_confirm', array( $r->id() ), \BeltoftServices\Jobs::GROUP ), 'Looked at again later.' );
+	}
+
+	public function test_after_the_retries_one_admin_alert_is_raised_and_the_loss_stays_unconfirmed(): void {
+		$this->settings( array( 'dns_watch_unknown_retries' => 2 ) );
+		$r = $this->pending_loss();
+		DnsWatchFakeFeature::$failing = true;
+
+		for ( $i = 0; $i < 5; $i++ ) {
+			DnsWatch::confirm( $this->feature, $r->id() );
+		}
+		$r = $this->fresh( $r );
+
+		$this->assertCount( 1, $this->failing_subjects(), 'One alert, however many reads fail.' );
+		$this->assertCount( 1, $this->mails, 'Only that alert: no customer mail.' );
+		$this->assertGreaterThan( 0, (int) $r->get( 'fk_dns_lost_pending' ) );
+		$this->assertSame( 0, (int) $r->get( 'fk_dns_lost_at' ) );
+
+		// The resolver is back and the record is still gone: now it is a loss.
+		DnsWatchFakeFeature::$failing = false;
+		DnsWatch::confirm( $this->feature, $r->id() );
+		$this->assertContains( 'DNS records are missing for watched.example', $this->subjects() );
+	}
+
+	public function test_a_single_failed_lookup_never_starts_a_loss_but_a_missing_or_wrong_record_does(): void {
+		$r = $this->service( 'ok' );
+		DnsWatchFakeFeature::$failing = true;
+		DnsWatch::recheck( $this->feature, $r->id() );
+		$r = $this->fresh( $r );
+		$this->assertSame( 'ok', $r->get( 'fk_dns' ) );
+		$this->assertSame( 0, (int) $r->get( 'fk_dns_lost_pending' ) );
+		$this->assertSame( array(), $this->mails );
+
+		DnsWatchFakeFeature::$failing = false;
+		DnsWatchFakeFeature::$present = array( 'a', 'c' );
+		$this->assertTrue( $r->set( array( 'fk_dns_rechecked' => 0 ) ) );
+		DnsWatch::recheck( $this->feature, $r->id() );
+		$this->assertGreaterThan( 0, (int) $this->fresh( $r )->get( 'fk_dns_lost_pending' ), 'A record that is not there is a loss.' );
+	}
+
+	public function test_a_reminder_is_not_sent_on_a_look_that_failed(): void {
+		$r = $this->service( 'waiting', array( 'fk_dns_lost_at' => time() - 4 * DAY_IN_SECONDS, 'fk_dns_lost_mails' => 1, 'fk_dns_last_mail' => time() - 4 * DAY_IN_SECONDS ) );
+		DnsWatchFakeFeature::$failing = true;
+		$this->fresh( $r )->set( array( 'fk_dns_checked' => time() - 3600 ) );
+
+		DnsWatch::run( $this->feature, $r->id() );
+
+		$this->assertSame( array(), $this->mails );
+	}
+
+	public function test_a_sweep_in_which_most_lookups_fail_starts_no_loss_and_alerts_once_a_day(): void {
+		\BeltoftServices\Domains\DnsWatchHealth::reset( $this->feature );
+		\BeltoftServices\Domains\DnsWatchHealth::note( $this->feature, 9, 10 );
+		$this->assertTrue( \BeltoftServices\Domains\DnsWatchHealth::tripped( $this->feature ) );
+
+		$r = $this->service( 'ok' );
+		DnsWatchFakeFeature::$present = array( 'a', 'c' );
+		DnsWatch::recheck( $this->feature, $r->id() );
+		$r = $this->fresh( $r );
+
+		$this->assertSame( 'ok', $r->get( 'fk_dns' ), 'Nothing is stored as lost.' );
+		$this->assertSame( 0, (int) $r->get( 'fk_dns_lost_pending' ) );
+
+		$r2 = $this->service( 'ok' );
+		$this->fresh( $r2 )->set( array( 'fk_dns_rechecked' => 0 ) );
+		DnsWatch::recheck( $this->feature, $r2->id() );
+		$this->assertCount( 1, $this->failing_subjects(), 'One alert per day.' );
+
+		\BeltoftServices\Domains\DnsWatchHealth::reset( $this->feature );
+		$this->assertFalse( \BeltoftServices\Domains\DnsWatchHealth::tripped( $this->feature ) );
+	}
+
+	public function test_the_sweep_percent_and_the_retries_are_settings(): void {
+		$this->settings( array( 'dns_watch_sweep_fail_percent' => 80 ) );
+		\BeltoftServices\Domains\DnsWatchHealth::reset( $this->feature );
+		\BeltoftServices\Domains\DnsWatchHealth::note( $this->feature, 3, 4 );
+		$this->assertFalse( \BeltoftServices\Domains\DnsWatchHealth::tripped( $this->feature ), '75 percent is under 80.' );
+		$this->assertSame( 6, DnsWatchSettings::unknown_retries() );
+		$this->assertSame( 80, DnsWatchSettings::sweep_fail_percent() );
+	}
 }

@@ -444,4 +444,17 @@ final class AppDnsWatchTest extends MonitoringTestCase {
 		DnsWatch::recheck( $this->f(), $gone->id() );
 		$this->assertCount( $gone_lookups, $this->lookups );
 	}
+
+	public function test_a_resolver_outage_at_the_confirm_step_mails_nobody_and_stays_pending(): void {
+		$r = $this->live();
+		$this->answers['A'] = array();
+		$this->recheck( $r );
+		$this->answers['A'] = new \WP_Error( 'dns_transport', 'down' );
+		DnsWatch::confirm( $this->f(), $r->id() );
+		$fresh = $this->fresh( $r );
+
+		$this->assertSame( array(), $this->customer_subjects() );
+		$this->assertGreaterThan( 0, (int) $fresh->get( 'app_domain_dns_lost_pending' ) );
+		$this->assertSame( 1, (int) $fresh->get( 'app_domain_dns_unknown_tries' ) );
+	}
 }
