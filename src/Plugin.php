@@ -81,6 +81,7 @@ final class Plugin {
 		Ssl\SslRenewals::register();
 		Ssl\SslRoutes::register();
 		Ssl\SslJobs::register();
+		Ssl\SslDnsWatch::register();
 		Storage\StorageSwitch::register();
 		Storage\StorageRoutes::register();
 		Storage\StoragePanel::register();

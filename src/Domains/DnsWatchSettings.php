@@ -172,7 +172,16 @@ final class DnsWatchSettings {
 
 	/** Days the records are looked for every few minutes. */
 	public static function wait_days( string $feature = '' ): int {
-		return max( 1, (int) self::get( 'wait_days', $feature ) );
+		$days = (int) self::get( 'wait_days', $feature );
+
+		/**
+		 * The days of the wait of one feature, for a feature whose wait is bound to something else (a certificate order is cancelled
+		 * after its own number of days, and the watch must end with it).
+		 *
+		 * @param int    $days    Days from the setting.
+		 * @param string $feature Feature id ('' for the shared number).
+		 */
+		return max( 1, (int) apply_filters( 'beltoft_services_dns_watch_wait_days', $days, $feature ) );
 	}
 
 	/** How many times a lost record whose lookup keeps failing is looked at again before the staff are told. */

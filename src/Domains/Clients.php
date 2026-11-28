@@ -20,7 +20,7 @@ final class Clients {
 	}
 
 	public static function base_url( string $mode ): string {
-		return 'sandbox' === $mode ? 'https://api.sandbox.openprovider.nl/v1beta' : 'https://api.openprovider.eu/v1';
+		return 'sandbox' === $mode ? 'https://api.sandbox.openprovider.nl/v1' : 'https://api.openprovider.eu/v1';
 	}
 
 	/**

@@ -254,7 +254,7 @@ final class Panels {
 						'value'    => (string) ( $row['value'] ?? '' ),
 						'required' => true,
 						'purpose'  => __( 'Lets the certificate authority see that you control the name.', 'beltoft-services' ),
-						'status'   => 'none',
+						'status'   => SslDnsWatch::status_of( $r, (string) ( $row['name'] ?? '' ) ),
 					);
 				}
 
@@ -264,6 +264,7 @@ final class Panels {
 						'domain'  => (string) $base,
 						'title'   => sprintf( /* translators: %s: domain name. */ __( 'Validate %s for the certificate', 'beltoft-services' ), \BeltoftServices\Domains\HostName::display( (string) $base ) ),
 						'why'     => __( 'The certificate authority issues the certificate after it finds this record. Nothing is issued until then.', 'beltoft-services' ),
+						'done_text' => __( 'The record is found. Leave it in place: it lets later renewals and reissues validate without you.', 'beltoft-services' ),
 						'records' => $records,
 						'notes'   => array( __( 'Leave the record in place after the certificate is issued. It lets later reissues validate without you.', 'beltoft-services' ) ),
 					)

@@ -32,7 +32,7 @@ class ClientsTest extends TestCase {
 	public function test_sandbox_mode_uses_sandbox_url_without_constant_and_dns_stays_fake(): void {
 		$this->settings( array( 'domain_api_mode' => 'sandbox' ) );
 		$this->assertSame( 'sandbox', Clients::mode() );
-		$this->assertSame( 'https://api.sandbox.openprovider.nl/v1beta', Clients::base_url( 'sandbox' ) );
+		$this->assertSame( 'https://api.sandbox.openprovider.nl/v1', Clients::base_url( 'sandbox' ) );
 		$this->assertInstanceOf( LiveClient::class, Clients::registrar() );
 		$this->assertInstanceOf( FakeDns::class, Clients::dns() );
 	}

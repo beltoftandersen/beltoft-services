@@ -384,7 +384,19 @@ final class FakeModel {
 			$order = self::issue( $order, $now, (int) $order['issued_at'] > 0 );
 			$dirty = true;
 		} elseif ( 'ACT' === $order['status'] && (int) $order['issued_at'] > 0 && $now >= (int) $order['issued_at'] + self::LIFETIME_DAYS * DAY_IN_SECONDS && $now < strtotime( (string) $order['expiration_date'] . ' UTC' ) ) {
-			$order = self::issue( $order, $now, true );
+			/**
+			 * Offline model only: the authority's own reissue waits for domain validation (the order is requested again and becomes
+			 * active after the delay), as a real one does when the validation record is gone. Default: it reissues at once.
+			 *
+			 * @param bool $waits Whether the reissue waits.
+			 */
+			if ( apply_filters( 'beltoft_services_ssl_fake_reissue_waits', false ) ) {
+				$order['status']       = 'REQ';
+				$order['requested_at'] = $now;
+			} else {
+				$order = self::issue( $order, $now, true );
+			}
+
 			$dirty = true;
 		}
 

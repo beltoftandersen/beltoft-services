@@ -424,6 +424,22 @@ final class Operations {
 
 		$newer = $info && ! is_wp_error( $info ) && $info['serial'] !== (string) $r->get( 'ssl_serial' ) && $info['to'] >= (int) strtotime( (string) $r->get( 'ssl_valid_to' ) . ' UTC' );
 
+		// The authority reissues an order by itself (about every 199 days) and then needs the validation again. The stored status stays
+		// ACT, so a reissue that waits for validation is noted here: staff are told once, and the next read comes sooner.
+		if ( ! $pending && 'REQ' === $status && '' !== trim( (string) $r->get( 'ssl_cert' ) ) ) {
+			if ( ! $r->get( 'ssl_authority_reissue_at' ) ) {
+				$r->set( array( 'ssl_authority_reissue_at' => time() ) );
+				Alerts::admin( $r, 'The certificate authority reissued this certificate by itself and the new one waits for domain validation. The running certificate keeps working until it ends.' );
+			}
+
+			Jobs::queue_act( $r->id(), 'refresh', array(), 3600 );
+		} elseif ( $r->get( 'ssl_authority_reissue_at' ) && ! ( 'ACT' === $status && $newer ) && 'REQ' !== $status ) {
+			// It went back to active with no newer certificate: nothing waits.
+			$r->set( array( 'ssl_authority_reissue_at' => null ) );
+		}
+
+		SslDnsWatch::sync( Resource::find( $r->id() ) ?? $r );
+
 		if ( 'ACT' === $status && $newer ) {
 			$next    = (string) $r->get( 'ssl_csr_next' );
 			$wanted  = $pending && '' !== $next ? Csr::parse( $next ) : null;
@@ -432,7 +448,7 @@ final class Operations {
 			$stored = Provision::store_certificate( $r, $detail, $promote ? $next : null );
 
 			if ( $stored->is_done() ) {
-				$meta  = array_merge( $meta, $stored->meta(), array( 'ssl_expiry_alerted' => null ) );
+				$meta  = array_merge( $meta, $stored->meta(), array( 'ssl_expiry_alerted' => null, 'ssl_authority_reissue_at' => null ) );
 				$event = $promote ? 'SSL certificate reissued at the customer\'s request' : 'SSL certificate reissued by the certificate authority';
 
 				if ( $promote ) {

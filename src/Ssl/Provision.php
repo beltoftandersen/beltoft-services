@@ -599,6 +599,9 @@ final class Provision {
 		$until = $since + SslSettings::wait_days() * DAY_IN_SECONDS;
 		$soft  = 'dv' === $level ? 6 * HOUR_IN_SECONDS : 5 * DAY_IN_SECONDS;
 
+		// The DNS watch looks for the validation record while the order waits (it ends with this wait).
+		SslDnsWatch::sync( $r );
+
 		if ( time() >= $until ) {
 			return StepResult::fail( 'The certificate was not issued within ' . SslSettings::wait_days() . ' days.' );
 		}
