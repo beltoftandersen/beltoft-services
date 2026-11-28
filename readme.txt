@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.68.0
+Stable tag: 0.69.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,11 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.69.0 =
+* Shared DNS watch (Domains\DnsWatch): one engine checks the DNS records a service needs (confirm after 10 minutes, reminders, 14-day stop with a weekly look up to 90 days, moved name servers, check now limits, flap gap). Email is its first user, with no change in behaviour.
+* The DNS numbers are shared settings under Domains, section DNS watch (copied from the email settings). Three former constants are settings: wait days, look minutes, first reminder hours.
+* The four email DNS emails are now the shared DNS emails (reminder, lost, back, timeout); saved texts are copied over.
 
 = 0.68.0 =
 * Domain prices: `Domains\Prices::rule()` makes the price with VAT a whole euro: the dearer of the markup and the minimum margin, times 1.25, rounded up to a whole euro, divided by 1.25 again (13.60 instead of 14 for a cost of 9.41/8.15). The table is rewritten at the next price refresh (daily 04:15, or `wp beltoft-services domain-prices`); domains already bought keep the amount stored on their subscription. Override lines (setting `domain_price_overrides`) stay as typed.
