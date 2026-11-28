@@ -494,4 +494,20 @@ final class AppDnsWatchTest extends MonitoringTestCase {
 		$this->assertSame( self::NAME, $fresh->get( 'app_domain' ), 'The install job handed the name over first.' );
 		$this->assertSame( 1, $this->pending( $r->id(), AppInstall::HOOK ) );
 	}
+
+	public function test_reinstall_keeping_a_lost_name_keeps_the_loss_and_the_warning(): void {
+		foreach ( array( 'waiting', 'timeout' ) as $i => $status ) {
+			$r = $this->live( array( 'app_domain_dns' => $status, 'app_domain_dns_lost_at' => time() - 3600, 'app_domain_dns_lost_mails' => 1, 'app_domain_dns_since' => time() - DAY_IN_SECONDS ), 5000 + $i );
+			$this->assertTrue( AppOwnDomain::lost( $r ) );
+
+			$meta = \BeltoftServices\Apps\AppReinstall::meta( array(), $r, array( 'app_version' => 'keep', 'app_domain_mode' => 'keep' ) );
+			$this->assertArrayNotHasKey( 'app_domain_dns', $meta, "$status: the watch state is not reset." );
+			$this->assertArrayNotHasKey( 'app_domain_dns_lost_at', $meta );
+			$this->assertArrayNotHasKey( 'app_domain_dns_since', $meta );
+			$this->assertTrue( $r->set( $meta ) );
+			$fresh = $this->fresh( $r );
+			$this->assertSame( self::NAME, $fresh->get( 'app_domain' ), 'The reinstall keeps the name.' );
+			$this->assertSame( 'waiting' === $status ? DnsWatchState::LOST : DnsWatchState::STOPPED, DnsWatchState::of( $this->f(), $fresh ), 'The warning stays on the page.' );
+		}
+	}
 }

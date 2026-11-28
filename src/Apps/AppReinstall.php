@@ -764,6 +764,12 @@ final class AppReinstall {
 		$published = (string) $r->get( 'app_domain' );
 		$own       = (string) $r->get( 'app_domain_own' );
 		if ( 'keep' === $choice['mode'] ) {
+			if ( AppOwnDomain::lost( $r ) ) {
+				// The name was live and no longer points to the server: nothing is reset. The reinstall keeps the name, and the watch keeps
+				// its loss, its reminders and the warning on the page (a restart of the wait would hide the loss and mail nobody). The
+				// customer can change the name, or fix the record; the daily look finds it again.
+				return $meta;
+			}
 			if ( '' !== $own && 'live' !== (string) $r->get( 'app_domain_dns' ) ) {
 				// The name was never confirmed, or the wait ran out: the wait starts again with the new install.
 				return array_merge( $meta, AppOwnDomain::fresh_wait( $own ) );
