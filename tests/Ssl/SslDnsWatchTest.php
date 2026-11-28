@@ -367,6 +367,12 @@ final class SslDnsWatchTest extends SslTestCase {
 		$this->assertSame( 'ACT', $fresh->get( 'ssl_status' ), 'The stored status is not changed.' );
 		$this->assertGreaterThan( 0, (int) $fresh->get( 'ssl_authority_reissue_at' ) );
 		$this->assertCount( 1, $this->staff_subjects() );
+		$this->assertStringContainsString( 'SSL renewal waits for validation: example.com', $this->staff_subjects()[0] );
+		$this->assertStringNotContainsString( 'Service failed', $this->staff_subjects()[0] );
+		$body = (string) $this->mails[ array_key_last( $this->mails ) ]['message'];
+		$this->assertStringContainsString( 'Order id: ' . $fresh->get( 'remote_id' ), $body );
+		$this->assertStringContainsString( 'Resource: ' . $r->id(), $body );
+		$this->assertStringContainsString( 'validation CNAME', $body );
 		$this->assertSame( array(), $this->customer_subjects() );
 
 		$this->apply( $fresh, Operations::refresh( $fresh ) );
