@@ -457,4 +457,41 @@ final class AppDnsWatchTest extends MonitoringTestCase {
 		$this->assertGreaterThan( 0, (int) $fresh->get( 'app_domain_dns_lost_pending' ) );
 		$this->assertSame( 1, (int) $fresh->get( 'app_domain_dns_unknown_tries' ) );
 	}
+
+	public function test_found_with_a_busy_lock_is_retried_by_its_own_job_and_never_installs_on_the_address(): void {
+		global $wpdb;
+		$r = $this->waiting( array( 'app_domain_dns' => 'live', 'app_domain_dns_since' => time() ) );
+		add_filter( 'beltoft_services_desire_lock_wait', '__return_zero' );
+
+		$name  = \BeltoftServices\Locks::name( 'resource', $r->id() );
+		$other = new \mysqli( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- a second connection holds the lock.
+		$other->query( $wpdb->prepare( 'SELECT GET_LOCK( %s, 1 )', $name ) );
+
+		AppOwnDomain::found( $this->fresh( $r ) );
+		$this->assertSame( '', (string) $this->fresh( $r )->get( 'app_domain' ), 'The lock was busy.' );
+		$this->assertSame( 0, $this->pending( $r->id(), AppInstall::HOOK ), 'No install on the address.' );
+		$this->assertNotFalse( as_next_scheduled_action( AppOwnDomain::FOUND_HOOK, array( $r->id(), 1 ), Jobs::GROUP ), 'found() queued itself again.' );
+
+		// The status is live already, so the look would return at once: only the retry can hand the name over.
+		AppOwnDomain::run( $r->id() );
+		$this->assertSame( '', (string) $this->fresh( $r )->get( 'app_domain' ) );
+
+		$other->close();
+		do_action( AppOwnDomain::FOUND_HOOK, $r->id(), 1 );
+		$fresh = $this->fresh( $r );
+		$this->assertSame( self::NAME, $fresh->get( 'app_domain' ) );
+		$this->assertFalse( $fresh->get( 'app_domain_made' ) );
+		$this->assertSame( 1, $this->pending( $r->id(), AppInstall::HOOK ) );
+	}
+
+	public function test_the_install_job_never_installs_on_the_address_while_a_found_name_is_not_handed_over(): void {
+		$r = $this->waiting( array( 'app_domain_dns' => 'live', 'app_domain_dns_since' => time() ) );
+		$this->assertTrue( AppOwnDomain::handing_over( $r ) );
+		AppInstall::run( $r->id() );
+		$fresh = $this->fresh( $r );
+
+		$this->assertNotSame( 'installing', $fresh->get( 'app_state' ) );
+		$this->assertSame( self::NAME, $fresh->get( 'app_domain' ), 'The install job handed the name over first.' );
+		$this->assertSame( 1, $this->pending( $r->id(), AppInstall::HOOK ) );
+	}
 }

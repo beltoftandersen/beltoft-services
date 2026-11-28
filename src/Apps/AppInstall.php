@@ -117,6 +117,11 @@ final class AppInstall {
 			AppOwnDomain::start( $r );
 			return;
 		}
+		// The name was found and not handed over yet (the hand-over could not take the lock): do it now, never install on the address.
+		if ( AppOwnDomain::handing_over( $r ) ) {
+			AppOwnDomain::found( $r );
+			return;
+		}
 		$locked = $r->locked( static function () use ( $id ) {
 			// Read again under the lock: the server may have been paused, held or deleted since the check above. Stop quietly then.
 			$r = Resource::find( $id );

@@ -3,6 +3,7 @@
 
 namespace BeltoftServices\Apps;
 
+use BeltoftServices\Background;
 use BeltoftServices\Domains\DnsWatch;
 use BeltoftServices\Domains\DnsWatchJobs;
 use BeltoftServices\Domains\DnsWatchSettings;
@@ -10,6 +11,7 @@ use BeltoftServices\Domains\HostName;
 use BeltoftServices\Emails\Emails;
 use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Domains\ManualCheck;
+use BeltoftServices\Jobs;
 use BeltoftServices\Resource;
 
 defined( 'ABSPATH' ) || exit;
@@ -30,6 +32,9 @@ final class AppOwnDomain {
 
 	public const HOOK = 'beltoft_services_app_own_domain_check';
 
+	/** The job that hands a found name to the install again when the lock was busy ( resource id, try ). */
+	public const FOUND_HOOK = 'beltoft_services_app_own_domain_found';
+
 	/** The defaults of the shared DNS watch settings (Domains, DNS watch), kept for the domain change, which waits with the same numbers. */
 	public const INTERVAL = 600;
 	public const MIN_GAP  = 300;
@@ -49,6 +54,24 @@ final class AppOwnDomain {
 				return $features;
 			}
 		);
+
+		add_action( self::FOUND_HOOK, array( __CLASS__, 'on_found' ), 10, 2 );
+		Background::declare( self::FOUND_HOOK, array( 'resource' => true, 'label' => 'App own domain hand-over to the install' ) );
+	}
+
+	/**
+	 * The retry of found(): the watch stored the name as live before found() ran, so the look would return at once; this job is
+	 * the only thing that can still hand the name over.
+	 *
+	 * @param mixed $resource_id Resource id.
+	 * @param mixed $try         Number of the try.
+	 */
+	public static function on_found( $resource_id, $try = 1 ): void {
+		$r = Resource::find( (int) $resource_id );
+
+		if ( $r && $r->is_live() && 'live' === (string) $r->get( 'app_domain_dns' ) ) {
+			self::found( $r, max( 1, (int) $try ) );
+		}
 	}
 
 	/** The watch's object for apps. */
@@ -89,6 +112,11 @@ final class AppOwnDomain {
 	 */
 	public static function waiting( Resource $r ): bool {
 		return '' !== (string) $r->get( 'app_domain_own' ) && 'waiting' === (string) $r->get( 'app_domain_dns' ) && '' === (string) $r->get( 'app_domain' );
+	}
+
+	/** Was the name found (stored live) without being handed to the install yet? The install must not run on the address then. */
+	public static function handing_over( Resource $r ): bool {
+		return '' !== (string) $r->get( 'app_domain_own' ) && '' === (string) $r->get( 'app_domain' ) && 'live' === (string) $r->get( 'app_domain_dns' );
 	}
 
 	/** Did the name point to the server once and not any more (the watch warns the customer; nothing is stopped)? */
@@ -231,7 +259,7 @@ final class AppOwnDomain {
 	 * `domain`), and no record of ours exists (app_domain_made false), so a later reinstall never removes anything for this name. Called
 	 * by the watch when the needed record is found. A name found again after it was lost has been handed over already: nothing is queued.
 	 */
-	public static function found( Resource $r ): void {
+	public static function found( Resource $r, int $try = 0 ): void {
 		if ( '' !== (string) $r->get( 'app_domain' ) || ! in_array( (string) $r->get( 'app_state' ), array( '', 'pending' ), true ) ) {
 			return;
 		}
@@ -245,8 +273,10 @@ final class AppOwnDomain {
 		);
 		if ( true === $stored ) {
 			AppInstall::schedule( $id, 0 );
-		} else {
-			self::schedule( $id, 60 );
+		} elseif ( $try < 12 ) {
+			// The watch has stored the name as live already, so a look would return at once: found() is tried again by its own job,
+			// along a backoff (1, 2, 4 ... 60 minutes). The install job does the same hand-over (see handing_over()) if it runs first.
+			Jobs::schedule_once( time() + min( 3600, 60 * ( 2 ** $try ) ), self::FOUND_HOOK, array( $id, $try + 1 ) );
 		}
 	}
 
