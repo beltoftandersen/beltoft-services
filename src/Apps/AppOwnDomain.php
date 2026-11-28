@@ -35,11 +35,6 @@ final class AppOwnDomain {
 	/** The job that hands a found name to the install again when the lock was busy ( resource id, try ). */
 	public const FOUND_HOOK = 'beltoft_services_app_own_domain_found';
 
-	/** The defaults of the shared DNS watch settings (Domains, DNS watch), kept for the domain change, which waits with the same numbers. */
-	public const INTERVAL = 600;
-	public const MIN_GAP  = 300;
-	public const WAIT_DAYS = 14;
-
 	/**
 	 * The own-domain look is the shared DNS watch (Domains\DnsWatch): this registers the app's object with it. The look hook, its
 	 * watchdog and the daily look are declared by the watch.

@@ -183,8 +183,9 @@ $beltoft_services_status_text = array(
 							<?php
 							echo esc_html(
 								sprintf(
-									/* translators: %s: a date */
-									__( 'We check every ten minutes until %s. When the name points to this server, the app switches to it. Until then nothing changes and the app keeps answering on the current address.', 'beltoft-services' ),
+									/* translators: 1: minutes between two looks, 2: a date */
+									__( 'We check every %1$d minutes until %2$s. When the name points to this server, the app switches to it. Until then nothing changes and the app keeps answering on the current address.', 'beltoft-services' ),
+									(int) $beltoft_services_chg['minutes'],
 									(string) $beltoft_services_chg['deadline']
 								)
 							);
@@ -276,15 +277,17 @@ $beltoft_services_status_text = array(
 								echo esc_html(
 									'' !== $beltoft_services_ip
 										? sprintf(
-											/* translators: 1: server IPv4 address, 2: number of days */
-											_n( 'We change no DNS records. Add an A record that points the name to %1$s. We check every ten minutes for up to %2$d day, and switch when the name points to this server. Until then nothing changes.', 'We change no DNS records. Add an A record that points the name to %1$s. We check every ten minutes for up to %2$d days, and switch when the name points to this server. Until then nothing changes.', (int) $beltoft_services_chg['days'], 'beltoft-services' ),
+											/* translators: 1: server IPv4 address, 2: number of days, 3: minutes between two looks */
+											_n( 'We change no DNS records. Add an A record that points the name to %1$s. We check every %3$d minutes for up to %2$d day, and switch when the name points to this server. Until then nothing changes.', 'We change no DNS records. Add an A record that points the name to %1$s. We check every %3$d minutes for up to %2$d days, and switch when the name points to this server. Until then nothing changes.', (int) $beltoft_services_chg['days'], 'beltoft-services' ),
 											$beltoft_services_ip,
-											(int) $beltoft_services_chg['days']
+											(int) $beltoft_services_chg['days'],
+											(int) $beltoft_services_chg['minutes']
 										)
 										: sprintf(
-											/* translators: %d: number of days */
-											_n( 'We change no DNS records. Add an A record that points the name to this server. We check every ten minutes for up to %d day, and switch when the name points to this server. Until then nothing changes.', 'We change no DNS records. Add an A record that points the name to this server. We check every ten minutes for up to %d days, and switch when the name points to this server. Until then nothing changes.', (int) $beltoft_services_chg['days'], 'beltoft-services' ),
-											(int) $beltoft_services_chg['days']
+											/* translators: 1: number of days, 2: minutes between two looks */
+											_n( 'We change no DNS records. Add an A record that points the name to this server. We check every %2$d minutes for up to %1$d day, and switch when the name points to this server. Until then nothing changes.', 'We change no DNS records. Add an A record that points the name to this server. We check every %2$d minutes for up to %1$d days, and switch when the name points to this server. Until then nothing changes.', (int) $beltoft_services_chg['days'], 'beltoft-services' ),
+											(int) $beltoft_services_chg['days'],
+											(int) $beltoft_services_chg['minutes']
 										)
 								);
 								?>

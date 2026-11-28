@@ -1250,8 +1250,8 @@
         "default": 7,
         "min": 1,
         "max": 60,
-        "label": "Days between looks after the first 14 days",
-        "desc": "After the first look has stopped, a service that still lacks records is looked at this often."
+        "label": "Days between looks after the days of the wait above",
+        "desc": "After the look every few minutes has stopped (the days of the wait above), a service that still lacks records is looked at this often."
     },
     "dns_watch_stop_days": {
         "tab": "domains",

@@ -828,6 +828,9 @@ final class MailAccountTest extends MailTestCase {
 
 		$r->set( array( 'mail_dns' => 'timeout', 'mail_dns_lost_at' => 0 ) );
 		$this->assertStringContainsString( 'We stopped checking after 14 days. Add the records, then press Check now and we check again.', $this->page( Resource::find( $r->id() ) ) );
+		$this->settings( array( 'dns_watch_wait_days' => 5 ) );
+		$this->assertStringContainsString( 'We stopped checking after 5 days.', $this->page( Resource::find( $r->id() ) ), 'The days are the shared setting.' );
+		$this->settings( array( 'dns_watch_wait_days' => 14 ) );
 
 		$r->set( array( 'mail_dns' => 'waiting', 'mail_dns_moved' => time(), 'mail_dns_lost_at' => time() ) );
 		$this->assertStringContainsString( 'The name servers of state.example no longer point to us.', $this->page( Resource::find( $r->id() ) ) );

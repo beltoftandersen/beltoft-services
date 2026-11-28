@@ -537,7 +537,7 @@ final class AppDomainChangeTest extends MonitoringTestCase {
 			$this->lookups = array();
 			$this->job( $r );
 			$this->assertSame( array(), $this->lookups, 'Gap of MIN_GAP: no second read.' );
-			$this->assertTrue( $this->fresh( $r )->set( array( 'app_chg_checked' => time() - AppOwnDomain::MIN_GAP - 1 ) ) );
+			$this->assertTrue( $this->fresh( $r )->set( array( 'app_chg_checked' => time() - \BeltoftServices\Domains\DnsWatch::MIN_GAP - 1 ) ) );
 		}
 		$this->assertSame( array(), $this->guest->pushed );
 
@@ -555,7 +555,7 @@ final class AppDomainChangeTest extends MonitoringTestCase {
 	public function test_own_domain_that_never_resolves_times_out_with_everything_unchanged(): void {
 		$r = $this->server( array( 'app_domain' => 'old.mine.example', 'app_zone' => self::ZONE, 'app_domain_made' => true ) );
 		$this->assertTrue( $this->started( $r, $this->own() )->is_done() );
-		$this->assertTrue( $this->fresh( $r )->set( array( 'app_chg_since' => time() - ( AppOwnDomain::WAIT_DAYS * DAY_IN_SECONDS ) - 10 ) ) );
+		$this->assertTrue( $this->fresh( $r )->set( array( 'app_chg_since' => time() - ( 14 * DAY_IN_SECONDS ) - 10 ) ) );
 		$this->lookups = array();
 		$this->job( $r );
 		$fresh = $this->fresh( $r );
@@ -566,6 +566,24 @@ final class AppDomainChangeTest extends MonitoringTestCase {
 		$this->assertEmpty( (array) $fresh->get( 'app_domain_old' ) );
 		$this->assertSame( array(), $this->lookups );
 		$this->assertSame( array(), $this->guest->pushed );
+	}
+
+	public function test_own_domain_change_waits_the_shared_days_and_the_texts_name_them(): void {
+		$this->settings( array( 'dns_watch_wait_days' => 3, 'dns_watch_look_minutes' => 20 ) );
+		$r = $this->server( array( 'app_domain' => 'old.mine.example', 'app_zone' => self::ZONE, 'app_domain_made' => true ) );
+		$this->assertTrue( $this->started( $r, $this->own() )->is_done() );
+		$this->assertTrue( $this->fresh( $r )->set( array( 'app_chg_since' => time() - 2 * DAY_IN_SECONDS ) ) );
+		$this->assertSame( time() - 2 * DAY_IN_SECONDS + 3 * DAY_IN_SECONDS, AppDomainChange::view( $this->fresh( $r ) )['deadline'] );
+		$view = \BeltoftServices\Apps\AppTab::change_view( $this->fresh( $r ), (array) \BeltoftServices\Apps\Apps::definition( 'wordpress' ) );
+		$this->assertSame( 3, $view['days'] );
+		$this->assertSame( 20, $view['minutes'] );
+
+		$this->job( $r );
+		$this->assertSame( 'waiting', $this->fresh( $r )->get( 'app_chg_state' ), 'Two days into three: still waiting.' );
+
+		$this->assertTrue( $this->fresh( $r )->set( array( 'app_chg_since' => time() - 3 * DAY_IN_SECONDS - 10, 'app_chg_checked' => time() - 2 * DAY_IN_SECONDS ) ) );
+		$this->job( $r );
+		$this->assertSame( 'timeout', $this->fresh( $r )->get( 'app_chg_reason' ), 'Three days is the shared setting, not 14.' );
 	}
 
 	public function test_own_domain_commit_sends_the_existing_live_email_once(): void {

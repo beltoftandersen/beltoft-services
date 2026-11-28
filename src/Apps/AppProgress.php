@@ -396,6 +396,7 @@ final class AppProgress {
 				__( 'Last checked at %s', 'beltoft-services' ),
 				$today ? wp_date( get_option( 'time_format' ), $checked ) : wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $checked )
 			) : '',
+			'minutes'   => (int) round( \BeltoftServices\Domains\DnsWatchSettings::look_seconds( AppDnsWatch::ID ) / MINUTE_IN_SECONDS ),
 			'deadline'  => $deadline > 0 ? wp_date( get_option( 'date_format' ), $deadline ) : '',
 			'id'        => $r->id(),
 			'next'      => $next,

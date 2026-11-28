@@ -156,7 +156,10 @@ final class MailDnsState {
 				/* translators: %s: domain name. */
 				return sprintf( __( 'The name servers of %s no longer point to us. Records we made for you are not used any more. Add the records below where the DNS is now.', 'beltoft-services' ), $domain );
 			case self::STOPPED:
-				return __( 'We stopped checking after 14 days. Add the records, then press Check now and we check again.', 'beltoft-services' );
+				$days = \BeltoftServices\Domains\DnsWatchSettings::wait_days( 'mail' );
+
+				/* translators: %d: number of days */
+				return sprintf( _n( 'We stopped checking after %d day. Add the records, then press Check now and we check again.', 'We stopped checking after %d days. Add the records, then press Check now and we check again.', $days, 'beltoft-services' ), $days );
 		}
 
 		return '';

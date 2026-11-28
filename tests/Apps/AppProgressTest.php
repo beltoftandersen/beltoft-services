@@ -160,6 +160,19 @@ class AppProgressTest extends MonitoringTestCase {
 		$this->assertStringNotContainsString( "\u{00B7}", $html );
 	}
 
+	public function test_the_dns_box_names_the_look_minutes_and_the_days_of_the_settings(): void {
+		$this->settings( array( 'dns_watch_look_minutes' => 15, 'dns_watch_wait_days' => 7 ) );
+		$checked = (int) strtotime( 'today 09:41' );
+		$html    = $this->box( array( 'app_domain_dns_since' => $checked ) );
+
+		$this->assertStringContainsString( 'We check every 15 minutes and start the installation ourselves.', $html );
+		$this->assertStringNotContainsString( 'every 10 minutes', $html );
+		$this->assertStringContainsString( 'If this has not happened by ' . wp_date( get_option( 'date_format' ), $checked + 7 * DAY_IN_SECONDS ), $html );
+
+		$this->settings( array( 'dns_watch_look_minutes' => 5 ) );
+		$this->assertStringContainsString( 'We check every 5 minutes', $this->box( array( 'app_domain_dns_since' => $checked ), 5001 ) );
+	}
+
 	public function test_the_dns_box_says_no_record_nothing_looked_and_the_aaaa_step(): void {
 		$this->assertStringContainsString( 'We have not looked yet.', $this->box( array() ) );
 		$this->assertStringNotContainsString( 'Last checked', $this->box( array(), 5001 ) );

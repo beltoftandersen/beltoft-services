@@ -4,6 +4,8 @@
 namespace BeltoftServices\Apps;
 
 use BeltoftServices\Background;
+use BeltoftServices\Domains\DnsWatch;
+use BeltoftServices\Domains\DnsWatchSettings;
 use BeltoftServices\Domains\ZoneAccess;
 use BeltoftServices\Drivers\StepResult;
 use BeltoftServices\Jobs;
@@ -21,7 +23,7 @@ defined( 'ABSPATH' ) || exit;
  * Order, so the old name keeps working until the new one is proven:
  * 1. start() (the action job, resource lock held): the choice is checked again. A name in our zone gets its A record through
  *    AppDomains::publish (only a zone of this customer, only when the name has no address record). An own domain writes
- *    nothing: the change waits and reads public DNS at the rate AppOwnDomain uses, for up to AppOwnDomain::WAIT_DAYS.
+ *    nothing: the change waits and reads public DNS at the rate AppOwnDomain uses, for up to the shared DNS watch days (DnsWatchSettings::wait_days, feature app).
  * 2. The guest is told (AppRename::push) and answers in a status file that run() reads (AppRename::read, untrusted).
  * 3. On ready the new name is committed in one write and the records we wrote for the old name are queued for removal
  *    (AppDomainRelease::queue_old: only A sets we wrote, still unchanged). On any failure the records we wrote for the new
@@ -384,7 +386,7 @@ final class AppDomainChange {
 			return;
 		}
 		if ( ! AppInstall::installable( $r ) ) {
-			self::schedule( $id, AppOwnDomain::INTERVAL );
+			self::schedule( $id, DnsWatchSettings::look_seconds( AppDnsWatch::ID ) );
 			return;
 		}
 
@@ -413,18 +415,18 @@ final class AppDomainChange {
 		$now   = time();
 		$since = (int) $r->get( 'app_chg_since' );
 		$gap   = $now - (int) $r->get( 'app_chg_checked' );
-		if ( (int) $r->get( 'app_chg_checked' ) > 0 && $gap < AppOwnDomain::MIN_GAP ) {
-			self::schedule( $id, AppOwnDomain::MIN_GAP - $gap );
+		if ( (int) $r->get( 'app_chg_checked' ) > 0 && $gap < DnsWatch::MIN_GAP ) {
+			self::schedule( $id, DnsWatch::MIN_GAP - $gap );
 			return;
 		}
-		if ( $since > 0 && $now >= $since + AppOwnDomain::WAIT_DAYS * DAY_IN_SECONDS ) {
+		if ( $since > 0 && $now >= $since + DnsWatchSettings::wait_days( AppDnsWatch::ID ) * DAY_IN_SECONDS ) {
 			self::store( $id, array( 'app_chg_state' => 'failed', 'app_chg_reason' => 'timeout', 'app_chg_checked' => $now, 'app_chg_at' => $now ), 'waiting' );
 			AppAlerts::domain_change_failed( $r, (string) $r->get( 'app_chg_name' ), 'timeout' );
 			return;
 		}
 		$ip = AppOwnDomain::address( $r );
 		if ( '' === $ip ) {
-			self::schedule( $id, AppOwnDomain::INTERVAL );
+			self::schedule( $id, DnsWatchSettings::look_seconds( AppDnsWatch::ID ) );
 			return;
 		}
 		// The read is made outside the resource lock; the result is stored under it.
@@ -432,7 +434,7 @@ final class AppDomainChange {
 		$verdict = AppWww::verdict( $name, $ip );
 		if ( 'live' !== $verdict ) {
 			if ( self::store( $id, array( 'app_chg_checked' => $now, 'app_chg_reason' => $verdict ), 'waiting' ) ) {
-				self::schedule( $id, AppOwnDomain::INTERVAL );
+				self::schedule( $id, DnsWatchSettings::look_seconds( AppDnsWatch::ID ) );
 			}
 			return;
 		}
@@ -714,7 +716,7 @@ final class AppDomainChange {
 			'www'       => '' === $name || 'own' !== $mode ? '' : AppWww::name_for( $r, $name, '' ),
 			'reason'    => in_array( (string) $r->get( 'app_chg_reason' ), self::REASONS, true ) ? (string) $r->get( 'app_chg_reason' ) : '',
 			'ip'        => AppOwnDomain::address( $r ),
-			'deadline'  => 'waiting' === $state ? ( $since > 0 ? $since : time() ) + AppOwnDomain::WAIT_DAYS * DAY_IN_SECONDS : 0,
+			'deadline'  => 'waiting' === $state ? ( $since > 0 ? $since : time() ) + DnsWatchSettings::wait_days( AppDnsWatch::ID ) * DAY_IN_SECONDS : 0,
 			'zones'     => null === $def || empty( $def['domain'] ) ? array() : ZoneAccess::zones( (int) ( $r->license()['user_id'] ?? 0 ) ),
 			'current'   => AppDomainChoice::current( $r ),
 		);

@@ -315,8 +315,8 @@ final class DnsWatchSettings {
 			'default' => 7,
 			'min'     => 1,
 			'max'     => 60,
-			'label'   => __( 'Days between looks after the first 14 days', 'beltoft-services' ),
-			'desc'    => __( 'After the first look has stopped, a service that still lacks records is looked at this often.', 'beltoft-services' ),
+			'label'   => __( 'Days between looks after the days of the wait above', 'beltoft-services' ),
+			'desc'    => __( 'After the look every few minutes has stopped (the days of the wait above), a service that still lacks records is looked at this often.', 'beltoft-services' ),
 		);
 		$fields['dns_watch_stop_days'] = $w + array(
 			'type'    => 'number',

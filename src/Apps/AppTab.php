@@ -403,7 +403,8 @@ final class AppTab {
 		// The date the wait ends: a time stamp from the flow, or already a date.
 		$out['deadline'] = is_numeric( $out['deadline'] ) ? ( (int) $out['deadline'] > 0 ? wp_date( get_option( 'date_format' ), (int) $out['deadline'] ) : '' ) : (string) $out['deadline'];
 		$out['www']      = 'own' === $out['mode'] && '' !== (string) $out['name'] ? AppWww::name_for( $r, (string) $out['name'] ) : '';
-		$out['days']     = AppOwnDomain::WAIT_DAYS;
+		$out['days']     = \BeltoftServices\Domains\DnsWatchSettings::wait_days( AppDnsWatch::ID );
+		$out['minutes']  = (int) round( \BeltoftServices\Domains\DnsWatchSettings::look_seconds( AppDnsWatch::ID ) / MINUTE_IN_SECONDS );
 		$changed         = (int) $r->get( 'app_domain_changed_at' );
 		$out['changed']  = $changed > 0 && time() - $changed < 7 * DAY_IN_SECONDS && '' === (string) $out['state'] ? wp_date( get_option( 'date_format' ), $changed ) : '';
 
