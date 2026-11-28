@@ -354,4 +354,14 @@ final class DnsWatchTest extends TestCase {
 
 		$this->assertSame( 'ok', $this->fresh( $r )->get( 'fk_dns' ), 'The hook that fired found the fake feature and ran its look.' );
 	}
+
+	public function test_a_service_with_no_stored_mode_is_never_reported_as_moved_away(): void {
+		DnsWatchFakeFeature::$present = array( 'a', 'b', 'c' );
+		$r = $this->service( 'ok', array( 'fk_mode' => null, 'fk_dns_rechecked' => time() - 2 * DAY_IN_SECONDS ) );
+
+		DnsWatch::recheck( $this->feature, $r->id() );
+
+		$this->assertNotContains( 'moved_away', DnsWatchFakeFeature::$events );
+		$this->assertSame( array(), $this->subjects() );
+	}
 }
