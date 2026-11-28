@@ -82,6 +82,8 @@ final class DnsQuery {
 	 * The addresses a public name resolves to, as any visitor would see them (not an authoritative read of our own
 	 * zones): the A records (type 'A') or AAAA records (type 'AAAA') of a name, following an alias. An empty list means
 	 * the name has none yet. A resolver that cannot be reached is an error, so a caller does not take it for "no record".
+	 * This is the DNS watch's reader of addresses (and texts() of ownership records), so it tells a name that does not exist (an empty
+	 * list) from a lookup that failed with one extra question to the resolver, asked only when the system call fails.
 	 * Tests answer through the filter beltoft_services_dns_resolve; nothing in a test run reaches the network.
 	 *
 	 * @param string $name Host name.
@@ -95,8 +97,8 @@ final class DnsQuery {
 			if ( is_wp_error( $test ) ) { return $test; }
 			return is_array( $test ) ? array_values( array_map( 'strval', $test ) ) : new \WP_Error( 'bad_query', 'Invalid DNS query result.' );
 		}
-		// The system resolver reports "no such name" and "cannot reach a resolver" the same way; both mean not yet.
-		$values = PublicDns::resolve( $name, $type );
+		// The system resolver reports "no such name" and "cannot reach a resolver" the same way; the watch's reader asks which it was.
+		$values = PublicDns::resolve( $name, $type, true );
 		return is_wp_error( $values ) ? $values : array_values( array_unique( $values ) );
 	}
 
@@ -113,7 +115,7 @@ final class DnsQuery {
 			if ( is_wp_error( $test ) ) { return $test; }
 			return is_array( $test ) ? array_values( array_map( 'strval', $test ) ) : new \WP_Error( 'bad_query', 'Invalid DNS query result.' );
 		}
-		$values = PublicDns::resolve( $name, 'TXT' );
+		$values = PublicDns::resolve( $name, 'TXT', true );
 		return is_wp_error( $values ) ? $values : array_values( array_unique( $values ) );
 	}
 }

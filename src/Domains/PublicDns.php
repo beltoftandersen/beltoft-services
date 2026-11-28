@@ -31,7 +31,9 @@ final class PublicDns {
 	 *
 	 * @param string $fqdn Name.
 	 * @param string $type MX, TXT or CNAME.
-	 * @return string[]|\WP_Error Values (MX as "priority host"), empty when none; an error when no resolver answered.
+	 * @return string[]|\WP_Error Values (MX as "priority host"), empty when none; an error when no resolver answered. This is the
+	 *                           reader of the checks that wait for a customer's records (mail, certificates), so it tells a name that
+	 *                           does not exist from a failure (see resolve(), $watch).
 	 */
 	public static function lookup( string $fqdn, string $type ) {
 		/**
@@ -47,7 +49,7 @@ final class PublicDns {
 			return is_wp_error( $test ) ? $test : array_values( array_map( 'strval', (array) $test ) );
 		}
 
-		return self::resolve( $fqdn, $type );
+		return self::resolve( $fqdn, $type, true );
 	}
 
 	/**
@@ -55,16 +57,24 @@ final class PublicDns {
 	 * leaves with a trailing dot (see records()). A resolver that cannot be reached, or a name that does not exist, is a
 	 * dns_transport error, because the system resolver reports both the same way; an empty list means no record of that type.
 	 *
+	 * With $watch the failure is told from a name that does not exist: the response code is asked once more (rcode(), one extra query),
+	 * and only NXDOMAIN (3) is an empty answer. Only the DNS watch needs this, to tell a record that is gone from a lookup that failed;
+	 * every other caller (domain search, delegation, the DNS guide) keeps the plain answer and makes no extra query.
+	 *
+	 * @param string $name  Name.
+	 * @param string $type  A, AAAA, MX, TXT, CNAME or NS.
+	 * @param bool   $watch Ask the response code when the system call fails (the DNS watch's reads).
 	 * @return string[]|\WP_Error
 	 */
-	public static function resolve( string $name, string $type ) {
+	public static function resolve( string $name, string $type, bool $watch = false ) {
 		$flag    = array( 'A' => DNS_A, 'AAAA' => DNS_AAAA, 'MX' => DNS_MX, 'TXT' => DNS_TXT, 'CNAME' => DNS_CNAME, 'NS' => DNS_NS )[ $type ] ?? DNS_TXT;
 		$records = self::records( $name, $flag );
 
 		if ( false === $records ) {
-			// The system call is false for a name that does not exist and for a resolver that failed. Only a name the resolver says does
-			// not exist (NXDOMAIN) is an empty answer; anything else is unknown and stays an error, so nothing takes it for "no record".
-			return 3 === self::rcode( $name, $type ) ? array() : new \WP_Error( 'dns_transport', __( 'The name did not resolve.', 'beltoft-services' ) );
+			// The system call is false for a name that does not exist and for a resolver that failed. For the watch only a name the
+			// resolver says does not exist (NXDOMAIN) is an empty answer; anything else is unknown and stays an error, so nothing takes
+			// it for "no record".
+			return $watch && 3 === self::rcode( $name, $type ) ? array() : new \WP_Error( 'dns_transport', __( 'The name did not resolve.', 'beltoft-services' ) );
 		}
 
 		return self::shape( $records, $type );
