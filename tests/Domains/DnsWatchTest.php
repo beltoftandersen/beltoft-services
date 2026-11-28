@@ -485,4 +485,35 @@ final class DnsWatchTest extends TestCase {
 		$this->assertSame( 6, DnsWatchSettings::unknown_retries() );
 		$this->assertSame( 80, DnsWatchSettings::sweep_fail_percent() );
 	}
+
+	public function test_the_lookups_failing_alert_comes_again_after_the_record_was_back(): void {
+		$this->settings( array( 'dns_watch_unknown_retries' => 2 ) );
+		$r = $this->pending_loss();
+		DnsWatchFakeFeature::$failing = true;
+
+		for ( $i = 0; $i < 5; $i++ ) {
+			DnsWatch::confirm( $this->feature, $r->id() );
+		}
+		$this->assertCount( 1, $this->failing_subjects() );
+
+		// The record is back: every mark of the failed lookups is cleared.
+		DnsWatchFakeFeature::$failing = false;
+		DnsWatchFakeFeature::$present = array( 'a', 'b', 'c' );
+		DnsWatch::confirm( $this->feature, $r->id() );
+		$this->assertSame( 'ok', $this->fresh( $r )->get( 'fk_dns' ) );
+		$this->assertSame( 0, (int) $this->fresh( $r )->get( 'fk_dns_unknown_alerted' ) );
+
+		// A new loss, and the lookups fail again (the day's throttle of the alert is over).
+		DnsWatchFakeFeature::$present = array( 'a', 'c' );
+		$this->assertTrue( $this->fresh( $r )->set( array( 'fk_dns_rechecked' => 0 ) ) );
+		DnsWatch::recheck( $this->feature, $r->id() );
+		$this->assertGreaterThan( 0, (int) $this->fresh( $r )->get( 'fk_dns_lost_pending' ) );
+		delete_transient( 'beltoft_services_fake_lookups_' . md5( 'watched.example|' . $r->id() ) );
+		DnsWatchFakeFeature::$failing = true;
+		for ( $i = 0; $i < 5; $i++ ) {
+			DnsWatch::confirm( $this->feature, $r->id() );
+		}
+
+		$this->assertCount( 2, $this->failing_subjects(), 'The second outage alerts again.' );
+	}
 }

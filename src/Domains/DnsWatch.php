@@ -676,7 +676,7 @@ final class DnsWatch {
 		}
 
 		$still = array_values( array_intersect( $keys, array_diff( $f->needed(), DnsWatchState::keys_ok( $rows ) ) ) );
-		$clear = array( $p . '_lost_pending' => 0, $p . '_unknown_tries' => 0 );
+		$clear = array( $p . '_lost_pending' => 0, $p . '_unknown_tries' => 0, $p . '_unknown_alerted' => 0 );
 
 		if ( array() === $still || self::complete( $f, $rows ) ) {
 			// It is back: nobody was told, nobody needs to be.
