@@ -128,6 +128,22 @@ final class DnsWatchMail {
 		$feature = '' !== $wanted ? DnsWatch::feature( $wanted ) : DnsWatch::feature_of( $r );
 		$fresh   = Resource::find( $r->id() ) ?? $r;
 
+		/**
+		 * The values of a DNS watch email about one subject of a resource, for a feature that watches many names of one service (hosting:
+		 * each outside domain of an account). The trigger data carries dns_feature and the feature's own subject. Return the dns_* values
+		 * (the keys of empty_values()), or null to let the one-subject path above answer.
+		 *
+		 * @param array<string, mixed>|null $subject Null.
+		 * @param string                    $event   reminder, lost, back or timeout.
+		 * @param array<string, mixed>      $data    Trigger data.
+		 * @param Resource                  $fresh   The resource, read again.
+		 */
+		$subject = '' === $wanted || ! is_array( $data ) ? null : apply_filters( 'beltoft_services_dns_watch_subject_values', null, $event, $data, $fresh );
+
+		if ( is_array( $subject ) ) {
+			return array_merge( $values, $subject );
+		}
+
 		if ( null === $feature ) {
 			return $values;
 		}

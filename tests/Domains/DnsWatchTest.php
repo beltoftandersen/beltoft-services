@@ -326,6 +326,25 @@ final class DnsWatchTest extends TestCase {
 		$this->assertSame( 'ok', DnsWatchState::tone( $this->feature, $this->fresh( $r ) ) );
 	}
 
+	public function test_the_words_and_tones_of_a_state_kept_outside_one_resource(): void {
+		$this->assertSame( '', DnsWatchState::state_of( '', true, 0, 0, 0 ), 'No status, no word.' );
+		$this->assertSame( '', DnsWatchState::state_of( 'waiting', false, 0, 0, 0 ), 'No records known yet.' );
+		$this->assertSame( DnsWatchState::OK, DnsWatchState::state_of( 'ok', true, 0, 0, 0 ) );
+		$this->assertSame( DnsWatchState::SETTING_UP, DnsWatchState::state_of( 'waiting', true, 0, 0, 0 ) );
+		$this->assertSame( DnsWatchState::OK, DnsWatchState::state_of( 'waiting', true, 0, 0, time() ), 'A loss is not said before it is confirmed.' );
+		$this->assertSame( DnsWatchState::LOST, DnsWatchState::state_of( 'waiting', true, 0, time(), 0 ) );
+		$this->assertSame( DnsWatchState::MOVED, DnsWatchState::state_of( 'waiting', true, time(), time(), 0 ) );
+		$this->assertSame( DnsWatchState::STOPPED, DnsWatchState::state_of( 'timeout', true, 0, 0, 0 ) );
+
+		$this->assertSame( 'DNS records needed', DnsWatchState::word_of( DnsWatchState::SETTING_UP, 0 ) );
+		$this->assertSame( 'DNS records missing', DnsWatchState::word_of( DnsWatchState::LOST, 0 ) );
+		$this->assertStringStartsWith( 'DNS records missing since', DnsWatchState::word_of( DnsWatchState::LOST, time() ) );
+		$this->assertSame( '', DnsWatchState::word_of( DnsWatchState::OK, 0 ) );
+		$this->assertSame( 'busy', DnsWatchState::tone_of( DnsWatchState::LOST, time() - HOUR_IN_SECONDS, 'fake' ) );
+		$this->assertSame( 'bad', DnsWatchState::tone_of( DnsWatchState::LOST, time() - 4 * DAY_IN_SECONDS, 'fake' ) );
+		$this->assertSame( 'ok', DnsWatchState::tone_of( DnsWatchState::OK, 0, 'fake' ) );
+	}
+
 	public function test_the_status_poll_and_the_list_row_take_the_word_from_the_engine(): void {
 		$r = $this->service();
 		$r->set( array( 'fk_dns_lost_at' => time() - 3600, 'fk_dns_lost_keys' => array( 'b' ) ) );

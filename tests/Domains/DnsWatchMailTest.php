@@ -79,6 +79,36 @@ final class DnsWatchMailTest extends MailTestCase {
 		$this->assertStringNotContainsString( "\u{00B7}", $text );
 	}
 
+	public function test_a_feature_with_many_subjects_gives_the_values_of_one_subject_through_the_filter(): void {
+		$r    = $this->mail_resource( 'many.example' );
+		$seen = array();
+
+		add_filter(
+			'beltoft_services_dns_watch_subject_values',
+			static function ( $pre, $event, $data ) use ( &$seen ) {
+				$seen[] = array( $event, $data['dns_feature'] ?? '', $data['dns_host'] ?? '' );
+
+				return array( 'dns_name' => (string) $data['dns_host'], 'dns_lost_names' => 'A', 'dns_lost_rows' => array( array( 'type' => 'A', 'name' => (string) $data['dns_host'], 'value' => '192.0.2.1', 'priority' => 0 ) ) );
+			},
+			10,
+			3
+		);
+
+		$values = DnsWatchMail::values( array(), $r, array( 'dns_feature' => 'subjects', 'dns_host' => 'a.example' ), (object) array( 'id' => DnsWatchMail::id( 'lost' ) ) );
+
+		$this->assertSame( array( array( 'lost', 'subjects', 'a.example' ) ), $seen );
+		$this->assertSame( 'a.example', $values['dns_name'] );
+		$this->assertSame( 'A', $values['dns_lost_names'] );
+		$this->assertArrayHasKey( 'dns_effect', $values, 'The keys the template needs are there.' );
+
+		// Mail is not asked: no feature id in the data, the one-subject path answers.
+		$seen   = array();
+		$values = DnsWatchMail::values( array(), $r, array(), (object) array( 'id' => DnsWatchMail::id( 'lost' ) ) );
+		$this->assertSame( array(), $seen );
+		$this->assertSame( 'many.example', $values['dns_name'] );
+		remove_all_filters( 'beltoft_services_dns_watch_subject_values' );
+	}
+
 	public function test_the_timeout_mail_says_the_days_of_the_setting(): void {
 		$this->settings( array( 'dns_watch_wait_days' => 5 ) );
 		$r = $this->mail_resource( 'late.example' );

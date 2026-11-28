@@ -179,14 +179,23 @@ final class DnsWatchState {
 	public static function word( DnsWatchFeature $feature, Resource $r ): string {
 		$state = self::of( $feature, $r );
 
+		return self::word_of( $state, (int) $r->get( $feature->prefix() . '_lost_at' ), $feature );
+	}
+
+	/**
+	 * The words of a state, from its parts: for a feature whose state is not kept in one resource's meta (hosting keeps one per domain).
+	 *
+	 * @param string               $state   One of the constants, or a feature's partial state.
+	 * @param int                  $lost_at When the loss was confirmed, 0 for none.
+	 * @param DnsWatchFeature|null $feature Feature, for its partial word.
+	 */
+	public static function word_of( string $state, int $lost_at, ?DnsWatchFeature $feature = null ): string {
 		switch ( $state ) {
 			case self::SETTING_UP:
 				return __( 'DNS records needed', 'beltoft-services' );
 			case self::LOST:
-				$since = (int) $r->get( $feature->prefix() . '_lost_at' );
-
-				return $since > 0
-					? sprintf( /* translators: %s: a date such as 12 December */ __( 'DNS records missing since %s', 'beltoft-services' ), wp_date( _x( 'j F', 'a day and a month, such as 12 December', 'beltoft-services' ), $since ) )
+				return $lost_at > 0
+					? sprintf( /* translators: %s: a date such as 12 December */ __( 'DNS records missing since %s', 'beltoft-services' ), wp_date( _x( 'j F', 'a day and a month, such as 12 December', 'beltoft-services' ), $lost_at ) )
 					: __( 'DNS records missing', 'beltoft-services' );
 			case self::STOPPED:
 				return __( 'We stopped checking DNS', 'beltoft-services' );
@@ -194,7 +203,41 @@ final class DnsWatchState {
 				return __( 'DNS is at another provider', 'beltoft-services' );
 		}
 
-		return '' !== $state && $state === $feature->partial_state() ? $feature->partial_word() : '';
+		return null !== $feature && '' !== $state && $state === $feature->partial_state() ? $feature->partial_word() : '';
+	}
+
+	/**
+	 * The state from its parts, for a feature without a partial state: ok, stopped, moved, lost, confirming (ok until it is confirmed) or setting up.
+	 *
+	 * @param string $status       waiting, ok or timeout.
+	 * @param bool   $has_rows     Whether records are known at all.
+	 * @param int    $moved        Time the name servers moved away, 0 for none.
+	 * @param int    $lost_at      Time the loss was confirmed, 0 for none.
+	 * @param int    $lost_pending Time a loss awaits its second read, 0 for none.
+	 * @return string One of the constants, or '' when there are no records yet.
+	 */
+	public static function state_of( string $status, bool $has_rows, int $moved, int $lost_at, int $lost_pending ): string {
+		if ( '' === $status || ! $has_rows ) {
+			return '';
+		}
+
+		if ( 'ok' === $status ) {
+			return self::OK;
+		}
+
+		if ( 'timeout' === $status ) {
+			return self::STOPPED;
+		}
+
+		if ( $moved > 0 ) {
+			return self::MOVED;
+		}
+
+		if ( $lost_at > 0 ) {
+			return self::LOST;
+		}
+
+		return $lost_pending > 0 ? self::OK : self::SETTING_UP;
 	}
 
 	/**
@@ -205,12 +248,20 @@ final class DnsWatchState {
 	 * @return string busy (amber), bad (red) or ok.
 	 */
 	public static function tone( DnsWatchFeature $feature, Resource $r ): string {
-		$state = self::of( $feature, $r );
+		return self::tone_of( self::of( $feature, $r ), (int) $r->get( $feature->prefix() . '_lost_at' ), $feature->id() );
+	}
 
+	/**
+	 * The colour group of a state, from its parts.
+	 *
+	 * @param string $state      State.
+	 * @param int    $lost_at    When the loss was confirmed, 0 for none.
+	 * @param string $feature_id Feature id (the days after which a loss is red are a setting per feature).
+	 * @return string busy (amber), bad (red) or ok.
+	 */
+	public static function tone_of( string $state, int $lost_at, string $feature_id ): string {
 		if ( in_array( $state, array( self::LOST, self::MOVED ), true ) ) {
-			$since = (int) $r->get( $feature->prefix() . '_lost_at' );
-
-			return $since > 0 && time() >= $since + DnsWatchSettings::red_after( $feature->id() ) ? 'bad' : 'busy';
+			return $lost_at > 0 && time() >= $lost_at + DnsWatchSettings::red_after( $feature_id ) ? 'bad' : 'busy';
 		}
 
 		return '' !== $state && self::OK !== $state ? 'busy' : 'ok';
