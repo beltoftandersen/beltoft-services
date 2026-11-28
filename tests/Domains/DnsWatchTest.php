@@ -587,4 +587,25 @@ final class DnsWatchTest extends TestCase {
 		DnsWatchFakeFeature::$before = false;
 		$this->assertSame( array(), \BeltoftServices\Domains\DnsWatchJobs::due( 'fake' ), 'A service that is not ready for a look (before_look) is not queued.' );
 	}
+
+	public function test_an_old_confirm_job_does_not_confirm_a_loss_that_started_again_later(): void {
+		// Lost, back, lost again: the job queued for the first loss fires one minute after the second one began.
+		$r = $this->pending_loss( array( 'fk_dns_lost_pending' => time() - 60 ) );
+		\BeltoftServices\Domains\DnsWatchJobs::register();
+
+		do_action( 'beltoft_services_test_fake_confirm', $r->id() );
+		$r = $this->fresh( $r );
+
+		$this->assertSame( array(), $this->mails, 'Too early: nobody is told.' );
+		$this->assertSame( 0, (int) $r->get( 'fk_dns_lost_at' ) );
+		$this->assertGreaterThan( 0, (int) $r->get( 'fk_dns_lost_pending' ), 'Still pending.' );
+		$when = as_next_scheduled_action( 'beltoft_services_test_fake_confirm', array( $r->id() ), \BeltoftServices\Jobs::GROUP );
+		$this->assertNotFalse( $when );
+		$this->assertEqualsWithDelta( (int) $r->get( 'fk_dns_lost_pending' ) + DnsWatchSettings::confirm_seconds( 'fake' ), $when, 5, 'Queued for the real end of the wait.' );
+
+		$r->set( array( 'fk_dns_lost_pending' => time() - DnsWatchSettings::confirm_seconds( 'fake' ) - 1 ) );
+		do_action( 'beltoft_services_test_fake_confirm', $r->id() );
+
+		$this->assertGreaterThan( 0, (int) $this->fresh( $r )->get( 'fk_dns_lost_at' ), 'After the wait it is confirmed.' );
+	}
 }

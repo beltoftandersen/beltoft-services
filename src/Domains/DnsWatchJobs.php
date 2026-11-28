@@ -106,9 +106,23 @@ final class DnsWatchJobs {
 	public static function on_confirm( $resource_id ): void {
 		$f = self::fired( 'confirm' );
 
-		if ( $f ) {
-			DnsWatch::confirm( $f, (int) $resource_id );
+		if ( ! $f ) {
+			return;
 		}
+
+		// A loss that went away and came again leaves the first loss's job queued (schedule_once does nothing while one is pending), and
+		// that job would fire early for the second loss. Every loss is read after its own wait: too early, it is queued for the end of it.
+		$r    = Resource::find( (int) $resource_id );
+		$at   = $r ? (int) $r->get( $f->prefix() . '_lost_pending' ) : 0;
+		$left = $at > 0 ? $at + DnsWatchSettings::confirm_seconds( $f->id() ) - time() : 0;
+
+		if ( $left > 0 ) {
+			self::confirm( $f, (int) $resource_id, $left );
+
+			return;
+		}
+
+		DnsWatch::confirm( $f, (int) $resource_id );
 	}
 
 	/**

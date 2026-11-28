@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.72.1
+Stable tag: 0.72.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,9 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.72.2 =
+* The DNS watch confirms a loss only after its own wait: a name that was lost, came back and was lost again no longer gets the first loss's queued confirmation, which fired early (mail, apps, SSL and every other feature).
 
 = 0.72.1 =
 * Code review fixes for the DNS watch: an app whose domain is found while its lock is busy is handed over by its own retry job and never installed on the server address; the lookups-failing alert can fire again after a recovery; resolver health is decided by a probe of a known name (settings dns_watch_health_probe_name, dns_watch_health_min_domains) and counted by distinct domain; reinstall keeping a lost name keeps its warning; the NXDOMAIN probe runs only for the watch (domain search unchanged); the watchdog skips services the feature would not look at; one shared list of marks for every reset; the staff alert says whether the customer was emailed; texts follow the look and wait settings; the SSL reissue alert lives in Ssl.
