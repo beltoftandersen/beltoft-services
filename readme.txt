@@ -4,7 +4,7 @@ Tags: services, provisioning, woocommerce, subscriptions, license
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.71.0
+Stable tag: 0.72.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -257,6 +257,11 @@ In Settings → Services → Proxmox, Customer monitoring emails are off by defa
 The settings, connections, clusters, IP pool, VM records, breach marks, DNS hosting claims and email settings are deleted only if "Delete the settings when the plugin is deleted" is ticked. Uninstalling never deletes a service or a virtual machine on the remote side. The DNS assignments table stays while any name is still active or waiting for release, because a name may still point at our servers. The list of service product slugs and the queued Action Scheduler actions are left in place on purpose.
 
 == Changelog ==
+
+= 0.72.0 =
+* DNS watch step 4: SSL certificates with DNS validation (CNAME) use the shared watch. While an order waits: looks every 10 minutes, Found / Not found yet, reminders for method dns. After issue: a daily look and the lost and found-again mails, because every automatic reissue needs the CNAME again; the running certificate is never touched. A missing CNAME in a zone of ours is written back; a foreign value is a conflict.
+* An automatic reissue by the authority that waits for validation raises one staff alert (Alerts::ssl_reissue_waits) instead of being noticed only at the expiry notice.
+* Sandbox API address is /v1 (Openprovider retires /v1beta).
 
 = 0.71.0 =
 * DNS watch step 3: generic parts a feature with many names per service needs (filter beltoft_services_dns_watch_subject_values, DnsWatchState words from plain parts); used by beltoft-hosting 0.2.10 for webhotel outside domains.
