@@ -61,6 +61,10 @@ final class DnsWatchMail {
 	 * @param Resource        $r     Resource.
 	 */
 	public static function send( string $event, DnsWatchFeature $f, Resource $r ): bool {
+		if ( ! $f->mails( $event, $r ) ) {
+			return false;
+		}
+
 		return Emails::send( self::id( $event ), $r, array( 'dns_feature' => $f->id() ) );
 	}
 

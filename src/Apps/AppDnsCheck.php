@@ -53,7 +53,7 @@ final class AppDnsCheck {
 					'code'      => 'beltoft_services_' . $result->get_error_code(),
 					'message'   => 429 === $status ? (string) $view['next_text'] : $result->get_error_message(),
 					'next'      => (int) ( $data['next'] ?? 0 ),
-					'box'       => AppOwnDomain::waiting( $fresh ) ? AppProgress::dns_box( $fresh ) : '',
+					'box'       => AppOwnDomain::waiting( $fresh ) || AppOwnDomain::lost( $fresh ) ? AppProgress::dns_box( $fresh ) : '',
 				),
 				$status
 			);

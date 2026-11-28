@@ -295,6 +295,11 @@ final class AppTab {
 		$own_state = '' === $own_name ? '' : (string) $r->get( 'app_domain_dns' );
 		$own_wait  = AppOwnDomain::waiting( $r );
 
+		// A name that worked and does not any more is not the first wait and not the "installed on the address" end: the box says so.
+		if ( AppOwnDomain::lost( $r ) ) {
+			$own_state = 'lost';
+		}
+
 		if ( $own_wait && 'waiting' === $kind && 'ready' === $server ) {
 			$kind = 'dns';
 		}
@@ -348,7 +353,7 @@ final class AppTab {
 				'ip'       => AppOwnDomain::address( $r ),
 				'reason'   => (string) $r->get( 'app_domain_dns_reason' ),
 				'deadline' => $own_since > 0 ? wp_date( get_option( 'date_format' ), $own_since ) : '',
-				'days'     => AppOwnDomain::WAIT_DAYS,
+				'days'     => \BeltoftServices\Domains\DnsWatchSettings::wait_days( AppDnsWatch::ID ),
 			),
 			'www'             => AppWww::view( $r ),
 			'domain_support'  => ! empty( $app['domain'] ),

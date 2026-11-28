@@ -3,11 +3,11 @@
 
 namespace BeltoftServices\Apps;
 
-use BeltoftServices\Background;
-use BeltoftServices\Domains\DnsQuery;
+use BeltoftServices\Domains\DnsWatch;
+use BeltoftServices\Domains\DnsWatchJobs;
+use BeltoftServices\Domains\DnsWatchSettings;
 use BeltoftServices\Domains\HostName;
 use BeltoftServices\Emails\Emails;
-use BeltoftServices\Jobs;
 use BeltoftServices\Proxmox\Network\IpPool;
 use BeltoftServices\Domains\ManualCheck;
 use BeltoftServices\Resource;
@@ -30,25 +30,32 @@ final class AppOwnDomain {
 
 	public const HOOK = 'beltoft_services_app_own_domain_check';
 
-	/** Seconds between two public DNS reads of one server. */
+	/** The defaults of the shared DNS watch settings (Domains, DNS watch), kept for the domain change, which waits with the same numbers. */
 	public const INTERVAL = 600;
-
-	/** The least gap between two reads, whatever calls the job. */
-	public const MIN_GAP = 300;
-
-	/** Days the app waits for the name before it is installed on the server address. */
+	public const MIN_GAP  = 300;
 	public const WAIT_DAYS = 14;
 
+	/**
+	 * The own-domain look is the shared DNS watch (Domains\DnsWatch): this registers the app's object with it. The look hook, its
+	 * watchdog and the daily look are declared by the watch.
+	 */
 	public static function register(): void {
-		add_action( self::HOOK, array( __CLASS__, 'run' ) );
-		Background::declare(
-			self::HOOK,
-			array(
-				'due'      => array( __CLASS__, 'due' ),
-				'resource' => true,
-				'label'    => 'App own domain look',
-			)
+		add_filter(
+			'beltoft_services_dns_watches',
+			static function ( $features ) {
+				$features                    = is_array( $features ) ? $features : array();
+				$features[ AppDnsWatch::ID ] = new AppDnsWatch();
+
+				return $features;
+			}
 		);
+	}
+
+	/** The watch's object for apps. */
+	private static function feature(): ?AppDnsWatch {
+		$f = DnsWatch::feature( AppDnsWatch::ID );
+
+		return $f instanceof AppDnsWatch ? $f : null;
 	}
 
 	// -- The name ------------------------------------------------------------------------------
@@ -76,9 +83,22 @@ final class AppOwnDomain {
 
 	// -- State ---------------------------------------------------------------------------------
 
-	/** Is the app held back until the name points at the server? */
+	/**
+	 * Is the app held back until the name points at the server (the first wait, before the install)? A name that was live and was lost
+	 * is not this: the app is installed and runs (see lost()).
+	 */
 	public static function waiting( Resource $r ): bool {
-		return '' !== (string) $r->get( 'app_domain_own' ) && 'waiting' === (string) $r->get( 'app_domain_dns' );
+		return '' !== (string) $r->get( 'app_domain_own' ) && 'waiting' === (string) $r->get( 'app_domain_dns' ) && '' === (string) $r->get( 'app_domain' );
+	}
+
+	/** Did the name point to the server once and not any more (the watch warns the customer; nothing is stopped)? */
+	public static function lost( Resource $r ): bool {
+		return '' !== (string) $r->get( 'app_domain_own' ) && '' !== (string) $r->get( 'app_domain' ) && in_array( (string) $r->get( 'app_domain_dns' ), array( 'waiting', 'timeout' ), true );
+	}
+
+	/** Is the name one the install used (live or lost), not one that is still awaited or that never worked? */
+	public static function lost_or_live( Resource $r ): bool {
+		return '' !== (string) $r->get( 'app_domain_own' ) && '' !== (string) $r->get( 'app_domain' ) && '' !== (string) $r->get( 'app_domain_dns' );
 	}
 
 	/** The meta of a name that starts its wait, and of a reinstall that asks for one again. */
@@ -91,6 +111,19 @@ final class AppOwnDomain {
 			'app_domain_dns_reason'  => null,
 			'app_domain_dns_seen'    => null,
 			'app_domain_dns_mailed'  => null,
+			'app_domain_dns_rows'    => null,
+			'app_domain_dns_mode'    => null,
+			'app_domain_dns_rechecked' => null,
+			'app_domain_dns_reminded' => null,
+			'app_domain_dns_lost_at' => null,
+			'app_domain_dns_lost_keys' => null,
+			'app_domain_dns_lost_mails' => null,
+			'app_domain_dns_lost_pending' => null,
+			'app_domain_dns_last_mail' => null,
+			'app_domain_dns_back_at' => null,
+			'app_domain_dns_timeout_mailed' => null,
+			'app_domain_dns_admin_alerted' => null,
+			'app_domain_dns_moved'   => null,
 		);
 	}
 
@@ -104,6 +137,19 @@ final class AppOwnDomain {
 			'app_domain_dns_reason'  => null,
 			'app_domain_dns_seen'    => null,
 			'app_domain_dns_mailed'  => null,
+			'app_domain_dns_rows'    => null,
+			'app_domain_dns_mode'    => null,
+			'app_domain_dns_rechecked' => null,
+			'app_domain_dns_reminded' => null,
+			'app_domain_dns_lost_at' => null,
+			'app_domain_dns_lost_keys' => null,
+			'app_domain_dns_lost_mails' => null,
+			'app_domain_dns_lost_pending' => null,
+			'app_domain_dns_last_mail' => null,
+			'app_domain_dns_back_at' => null,
+			'app_domain_dns_timeout_mailed' => null,
+			'app_domain_dns_admin_alerted' => null,
+			'app_domain_dns_moved'   => null,
 		);
 	}
 
@@ -116,7 +162,7 @@ final class AppOwnDomain {
 	/** The moment the wait ends, 0 before it has started. */
 	public static function deadline( Resource $r ): int {
 		$since = (int) $r->get( 'app_domain_dns_since' );
-		return $since > 0 ? $since + self::WAIT_DAYS * DAY_IN_SECONDS : 0;
+		return $since > 0 ? $since + DnsWatchSettings::wait_days( AppDnsWatch::ID ) * DAY_IN_SECONDS : 0;
 	}
 
 	/**
@@ -138,9 +184,12 @@ final class AppOwnDomain {
 
 	// -- The job -------------------------------------------------------------------------------
 
-	/** Starts the wait once the server is ready: the clock begins and the first read is queued. */
+	/**
+	 * Starts the wait once the server is ready: the clock begins and the first look is queued. A name that was live and was lost
+	 * has its clock restarted by the watch itself.
+	 */
 	public static function start( Resource $r ): void {
-		if ( ! self::waiting( $r ) ) {
+		if ( ! self::waiting( $r ) && ! self::lost( $r ) ) {
 			return;
 		}
 		$delay = 0;
@@ -159,131 +208,130 @@ final class AppOwnDomain {
 	}
 
 	public static function schedule( int $id, int $delay ): void {
-		Jobs::schedule_once( time() + $delay, self::HOOK, array( $id ) );
-	}
+		$f = self::feature();
 
-	/**
-	 * The watchdog's list (Background): a read lost (a worker stopped, an action removed).
-	 *
-	 * @return array<int, array<int, int>>
-	 */
-	public static function due(): array {
-		$sets = array();
-		foreach ( Resource::find_by_meta( 'vm', 'app_domain_dns', 'waiting' ) as $id ) {
-			$r = Resource::find( (int) $id );
-			if ( $r && 'ready' === $r->get( 'state' ) && self::waiting( $r ) ) {
-				$sets[] = array( (int) $id );
-			}
+		if ( $f ) {
+			DnsWatchJobs::look( $f, $id, $delay );
 		}
-		return $sets;
 	}
 
 	/**
-	 * One bounded read of public DNS for one server. The read is made outside the resource lock; the result is stored
-	 * under it, after the resource has been read again.
+	 * One bounded read of public DNS for one server: the shared watch's look.
 	 */
 	public static function run( int $id ): void {
-		$r = Resource::find( $id );
-		if ( ! $r || ! $r->is_live() || 'ready' !== $r->get( 'state' ) || ! self::waiting( $r ) ) {
-			return;
-		}
+		$f = self::feature();
 
-		// The clock starts here too when the job was queued by the watchdog and not by start().
-		if ( 0 === (int) $r->get( 'app_domain_dns_since' ) ) {
-			self::start( $r );
-			return;
-		}
-
-		$now  = time();
-		$gap  = $now - (int) $r->get( 'app_domain_dns_checked' );
-		$name = (string) $r->get( 'app_domain_own' );
-		$ip   = self::address( $r );
-
-		if ( (int) $r->get( 'app_domain_dns_checked' ) > 0 && $gap < self::MIN_GAP ) {
-			self::schedule( $id, self::MIN_GAP - $gap );
-			return;
-		}
-
-		$since = (int) $r->get( 'app_domain_dns_since' );
-		if ( $since > 0 && $now >= $since + self::WAIT_DAYS * DAY_IN_SECONDS ) {
-			self::store( $id, array( 'app_domain_dns' => 'timeout', 'app_domain_dns_checked' => $now, 'app_domain_dns_reason' => null ), true );
-			return;
-		}
-
-		if ( '' === $ip ) {
-			self::schedule( $id, self::INTERVAL );
-			return;
-		}
-
-		$verdict = self::look( $id, $name, $ip, $now );
-
-		if ( 'live' !== $verdict && null !== $verdict ) {
-			self::schedule( $id, self::INTERVAL );
+		if ( $f ) {
+			DnsWatch::run( $f, $id );
 		}
 	}
 
 	/**
-	 * One read of public DNS for one name and what comes of it: the result is stored, and a name that points at this server alone
-	 * is handed to the install. The one code path of the recurring job and of the customer's Check now button.
-	 *
-	 * @return string|null The verdict (none, other, aaaa, unreachable, live), or null when the result could not be stored (the lock was busy;
-	 *                     store() has queued a look soon).
+	 * The name points to the server alone: it is handed to the install exactly as a name in a zone of ours is (the install job's
+	 * `domain`), and no record of ours exists (app_domain_made false), so a later reinstall never removes anything for this name. Called
+	 * by the watch when the needed record is found. A name found again after it was lost has been handed over already: nothing is queued.
 	 */
-	private static function look( int $id, string $name, string $ip, int $now ): ?string {
-		$a    = DnsQuery::addresses( $name, 'A' );
-		$aaaa = DnsQuery::addresses( $name, 'AAAA' );
-		if ( is_wp_error( $a ) ) {
-			$verdict = 'unreachable';
+	public static function found( Resource $r ): void {
+		if ( '' !== (string) $r->get( 'app_domain' ) || ! in_array( (string) $r->get( 'app_state' ), array( '', 'pending' ), true ) ) {
+			return;
+		}
+		$id    = $r->id();
+		$name  = (string) $r->get( 'app_domain_own' );
+		$stored = $r->locked(
+			static function () use ( $id, $name ): bool {
+				$fresh = Resource::find( $id );
+				return $fresh && '' === (string) $fresh->get( 'app_domain' ) && $name === (string) $fresh->get( 'app_domain_own' ) && $fresh->set( array( 'app_domain' => $name, 'app_domain_made' => false ) );
+			}
+		);
+		if ( true === $stored ) {
+			AppInstall::schedule( $id, 0 );
 		} else {
-			$verdict = self::verdict( $ip, $a, is_wp_error( $aaaa ) ? array() : $aaaa );
+			self::schedule( $id, 60 );
+		}
+	}
+
+	/**
+	 * The wait ended without the name: the app is installed on the server address, as before the watch. A name that was live and was
+	 * lost never starts an install: the watch only warns.
+	 */
+	public static function timed_out( Resource $r ): void {
+		if ( '' === (string) $r->get( 'app_domain' ) && in_array( (string) $r->get( 'app_state' ), array( '', 'pending' ), true ) ) {
+			AppInstall::schedule( $r->id(), 0 );
+		}
+	}
+
+	/**
+	 * What the box says follows the row the watch stored: the verdict (none, other, aaaa, unreachable) and the addresses seen. A name
+	 * that is found clears the verdict.
+	 *
+	 * @param Resource             $r   Resource.
+	 * @param array<string, mixed> $row The record's row.
+	 */
+	public static function sync_view( Resource $r, array $row ): void {
+		$ok   = 'ok' === (string) ( $row['status'] ?? '' );
+		$meta = array( 'app_domain_dns_reason' => $ok ? null : ( '' !== (string) ( $row['reason'] ?? '' ) ? (string) $row['reason'] : null ) );
+
+		if ( ! $ok && is_array( $row['seen'] ?? null ) ) {
+			$meta['app_domain_dns_seen'] = array_values( $row['seen'] );
 		}
 
-		if ( 'live' === $verdict ) {
-			// No record of ours exists (app_domain_made false), so a later reinstall never removes anything for this name.
-			return self::store( $id, array( 'app_domain' => $name, 'app_domain_made' => false, 'app_domain_dns' => 'live', 'app_domain_dns_checked' => $now, 'app_domain_dns_reason' => null ), true ) ? 'live' : null;
+		if ( (string) $r->get( 'app_domain_dns_reason' ) === (string) $meta['app_domain_dns_reason'] && ( ! isset( $meta['app_domain_dns_seen'] ) || $r->get( 'app_domain_dns_seen' ) === $meta['app_domain_dns_seen'] ) ) {
+			return;
 		}
 
-		$meta = array( 'app_domain_dns_checked' => $now, 'app_domain_dns_reason' => $verdict );
-		if ( ! is_wp_error( $a ) ) {
-			$meta['app_domain_dns_seen'] = array_values( array_unique( array_filter( $a, static fn( $x ): bool => false !== filter_var( $x, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) ) );
-		}
-
-		return self::store( $id, $meta, false ) ? $verdict : null;
+		$id = $r->id();
+		$r->locked(
+			static function () use ( $id, $meta ): bool {
+				$fresh = Resource::find( $id );
+				return $fresh && $fresh->set( $meta );
+			}
+		);
 	}
 
 	// -- The customer's Check now ----------------------------------------------------------------
 
-	/** Least seconds between two customer checks of one server. */
-	public const MANUAL_GAP = 60;
-
-	/** Most customer checks of one server in a rolling hour. */
-	public const MANUAL_PER_HOUR = 10;
-
 	/** The times (Unix) of the customer's checks of the last hour. */
 	public const MANUAL_META = 'app_domain_dns_manual';
 
+	/** The shared least seconds between two customer checks of one server (DNS watch settings). */
+	public static function manual_gap(): int {
+		return DnsWatchSettings::check_gap( AppDnsWatch::ID );
+	}
+
+	/** The shared most customer checks of one server in a rolling hour (DNS watch settings). */
+	public static function manual_per_hour(): int {
+		return DnsWatchSettings::check_per_hour( AppDnsWatch::ID );
+	}
+
 	/** The moment the customer may check again, 0 when now. */
 	public static function manual_next( Resource $r, ?int $now = null ): int {
-		return ManualCheck::next( $r, self::MANUAL_META, self::MANUAL_GAP, self::MANUAL_PER_HOUR, $now );
+		return ManualCheck::next( $r, self::MANUAL_META, self::manual_gap(), self::manual_per_hour(), $now );
 	}
 
 	/**
-	 * The customer asks for a look now. The look is the job's own (look()); the limits are kept here, on the server. The job's schedule
-	 * is not touched: its next run stays where it was, and its MIN_GAP never blocks this look.
+	 * The customer asks for a look now. The look is the watch's (DnsWatch::run, which a name that is lost and a name that is awaited both
+	 * use); the limits are the shared ones and are kept here, on the server. A name whose look had stopped after the days ran out is
+	 * started again. The job's schedule is not touched.
 	 *
 	 * @return array{verdict: string|null}|\WP_Error Error codes: not_waiting (409), rate_limited (429, data: next), busy (409).
 	 */
 	public static function check_now( Resource $r ) {
-		if ( ! $r->is_live() || 'ready' !== $r->get( 'state' ) || ! self::waiting( $r ) || 0 === (int) $r->get( 'app_domain_dns_since' ) || '' === self::address( $r ) ) {
+		$f = self::feature();
+		if ( ! $f || ! $r->is_live() || 'ready' !== $r->get( 'state' ) || '' === self::address( $r ) ) {
+			return new \WP_Error( 'not_waiting', __( 'This server is not waiting for your domain.', 'beltoft-services' ), array( 'status' => 409 ) );
+		}
+		$first = self::waiting( $r ) && 0 !== (int) $r->get( 'app_domain_dns_since' );
+		$gone  = self::lost( $r );
+		if ( ! $first && ! $gone ) {
 			return new \WP_Error( 'not_waiting', __( 'This server is not waiting for your domain.', 'beltoft-services' ), array( 'status' => 409 ) );
 		}
 		$deadline = self::deadline( $r );
-		if ( $deadline > 0 && time() >= $deadline ) {
+		if ( $first && $deadline > 0 && time() >= $deadline ) {
 			return new \WP_Error( 'not_waiting', __( 'This server is not waiting for your domain.', 'beltoft-services' ), array( 'status' => 409 ) );
 		}
 
 		// The count is kept under the lock, so two clicks at once make one look.
-		$next = ManualCheck::claim( $r, self::MANUAL_META, self::MANUAL_GAP, self::MANUAL_PER_HOUR );
+		$next = ManualCheck::claim( $r, self::MANUAL_META, self::manual_gap(), self::manual_per_hour() );
 		if ( null === $next ) {
 			return new \WP_Error( 'busy', __( 'This server is busy. Please try again in a moment.', 'beltoft-services' ), array( 'status' => 409 ) );
 		}
@@ -291,35 +339,19 @@ final class AppOwnDomain {
 			return new \WP_Error( 'rate_limited', __( 'You are checking too often.', 'beltoft-services' ), array( 'status' => 429, 'next' => $next ) );
 		}
 
-		return array( 'verdict' => self::look( $r->id(), (string) $r->get( 'app_domain_own' ), self::address( $r ), time() ) );
-	}
+		// A look that had stopped (after the days ran out) starts again, as the customer asked.
+		if ( $gone && 'timeout' === (string) $r->get( 'app_domain_dns' ) && ! DnsWatch::restart( $f, $r ) ) {
+			return new \WP_Error( 'busy', __( 'This server is busy. Please try again in a moment.', 'beltoft-services' ), array( 'status' => 409 ) );
+		}
 
-	/**
-	 * Stores the result under the resource lock. A busy lock reads again soon.
-	 *
-	 * @param array<string, mixed> $meta    Meta.
-	 * @param bool                 $install Queue the app install after storing (the wait is over).
-	 * @return bool Whether it was stored.
-	 */
-	private static function store( int $id, array $meta, bool $install ): bool {
-		$r = Resource::find( $id );
-		if ( ! $r ) {
-			return false;
+		DnsWatch::run( $f, $r->id(), true );
+		$fresh = Resource::find( $r->id() ) ?? $r;
+
+		if ( 'live' === (string) $fresh->get( 'app_domain_dns' ) ) {
+			return array( 'verdict' => 'live' );
 		}
-		$done = $r->locked(
-			static function () use ( $id, $meta ): bool {
-				$fresh = Resource::find( $id );
-				return $fresh && self::waiting( $fresh ) && $fresh->set( $meta );
-			}
-		);
-		if ( true !== $done ) {
-			self::schedule( $id, 60 );
-			return false;
-		}
-		if ( $install ) {
-			AppInstall::schedule( $id, 0 );
-		}
-		return true;
+
+		return array( 'verdict' => '' !== (string) $fresh->get( 'app_domain_dns_reason' ) ? (string) $fresh->get( 'app_domain_dns_reason' ) : null );
 	}
 
 	// -- The customer is told --------------------------------------------------------------------

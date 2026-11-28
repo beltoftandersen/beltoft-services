@@ -26,7 +26,13 @@ if ( '' !== $box['ip'] ) {
 		<h4><?php echo esc_html( sprintf( /* translators: %s: domain name */ __( 'Point %s to your server', 'beltoft-services' ), $box['name'] ) ); ?></h4>
 		<span class="beltoft-services-dnsbox__pill<?php echo $box['found'] ? ' is-found' : ' is-missing'; ?>"><?php echo $box['found'] ? esc_html__( 'Found', 'beltoft-services' ) : esc_html__( 'Missing', 'beltoft-services' ); ?></span>
 	</header>
-	<p class="beltoft-services-dnsbox__lead"><?php echo esc_html( sprintf( /* translators: %s: app name such as Odoo */ __( '%s is installed as soon as your domain points to the server.', 'beltoft-services' ), $box['app'] ) ); ?></p>
+	<p class="beltoft-services-dnsbox__lead"><?php
+	if ( $box['lost'] ) {
+		echo esc_html( sprintf( /* translators: %s: app name such as Odoo */ __( '%s keeps running, but your domain no longer points to the server only. Visitors may not reach it at this name.', 'beltoft-services' ), '' !== $box['app'] ? $box['app'] : __( 'Your app', 'beltoft-services' ) ) );
+	} else {
+		echo esc_html( sprintf( /* translators: %s: app name such as Odoo */ __( '%s is installed as soon as your domain points to the server.', 'beltoft-services' ), $box['app'] ) );
+	}
+	?></p>
 	<ol class="beltoft-services-dnsbox__steps">
 		<li><?php echo esc_html( sprintf( /* translators: %s: domain name */ __( 'Log in to your DNS provider (where %s is set up).', 'beltoft-services' ), $box['name'] ) ); ?></li>
 		<?php if ( array() !== $beltoft_services_rows ) : ?>
@@ -64,7 +70,7 @@ if ( '' !== $box['ip'] ) {
 	<?php if ( ! $box['found'] ) : ?>
 		<p class="beltoft-services-dnsbox__check"><button type="button" class="beltoft-services-dnsbox__button" data-dns-check="<?php echo esc_attr( (string) $box['id'] ); ?>" data-label="<?php esc_attr_e( 'Check now', 'beltoft-services' ); ?>" data-next="<?php echo esc_attr( (string) $box['next'] ); ?>"<?php echo $box['next'] > 0 ? ' disabled' : ''; ?>><?php echo $box['next'] > 0 ? esc_html( $box['next_text'] ) : esc_html__( 'Check now', 'beltoft-services' ); ?></button></p>
 	<?php endif; ?>
-	<p class="beltoft-services-dnsbox__foot"><?php esc_html_e( 'We check every 10 minutes and start the installation ourselves.', 'beltoft-services' ); ?>
+	<p class="beltoft-services-dnsbox__foot"><?php echo $box['lost'] ? esc_html__( 'We keep checking. Nothing on your server is stopped, changed or removed.', 'beltoft-services' ) : esc_html__( 'We check every 10 minutes and start the installation ourselves.', 'beltoft-services' ); ?>
 		<?php if ( '' !== $box['deadline'] ) : ?>
 			<?php echo esc_html( sprintf( /* translators: 1: date, 2: app name such as Odoo */ __( 'If this has not happened by %1$s, %2$s is installed on the server address instead.', 'beltoft-services' ), $box['deadline'], $box['app'] ) ); ?>
 		<?php endif; ?>

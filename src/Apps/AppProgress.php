@@ -354,7 +354,7 @@ final class AppProgress {
 		$checked = (int) $r->get( 'app_domain_dns_checked' );
 		$reason  = (string) $r->get( 'app_domain_dns_reason' );
 		$seen    = array_values( array_filter( (array) $r->get( 'app_domain_dns_seen' ), 'is_string' ) );
-		$deadline = AppOwnDomain::deadline( $r );
+		$deadline = AppOwnDomain::lost( $r ) ? 0 : AppOwnDomain::deadline( $r );
 		$today   = wp_date( 'Y-m-d' ) === wp_date( 'Y-m-d', $checked );
 		$next    = AppOwnDomain::manual_next( $r );
 
@@ -388,6 +388,7 @@ final class AppProgress {
 			'www'       => $www_name,
 			'www_label' => $www_label,
 			'found'     => 'live' === (string) $r->get( 'app_domain_dns' ),
+			'lost'      => AppOwnDomain::lost( $r ),
 			'aaaa'      => 'aaaa' === $reason,
 			'now'       => $now,
 			'checked'   => $checked > 0 ? sprintf(

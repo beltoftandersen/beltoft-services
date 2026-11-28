@@ -42,7 +42,7 @@ final class DnsWatchState {
 	public static function status_words( $words, $resource ) {
 		$feature = $resource instanceof Resource ? DnsWatch::feature_of( $resource ) : null;
 
-		if ( ! is_array( $words ) || null === $feature || ! $feature->shows_status() ) {
+		if ( ! is_array( $words ) || null === $feature || ! $feature->shows_status( $resource ) ) {
 			return $words;
 		}
 
@@ -70,7 +70,7 @@ final class DnsWatchState {
 	public static function area_state( $state, $resource ) {
 		$feature = $resource instanceof Resource ? DnsWatch::feature_of( $resource ) : null;
 
-		if ( ! is_array( $state ) || null === $feature || ! $feature->shows_status() || ! $resource->is_live() ) {
+		if ( ! is_array( $state ) || null === $feature || ! $feature->shows_status( $resource ) || ! $resource->is_live() ) {
 			return $state;
 		}
 
@@ -105,9 +105,9 @@ final class DnsWatchState {
 	 */
 	public static function of( DnsWatchFeature $feature, Resource $r ): string {
 		$p      = $feature->prefix();
-		$status = (string) $r->get( $p );
+		$status = DnsWatch::status( $feature, $r );
 
-		if ( '' === $status || array() === (array) $r->get( $feature->rows_key() ) ) {
+		if ( '' === $status || array() === $feature->rows( $r ) ) {
 			return '';
 		}
 
@@ -149,7 +149,7 @@ final class DnsWatchState {
 	 * @return string[]
 	 */
 	public static function ok_keys( DnsWatchFeature $feature, Resource $r ): array {
-		return self::keys_ok( (array) $r->get( $feature->rows_key() ) );
+		return self::keys_ok( $feature->rows( $r ) );
 	}
 
 	/**

@@ -332,6 +332,10 @@ $beltoft_services_status_text = array(
 		</p>
 	<?php endif; ?>
 
+	<?php if ( 'lost' === $view['own']['state'] && 'ready' === $beltoft_services_kind ) : ?>
+		<?php echo \BeltoftServices\Apps\AppProgress::dns_box( \BeltoftServices\Resource::find( (int) $view['resource_id'] ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in the template. ?>
+	<?php endif; ?>
+
 	<?php if ( '' !== $view['own']['name'] && 'waiting' === $view['own']['state'] && 'dns' !== $beltoft_services_kind ) : ?>
 		<p class="description" data-app-own-domain-before>
 			<?php

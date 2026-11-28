@@ -48,8 +48,50 @@ interface DnsWatchFeature {
 	 */
 	public function hook( string $job ): string;
 
-	/** Does the feature show the DNS word in its list rows, badges and status poll? */
-	public function shows_status(): bool;
+	/**
+	 * Does the feature show the DNS word in the list rows, badges and status poll of this resource?
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public function shows_status( Resource $r ): bool;
+
+	/**
+	 * The stored rows of a resource, or the rows the feature derives when none are stored yet (apps that were live before the watch).
+	 *
+	 * @param Resource $r Resource.
+	 * @return array<int, mixed>
+	 */
+	public function rows( Resource $r ): array;
+
+	/**
+	 * The status as stored, for the status the engine writes: waiting, ok or timeout. Apps store ok as live.
+	 *
+	 * @param string $status Engine status.
+	 */
+	public function status_in( string $status ): string;
+
+	/**
+	 * The status the engine reads, for the status as stored.
+	 *
+	 * @param string $status Stored status.
+	 */
+	public function status_out( string $status ): string;
+
+	/**
+	 * May the look run now? Return false to skip it (apps: the server is not ready, or the clock of the wait has not started and the
+	 * feature starts it itself).
+	 *
+	 * @param Resource $r Resource.
+	 */
+	public function before_look( Resource $r ): bool;
+
+	/**
+	 * Does the feature want this customer email? Apps send none while the first wait for the name runs.
+	 *
+	 * @param string   $event reminder, lost, back or timeout.
+	 * @param Resource $r     Resource.
+	 */
+	public function mails( string $event, Resource $r ): bool;
 
 	/** Is the resource one of this feature's? */
 	public function owns( Resource $r ): bool;

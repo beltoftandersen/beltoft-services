@@ -53,7 +53,27 @@ final class DnsWatchFakeFeature implements DnsWatchFeature {
 		return 'beltoft_services_test_fake_' . $job;
 	}
 
-	public function shows_status(): bool {
+	public function shows_status( Resource $r ): bool {
+		return true;
+	}
+
+	public function rows( Resource $r ): array {
+		return (array) $r->get( 'fk_records' );
+	}
+
+	public function status_in( string $status ): string {
+		return $status;
+	}
+
+	public function status_out( string $status ): string {
+		return $status;
+	}
+
+	public function before_look( Resource $r ): bool {
+		return true;
+	}
+
+	public function mails( string $event, Resource $r ): bool {
 		return true;
 	}
 

@@ -141,6 +141,16 @@ final class DnsWatch {
 	}
 
 	/**
+	 * The status of a resource as the engine reads it: waiting, ok or timeout (a feature may store ok under another word).
+	 *
+	 * @param DnsWatchFeature $f Feature.
+	 * @param Resource        $r Resource.
+	 */
+	public static function status( DnsWatchFeature $f, Resource $r ): string {
+		return $f->status_out( (string) $r->get( $f->prefix() ) );
+	}
+
+	/**
 	 * Tells the feature and the observers what happened.
 	 *
 	 * @param DnsWatchFeature      $f     Feature.
@@ -222,13 +232,14 @@ final class DnsWatch {
 	 * One bounded read of public DNS for one service: each record that is not ok yet is looked up, the result is stored under the
 	 * resource lock after the resource was read again, and the next read is queued.
 	 *
-	 * @param DnsWatchFeature $f  Feature.
-	 * @param int             $id Resource id.
+	 * @param DnsWatchFeature $f      Feature.
+	 * @param int             $id     Resource id.
+	 * @param bool            $manual The customer pressed Check now: the least gap between two reads does not apply (the feature keeps its own limits).
 	 */
-	public static function run( DnsWatchFeature $f, int $id ): void {
+	public static function run( DnsWatchFeature $f, int $id, bool $manual = false ): void {
 		$r = Resource::find( $id );
 
-		if ( ! $r || ! $r->is_live() || ! self::waiting( $f, $r ) ) {
+		if ( ! $r || ! $r->is_live() || ! self::waiting( $f, $r ) || ! $f->before_look( $r ) ) {
 			return;
 		}
 
@@ -236,7 +247,7 @@ final class DnsWatch {
 		$now     = time();
 		$checked = (int) $r->get( $p . '_checked' );
 
-		if ( $checked > 0 && $now - $checked < self::MIN_GAP ) {
+		if ( ! $manual && $checked > 0 && $now - $checked < self::MIN_GAP ) {
 			DnsWatchJobs::look( $f, $id, self::MIN_GAP - ( $now - $checked ) );
 			return;
 		}
@@ -253,7 +264,7 @@ final class DnsWatch {
 		}
 
 		$domain = $f->domain( $r );
-		$rows   = (array) $r->get( $f->rows_key() );
+		$rows   = $f->rows( $r );
 		$user   = $f->zone_user( $r );
 		$ours   = $f->on_our_servers( $r );
 
@@ -288,7 +299,7 @@ final class DnsWatch {
 		$meta = array( $f->rows_key() => $rows, $p . '_checked' => $now, $f->mode_key() => $ours ? 'ours' : 'external' );
 
 		if ( $done ) {
-			$meta[ $p ] = 'ok';
+			$meta[ $p ] = $f->status_in( 'ok' );
 		}
 
 		if ( self::store( $f, $id, $meta, $done ? null : DnsWatchSettings::look_seconds( $f->id() ) ) ) {
@@ -322,7 +333,7 @@ final class DnsWatch {
 		$step   = 0;
 		$spread = DnsWatchSettings::recheck_spread( $f->id() );
 
-		foreach ( Resource::find_by_meta( $f->kind(), $f->prefix(), 'ok' ) as $id ) {
+		foreach ( Resource::find_by_meta( $f->kind(), $f->prefix(), $f->status_in( 'ok' ) ) as $id ) {
 			Jobs::schedule_once( time() + min( $step * 4, $spread ), $f->hook( 'recheck' ), array( (int) $id ) );
 			++$step;
 		}
@@ -379,7 +390,7 @@ final class DnsWatch {
 		}
 
 		$p      = $f->prefix();
-		$status = (string) $r->get( $p );
+		$status = self::status( $f, $r );
 
 		if ( 'ok' !== $status && 'timeout' !== $status ) {
 			return;
@@ -393,7 +404,7 @@ final class DnsWatch {
 		}
 
 		$domain = $f->domain( $r );
-		$rows   = (array) $r->get( $f->rows_key() );
+		$rows   = $f->rows( $r );
 		$user   = $f->zone_user( $r );
 
 		if ( '' === $domain || array() === $rows ) {
@@ -452,7 +463,7 @@ final class DnsWatch {
 		$gone = array_values( array_intersect( $f->needed(), $before, array_diff( $f->needed(), DnsWatchState::keys_ok( $rows ) ) ) );
 
 		// The service was ours when it was set up and is not on our servers any more: the stored mode follows the live one.
-		$left = ! $ours && 'external' !== $stored;
+		$left = ! $ours && 'ours' === $stored;
 
 		if ( $left ) {
 			$meta[ $f->mode_key() ] = 'external';
@@ -482,10 +493,10 @@ final class DnsWatch {
 		}
 
 		$stored_ok = $r->locked(
-			static function () use ( $f, $id, $meta, $p ): bool {
+			static function () use ( $f, $id, $meta ): bool {
 				$fresh = Resource::find( $id );
 
-				return $fresh && 'ok' === (string) $fresh->get( $p ) && $fresh->set( $meta );
+				return $fresh && 'ok' === self::status( $f, $fresh ) && $fresh->set( $meta );
 			}
 		);
 
@@ -522,7 +533,7 @@ final class DnsWatch {
 		$p  = $f->prefix();
 
 		if ( $found ) {
-			$meta[ $p ] = 'ok';
+			$meta[ $p ] = $f->status_in( 'ok' );
 		}
 
 		$stored = $r->locked(
@@ -585,7 +596,7 @@ final class DnsWatch {
 		$user   = $f->zone_user( $r );
 		$ours   = $f->on_our_servers( $r );
 		$keys   = DnsWatchState::lost_keys( $f, $r );
-		$rows   = (array) $r->get( $f->rows_key() );
+		$rows   = $f->rows( $r );
 
 		foreach ( $rows as $i => $row ) {
 			if ( ! is_array( $row ) || ! in_array( (string) ( $row['key'] ?? '' ), $keys, true ) || 'ok' === ( $row['status'] ?? '' ) ) {
@@ -614,7 +625,7 @@ final class DnsWatch {
 
 		if ( array() === $still || self::complete( $f, $rows ) ) {
 			// It is back: nobody was told, nobody needs to be.
-			$meta = array_merge( $clear, array( $f->rows_key() => $rows, $p => 'ok', $p . '_lost_keys' => array(), $p . '_checked' => time() ) );
+			$meta = array_merge( $clear, array( $f->rows_key() => $rows, $p => $f->status_in( 'ok' ), $p . '_lost_keys' => array(), $p . '_checked' => time() ) );
 
 			if ( self::store( $f, $id, $meta, null ) ) {
 				self::event( $f, 'changed', Resource::find( $id ) ?? $r );
@@ -719,7 +730,7 @@ final class DnsWatch {
 		$r = Resource::find( $id );
 		$p = $f->prefix();
 
-		if ( ! $r || 'ok' !== (string) $r->get( $p ) ) {
+		if ( ! $r || 'ok' !== self::status( $f, $r ) ) {
 			return;
 		}
 
@@ -739,7 +750,7 @@ final class DnsWatch {
 		}
 
 		$cleared = $r->locked(
-			static function () use ( $id, $marks, $told, $p ): bool {
+			static function () use ( $f, $id, $marks, $told, $p ): bool {
 				$fresh = Resource::find( $id );
 				$meta  = array();
 
@@ -752,7 +763,7 @@ final class DnsWatch {
 					$meta[ $p . '_last_mail' ] = time();
 				}
 
-				return $fresh && 'ok' === (string) $fresh->get( $p ) && $fresh->set( $meta );
+				return $fresh && 'ok' === self::status( $f, $fresh ) && $fresh->set( $meta );
 			}
 		);
 
@@ -808,7 +819,7 @@ final class DnsWatch {
 		$p    = $f->prefix();
 		$rows = array();
 
-		foreach ( (array) $r->get( $f->rows_key() ) as $row ) {
+		foreach ( $f->rows( $r ) as $row ) {
 			if ( is_array( $row ) ) {
 				$row['status'] = 'missing';
 				$row['reason'] = '';

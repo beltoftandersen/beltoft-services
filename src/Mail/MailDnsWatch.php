@@ -59,7 +59,33 @@ final class MailDnsWatch implements DnsWatchFeature {
 		)[ $job ] ?? 'beltoft_services_dns_watch_' . $job . '_' . self::ID;
 	}
 
-	public function shows_status(): bool {
+	public function shows_status( Resource $r ): bool {
+		unset( $r );
+
+		return true;
+	}
+
+	public function rows( Resource $r ): array {
+		return (array) $r->get( $this->rows_key() );
+	}
+
+	public function status_in( string $status ): string {
+		return $status;
+	}
+
+	public function status_out( string $status ): string {
+		return $status;
+	}
+
+	public function before_look( Resource $r ): bool {
+		unset( $r );
+
+		return true;
+	}
+
+	public function mails( string $event, Resource $r ): bool {
+		unset( $event, $r );
+
 		return true;
 	}
 
