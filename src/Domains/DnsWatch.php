@@ -494,7 +494,7 @@ final class DnsWatch {
 			$rows[ $i ] = $read;
 		}
 
-		DnsWatchHealth::note( $f, $tally['bad'], $tally['total'] );
+		DnsWatchHealth::note( $f, $domain, $tally['bad'], $tally['total'] );
 
 		$lost = ! self::complete( $f, $rows );
 

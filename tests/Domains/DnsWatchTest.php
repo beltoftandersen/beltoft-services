@@ -25,6 +25,9 @@ final class DnsWatchTest extends TestCase {
 
 	private DnsWatchFakeFeature $feature;
 
+	/** @var array<int, string>|\WP_Error What the health probe name (beltoft.net) answers. */
+	private $probe = array( '192.0.2.1' );
+
 	public function set_up(): void {
 		parent::set_up();
 
@@ -34,6 +37,8 @@ final class DnsWatchTest extends TestCase {
 		$this->mails                  = array();
 		$this->observed               = array();
 		$this->feature                = new DnsWatchFakeFeature();
+		$this->probe                  = array( '192.0.2.1' );
+		add_filter( 'beltoft_services_dns_resolve', fn( $pre, $name ) => 'beltoft.net' === $name ? $this->probe : $pre, 10, 2 );
 
 		add_filter( 'beltoft_services_dns_watches', fn( $f ) => $f + array( 'fake' => $this->feature ) );
 		add_filter(
@@ -457,7 +462,8 @@ final class DnsWatchTest extends TestCase {
 
 	public function test_a_sweep_in_which_most_lookups_fail_starts_no_loss_and_alerts_once_a_day(): void {
 		\BeltoftServices\Domains\DnsWatchHealth::reset( $this->feature );
-		\BeltoftServices\Domains\DnsWatchHealth::note( $this->feature, 9, 10 );
+		$this->probe = new \WP_Error( 'dns_transport', 'down' );
+		$this->note_domains( 9, 1 );
 		$this->assertTrue( \BeltoftServices\Domains\DnsWatchHealth::tripped( $this->feature ) );
 
 		$r = $this->service( 'ok' );
@@ -478,10 +484,13 @@ final class DnsWatchTest extends TestCase {
 	}
 
 	public function test_the_sweep_percent_and_the_retries_are_settings(): void {
-		$this->settings( array( 'dns_watch_sweep_fail_percent' => 80 ) );
+		$this->settings( array( 'dns_watch_sweep_fail_percent' => 80, 'dns_watch_health_probe_name' => '', 'dns_watch_health_min_domains' => 3 ) );
 		\BeltoftServices\Domains\DnsWatchHealth::reset( $this->feature );
-		\BeltoftServices\Domains\DnsWatchHealth::note( $this->feature, 3, 4 );
+		$this->note_domains( 3, 1 );
 		$this->assertFalse( \BeltoftServices\Domains\DnsWatchHealth::tripped( $this->feature ), '75 percent is under 80.' );
+		\BeltoftServices\Domains\DnsWatchHealth::reset( $this->feature );
+		$this->note_domains( 2, 0 );
+		$this->assertFalse( \BeltoftServices\Domains\DnsWatchHealth::tripped( $this->feature ), 'Two failing domains are under the minimum of 3, even though all failed.' );
 		$this->assertSame( 6, DnsWatchSettings::unknown_retries() );
 		$this->assertSame( 80, DnsWatchSettings::sweep_fail_percent() );
 	}
@@ -515,5 +524,50 @@ final class DnsWatchTest extends TestCase {
 		}
 
 		$this->assertCount( 2, $this->failing_subjects(), 'The second outage alerts again.' );
+	}
+
+	/** Notes lookups of distinct domains: $bad failing ones, $good healthy ones. */
+	private function note_domains( int $bad, int $good, string $tag = 'd' ): void {
+		for ( $i = 0; $i < $bad; $i++ ) {
+			\BeltoftServices\Domains\DnsWatchHealth::note( $this->feature, "bad{$i}.{$tag}.example", 1, 1 );
+		}
+		for ( $i = 0; $i < $good; $i++ ) {
+			\BeltoftServices\Domains\DnsWatchHealth::note( $this->feature, "good{$i}.{$tag}.example", 0, 1 );
+		}
+	}
+
+	public function test_a_few_broken_customer_domains_do_not_hide_a_real_loss(): void {
+		\BeltoftServices\Domains\DnsWatchHealth::reset( $this->feature );
+		// Two domains whose own name servers fail, counted by distinct domain, in a small sweep: two thirds of the domains fail.
+		$this->note_domains( 2, 0 );
+		$real = $this->service( 'ok' );
+		DnsWatchFakeFeature::$present = array( 'a', 'c' );
+		DnsWatch::recheck( $this->feature, $real->id() );
+		$real = $this->fresh( $real );
+
+		$this->assertFalse( \BeltoftServices\Domains\DnsWatchHealth::tripped( $this->feature ), 'The probe name resolves: the resolver is fine.' );
+		$this->assertSame( 'waiting', $real->get( 'fk_dns' ), 'The real loss is stored.' );
+		$this->assertGreaterThan( 0, (int) $real->get( 'fk_dns_lost_pending' ) );
+		$this->assertSame( array(), array_filter( $this->subjects(), static fn( $s ) => str_contains( $s, 'lookups failing' ) ), 'No false alert.' );
+	}
+
+	public function test_the_resolver_counts_as_down_only_when_the_probe_name_fails_too(): void {
+		\BeltoftServices\Domains\DnsWatchHealth::reset( $this->feature );
+		$this->note_domains( 1, 0 );
+		$this->assertFalse( \BeltoftServices\Domains\DnsWatchHealth::tripped( $this->feature ) );
+
+		\BeltoftServices\Domains\DnsWatchHealth::reset( $this->feature );
+		$this->probe = new \WP_Error( 'dns_transport', 'down' );
+		$this->note_domains( 1, 0 );
+		$this->assertTrue( \BeltoftServices\Domains\DnsWatchHealth::tripped( $this->feature ) );
+
+		// The same domain counted twice is one domain.
+		\BeltoftServices\Domains\DnsWatchHealth::reset( $this->feature );
+		$this->settings( array( 'dns_watch_health_probe_name' => '', 'dns_watch_health_min_domains' => 2, 'dns_watch_sweep_fail_percent' => 10 ) );
+		\BeltoftServices\Domains\DnsWatchHealth::note( $this->feature, 'one.example', 1, 3 );
+		\BeltoftServices\Domains\DnsWatchHealth::note( $this->feature, 'one.example', 1, 3 );
+		$this->assertFalse( \BeltoftServices\Domains\DnsWatchHealth::tripped( $this->feature ) );
+		$this->assertSame( array( 1, 1 ), array_slice( \BeltoftServices\Domains\DnsWatchHealth::counts( $this->feature ), 0, 2 ) );
+		$this->assertSame( '', DnsWatchSettings::health_probe_name() );
 	}
 }

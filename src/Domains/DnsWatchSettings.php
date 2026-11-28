@@ -194,6 +194,18 @@ final class DnsWatchSettings {
 		return min( 100, max( 1, (int) self::get( 'sweep_fail_percent', $feature ) ) );
 	}
 
+	/** A name that always resolves; the resolver is called down only when it does not resolve either. '' turns the probe off. */
+	public static function health_probe_name( string $feature = '' ): string {
+		$name = strtolower( trim( (string) self::get( 'health_probe_name', $feature ) ) );
+
+		return 1 === preg_match( '/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/', $name ) ? $name : '';
+	}
+
+	/** Fewest distinct failing domains in a sweep before the share of failures counts (only without a probe name). */
+	public static function health_min_domains( string $feature = '' ): int {
+		return max( 1, (int) self::get( 'health_min_domains', $feature ) );
+	}
+
 	/** Seconds between two reads of public DNS while the records are awaited. */
 	public static function look_seconds( string $feature = '' ): int {
 		return max( 5, (int) self::get( 'look_minutes', $feature ) ) * MINUTE_IN_SECONDS;
@@ -245,13 +257,26 @@ final class DnsWatchSettings {
 			'label'   => __( 'Times a lost record is looked at again when the lookup itself fails', 'beltoft-services' ),
 			'desc'    => __( 'A lookup that fails (no answer from the resolver) never confirms a loss and sends no email. The record is looked at again after the confirm minutes; after this many failed tries you get one alert and the loss stays unconfirmed.', 'beltoft-services' ),
 		);
+		$fields['dns_watch_health_probe_name'] = $w + array(
+			'type'    => 'text',
+			'default' => 'beltoft.net',
+			'label'   => __( 'A domain name that always resolves, to tell a broken resolver from broken customer DNS', 'beltoft-services' ),
+			'desc'    => __( 'When a lookup of a customer domain fails and a loss would start, this name is looked up once. Only if it fails too is the resolver down: then no service is marked as losing records and you get one alert a day. A customer whose own name servers fail never stops the watch of other customers. Empty uses the percent and the number of domains below instead.', 'beltoft-services' ),
+		);
 		$fields['dns_watch_sweep_fail_percent'] = $w + array(
 			'type'    => 'number',
 			'default' => 50,
 			'min'     => 1,
 			'max'     => 100,
-			'label'   => __( 'Percent of failed lookups in one daily sweep that stops it from starting any loss', 'beltoft-services' ),
-			'desc'    => __( 'When more than this share of the lookups of a sweep fail, the resolver is the problem: no service is marked as losing records in that sweep, and you get one alert a day.', 'beltoft-services' ),
+			'label'   => __( 'Percent of failing domains in one daily sweep that stops it from starting any loss (only with no name above)', 'beltoft-services' ),
+			'desc'    => __( 'Used only when the name above is empty. When more than this share of the domains of a sweep fail, and at least the number below, the resolver is the problem: no service is marked as losing records in that sweep, and you get one alert a day.', 'beltoft-services' ),
+		);
+		$fields['dns_watch_health_min_domains'] = $w + array(
+			'type'    => 'number',
+			'default' => 5,
+			'min'     => 1,
+			'max'     => 1000,
+			'label'   => __( 'Fewest failing domains before the percent above counts (only with no name above)', 'beltoft-services' ),
 		);
 		$fields['dns_watch_first_remind_hours'] = $w + array(
 			'type'    => 'number',
