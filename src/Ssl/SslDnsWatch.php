@@ -39,6 +39,9 @@ final class SslDnsWatch implements DnsWatchFeature {
 
 	public const ID = 'ssl';
 
+	/** The prefix of the watch's meta. */
+	public const PREFIX = 'ssl_dns';
+
 	/** Stored status values of the engine, kept as they are. */
 	private const DEAD = array( 'FAI', 'REJ', 'EXP' );
 
@@ -80,7 +83,7 @@ final class SslDnsWatch implements DnsWatchFeature {
 	}
 
 	public function prefix(): string {
-		return 'ssl_dns';
+		return self::PREFIX;
 	}
 
 	public function rows_key(): string {
@@ -477,16 +480,16 @@ final class SslDnsWatch implements DnsWatchFeature {
 			$look = ! $issued;
 		} elseif ( $sig !== $known ) {
 			// New records to find: the wait starts again, as for a new order.
-			$meta = array(
-				'ssl_dns'              => 'waiting',
-				'ssl_dns_since'        => $now,
-				'ssl_dns_checked'      => null,
-				'ssl_dns_reminded'     => 0,
-				'ssl_dns_rows'         => array(),
-				'ssl_dns_lost_pending' => 0,
-				'ssl_dns_lost_keys'    => array(),
-				'ssl_dns_lost_at'      => 0,
-				'ssl_dns_lost_mails'   => 0,
+			// Every mark of the old records goes (the engine's one list), so no loss, alert or mail mark of them survives.
+			$meta = array_merge(
+				array_fill_keys( DnsWatch::reset_marks( self::PREFIX ), 0 ),
+				array(
+					'ssl_dns'           => 'waiting',
+					'ssl_dns_since'     => $now,
+					'ssl_dns_checked'   => null,
+					'ssl_dns_rows'      => array(),
+					'ssl_dns_lost_keys' => array(),
+				)
 			);
 			$look = true;
 		} elseif ( 'waiting' === $status && $issued && 0 === (int) $r->get( 'ssl_dns_lost_pending' ) && 0 === (int) $r->get( 'ssl_dns_lost_at' ) ) {

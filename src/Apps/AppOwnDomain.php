@@ -131,54 +131,43 @@ final class AppOwnDomain {
 
 	/** The meta of a name that starts its wait, and of a reinstall that asks for one again. */
 	public static function fresh_wait( string $name ): array {
-		return array(
-			'app_domain_own'         => $name,
-			'app_domain_dns'         => 'waiting',
-			'app_domain_dns_since'   => null,
-			'app_domain_dns_checked' => null,
-			'app_domain_dns_reason'  => null,
-			'app_domain_dns_seen'    => null,
-			'app_domain_dns_mailed'  => null,
-			'app_domain_dns_rows'    => null,
-			'app_domain_dns_mode'    => null,
-			'app_domain_dns_rechecked' => null,
-			'app_domain_dns_reminded' => null,
-			'app_domain_dns_lost_at' => null,
-			'app_domain_dns_lost_keys' => null,
-			'app_domain_dns_lost_mails' => null,
-			'app_domain_dns_lost_pending' => null,
-			'app_domain_dns_last_mail' => null,
-			'app_domain_dns_back_at' => null,
-			'app_domain_dns_timeout_mailed' => null,
-			'app_domain_dns_admin_alerted' => null,
-			'app_domain_dns_moved'   => null,
+		return array_merge(
+			array(
+				'app_domain_own'         => $name,
+				'app_domain_dns'         => 'waiting',
+				'app_domain_dns_since'   => null,
+				'app_domain_dns_checked' => null,
+				'app_domain_dns_reason'  => null,
+				'app_domain_dns_seen'    => null,
+				'app_domain_dns_mailed'  => null,
+				'app_domain_dns_rows'    => null,
+				'app_domain_dns_mode'    => null,
+			),
+			self::watch_marks()
 		);
 	}
 
 	/** The meta that forgets an own domain (another choice at reinstall). */
 	public static function cleared(): array {
-		return array(
-			'app_domain_own'         => null,
-			'app_domain_dns'         => null,
-			'app_domain_dns_since'   => null,
-			'app_domain_dns_checked' => null,
-			'app_domain_dns_reason'  => null,
-			'app_domain_dns_seen'    => null,
-			'app_domain_dns_mailed'  => null,
-			'app_domain_dns_rows'    => null,
-			'app_domain_dns_mode'    => null,
-			'app_domain_dns_rechecked' => null,
-			'app_domain_dns_reminded' => null,
-			'app_domain_dns_lost_at' => null,
-			'app_domain_dns_lost_keys' => null,
-			'app_domain_dns_lost_mails' => null,
-			'app_domain_dns_lost_pending' => null,
-			'app_domain_dns_last_mail' => null,
-			'app_domain_dns_back_at' => null,
-			'app_domain_dns_timeout_mailed' => null,
-			'app_domain_dns_admin_alerted' => null,
-			'app_domain_dns_moved'   => null,
+		return array_merge(
+			array(
+				'app_domain_own'         => null,
+				'app_domain_dns'         => null,
+				'app_domain_dns_since'   => null,
+				'app_domain_dns_checked' => null,
+				'app_domain_dns_reason'  => null,
+				'app_domain_dns_seen'    => null,
+				'app_domain_dns_mailed'  => null,
+				'app_domain_dns_rows'    => null,
+				'app_domain_dns_mode'    => null,
+			),
+			self::watch_marks()
 		);
+	}
+
+	/** Every mark of the shared watch, nulled: the one list of the engine (DnsWatch::reset_marks). */
+	private static function watch_marks(): array {
+		return array_fill_keys( DnsWatch::reset_marks( AppDnsWatch::PREFIX ), null );
 	}
 
 	/** The server's address the name must point at, '' while it has none. */

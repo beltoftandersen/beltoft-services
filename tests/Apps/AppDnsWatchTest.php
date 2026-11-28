@@ -510,4 +510,21 @@ final class AppDnsWatchTest extends MonitoringTestCase {
 			$this->assertSame( 'waiting' === $status ? DnsWatchState::LOST : DnsWatchState::STOPPED, DnsWatchState::of( $this->f(), $fresh ), 'The warning stays on the page.' );
 		}
 	}
+
+	public function test_every_reset_of_the_watch_clears_the_same_marks(): void {
+		$marks = DnsWatch::reset_marks( 'app_domain_dns' );
+		$this->assertContains( 'app_domain_dns_unknown_tries', $marks );
+		$this->assertContains( 'app_domain_dns_unknown_alerted', $marks );
+		$this->assertContains( 'app_domain_dns_lost_pending', $marks );
+
+		foreach ( array( AppOwnDomain::fresh_wait( self::NAME ), AppOwnDomain::cleared() ) as $meta ) {
+			foreach ( $marks as $key ) {
+				$this->assertArrayHasKey( $key, $meta, $key );
+				$this->assertNull( $meta[ $key ], $key );
+			}
+		}
+
+		// What a loss that is found again clears is a part of the same list.
+		$this->assertSame( array(), array_diff( DnsWatch::loss_marks( 'app_domain_dns' ), $marks ) );
+	}
 }

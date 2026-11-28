@@ -33,8 +33,35 @@ final class DnsWatch {
 	/** The least gap between two reads, whatever calls the job. */
 	public const MIN_GAP = 300;
 
+	/** The marks of a loss (suffixes of the feature's prefix): cleared when the records are found again. */
+	public const LOSS_MARKS = array( 'lost_at', 'lost_keys', 'lost_mails', 'lost_pending', 'moved', 'timeout_mailed', 'admin_alerted', 'unknown_tries', 'unknown_alerted' );
+
+	/** The marks that a reset of the whole watch clears besides the loss marks (a new wait, a new request, another name). */
+	public const MORE_MARKS = array( 'last_mail', 'back_at', 'reminded', 'rechecked' );
+
 	/** The action the engine fires on every event, for observers: ( $event, $feature_id, Resource, $ctx ). */
 	public const EVENT = 'beltoft_services_dns_watch_event';
+
+	/**
+	 * The full meta keys of a loss, for a feature's prefix.
+	 *
+	 * @param string $prefix Feature prefix.
+	 * @return string[]
+	 */
+	public static function loss_marks( string $prefix ): array {
+		return array_map( static fn( string $m ): string => $prefix . '_' . $m, self::LOSS_MARKS );
+	}
+
+	/**
+	 * Every mark a reset must clear: the loss marks, the mail marks and the guard of the daily look. The one list every reset uses
+	 * (a new wait, a new request, a name that is given up); set each to null, or to 0 (an empty list for `_lost_keys`).
+	 *
+	 * @param string $prefix Feature prefix.
+	 * @return string[]
+	 */
+	public static function reset_marks( string $prefix ): array {
+		return array_merge( self::loss_marks( $prefix ), array_map( static fn( string $m ): string => $prefix . '_' . $m, self::MORE_MARKS ) );
+	}
 
 	/**
 	 * Hooks the whole watch once: settings, words, emails, jobs. Called after every feature has registered its object.
@@ -830,7 +857,7 @@ final class DnsWatch {
 		// Told that records were lost, and no found mail went out inside the gap: a flapping record gets one found mail.
 		$gap   = DnsWatchSettings::mail_gap( $f->id() );
 		$told  = (int) $r->get( $p . '_lost_at' ) > 0 && (int) $r->get( $p . '_lost_mails' ) > 0 && ! ( $gap > 0 && time() < (int) $r->get( $p . '_back_at' ) + $gap );
-		$marks = array( $p . '_lost_at', $p . '_lost_keys', $p . '_lost_mails', $p . '_lost_pending', $p . '_moved', $p . '_timeout_mailed', $p . '_admin_alerted', $p . '_unknown_tries', $p . '_unknown_alerted' );
+		$marks = self::loss_marks( $p );
 		$set   = false;
 
 		foreach ( $marks as $mark ) {

@@ -200,6 +200,26 @@ final class SslDnsWatchTest extends SslTestCase {
 		$this->assertNotSame( $sig, $fresh->get( 'ssl_dns_sig' ) );
 	}
 
+	public function test_new_rows_clear_every_mark_of_the_old_ones(): void {
+		$r = $this->waiting();
+		$marks = array( '_lost_at', '_lost_pending', '_lost_mails', '_moved', '_timeout_mailed', '_admin_alerted', '_unknown_tries', '_unknown_alerted', '_last_mail', '_back_at', '_reminded', '_rechecked' );
+		$set   = array();
+		foreach ( $marks as $mark ) {
+			$set[ 'ssl_dns' . $mark ] = time() - 100;
+		}
+		$set['ssl_dns_lost_keys'] = array( 'cname' );
+		$this->assertTrue( $this->fresh( $r )->set( $set ) );
+
+		$this->assertTrue( $this->fresh( $r )->set( array( 'ssl_validation_rows' => array( array( 'type' => 'CNAME', 'name' => '_new.example.com', 'value' => 'new.validation.example', 'status' => 'manual' ) ) ) ) );
+		SslDnsWatch::sync( $this->fresh( $r ) );
+		$fresh = $this->fresh( $r );
+
+		foreach ( $marks as $mark ) {
+			$this->assertSame( 0, (int) $fresh->get( 'ssl_dns' . $mark ), $mark );
+		}
+		$this->assertSame( array(), $fresh->get( 'ssl_dns_lost_keys' ) );
+	}
+
 	// -- The standing look after the certificate is issued -----------------------------------------------
 
 	public function test_an_issued_order_with_no_record_of_ours_yet_starts_as_found(): void {

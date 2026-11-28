@@ -30,6 +30,9 @@ final class AppDnsWatch implements DnsWatchFeature {
 
 	public const ID = 'app';
 
+	/** The prefix of the watch's meta. */
+	public const PREFIX = 'app_domain_dns';
+
 	public function id(): string {
 		return self::ID;
 	}
@@ -47,7 +50,7 @@ final class AppDnsWatch implements DnsWatchFeature {
 	}
 
 	public function prefix(): string {
-		return 'app_domain_dns';
+		return self::PREFIX;
 	}
 
 	public function rows_key(): string {
