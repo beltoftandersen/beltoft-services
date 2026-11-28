@@ -429,7 +429,7 @@ final class Operations {
 		if ( ! $pending && 'REQ' === $status && '' !== trim( (string) $r->get( 'ssl_cert' ) ) ) {
 			if ( ! $r->get( 'ssl_authority_reissue_at' ) ) {
 				$r->set( array( 'ssl_authority_reissue_at' => time() ) );
-				Alerts::ssl_reissue_waits( $r, (string) ( $r->get( 'ssl_name' ) ?: $r->get( 'ssl_domain' ) ) );
+				SslAlerts::reissue_waits( $r, (string) ( $r->get( 'ssl_name' ) ?: $r->get( 'ssl_domain' ) ) );
 			}
 
 			Jobs::queue_act( $r->id(), 'refresh', array(), 3600 );

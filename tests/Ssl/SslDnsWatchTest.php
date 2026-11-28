@@ -415,6 +415,18 @@ final class SslDnsWatchTest extends SslTestCase {
 		remove_all_filters( 'beltoft_services_ssl_fake_reissue_waits' );
 	}
 
+	public function test_the_core_alerts_name_no_certificate_and_the_ssl_folder_owns_the_reissue_alert(): void {
+		$this->assertDoesNotMatchRegularExpression( '/ssl|certificate/i', (string) file_get_contents( dirname( __DIR__, 2 ) . '/src/Alerts.php' ), 'Rule 1: the core never names a feature.' );
+		$this->assertFalse( method_exists( \BeltoftServices\Alerts::class, 'ssl_reissue_waits' ) );
+
+		$r = $this->built();
+		$this->mails = array();
+		$this->assertTrue( \BeltoftServices\Ssl\SslAlerts::reissue_waits( $r, 'example.com' ) );
+		$this->assertFalse( \BeltoftServices\Ssl\SslAlerts::reissue_waits( $r, 'example.com' ), 'Once per order.' );
+		$this->assertCount( 1, $this->staff_subjects() );
+		$this->assertStringEndsWith( 'SSL renewal waits for validation: example.com', $this->staff_subjects()[0] );
+	}
+
 	public function test_a_certificate_for_several_names_is_found_only_when_every_record_is(): void {
 		$r = $this->waiting();
 		$this->assertTrue( $r->set( array( 'ssl_validation_rows' => array(
