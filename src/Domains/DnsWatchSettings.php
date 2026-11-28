@@ -198,7 +198,7 @@ final class DnsWatchSettings {
 	public static function health_probe_name( string $feature = '' ): string {
 		$name = strtolower( trim( (string) self::get( 'health_probe_name', $feature ) ) );
 
-		return 1 === preg_match( '/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/', $name ) ? $name : '';
+		return 1 === preg_match( '/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/D', $name ) ? $name : '';
 	}
 
 	/** Fewest distinct failing domains in a sweep before the share of failures counts (only without a probe name). */
